@@ -31,7 +31,7 @@ These formulations dynamically infer the molecular viscosity directly from the R
 The codebase leverages a rigid separation of concerns:
 *   `src/config.jl`: Implements a JSON parsing engine establishing base default configs, nested parsing, deep-merging capabilities, and strict typing routines.
 *   `src/geometry_mesh.jl`: Constructs and labels `Gridap` discrete Cartesian box models.
-*   `src/formulation.jl`: Directly translates the abstract mathematical ASGS theory into the code. Gridap's non-linear `FEOperator` is powered by automatic differentiation (AD) algorithms directly deducing the Jacobian matrix from the defined non-linear momentum/mass residuals spanning convection and resistance terms. 
+*   `src/formulation.jl`: Directly translates the abstract mathematical ASGS theory into the code. The non-linear `FEOperator` bypasses automatic differentiation (AD) limitations by implementing an exact analytical Picard/Newton Jacobian, ensuring optimal non-linear convergence and robust evaluation of momentum, mass, and stabilization residuals. 
 *   `src/run_simulation.jl`: Handles high-level pipeline orchestration. Links configuration, FEM spaces, boundaries, and executes the Newton-Raphson non-linear solver. 
 *   `src/io.jl`: Automates the serialization to high-fidelity VTU datasets compatible with ParaView visualizations.
 
@@ -40,7 +40,15 @@ The codebase leverages a rigid separation of concerns:
 Both major validation scenarios from the literature are explicitly implemented:
 
 ### 1. Manufactured Solutions (`tests/ManufacturedSolutions/`)
-Executes an artificially constructed vector/pressure profile perfectly satisfying the local governing continuity restrictions. Operates across successively refined mesh levels ($10\dots 40$) and strictly validates convergence behaviors reporting $L^2$ and $H^1$ errors locally evaluated against dynamic asymptotic optimality formulas ($O(h^{k+1})$). Python Matplotlib endpoints visualize the $L^2$/$H^1$ convergence slopes cleanly.
+Executes an artificially constructed vector/pressure profile perfectly satisfying local governing continuity restrictions. Operates across successively refined mesh levels ($10\dots 40$) and strictly validates convergence behaviors. 
+
+**Recent Validation**: The stabilizing ASGS formulation achieves theoretically optimal scaling ($O(h^{k+1})$ for velocity $L^2$ and $O(h^k)$ for pressure $L^2$ on equal-order spaces) even under a highly non-linear spatially-varying porosity field $\alpha(x)$. This is achieved by strictly balancing the convective operators and preserving the complete viscous stress divergence $\nu (\nabla u + \nabla u^T) \cdot \nabla \alpha$ within the strong discrete residual $\mathcal{R}_u(U_h)$.
+
+Python Matplotlib endpoints visualize the $L^2$/$H^1$ convergence slopes cleanly:
+
+<p align="center">
+  <img src="tests/ManufacturedSolutions/results/convergence.png" alt="MMS Convergence Plot" width="600"/>
+</p>
 
 ### 2. Cocquet Experiment (`tests/CocquetExperiment/`)
 Configured to validate Section 4.2 of the benchmark error analysis established by Cocquet et al. Simulates a heterogeneous structural transition driving flow through a "free space" ($\alpha = 1$) into an active DBF internal porous matrix ($\alpha \ll 1$), properly capturing rapid interfacial non-linear shear deterioration and macroscopic flow diversion without analytical boundary instabilities.
@@ -58,3 +66,27 @@ python3 tests/ManufacturedSolutions/plot_results.py
 julia --project=. tests/CocquetExperiment/run_test.jl
 python3 tests/CocquetExperiment/plot_results.py
 ```
+
+## 🤖 Context Base for AI Assistants
+
+This section is explicitly designed to bootstrap AI agents reading this repository, outlining critical architectural nuances and Gridap.jl implementation constraints that define this solver.
+
+### 1. Convective Operator Orientation in Gridap
+The solver builds upon Gridap's tensor operators. In Gridap, the gradient of a vector field `u` returns a Jacobian tensor structured such that the expression for the convective directional derivative $(u \cdot \nabla) u$ maps strictly to:
+```julia
+conv_u = transpose(∇(u)) ⋅ u  # OR  ∇(u)' ⋅ u
+```
+Using `∇(u) ⋅ u` computes $\nabla u \cdot u$ and will break formulation consistency. All manufactured solution forcing derivations (`f_ex`) explicitly respect this mapping.
+
+### 2. Strong Residuals and Viscous Divergence
+In the ASGS stabilization framework, the strong residual $\mathcal{R}_u(U_h)$ drives the stabilization operators $\tau_1$. Although the standard Laplacian $\Delta u_h$ evaluates natively to $0.0$ inside piecewise-linear ($P_1$) elements, the porous Navier-Stokes equations couple velocity gradients with the spatially varying porosity field $\alpha(x)$. 
+Therefore, the **full viscous divergence** must be manually constructed and retained within `R_u` evaluated inside `src/formulation.jl`:
+```julia
+div_visc_u = α * ν * Δ(u) + ν * (∇(u) + transpose(∇(u))) ⋅ ∇(α)
+```
+Omitting the right-hand term $\nu (\nabla u + \nabla u^T) \cdot \nabla \alpha$ breaks consistency and immediately caps pressure $L^2$ convergence below optimal $O(h^k)$ rates.
+
+### 3. Analytical Picard/Newton Jacobian
+Gridap's Automatic Differentiation (AD) struggles with nested `Operation` closures involving highly non-linear scalar coefficients ($\sigma(\alpha, u)$, $\tau_1$, $\tau_2$). To bypass JIT compilation hangs and `MethodError` exceptions during `FEOperator` assembly, this repository manually defines the `weak_form_jacobian` (found in `src/formulation.jl`). 
+- When editing the residual, agents **must exactly mirror** the changes within the Jacobian's $R_{du}$ and $R_{u\_old}$ closures.
+- The scalar fields ($\tau_1$, $\tau_2$, $\sigma$) are effectively "frozen" (Picard-style) with respect to $du$ derivations to ensure unconditional matrix stability, but the vector derivatives $\mathcal{L}^* \cdot \tau_1 \mathcal{R}_u$ are fully expanded via the product rule into $dL_{du}^* \cdot \tau R_{u\_old} + L_u^* \cdot \tau R_{du}$.

@@ -104,7 +104,7 @@ function f_ex(x, config::PorousNSSolver.PorousNSConfig)
     lap_u_val = lap_u_ex(x, config)
     grad_p_val = grad_p_ex(x)
     
-    conv_u_val = grad_u_val ⋅ u_ex_val
+    conv_u_val = transpose(grad_u_val) ⋅ u_ex_val
     div_stress = α_val * ν * lap_u_val + ν * (grad_u_val + transpose(grad_u_val)) ⋅ grad_alpha_val
     
     a_term = PorousNSSolver.a_resistance(α_val, Re, Da)

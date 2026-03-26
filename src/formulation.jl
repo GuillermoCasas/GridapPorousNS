@@ -50,7 +50,8 @@ function weak_form_residual(X, Y, config::PorousNSConfig, dΩ, h, f_custom=nothi
     alpha_eps = Operation(a -> eps_val)(α)
     
     conv_u = ∇(u)' ⋅ u
-    R_u = alpha_conv * conv_u + alpha_conv * ∇(p) + σ * u - f
+    div_visc_u = α * ν * Δ(u) + ν * (∇(u) + transpose(∇(u))) ⋅ ∇(α)
+    R_u = alpha_conv * conv_u + alpha_conv * ∇(p) + σ * u - div_visc_u - f
     
     conv_v = ∇(v)' ⋅ u
     L_u_star_v = alpha_conv * conv_v + alpha_conv * ∇(q)
@@ -111,7 +112,8 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom=n
     alpha_nu2 = Operation(a -> 2.0 * a * ν)(α)
     
     conv_du = ∇(u)' ⋅ du + ∇(du)' ⋅ u
-    R_du = alpha_conv * conv_du + alpha_conv * ∇(dp) + σ * du
+    div_visc_du = α * ν * Δ(du) + ν * (∇(du) + transpose(∇(du))) ⋅ ∇(α)
+    R_du = alpha_conv * conv_du + alpha_conv * ∇(dp) + σ * du - div_visc_du
     
     conv_v = ∇(v)' ⋅ u
     L_u_star_v = alpha_conv * conv_v + alpha_conv * ∇(q)
@@ -126,7 +128,8 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom=n
     res_term_jac  = v ⋅ ( σ * du )
     mass_term_jac = q * (eps_val * dp + alpha_conv * (∇⋅du))
 
-    R_u_old = alpha_conv * (∇(u)' ⋅ u) + alpha_conv * ∇(p) + σ * u - f
+    div_visc_u_old = α * ν * Δ(u) + ν * (∇(u) + transpose(∇(u))) ⋅ ∇(α)
+    R_u_old = alpha_conv * (∇(u)' ⋅ u) + alpha_conv * ∇(p) + σ * u - div_visc_u_old - f
     stab_mom_jac = L_u_star_v ⋅ (τ_1 * R_du) + dL_du_star_v ⋅ (τ_1 * R_u_old)
     stab_mass_jac = (alpha_conv * (∇⋅v)) * (τ_2 * R_dp)
 
