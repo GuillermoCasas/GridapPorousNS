@@ -1,0 +1,52 @@
+using LinearAlgebra
+
+function alpha_exact(x, alpha_0, r1, r2)
+    dx = x[1] - 1.0
+    dy = x[2] - 1.0
+    r = sqrt(dx^2 + dy^2)
+    if r <= r1
+        return alpha_0
+    elseif r >= r2
+        return 1.0
+    else
+        eta = (r^2 - r1^2) / (r2^2 - r1^2)
+        gamma_val = (2.0*eta - 1.0) / (eta * (1.0 - eta))
+        return 1.0 - (1.0 - alpha_0) / (1.0 + exp(gamma_val))
+    end
+end
+
+function grad_alpha_exact(x, alpha_0, r1, r2)
+    dx = x[1] - 1.0
+    dy = x[2] - 1.0
+    r = sqrt(dx^2 + dy^2)
+    if r <= r1 || r >= r2
+        return [0.0, 0.0]
+    else
+        eta = (r^2 - r1^2) / (r2^2 - r1^2)
+        gamma_val = (2.0*eta - 1.0) / (eta * (1.0 - eta))
+        
+        deta_dr = 2.0 * r / (r2^2 - r1^2)
+        dgamma_deta = (2.0*eta^2 - 2.0*eta + 1.0) / (eta^2 * (1.0 - eta)^2)
+        
+        exp_g = exp(gamma_val)
+        dalpha_dgamma = (1.0 - alpha_0) * exp_g / (1.0 + exp_g)^2
+        
+        dalpha_dr = dalpha_dgamma * dgamma_deta * deta_dr
+        
+        return [dalpha_dr * (dx / r), dalpha_dr * (dy / r)]
+    end
+end
+
+# finite diff check
+x_test = [1.2, 1.25]
+eps = 1e-7
+a0 = alpha_exact(x_test, 0.5, 0.2, 0.5)
+ax = alpha_exact(x_test .+ [eps, 0.0], 0.5, 0.2, 0.5)
+ay = alpha_exact(x_test .+ [0.0, eps], 0.5, 0.2, 0.5)
+
+grad_fd = [(ax - a0)/eps, (ay - a0)/eps]
+grad_an = grad_alpha_exact(x_test, 0.5, 0.2, 0.5)
+
+println("FD: ", grad_fd)
+println("AN: ", grad_an)
+println("Diff: ", norm(grad_fd - grad_an))

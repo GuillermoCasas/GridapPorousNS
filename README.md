@@ -1,0 +1,60 @@
+# PorousNSSolver
+
+A modular Finite Element Method (FEM) solver for the stabilized Darcy-Brinkman-Forchheimer (DBF) and Porous Navier-Stokes equations using `Gridap.jl`. This repository implements the **Algebraic Sub-Grid Scale (ASGS)** formulation presented in the theoretical work by Casas et al.
+
+## Mathematical Formulation
+
+The solver discretizes the time-independent porous Navier-Stokes continuous equations:
+
+1. **Momentum:**
+   $$ \alpha (u \cdot \nabla) u - 2\nabla \cdot (\alpha \nu \nabla^S u) + \alpha \nabla p + \sigma(\alpha, u)u = f $$
+2. **Mass:**
+   $$ \epsilon p + \nabla \cdot (\alpha u) = 0 $$
+
+To stabilize the convective and pressure terms optimally across standard equal-order elements (e.g., $P_1/P_1$ or $P_2/P_2$), we employ the ASGS stabilization method where the projection operator is exactly chosen as $\mathbb{\Pi} \equiv \mathbb{I}$. The stabilized weak form is given by:
+
+$$ B_{ASGS}(u, U_h, V_h) = B_{Gal}(u, U_h, V_h) + \sum_K \langle \mathcal{L}_u^* V_h, \tau_1 \mathcal{R}_u(U_h) \rangle_K + \sum_K \langle \mathcal{L}_p^* Q_h, \tau_2 \mathcal{R}_p(U_h) \rangle_K $$
+
+### Resistance and Stabilization Constants
+The nonlinear Darcy-Forchheimer resistance is governed by the structural porosity $\alpha$:
+$$ \sigma(\alpha, u) = \frac{1}{Da}\frac{150}{Re}\left(\frac{1-\alpha}{\alpha}\right)^2 + 1.75\left(\frac{1-\alpha}{\alpha}\right)\|u\| $$
+
+Where the ASGS temporal scaling operators are calculated strictly cell-wise as:
+$$ \tau_{1,NS} = \left( c_1 \frac{\nu}{h^2} + c_2 \frac{\|u\|}{h} \right)^{-1} $$
+$$ \tau_1 = \left( \alpha \tau_{1,NS}^{-1} + \sigma(\alpha, u) \right)^{-1} $$
+$$ \tau_2 = \frac{h^2}{c_1 \alpha \tau_{1,NS} + \epsilon h^2} $$
+
+These formulations dynamically infer the molecular viscosity directly from the Reynolds number ($\nu = 1/Re$) when treated in a strictly dimensionless format.
+
+## Algorithmic Architecture
+
+The codebase leverages a rigid separation of concerns:
+*   `src/config.jl`: Implements a JSON parsing engine establishing base default configs, nested parsing, deep-merging capabilities, and strict typing routines.
+*   `src/geometry_mesh.jl`: Constructs and labels `Gridap` discrete Cartesian box models.
+*   `src/formulation.jl`: Directly translates the abstract mathematical ASGS theory into the code. Gridap's non-linear `FEOperator` is powered by automatic differentiation (AD) algorithms directly deducing the Jacobian matrix from the defined non-linear momentum/mass residuals spanning convection and resistance terms. 
+*   `src/run_simulation.jl`: Handles high-level pipeline orchestration. Links configuration, FEM spaces, boundaries, and executes the Newton-Raphson non-linear solver. 
+*   `src/io.jl`: Automates the serialization to high-fidelity VTU datasets compatible with ParaView visualizations.
+
+## Experimental Suites
+
+Both major validation scenarios from the literature are explicitly implemented:
+
+### 1. Manufactured Solutions (`tests/ManufacturedSolutions/`)
+Executes an artificially constructed vector/pressure profile perfectly satisfying the local governing continuity restrictions. Operates across successively refined mesh levels ($10\dots 40$) and strictly validates convergence behaviors reporting $L^2$ and $H^1$ errors locally evaluated against dynamic asymptotic optimality formulas ($O(h^{k+1})$). Python Matplotlib endpoints visualize the $L^2$/$H^1$ convergence slopes cleanly.
+
+### 2. Cocquet Experiment (`tests/CocquetExperiment/`)
+Configured to validate Section 4.2 of the benchmark error analysis established by Cocquet et al. Simulates a heterogeneous structural transition driving flow through a "free space" ($\alpha = 1$) into an active DBF internal porous matrix ($\alpha \ll 1$), properly capturing rapid interfacial non-linear shear deterioration and macroscopic flow diversion without analytical boundary instabilities.
+
+## Usage
+
+You can run individual test cases directly by loading the local Julia environment:
+
+```bash
+# Run the Method of Manufactured Solutions Tests
+julia --project=. tests/ManufacturedSolutions/run_test.jl
+python3 tests/ManufacturedSolutions/plot_results.py
+
+# Run the Cocquet DBF Verification
+julia --project=. tests/CocquetExperiment/run_test.jl
+python3 tests/CocquetExperiment/plot_results.py
+```

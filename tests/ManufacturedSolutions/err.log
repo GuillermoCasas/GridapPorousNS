@@ -1,0 +1,81 @@
+  Activating project at `~/repos/porous_NS_with_Gridap`
+ERROR: LoadError: AssertionError: A check failed
+Stacktrace:
+  [1] macro expansion
+    @ ~/.julia/packages/Gridap/cvsif/src/Helpers/Macros.jl:61 [inlined]
+  [2] evaluate!(cache::Gridap.Arrays.VectorBlock{Gridap.Arrays.VectorBlock{Matrix{Float64}}}, k::Gridap.Arrays.MatchingBlockMap{1}, a::Gridap.Arrays.VectorBlock{Matrix{Float64}})
+    @ Gridap.Arrays ~/.julia/packages/Gridap/cvsif/src/Arrays/ArrayBlocks.jl:439
+  [3] #179
+    @ ~/.julia/packages/Gridap/cvsif/src/Fields/FieldArrayBlocks.jl:651 [inlined]
+  [4] map (repeats 5 times)
+    @ ./tuple.jl:386 [inlined]
+  [5] map(f::Gridap.Fields.var"#179#181"{Gridap.Arrays.MatchingBlockMap{1}}, t::Tuple{Gridap.Arrays.VectorBlock{Vector{VectorValue{2, Float64}}}, Gridap.Arrays.VectorBlock{Vector{Float64}}, Gridap.Arrays.VectorBlock{Vector{TensorValue{2, 2, Float64, 4}}}, Gridap.Arrays.VectorBlock{Vector{VectorValue{2, Float64}}}, Gridap.Arrays.VectorBlock{Gridap.Arrays.VectorBlock{Matrix{VectorValue{2, Float64}}}}, Gridap.Arrays.VectorBlock{Gridap.Arrays.VectorBlock{Matrix{Float64}}}, Gridap.Arrays.VectorBlock{Gridap.Arrays.VectorBlock{Matrix{TensorValue{2, 2, Float64, 4}}}}, Gridap.Arrays.VectorBlock{Gridap.Arrays.VectorBlock{Matrix{VectorValue{2, Float64}}}}, Gridap.Arrays.VectorBlock{Vector{Float64}}, Gridap.Arrays.VectorBlock{Vector{VectorValue{2, Float64}}}}, s::Tuple{Vector{VectorValue{2, Float64}}, Vector{Float64}, Vector{TensorValue{2, 2, Float64, 4}}, Vector{VectorValue{2, Float64}}, Gridap.Arrays.VectorBlock{Matrix{VectorValue{2, Float64}}}, Gridap.Arrays.VectorBlock{Matrix{Float64}}, Gridap.Arrays.VectorBlock{Matrix{TensorValue{2, 2, Float64, 4}}}, Gridap.Arrays.VectorBlock{Matrix{VectorValue{2, Float64}}}, Vector{Float64}, Vector{VectorValue{2, Float64}}})
+    @ Base ./tuple.jl:386
+  [6] return_cache(::Gridap.Fields.BroadcastingFieldOpMap{PorousNSSolver.var"#stab_integrand#20"{Float64, Float64, Float64, Float64, Float64, Float64}}, ::Vector{VectorValue{2, Float64}}, ::Vector{Float64}, ::Vector{TensorValue{2, 2, Float64, 4}}, ::Vector{VectorValue{2, Float64}}, ::Gridap.Arrays.VectorBlock{Matrix{VectorValue{2, Float64}}}, ::Vararg{Union{Gridap.Arrays.ArrayBlock, AbstractArray}})
+    @ Gridap.Fields ~/.julia/packages/Gridap/cvsif/src/Fields/FieldArrayBlocks.jl:651
+  [7] evaluate(::Gridap.Fields.BroadcastingFieldOpMap{PorousNSSolver.var"#stab_integrand#20"{Float64, Float64, Float64, Float64, Float64, Float64}}, ::Vector{VectorValue{2, Float64}}, ::Vector{Float64}, ::Vararg{Any})
+    @ Gridap.Arrays ~/.julia/packages/Gridap/cvsif/src/Arrays/Maps.jl:123
+  [8] return_value(::Gridap.Fields.BroadcastingFieldOpMap{PorousNSSolver.var"#stab_integrand#20"{Float64, Float64, Float64, Float64, Float64, Float64}}, ::Vector{VectorValue{2, Float64}}, ::Vector{Float64}, ::Vector{TensorValue{2, 2, Float64, 4}}, ::Vector{VectorValue{2, Float64}}, ::Vararg{Union{Gridap.Arrays.ArrayBlock, AbstractArray}})
+    @ Gridap.Fields ~/.julia/packages/Gridap/cvsif/src/Fields/FieldArrayBlocks.jl:643
+  [9] return_type(::Gridap.Fields.BroadcastingFieldOpMap{PorousNSSolver.var"#stab_integrand#20"{Float64, Float64, Float64, Float64, Float64, Float64}}, ::Vector{VectorValue{2, Float64}}, ::Vector{Float64}, ::Vector{TensorValue{2, 2, Float64, 4}}, ::Vararg{Any})
+    @ Gridap.Arrays ~/.julia/packages/Gridap/cvsif/src/Arrays/Maps.jl:94
+ [10] lazy_map(::Gridap.Fields.BroadcastingFieldOpMap{PorousNSSolver.var"#stab_integrand#20"{Float64, Float64, Float64, Float64, Float64, Float64}}, ::Gridap.Arrays.LazyArray{FillArrays.Fill{Gridap.Fields.LinearCombinationMap{Colon}, 1, Tuple{Base.OneTo{Int64}}}, Vector{VectorValue{2, Float64}}, 1, Tuple{Gridap.Arrays.LazyArray{FillArrays.Fill{Broadcasting{Gridap.Arrays.PosNegReindex{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Vector{Float64}}}, 1, Tuple{Base.OneTo{Int64}}}, Vector{Float64}, 1, Tuple{Gridap.Arrays.Table{Int32, Vector{Int32}, Vector{Int32}}}}, FillArrays.Fill{Matrix{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}}}, ::Gridap.Arrays.LazyArray{FillArrays.Fill{Gridap.Fields.LinearCombinationMap{Colon}, 1, Tuple{Base.OneTo{Int64}}}, Vector{Float64}, 1, Tuple{Gridap.Arrays.LazyArray{FillArrays.Fill{Broadcasting{Gridap.Arrays.PosNegReindex{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Vector{Float64}}}, 1, Tuple{Base.OneTo{Int64}}}, Vector{Float64}, 1, Tuple{Gridap.Arrays.Table{Int32, Vector{Int32}, Vector{Int32}}}}, FillArrays.Fill{Matrix{Float64}, 1, Tuple{Base.OneTo{Int64}}}}}, ::Gridap.Arrays.LazyArray{FillArrays.Fill{Gridap.Fields.BroadcastingFieldOpMap{typeof(dot)}, 1, Tuple{Base.OneTo{Int64}}}, Vector{TensorValue{2, 2, Float64, 4}}, 1, Tuple{FillArrays.Fill{Vector{TensorValue{2, 2, Float64, 4}}, 1, Tuple{Base.OneTo{Int64}}}, Gridap.Arrays.LazyArray{FillArrays.Fill{Gridap.Fields.LinearCombinationMap{Colon}, 1, Tuple{Base.OneTo{Int64}}}, Vector{TensorValue{2, 2, Float64, 4}}, 1, Tuple{Gridap.Arrays.LazyArray{FillArrays.Fill{Broadcasting{Gridap.Arrays.PosNegReindex{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Vector{Float64}}}, 1, Tuple{Base.OneTo{Int64}}}, Vector{Float64}, 1, Tuple{Gridap.Arrays.Table{Int32, Vector{Int32}, Vector{Int32}}}}, FillArrays.Fill{Matrix{TensorValue{2, 2, Float64, 4}}, 1, Tuple{Base.OneTo{Int64}}}}}}}, ::Gridap.Arrays.LazyArray{FillArrays.Fill{Gridap.Fields.BroadcastingFieldOpMap{typeof(dot)}, 1, Tuple{Base.OneTo{Int64}}}, Vector{VectorValue{2, Float64}}, 1, Tuple{FillArrays.Fill{Vector{TensorValue{2, 2, Float64, 4}}, 1, Tuple{Base.OneTo{Int64}}}, Gridap.Arrays.LazyArray{FillArrays.Fill{Gridap.Fields.LinearCombinationMap{Colon}, 1, Tuple{Base.OneTo{Int64}}}, Vector{VectorValue{2, Float64}}, 1, Tuple{Gridap.Arrays.LazyArray{FillArrays.Fill{Broadcasting{Gridap.Arrays.PosNegReindex{SubArray{Float64, 1, Vector{Float64}, Tuple{UnitRange{Int64}}, true}, Vector{Float64}}}, 1, Tuple{Base.OneTo{Int64}}}, Vector{Float64}, 1, Tuple{Gridap.Arrays.Table{Int32, Vector{Int32}, Vector{Int32}}}}, FillArrays.Fill{Matrix{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}}}}}, ::FillArrays.Fill{Gridap.Arrays.VectorBlock{Matrix{VectorValue{2, Float64}}}, 1, Tuple{Base.OneTo{Int64}}}, ::Vararg{AbstractArray})
+    @ Gridap.Arrays ~/.julia/packages/Gridap/cvsif/src/Arrays/LazyArrays.jl:57
+ [11] evaluate!(cache::Nothing, f::Gridap.CellData.OperationCellField{ReferenceDomain, PorousNSSolver.var"#stab_integrand#20"{Float64, Float64, Float64, Float64, Float64, Float64}}, x::Gridap.CellData.CellPoint{ReferenceDomain, FillArrays.Fill{Vector{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}, Gridap.Arrays.LazyArray{Gridap.Geometry.CartesianMap{2, Float64, 4}, Vector{VectorValue{2, Float64}}, 1, Tuple{FillArrays.Fill{Vector{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}}}, Gridap.Geometry.BodyFittedTriangulation{2, 2, CartesianDiscreteModel{2, Float64, typeof(identity)}, CartesianGrid{2, Float64, typeof(identity)}, Gridap.Arrays.IdentityVector{Int64}}})
+    @ Gridap.CellData ~/.julia/packages/Gridap/cvsif/src/CellData/CellFields.jl:405
+ [12] evaluate
+    @ ~/.julia/packages/Gridap/cvsif/src/Arrays/Maps.jl:124 [inlined]
+ [13] CellField
+    @ ~/.julia/packages/Gridap/cvsif/src/CellData/CellFields.jl:253 [inlined]
+ [14] #7
+    @ ~/.julia/packages/Gridap/cvsif/src/CellData/CellFields.jl:404 [inlined]
+ [15] map(f::Gridap.CellData.var"#7#8"{Gridap.CellData.CellPoint{ReferenceDomain, FillArrays.Fill{Vector{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}, Gridap.Arrays.LazyArray{Gridap.Geometry.CartesianMap{2, Float64, 4}, Vector{VectorValue{2, Float64}}, 1, Tuple{FillArrays.Fill{Vector{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}}}, Gridap.Geometry.BodyFittedTriangulation{2, 2, CartesianDiscreteModel{2, Float64, typeof(identity)}, CartesianGrid{2, Float64, typeof(identity)}, Gridap.Arrays.IdentityVector{Int64}}}}, t::Tuple{Gridap.CellData.OperationCellField{ReferenceDomain, typeof(-)}, Gridap.CellData.OperationCellField{ReferenceDomain, PorousNSSolver.var"#stab_integrand#20"{Float64, Float64, Float64, Float64, Float64, Float64}}})
+    @ Base ./tuple.jl:356
+ [16] evaluate!(cache::Nothing, f::Gridap.CellData.OperationCellField{ReferenceDomain, typeof(+)}, x::Gridap.CellData.CellPoint{ReferenceDomain, FillArrays.Fill{Vector{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}, Gridap.Arrays.LazyArray{Gridap.Geometry.CartesianMap{2, Float64, 4}, Vector{VectorValue{2, Float64}}, 1, Tuple{FillArrays.Fill{Vector{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}}}, Gridap.Geometry.BodyFittedTriangulation{2, 2, CartesianDiscreteModel{2, Float64, typeof(identity)}, CartesianGrid{2, Float64, typeof(identity)}, Gridap.Arrays.IdentityVector{Int64}}})
+    @ Gridap.CellData ~/.julia/packages/Gridap/cvsif/src/CellData/CellFields.jl:404
+ [17] evaluate
+    @ ~/.julia/packages/Gridap/cvsif/src/Arrays/Maps.jl:124 [inlined]
+ [18] (::Gridap.CellData.OperationCellField{ReferenceDomain, typeof(+)})(x::Gridap.CellData.CellPoint{ReferenceDomain, FillArrays.Fill{Vector{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}, Gridap.Arrays.LazyArray{Gridap.Geometry.CartesianMap{2, Float64, 4}, Vector{VectorValue{2, Float64}}, 1, Tuple{FillArrays.Fill{Vector{VectorValue{2, Float64}}, 1, Tuple{Base.OneTo{Int64}}}}}, Gridap.Geometry.BodyFittedTriangulation{2, 2, CartesianDiscreteModel{2, Float64, typeof(identity)}, CartesianGrid{2, Float64, typeof(identity)}, Gridap.Arrays.IdentityVector{Int64}}})
+    @ Gridap.CellData ~/.julia/packages/Gridap/cvsif/src/CellData/CellFields.jl:253
+ [19] integrate(f::Gridap.CellData.OperationCellField{ReferenceDomain, typeof(+)}, quad::CellQuadrature{ReferenceDomain, PhysicalDomain})
+    @ Gridap.CellData ~/.julia/packages/Gridap/cvsif/src/CellData/CellQuadratures.jl:151
+ [20] integrate(f::Gridap.CellData.OperationCellField{ReferenceDomain, typeof(+)}, b::Gridap.CellData.GenericMeasure)
+    @ Gridap.CellData ~/.julia/packages/Gridap/cvsif/src/CellData/DomainContributions.jl:190
+ [21] *(a::Gridap.CellData.Integrand, b::Gridap.CellData.GenericMeasure)
+    @ Gridap.CellData ~/.julia/packages/Gridap/cvsif/src/CellData/DomainContributions.jl:174
+ [22] weak_form_residual(X::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}, Y::Gridap.MultiField.MultiFieldCellField{ReferenceDomain}, config::PorousNSConfig, dΩ::Gridap.CellData.GenericMeasure, h::Gridap.CellData.GenericCellField{ReferenceDomain}, f_custom::Function, alpha_custom::Nothing)
+    @ PorousNSSolver ~/repos/porous_NS_with_Gridap/src/formulation.jl:89
+ [23] weak_form_residual
+    @ ~/repos/porous_NS_with_Gridap/src/formulation.jl:22 [inlined]
+ [24] res
+    @ ~/repos/porous_NS_with_Gridap/tests/ManufacturedSolutions/run_test.jl:85 [inlined]
+ [25] #104
+    @ ~/.julia/packages/Gridap/cvsif/src/FESpaces/FEOperatorsFromWeakForm.jl:37 [inlined]
+ [26] jacobian(f::Gridap.FESpaces.var"#104#106"{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}, var"#res#5"{var"#f#4"{PorousNSConfig}, Gridap.CellData.GenericCellField{ReferenceDomain}, Gridap.CellData.GenericMeasure, PorousNSConfig}}, uh::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}; ad_type::Symbol)
+    @ Gridap.MultiField ~/.julia/packages/Gridap/cvsif/src/MultiField/MultiFieldAutodiff.jl:23
+ [27] jacobian
+    @ ~/.julia/packages/Gridap/cvsif/src/MultiField/MultiFieldAutodiff.jl:22 [inlined]
+ [28] (::Gridap.FESpaces.var"#jac#105"{var"#res#5"{var"#f#4"{PorousNSConfig}, Gridap.CellData.GenericCellField{ReferenceDomain}, Gridap.CellData.GenericMeasure, PorousNSConfig}})(u::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}, du::Gridap.MultiField.MultiFieldCellField{ReferenceDomain}, dv::Gridap.MultiField.MultiFieldCellField{ReferenceDomain})
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FEOperatorsFromWeakForm.jl:37
+ [29] residual_and_jacobian(op::Gridap.FESpaces.FEOperatorFromWeakForm, uh::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}})
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FEOperatorsFromWeakForm.jl:100
+ [30] residual_and_jacobian(op::Gridap.FESpaces.AlgebraicOpFromFEOp, x::Vector{Float64})
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FEOperators.jl:193
+ [31] _new_nlsolve_cache(x0::Vector{Float64}, nls::NLSolver, op::Gridap.FESpaces.AlgebraicOpFromFEOp)
+    @ Gridap.Algebra ~/.julia/packages/Gridap/cvsif/src/Algebra/NLSolvers.jl:159
+ [32] solve!
+    @ ~/.julia/packages/Gridap/cvsif/src/Algebra/NLSolvers.jl:130 [inlined]
+ [33] solve!(x::Vector{Float64}, nls::NLSolver, op::Gridap.FESpaces.AlgebraicOpFromFEOp)
+    @ Gridap.Algebra ~/.julia/packages/Gridap/cvsif/src/Algebra/NonlinearSolvers.jl:22
+ [34] solve!(u::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}, solver::Gridap.FESpaces.NonlinearFESolver, feop::Gridap.FESpaces.FEOperatorFromWeakForm, cache::Nothing)
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FESolvers.jl:163
+ [35] solve!(uh::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}, solver::Gridap.FESpaces.NonlinearFESolver, op::Gridap.FESpaces.FEOperatorFromWeakForm)
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FESolvers.jl:15
+ [36] solve(nls::Gridap.FESpaces.NonlinearFESolver, op::Gridap.FESpaces.FEOperatorFromWeakForm)
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FESolvers.jl:53
+ [37] run_mms()
+    @ Main ~/repos/porous_NS_with_Gridap/tests/ManufacturedSolutions/run_test.jl:92
+ [38] top-level scope
+    @ ~/repos/porous_NS_with_Gridap/tests/ManufacturedSolutions/run_test.jl:118
+in expression starting at /Users/guillermocasasgonzalez/repos/porous_NS_with_Gridap/tests/ManufacturedSolutions/run_test.jl:118
+Running MMS for partition 10 x 10

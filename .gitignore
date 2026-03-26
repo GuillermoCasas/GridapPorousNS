@@ -1,0 +1,27 @@
+# Ignore system specific and temporary IDE files
+.DS_Store
+*.DS_Store
+**/.DS_Store
+FETCH_HEAD
+.idea/
+.vscode/
+
+# Ignore compiled artifacts and test result output directories entirely
+results/
+**/results/
+
+# Ignore specific Gridap and Julia files
+*.jl.cov
+*.jl.cs
+*.jl.mem
+jl_*.log
+*.sqlite
+Manifest.toml
+
+# Ignore generic compilation temporary files
+*.tmp
+*.bak
+*~
+*.so
+*.dylib
+*.dylib.*

@@ -1,0 +1,35 @@
+{
+    "physical_parameters": {
+        "Re": 10.0,
+        "Da": 1.0,
+        "epsilon": 0.0,
+        "f_x": 0.0,
+        "f_y": 0.0
+    },
+    "porosity_field": {
+        "alpha_0": 0.5,
+        "r_1": 0.2,
+        "r_2": 0.5
+    },
+    "discretization": {
+        "k_velocity": 1,
+        "k_pressure": 1
+    },
+    "mesh": {
+        "domain": [
+            0.0,
+            2.0,
+            0.0,
+            2.0
+        ],
+        "partition": [
+            10,
+            10
+        ],
+        "convergence_partitions": [10, 20, 30, 40]
+    },
+    "output": {
+        "directory": "tests/ManufacturedSolutions/results",
+        "basename": "mms_test"
+    }
+}

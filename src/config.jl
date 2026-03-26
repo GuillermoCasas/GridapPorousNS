@@ -1,0 +1,70 @@
+# src/config.jl
+
+@with_kw struct PhysicalParameters
+    Re::Float64 = 1.0
+    Da::Float64 = 1.0
+    epsilon::Float64 = 1.0
+    f_x::Float64 = 0.0
+    f_y::Float64 = 0.0
+end
+
+@with_kw struct PorosityField
+    alpha_0::Float64 = 0.4
+    r_1::Float64 = 0.2
+    r_2::Float64 = 0.5
+end
+
+@with_kw struct DiscretizationConfig
+    k_velocity::Int = 2
+    k_pressure::Int = 1
+end
+
+@with_kw struct MeshConfig
+    domain::Vector{Float64} = [0.0, 1.0, 0.0, 1.0]
+    partition::Vector{Int} = [20, 20]
+    convergence_partitions::Vector{Int} = [10, 20, 30]
+end
+
+@with_kw struct OutputConfig
+    directory::String = "results"
+    basename::String = "porous_ns"
+end
+
+@with_kw struct PorousNSConfig
+    phys::PhysicalParameters = PhysicalParameters()
+    porosity::PorosityField = PorosityField()
+    discretization::DiscretizationConfig = DiscretizationConfig()
+    mesh::MeshConfig = MeshConfig()
+    output::OutputConfig = OutputConfig()
+end
+
+function deep_merge!(base::AbstractDict, override::AbstractDict)
+    for (k, v) in override
+        if haskey(base, k) && isa(base[k], AbstractDict) && isa(v, AbstractDict)
+            deep_merge!(base[k], v)
+        else
+            base[k] = v
+        end
+    end
+    return base
+end
+
+function load_config(test_config_path::String="")
+    base_config_path = joinpath(@__DIR__, "..", "base_config.json")
+    base_dict = JSON.parsefile(base_config_path)
+    
+    if !isempty(test_config_path) && isfile(test_config_path)
+        test_dict = JSON.parsefile(test_config_path)
+        deep_merge!(base_dict, test_dict)
+    end
+    
+    # Parse back into structs. Note: simple conversion from Dict to kwargs.
+    # To handle potential type conversions like Int to Float64 depending on JSON.
+    local_phys = PhysicalParameters(; (Symbol(k) => v for (k,v) in base_dict["physical_parameters"])...)
+    local_poro = PorosityField(; (Symbol(k) => v for (k,v) in base_dict["porosity_field"])...)
+    local_disc = DiscretizationConfig(; (Symbol(k) => v for (k,v) in base_dict["discretization"])...)
+    local_mesh = MeshConfig(; (Symbol(k) => v for (k,v) in base_dict["mesh"])...)
+    local_out = OutputConfig(; (Symbol(k) => v for (k,v) in base_dict["output"])...)
+    
+    return PorousNSConfig(phys=local_phys, porosity=local_poro, discretization=local_disc, mesh=local_mesh, output=local_out)
+end
