@@ -23,6 +23,7 @@ end
     domain::Vector{Float64} = [0.0, 1.0, 0.0, 1.0]
     partition::Vector{Int} = [20, 20]
     convergence_partitions::Vector{Int} = [10, 20, 30]
+    element_type::String = "QUAD"
 end
 
 @with_kw struct OutputConfig
@@ -58,13 +59,22 @@ function load_config(test_config_path::String="")
         deep_merge!(base_dict, test_dict)
     end
     
-    # Parse back into structs. Note: simple conversion from Dict to kwargs.
-    # To handle potential type conversions like Int to Float64 depending on JSON.
-    local_phys = PhysicalParameters(; (Symbol(k) => v for (k,v) in base_dict["physical_parameters"])...)
-    local_poro = PorosityField(; (Symbol(k) => v for (k,v) in base_dict["porosity_field"])...)
-    local_disc = DiscretizationConfig(; (Symbol(k) => v for (k,v) in base_dict["discretization"])...)
-    local_mesh = MeshConfig(; (Symbol(k) => v for (k,v) in base_dict["mesh"])...)
-    local_out = OutputConfig(; (Symbol(k) => v for (k,v) in base_dict["output"])...)
+    return _parse_dict_to_config(base_dict)
+end
+
+function load_config_from_dict(override::AbstractDict)
+    base_config_path = joinpath(@__DIR__, "..", "base_config.json")
+    base_dict = JSON.parsefile(base_config_path)
+    deep_merge!(base_dict, override)
+    return _parse_dict_to_config(base_dict)
+end
+
+function _parse_dict_to_config(dict::AbstractDict)
+    local_phys = PhysicalParameters(; (Symbol(k) => v for (k,v) in dict["physical_parameters"])...)
+    local_poro = PorosityField(; (Symbol(k) => v for (k,v) in dict["porosity_field"])...)
+    local_disc = DiscretizationConfig(; (Symbol(k) => v for (k,v) in dict["discretization"])...)
+    local_mesh = MeshConfig(; (Symbol(k) => v for (k,v) in dict["mesh"])...)
+    local_out = OutputConfig(; (Symbol(k) => v for (k,v) in dict["output"])...)
     
     return PorousNSConfig(phys=local_phys, porosity=local_poro, discretization=local_disc, mesh=local_mesh, output=local_out)
 end

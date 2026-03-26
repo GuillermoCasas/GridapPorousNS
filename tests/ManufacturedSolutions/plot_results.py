@@ -1,76 +1,74 @@
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import h5py
 
 def plot_convergence():
     results_dir = os.path.join(os.path.dirname(__file__), 'results')
-    err_file = os.path.join(results_dir, 'errors.csv')
+    h5_file = os.path.join(results_dir, 'convergence_data.h5')
     
-    if not os.path.exists(err_file):
-        print(f"Error file not found: {err_file}")
+    if not os.path.exists(h5_file):
+        print(f"Error file not found: {h5_file}")
         return
 
-    df = pd.read_csv(err_file, sep='\t')
-    
-    h = df['h'].values
-    err_u_l2 = df['err_u_l2'].values
-    err_p_l2 = df['err_p_l2'].values
-    err_u_h1 = df['err_u_h1'].values
-    err_p_h1 = df['err_p_h1'].values
-    
-    import json
-    config_file = os.path.join(os.path.dirname(__file__), 'data', 'test_config.json')
-    if os.path.exists(config_file):
-        with open(config_file, 'r') as f:
-            config = json.load(f)
-        k_u = config.get('discretization', {}).get('k_velocity', 2)
-        k_p = config.get('discretization', {}).get('k_pressure', 1)
-        opt_u_l2 = k_u + 1
-        opt_u_h1 = k_u
-        opt_p_l2 = k_p
-        
-        Re = config.get('physical_parameters', {}).get('Re', "N/A")
-        Da = config.get('physical_parameters', {}).get('Da', "N/A")
-        alpha_0 = config.get('porosity_field', {}).get('alpha_0', "N/A")
-    else:
-        raise FileNotFoundError(f"Configuration file not found: {config_file}")
-
-    plt.figure(figsize=(10, 8))
-    plt.loglog(h, err_u_l2, 'o-', color='C0', label=fr'Velocity $L^2$ Error (optimal: $\mathcal{{O}}(h^{{{opt_u_l2}}})$)')
-    plt.loglog(h, err_u_h1, 's-', color='C1', label=fr'Velocity $H^1$ Error (optimal: $\mathcal{{O}}(h^{{{opt_u_h1}}})$)')
-    plt.loglog(h, err_p_l2, '^-', color='C2', label=fr'Pressure $L^2$ Error (optimal: $\mathcal{{O}}(h^{{{opt_p_l2}}})$)')
-    
-    # Annotate local slopes for each segment
-    for i in range(len(h) - 1):
-        # Calculate slope
-        slope_u_l2 = (np.log(err_u_l2[i+1]) - np.log(err_u_l2[i])) / (np.log(h[i+1]) - np.log(h[i]))
-        slope_u_h1 = (np.log(err_u_h1[i+1]) - np.log(err_u_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))
-        slope_p_l2 = (np.log(err_p_l2[i+1]) - np.log(err_p_l2[i])) / (np.log(h[i+1]) - np.log(h[i]))
-        
-        # Find midpoint in log space for text placement
-        h_mid = np.exp((np.log(h[i]) + np.log(h[i+1])) / 2.0)
-        err_u_l2_mid = np.exp((np.log(err_u_l2[i]) + np.log(err_u_l2[i+1])) / 2.0)
-        err_u_h1_mid = np.exp((np.log(err_u_h1[i]) + np.log(err_u_h1[i+1])) / 2.0)
-        err_p_l2_mid = np.exp((np.log(err_p_l2[i]) + np.log(err_p_l2[i+1])) / 2.0)
-        
-        # Annotate
-        plt.annotate(f'{slope_u_l2:.2f}', xy=(h_mid, err_u_l2_mid), xytext=(-10, 10), 
-                     textcoords='offset points', color='C0', fontweight='bold')
-        plt.annotate(f'{slope_u_h1:.2f}', xy=(h_mid, err_u_h1_mid), xytext=(10, 10), 
-                     textcoords='offset points', color='C1', fontweight='bold')
-        plt.annotate(f'{slope_p_l2:.2f}', xy=(h_mid, err_p_l2_mid), xytext=(-10, -15), 
-                     textcoords='offset points', color='C2', fontweight='bold')
-    
-    plt.xlabel(r'Mesh size ($h$)')
-    plt.ylabel('Error Norms')
-    plt.title(fr'Convergence Analysis ($Re: {Re}$, $Da: {Da}$, $\alpha_0: {alpha_0}$)')
-    plt.legend()
-    plt.grid(True, which="both", ls="--")
-    
-    plot_file = os.path.join(results_dir, 'convergence.png')
-    plt.savefig(plot_file)
-    print(f"Convergence plot saved to: {plot_file}")
+    with h5py.File(h5_file, 'r') as f:
+        for group_name in f.keys():
+            g = f[group_name]
+            
+            # Read Datasets
+            h = g['h'][:]
+            err_u_l2 = g['err_u_l2'][:]
+            err_p_l2 = g['err_p_l2'][:]
+            err_u_h1 = g['err_u_h1'][:]
+            err_p_h1 = g['err_p_h1'][:]
+            
+            # Read Metadata
+            Re = g.attrs.get('Re', 'N/A')
+            Da = g.attrs.get('Da', 'N/A')
+            kv = g.attrs.get('k_velocity', 'N/A')
+            kp = g.attrs.get('k_pressure', 'N/A')
+            etype = g.attrs.get('element_type', 'N/A')
+            if isinstance(etype, bytes):
+                etype = etype.decode('utf-8')
+            
+            opt_u_l2 = kv + 1
+            opt_u_h1 = kv
+            opt_p_l2 = kp
+            
+            plt.figure(figsize=(10, 8))
+            plt.loglog(h, err_u_l2, 'o-', color='C0', label=fr'Velocity $L^2$ Error (optimal: $\mathcal{{O}}(h^{{{opt_u_l2}}})$)')
+            plt.loglog(h, err_u_h1, 's-', color='C1', label=fr'Velocity $H^1$ Error (optimal: $\mathcal{{O}}(h^{{{opt_u_h1}}})$)')
+            plt.loglog(h, err_p_l2, '^-', color='C2', label=fr'Pressure $L^2$ Error (optimal: $\mathcal{{O}}(h^{{{opt_p_l2}}})$)')
+            
+            # Annotate local slopes for each segment
+            for i in range(len(h) - 1):
+                slope_u_l2 = (np.log(err_u_l2[i+1]) - np.log(err_u_l2[i])) / (np.log(h[i+1]) - np.log(h[i]))
+                slope_u_h1 = (np.log(err_u_h1[i+1]) - np.log(err_u_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))
+                slope_p_l2 = (np.log(err_p_l2[i+1]) - np.log(err_p_l2[i])) / (np.log(h[i+1]) - np.log(h[i]))
+                
+                h_mid = np.exp((np.log(h[i]) + np.log(h[i+1])) / 2.0)
+                err_u_l2_mid = np.exp((np.log(err_u_l2[i]) + np.log(err_u_l2[i+1])) / 2.0)
+                err_u_h1_mid = np.exp((np.log(err_u_h1[i]) + np.log(err_u_h1[i+1])) / 2.0)
+                err_p_l2_mid = np.exp((np.log(err_p_l2[i]) + np.log(err_p_l2[i+1])) / 2.0)
+                
+                plt.annotate(f'{slope_u_l2:.2f}', xy=(h_mid, err_u_l2_mid), xytext=(-10, 10), 
+                             textcoords='offset points', color='C0', fontweight='bold')
+                plt.annotate(f'{slope_u_h1:.2f}', xy=(h_mid, err_u_h1_mid), xytext=(10, 10), 
+                             textcoords='offset points', color='C1', fontweight='bold')
+                plt.annotate(f'{slope_p_l2:.2f}', xy=(h_mid, err_p_l2_mid), xytext=(-10, -15), 
+                             textcoords='offset points', color='C2', fontweight='bold')
+            
+            plt.xlabel(r'Mesh size ($h$)')
+            plt.ylabel('Error Norms')
+            title_str = fr'Convergence ($Re: {Re}$, $Da: {Da}$, $k_v: {kv}$, $k_p: {kp}$, Mesh: {etype})'
+            plt.title(title_str)
+            plt.legend()
+            plt.grid(True, which="both", ls="--")
+            
+            plot_file = os.path.join(results_dir, f'convergence_Re{Re}_Da{Da}_kv{kv}_kp{kp}_{etype}.png')
+            plt.savefig(plot_file)
+            print(f"Convergence plot saved to: {plot_file}")
+            plt.close()
 
 if __name__ == "__main__":
     plot_convergence()

@@ -7,6 +7,7 @@ using PorousNSSolver
 using Gridap
 using JSON
 using DelimitedFiles
+using HDF5
 
 function alpha_field(x, config::PorousNSSolver.PorousNSConfig)
     alpha_0 = config.porosity.alpha_0
@@ -116,17 +117,45 @@ end
 
 function run_mms()
     config_path = joinpath(@__DIR__, "data", "test_config.json")
-    base_config = PorousNSSolver.load_config(config_path)
+    test_dict = JSON.parsefile(config_path)
     
-    partitions = base_config.mesh.convergence_partitions
-    hs = Float64[]
-    err_u_L2 = Float64[]
-    err_p_L2 = Float64[]
-    err_u_H1 = Float64[]
-    err_p_H1 = Float64[]
+    # Helper to enforce arrays
+    as_list(x) = x isa Vector ? x : [x]
     
-    for n in partitions
-        println("Running MMS for partition $n x $n")
+    Re_list = as_list(get(test_dict["physical_parameters"], "Re", [10.0]))
+    Da_list = as_list(get(test_dict["physical_parameters"], "Da", [1.0]))
+    eps_list = as_list(get(test_dict["physical_parameters"], "epsilon", [0.0]))
+    kv_list = as_list(get(test_dict["discretization"], "k_velocity", [1]))
+    kp_list = as_list(get(test_dict["discretization"], "k_pressure", [1]))
+    etype_list = as_list(get(test_dict["mesh"], "element_type", ["QUAD"]))
+    
+    results_dir = joinpath(@__DIR__, "results")
+    mkpath(results_dir)
+    h5_path = joinpath(results_dir, "convergence_data.h5")
+    
+    h5open(h5_path, "w") do h5f
+        config_idx = 1
+        for (Re, Da, eps, kv, kp, etype) in Iterators.product(Re_list, Da_list, eps_list, kv_list, kp_list, etype_list)
+            println("\n========================================")
+            println("Running Config $config_idx: Re=$Re, Da=$Da, eps=$eps, kv=$kv, kp=$kp, type=$etype")
+            println("========================================")
+            
+            override_dict = Dict(
+                "physical_parameters" => Dict("Re" => Float64(Re), "Da" => Float64(Da), "epsilon" => Float64(eps)),
+                "discretization" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
+                "mesh" => Dict("element_type" => String(etype))
+            )
+            
+            base_config = PorousNSSolver.load_config_from_dict(override_dict)
+            partitions = base_config.mesh.convergence_partitions
+            hs = Float64[]
+            err_u_L2 = Float64[]
+            err_p_L2 = Float64[]
+            err_u_H1 = Float64[]
+            err_p_H1 = Float64[]
+    
+            for n in partitions
+                println("Running MMS for partition $n x $n")
         
         config = PorousNSSolver.PorousNSConfig(
             phys=base_config.phys,
@@ -193,62 +222,66 @@ function run_mms()
         e_p = p_ex - p_h
         
         PorousNSSolver.export_results(config, model, u_h, p_h,
-            "u_ex" => u_final,
-            "p_ex" => p_ex,
-            "e_u" => e_u,
-            "e_p" => e_p,
-            "alpha" => alpha_fn)
-        
-        el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ))
-        el2_p = sqrt(sum(∫(e_p * e_p)dΩ))
-        
-        eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ))
-        eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ))
-        eh1_u = sqrt(el2_u^2 + eh1_semi_u^2)
-        eh1_p = sqrt(el2_p^2 + eh1_semi_p^2)
-        
-        push!(hs, 1.0 / n)
-        push!(err_u_L2, el2_u)
-        push!(err_p_L2, el2_p)
-        push!(err_u_H1, eh1_u)
-        push!(err_p_H1, eh1_p)
-        println("L2 Error u: $el2_u, p: $el2_p")
-        println("H1 Error u: $eh1_u, p: $eh1_p")
+                    "u_ex" => u_final,
+                    "p_ex" => p_ex,
+                    "e_u" => e_u,
+                    "e_p" => e_p,
+                    "alpha" => alpha_fn)
+                
+                el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ))
+                el2_p = sqrt(sum(∫(e_p * e_p)dΩ))
+                
+                eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ))
+                eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ))
+                eh1_u = sqrt(el2_u^2 + eh1_semi_u^2)
+                eh1_p = sqrt(el2_p^2 + eh1_semi_p^2)
+                
+                push!(hs, 1.0 / n)
+                push!(err_u_L2, el2_u)
+                push!(err_p_L2, el2_p)
+                push!(err_u_H1, eh1_u)
+                push!(err_p_H1, eh1_p)
+                println("L2 Error u: $el2_u, p: $el2_p")
+                println("H1 Error u: $eh1_u, p: $eh1_p")
+            end
+            
+            # Save combination to HDF5
+            grp_name = "config_$config_idx"
+            g = create_group(h5f, grp_name)
+            
+            # Write datasets
+            g["h"] = hs
+            g["err_u_l2"] = err_u_L2
+            g["err_p_l2"] = err_p_L2
+            g["err_u_h1"] = err_u_H1
+            g["err_p_h1"] = err_p_H1
+            
+            # Write metadata attributes
+            attributes(g)["Re"] = Float64(Re)
+            attributes(g)["Da"] = Float64(Da)
+            attributes(g)["epsilon"] = Float64(eps)
+            attributes(g)["k_velocity"] = Int(kv)
+            attributes(g)["k_pressure"] = Int(kp)
+            attributes(g)["element_type"] = String(etype)
+            
+            # Calculate rates
+            compute_slope(x, y) = sum((x .- sum(x)/length(x)) .* (y .- sum(y)/length(y))) / sum((x .- sum(x)/length(x)).^2)
+            log_h = log.(hs)
+            rate_u_l2 = compute_slope(log_h, log.(err_u_L2))
+            rate_u_h1 = compute_slope(log_h, log.(err_u_H1))
+            rate_p_l2 = compute_slope(log_h, log.(err_p_L2))
+            rate_p_h1 = compute_slope(log_h, log.(err_p_H1))
+            
+            attributes(g)["rate_u_l2"] = rate_u_l2
+            attributes(g)["rate_u_h1"] = rate_u_h1
+            attributes(g)["rate_p_l2"] = rate_p_l2
+            attributes(g)["rate_p_h1"] = rate_p_h1
+            
+            config_idx += 1
+        end
     end
     
-    # Data to file
-    open(joinpath(@__DIR__, "results", "errors.csv"), "w") do io
-        writedlm(io, ["h" "err_u_l2" "err_p_l2" "err_u_h1" "err_p_h1"])
-        writedlm(io, [hs err_u_L2 err_p_L2 err_u_H1 err_p_H1])
-    end
-    
-    # Calculate rates
-    compute_slope(x, y) = sum((x .- sum(x)/length(x)) .* (y .- sum(y)/length(y))) / sum((x .- sum(x)/length(x)).^2)
-    log_h = log.(hs)
-    rate_u_l2 = compute_slope(log_h, log.(err_u_L2))
-    rate_u_h1 = compute_slope(log_h, log.(err_u_H1))
-    rate_p_l2 = compute_slope(log_h, log.(err_p_L2))
-    rate_p_h1 = compute_slope(log_h, log.(err_p_H1))
-    
-    # Validate against theory
-    k = base_config.discretization.k_velocity
-    theo_u_l2 = float(k + 1)
-    theo_u_h1 = float(k)
-    theo_p_l2 = float(k)
-    theo_p_h1 = float(max(k - 1, 0)) # Not explicitly requested to validate, but kept for completeness
-    
-    summary_file = joinpath(@__DIR__, "results", "summary.txt")
-    open(summary_file, "w") do io
-        println(io, "=== Convergence Summary ===")
-        println(io, "Variable & Norm | Empirical Rate | Theoretical Rate")
-        println(io, "----------------|----------------|-----------------")
-        println(io, "Velocity L2     | $(round(rate_u_l2, digits=2))           | $(theo_u_l2)")
-        println(io, "Velocity H1     | $(round(rate_u_h1, digits=2))           | $(theo_u_h1)")
-        println(io, "Pressure L2     | $(round(rate_p_l2, digits=2))           | $(theo_p_l2)")
-        println(io, "Pressure H1     | $(round(rate_p_h1, digits=2))           | $(theo_p_h1)")
-    end
-    
-    println("MMS setup complete. Rates saved to summary.txt")
+    println("MMS setup complete. Parametric sweep written to convergence_data.h5")
 end
 
 run_mms()

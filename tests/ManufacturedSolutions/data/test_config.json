@@ -1,8 +1,8 @@
 {
     "physical_parameters": {
-        "Re": 10.0,
-        "Da": 1.0,
-        "epsilon": 0.0,
+        "Re": [1.0, 10.0],
+        "Da": [1e-4, 1.0],
+        "epsilon": [0.0],
         "f_x": 0.0,
         "f_y": 0.0
     },
@@ -12,8 +12,8 @@
         "r_2": 0.5
     },
     "discretization": {
-        "k_velocity": 1,
-        "k_pressure": 1
+        "k_velocity": [1],
+        "k_pressure": [1]
     },
     "mesh": {
         "domain": [
@@ -26,7 +26,8 @@
             10,
             10
         ],
-        "convergence_partitions": [10, 20, 30, 40]
+        "convergence_partitions": [10, 20, 30, 40],
+        "element_type": ["QUAD", "TRI"]
     },
     "output": {
         "directory": "tests/ManufacturedSolutions/results",

@@ -4,7 +4,12 @@ function create_mesh(config::PorousNSConfig)
     domain = Tuple(config.mesh.domain)
     partition = Tuple(config.mesh.partition)
     
-    model = CartesianDiscreteModel(domain, partition)
+    if config.mesh.element_type == "TRI"
+        model = CartesianDiscreteModel(domain, partition; isperiodic=Tuple(fill(false, length(partition))), map=identity)
+        model = simplexify(model)
+    else
+        model = CartesianDiscreteModel(domain, partition)
+    end
     
     # Automatically tag boundaries for a 2D box
     # Default Gridap face labels for a 2D Cartesian box:
