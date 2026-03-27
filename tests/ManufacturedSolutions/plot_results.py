@@ -27,6 +27,7 @@ def plot_convergence():
             Da = g.attrs.get('Da', 'N/A')
             kv = g.attrs.get('k_velocity', 'N/A')
             kp = g.attrs.get('k_pressure', 'N/A')
+            alpha_0 = g.attrs.get('alpha_0', 'N/A')
             etype = g.attrs.get('element_type', 'N/A')
             if isinstance(etype, bytes):
                 etype = etype.decode('utf-8')
@@ -60,12 +61,12 @@ def plot_convergence():
             
             plt.xlabel(r'Mesh size ($h$)')
             plt.ylabel('Error Norms')
-            title_str = fr'Convergence ($Re: {Re}$, $Da: {Da}$, $k_v: {kv}$, $k_p: {kp}$, Mesh: {etype})'
+            title_str = fr'Convergence ($Re: {Re}$, $Da: {Da}$, $\alpha_0: {alpha_0}$, $k_v: {kv}$, $k_p: {kp}$, Mesh: {etype})'
             plt.title(title_str)
             plt.legend()
             plt.grid(True, which="both", ls="--")
             
-            plot_file = os.path.join(results_dir, f'convergence_Re{Re}_Da{Da}_kv{kv}_kp{kp}_{etype}.png')
+            plot_file = os.path.join(results_dir, f'convergence_Re{Re}_Da{Da}_a{alpha_0}_kv{kv}_kp{kp}_{etype}.png')
             plt.savefig(plot_file)
             print(f"Convergence plot saved to: {plot_file}")
             plt.close()

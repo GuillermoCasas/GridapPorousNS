@@ -46,23 +46,23 @@ function weak_form_residual(X, Y, config::PorousNSConfig, dΩ, h, f_custom=nothi
     τ_2 = Operation(compute_tau_2)(u, h, α)
 
     alpha_conv = Operation(a -> a)(α)
-    alpha_nu2 = Operation(a -> 2.0 * a * ν)(α)
+    alpha_nu = Operation(a -> a * ν)(α)
     alpha_eps = Operation(a -> eps_val)(α)
     
     conv_u = ∇(u)' ⋅ u
-    div_visc_u = α * ν * Δ(u) + ν * (∇(u) + transpose(∇(u))) ⋅ ∇(α)
+    div_visc_u = α * ν * Δ(u) + ν * ∇(u) ⋅ ∇(α)
     R_u = alpha_conv * conv_u + alpha_conv * ∇(p) + σ * u - div_visc_u - f
     
     conv_v = ∇(v)' ⋅ u
     L_u_star_v = alpha_conv * conv_v + alpha_conv * ∇(q)
     
-    R_p = eps_val * p + alpha_conv * (∇⋅u)
+    R_p = alpha_conv * (∇⋅u)
 
     conv_term = v ⋅ ( alpha_conv * conv_u )
-    visc_term = alpha_nu2 * ( ε(u) ⊙ ε(v) ) 
-    pres_term = v ⋅ ( alpha_conv * ∇(p) )
+    visc_term = alpha_nu * ( ∇(u) ⊙ ∇(v) ) 
+    pres_term = - p * ( α * (∇⋅v) + ∇(α) ⋅ v )
     res_term  = v ⋅ ( σ * u )
-    mass_term = q * (eps_val * p + alpha_conv * (∇⋅u))
+    mass_term = q * (alpha_conv * (∇⋅u))
     src_term  = v ⋅ f
 
     stab_mom = L_u_star_v ⋅ (τ_1 * R_u)
@@ -108,30 +108,30 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom=n
     τ_1 = Operation(compute_tau_1)(u, h, α)
     τ_2 = Operation(compute_tau_2)(u, h, α)
 
-    alpha_conv = Operation(a -> a)(α)
-    alpha_nu2 = Operation(a -> 2.0 * a * ν)(α)
+    alpha_conv_jac = Operation(a -> a)(α)
+    alpha_nu_jac = Operation(a -> a * ν)(α)
     
-    conv_du = ∇(u)' ⋅ du + ∇(du)' ⋅ u
-    div_visc_du = α * ν * Δ(du) + ν * (∇(du) + transpose(∇(du))) ⋅ ∇(α)
-    R_du = alpha_conv * conv_du + alpha_conv * ∇(dp) + σ * du - div_visc_du
+    conv_du = ∇(du)' ⋅ u + ∇(u)' ⋅ du
+    div_visc_du = α * ν * Δ(du) + ν * ∇(du) ⋅ ∇(α)
+    R_du = alpha_conv_jac * conv_du + alpha_conv_jac * ∇(dp) + σ * du - div_visc_du
     
     conv_v = ∇(v)' ⋅ u
-    L_u_star_v = alpha_conv * conv_v + alpha_conv * ∇(q)
+    L_u_star_v = alpha_conv_jac * conv_v + alpha_conv_jac * ∇(q)
     
-    dL_du_star_v = alpha_conv * (∇(v)' ⋅ du)
+    dL_du_star_v = alpha_conv_jac * (∇(v)' ⋅ du)
     
-    R_dp = eps_val * dp + alpha_conv * (∇⋅du)
+    R_dp = eps_val * dp + alpha_conv_jac * (∇⋅du)
 
-    conv_term_jac = v ⋅ ( alpha_conv * conv_du )
-    visc_term_jac = alpha_nu2 * ( ε(du) ⊙ ε(v) ) 
-    pres_term_jac = v ⋅ ( alpha_conv * ∇(dp) )
+    conv_term_jac = v ⋅ ( alpha_conv_jac * conv_du )
+    visc_term_jac = alpha_nu_jac * ( ∇(du) ⊙ ∇(v) ) 
+    pres_term_jac = - dp * ( α * (∇⋅v) + ∇(α) ⋅ v )
     res_term_jac  = v ⋅ ( σ * du )
-    mass_term_jac = q * (eps_val * dp + alpha_conv * (∇⋅du))
+    mass_term_jac = q * (eps_val * dp + alpha_conv_jac * (∇⋅du))
 
     div_visc_u_old = α * ν * Δ(u) + ν * (∇(u) + transpose(∇(u))) ⋅ ∇(α)
-    R_u_old = alpha_conv * (∇(u)' ⋅ u) + alpha_conv * ∇(p) + σ * u - div_visc_u_old - f
+    R_u_old = alpha_conv_jac * (∇(u)' ⋅ u) + alpha_conv_jac * ∇(p) + σ * u - div_visc_u_old - f
     stab_mom_jac = L_u_star_v ⋅ (τ_1 * R_du) + dL_du_star_v ⋅ (τ_1 * R_u_old)
-    stab_mass_jac = (alpha_conv * (∇⋅v)) * (τ_2 * R_dp)
+    stab_mass_jac = (alpha_conv_jac * (∇⋅v)) * (τ_2 * R_dp)
 
     return ∫( conv_term_jac + visc_term_jac + pres_term_jac + res_term_jac + mass_term_jac + stab_mom_jac + stab_mass_jac )dΩ
 end

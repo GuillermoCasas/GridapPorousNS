@@ -1,0 +1,42 @@
+  Activating project at `~/repos/porous_NS_with_Gridap`
+ERROR: LoadError: UndefVarError: `alpha_conv` not defined in `PorousNSSolver`
+Stacktrace:
+  [1] weak_form_jacobian(X::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}, dX::Gridap.MultiField.MultiFieldCellField{ReferenceDomain}, Y::Gridap.MultiField.MultiFieldCellField{ReferenceDomain}, config::PorousNSConfig, dΩ::Gridap.CellData.GenericMeasure, h::Gridap.CellData.GenericCellField{ReferenceDomain}, f_custom::Nothing, alpha_custom::Gridap.FESpaces.SingleFieldFEFunction{Gridap.CellData.GenericCellField{ReferenceDomain}})
+    @ PorousNSSolver ~/repos/porous_NS_with_Gridap/src/formulation.jl:134
+  [2] (::var"#jac#4"{Gridap.FESpaces.SingleFieldFEFunction{Gridap.CellData.GenericCellField{ReferenceDomain}}, Gridap.CellData.GenericCellField{ReferenceDomain}, Gridap.CellData.GenericMeasure, PorousNSConfig})(x::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}, dx::Gridap.MultiField.MultiFieldCellField{ReferenceDomain}, y::Gridap.MultiField.MultiFieldCellField{ReferenceDomain})
+    @ Main ~/repos/porous_NS_with_Gridap/tests/CocquetExperiment/run_convergence.jl:55
+  [3] residual_and_jacobian(op::Gridap.FESpaces.FEOperatorFromWeakForm, uh::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}})
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FEOperatorsFromWeakForm.jl:100
+  [4] residual_and_jacobian(op::Gridap.FESpaces.AlgebraicOpFromFEOp, x::Vector{Float64})
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FEOperators.jl:193
+  [5] _new_nlsolve_cache(x0::Vector{Float64}, nls::NLSolver, op::Gridap.FESpaces.AlgebraicOpFromFEOp)
+    @ Gridap.Algebra ~/.julia/packages/Gridap/cvsif/src/Algebra/NLSolvers.jl:159
+  [6] solve!
+    @ ~/.julia/packages/Gridap/cvsif/src/Algebra/NLSolvers.jl:130 [inlined]
+  [7] solve!(x::Vector{Float64}, nls::NLSolver, op::Gridap.FESpaces.AlgebraicOpFromFEOp)
+    @ Gridap.Algebra ~/.julia/packages/Gridap/cvsif/src/Algebra/NonlinearSolvers.jl:22
+  [8] solve!(u::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}, solver::Gridap.FESpaces.NonlinearFESolver, feop::Gridap.FESpaces.FEOperatorFromWeakForm, cache::Nothing)
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FESolvers.jl:163
+  [9] solve!(uh::Gridap.MultiField.MultiFieldFEFunction{Gridap.MultiField.MultiFieldCellField{ReferenceDomain}}, solver::Gridap.FESpaces.NonlinearFESolver, op::Gridap.FESpaces.FEOperatorFromWeakForm)
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FESolvers.jl:15
+ [10] solve(nls::Gridap.FESpaces.NonlinearFESolver, op::Gridap.FESpaces.FEOperatorFromWeakForm)
+    @ Gridap.FESpaces ~/.julia/packages/Gridap/cvsif/src/FESpaces/FESolvers.jl:53
+ [11] (::var"#5#6"{Vector{Int64}, Int64, JSON.Object{String, Any}})(file::HDF5.File)
+    @ Main ~/repos/porous_NS_with_Gridap/tests/CocquetExperiment/run_convergence.jl:96
+ [12] (::HDF5.var"#17#18"{HDF5.HDF5Context, @Kwargs{}, var"#5#6"{Vector{Int64}, Int64, JSON.Object{String, Any}}, HDF5.File})()
+    @ HDF5 ~/.julia/packages/HDF5/Z859u/src/file.jl:101
+ [13] task_local_storage(body::HDF5.var"#17#18"{HDF5.HDF5Context, @Kwargs{}, var"#5#6"{Vector{Int64}, Int64, JSON.Object{String, Any}}, HDF5.File}, key::Symbol, val::HDF5.HDF5Context)
+    @ Base ./task.jl:315
+ [14] h5open(::var"#5#6"{Vector{Int64}, Int64, JSON.Object{String, Any}}, ::String, ::Vararg{String}; context::HDF5.HDF5Context, pv::@Kwargs{})
+    @ HDF5 ~/.julia/packages/HDF5/Z859u/src/file.jl:96
+ [15] h5open(::Function, ::String, ::String)
+    @ HDF5 ~/.julia/packages/HDF5/Z859u/src/file.jl:94
+ [16] run_convergence()
+    @ Main ~/repos/porous_NS_with_Gridap/tests/CocquetExperiment/run_convergence.jl:84
+ [17] top-level scope
+    @ ~/repos/porous_NS_with_Gridap/tests/CocquetExperiment/run_convergence.jl:135
+in expression starting at /Users/guillermocasasgonzalez/repos/porous_NS_with_Gridap/tests/CocquetExperiment/run_convergence.jl:135
+--- Cocquet Convergence Analysis (N=100 Reference) ---
+
+====== STARTING EQUAL-ORDER k=1 ======
+Solving Reference Grid (N = 100) -> [200 x 100] Elements...

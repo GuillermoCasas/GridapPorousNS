@@ -1,19 +1,19 @@
 {
     "physical_parameters": {
-        "Re": [1.0, 10.0],
-        "Da": [1e-4, 1.0],
-        "epsilon": [0.0],
+        "Re": [1.0, 10.0, 100.0],
+        "Da": [1e-4, 1e-2, 1.0, 1000.0],
+        "epsilon": [1e-5],
         "f_x": 0.0,
         "f_y": 0.0
     },
     "porosity_field": {
-        "alpha_0": 0.5,
+        "alpha_0": [1.0, 0.4],
         "r_1": 0.2,
         "r_2": 0.5
     },
     "discretization": {
-        "k_velocity": [1],
-        "k_pressure": [1]
+        "k_velocity": [1, 2],
+        "k_pressure": [1, 2]
     },
     "mesh": {
         "domain": [
@@ -26,7 +26,7 @@
             10,
             10
         ],
-        "convergence_partitions": [10, 20, 30, 40],
+        "convergence_partitions": [10, 20, 30, 40, 50],
         "element_type": ["QUAD", "TRI"]
     },
     "output": {

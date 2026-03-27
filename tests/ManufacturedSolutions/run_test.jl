@@ -125,6 +125,7 @@ function run_mms()
     Re_list = as_list(get(test_dict["physical_parameters"], "Re", [10.0]))
     Da_list = as_list(get(test_dict["physical_parameters"], "Da", [1.0]))
     eps_list = as_list(get(test_dict["physical_parameters"], "epsilon", [0.0]))
+    alpha_list = as_list(get(test_dict["porosity_field"], "alpha_0", [0.4]))
     kv_list = as_list(get(test_dict["discretization"], "k_velocity", [1]))
     kp_list = as_list(get(test_dict["discretization"], "k_pressure", [1]))
     etype_list = as_list(get(test_dict["mesh"], "element_type", ["QUAD"]))
@@ -135,13 +136,14 @@ function run_mms()
     
     h5open(h5_path, "w") do h5f
         config_idx = 1
-        for (Re, Da, eps, kv, kp, etype) in Iterators.product(Re_list, Da_list, eps_list, kv_list, kp_list, etype_list)
+        for (Re, Da, eps, alpha_0, kv, kp, etype) in Iterators.product(Re_list, Da_list, eps_list, alpha_list, kv_list, kp_list, etype_list)
             println("\n========================================")
-            println("Running Config $config_idx: Re=$Re, Da=$Da, eps=$eps, kv=$kv, kp=$kp, type=$etype")
+            println("Running Config $config_idx: Re=$Re, Da=$Da, alpha_0=$alpha_0, type=$etype")
             println("========================================")
             
             override_dict = Dict(
                 "physical_parameters" => Dict("Re" => Float64(Re), "Da" => Float64(Da), "epsilon" => Float64(eps)),
+                "porosity_field" => Dict("alpha_0" => Float64(alpha_0)),
                 "discretization" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
                 "mesh" => Dict("element_type" => String(etype))
             )
@@ -157,12 +159,13 @@ function run_mms()
             for n in partitions
                 println("Running MMS for partition $n x $n")
         
+        vtu_name = "mms_Re$(Re)_Da$(Da)_a$(alpha_0)_$(etype)_n$(n)"
         config = PorousNSSolver.PorousNSConfig(
             phys=base_config.phys,
             porosity=base_config.porosity,
             discretization=base_config.discretization,
-            mesh=PorousNSSolver.MeshConfig(domain=base_config.mesh.domain, partition=[n, n]),
-            output=PorousNSSolver.OutputConfig(directory=joinpath(@__DIR__, "results"), basename="mms_$n")
+            mesh=PorousNSSolver.MeshConfig(domain=base_config.mesh.domain, partition=[n, n], element_type=String(etype)),
+            output=PorousNSSolver.OutputConfig(directory=joinpath(@__DIR__, "results"), basename=vtu_name)
         )
         
         model = PorousNSSolver.create_mesh(config)
@@ -220,8 +223,7 @@ function run_mms()
         # Compute errors
         e_u = u_final - u_h
         e_p = p_ex - p_h
-        
-        PorousNSSolver.export_results(config, model, u_h, p_h,
+                PorousNSSolver.export_results(config, model, u_h, p_h,
                     "u_ex" => u_final,
                     "p_ex" => p_ex,
                     "e_u" => e_u,
@@ -229,7 +231,12 @@ function run_mms()
                     "alpha" => alpha_fn)
                 
                 el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ))
-                el2_p = sqrt(sum(∫(e_p * e_p)dΩ))
+                
+                # Center pressure to isolate mean-fixing errors introduced by nullspace boundaries
+                area = sum(∫(1.0)dΩ)
+                mean_e_p = sum(∫(e_p)dΩ) / area
+                e_p_centered = e_p - mean_e_p
+                el2_p = sqrt(sum(∫(e_p_centered * e_p_centered)dΩ))
                 
                 eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ))
                 eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ))
@@ -259,6 +266,7 @@ function run_mms()
             # Write metadata attributes
             attributes(g)["Re"] = Float64(Re)
             attributes(g)["Da"] = Float64(Da)
+            attributes(g)["alpha_0"] = Float64(alpha_0)
             attributes(g)["epsilon"] = Float64(eps)
             attributes(g)["k_velocity"] = Int(kv)
             attributes(g)["k_pressure"] = Int(kp)

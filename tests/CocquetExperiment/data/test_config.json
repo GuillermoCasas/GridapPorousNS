@@ -1,7 +1,7 @@
 {
     "physical_parameters": {
         "Re": 100.0,
-        "Da": 1.0,
+        "Da": 1e-4,
         "epsilon": 0.0,
         "f_x": 0.0,
         "f_y": 0.0
@@ -16,11 +16,11 @@
         "k_pressure": 1
     },
     "mesh": {
-        "domain": [0.0, 5.0, 0.0, 1.0],
-        "partition": [50, 20]
+        "domain": [0.0, 2.0, 0.0, 1.0],
+        "partition": [40, 20]
     },
     "output": {
-        "directory": "tests/CocquetExperiment/results",
+        "directory": "results",
         "basename": "cocquet_flow"
     }
 }

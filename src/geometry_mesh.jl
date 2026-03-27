@@ -11,19 +11,18 @@ function create_mesh(config::PorousNSConfig)
         model = CartesianDiscreteModel(domain, partition)
     end
     
-    # Automatically tag boundaries for a 2D box
     # Default Gridap face labels for a 2D Cartesian box:
-    # 1,2,3,4: Corners
-    # 5: Left (x=xmin)
-    # 6: Right (x=xmax)
-    # 7: Bottom (y=ymin)
-    # 8: Top (y=ymax)
+    # 1..4: Corners
+    # 5: Bottom (y=ymin)
+    # 6: Top (y=ymax)
+    # 7: Left (x=xmin) -> Inlet
+    # 8: Right (x=xmax) -> Outlet
     labels = get_face_labeling(model)
-    add_tag_from_tags!(labels, "inlet", [5])
-    add_tag_from_tags!(labels, "outlet", [6])
+    add_tag_from_tags!(labels, "inlet", [7])
+    add_tag_from_tags!(labels, "outlet", [8])
     
     # Add top and bottom walls, plus all corners to "walls" tag
-    add_tag_from_tags!(labels, "walls", [1, 2, 3, 4, 7, 8])
+    add_tag_from_tags!(labels, "walls", [1, 2, 3, 4, 5, 6])
     
     return model
 end

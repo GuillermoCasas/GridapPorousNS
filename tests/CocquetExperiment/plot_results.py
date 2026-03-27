@@ -13,8 +13,8 @@ def plot_cocquet():
 
     mesh = pv.read(vtu_file)
     
-    # Extract line across the channel at x = 2.5
-    line = mesh.sample_over_line((2.5, 0, 0), (2.5, 1.0, 0), resolution=100)
+    # Extract line across the channel center at x = 1.0
+    line = mesh.sample_over_line((1.0, 0, 0), (1.0, 1.0, 0), resolution=100)
     
     y = line.points[:, 1]
     u = line['u'][:, 0]
@@ -24,7 +24,7 @@ def plot_cocquet():
     plt.axhline(0.5, color='r', linestyle='--', label='Porous/Fluid Interface')
     plt.xlabel('Velocity u_x')
     plt.ylabel('y')
-    plt.title('Velocity Profile at x=2.5')
+    plt.title('Velocity Profile at x=1.0')
     plt.legend()
     plt.grid(True)
     
