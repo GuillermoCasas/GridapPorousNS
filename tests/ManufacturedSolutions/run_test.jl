@@ -13,8 +13,8 @@ function alpha_field(x, config::PorousNSSolver.PorousNSConfig)
     alpha_0 = config.porosity.alpha_0
     r1 = config.porosity.r_1
     r2 = config.porosity.r_2
-    dx = x[1] - 1.0
-    dy = x[2] - 1.0
+    dx = x[1] - 0.0
+    dy = x[2] - 0.0
     r_sq = dx^2 + dy^2
     r = sqrt(r_sq)
     if r <= r1
@@ -41,8 +41,8 @@ function analyze_alpha(x, config)
     alpha_0 = config.porosity.alpha_0
     r1 = config.porosity.r_1
     r2 = config.porosity.r_2
-    dx = x[1] - 1.0
-    dy = x[2] - 1.0
+    dx = x[1] - 0.0
+    dy = x[2] - 0.0
     r_sq = dx^2 + dy^2
     r = sqrt(r_sq)
     
@@ -129,6 +129,10 @@ function run_mms()
     kv_list = as_list(get(test_dict["discretization"], "k_velocity", [1]))
     kp_list = as_list(get(test_dict["discretization"], "k_pressure", [1]))
     etype_list = as_list(get(test_dict["mesh"], "element_type", ["QUAD"]))
+    equal_order_only = get(test_dict, "equal_order_only", false)
+    if haskey(test_dict, "discretization")
+        equal_order_only = get(test_dict["discretization"], "equal_order_only", equal_order_only)
+    end
     
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
@@ -137,6 +141,9 @@ function run_mms()
     h5open(h5_path, "w") do h5f
         config_idx = 1
         for (Re, Da, eps, alpha_0, kv, kp, etype) in Iterators.product(Re_list, Da_list, eps_list, alpha_list, kv_list, kp_list, etype_list)
+            if equal_order_only && kv != kp
+                continue
+            end
             println("\n========================================")
             println("Running Config $config_idx: Re=$Re, Da=$Da, alpha_0=$alpha_0, type=$etype")
             println("========================================")

@@ -1,26 +1,27 @@
 {
     "physical_parameters": {
-        "Re": [1.0, 10.0, 100.0],
-        "Da": [1e-4, 1e-2, 1.0, 1000.0],
+        "Re": [1e-6, 1.0, 1e6],
+        "Da": [1e-6, 1.0, 1e6],
         "epsilon": [1e-5],
         "f_x": 0.0,
         "f_y": 0.0
     },
     "porosity_field": {
-        "alpha_0": [1.0, 0.4],
+        "alpha_0": [0.5, 0.05],
         "r_1": 0.2,
         "r_2": 0.5
     },
     "discretization": {
         "k_velocity": [1, 2],
-        "k_pressure": [1, 2]
+        "k_pressure": [1, 2],
+        "equal_order_only": true
     },
     "mesh": {
         "domain": [
-            0.0,
-            2.0,
-            0.0,
-            2.0
+            -0.5,
+            0.5,
+            -0.5,
+            0.5
         ],
         "partition": [
             10,
