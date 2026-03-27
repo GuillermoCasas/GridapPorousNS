@@ -1,4 +1,7 @@
+using Test
 using LinearAlgebra
+using Gridap
+using PorousNSSolver
 
 function alpha_exact(x, alpha_0, r1, r2)
     dx = x[1] - 1.0
@@ -37,16 +40,22 @@ function grad_alpha_exact(x, alpha_0, r1, r2)
     end
 end
 
-# finite diff check
-x_test = [1.2, 1.25]
-eps = 1e-7
-a0 = alpha_exact(x_test, 0.5, 0.2, 0.5)
-ax = alpha_exact(x_test .+ [eps, 0.0], 0.5, 0.2, 0.5)
-ay = alpha_exact(x_test .+ [0.0, eps], 0.5, 0.2, 0.5)
+@testset "PorousNSSolver Tests" begin
 
-grad_fd = [(ax - a0)/eps, (ay - a0)/eps]
-grad_an = grad_alpha_exact(x_test, 0.5, 0.2, 0.5)
+    @testset "Analytical Porosity Gradient Evaluation" begin
+        # Run finite difference check against analytical gradient
+        x_test = [1.2, 1.25]
+        eps = 1e-7
+        a0 = alpha_exact(x_test, 0.5, 0.2, 0.5)
+        ax = alpha_exact(x_test .+ [eps, 0.0], 0.5, 0.2, 0.5)
+        ay = alpha_exact(x_test .+ [0.0, eps], 0.5, 0.2, 0.5)
 
-println("FD: ", grad_fd)
-println("AN: ", grad_an)
-println("Diff: ", norm(grad_fd - grad_an))
+        grad_fd = [(ax - a0)/eps, (ay - a0)/eps]
+        grad_an = grad_alpha_exact(x_test, 0.5, 0.2, 0.5)
+
+        # Analytical gradient should extremely closely match the finite differences (Float64 eps scale limits)
+        @test isapprox(grad_fd[1], grad_an[1], atol=1e-5)
+        @test isapprox(grad_fd[2], grad_an[2], atol=1e-5)
+    end
+
+end
