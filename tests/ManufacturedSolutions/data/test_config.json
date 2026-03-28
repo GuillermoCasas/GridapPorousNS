@@ -2,7 +2,8 @@
     "physical_parameters": {
         "Re": [1e-6, 1.0, 1e6],
         "Da": [1e-6, 1.0, 1e6],
-        "epsilon": [1e-5],
+        "physical_epsilon": [1e-5],
+        "numerical_epsilon_coefficient": [0.0001],
         "f_x": 0.0,
         "f_y": 0.0
     },

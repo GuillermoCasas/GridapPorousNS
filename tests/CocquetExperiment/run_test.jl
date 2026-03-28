@@ -6,6 +6,7 @@ Pkg.activate(joinpath(@__DIR__, "..", ".."))
 using PorousNSSolver
 using Gridap
 using JSON
+using LineSearches
 
 # Alpha varies: 1.0 in free flow (y >= 0.5), 0.4 in porous (y < 0.5)
 # This mimics the Section 4.2 inhomogeneous porous media experiment with a free stream
@@ -50,14 +51,30 @@ function run_cocquet()
     alpha_h = interpolate_everywhere(alpha_func, Q)
     res(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, nothing, alpha_h)
     jac(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, nothing, alpha_h)
+    jac_picard(x, dx, y) = PorousNSSolver.weak_form_jacobian_picard(x, dx, y, config, dΩ, h, nothing, alpha_h)
     
-    op = FEOperator(res, jac, X, Y)
+    op_picard = FEOperator(res, jac_picard, X, Y)
+    op_newton = FEOperator(res, jac, X, Y)
     
-    nls = NLSolver(show_trace=true, method=:newton, iterations=15)
-    solver = FESolver(nls)
+    if config.solver.use_linesearch
+        nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=config.solver.newton_iterations)
+        nls_picard = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=config.solver.picard_iterations)
+    else
+        nls_newton = NLSolver(show_trace=true, method=:newton, iterations=config.solver.newton_iterations)
+        nls_picard = NLSolver(show_trace=true, method=:newton, iterations=config.solver.picard_iterations)
+    end
+    solver_newton = FESolver(nls_newton)
+    solver_picard = FESolver(nls_picard)
     
-    println("Solving the uncoupled/porous DBF equations...")
-    x_h = solve(solver, op)
+    if config.solver.picard_iterations > 0
+        println("Solving the uncoupled/porous DBF equations (Picard stage, $(config.solver.picard_iterations) iters)...")
+        x_h = solve(solver_picard, op_picard)
+        println("Solving the uncoupled/porous DBF equations (Newton stage)...")
+        solve!(x_h, solver_newton, op_newton)
+    else
+        println("Solving the uncoupled/porous DBF equations (Newton stage directly)...")
+        x_h = solve(solver_newton, op_newton)
+    end
     u_h, p_h = x_h
     
     # Export fields out to VTK

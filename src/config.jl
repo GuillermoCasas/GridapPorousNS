@@ -3,7 +3,8 @@
 @with_kw struct PhysicalParameters
     Re::Float64 = 1.0
     Da::Float64 = 1.0
-    epsilon::Float64 = 1.0
+    physical_epsilon::Float64 = 0.0
+    numerical_epsilon_coefficient::Float64 = 1e-4
     f_x::Float64 = 0.0
     f_y::Float64 = 0.0
 end
@@ -31,12 +32,19 @@ end
     basename::String = "porous_ns"
 end
 
+@with_kw struct SolverConfig
+    picard_iterations::Int = 5
+    newton_iterations::Int = 20
+    use_linesearch::Bool = true
+end
+
 @with_kw struct PorousNSConfig
     phys::PhysicalParameters = PhysicalParameters()
     porosity::PorosityField = PorosityField()
     discretization::DiscretizationConfig = DiscretizationConfig()
     mesh::MeshConfig = MeshConfig()
     output::OutputConfig = OutputConfig()
+    solver::SolverConfig = SolverConfig()
 end
 
 function deep_merge!(base::AbstractDict, override::AbstractDict)
@@ -76,5 +84,10 @@ function _parse_dict_to_config(dict::AbstractDict)
     local_mesh = MeshConfig(; (Symbol(k) => v for (k,v) in dict["mesh"])...)
     local_out = OutputConfig(; (Symbol(k) => v for (k,v) in dict["output"])...)
     
-    return PorousNSConfig(phys=local_phys, porosity=local_poro, discretization=local_disc, mesh=local_mesh, output=local_out)
+    local_solver = SolverConfig()
+    if haskey(dict, "solver")
+        local_solver = SolverConfig(; (Symbol(k) => v for (k,v) in dict["solver"])...)
+    end
+    
+    return PorousNSConfig(phys=local_phys, porosity=local_poro, discretization=local_disc, mesh=local_mesh, output=local_out, solver=local_solver)
 end

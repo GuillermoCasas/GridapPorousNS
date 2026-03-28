@@ -2,7 +2,8 @@
     "physical_parameters": {
         "Re": 1.0,
         "Da": 1.0,
-        "epsilon": 1.0,
+        "physical_epsilon": 0.0,
+        "numerical_epsilon_coefficient": 0.0001,
         "f_x": 0.0,
         "f_y": 0.0
     },
@@ -22,5 +23,10 @@
     "output": {
         "directory": "results",
         "basename": "porous_ns"
+    },
+    "solver": {
+        "picard_iterations": 5,
+        "newton_iterations": 20,
+        "use_linesearch": true
     }
 }

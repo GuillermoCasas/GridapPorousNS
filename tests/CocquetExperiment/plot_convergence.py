@@ -36,10 +36,6 @@ def plot_cocquet():
             plt.loglog(N_list, err_p, f'{c}{markers_p[idx]}--', linewidth=2, markersize=8, 
                        label=fr'P{k}/P{k} L2 Pressure (opt: $\mathcal{{O}}(h^{opt_p})$)')
             
-            # Print expected slopes correctly anchored relative to N
-            offset_ideal = err_u[0] * (N_list[0]**opt_u)
-            plt.loglog(N_list, offset_ideal * (N_list**(-float(opt_u))), f'{c}:', alpha=0.5, label=f'O(h^{opt_u}) reference')
-            
             # Annotate local slopes for each segment
             for i in range(len(N_list) - 1):
                 slope_u = (np.log(err_u[i+1]) - np.log(err_u[i])) / (np.log(h[i+1]) - np.log(h[i]))

@@ -1,9 +1,0 @@
-
-[74972] signal 2: Interrupt: 2
-in expression starting at /Users/guillermocasasgonzalez/repos/porous_NS_with_Gridap/tests/CocquetExperiment/run_test.jl:67
-_ZN4llvm15BaseIndexOffset5matchEPKNS_6SDNodeERKNS_12SelectionDAGE at /Users/guillermocasasgonzalez/.julia/juliaup/julia-1.11.7+0.aarch64.apple.darwin14/lib/julia/libLLVM.dylib (unknown line)
-unknown function (ip: 0x0)
-Allocations: 154815209 (Pool: 154809985; Big: 5224); GC: 49
-  Activating project at `~/repos/porous_NS_with_Gridap`
-Running Cocquet Experiment...
-Solving the uncoupled/porous DBF equations...
