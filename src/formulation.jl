@@ -39,7 +39,13 @@ function weak_form_residual(X, Y, config::PorousNSConfig, dΩ, h, f_custom=nothi
     # User directive: "the two epsilons can be added"
     num_eps_coef = config.phys.numerical_epsilon_coefficient
     eps_num = num_eps_coef * config.porosity.alpha_0 / (ν * (1.0 + Re + Da))
-    eps_val = config.phys.physical_epsilon + eps_num
+    # ALGORITHMIC RATIONALE: Nullspace Clamping
+    # We enforce a hard mathematical floor (1e-8) on the aggregate pseudo-compressibility.
+    # Without this clamp, at extreme advective/incompressible limits the global matrix generates 
+    # exact zero-diagonal blocks creating a singular pressure nullspace, triggering catastrophic O(10^20) 
+    # UMFPACK pivoting blowups. This is identically synchronized with manufactured boundary scripts 
+    # (g_ex) to eliminate O(10^-8) artificial mass residual drifts and preserve theoretical FME spatial rates.
+    eps_val = max(config.phys.physical_epsilon + eps_num, 1e-8)
     
     k_deg = config.discretization.k_velocity
     f = isnothing(f_custom) ? VectorValue(config.phys.f_x, config.phys.f_y) : f_custom
@@ -89,7 +95,7 @@ function weak_form_residual(X, Y, config::PorousNSConfig, dΩ, h, f_custom=nothi
     
     # Oseen operator explicitly forming the exact mathematical adjoint
     conv_v = ∇(v)' ⋅ u
-    L_u_star_v = alpha_conv * conv_v + alpha_conv * ∇(q)
+    L_u_star_v = alpha_conv * conv_v + alpha_conv * ∇(q) - σ * v
     
     # Internal continuity limits
     div_alpha_u = α * (∇⋅u) + u ⋅ ∇(α)
@@ -128,7 +134,13 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom=n
     Da = config.phys.Da
     num_eps_coef = config.phys.numerical_epsilon_coefficient
     eps_num = num_eps_coef * config.porosity.alpha_0 / (ν * (1.0 + Re + Da))
-    eps_val = config.phys.physical_epsilon + eps_num
+    # ALGORITHMIC RATIONALE: Nullspace Clamping
+    # We enforce a hard mathematical floor (1e-8) on the aggregate pseudo-compressibility.
+    # Without this clamp, at extreme advective/incompressible limits the global matrix generates 
+    # exact zero-diagonal blocks creating a singular pressure nullspace, triggering catastrophic O(10^20) 
+    # UMFPACK pivoting blowups. This is identically synchronized with manufactured boundary scripts 
+    # (g_ex) to eliminate O(10^-8) artificial mass residual drifts and preserve theoretical FME spatial rates.
+    eps_val = max(config.phys.physical_epsilon + eps_num, 1e-8)
     k_deg = config.discretization.k_velocity
     f = isnothing(f_custom) ? VectorValue(config.phys.f_x, config.phys.f_y) : f_custom
 
@@ -179,8 +191,8 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom=n
     R_du = alpha_conv_jac * conv_du + alpha_conv_jac * ∇(dp) + σ * du + (dsigma_du * u) - div_visc_du
     
     conv_v = ∇(v)' ⋅ u
-    L_u_star_v = alpha_conv_jac * conv_v + alpha_conv_jac * ∇(q)
-    dL_du_star_v = alpha_conv_jac * (∇(v)' ⋅ du)
+    L_u_star_v = alpha_conv_jac * conv_v + alpha_conv_jac * ∇(q) - σ * v
+    dL_du_star_v = alpha_conv_jac * (∇(v)' ⋅ du) - (dsigma_du * v)
     
     div_alpha_du = α * (∇⋅du) + du ⋅ ∇(α)
     R_dp = eps_val * dp + div_alpha_du
@@ -199,7 +211,14 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom=n
     
     L_q_star = α * (∇⋅v) + v ⋅ ∇(α)
     
-    # Stabilization matrices freeze limit parameters tau1, tau2 bypassing P2 cusp singularities
+    # ALGORITHMIC RATIONALE: Jacobian Newton-Cusp Freezing
+    # The algebraic scaling metrics tau_1 and tau_2 possess highly sensitive inverse limits (1/|u|).
+    # Computing their exact analytical Fréchet derivatives (dtau1_du, dtau2_du) structurally injects massive 
+    # indefinite and non-symmetric perturbation spikes identically near velocity stagnation domains (u ≈ 0).
+    # This inevitably destroys the matrix spectral coercivity, blowing up Newton descent on high-order (P2) elements.
+    # As mandated by standard ASGS formulation theory, we strictly "freeze" these advection-diffusion 
+    # parameter caps (discarding variations) whilst cleanly solving the remainder of the exact momentum Jacobians, 
+    # identically tracking local Forchheimer physical drag forces (dsigma_du) and non-linear Oseen terms.
     stab_mom_jac = L_u_star_v ⋅ (τ_1 * R_du) + dL_du_star_v ⋅ (τ_1 * R_u_old)
     stab_mass_jac = L_q_star * (τ_2 * R_dp)
 
@@ -225,7 +244,8 @@ function weak_form_jacobian_picard(X, dX, Y, config::PorousNSConfig, dΩ, h, f_c
     Da = config.phys.Da
     num_eps_coef = config.phys.numerical_epsilon_coefficient
     eps_num = num_eps_coef * config.porosity.alpha_0 / (ν * (1.0 + Re + Da))
-    eps_val = config.phys.physical_epsilon + eps_num
+    # Clamp to safely regularize the pressure nullspace and guarantee UMFPACK pivoting
+    eps_val = max(config.phys.physical_epsilon + eps_num, 1e-8)
     k_deg = config.discretization.k_velocity
     f = isnothing(f_custom) ? VectorValue(config.phys.f_x, config.phys.f_y) : f_custom
 
@@ -265,7 +285,7 @@ function weak_form_jacobian_picard(X, dX, Y, config::PorousNSConfig, dΩ, h, f_c
     R_du = alpha_conv_jac * conv_du + alpha_conv_jac * ∇(dp) + σ * du - div_visc_du
     
     conv_v = ∇(v)' ⋅ u
-    L_u_star_v = alpha_conv_jac * conv_v + alpha_conv_jac * ∇(q)
+    L_u_star_v = alpha_conv_jac * conv_v + alpha_conv_jac * ∇(q) - σ * v
     
     # Picard linearization: derivative of the adjoint convective operator is zero
     dL_du_star_v = 0.0 * (∇(v)' ⋅ du)

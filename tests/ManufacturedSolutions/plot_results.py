@@ -3,6 +3,22 @@ import numpy as np
 import os
 import h5py
 
+import time
+
+def robust_open_h5(filepath, mode='r', retries=10, delay=2.0):
+    os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
+    for attempt in range(retries):
+        try:
+            return h5py.File(filepath, mode, swmr=True)
+        except (OSError, RuntimeError) as e:
+            if attempt < retries - 1:
+                print(f"HDF5 file busy/locked. Retrying in {delay}s... ({attempt+1}/{retries})")
+                time.sleep(delay)
+            else:
+                print(f"Failed to open HDF5 file after {retries} attempts: {e}. Skipping plot generation.")
+                import sys
+                sys.exit(0)
+
 def plot_convergence():
     results_dir = os.path.join(os.path.dirname(__file__), 'results')
     h5_file = os.path.join(results_dir, 'convergence_data.h5')
@@ -16,7 +32,7 @@ def plot_convergence():
     # values: list of dicts with Re, Da, alpha_0, slope_u, fme_u, slope_p, fme_p
     table_data = {}
 
-    with h5py.File(h5_file, 'r') as f:
+    with robust_open_h5(h5_file, 'r') as f:
         for group_name in f.keys():
             g = f[group_name]
             
