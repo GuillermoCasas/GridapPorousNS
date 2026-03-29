@@ -36,14 +36,22 @@ function alpha_field(x, config::PorousNSSolver.PorousNSConfig)
 end
 
 # Global closures strictly preventing recreation within quadrature loops
-function u_ex(x, config)
+function get_force_scale(config)
     Re = config.phys.Re; Da = config.phys.Da
-    # ALGORITHMIC RATIONALE: Universal scaling to trap numerical floating-point limits natively.
-    # At extreme viscosity limits (Re=10^-6), standard u_ex generates f_ex ~ 10^12.
-    # In standard Float64 precision, adding O(1) fields to 10^12 introduces a 10^-4 truncation baseline,
-    # mapping false '0.00' spatial convergence slopes. Scaling velocity explicitly bounds maximum stress inside O(1) limits.
-    force_scale = 1.0 + (1.0 / Re) + (1.0 / (Da * Re))
-    return (1.0 / force_scale) * VectorValue(sin(pi*x[1])*sin(pi*x[2]), cos(pi*x[1])*cos(pi*x[2]))
+    a0 = config.porosity.alpha_0
+    
+    geom_a = ((1.0 - a0) / a0)^2
+    geom_b = (1.0 - a0) / a0
+    
+    visc_scale = 1.0 / Re
+    drag_scale = (150.0 / (Da * Re)) * geom_a + 1.75 * geom_b
+    
+    return 1.0 + visc_scale + drag_scale
+end
+
+function u_ex(x, config)
+    f_scale = get_force_scale(config)
+    return (1.0 / f_scale) * VectorValue(sin(pi*x[1])*sin(pi*x[2]), cos(pi*x[1])*cos(pi*x[2]))
 end
 
 # DO NOT SCALE PRESSURE. Leave it strictly O(1)
@@ -102,9 +110,8 @@ function analyze_alpha(x, config)
 end
 
 function grad_u_ex(x, config)
-    Re = config.phys.Re; Da = config.phys.Da
-    force_scale = 1.0 + (1.0 / Re) + (1.0 / (Da * Re))
-    return (1.0 / force_scale) * TensorValue(
+    f_scale = get_force_scale(config)
+    return (1.0 / f_scale) * TensorValue(
         pi * cos(pi*x[1])*sin(pi*x[2]), pi * sin(pi*x[1])*cos(pi*x[2]),
         -pi * sin(pi*x[1])*cos(pi*x[2]), -pi * cos(pi*x[1])*sin(pi*x[2])
     )
@@ -242,31 +249,32 @@ function run_mms()
         h_array = lazy_map(v -> is_tri ? sqrt(2.0 * abs(v)) : sqrt(abs(v)), get_cell_measure(Ω))
         h = CellField(h_array, Ω)
         
-        f(x) = f_ex(x, config)
-        alpha_fn(x) = alpha_field(x, config)
-        
-        println("Nodally interpolating alpha and f...")
-        alpha_h = interpolate_everywhere(alpha_fn, Q)
-        f_h = interpolate_everywhere(f, V)
-        
+        f_fn(x) = f_ex(x, config)
+        alpha_fn_wrapper(x) = alpha_field(x, config)
         g_fn(x) = g_ex(x, config)
-        g_h = interpolate_everywhere(g_fn, Q)
+        
+        # ALGORITHMIC RATIONALE: Exact Gauss Integration
+        # Interpolating steep exponential spikes onto nodal grids causes massive spatial aliasing.
+        # Passing functions directly forces Gridap to evaluate them exactly at the high-order dΩ Gauss points.
+        println("Binding analytical functions for exact Gauss integration...")
         
         println("Defining formulation closures...")
-        res(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_h, alpha_h, g_h)
-        jac(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_h, alpha_h, g_h)
-        jac_picard(x, dx, y) = PorousNSSolver.weak_form_jacobian_picard(x, dx, y, config, dΩ, h, f_h, alpha_h, g_h)
+        # Pass analytical functions packed into exact CellFields instead of nodal distributions
+        f_cf = CellField(f_fn, Ω)
+        alpha_cf = CellField(alpha_fn_wrapper, Ω)
+        g_cf = CellField(g_fn, Ω)
+        res(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, g_cf)
+        jac(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf)
         
         println("Creating FEOperators...")
-        op_picard = FEOperator(res, jac_picard, X, Y)
+        # Only the exact Newton operator is needed for MMS spatial error tracking
         op_newton = FEOperator(res, jac, X, Y)
         
-        # ALGORITHMIC RATIONALE: Initialize exactly at the manufactured root to bypass globalization limits.
-        # This isolates pure spatial FME truncation errors without triggering nonlinear tracking failures.
+        # ALGORITHMIC RATIONALE: Initialize exactly at the manufactured root.
+        # This isolates pure spatial FME truncation errors without triggering nonlinear globalization failures.
         println("Interpolating exact initial guess...")
         x0 = interpolate_everywhere([u_final, p_final], X)
         
-        # Bypass Picard entirely for MMS. Run exact Newton from the exact root.
         nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=15)
         solver_newton = FESolver(nls_newton)
         
@@ -283,7 +291,7 @@ function run_mms()
                     "p_ex" => p_final,
                     "e_u" => e_u,
                     "e_p" => e_p,
-                    "alpha" => alpha_fn)
+                    "alpha" => alpha_fn_wrapper)
                 
                 el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ))
                 
@@ -352,8 +360,8 @@ function run_mms()
     report_file = joinpath(results_dir, "convergence_report.md")
     open(report_file, "w") do io
         println(io, "# Convergence Rate and FME Table\n")
-        println(io, "| Config | Re | Da | α_0 | k | Elem | rate_u_L2 | opt_u_L2 | rate_p_L2 | opt_p_L2 | err_p_L2 (fine) |")
-        println(io, "|---|---|---|---|---|---|---|---|---|---|---|")
+        println(io, "| Config | Re | Da | α_0 | k | Elem | rate_u_L2 (opt) | rate_p_L2 (opt) | rate_u_H1 (opt) | rate_p_H1 (opt) | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |")
+        println(io, "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
         
         h5open(h5_path, "r") do h5f
             for group_name in sort(keys(h5f), by=x->parse(Int, split(x, "_")[2]))
@@ -366,15 +374,28 @@ function run_mms()
                 kv = read(attr["k_velocity"])
                 etype = read(attr["element_type"])
                 
-                rate_u = read(attr["rate_u_l2"])
-                rate_p = read(attr["rate_p_l2"])
-                err_p_last = read(g["err_p_l2"])[end]
+                rate_u_l2 = read(attr["rate_u_l2"])
+                rate_p_l2 = read(attr["rate_p_l2"])
+                rate_u_h1 = read(attr["rate_u_h1"])
+                rate_p_h1 = read(attr["rate_p_h1"])
                 
-                opt_u = kv + 1.0
-                opt_p = Float64(kv)
+                err_u_l2_last = read(g["err_u_l2"])[end]
+                err_p_l2_last = read(g["err_p_l2"])[end]
+                err_u_h1_last = read(g["err_u_h1"])[end]
+                err_p_h1_last = read(g["err_p_h1"])[end]
                 
-                Printf.@printf(io, "| C%s | %.0e | %.0e | %.2f | %d | %s | %5.2f | %5.2f | %5.2f | %5.2f | %.4e |\n", 
-                        c_idx, re, da, a0, kv, etype, rate_u, opt_u, rate_p, opt_p, err_p_last)
+                opt_u_l2 = kv + 1.0
+                opt_p_l2 = Float64(kv)
+                opt_u_h1 = Float64(kv)
+                opt_p_h1 = Float64(kv - 1)
+                
+                r_u_l2_str = Printf.@sprintf("%5.2f (%d)", rate_u_l2, Int(opt_u_l2))
+                r_p_l2_str = Printf.@sprintf("%5.2f (%d)", rate_p_l2, Int(opt_p_l2))
+                r_u_h1_str = Printf.@sprintf("%5.2f (%d)", rate_u_h1, Int(opt_u_h1))
+                r_p_h1_str = Printf.@sprintf("%5.2f (%d)", rate_p_h1, Int(opt_p_h1))
+                
+                Printf.@printf(io, "| C%s | %.0e | %.0e | %.2f | %d | %s | %s | %s | %s | %s | %.4e | %.4e | %.4e | %.4e |\n", 
+                        c_idx, re, da, a0, kv, etype, r_u_l2_str, r_p_l2_str, r_u_h1_str, r_p_h1_str, err_u_l2_last, err_p_l2_last, err_u_h1_last, err_p_h1_last)
             end
         end
     end
