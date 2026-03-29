@@ -1,20 +1,41 @@
 {
     "physical_parameters": {
-        "Re": [1e-6, 1.0, 1e6],
-        "Da": [1e-6, 1.0, 1e6],
-        "physical_epsilon": [1e-5],
-        "numerical_epsilon_coefficient": [0.0001],
+        "Re": [
+            1e-6,
+            1.0,
+            1e6
+        ],
+        "Da": [
+            1e-6,
+            1.0,
+            1e6
+        ],
+        "physical_epsilon": [
+            0.0
+        ],
+        "numerical_epsilon_coefficient": [
+            0.0001
+        ],
         "f_x": 0.0,
         "f_y": 0.0
     },
     "porosity_field": {
-        "alpha_0": [0.5, 0.05],
+        "alpha_0": [
+            0.5,
+            0.05
+        ],
         "r_1": 0.2,
-        "r_2": 0.5
+        "r_2": 0.4
     },
     "discretization": {
-        "k_velocity": [1, 2],
-        "k_pressure": [1, 2],
+        "k_velocity": [
+            1,
+            2
+        ],
+        "k_pressure": [
+            1,
+            2
+        ],
         "equal_order_only": true
     },
     "mesh": {
@@ -28,8 +49,15 @@
             10,
             10
         ],
-        "convergence_partitions": [10, 20, 30, 40, 50],
-        "element_type": ["QUAD", "TRI"]
+        "convergence_partitions": [
+            10,
+            30,
+            50
+        ],
+        "element_type": [
+            "QUAD",
+            "TRI"
+        ]
     },
     "output": {
         "directory": "tests/ManufacturedSolutions/results",

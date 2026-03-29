@@ -68,8 +68,10 @@ function run_convergence()
     # Force Parameters for Figure 2: Re=500, Da=1.0
     base_config_dict["physical_parameters"]["Re"] = 500.0
     base_config_dict["physical_parameters"]["Da"] = 1.0
-    base_config_dict["physical_parameters"]["physical_epsilon"] = 0.0
-    base_config_dict["physical_parameters"]["numerical_epsilon_coefficient"] = 0.0001
+    # Cocquet et al. Section 4.2 specifically adds ηp to the continuity equation
+    # with η = 1e-7 to ensure sub-matrix invertibility for Crout factorization
+    base_config_dict["physical_parameters"]["physical_epsilon"] = 1e-7
+    base_config_dict["physical_parameters"]["numerical_epsilon_coefficient"] = 0.0
     
     base_config_dict["mesh"]["domain"] = [0.0, 2.0, 0.0, 1.0]
     base_config = PorousNSSolver.load_config_from_dict(base_config_dict)

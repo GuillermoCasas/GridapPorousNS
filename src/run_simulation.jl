@@ -1,4 +1,5 @@
 # src/run_simulation.jl
+using LineSearches
 
 function run_simulation(config_path::String; 
                         dirichlet_tags=["walls"], 
@@ -24,14 +25,15 @@ function run_simulation(config_path::String;
     Y = MultiFieldFESpace([V, Q])
     X = MultiFieldFESpace([U, P])
     
-    degree = 2 * kv
+    degree = 4 * kv 
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     
     # Calculate element size h
     # Using cell measures (area in 2D) and taking sqrt
+    is_tri = config.mesh.element_type == "TRI"
     cell_measures = get_cell_measure(Ω)
-    h_array = lazy_map(v -> sqrt(abs(v)), cell_measures)
+    h_array = lazy_map(v -> is_tri ? sqrt(2.0 * abs(v)) : sqrt(abs(v)), cell_measures)
     h = CellField(h_array, Ω)
     
     # Define residual operator
@@ -56,14 +58,20 @@ function run_simulation(config_path::String;
 end
 
 # An alternative for when X and Y and op are constructed externally (like Manufactured Solutions)
-function run_simulation(op::FEOperator, config::PorousNSConfig, model, X)
-    nls = NLSolver(show_trace=true, method=:newton, iterations=10)
-    solver = FESolver(nls)
+function run_simulation(op_newton::FEOperator, op_picard::FEOperator, config::PorousNSConfig, model, X)
+    # Stage 1: Picard Initialization
+    nls_picard = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=5)
+    solver_picard = FESolver(nls_picard)
+    println("Solving Picard Initialization...")
+    x_picard = solve(solver_picard, op_picard)
     
-    println("Solving non-linear system...")
-    x_h = solve(solver, op)
+    # Stage 2: Newton-Raphson
+    nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=10)
+    solver_newton = FESolver(nls_newton)
+    println("Solving Newton-Raphson...")
+    solve!(x_picard, solver_newton, op_newton)
     
-    u_h, p_h = x_h
+    u_h, p_h = x_picard
     
     export_results(config, model, u_h, p_h)
     

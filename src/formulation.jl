@@ -67,7 +67,8 @@ function weak_form_residual(X, Y, config::PorousNSConfig, dΩ, h, f_custom=nothi
     function compute_tau_2(u_val, h_val, alpha_val)
         mag_u = sqrt(u_val ⋅ u_val + 1e-12)
         τ_1_NS_val = 1.0 / ( (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + 1e-12 )
-        return (h_val * h_val) / ( (c_1 * alpha_val * τ_1_NS_val) + (eps_val * h_val * h_val) + 1e-12 )
+        # Removed eps_val clamping to restore optimal high-viscosity mass conservation
+        return (h_val * h_val) / ( (c_1 * alpha_val * τ_1_NS_val) + 1e-12 )
     end
 
     σ = Operation(compute_sigma)(u, α)
@@ -149,7 +150,8 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom=n
     function compute_tau_2(u_val, h_val, alpha_val)
         mag_u = sqrt(u_val ⋅ u_val + 1e-12)
         τ_1_NS_val = 1.0 / ( (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + 1e-12 )
-        return (h_val * h_val) / ( (c_1 * alpha_val * τ_1_NS_val) + (eps_val * h_val * h_val) + 1e-12 )
+        # Removed eps_val clamping to restore optimal high-viscosity mass conservation
+        return (h_val * h_val) / ( (c_1 * alpha_val * τ_1_NS_val) + 1e-12 )
     end
 
     # Fréchet exact analytical derivatives to bypass Gridap AD exponential compilation 
@@ -244,7 +246,8 @@ function weak_form_jacobian_picard(X, dX, Y, config::PorousNSConfig, dΩ, h, f_c
     function compute_tau_2(u_val, h_val, alpha_val)
         mag_u = sqrt(u_val ⋅ u_val + 1e-12)
         τ_1_NS_val = 1.0 / ( (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + 1e-12 )
-        return (h_val * h_val) / ( (c_1 * alpha_val * τ_1_NS_val) + (eps_val * h_val * h_val) + 1e-12 )
+        # Removed eps_val clamping to restore optimal high-viscosity mass conservation
+        return (h_val * h_val) / ( (c_1 * alpha_val * τ_1_NS_val) + 1e-12 )
     end
 
     σ = Operation(compute_sigma)(u, α)

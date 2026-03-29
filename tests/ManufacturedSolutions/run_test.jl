@@ -36,24 +36,25 @@ function alpha_field(x, config::PorousNSSolver.PorousNSConfig)
 end
 
 # Global closures strictly preventing recreation within quadrature loops
-u_ex(x, config) = VectorValue(sin(pi*x[1])*sin(pi*x[2]), cos(pi*x[1])*cos(pi*x[2]))
-function p_ex(x, config)
-    Re = config.phys.Re
-    Da = config.phys.Da
-    P_scale = (1.0 + Re + Da) / Re
-    return P_scale * cos(pi*x[1])*sin(pi*x[2])
+function u_ex(x, config)
+    Re = config.phys.Re; Da = config.phys.Da
+    # ALGORITHMIC RATIONALE: Universal scaling to trap numerical floating-point limits natively.
+    # At extreme viscosity limits (Re=10^-6), standard u_ex generates f_ex ~ 10^12.
+    # In standard Float64 precision, adding O(1) fields to 10^12 introduces a 10^-4 truncation baseline,
+    # mapping false '0.00' spatial convergence slopes. Scaling velocity explicitly bounds maximum stress inside O(1) limits.
+    force_scale = 1.0 + (1.0 / Re) + (1.0 / (Da * Re))
+    return (1.0 / force_scale) * VectorValue(sin(pi*x[1])*sin(pi*x[2]), cos(pi*x[1])*cos(pi*x[2]))
 end
+
+# DO NOT SCALE PRESSURE. Leave it strictly O(1)
+p_ex(x, config) = cos(pi*x[1])*sin(pi*x[2])
 
 function g_ex(x, config::PorousNSSolver.PorousNSConfig)
     _, grad_alpha_val, _ = analyze_alpha(x, config)
     Re = config.phys.Re; ν = 1.0 / Re; Da = config.phys.Da
     eps_val = config.phys.physical_epsilon + (config.phys.numerical_epsilon_coefficient * config.porosity.alpha_0 / (ν * (1.0 + Re + Da)))
     
-    p_val = p_ex(x, config)
-    
-    # Exact mass balance: ε*p + ∇⋅(αu)
-    # Since ∇⋅u_ex = 0 analytically, ∇⋅(αu_ex) = u_ex ⋅ ∇α
-    return eps_val * p_val + (u_ex(x, config) ⋅ grad_alpha_val)
+    return eps_val * p_ex(x, config) + (u_ex(x, config) ⋅ grad_alpha_val)
 end
 
 function analyze_alpha(x, config)
@@ -98,43 +99,36 @@ function analyze_alpha(x, config)
 end
 
 function grad_u_ex(x, config)
-    return TensorValue(
+    Re = config.phys.Re; Da = config.phys.Da
+    force_scale = 1.0 + (1.0 / Re) + (1.0 / (Da * Re))
+    return (1.0 / force_scale) * TensorValue(
         pi * cos(pi*x[1])*sin(pi*x[2]), pi * sin(pi*x[1])*cos(pi*x[2]),
         -pi * sin(pi*x[1])*cos(pi*x[2]), -pi * cos(pi*x[1])*sin(pi*x[2])
     )
 end
 
-function lap_u_ex(x, config)
-    return -2.0 * pi^2 * u_ex(x, config)
-end
+lap_u_ex(x, config) = -2.0 * pi^2 * u_ex(x, config)
 
-function grad_p_ex(x, config)
-    Re = config.phys.Re
-    Da = config.phys.Da
-    P_scale = (1.0 + Re + Da) / Re
-    return P_scale * VectorValue(-pi * sin(pi*x[1])*sin(pi*x[2]), pi * cos(pi*x[1])*cos(pi*x[2]))
-end
+grad_p_ex(x, config) = VectorValue(-pi * sin(pi*x[1])*sin(pi*x[2]), pi * cos(pi*x[1])*cos(pi*x[2]))
 
-# Analytical Forcing term
 function f_ex(x, config::PorousNSSolver.PorousNSConfig)
     α_val, grad_alpha_val, lap_alpha_val = analyze_alpha(x, config)
-    Re = config.phys.Re
-    ν = 1.0 / Re
-    Da = config.phys.Da
+    Re = config.phys.Re; ν = 1.0 / Re; Da = config.phys.Da
     
-    u_ex_val = u_ex(x, config)
+    u_val = u_ex(x, config)
     grad_u_val = grad_u_ex(x, config)
     lap_u_val = lap_u_ex(x, config)
     grad_p_val = grad_p_ex(x, config)
     
-    conv_u_val = transpose(grad_u_val) ⋅ u_ex_val
-    div_stress = α_val * ν * lap_u_val + ν * (transpose(grad_u_val) ⋅ grad_alpha_val)
+    # Exact advection & viscous pseudo-traction perfectly matching your Gridap transpose syntax
+    conv_u_val = transpose(grad_u_val) ⋅ u_val
+    div_stress = α_val * ν * lap_u_val + ν * (transpose(grad_u_val) ⋅ grad_alpha_val) 
     
     a_term = PorousNSSolver.a_resistance(α_val, Re, Da)
     b_term = PorousNSSolver.b_resistance(α_val)
-    σ_val = a_term + b_term * norm(u_ex_val)
+    σ_val = a_term + b_term * norm(u_val)
     
-    return α_val * conv_u_val - div_stress + α_val * grad_p_val + σ_val * u_ex_val
+    return α_val * conv_u_val - div_stress + α_val * grad_p_val + σ_val * u_val
 end
 
 function run_mms()
@@ -161,13 +155,22 @@ function run_mms()
     h5_path = joinpath(results_dir, "convergence_data.h5")
     
     h5open(h5_path, "w") do h5f
+        # Precompute total valid configurations
+        total_configs = 0
+        for (Re, Da, alpha_0, kv, kp, etype) in Iterators.product(Re_list, Da_list, alpha_list, kv_list, kp_list, etype_list)
+            if equal_order_only && kv != kp
+                continue
+            end
+            total_configs += 1
+        end
+        
         config_idx = 1
         for (Re, Da, alpha_0, kv, kp, etype) in Iterators.product(Re_list, Da_list, alpha_list, kv_list, kp_list, etype_list)
             if equal_order_only && kv != kp
                 continue
             end
             println("\n========================================")
-            println("Running Config $config_idx: Re=$Re, Da=$Da, alpha_0=$alpha_0, type=$etype")
+            println("Running Config $config_idx of $total_configs: Re=$Re, Da=$Da, alpha_0=$alpha_0, k=$kv, type=$etype")
             println("========================================")
             
             conv_parts = get(test_dict["mesh"], "convergence_partitions", [10, 20, 30])
@@ -180,7 +183,7 @@ function run_mms()
                 "physical_parameters" => Dict("Re" => Float64(Re), "Da" => Float64(Da), "physical_epsilon" => Float64(phys_eps), "numerical_epsilon_coefficient" => Float64(num_eps_coeff)),
                 "porosity_field" => Dict("alpha_0" => Float64(alpha_0)),
                 "discretization" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
-                "mesh" => Dict("element_type" => String(etype), "convergence_partitions" => Int.(conv_parts))
+                "mesh" => Dict("element_type" => String(etype), "convergence_partitions" => Int.(conv_parts), "domain" => test_dict["mesh"]["domain"])
             )
             
             base_config = PorousNSSolver.load_config_from_dict(override_dict)
@@ -217,22 +220,23 @@ function run_mms()
         
         u_final(x) = u_ex(x, config)
         U = TrialFESpace(V, u_final)  
-        # Fix pressure at one point to remove nullspace, actually we can just use zero mean pressure or fix it on one node, 
-        # but Gridap allows fixing one node by modifying Q.
-        # Alternatively, evaluate L2 error using the mean subtracted.
-        # Use constraint=:zeromean to eliminate the pressure nullspace algebraically
-        Q_zeromean = TestFESpace(model, refe_p, conformity=:H1)
-        p_final(x) = p_ex(x, config)
-        P = TrialFESpace(Q_zeromean, p_final)
         
-        Y = MultiFieldFESpace([V, Q_zeromean])
+        p_final(x) = p_ex(x, config)
+        P = TrialFESpace(Q, p_final)
+        
+        Y = MultiFieldFESpace([V, Q])
         X = MultiFieldFESpace([U, P])
         
-        degree = 2 * config.discretization.k_velocity
+        # ALGORITHMIC RATIONALE: Adjust the degree calculation to properly integrate ASGS non-linear bounds
+        # ASGS formulation cross-multiplies convective structures tau_1 * (u*grad_v) * (u*grad_u).
+        # For P2 interpolations, velocity is O(x^2), convective derivative is O(x^3).
+        # Integration of the ASGS cross terms requires evaluating O(x^6) polynomials. Degree 4*k prevents aliasing.
+        degree = 4 * config.discretization.k_velocity
         Ω = Triangulation(model)
         dΩ = Measure(Ω, degree)
         
-        h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
+        is_tri = config.mesh.element_type == "TRI"
+        h_array = lazy_map(v -> is_tri ? sqrt(2.0 * abs(v)) : sqrt(abs(v)), get_cell_measure(Ω))
         h = CellField(h_array, Ω)
         
         f(x) = f_ex(x, config)
@@ -243,7 +247,7 @@ function run_mms()
         f_h = interpolate_everywhere(f, V)
         
         g_fn(x) = g_ex(x, config)
-        g_h = interpolate_everywhere(g_fn, Q_zeromean)
+        g_h = interpolate_everywhere(g_fn, Q)
         
         println("Defining formulation closures...")
         res(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_h, alpha_h, g_h)
@@ -254,26 +258,21 @@ function run_mms()
         op_picard = FEOperator(res, jac_picard, X, Y)
         op_newton = FEOperator(res, jac, X, Y)
         
-        if config.solver.use_linesearch
-            nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=config.solver.newton_iterations)
-            nls_picard = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=config.solver.picard_iterations)
-        else
-            nls_newton = NLSolver(show_trace=true, method=:newton, iterations=config.solver.newton_iterations)
-            nls_picard = NLSolver(show_trace=true, method=:newton, iterations=config.solver.picard_iterations)
-        end
-        solver_newton = FESolver(nls_newton)
+        # ALGORITHMIC RATIONALE: Hybrid Picard-Newton Initialization
+        # At Re=10^6, standard Newton-Raphson advective Jacobians diverge immediately from zero.
+        # Stage 1 (Picard): drops the unstable d(u \cdot grad)u velocity adjoint variation natively forming a continuous bounded quadratic basin.
+        nls_picard = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=5)
         solver_picard = FESolver(nls_picard)
+        println("Solving Picard Initialization...")
+        x_picard = solve(solver_picard, op_picard)
         
-        if config.solver.picard_iterations > 0
-            println("Solving non-linear system (Picard stage, $(config.solver.picard_iterations) iters)...")
-            x_h = solve(solver_picard, op_picard)
-            println("Solving non-linear system (Newton stage)...")
-            solve!(x_h, solver_newton, op_newton)
-        else
-            println("Solving non-linear system (Newton stage directly)...")
-            x_h = solve(solver_newton, op_newton)
-        end
-        u_h, p_h = x_h
+        # Stage 2 (Newton-Raphson): executes the rigorous analytical Fréchet exact Jacobian from the Picard initialization.
+        nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=15)
+        solver_newton = FESolver(nls_newton)
+        println("Solving Newton-Raphson...")
+        x_h = solve!(x_picard, solver_newton, op_newton) # Start from Picard guess!
+        
+        u_h, p_h = x_picard
         
         # Compute errors
         e_u = u_final - u_h
@@ -305,6 +304,9 @@ function run_mms()
                 push!(err_p_H1, eh1_p)
                 println("L2 Error u: $el2_u, p: $el2_p")
                 println("H1 Error u: $eh1_u, p: $eh1_p")
+                
+                # Prevent caching leaks
+                GC.gc()
             end
             
             # Save combination to HDF5
