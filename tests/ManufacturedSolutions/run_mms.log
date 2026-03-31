@@ -1,0 +1,73 @@
+
+[79322] signal 2: Interrupt: 2
+in expression starting at /Users/guillermocasasgonzalez/repos/porous_NS_with_Gridap/tests/ManufacturedSolutions/run_test.jl:434
+_ZZN12_GLOBAL__N_111DAGCombiner16visitTokenFactorEPN4llvm6SDNodeEENK3$_0clEjS3_j at /Users/guillermocasasgonzalez/.julia/juliaup/julia-1.11.7+0.aarch64.apple.darwin14/lib/julia/libLLVM.dylib (unknown line)
+unknown function (ip: 0x0)
+Allocations: 262524418 (Pool: 262488850; Big: 35568); GC: 82
+  Activating project at `~/repos/porous_NS_with_Gridap`
+Precompiling PorousNSSolver...
+   2989.9 ms  ✓ PorousNSSolver
+  1 dependency successfully precompiled in 3 seconds. 169 already precompiled.
+┌ Warning: detected extension '.5_QUAD_n10_ASGS' does not correspond to dataset type.
+│ Appending '.vtu' to filename.
+└ @ WriteVTK ~/.julia/packages/WriteVTK/Be3qm/src/WriteVTK.jl:162
+┌ Warning: detected extension '.5_QUAD_n30_ASGS' does not correspond to dataset type.
+│ Appending '.vtu' to filename.
+└ @ WriteVTK ~/.julia/packages/WriteVTK/Be3qm/src/WriteVTK.jl:162
+┌ Warning: detected extension '.5_QUAD_n50_ASGS' does not correspond to dataset type.
+│ Appending '.vtu' to filename.
+└ @ WriteVTK ~/.julia/packages/WriteVTK/Be3qm/src/WriteVTK.jl:162
+
+========================================
+Running Config 1: Re=1.0e-6, Da=1.0e-6, alpha_0=0.5, k=1, type=QUAD, method=ASGS
+========================================
+Running MMS for partition 10 x 10
+Binding analytical functions for exact Gauss integration...
+Defining formulation closures...
+Creating FEOperators...
+Interpolating exact initial guess...
+Solving Newton-Raphson from exact initialization...
+Iter     f(x) inf-norm    Step 2-norm 
+------   --------------   --------------
+     0     4.559800e-04              NaN
+     1     5.325601e-16     1.426644e-02
+Results exported to: /Users/guillermocasasgonzalez/repos/porous_NS_with_Gridap/tests/ManufacturedSolutions/results/mms_Re1.0e-6_Da1.0e-6_a0.5_QUAD_n10_ASGS.vtu
+L2 Error u: 1.6956604303711937e-11, p: 0.005327770108255765
+H1 Error u: 3.1795943161795664e-10, p: 0.24026504047635072
+Running MMS for partition 30 x 30
+Binding analytical functions for exact Gauss integration...
+Defining formulation closures...
+Creating FEOperators...
+Interpolating exact initial guess...
+Solving Newton-Raphson from exact initialization...
+Iter     f(x) inf-norm    Step 2-norm 
+------   --------------   --------------
+     0     1.228757e-05              NaN
+     1     1.734723e-17     9.902273e-04
+Results exported to: /Users/guillermocasasgonzalez/repos/porous_NS_with_Gridap/tests/ManufacturedSolutions/results/mms_Re1.0e-6_Da1.0e-6_a0.5_QUAD_n30_ASGS.vtu
+L2 Error u: 7.825866078887072e-13, p: 0.0004150062300633255
+H1 Error u: 2.8083739434605203e-11, p: 0.06981545136025333
+Running MMS for partition 50 x 50
+Binding analytical functions for exact Gauss integration...
+Defining formulation closures...
+Creating FEOperators...
+Interpolating exact initial guess...
+Solving Newton-Raphson from exact initialization...
+Iter     f(x) inf-norm    Step 2-norm 
+------   --------------   --------------
+     0     1.320102e-06              NaN
+     1     1.040834e-17     3.133102e-04
+Results exported to: /Users/guillermocasasgonzalez/repos/porous_NS_with_Gridap/tests/ManufacturedSolutions/results/mms_Re1.0e-6_Da1.0e-6_a0.5_QUAD_n50_ASGS.vtu
+L2 Error u: 1.292733404310039e-13, p: 0.00012928002914119497
+H1 Error u: 5.9053972730037865e-12, p: 0.040630512666986696
+
+========================================
+Running Config 1: Re=1.0e-6, Da=1.0e-6, alpha_0=0.5, k=1, type=QUAD, method=OSGS
+========================================
+Running MMS for partition 10 x 10
+Binding analytical functions for exact Gauss integration...
+Defining formulation closures...
+Creating FEOperators...
+Interpolating exact initial guess...
+Solving Newton-Raphson from exact initialization...
+OSGS Iteration 1/3

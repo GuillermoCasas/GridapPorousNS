@@ -36,6 +36,8 @@ end
     picard_iterations::Int = 5
     newton_iterations::Int = 20
     use_linesearch::Bool = true
+    method::String = "ASGS"
+    osgs_iterations::Int = 3
 end
 
 @with_kw struct PorousNSConfig

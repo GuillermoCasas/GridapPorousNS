@@ -33,23 +33,27 @@ def plot_convergence():
     table_data = {}
 
     with robust_open_h5(h5_file, 'r') as f:
+        # Group runs by config_idx
+        import collections
+        config_dict = collections.defaultdict(dict)
         for group_name in f.keys():
-            g = f[group_name]
+            parts = group_name.split('_')
+            if len(parts) >= 3 and parts[0] == 'config':
+                c_idx = parts[1]
+                method = parts[-1] 
+                config_dict[c_idx][method] = f[group_name]
+
+        for c_idx, methods in config_dict.items():
+            # We'll use the metadata from the first method we find (they are identical except for method)
+            first_g = next(iter(methods.values()))
             
-            # Read Datasets
-            h = g['h'][:]
-            err_u_l2 = g['err_u_l2'][:]
-            err_p_l2 = g['err_p_l2'][:]
-            err_u_h1 = g['err_u_h1'][:]
-            err_p_h1 = g['err_p_h1'][:]
-            
-            # Read Metadata
-            Re = g.attrs.get('Re', 'N/A')
-            Da = g.attrs.get('Da', 'N/A')
-            kv = g.attrs.get('k_velocity', 'N/A')
-            kp = g.attrs.get('k_pressure', 'N/A')
-            alpha_0 = g.attrs.get('alpha_0', 'N/A')
-            etype = g.attrs.get('element_type', 'N/A')
+            # Read Metadata once per config
+            Re = first_g.attrs.get('Re', 'N/A')
+            Da = first_g.attrs.get('Da', 'N/A')
+            kv = first_g.attrs.get('k_velocity', 'N/A')
+            kp = first_g.attrs.get('k_pressure', 'N/A')
+            alpha_0 = first_g.attrs.get('alpha_0', 'N/A')
+            etype = first_g.attrs.get('element_type', 'N/A')
             if isinstance(etype, bytes):
                 etype = etype.decode('utf-8')
                 
@@ -57,64 +61,105 @@ def plot_convergence():
             opt_u_h1 = kv
             opt_p_l2 = kp
             
-            # For summary tables: compute slope from two finest meshes and FME natively
-            if len(h) >= 2:
-                slope_finest_u = (np.log(err_u_l2[-1]) - np.log(err_u_l2[-2])) / (np.log(h[-1]) - np.log(h[-2]))
-                slope_finest_p = (np.log(err_p_l2[-1]) - np.log(err_p_l2[-2])) / (np.log(h[-1]) - np.log(h[-2]))
-                fme_u = err_u_l2[-1]
-                fme_p = err_p_l2[-1]
-            else:
-                slope_finest_u = 0.0
-                slope_finest_p = 0.0
-                fme_u = err_u_l2[-1] if len(h) > 0 else 0.0
-                fme_p = err_p_l2[-1] if len(h) > 0 else 0.0
+            plt.figure(figsize=(10, 8))
+            
+            table_row = {
+                'Re': float(Re), 'Da': float(Da), 'alpha_0': float(alpha_0)
+            }
+            
+            for method, g in methods.items():
+                h = g['h'][:]
+                err_u_l2 = g['err_u_l2'][:]
+                err_p_l2 = g['err_p_l2'][:]
+                err_u_h1 = g['err_u_h1'][:]
+                err_p_h1 = g['err_p_h1'][:]
                 
+                # Filter out pure-zero arrays avoiding nan logs
+                valid_mask = (err_u_l2 > 0) & (err_p_l2 > 0)
+                h = h[valid_mask]
+                err_u_l2 = err_u_l2[valid_mask]
+                err_p_l2 = err_p_l2[valid_mask]
+                err_u_h1 = err_u_h1[valid_mask]
+                err_p_h1 = err_p_h1[valid_mask]
+                
+                ls = '-' if method == 'ASGS' else '--'
+                
+                if len(h) >= 2:
+                    slope_finest_u = (np.log(err_u_l2[-1]) - np.log(err_u_l2[-2])) / (np.log(h[-1]) - np.log(h[-2]))
+                    slope_finest_p = (np.log(err_p_l2[-1]) - np.log(err_p_l2[-2])) / (np.log(h[-1]) - np.log(h[-2]))
+                    fme_u = err_u_l2[-1]
+                    fme_p = err_p_l2[-1]
+                else:
+                    slope_finest_u = float('nan')
+                    slope_finest_p = float('nan')
+                    fme_u = err_u_l2[-1] if len(h) > 0 else float('nan')
+                    fme_p = err_p_l2[-1] if len(h) > 0 else float('nan')
+                
+                table_row[f'slope_u_{method}'] = slope_finest_u
+                table_row[f'fme_u_{method}'] = fme_u
+                table_row[f'slope_p_{method}'] = slope_finest_p
+                table_row[f'fme_p_{method}'] = fme_p
+                
+                plt.loglog(h, err_u_l2, marker='o', linestyle=ls, color='blue', linewidth=2, markersize=8,
+                           label=f'{method} $L_2$ Velocity ({opt_u_l2})')
+                plt.loglog(h, err_u_h1, marker='D', linestyle=ls, color='blue', linewidth=2, markersize=8,
+                           label=f'{method} $H^1$ Velocity ({opt_u_h1})')
+                plt.loglog(h, err_p_l2, marker='o', linestyle=ls, color='red', linewidth=2, markersize=8, markerfacecolor='white',
+                           label=f'{method} $L_2$ Pressure ({opt_p_l2})')
+
+                # Annotate local slopes for each segment
+                alpha = 0.50 if method == 'ASGS' else 0.75
+                offset_pts = 15.0 if method == 'ASGS' else -15.0
+
+                for i in range(len(h)-1):
+                    # Points in log space
+                    h_pt = np.exp((1.0 - alpha) * np.log(h[i]) + alpha * np.log(h[i+1]))
+                    
+                    # Log distances to estimate visual direction
+                    d_log_h = np.log(h[i+1]) - np.log(h[i])
+                    
+                    def annotate_slope(err_arr, c_plot):
+                        err_pt = np.exp((1.0 - alpha) * np.log(err_arr[i]) + alpha * np.log(err_arr[i+1]))
+                        slope_val = (np.log(err_arr[i+1]) - np.log(err_arr[i])) / (np.log(h[i+1]) - np.log(h[i]))
+                        
+                        d_log_e = np.log(err_arr[i+1]) - np.log(err_arr[i])
+                        
+                        # Orient tangent from left to right (visual axis +x)
+                        if d_log_h < 0:
+                            t_x, t_y = -d_log_h, -d_log_e
+                        else:
+                            t_x, t_y = d_log_h, d_log_e
+                            
+                        # Normalize direction exactly as plotted proportions
+                        length = np.sqrt(t_x**2 + t_y**2)
+                        if length == 0: length = 1.0
+                        
+                        # Normal vector "up and left" from tangent
+                        n_x = -t_y / length
+                        n_y = t_x / length
+                        
+                        plt.annotate(f'{slope_val:.2f}', xy=(h_pt, err_pt), 
+                                     xytext=(n_x * offset_pts, n_y * offset_pts),
+                                     textcoords='offset points', ha='center', va='center', 
+                                     fontsize=8, color=c_plot, fontweight='bold')
+
+                    annotate_slope(err_u_l2, 'blue')
+                    annotate_slope(err_u_h1, 'blue')
+                    annotate_slope(err_p_l2, 'red')
+            
             key = (etype, kv, kp)
             if key not in table_data:
                 table_data[key] = []
-            
-            table_data[key].append({
-                'Re': float(Re),
-                'Da': float(Da),
-                'alpha_0': float(alpha_0),
-                'slope_u': slope_finest_u,
-                'fme_u': fme_u,
-                'slope_p': slope_finest_p,
-                'fme_p': fme_p
-            })
-            
-            # Plotting logic
-            plt.figure(figsize=(10, 8))
-            plt.loglog(h, err_u_l2, 'o-', color='C0', label=fr'Velocity $L^2$ Error (optimal: $\mathcal{{O}}(h^{{{opt_u_l2}}})$)')
-            plt.loglog(h, err_u_h1, 's-', color='C1', label=fr'Velocity $H^1$ Error (optimal: $\mathcal{{O}}(h^{{{opt_u_h1}}})$)')
-            plt.loglog(h, err_p_l2, '^-', color='C2', label=fr'Pressure $L^2$ Error (optimal: $\mathcal{{O}}(h^{{{opt_p_l2}}})$)')
-            
-            # Annotate local slopes for each segment
-            for i in range(len(h) - 1):
-                slope_u_l2 = (np.log(err_u_l2[i+1]) - np.log(err_u_l2[i])) / (np.log(h[i+1]) - np.log(h[i]))
-                slope_u_h1 = (np.log(err_u_h1[i+1]) - np.log(err_u_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))
-                slope_p_l2 = (np.log(err_p_l2[i+1]) - np.log(err_p_l2[i])) / (np.log(h[i+1]) - np.log(h[i]))
-                
-                h_mid = np.exp((np.log(h[i]) + np.log(h[i+1])) / 2.0)
-                err_u_l2_mid = np.exp((np.log(err_u_l2[i]) + np.log(err_u_l2[i+1])) / 2.0)
-                err_u_h1_mid = np.exp((np.log(err_u_h1[i]) + np.log(err_u_h1[i+1])) / 2.0)
-                err_p_l2_mid = np.exp((np.log(err_p_l2[i]) + np.log(err_p_l2[i+1])) / 2.0)
-                
-                plt.annotate(f'{slope_u_l2:.2f}', xy=(h_mid, err_u_l2_mid), xytext=(-10, 10), 
-                             textcoords='offset points', color='C0', fontweight='bold')
-                plt.annotate(f'{slope_u_h1:.2f}', xy=(h_mid, err_u_h1_mid), xytext=(10, 10), 
-                             textcoords='offset points', color='C1', fontweight='bold')
-                plt.annotate(f'{slope_p_l2:.2f}', xy=(h_mid, err_p_l2_mid), xytext=(-10, -15), 
-                             textcoords='offset points', color='C2', fontweight='bold')
+            table_data[key].append(table_row)
             
             plt.xlabel(r'Mesh size ($h$)')
             plt.ylabel('Error Norms')
-            title_str = fr'Convergence ($Re: {Re}$, $Da: {Da}$, $\alpha_0: {alpha_0}$, $k_v: {kv}$, $k_p: {kp}$, Mesh: {etype})'
+            title_str = fr'Convergence ($Re: {Re}$, $Da: {Da}$, $\alpha_0: {alpha_0}$, $k: {kv}$, Mesh: {etype})'
             plt.title(title_str)
-            plt.legend()
+            plt.legend(handlelength=4.0)
             plt.grid(True, which="both", ls="--")
             
-            plot_file = os.path.join(results_dir, f'convergence_Re{Re}_Da{Da}_a{alpha_0}_kv{kv}_kp{kp}_{etype}.png')
+            plot_file = os.path.join(results_dir, f'convergence_config{c_idx}_Re{Re}_Da{Da}_a{alpha_0}_{etype}.png')
             plt.savefig(plot_file)
             plt.close()
 
@@ -143,39 +188,114 @@ def write_summary_tables(table_data, results_dir):
             
             # Velocity Table Matrix
             f.write("velocity\n")
-            f.write(f"                        slope ({opt_u})      FME\n")
-            f.write("Re          Da          α0      ASGS          ASGS\n")
+            f.write(f"                        ASGS ({opt_u})                   OSGS ({opt_u})    \n")
+            f.write("Re          Da          α0      slope        FME          slope        FME\n")
             for row in data:
                 Re_str = format_scientific(row['Re'])
                 Da_str = format_scientific(row['Da'])
                 a0_str = f"{row['alpha_0']:.2f}"
-                slope = f"{row['slope_u']:.2f}"
-                fme = f"{row['fme_u']:.2e}"
-                f.write(f"{Re_str:<11} {Da_str:<11} {a0_str:<7} {slope:<13} {fme:<13}\n")
+                
+                def fmt_slope(v): return "N/A" if np.isnan(v) else f"{v:.2f}"
+                def fmt_fme(v): return "N/A" if np.isnan(v) else f"{v:.2e}"
+                
+                slope_a = fmt_slope(row.get('slope_u_ASGS', np.nan))
+                fme_a = fmt_fme(row.get('fme_u_ASGS', np.nan))
+                slope_o = fmt_slope(row.get('slope_u_OSGS', np.nan))
+                fme_o = fmt_fme(row.get('fme_u_OSGS', np.nan))
+                f.write(f"{Re_str:<11} {Da_str:<11} {a0_str:<7} {slope_a:<12} {fme_a:<12} {slope_o:<12} {fme_o:<12}\n")
             
             f.write("\n")
             
             # Pressure Table Matrix
             f.write("pressure\n")
-            f.write(f"                        slope ({opt_p})      FME\n")
-            f.write("Re          Da          α0      ASGS          ASGS\n")
+            f.write(f"                        ASGS ({opt_p})                   OSGS ({opt_p})    \n")
+            f.write("Re          Da          α0      slope        FME          slope        FME\n")
             for row in data:
                 Re_str = format_scientific(row['Re'])
                 Da_str = format_scientific(row['Da'])
                 a0_str = f"{row['alpha_0']:.2f}"
-                slope = f"{row['slope_p']:.2f}"
-                fme = f"{row['fme_p']:.2e}"
-                f.write(f"{Re_str:<11} {Da_str:<11} {a0_str:<7} {slope:<13} {fme:<13}\n")
+                
+                def fmt_slope(v): return "N/A" if np.isnan(v) else f"{v:.2f}"
+                def fmt_fme(v): return "N/A" if np.isnan(v) else f"{v:.2e}"
+                
+                slope_a = fmt_slope(row.get('slope_p_ASGS', np.nan))
+                fme_a = fmt_fme(row.get('fme_p_ASGS', np.nan))
+                slope_o = fmt_slope(row.get('slope_p_OSGS', np.nan))
+                fme_o = fmt_fme(row.get('fme_p_OSGS', np.nan))
+                f.write(f"{Re_str:<11} {Da_str:<11} {a0_str:<7} {slope_a:<12} {fme_a:<12} {slope_o:<12} {fme_o:<12}\n")
             
             f.write("\n========================================================================================================\n\n")
             
     print(f"Summary tables structurally generated and saved to: {summary_file}")
 
+def generate_markdown_report(h5_file, results_dir):
+    report_file = os.path.join(results_dir, "convergence_report.md")
+    with open(report_file, "w") as io:
+        io.write("# Convergence Rate and FME Table\n\n")
+        io.write("| Config | Method | Re | Da | α_0 | k | Elem | rate_u_L2 (opt) | rate_p_L2 (opt) | rate_u_H1 (opt) | rate_p_H1 (opt) | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |\n")
+        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+        
+        with robust_open_h5(h5_file, 'r') as h5f:
+            groups = sorted(h5f.keys(), key=lambda x: int(x.split('_')[1]))
+            for group_name in groups:
+                g = h5f[group_name]
+                c_idx = group_name.split('_')[1]
+                method = group_name.split('_')[2]
+                
+                re = float(g.attrs['Re'])
+                da = float(g.attrs['Da'])
+                a0 = float(g.attrs['alpha_0'])
+                kv = int(g.attrs['k_velocity'])
+                etype = g.attrs['element_type']
+                if isinstance(etype, bytes): etype = etype.decode('utf-8')
+                
+                rate_u_l2 = float(g.attrs['rate_u_l2'])
+                rate_p_l2 = float(g.attrs['rate_p_l2'])
+                rate_u_h1 = float(g.attrs['rate_u_h1'])
+                rate_p_h1 = float(g.attrs['rate_p_h1'])
+                
+                err_u_l2_last = g['err_u_l2'][-1] if len(g['err_u_l2']) > 0 else float('nan')
+                err_p_l2_last = g['err_p_l2'][-1] if len(g['err_p_l2']) > 0 else float('nan')
+                err_u_h1_last = g['err_u_h1'][-1] if len(g['err_u_h1']) > 0 else float('nan')
+                err_p_h1_last = g['err_p_h1'][-1] if len(g['err_p_h1']) > 0 else float('nan')
+                
+                opt_u_l2 = float(kv + 1)
+                opt_p_l2 = float(kv)
+                opt_u_h1 = float(kv)
+                opt_p_h1 = float(kv - 1)
+                
+                def format_rate(rate, opt):
+                    if np.isnan(rate):
+                        return f"  N/A ({int(opt)})"
+                    threshold = opt * 0.90 if opt > 0 else -0.10
+                    if rate < threshold:
+                        return f"<b style='color:red'>{rate:5.2f}</b> ({int(opt)})"
+                    return f" {rate:5.2f} ({int(opt)})"
+                
+                def format_sci(v):
+                    if np.isnan(v): return "NaN"
+                    return f"{v:.4e}"
+
+                def jl_fmt(val):
+                    if val == 1.0: return "1e+00"
+                    if val == 1e-6: return "1e-06"
+                    if val == 1e6: return "1e+06"
+                    s = f"{val:.0e}".replace("e-0", "e-").replace("e+0", "e+")
+                    return s
+
+                ru2 = format_rate(rate_u_l2, opt_u_l2)
+                rp2 = format_rate(rate_p_l2, opt_p_l2)
+                ru1 = format_rate(rate_u_h1, opt_u_h1)
+                rp1 = format_rate(rate_p_h1, opt_p_h1)
+                
+                io.write(f"| C{c_idx} | {method} | {jl_fmt(re)} | {jl_fmt(da)} | {a0:.2f} | {kv} | {etype} | {ru2} | {rp2} | {ru1} | {rp1} | {format_sci(err_u_l2_last)} | {format_sci(err_p_l2_last)} | {format_sci(err_u_h1_last)} | {format_sci(err_p_h1_last)} |\n")
+                
+    print(f"Convergence Markdown report generated explicitly securely to: {report_file}")
+
 def format_scientific(val):
     if val == 1.0:
         return "1"
     else:
-        # e.g., 1e-06 -> 10^-6 natively
         s = f"{val:.0e}"
         s = s.replace("e-0", "e-").replace("e+0", "e")
         base, exp = s.split("e")
@@ -185,3 +305,7 @@ def format_scientific(val):
 
 if __name__ == "__main__":
     plot_convergence()
+    results_dir = os.path.join(os.path.dirname(__file__), 'results')
+    h5_file = os.path.join(results_dir, 'convergence_data.h5')
+    if os.path.exists(h5_file):
+        generate_markdown_report(h5_file, results_dir)

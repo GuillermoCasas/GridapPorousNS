@@ -1,9 +1,9 @@
 {
     "physical_parameters": {
-        "Re": 100.0,
-        "Da": 1e-4,
-        "physical_epsilon": 0.0,
-        "numerical_epsilon_coefficient": 1e-4,
+        "Re": 500.0,
+        "Da": 1.0,
+        "physical_epsilon": 1e-7,
+        "numerical_epsilon_coefficient": 0.0,
         "f_x": 0.0,
         "f_y": 0.0
     },
@@ -18,7 +18,9 @@
     },
     "mesh": {
         "domain": [0.0, 2.0, 0.0, 1.0],
-        "partition": [40, 20]
+        "partition": [400, 200],
+        "convergence_partitions": [25, 50, 100],
+        "element_type": "TRI"
     },
     "output": {
         "directory": "results",

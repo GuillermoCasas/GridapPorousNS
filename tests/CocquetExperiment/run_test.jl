@@ -47,8 +47,9 @@ function run_cocquet()
     h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
     h = CellField(h_array, Ω)
     
-    # Interpolate alpha_func to Q so it acts as a smooth CellField and permits native AD scaling
-    alpha_h = interpolate_everywhere(alpha_func, Q)
+    # Interpolate alpha_func to a boundary-unconstrained space matching Q so it avoids zeroing out the outlet Dirichlet nodes
+    Q_alpha = TestFESpace(model, refe_p, conformity=:H1)
+    alpha_h = interpolate_everywhere(alpha_func, Q_alpha)
     res(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, nothing, alpha_h)
     jac(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, nothing, alpha_h)
     jac_picard(x, dx, y) = PorousNSSolver.weak_form_jacobian_picard(x, dx, y, config, dΩ, h, nothing, alpha_h)

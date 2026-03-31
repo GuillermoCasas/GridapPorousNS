@@ -38,6 +38,26 @@ Below, we detail the core algorithmic elements implemented in the codebase, what
 **The Algorithmic Intervention**: During Method of Manufactured Solution (MMS) validations, the artificial continuous equations and true velocity $u_{ex}$ are geometrically attenuated by a localized scalar bound `get_force_scale` aggregating the global viscous and Forchheimer bounds.
 **What it provides**: Unscaled manufactured true formulations evaluating at pure viscosity limits ($Re = 10^{-6}$) naturally cast $O(10^{12})$ loading scales dynamically. Inside standard double-precision `Float64` constraints, combining this unscaled load with bounded variable limits induces severe $10^{-4}$ numeric truncation ceilings that permanently drown sensitive generic $O(h^k)$ evaluation thresholds. Sinking and scaling the velocities directly maps continuous evaluation metrics seamlessly underneath generic floating-point stress-limits natively preserving scaling convergence slopes perfectly to zero.
 
+### 7. Lossless Subspace Prolongation & Convergence Aliasing
+**The Objective**: Accurately tracking spatial convergence rates ($L_2$ and $H^1$-seminorms) requires integrating errors natively between disparate discrete densities, such as comparing a coarse grid $N=25$ against a highly refined $N=200$ reference solution.
+**The Algorithmic Intervention**: Rather than relying on standard geometrical Point-in-Cell interpolation structures (which enforce a massive $\mathcal{O}(M_{quad} \times N_{cells})$ CPU tree-search crash) or lossy analytical field wrappers, the convergence loops dynamically exploit the mathematically nested property of uniform Cartesian grids ($V_H \subset V_h$). Coarse FEFunctions are directly, exactly prolongated onto an unbound reference topology (`testFESpace(mod_ref)`) without triggering search arrays, integrating identically over the precise fine measure `dΩ_ref`.
+**What it provides**: Not only does this completely bypass 30+ minute spatial intersection bottlenecks, but structurally projecting the low-order polynomials onto the high-resolution quadrature bounds implicitly protects the evaluation from severe spatial aliasing errors caused by integrating non-smooth inter-element derivative kinks.
+
+### 8. Dimensionally Consistent Asymptotic Regularization
+**The Theory (`article.pdf`)**: Continuous subgrid closures structurally blow up at exact zero-velocity domains ($\|u\| \to 0$), demanding numerical bounds.
+**The Algorithmic Intervention**: Standard engineering approaches strictly add isolated generic scalars (e.g., `mag_u = sqrt(u ⋅ u + 1e-12)`). The codebase specifically substitutes these with dimensionally scaling invariants explicitly chained to a macroscopic feature space: `eps_v_sq = (1e-6 * U_ref)^2`.
+**What it provides**: Injecting raw scalar constants mathematically distorts the formulation's physical unit limits and arbitrarily biases behavior during extremely slow creeping flow dynamics ($Re < 10^{-6}$). Enforcing a scale-invariant velocity reference dynamically shields the matrix singularity limit while perfectly preserving dimensional scaling invariants geometrically down to zero.
+
+### 9. Exactly-Linearized Subscale (OSGS) Newton Pipelines
+**The Theory (`article.pdf`)**: Orthogonal Sub-Grid Scale (OSGS) iterates linearly upon stabilized reference frames by tracking explicit $P_h^\perp$ projections natively subtracted out of the continuous boundary residual loop.
+**The Algorithmic Intervention**: While calculating the inner loop projection Jacobians theoretically risks singular algebraic blocks due to decoupling, the codebase dynamically attempts to wrap the generic native Automatic Differentiation (AD) exact Fréchet Jacobian wrapper natively first.
+**What it provides**: OSGS formally executes physically inside the global unconstrained quadratic convergence basin. Forcing exact Fréchet boundaries natively ensures optimal, steepest-descent matrix trajectory sweeps. If the non-linear flow geometry inherently sparks indefinite behavior on extreme parametric corners, the architecture utilizes an integrated `try-catch` intercept to gracefully fall back dynamically onto a heavily coercive, frozen-cusp manual Jacobian without failing the sweep.
+
+### 10. Persistent HDF5 Mappings and Native 1x2 Topologies
+**The Objective**: Benchmarking spatial execution bounds algorithmically against optimal finite element theory proofs natively.
+**The Algorithmic Intervention**: The Method of Manufactured Solutions (MMS) pipeline organically projects runtime execution sweeps dynamically through a localized overlapping HDF5 dictionary strategy, plotting structurally decoupled 1x2 generic Matplotlib graphics.
+**What it provides**: Past runs overwrote previous discrete convergence sweeps identically mapping overlapping bounds. The generic HDF5 module now selectively merges new topological points across resolutions natively avoiding destruct cycles. The visualizations physically detach standard $L_2$ error norm arrays from heavily scaled $H_1$ seminorms horizontally perfectly clearing dense graphical intersection meshes natively avoiding saturation.
+
 ---
 
 ## Technical Architecture

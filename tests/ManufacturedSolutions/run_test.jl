@@ -164,23 +164,56 @@ function run_mms()
     mkpath(results_dir)
     h5_path = joinpath(results_dir, "convergence_data.h5")
     
-    h5open(h5_path, "w") do h5f
-        # Precompute total valid configurations
-        total_configs = 0
-        for (Re, Da, alpha_0, kv, kp, etype) in Iterators.product(Re_list, Da_list, alpha_list, kv_list, kp_list, etype_list)
-            if equal_order_only && kv != kp
-                continue
+    erase_past = get(test_dict, "erase_past_results", false)
+    h5_mode = erase_past ? "w" : "cw"
+    
+    h5open(h5_path, h5_mode) do h5f
+        # Pre-scan existing HDF5 to seamlessly append newly requested combinations dynamically mapping to identical c_idx schemas
+        max_idx = 0
+        existing_signatures = Dict()
+        if !erase_past
+            for gname in keys(h5f)
+                parts = split(gname, "_")
+                if length(parts) >= 3 && parts[1] == "config"
+                    idx = parse(Int, parts[2])
+                    max_idx = max(max_idx, idx)
+                    
+                    g = h5f[gname]
+                    att = attributes(g)
+                    try
+                        r = Float64(read(att["Re"]))
+                        d = Float64(read(att["Da"]))
+                        a = Float64(read(att["alpha_0"]))
+                        kv_v = Int(read(att["k_velocity"]))
+                        kp_v = Int(read(att["k_pressure"]))
+                        et = String(read(att["element_type"]))
+                        # Identify core physical signature mapping dynamically 
+                        sig_base = (r, d, a, kv_v, kp_v, et)
+                        existing_signatures[sig_base] = idx
+                    catch
+                    end
+                end
             end
-            total_configs += 1
         end
         
-        config_idx = 1
         for (Re, Da, alpha_0, kv, kp, etype) in Iterators.product(Re_list, Da_list, alpha_list, kv_list, kp_list, etype_list)
             if equal_order_only && kv != kp
                 continue
             end
+            
+            sig_base = (Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp), String(etype))
+            
+            if haskey(existing_signatures, sig_base)
+                c_idx = existing_signatures[sig_base]
+            else
+                max_idx += 1
+                c_idx = max_idx
+                existing_signatures[sig_base] = c_idx
+            end
+            
+            for method in ["ASGS", "OSGS"]
             println("\n========================================")
-            println("Running Config $config_idx of $total_configs: Re=$Re, Da=$Da, alpha_0=$alpha_0, k=$kv, type=$etype")
+            println("Running Config $c_idx: Re=$Re, Da=$Da, alpha_0=$alpha_0, k=$kv, type=$etype, method=$method")
             println("========================================")
             
             conv_parts = get(test_dict["mesh"], "convergence_partitions", [10, 20, 30])
@@ -207,13 +240,14 @@ function run_mms()
             for n in partitions
                 println("Running MMS for partition $n x $n")
         
-        vtu_name = "mms_Re$(Re)_Da$(Da)_a$(alpha_0)_$(etype)_n$(n)"
+        vtu_name = "mms_Re$(Re)_Da$(Da)_a$(alpha_0)_$(etype)_n$(n)_$(method)"
         config = PorousNSSolver.PorousNSConfig(
             phys=base_config.phys,
             porosity=base_config.porosity,
             discretization=base_config.discretization,
             mesh=PorousNSSolver.MeshConfig(domain=base_config.mesh.domain, partition=[n, n], element_type=String(etype)),
-            output=PorousNSSolver.OutputConfig(directory=joinpath(@__DIR__, "results"), basename=vtu_name)
+            output=PorousNSSolver.OutputConfig(directory=joinpath(@__DIR__, "results"), basename=vtu_name),
+            solver=PorousNSSolver.SolverConfig(method=method, osgs_iterations=3)
         )
         
         model = PorousNSSolver.create_mesh(config)
@@ -245,8 +279,11 @@ function run_mms()
         Ω = Triangulation(model)
         dΩ = Measure(Ω, degree)
         
-        is_tri = config.mesh.element_type == "TRI"
-        h_array = lazy_map(v -> is_tri ? sqrt(2.0 * abs(v)) : sqrt(abs(v)), get_cell_measure(Ω))
+        if config.mesh.element_type == "TRI"
+            h_array = lazy_map(v -> sqrt(2.0 * abs(v)), get_cell_measure(Ω))
+        else
+            h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
+        end
         h = CellField(h_array, Ω)
         
         f_fn(x) = f_ex(x, config)
@@ -259,16 +296,36 @@ function run_mms()
         println("Binding analytical functions for exact Gauss integration...")
         
         println("Defining formulation closures...")
-        # Pass analytical functions packed into exact CellFields instead of nodal distributions
-        f_cf = CellField(f_fn, Ω)
-        alpha_cf = CellField(alpha_fn_wrapper, Ω)
-        g_cf = CellField(g_fn, Ω)
-        res(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, g_cf)
-        jac(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf)
+        # -------------------------------------------------------------
+        # ALGORITHMIC RATIONALE: High-Order Static Interpolation 
+        # Directly wrapping deep math branches into Gridap closures causes 
+        # exponential LLVM DAG compiler blowups for simplex Geometries (TRI).
+        # We project them statically onto a clean high-order finite element space 
+        # (p=degree+2) to preserve perfect integration accuracy without identical AD overhead.
+        # QUAD geometries natively compile rapidly so we rely on theoretically exact evaluation mappings.
+        # -------------------------------------------------------------
+        if config.mesh.element_type == "QUAD"
+            f_cf = CellField(f_fn, Ω)
+            alpha_cf = CellField(alpha_fn_wrapper, Ω)
+            g_cf = CellField(g_fn, Ω)
+        else
+            degree_high = degree + 2
+            refe_p_high = ReferenceFE(lagrangian, Float64, degree_high)
+            refe_v_high = ReferenceFE(lagrangian, VectorValue{2,Float64}, degree_high)
+            Q_high = TestFESpace(model, refe_p_high, conformity=:H1)
+            V_high = TestFESpace(model, refe_v_high, conformity=:H1)
+
+            f_cf = interpolate_everywhere(f_fn, V_high)
+            alpha_cf = interpolate_everywhere(alpha_fn_wrapper, Q_high)
+            g_cf = interpolate_everywhere(g_fn, Q_high)
+        end
+        
+        res_fn(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, g_cf)
+        jac_fn(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf)
         
         println("Creating FEOperators...")
         # Only the exact Newton operator is needed for MMS spatial error tracking
-        op_newton = FEOperator(res, jac, X, Y)
+        op_newton = FEOperator(res_fn, jac_fn, X, Y)
         
         # ALGORITHMIC RATIONALE: Initialize exactly at the manufactured root.
         # This isolates pure spatial FME truncation errors without triggering nonlinear globalization failures.
@@ -279,7 +336,49 @@ function run_mms()
         solver_newton = FESolver(nls_newton)
         
         println("Solving Newton-Raphson from exact initialization...")
-        solve!(x0, solver_newton, op_newton)
+        if method == "OSGS"
+            # Outer OSGS iterations
+            osgs_iters = config.solver.osgs_iterations
+            
+            # Formulate strictly unconstrained target mapping spaces for orthogonal L2 residual projections 
+            V_pi = TestFESpace(model, refe_u, conformity=:H1) # No dirichlet bounds
+            Q_pi = TestFESpace(model, refe_p, conformity=:H1)
+            U_pi = TrialFESpace(V_pi)
+            P_pi = TrialFESpace(Q_pi)
+            
+            for osgs_idx in 1:osgs_iters
+                println("OSGS Iteration $osgs_idx/$osgs_iters")
+                u_h_prev, p_h_prev = x0
+                
+                # Compute projections onto the unconstrained basis
+                pi_u_raw, pi_p_raw = PorousNSSolver.project_residuals(u_h_prev, p_h_prev, config, dΩ, h, f_cf, alpha_cf, g_cf, V_pi, Q_pi, U_pi, P_pi)
+                
+                # Protect Julia from boxed dynamic variable AD compiler collapse
+                let pi_u = pi_u_raw, pi_p = pi_p_raw
+                    # Create operator with pi_h
+                    res_osgs(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, g_cf, pi_u, pi_p)
+                    jac_osgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf, pi_u, pi_p)
+                    
+                    # Stage 2: Try Exact Jacobian first (guarantees steepest descent in the quadratic basin)
+                    op_osgs_exact = FEOperator(res_osgs, X, Y)
+                    
+                    # Dedicated lightweight solver for the inner loop
+                    nls_osgs = NLSolver(show_trace=true, method=:newton, iterations=4, ftol=1e-12)
+                    solver_osgs = FESolver(nls_osgs)
+                    
+                    try
+                        solve!(x0, solver_osgs, op_osgs_exact)
+                    catch e
+                        println("      -> [Warning] Exact AD Jacobian lost coercivity or failed. Falling back to coercive frozen Jacobian.")
+                        op_osgs_frozen = FEOperator(res_osgs, jac_osgs, X, Y)
+                        solve!(x0, solver_osgs, op_osgs_frozen)
+                    end
+                end
+            end
+        else
+            # ASGS pure Newton
+            solve!(x0, solver_newton, op_newton)
+        end
         
         u_h, p_h = x0
         
@@ -319,7 +418,42 @@ function run_mms()
             end
             
             # Save combination to HDF5
-            grp_name = "config_$config_idx"
+            grp_name = "config_$(c_idx)_$(method)"
+            
+            # Non-destructively merge with existing datasets to avoid nullifying prior partition sweeps!
+            if haskey(h5f, grp_name) && !erase_past
+                println("Merging preexisting result tuple globally within HDF5 namespace for $(grp_name)...")
+                g_old = h5f[grp_name]
+                old_hs = read(g_old["h"])
+                old_u_L2 = read(g_old["err_u_l2"])
+                old_p_L2 = read(g_old["err_p_l2"])
+                old_u_H1 = read(g_old["err_u_h1"])
+                old_p_H1 = read(g_old["err_p_h1"])
+                
+                # Zip old values into dictionary keyed by grid interval h
+                combined = Dict(zip(old_hs, zip(old_u_L2, old_p_L2, old_u_H1, old_p_H1)))
+                
+                # Overlay newly computed resolutions
+                for i in 1:length(hs)
+                    combined[hs[i]] = (err_u_L2[i], err_p_L2[i], err_u_H1[i], err_p_H1[i])
+                end
+                
+                # Sort strictly by descending h = mathematically ascending N refinement
+                sorted_hs = sort(collect(keys(combined)), rev=true)
+                
+                hs = sorted_hs
+                err_u_L2 = Float64[combined[h][1] for h in sorted_hs]
+                err_p_L2 = Float64[combined[h][2] for h in sorted_hs]
+                err_u_H1 = Float64[combined[h][3] for h in sorted_hs]
+                err_p_H1 = Float64[combined[h][4] for h in sorted_hs]
+                
+                # Nuke group structure safely to allow continuous reallocation
+                delete_object(h5f, grp_name)
+            elseif haskey(h5f, grp_name)
+                delete_object(h5f, grp_name)
+                println("Overwriting preexisting result tuple globally within HDF5 namespace for $(grp_name)...")
+            end
+            
             g = create_group(h5f, grp_name)
             
             # Write datasets
@@ -338,6 +472,7 @@ function run_mms()
             attributes(g)["k_velocity"] = Int(kv)
             attributes(g)["k_pressure"] = Int(kp)
             attributes(g)["element_type"] = String(etype)
+            attributes(g)["method"] = String(method)
             
             # Calculate rates
             compute_slope(x, y) = sum((x .- sum(x)/length(x)) .* (y .- sum(y)/length(y))) / sum((x .- sum(x)/length(x)).^2)
@@ -352,56 +487,12 @@ function run_mms()
             attributes(g)["rate_p_l2"] = rate_p_l2
             attributes(g)["rate_p_h1"] = rate_p_h1
             
-            config_idx += 1
-        end
-    end
-    
-    # Generate Markdown Report
-    report_file = joinpath(results_dir, "convergence_report.md")
-    open(report_file, "w") do io
-        println(io, "# Convergence Rate and FME Table\n")
-        println(io, "| Config | Re | Da | α_0 | k | Elem | rate_u_L2 (opt) | rate_p_L2 (opt) | rate_u_H1 (opt) | rate_p_H1 (opt) | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |")
-        println(io, "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
-        
-        h5open(h5_path, "r") do h5f
-            for group_name in sort(keys(h5f), by=x->parse(Int, split(x, "_")[2]))
-                g = h5f[group_name]
-                attr = attributes(g)
-                c_idx = split(group_name, "_")[2]
-                re = read(attr["Re"])
-                da = read(attr["Da"])
-                a0 = read(attr["alpha_0"])
-                kv = read(attr["k_velocity"])
-                etype = read(attr["element_type"])
-                
-                rate_u_l2 = read(attr["rate_u_l2"])
-                rate_p_l2 = read(attr["rate_p_l2"])
-                rate_u_h1 = read(attr["rate_u_h1"])
-                rate_p_h1 = read(attr["rate_p_h1"])
-                
-                err_u_l2_last = read(g["err_u_l2"])[end]
-                err_p_l2_last = read(g["err_p_l2"])[end]
-                err_u_h1_last = read(g["err_u_h1"])[end]
-                err_p_h1_last = read(g["err_p_h1"])[end]
-                
-                opt_u_l2 = kv + 1.0
-                opt_p_l2 = Float64(kv)
-                opt_u_h1 = Float64(kv)
-                opt_p_h1 = Float64(kv - 1)
-                
-                r_u_l2_str = Printf.@sprintf("%5.2f (%d)", rate_u_l2, Int(opt_u_l2))
-                r_p_l2_str = Printf.@sprintf("%5.2f (%d)", rate_p_l2, Int(opt_p_l2))
-                r_u_h1_str = Printf.@sprintf("%5.2f (%d)", rate_u_h1, Int(opt_u_h1))
-                r_p_h1_str = Printf.@sprintf("%5.2f (%d)", rate_p_h1, Int(opt_p_h1))
-                
-                Printf.@printf(io, "| C%s | %.0e | %.0e | %.2f | %d | %s | %s | %s | %s | %s | %.4e | %.4e | %.4e | %.4e |\n", 
-                        c_idx, re, da, a0, kv, etype, r_u_l2_str, r_p_l2_str, r_u_h1_str, r_p_h1_str, err_u_l2_last, err_p_l2_last, err_u_h1_last, err_p_h1_last)
             end
         end
     end
     
     println("MMS setup complete. Parametric sweep written to convergence_data.h5")
-    println("Markdown convergence report generated at $(report_file)")
+    println("Please run `python3 plot_results.py` to compile the colored convergence_report.md tables.")
 end
 
 run_mms()
