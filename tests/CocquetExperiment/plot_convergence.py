@@ -118,7 +118,7 @@ def plot_cocquet():
     ax2.grid(True, which="both", ls="--")
     ax2.legend(handlelength=4.0)
     
-    plt.suptitle('Cocquet Experiment Convergence Analysis: Equal-Order P1 and P2 (Re=500)', fontsize=16)
+    plt.suptitle(r'Cocquet Experiment Convergence Analysis: Equal-Order P1 and P2 (Re=500, $c_\text{in}=0.5$)', fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     
     plot_file = os.path.join(results_dir, 'convergence_cocquet.png')

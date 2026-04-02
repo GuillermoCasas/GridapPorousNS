@@ -10,6 +10,7 @@ include("config.jl")
 include("geometry_mesh.jl")
 include("formulation.jl")
 include("osgs.jl")
+include("safesolver.jl")
 include("io.jl")
 include("run_simulation.jl")
 

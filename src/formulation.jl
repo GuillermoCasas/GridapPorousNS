@@ -86,7 +86,7 @@ function weak_form_residual(X, Y, config::PorousNSConfig, dΩ, h, f_custom, alph
     end
     R_u = alpha_conv * conv_u + alpha_conv * ∇(p) + σ * u - div_visc_u - f
     
-    L_u_star_v = alpha_conv * (∇(v)' ⋅ u) + alpha_conv * ∇(q) - σ * v
+    L_u_star_v = alpha_conv * (∇(v)' ⋅ u) + alpha_conv * ∇(q)
     
     div_alpha_u = α * (∇⋅u) + u ⋅ ∇(α)
     R_p = eps_val * p + div_alpha_u - g_mass
@@ -114,7 +114,7 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
     f = isnothing(f_custom) ? VectorValue(config.phys.f_x, config.phys.f_y) : f_custom
     c_1 = 4.0 * k_deg^4; c_2 = 2.0 * k_deg^2
 
-    U_ref = 1.0 # Characteristic velocity scale (maintains dimensional consistency)
+    U_ref = 1.0 
     eps_v_sq = (1e-6 * U_ref)^2 
     function compute_sigma(u_val, alpha_val)
         a_term = a_resistance(alpha_val, Re, Da)
@@ -139,9 +139,28 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
         b_term = b_resistance(alpha_val)
         return b_term * (u_val ⋅ du_val) / mag_u
     end
+    function compute_dtau_1_du(u_val, du_val, h_val, alpha_val)
+        mag_u = sqrt(u_val ⋅ u_val + eps_v_sq)
+        df_dmag = (alpha_val * c_2 / h_val) + b_resistance(alpha_val)
+        a_t = a_resistance(alpha_val, Re, Da)
+        τ_1_NS_val = 1.0 / ( (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + eps_v_sq )
+        τ_1_val = 1.0 / ( (alpha_val / τ_1_NS_val) + a_t + b_resistance(alpha_val) * mag_u + eps_v_sq )
+        scalar_deriv = - (τ_1_val * τ_1_val) * df_dmag / mag_u
+        return scalar_deriv * (u_val ⋅ du_val)
+    end
+    function compute_dtau_2_du(u_val, du_val, h_val, alpha_val)
+        mag_u = sqrt(u_val ⋅ u_val + eps_v_sq)
+        A_NS_val = (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + eps_v_sq
+        dA_NS_dmag = c_2 / h_val
+        denom = c_1 * alpha_val / A_NS_val + eps_v_sq
+        scalar_deriv = (h_val * h_val) / (denom * denom) * (c_1 * alpha_val) / (A_NS_val * A_NS_val) * dA_NS_dmag / mag_u
+        return scalar_deriv * (u_val ⋅ du_val)
+    end
 
     σ = Operation(compute_sigma)(u, α); τ_1 = Operation(compute_tau_1)(u, h, α); τ_2 = Operation(compute_tau_2)(u, h, α)
     dsigma_du = Operation(compute_dsigma_du)(u, du, α)
+    dtau_1_du = Operation(compute_dtau_1_du)(u, du, h, α)
+    dtau_2_du = Operation(compute_dtau_2_du)(u, du, h, α)
     alpha_conv_jac = Operation(a -> a)(α); alpha_nu_jac = Operation(a -> a * ν)(α)
     g_mass = isnothing(g_custom) ? 0.0 : g_custom
 
@@ -152,8 +171,8 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
     end
     R_du = alpha_conv_jac * conv_du + alpha_conv_jac * ∇(dp) + σ * du + (dsigma_du * u) - div_visc_du
     
-    L_u_star_v = alpha_conv_jac * (∇(v)' ⋅ u) + alpha_conv_jac * ∇(q) - σ * v
-    dL_du_star_v = alpha_conv_jac * (∇(v)' ⋅ du) - (dsigma_du * v)
+    L_u_star_v = alpha_conv_jac * (∇(v)' ⋅ u) + alpha_conv_jac * ∇(q)
+    dL_du_star_v = alpha_conv_jac * (∇(v)' ⋅ du)
     
     div_alpha_du = α * (∇⋅du) + du ⋅ ∇(α)
     R_dp = eps_val * dp + div_alpha_du
@@ -169,10 +188,13 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
         div_visc_u_old = div_visc_u_old + α * ν * Δ(u)
     end
     R_u_old = alpha_conv_jac * (∇(u)' ⋅ u) + alpha_conv_jac * ∇(p) + σ * u - div_visc_u_old - f
+    
+    div_alpha_u_old = α * (∇⋅u) + u ⋅ ∇(α)
+    R_p_old = eps_val * p + div_alpha_u_old - g_mass
     L_q_star = α * (∇⋅v) + v ⋅ ∇(α)
 
-    stab_mom_jac = L_u_star_v ⋅ (τ_1 * R_du) + dL_du_star_v ⋅ (τ_1 * R_u_old)
-    stab_mass_jac = L_q_star * (τ_2 * R_dp)
+    stab_mom_jac = L_u_star_v ⋅ (τ_1 * R_du + dtau_1_du * R_u_old) + dL_du_star_v ⋅ (τ_1 * R_u_old)
+    stab_mass_jac = L_q_star * (τ_2 * R_dp + dtau_2_du * R_p_old)
 
     return ∫( conv_term_jac + visc_term_jac + pres_term_jac + res_term_jac + mass_term_jac + stab_mom_jac + stab_mass_jac )dΩ
 end
@@ -218,7 +240,7 @@ function weak_form_jacobian_picard(X, dX, Y, config::PorousNSConfig, dΩ, h, f_c
     end
     R_du = alpha_conv_jac * conv_du + alpha_conv_jac * ∇(dp) + σ * du - div_visc_du
     
-    L_u_star_v = alpha_conv_jac * (∇(v)' ⋅ u) + alpha_conv_jac * ∇(q) - σ * v
+    L_u_star_v = alpha_conv_jac * (∇(v)' ⋅ u) + alpha_conv_jac * ∇(q)
     dL_du_star_v = 0.0 * (∇(v)' ⋅ du)
     
     div_alpha_du = α * (∇⋅du) + du ⋅ ∇(α)
@@ -315,7 +337,7 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
     f = isnothing(f_custom) ? VectorValue(config.phys.f_x, config.phys.f_y) : f_custom
     c_1 = 4.0 * k_deg^4; c_2 = 2.0 * k_deg^2
 
-    U_ref = 1.0 # Characteristic velocity scale (maintains dimensional consistency)
+    U_ref = 1.0 
     eps_v_sq = (1e-6 * U_ref)^2 
     function compute_sigma(u_val, alpha_val)
         a_term = a_resistance(alpha_val, Re, Da)
@@ -340,9 +362,28 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
         b_term = b_resistance(alpha_val)
         return b_term * (u_val ⋅ du_val) / mag_u
     end
+    function compute_dtau_1_du(u_val, du_val, h_val, alpha_val)
+        mag_u = sqrt(u_val ⋅ u_val + eps_v_sq)
+        df_dmag = (alpha_val * c_2 / h_val) + b_resistance(alpha_val)
+        a_t = a_resistance(alpha_val, Re, Da)
+        τ_1_NS_val = 1.0 / ( (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + eps_v_sq )
+        τ_1_val = 1.0 / ( (alpha_val / τ_1_NS_val) + a_t + b_resistance(alpha_val) * mag_u + eps_v_sq )
+        scalar_deriv = - (τ_1_val * τ_1_val) * df_dmag / mag_u
+        return scalar_deriv * (u_val ⋅ du_val)
+    end
+    function compute_dtau_2_du(u_val, du_val, h_val, alpha_val)
+        mag_u = sqrt(u_val ⋅ u_val + eps_v_sq)
+        A_NS_val = (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + eps_v_sq
+        dA_NS_dmag = c_2 / h_val
+        denom = c_1 * alpha_val / A_NS_val + eps_v_sq
+        scalar_deriv = (h_val * h_val) / (denom * denom) * (c_1 * alpha_val) / (A_NS_val * A_NS_val) * dA_NS_dmag / mag_u
+        return scalar_deriv * (u_val ⋅ du_val)
+    end
 
     σ = Operation(compute_sigma)(u, α); τ_1 = Operation(compute_tau_1)(u, h, α); τ_2 = Operation(compute_tau_2)(u, h, α)
     dsigma_du = Operation(compute_dsigma_du)(u, du, α)
+    dtau_1_du = Operation(compute_dtau_1_du)(u, du, h, α)
+    dtau_2_du = Operation(compute_dtau_2_du)(u, du, h, α)
     alpha_conv_jac = Operation(a -> a)(α); alpha_nu_jac = Operation(a -> a * ν)(α)
     g_mass = isnothing(g_custom) ? 0.0 : g_custom
 
@@ -370,10 +411,13 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
         div_visc_u_old = div_visc_u_old + α * ν * Δ(u)
     end
     R_u_old = alpha_conv_jac * (∇(u)' ⋅ u) + alpha_conv_jac * ∇(p) + σ * u - div_visc_u_old - f
+    
+    div_alpha_u_old = α * (∇⋅u) + u ⋅ ∇(α)
+    R_p_old = eps_val * p + div_alpha_u_old - g_mass
     L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - eps_val * q
 
-    stab_mom_jac = L_u_star_v ⋅ (τ_1 * (R_du - (σ * du + (dsigma_du * u)))) + dL_du_star_v ⋅ (τ_1 * (R_u_old - (σ * u) - pi_u))
-    stab_mass_jac = L_q_star * (τ_2 * (R_dp - (eps_val * dp)))
+    stab_mom_jac = L_u_star_v ⋅ (τ_1 * (R_du - (σ * du + (dsigma_du * u))) + dtau_1_du * (R_u_old - (σ * u) - pi_u)) + dL_du_star_v ⋅ (τ_1 * (R_u_old - (σ * u) - pi_u))
+    stab_mass_jac = L_q_star * (τ_2 * (R_dp - (eps_val * dp)) + dtau_2_du * (R_p_old - (eps_val * p) - pi_p))
 
     return ∫( conv_term_jac + visc_term_jac + pres_term_jac + res_term_jac + mass_term_jac + stab_mom_jac + stab_mass_jac )dΩ
 end

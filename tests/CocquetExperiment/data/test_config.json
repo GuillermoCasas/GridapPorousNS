@@ -25,5 +25,10 @@
     "output": {
         "directory": "results",
         "basename": "cocquet_flow"
+    },
+    "solver": {
+        "xtol": 1e-8,
+        "stagnation_tol": 1e-5,
+        "max_increases": 3
     }
 }

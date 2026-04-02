@@ -38,6 +38,9 @@ end
     use_linesearch::Bool = true
     method::String = "ASGS"
     osgs_iterations::Int = 3
+    xtol::Float64 = 1e-8
+    stagnation_tol::Float64 = 1e-5
+    max_increases::Int = 2
 end
 
 @with_kw struct PorousNSConfig

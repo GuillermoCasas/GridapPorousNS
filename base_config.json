@@ -27,6 +27,9 @@
     "solver": {
         "picard_iterations": 5,
         "newton_iterations": 20,
-        "use_linesearch": true
+        "use_linesearch": true,
+        "xtol": 1e-8,
+        "stagnation_tol": 1e-5,
+        "max_increases": 3
     }
 }

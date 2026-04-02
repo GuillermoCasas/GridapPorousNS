@@ -7,6 +7,9 @@ function export_results(config::PorousNSConfig, model, u_h, p_h, extra_fields::P
     end
     
     base_name = joinpath(outdir, config.output.basename)
+    if !endswith(base_name, ".vtu")
+        base_name = base_name * ".vtu"
+    end
     
     Ω = Triangulation(model)
     fields = Pair{String, Any}["u"=>u_h, "p"=>p_h]
@@ -16,5 +19,5 @@ function export_results(config::PorousNSConfig, model, u_h, p_h, extra_fields::P
     
     writevtk(Ω, base_name, cellfields=fields)
     
-    println("Results exported to: ", base_name, ".vtu")
+    println("Results exported to: ", base_name)
 end

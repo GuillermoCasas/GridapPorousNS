@@ -21,11 +21,9 @@ def plot_cocquet():
     
     plt.figure(figsize=(6, 8))
     plt.plot(u, y, 'b-', lw=2)
-    plt.axhline(0.5, color='r', linestyle='--', label='Porous/Fluid Interface')
     plt.xlabel('Velocity u_x')
     plt.ylabel('y')
     plt.title('Velocity Profile at x=1.0')
-    plt.legend()
     plt.grid(True)
     
     plot_file = os.path.join(results_dir, 'velocity_profile.png')

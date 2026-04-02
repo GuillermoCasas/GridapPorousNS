@@ -232,8 +232,8 @@ def generate_markdown_report(h5_file, results_dir):
     report_file = os.path.join(results_dir, "convergence_report.md")
     with open(report_file, "w") as io:
         io.write("# Convergence Rate and FME Table\n\n")
-        io.write("| Config | Method | Re | Da | α_0 | k | Elem | rate_u_L2 (opt) | rate_p_L2 (opt) | rate_u_H1 (opt) | rate_p_H1 (opt) | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |\n")
-        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+        io.write("| Config | Method | Re | Da | α_0 | k | Elem | Iters | Converged | epsilon_pert | rate_u_L2 (opt) | rate_p_L2 (opt) | rate_u_H1 (opt) | rate_p_H1 (opt) | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |\n")
+        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
         
         with robust_open_h5(h5_file, 'r') as h5f:
             groups = sorted(h5f.keys(), key=lambda x: int(x.split('_')[1]))
@@ -288,7 +288,18 @@ def generate_markdown_report(h5_file, results_dir):
                 ru1 = format_rate(rate_u_h1, opt_u_h1)
                 rp1 = format_rate(rate_p_h1, opt_p_h1)
                 
-                io.write(f"| C{c_idx} | {method} | {jl_fmt(re)} | {jl_fmt(da)} | {a0:.2f} | {kv} | {etype} | {ru2} | {rp2} | {ru1} | {rp1} | {format_sci(err_u_l2_last)} | {format_sci(err_p_l2_last)} | {format_sci(err_u_h1_last)} | {format_sci(err_p_h1_last)} |\n")
+                eval_iters = g['eval_iters'][:] if 'eval_iters' in g else []
+                total_iters = int(g.attrs.get('total_iters', sum(eval_iters) if len(eval_iters) > 0 else 0))
+                
+                eval_eps = g['eval_eps'][:] if 'eval_eps' in g else []
+                eps_val = np.min(eval_eps) if len(eval_eps) > 0 else float('nan')
+                
+                if method == 'ASGS':
+                    converged = "<b style='color:red'>No</b>" if any(it >= 15 for it in eval_iters) else "Yes"
+                else: # OSGS takes max 4 iters per outer, typically 3 outer loops
+                    converged = "<b style='color:red'>No</b>" if any(it >= 12 for it in eval_iters) else "Yes"
+                
+                io.write(f"| C{c_idx} | {method} | {jl_fmt(re)} | {jl_fmt(da)} | {a0:.2f} | {kv} | {etype} | {total_iters} | {converged} | {format_sci(eps_val)} | {ru2} | {rp2} | {ru1} | {rp1} | {format_sci(err_u_l2_last)} | {format_sci(err_p_l2_last)} | {format_sci(err_u_h1_last)} | {format_sci(err_p_h1_last)} |\n")
                 
     print(f"Convergence Markdown report generated explicitly securely to: {report_file}")
 

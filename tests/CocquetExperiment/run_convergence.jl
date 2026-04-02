@@ -61,50 +61,66 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     jac_asgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h_cf, nothing, alpha_h)
     
     op_asgs = FEOperator(res_asgs, jac_asgs, X, Y)
-    nls_newton = NLSolver(show_trace=true, method=:newton, iterations=12, ftol=1e-13)
+    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol)
     solver_newton = FESolver(nls_newton)
     
-    # Base initialization identically solves ASGS
-    x_sol = solve(solver_newton, op_asgs)
-    
-    if config.solver.method == "OSGS"
-        println("--> Refining trajectory with OSGS Orthogonal Projections...")
-        osgs_iters = config.solver.osgs_iterations
+    eval_iters = 0
+    eval_time = @elapsed begin
+        # Extract native empty initialization exactly structured to Gridap arrays
+        xh0 = FEFunction(X, zeros(num_free_dofs(X)))
         
-        V_pi = TestFESpace(model, refe_u, conformity=:H1)
-        Q_pi = TestFESpace(model, refe_p, conformity=:H1)
-        U_pi = TrialFESpace(V_pi)
-        P_pi = TrialFESpace(Q_pi)
+        # Base initialization identically solves ASGS
+        res_solve = solve!(xh0, solver_newton, op_asgs)
+        cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
+        nls_cache_asgs = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+        eval_iters += nls_cache_asgs.result.iterations
+        x_sol = res_solve isa Tuple ? res_solve[1] : res_solve
         
-        for idx in 1:osgs_iters
-            println("   OSGS Outer Iteration $idx/$osgs_iters")
-            u_prev, p_prev = x_sol
+        if config.solver.method == "OSGS"
+            println("--> Refining trajectory with OSGS Orthogonal Projections...")
+            osgs_iters = config.solver.osgs_iterations
             
-            # Formally calculate $P_h^\perp$ projections wrapping purely analytical closures
-            pi_u_raw, pi_p_raw = PorousNSSolver.project_residuals(u_prev, p_prev, config, dΩ, h_cf, nothing, alpha_h, nothing, V_pi, Q_pi, U_pi, P_pi)
+            V_pi = TestFESpace(model, refe_u, conformity=:H1)
+            Q_pi = TestFESpace(model, refe_p, conformity=:H1)
+            U_pi = TrialFESpace(V_pi)
+            P_pi = TrialFESpace(Q_pi)
             
-            let pi_u = pi_u_raw, pi_p = pi_p_raw
-                res_osgs(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h_cf, nothing, alpha_h, nothing, pi_u, pi_p)
-                jac_osgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h_cf, nothing, alpha_h, nothing, pi_u, pi_p)
+            for idx in 1:osgs_iters
+                println("   OSGS Outer Iteration $idx/$osgs_iters")
+                u_prev, p_prev = x_sol
                 
-                # Stage 2: Try Exact Jacobian first (guarantees steepest descent in the quadratic basin)
-                op_osgs_exact = FEOperator(res_osgs, X, Y)
+                # Formally calculate $P_h^\perp$ projections wrapping purely analytical closures
+                pi_u_raw, pi_p_raw = PorousNSSolver.project_residuals(u_prev, p_prev, config, dΩ, h_cf, nothing, alpha_h, nothing, V_pi, Q_pi, U_pi, P_pi)
                 
-                # Dedicated lightweight solver for the inner loop
-                nls_osgs = NLSolver(show_trace=true, method=:newton, iterations=4, ftol=1e-12)
-                solver_osgs = FESolver(nls_osgs)
-                
-                try
-                    solve!(x_sol, solver_osgs, op_osgs_exact)
-                catch e
-                    println("      -> [Warning] Exact AD Jacobian lost coercivity or failed. Falling back to coercive frozen Jacobian.")
-                    op_osgs_frozen = FEOperator(res_osgs, jac_osgs, X, Y)
-                    solve!(x_sol, solver_osgs, op_osgs_frozen)
+                let pi_u = pi_u_raw, pi_p = pi_p_raw
+                    res_osgs(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h_cf, nothing, alpha_h, nothing, pi_u, pi_p)
+                    jac_osgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h_cf, nothing, alpha_h, nothing, pi_u, pi_p)
+                    
+                    # Stage 2: Try Exact Jacobian first (guarantees steepest descent in the quadratic basin)
+                    op_osgs_exact = FEOperator(res_osgs, X, Y)
+                    
+                    # Dedicated lightweight solver for the inner loop
+                    nls_osgs = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol)
+                    solver_osgs = FESolver(nls_osgs)
+                    
+                    try
+                        res2 = solve!(x_sol, solver_osgs, op_osgs_exact)
+                        c2 = res2 isa Tuple ? res2[2] : res2
+                        nl2 = c2 isa Tuple ? c2[2] : c2
+                        eval_iters += nl2.result.iterations
+                    catch e
+                        println("      -> [Warning] Exact AD Jacobian lost coercivity or failed. Falling back to coercive frozen Jacobian.")
+                        op_osgs_frozen = FEOperator(res_osgs, jac_osgs, X, Y)
+                        res2 = solve!(x_sol, solver_osgs, op_osgs_frozen)
+                        c2 = res2 isa Tuple ? res2[2] : res2
+                        nl2 = c2 isa Tuple ? c2[2] : c2
+                        eval_iters += nl2.result.iterations
+                    end
                 end
             end
         end
     end
-    return x_sol
+    return x_sol, eval_time, eval_iters
 end
 
 function run_convergence()
@@ -145,7 +161,7 @@ function run_convergence()
             println("Solving Reference Grid (N = $N_ref) -> [$(2*N_ref) x $N_ref] Elements...")
             base_config_dict["output"]["basename"] = "cocquet_ref_$(method)_P$(k)P$(k)_N$(N_ref)"
             mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref = build_solver(N_ref, base_config_dict)
-            xh_ref = execute_solver(mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref)
+            xh_ref, time_ref, iters_ref = execute_solver(mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref)
             u_ref, p_ref = xh_ref
             
             # Build unbound free spaces on the reference mesh for exact subspace prolongation
@@ -161,12 +177,14 @@ function run_convergence()
             errors_h1_p = Float64[]
             errors_l2_alpha = Float64[]
             errors_h1_alpha = Float64[]
+            eval_times = Float64[]
+            eval_iters = Int[]
             
             for N in N_list
                 println("\n   Evaluating Coarse Grid (N = $N)")
                 base_config_dict["output"]["basename"] = "cocquet_$(method)_P$(k)P$(k)_N$(N)"
                 mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h = build_solver(N, base_config_dict)
-                xh_h = execute_solver(mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h)
+                xh_h, time_h, iters_h = execute_solver(mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h)
                 u_h, p_h = xh_h
                 
                 # ---------------------------------------------------------------------
@@ -222,6 +240,8 @@ function run_convergence()
                 push!(errors_h1_p, h1_ep)
                 push!(errors_l2_alpha, l2_ealpha)
                 push!(errors_h1_alpha, h1_ealpha)
+                push!(eval_times, time_h)
+                push!(eval_iters, iters_h)
             end
             
             println("Writing $(method)/P$(k)P$(k) slice to HDF5...")
@@ -239,6 +259,11 @@ function run_convergence()
                 g["errors_h1_p"] = errors_h1_p
                 g["errors_l2_alpha"] = errors_l2_alpha
                 g["errors_h1_alpha"] = errors_h1_alpha
+                g["eval_times"] = eval_times
+                g["eval_iters"] = eval_iters
+                
+                attributes(g)["total_time_s"] = sum(eval_times)
+                attributes(g)["total_iters"] = sum(eval_iters)
             end
         end
     end

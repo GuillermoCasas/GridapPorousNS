@@ -8,12 +8,14 @@ using Gridap
 using JSON
 using LineSearches
 
-# Alpha varies: 1.0 in free flow (y >= 0.5), 0.4 in porous (y < 0.5)
-# This mimics the Section 4.2 inhomogeneous porous media experiment with a free stream
-alpha_func(x) = 0.45 + (1.0 - 0.45) / (1.0 + exp(10*(x[2] - 0.5)))
+# Section 4.2 Smooth Porosity Field
+# ε(y) = 0.45 + 0.55 * exp(y - 1.0)
+alpha_func(x) = 0.45 + 0.55 * exp(x[2] - 1.0)
+Gridap.∇(::typeof(alpha_func)) = x -> VectorValue(0.0, 0.55 * exp(x[2] - 1.0))
 
-# Inflow profile
-u_in(x) = VectorValue(4.0 * x[2] * (1.0 - x[2]), 0.0)
+# Inflow profile for (Re=500, c_in=0.5)
+c_in = 0.5
+u_in(x) = VectorValue(c_in * x[2] * (1.0 - x[2]), 0.0)
 u_wall(x) = VectorValue(0.0, 0.0)
 
 function run_cocquet()

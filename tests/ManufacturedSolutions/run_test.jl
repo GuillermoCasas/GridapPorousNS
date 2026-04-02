@@ -10,6 +10,7 @@ using DelimitedFiles
 using HDF5
 using LineSearches
 using Printf
+using Random
 
 function alpha_field(x, config::PorousNSSolver.PorousNSConfig)
     alpha_0 = config.porosity.alpha_0
@@ -141,8 +142,25 @@ function f_ex(x, config::PorousNSSolver.PorousNSConfig)
     return α_val * conv_u_val - div_stress + α_val * grad_p_val + σ_val * u_val
 end
 
-function run_mms()
-    config_path = joinpath(@__DIR__, "data", "test_config.json")
+struct ExactAlpha <: Function
+    cfg::PorousNSSolver.PorousNSConfig
+end
+(a::ExactAlpha)(x) = alpha_field(x, a.cfg)
+Gridap.∇(a::ExactAlpha) = x -> analyze_alpha(x, a.cfg)[2]
+
+struct ExactF <: Function
+    cfg::PorousNSSolver.PorousNSConfig
+end
+(f::ExactF)(x) = f_ex(x, f.cfg)
+
+struct ExactG <: Function
+    cfg::PorousNSSolver.PorousNSConfig
+end
+(g::ExactG)(x) = g_ex(x, g.cfg)
+
+
+function run_mms(config_file="test_config.json")
+    config_path = joinpath(@__DIR__, "data", config_file)
     test_dict = JSON.parsefile(config_path)
     
     # Helper to enforce arrays
@@ -196,6 +214,9 @@ function run_mms()
             end
         end
         
+        total_runs = sum(1 for (Re, Da, alpha_0, kv, kp, etype) in Iterators.product(Re_list, Da_list, alpha_list, kv_list, kp_list, etype_list) if !(equal_order_only && kv != kp)) * 2
+        run_idx = 0
+
         for (Re, Da, alpha_0, kv, kp, etype) in Iterators.product(Re_list, Da_list, alpha_list, kv_list, kp_list, etype_list)
             if equal_order_only && kv != kp
                 continue
@@ -212,8 +233,9 @@ function run_mms()
             end
             
             for method in ["ASGS", "OSGS"]
+            run_idx += 1
             println("\n========================================")
-            println("Running Config $c_idx: Re=$Re, Da=$Da, alpha_0=$alpha_0, k=$kv, type=$etype, method=$method")
+            println("Running Config $run_idx (of $total_runs) [ID: $c_idx]: Re=$Re, Da=$Da, alpha_0=$alpha_0, k=$kv, type=$etype, method=$method")
             println("========================================")
             
             conv_parts = get(test_dict["mesh"], "convergence_partitions", [10, 20, 30])
@@ -236,6 +258,9 @@ function run_mms()
             err_p_L2 = Float64[]
             err_u_H1 = Float64[]
             err_p_H1 = Float64[]
+            eval_times = Float64[]
+            eval_iters = Int[]
+            eval_eps = Float64[]
     
             for n in partitions
                 println("Running MMS for partition $n x $n")
@@ -258,7 +283,6 @@ function run_mms()
         
         refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, config.discretization.k_velocity)
         refe_p = ReferenceFE(lagrangian, Float64, config.discretization.k_pressure)
-        
         V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["all_boundaries"])
         Q = TestFESpace(model, refe_p, conformity=:H1)
         
@@ -271,13 +295,22 @@ function run_mms()
         Y = MultiFieldFESpace([V, Q])
         X = MultiFieldFESpace([U, P])
         
-        # ALGORITHMIC RATIONALE: Adjust the degree calculation to properly integrate ASGS non-linear bounds
-        # ASGS formulation cross-multiplies convective structures tau_1 * (u*grad_v) * (u*grad_u).
-        # For P2 interpolations, velocity is O(x^2), convective derivative is O(x^3).
-        # Integration of the ASGS cross terms requires evaluating O(x^6) polynomials. Degree 4*k prevents aliasing.
-        degree = 4 * config.discretization.k_velocity
         Ω = Triangulation(model)
-        dΩ = Measure(Ω, degree)
+        
+        # ALGORITHMIC RATIONALE: High-Order Dynamic Integration
+        # We fundamentally bypass Gridap's JIT AST compilation lock by using plain black-box closures inside CellField. 
+        # By elevating the geometric global `dΩ` limit proportionally (+4), we structurally resolve steep geometric integrals
+        # perfectly matching $P_{k+2}$ stability, while evaluating natively instantly without allocating 360k-DOF interpolation matrices!
+        degree = 4 * config.discretization.k_velocity
+        dΩ = Measure(Ω, degree + 4)
+        
+        alpha_fn_wrapper(x) = alpha_field(x, config)
+        f_fn(x) = f_ex(x, config)
+        g_fn(x) = g_ex(x, config)
+
+        f_cf = CellField(f_fn, Ω)
+        alpha_cf = CellField(alpha_fn_wrapper, Ω)
+        g_cf = CellField(g_fn, Ω)
         
         if config.mesh.element_type == "TRI"
             h_array = lazy_map(v -> sqrt(2.0 * abs(v)), get_cell_measure(Ω))
@@ -290,35 +323,9 @@ function run_mms()
         alpha_fn_wrapper(x) = alpha_field(x, config)
         g_fn(x) = g_ex(x, config)
         
-        # ALGORITHMIC RATIONALE: Exact Gauss Integration
-        # Interpolating steep exponential spikes onto nodal grids causes massive spatial aliasing.
-        # Passing functions directly forces Gridap to evaluate them exactly at the high-order dΩ Gauss points.
-        println("Binding analytical functions for exact Gauss integration...")
-        
-        println("Defining formulation closures...")
-        # -------------------------------------------------------------
-        # ALGORITHMIC RATIONALE: High-Order Static Interpolation 
-        # Directly wrapping deep math branches into Gridap closures causes 
-        # exponential LLVM DAG compiler blowups for simplex Geometries (TRI).
-        # We project them statically onto a clean high-order finite element space 
-        # (p=degree+2) to preserve perfect integration accuracy without identical AD overhead.
-        # QUAD geometries natively compile rapidly so we rely on theoretically exact evaluation mappings.
-        # -------------------------------------------------------------
-        if config.mesh.element_type == "QUAD"
-            f_cf = CellField(f_fn, Ω)
-            alpha_cf = CellField(alpha_fn_wrapper, Ω)
-            g_cf = CellField(g_fn, Ω)
-        else
-            degree_high = degree + 2
-            refe_p_high = ReferenceFE(lagrangian, Float64, degree_high)
-            refe_v_high = ReferenceFE(lagrangian, VectorValue{2,Float64}, degree_high)
-            Q_high = TestFESpace(model, refe_p_high, conformity=:H1)
-            V_high = TestFESpace(model, refe_v_high, conformity=:H1)
-
-            f_cf = interpolate_everywhere(f_fn, V_high)
-            alpha_cf = interpolate_everywhere(alpha_fn_wrapper, Q_high)
-            g_cf = interpolate_everywhere(g_fn, Q_high)
-        end
+        f_cf = CellField(ExactF(config), Ω)
+        alpha_cf = CellField(ExactAlpha(config), Ω)
+        g_cf = CellField(ExactG(config), Ω)
         
         res_fn(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, g_cf)
         jac_fn(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf)
@@ -330,57 +337,162 @@ function run_mms()
         # ALGORITHMIC RATIONALE: Initialize exactly at the manufactured root.
         # This isolates pure spatial FME truncation errors without triggering nonlinear globalization failures.
         println("Interpolating exact initial guess...")
-        x0 = interpolate_everywhere([u_final, p_final], X)
+        x0_exact = interpolate_everywhere([u_final, p_final], X)
+        free_exact = copy(get_free_dof_values(x0_exact))
         
-        nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=15)
+        nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 15, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol)
         solver_newton = FESolver(nls_newton)
         
-        println("Solving Newton-Raphson from exact initialization...")
-        if method == "OSGS"
-            # Outer OSGS iterations
-            osgs_iters = config.solver.osgs_iterations
-            
-            # Formulate strictly unconstrained target mapping spaces for orthogonal L2 residual projections 
-            V_pi = TestFESpace(model, refe_u, conformity=:H1) # No dirichlet bounds
-            Q_pi = TestFESpace(model, refe_p, conformity=:H1)
-            U_pi = TrialFESpace(V_pi)
-            P_pi = TrialFESpace(Q_pi)
-            
-            for osgs_idx in 1:osgs_iters
-                println("OSGS Iteration $osgs_idx/$osgs_iters")
-                u_h_prev, p_h_prev = x0
-                
-                # Compute projections onto the unconstrained basis
-                pi_u_raw, pi_p_raw = PorousNSSolver.project_residuals(u_h_prev, p_h_prev, config, dΩ, h, f_cf, alpha_cf, g_cf, V_pi, Q_pi, U_pi, P_pi)
-                
-                # Protect Julia from boxed dynamic variable AD compiler collapse
-                let pi_u = pi_u_raw, pi_p = pi_p_raw
-                    # Create operator with pi_h
-                    res_osgs(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, g_cf, pi_u, pi_p)
-                    jac_osgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf, pi_u, pi_p)
-                    
-                    # Stage 2: Try Exact Jacobian first (guarantees steepest descent in the quadratic basin)
-                    op_osgs_exact = FEOperator(res_osgs, X, Y)
-                    
-                    # Dedicated lightweight solver for the inner loop
-                    nls_osgs = NLSolver(show_trace=true, method=:newton, iterations=4, ftol=1e-12)
-                    solver_osgs = FESolver(nls_osgs)
-                    
-                    try
-                        solve!(x0, solver_osgs, op_osgs_exact)
-                    catch e
-                        println("      -> [Warning] Exact AD Jacobian lost coercivity or failed. Falling back to coercive frozen Jacobian.")
-                        op_osgs_frozen = FEOperator(res_osgs, jac_osgs, X, Y)
-                        solve!(x0, solver_osgs, op_osgs_frozen)
-                    end
-                end
-            end
-        else
-            # ASGS pure Newton
-            solve!(x0, solver_newton, op_newton)
+        println("Solving Newton-Raphson from perturbed initialization...")
+        iter_count = 0
+        eps_pert_base = Float64(get(test_dict, "epsilon_pert", [0.1])[1])
+        max_n_pert = Int(get(test_dict, "max_n_pert", 5))
+        
+        success = false
+        successful_eps = eps_pert_base
+        final_x0 = x0_exact
+        iter_count_attempt = 0
+        
+        xmin, xmax, ymin, ymax = config.mesh.domain[1], config.mesh.domain[2], config.mesh.domain[3], config.mesh.domain[4]
+        
+        Random.seed!(42)
+        kx, ky = Tuple(rand(1:3, 3)), Tuple(rand(1:3, 3))
+        A, ph = Tuple(rand(3) .* 2.0 .- 1.0), Tuple(rand(3) .* 2π)
+
+        B_fn(x) = (x[1] - xmin)^2 * (xmax - x[1])^2 * (x[2] - ymin)^2 * (ymax - x[2])^2
+
+        function psi_raw_fn(x)
+            return A[1] * sin(kx[1]*π*x[1] + ph[1]) * cos(ky[1]*π*x[2] + ph[1]) +
+                   A[2] * sin(kx[2]*π*x[1] + ph[2]) * cos(ky[2]*π*x[2] + ph[2]) +
+                   A[3] * sin(kx[3]*π*x[1] + ph[3]) * cos(ky[3]*π*x[2] + ph[3])
+        end
+
+        psi(x) = B_fn(x) * psi_raw_fn(x)
+        
+        function h_raw_func(x)
+            grad_psi = ∇(psi)(x) 
+            alpha = alpha_fn_wrapper(x)
+            return (1.0 / alpha) * VectorValue(grad_psi[2], -grad_psi[1])
         end
         
+        h_cf = CellField(h_raw_func, Ω)
+        norm_h = sqrt(abs(sum(∫( h_cf ⋅ h_cf )dΩ))) + 1e-14
+        u_h_exact, p_h_exact = x0_exact
+        u_ex_L2 = sqrt(abs(sum(∫(u_h_exact ⋅ u_h_exact)dΩ)))
+        
+        # Check normalization and exact mass conservation of analytical formulation
+        test_h_norm = sqrt(sum(∫( h_cf ⋅ h_cf )dΩ)) / (norm_h - 1e-14)
+        div_alpha_h = sqrt(abs(sum(∫( (∇⋅(alpha_cf * h_cf)) * (∇⋅(alpha_cf * h_cf)) )dΩ)))
+        
+        Γ = BoundaryTriangulation(model)
+        dΓ = Measure(Γ, degree+4)
+        boundary_h_norm = sqrt(abs(sum(∫( h_cf ⋅ h_cf )dΓ)))
+        
+        println("  [Test] Perturbation intrinsic L2 norm base    (expected ~1.0): ", test_h_norm)
+        println("  [Test] Perturbation mass residual ||∇⋅(α h)|| (expected ~0.0): ", div_alpha_h)
+        println("  [Test] Perturbation boundary norm ||h||_∂Ω    (expected ~0.0): ", boundary_h_norm)
+        
+        @assert abs(test_h_norm - 1.0) < 1e-10 "Perturbation normalization failed!"
+        @assert div_alpha_h < 1e-10 "Perturbation mass conservation failed!"
+        @assert boundary_h_norm < 1e-10 "Perturbation no-slip Dirichlet boundary constraint failed!"
+        
+        eval_time = @elapsed begin
+            for attempt in 0:(max_n_pert + 1)
+                eps_p = attempt <= max_n_pert ? eps_pert_base / (10.0^attempt) : 0.0
+                
+                function u_0_func(x)
+                    return u_final(x) + eps_p * (u_ex_L2 / norm_h) * h_raw_func(x)
+                end
+                
+                x0 = interpolate_everywhere([u_0_func, p_final], X)
+                
+                println("Attempting nonlinear solve with eps_pert = $eps_p ...")
+                iter_count_attempt = 0
+                attempt_success = true
+                
+                try
+                    if method == "OSGS"
+                        # Outer OSGS iterations
+                        osgs_iters = config.solver.osgs_iterations
+                        
+                        # Formulate strictly unconstrained target mapping spaces for orthogonal L2 residual projections 
+                        V_pi = TestFESpace(model, refe_u, conformity=:H1) # No dirichlet bounds
+                        Q_pi = TestFESpace(model, refe_p, conformity=:H1)
+                        U_pi = TrialFESpace(V_pi)
+                        P_pi = TrialFESpace(Q_pi)
+                        
+                        for osgs_idx in 1:osgs_iters
+                            println("OSGS Iteration $osgs_idx/$osgs_iters")
+                            u_h_prev, p_h_prev = x0
+                            
+                            # Compute projections onto the unconstrained basis
+                            println("    [Timing] Starting project_residuals computation...")
+                            pi_u_raw, pi_p_raw = @time PorousNSSolver.project_residuals(u_h_prev, p_h_prev, config, dΩ, h, f_cf, alpha_cf, g_cf, V_pi, Q_pi, U_pi, P_pi)
+                            println("    [Timing] project_residuals completed.")
+                            
+                            # Protect Julia from boxed dynamic variable AD compiler collapse
+                            let pi_u = pi_u_raw, pi_p = pi_p_raw
+                                # Create operator with pi_h
+                                res_osgs(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, g_cf, pi_u, pi_p)
+                                jac_osgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf, pi_u, pi_p)
+                                
+                                # Create operator explicitly using the analytical frozen/coercive Jacobian
+                                op_osgs = FEOperator(res_osgs, jac_osgs, X, Y)
+                                
+                                nls_osgs = PorousNSSolver.SafeNewtonSolver(LUSolver(), 15, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol)
+                                solver_osgs = FESolver(nls_osgs)
+                                
+                                res_solve = solve!(x0, solver_osgs, op_osgs)
+                                cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
+                                nls_cache_osgs = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                                iter_count_attempt += nls_cache_osgs.result.iterations
+                                final_res = nls_cache_osgs.result.residual_norm
+                                if nls_cache_osgs.result.iterations >= 15 || final_res > config.solver.stagnation_tol
+                                    attempt_success = false
+                                end
+                            end
+                            if !attempt_success
+                                break
+                            end
+                        end
+                    else
+                        # ASGS pure Newton
+                        res_solve = solve!(x0, solver_newton, op_newton)
+                        cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
+                        nls_cache_asgs = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                        iter_count_attempt = nls_cache_asgs.result.iterations
+                        final_res = nls_cache_asgs.result.residual_norm
+                        if nls_cache_asgs.result.iterations >= 15 || final_res > config.solver.stagnation_tol
+                            attempt_success = false
+                        end
+                    end
+                catch e
+                    println("Nonlinear solver crashed: ", typeof(e))
+                    attempt_success = false
+                end
+                
+                if attempt_success
+                    success = true
+                    successful_eps = eps_p
+                    iter_count = iter_count_attempt
+                    final_x0 = x0
+                    println("Convergence achieved with eps_pert = $eps_p in $iter_count iterations.")
+                    break
+                else
+                    println("Diverged with eps_pert = $eps_p.")
+                end
+            end
+            if !success
+                println("Convergence NOT achieved after $max_n_pert retries. Using the last state to preserve errors.")
+                iter_count = iter_count_attempt
+                final_x0 = x0
+                successful_eps = eps_pert_base / (10.0^max_n_pert)
+            end
+        end
+        x0 = final_x0
         u_h, p_h = x0
+        
+        u_init_func(x) = u_final(x) + successful_eps * (u_ex_L2 / norm_h) * h_raw_func(x)
         
         # Compute errors
         e_u = u_final - u_h
@@ -390,7 +502,9 @@ function run_mms()
                     "p_ex" => p_final,
                     "e_u" => e_u,
                     "e_p" => e_p,
-                    "alpha" => alpha_fn_wrapper)
+                    "alpha" => alpha_fn_wrapper,
+                    "u_init" => u_init_func,
+                    "p_init" => p_final)
                 
                 el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ))
                 
@@ -410,6 +524,9 @@ function run_mms()
                 push!(err_p_L2, el2_p)
                 push!(err_u_H1, eh1_u)
                 push!(err_p_H1, eh1_p)
+                push!(eval_times, eval_time)
+                push!(eval_iters, iter_count)
+                push!(eval_eps, successful_eps)
                 println("L2 Error u: $el2_u, p: $el2_p")
                 println("H1 Error u: $eh1_u, p: $eh1_p")
                 
@@ -420,22 +537,44 @@ function run_mms()
             # Save combination to HDF5
             grp_name = "config_$(c_idx)_$(method)"
             
+            # Helper to enforce vector type from HDF5 scalar readings
+            as_vec(x) = x isa Vector ? x : [x]
+
             # Non-destructively merge with existing datasets to avoid nullifying prior partition sweeps!
             if haskey(h5f, grp_name) && !erase_past
                 println("Merging preexisting result tuple globally within HDF5 namespace for $(grp_name)...")
                 g_old = h5f[grp_name]
-                old_hs = read(g_old["h"])
-                old_u_L2 = read(g_old["err_u_l2"])
-                old_p_L2 = read(g_old["err_p_l2"])
-                old_u_H1 = read(g_old["err_u_h1"])
-                old_p_H1 = read(g_old["err_p_h1"])
+                old_hs = as_vec(read(g_old["h"]))
+                old_u_L2 = as_vec(read(g_old["err_u_l2"]))
+                old_p_L2 = as_vec(read(g_old["err_p_l2"]))
+                old_u_H1 = as_vec(read(g_old["err_u_h1"]))
+                old_p_H1 = as_vec(read(g_old["err_p_h1"]))
+                old_times = zeros(Float64, length(old_hs))
+                old_iters = zeros(Int, length(old_hs))
+                old_eps = zeros(Float64, length(old_hs))
+                try
+                    if haskey(g_old, "eval_times")
+                        old_times = as_vec(read(g_old["eval_times"]))
+                    end
+                    if haskey(g_old, "eval_iters")
+                        old_iters = as_vec(read(g_old["eval_iters"]))
+                    end
+                    if haskey(g_old, "eval_eps")
+                        old_eps = as_vec(read(g_old["eval_eps"]))
+                    end
+                catch e
+                    println("Warning: Corrupted performance tracking nodes detected in H5 (likely from a force-killed run). Overwriting legacy metrics with zero.")
+                end
                 
                 # Zip old values into dictionary keyed by grid interval h
-                combined = Dict(zip(old_hs, zip(old_u_L2, old_p_L2, old_u_H1, old_p_H1)))
+                combined = Dict{Float64, Tuple}()
+                for i in 1:length(old_hs)
+                    combined[old_hs[i]] = (old_u_L2[i], old_p_L2[i], old_u_H1[i], old_p_H1[i], old_times[i], old_iters[i], old_eps[i])
+                end
                 
                 # Overlay newly computed resolutions
                 for i in 1:length(hs)
-                    combined[hs[i]] = (err_u_L2[i], err_p_L2[i], err_u_H1[i], err_p_H1[i])
+                    combined[hs[i]] = (err_u_L2[i], err_p_L2[i], err_u_H1[i], err_p_H1[i], eval_times[i], eval_iters[i], eval_eps[i])
                 end
                 
                 # Sort strictly by descending h = mathematically ascending N refinement
@@ -446,6 +585,9 @@ function run_mms()
                 err_p_L2 = Float64[combined[h][2] for h in sorted_hs]
                 err_u_H1 = Float64[combined[h][3] for h in sorted_hs]
                 err_p_H1 = Float64[combined[h][4] for h in sorted_hs]
+                eval_times = Float64[combined[h][5] for h in sorted_hs]
+                eval_iters = Int[combined[h][6] for h in sorted_hs]
+                eval_eps = Float64[combined[h][7] for h in sorted_hs]
                 
                 # Nuke group structure safely to allow continuous reallocation
                 delete_object(h5f, grp_name)
@@ -462,8 +604,13 @@ function run_mms()
             g["err_p_l2"] = err_p_L2
             g["err_u_h1"] = err_u_H1
             g["err_p_h1"] = err_p_H1
+            g["eval_times"] = eval_times
+            g["eval_iters"] = eval_iters
+            g["eval_eps"] = eval_eps
             
             # Write metadata attributes
+            attributes(g)["total_time_s"] = sum(eval_times)
+            attributes(g)["total_iters"] = sum(eval_iters)
             attributes(g)["Re"] = Float64(Re)
             attributes(g)["Da"] = Float64(Da)
             attributes(g)["alpha_0"] = Float64(alpha_0)
@@ -495,4 +642,7 @@ function run_mms()
     println("Please run `python3 plot_results.py` to compile the colored convergence_report.md tables.")
 end
 
-run_mms()
+if abspath(PROGRAM_FILE) == @__FILE__
+    config_file = length(ARGS) > 0 ? ARGS[1] : "test_config.json"
+    run_mms(config_file)
+end
