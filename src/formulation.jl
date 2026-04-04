@@ -86,11 +86,11 @@ function weak_form_residual(X, Y, config::PorousNSConfig, dΩ, h, f_custom, alph
     end
     R_u = alpha_conv * conv_u + alpha_conv * ∇(p) + σ * u - div_visc_u - f
     
-    L_u_star_v = alpha_conv * (∇(v)' ⋅ u) + alpha_conv * ∇(q)
+    L_u_star_v = alpha_conv * (∇(v)' ⋅ u) + alpha_conv * ∇(q) - σ * v
     
     div_alpha_u = α * (∇⋅u) + u ⋅ ∇(α)
     R_p = eps_val * p + div_alpha_u - g_mass
-    L_q_star = α * (∇⋅v) + v ⋅ ∇(α)
+    L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - eps_val * q
 
     conv_term = v ⋅ ( alpha_conv * conv_u )
     visc_term = alpha_nu * ( ∇(u) ⊙ ∇(v) ) 
@@ -140,6 +140,9 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
         return b_term * (u_val ⋅ du_val) / mag_u
     end
     function compute_dtau_1_du(u_val, du_val, h_val, alpha_val)
+        if config.solver.freeze_jacobian_cusp
+            return 0.0 * (u_val ⋅ du_val)
+        end
         mag_u = sqrt(u_val ⋅ u_val + eps_v_sq)
         df_dmag = (alpha_val * c_2 / h_val) + b_resistance(alpha_val)
         a_t = a_resistance(alpha_val, Re, Da)
@@ -149,6 +152,9 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
         return scalar_deriv * (u_val ⋅ du_val)
     end
     function compute_dtau_2_du(u_val, du_val, h_val, alpha_val)
+        if config.solver.freeze_jacobian_cusp
+            return 0.0 * (u_val ⋅ du_val)
+        end
         mag_u = sqrt(u_val ⋅ u_val + eps_v_sq)
         A_NS_val = (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + eps_v_sq
         dA_NS_dmag = c_2 / h_val
@@ -171,8 +177,8 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
     end
     R_du = alpha_conv_jac * conv_du + alpha_conv_jac * ∇(dp) + σ * du + (dsigma_du * u) - div_visc_du
     
-    L_u_star_v = alpha_conv_jac * (∇(v)' ⋅ u) + alpha_conv_jac * ∇(q)
-    dL_du_star_v = alpha_conv_jac * (∇(v)' ⋅ du)
+    L_u_star_v = alpha_conv_jac * (∇(v)' ⋅ u) + alpha_conv_jac * ∇(q) - σ * v
+    dL_du_star_v = alpha_conv_jac * (∇(v)' ⋅ du) - (dsigma_du * v)
     
     div_alpha_du = α * (∇⋅du) + du ⋅ ∇(α)
     R_dp = eps_val * dp + div_alpha_du
@@ -191,7 +197,7 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
     
     div_alpha_u_old = α * (∇⋅u) + u ⋅ ∇(α)
     R_p_old = eps_val * p + div_alpha_u_old - g_mass
-    L_q_star = α * (∇⋅v) + v ⋅ ∇(α)
+    L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - eps_val * q
 
     stab_mom_jac = L_u_star_v ⋅ (τ_1 * R_du + dtau_1_du * R_u_old) + dL_du_star_v ⋅ (τ_1 * R_u_old)
     stab_mass_jac = L_q_star * (τ_2 * R_dp + dtau_2_du * R_p_old)
@@ -240,7 +246,7 @@ function weak_form_jacobian_picard(X, dX, Y, config::PorousNSConfig, dΩ, h, f_c
     end
     R_du = alpha_conv_jac * conv_du + alpha_conv_jac * ∇(dp) + σ * du - div_visc_du
     
-    L_u_star_v = alpha_conv_jac * (∇(v)' ⋅ u) + alpha_conv_jac * ∇(q)
+    L_u_star_v = alpha_conv_jac * (∇(v)' ⋅ u) + alpha_conv_jac * ∇(q) - σ * v
     dL_du_star_v = 0.0 * (∇(v)' ⋅ du)
     
     div_alpha_du = α * (∇⋅du) + du ⋅ ∇(α)
@@ -257,7 +263,7 @@ function weak_form_jacobian_picard(X, dX, Y, config::PorousNSConfig, dΩ, h, f_c
         div_visc_u_old = div_visc_u_old + α * ν * Δ(u)
     end
     R_u_old = alpha_conv_jac * (∇(u)' ⋅ u) + alpha_conv_jac * ∇(p) + σ * u - div_visc_u_old - f
-    L_q_star = α * (∇⋅v) + v ⋅ ∇(α)
+    L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - eps_val * q
 
     stab_mom_jac = L_u_star_v ⋅ (τ_1 * R_du) + dL_du_star_v ⋅ (τ_1 * R_u_old)
     stab_mass_jac = L_q_star * (τ_2 * R_dp)
@@ -363,6 +369,9 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
         return b_term * (u_val ⋅ du_val) / mag_u
     end
     function compute_dtau_1_du(u_val, du_val, h_val, alpha_val)
+        if config.solver.freeze_jacobian_cusp
+            return 0.0 * (u_val ⋅ du_val)
+        end
         mag_u = sqrt(u_val ⋅ u_val + eps_v_sq)
         df_dmag = (alpha_val * c_2 / h_val) + b_resistance(alpha_val)
         a_t = a_resistance(alpha_val, Re, Da)
@@ -372,6 +381,9 @@ function weak_form_jacobian(X, dX, Y, config::PorousNSConfig, dΩ, h, f_custom, 
         return scalar_deriv * (u_val ⋅ du_val)
     end
     function compute_dtau_2_du(u_val, du_val, h_val, alpha_val)
+        if config.solver.freeze_jacobian_cusp
+            return 0.0 * (u_val ⋅ du_val)
+        end
         mag_u = sqrt(u_val ⋅ u_val + eps_v_sq)
         A_NS_val = (c_1 * ν / (h_val * h_val)) + (c_2 * mag_u / h_val) + eps_v_sq
         dA_NS_dmag = c_2 / h_val

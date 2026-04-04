@@ -304,13 +304,7 @@ function run_mms(config_file="test_config.json")
         degree = 4 * config.discretization.k_velocity
         dΩ = Measure(Ω, degree + 4)
         
-        alpha_fn_wrapper(x) = alpha_field(x, config)
-        f_fn(x) = f_ex(x, config)
-        g_fn(x) = g_ex(x, config)
 
-        f_cf = CellField(f_fn, Ω)
-        alpha_cf = CellField(alpha_fn_wrapper, Ω)
-        g_cf = CellField(g_fn, Ω)
         
         if config.mesh.element_type == "TRI"
             h_array = lazy_map(v -> sqrt(2.0 * abs(v)), get_cell_measure(Ω))
@@ -340,7 +334,7 @@ function run_mms(config_file="test_config.json")
         x0_exact = interpolate_everywhere([u_final, p_final], X)
         free_exact = copy(get_free_dof_values(x0_exact))
         
-        nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 15, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol)
+        nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 15, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_tolerance, config.solver.linesearch_alpha_min)
         solver_newton = FESolver(nls_newton)
         
         println("Solving Newton-Raphson from perturbed initialization...")
@@ -410,13 +404,44 @@ function run_mms(config_file="test_config.json")
                 iter_count_attempt = 0
                 attempt_success = true
                 
+                # --- Safe Picard Globalization Pass ---
+                jac_picard(x, dx, y) = PorousNSSolver.weak_form_jacobian_picard(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf, nothing, nothing)
+                op_picard = FEOperator(res_fn, jac_picard, X, Y)
+                nls_picard = NLSolver(show_trace=false, method=:newton, iterations=config.solver.picard_iterations)
+                solver_picard = FESolver(nls_picard)
+                
+                x0_backup = copy(get_free_dof_values(x0))
                 try
-                    if method == "OSGS"
-                        # Outer OSGS iterations
+                    println("    -> Running Picard Globalization (Max $(config.solver.picard_iterations) iters)...")
+                    solve!(x0, solver_picard, op_picard)
+                catch e
+                    println("    -> Picard phase hit limit/error. Proceeding to exact Newton.")
+                end
+                if any(isnan, get_free_dof_values(x0))
+                    println("    -> [Warning] Picard generated NaNs. Reverted to pristine initial guess.")
+                    get_free_dof_values(x0) .= x0_backup
+                end
+                # --------------------------------------
+                
+                try
+                    # 1. ALWAYS execute ASGS first to find a smooth, physical root
+                    res_solve = solve!(x0, solver_newton, op_newton)
+                    cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
+                    nls_cache_asgs = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                    
+                    iter_count_attempt = nls_cache_asgs.result.iterations
+                    final_res = nls_cache_asgs.result.residual_norm
+                    
+                    # Ensure script evaluates against ftol (with a safety floor for Float64 noise)
+                    if iter_count_attempt >= config.solver.newton_iterations || final_res > max(config.solver.ftol, 1e-12)
+                        attempt_success = false
+                    end
+                    
+                    # 2. ONLY if OSGS is requested, apply it using the pristine ASGS root
+                    if attempt_success && method == "OSGS"
                         osgs_iters = config.solver.osgs_iterations
                         
-                        # Formulate strictly unconstrained target mapping spaces for orthogonal L2 residual projections 
-                        V_pi = TestFESpace(model, refe_u, conformity=:H1) # No dirichlet bounds
+                        V_pi = TestFESpace(model, refe_u, conformity=:H1) 
                         Q_pi = TestFESpace(model, refe_p, conformity=:H1)
                         U_pi = TrialFESpace(V_pi)
                         P_pi = TrialFESpace(Q_pi)
@@ -425,49 +450,34 @@ function run_mms(config_file="test_config.json")
                             println("OSGS Iteration $osgs_idx/$osgs_iters")
                             u_h_prev, p_h_prev = x0
                             
-                            # Compute projections onto the unconstrained basis
                             println("    [Timing] Starting project_residuals computation...")
                             pi_u_raw, pi_p_raw = @time PorousNSSolver.project_residuals(u_h_prev, p_h_prev, config, dΩ, h, f_cf, alpha_cf, g_cf, V_pi, Q_pi, U_pi, P_pi)
                             println("    [Timing] project_residuals completed.")
                             
-                            # Protect Julia from boxed dynamic variable AD compiler collapse
                             let pi_u = pi_u_raw, pi_p = pi_p_raw
-                                # Create operator with pi_h
                                 res_osgs(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, g_cf, pi_u, pi_p)
                                 jac_osgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, g_cf, pi_u, pi_p)
                                 
-                                # Create operator explicitly using the analytical frozen/coercive Jacobian
                                 op_osgs = FEOperator(res_osgs, jac_osgs, X, Y)
-                                
-                                nls_osgs = PorousNSSolver.SafeNewtonSolver(LUSolver(), 15, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol)
+                                nls_osgs = PorousNSSolver.SafeNewtonSolver(LUSolver(), config.solver.newton_iterations, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_tolerance, config.solver.linesearch_alpha_min)
                                 solver_osgs = FESolver(nls_osgs)
                                 
-                                res_solve = solve!(x0, solver_osgs, op_osgs)
-                                cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
-                                nls_cache_osgs = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                                res_solve_osgs = solve!(x0, solver_osgs, op_osgs)
+                                cache_osgs = res_solve_osgs isa Tuple ? res_solve_osgs[2] : res_solve_osgs
+                                nls_cache_osgs = cache_osgs isa Tuple ? cache_osgs[2] : cache_osgs
+                                
                                 iter_count_attempt += nls_cache_osgs.result.iterations
                                 final_res = nls_cache_osgs.result.residual_norm
-                                if nls_cache_osgs.result.iterations >= 15 || final_res > config.solver.stagnation_tol
+                                
+                                if nls_cache_osgs.result.iterations >= config.solver.newton_iterations || final_res > max(config.solver.ftol, 1e-12)
                                     attempt_success = false
+                                    break
                                 end
                             end
-                            if !attempt_success
-                                break
-                            end
-                        end
-                    else
-                        # ASGS pure Newton
-                        res_solve = solve!(x0, solver_newton, op_newton)
-                        cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
-                        nls_cache_asgs = cache_solve isa Tuple ? cache_solve[2] : cache_solve
-                        iter_count_attempt = nls_cache_asgs.result.iterations
-                        final_res = nls_cache_asgs.result.residual_norm
-                        if nls_cache_asgs.result.iterations >= 15 || final_res > config.solver.stagnation_tol
-                            attempt_success = false
                         end
                     end
                 catch e
-                    println("Nonlinear solver crashed: ", typeof(e))
+                    println("Nonlinear solver crashed: ", typeof(e), " - ", e)
                     attempt_success = false
                 end
                 

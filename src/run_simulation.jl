@@ -9,8 +9,8 @@ function run_simulation(config_path::String;
     config = load_config(config_path)
     model = create_mesh(config)
     
-    kv = config.phys.k_velocity
-    kp = config.phys.k_pressure
+    kv = config.discretization.k_velocity
+    kp = config.discretization.k_pressure
     
     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
     refe_p = ReferenceFE(lagrangian, Float64, kp)
@@ -46,13 +46,19 @@ function run_simulation(config_path::String;
     h = CellField(h_array, Ω)
     
     # Define residual operator
-    res(x, y) = weak_form_residual(x, y, config, dΩ, h)
+    alpha_fn(x) = config.porosity.alpha_0
+    alpha_cf = CellField(alpha_fn, Ω)
+    f_fn(x) = VectorValue(config.phys.f_x, config.phys.f_y)
+    f_cf = CellField(f_fn, Ω)
+    
+    res(x, y) = weak_form_residual(x, y, config, dΩ, h, f_cf, alpha_cf, nothing)
+    jac(x, dx, y) = weak_form_jacobian(x, dx, y, config, dΩ, h, f_cf, alpha_cf, nothing)
     
     # Assemble non-linear system
-    op = FEOperator(res, X, Y)
+    op = FEOperator(res, jac, X, Y)
     
     # Non-linear solver (Newton-Raphson)
-    nls = NLSolver(show_trace=true, method=:newton, iterations=10)
+    nls = SafeNewtonSolver(LUSolver(), config.solver.newton_iterations, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_tolerance, config.solver.linesearch_alpha_min)
     solver = FESolver(nls)
     
     println("Solving non-linear system...")
@@ -79,7 +85,7 @@ function run_simulation(op_newton::FEOperator, op_picard::FEOperator, config::Po
     # NOTE: BackTracking is strictly disabled! Linear mapping structural surrogates natively break exact
     # strong residual linesearch tracking since they aren't guaranteed mathematically accurate descent maps!
     # Stage 1: Picard Initialization (NO BackTracking! Must take full surrogate steps)
-    nls_picard = NLSolver(show_trace=true, method=:newton, iterations=15)
+    nls_picard = NLSolver(show_trace=true, method=:newton, iterations=config.solver.picard_iterations)
     solver_picard = FESolver(nls_picard)
     println("Solving Picard Initialization...")
     x_picard = solve(solver_picard, op_picard)
@@ -90,7 +96,7 @@ function run_simulation(op_newton::FEOperator, op_picard::FEOperator, config::Po
     # exact Fréchet continuous matrix. Because this resolves the authentic analytical Jacobian dynamically bounding 
     # mapping exact strong mathematical residuals properly, we re-apply BackTracking natively tracking step lengths.
     # Stage 2: Newton-Raphson (Keep BackTracking to safely secure the quadratic basin)
-    nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=15)
+    nls_newton = SafeNewtonSolver(LUSolver(), config.solver.newton_iterations, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_tolerance, config.solver.linesearch_alpha_min)
     solver_newton = FESolver(nls_newton)
     println("Solving Newton-Raphson...")
     solve!(x_picard, solver_newton, op_newton)

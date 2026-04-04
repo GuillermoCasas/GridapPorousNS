@@ -40,7 +40,11 @@ end
     osgs_iterations::Int = 3
     xtol::Float64 = 1e-8
     stagnation_tol::Float64 = 1e-5
+    ftol::Float64 = 1e-10
     max_increases::Int = 2
+    freeze_jacobian_cusp::Bool = false
+    linesearch_tolerance::Float64 = 1.0001
+    linesearch_alpha_min::Float64 = 1e-4
 end
 
 @with_kw struct PorousNSConfig

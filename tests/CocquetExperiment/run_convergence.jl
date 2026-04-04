@@ -61,7 +61,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     jac_asgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h_cf, nothing, alpha_h)
     
     op_asgs = FEOperator(res_asgs, jac_asgs, X, Y)
-    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol)
+    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_tolerance, config.solver.linesearch_alpha_min)
     solver_newton = FESolver(nls_newton)
     
     eval_iters = 0
@@ -100,7 +100,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
                     op_osgs_exact = FEOperator(res_osgs, X, Y)
                     
                     # Dedicated lightweight solver for the inner loop
-                    nls_osgs = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol)
+                    nls_osgs = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_tolerance, config.solver.linesearch_alpha_min)
                     solver_osgs = FESolver(nls_osgs)
                     
                     try
