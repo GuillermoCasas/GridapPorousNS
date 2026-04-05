@@ -3,8 +3,8 @@
     "epsilon_pert": [0.1],
     "max_n_pert": 5,
     "physical_parameters": {
-        "Re": [1.0],
-        "Da": [1.0],
+        "Re": [1e6],
+        "Da": [1e-6],
         "physical_epsilon": [0.0],
         "numerical_epsilon_coefficient": [0.0001],
         "f_x": 0.0,
@@ -23,7 +23,7 @@
     "mesh": {
         "domain": [-0.5, 0.5, -0.5, 0.5],
         "partition": [10, 10],
-        "convergence_partitions": [10, 20],
+        "convergence_partitions": [20],
         "element_type": ["QUAD"]
     },
     "output": {

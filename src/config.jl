@@ -1,12 +1,18 @@
 # src/config.jl
 
 @with_kw struct PhysicalParameters
-    Re::Float64 = 1.0
-    Da::Float64 = 1.0
-    physical_epsilon::Float64 = 0.0
-    numerical_epsilon_coefficient::Float64 = 1e-4
-    f_x::Float64 = 0.0
-    f_y::Float64 = 0.0
+    nu::Float64 = 1.0           # Kinematic viscosity
+    f_x::Float64 = 0.0          # Forcing x
+    f_y::Float64 = 0.0          # Forcing y
+    eps_val::Float64 = 1e-8     # Absolute numerical stabilization limit for pressure
+    reaction_model::String = "Forchheimer"
+    sigma_constant::Float64 = 1.0
+    sigma_linear::Float64 = 150.0   # A
+    sigma_nonlinear::Float64 = 1.75 # B
+    u_base_floor_ref::Float64 = 1e-4
+    h_floor_weight::Float64 = 0.1
+    epsilon_floor::Float64 = 1e-12
+    tau_regularization_limit::Float64 = 1e-12
 end
 
 @with_kw struct PorosityField
@@ -42,9 +48,12 @@ end
     stagnation_tol::Float64 = 1e-5
     ftol::Float64 = 1e-10
     max_increases::Int = 2
-    freeze_jacobian_cusp::Bool = false
+    freeze_jacobian_cusp::Bool = true
     linesearch_tolerance::Float64 = 1.0001
     linesearch_alpha_min::Float64 = 1e-4
+    run_diagnostics::Bool = false
+    ablation_mode::String = "full"
+    experimental_reaction_mode::String = "standard"
 end
 
 @with_kw struct PorousNSConfig
@@ -87,15 +96,15 @@ function load_config_from_dict(override::AbstractDict)
 end
 
 function _parse_dict_to_config(dict::AbstractDict)
-    local_phys = PhysicalParameters(; (Symbol(k) => v for (k,v) in dict["physical_parameters"])...)
-    local_poro = PorosityField(; (Symbol(k) => v for (k,v) in dict["porosity_field"])...)
-    local_disc = DiscretizationConfig(; (Symbol(k) => v for (k,v) in dict["discretization"])...)
-    local_mesh = MeshConfig(; (Symbol(k) => v for (k,v) in dict["mesh"])...)
-    local_out = OutputConfig(; (Symbol(k) => v for (k,v) in dict["output"])...)
+    local_phys = PhysicalParameters(; (Symbol(k) => v for (k,v) in dict["physical_parameters"] if Symbol(k) in fieldnames(PhysicalParameters))...)
+    local_poro = PorosityField(; (Symbol(k) => v for (k,v) in dict["porosity_field"] if Symbol(k) in fieldnames(PorosityField))...)
+    local_disc = DiscretizationConfig(; (Symbol(k) => v for (k,v) in dict["discretization"] if Symbol(k) in fieldnames(DiscretizationConfig))...)
+    local_mesh = MeshConfig(; (Symbol(k) => v for (k,v) in dict["mesh"] if Symbol(k) in fieldnames(MeshConfig))...)
+    local_out = OutputConfig(; (Symbol(k) => v for (k,v) in dict["output"] if Symbol(k) in fieldnames(OutputConfig))...)
     
     local_solver = SolverConfig()
     if haskey(dict, "solver")
-        local_solver = SolverConfig(; (Symbol(k) => v for (k,v) in dict["solver"])...)
+        local_solver = SolverConfig(; (Symbol(k) => v for (k,v) in dict["solver"] if Symbol(k) in fieldnames(SolverConfig))...)
     end
     
     return PorousNSConfig(phys=local_phys, porosity=local_poro, discretization=local_disc, mesh=local_mesh, output=local_out, solver=local_solver)

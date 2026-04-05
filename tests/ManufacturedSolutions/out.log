@@ -1,0 +1,41 @@
+  Activating project at `~/repos/porous_NS_with_Gridap`
+
+========================================
+Running Config 1 (of 2) [ID: 1]: Re=1.0e6, Da=1.0e-6, alpha_0=0.5, k=1, type=QUAD, method=ASGS
+========================================
+Running MMS for partition 20 x 20
+Calculated MMS Exact Forcing...
+
+>>> Phase 1: EXACT ROOT TEST
+Exactness Diagnostic (Newton root mismatch) -> L2: 0.003194276227697327 | L_inf: 0.00040165117360761553
+  [SUCCESS] EXACTNESS DIAGNOSTIC PASSED. Interpolant root condition met.
+
+>>> Phase 2: ROBUST HOMOTOPY / PERTURBATION TEST
+Attempting nonlinear solve with eps_pert = 0.1 ...
+Iter 0: f(x) inf-norm = 5.098147681792398e-9 | Merit Φ(x) = 2.7425144659339042e-17
+Iter 1: f(x) inf-norm = 6.904663507611986e-10 | Merit Φ = 4.849858013654748e-19 | Step inf-norm = 0.00013604521138891077 | alpha = 1.0
+Iter 2: f(x) inf-norm = 9.478640095039736e-11 | Merit Φ = 8.458763344318888e-21 | Step inf-norm = 4.940665752765223e-5 | alpha = 1.0
+  [Convergence] Residual inf-norm (9.478640095039736e-11) is below tolerance (1.0e-10).
+Convergence achieved with eps_pert = 0.1 in 2 iterations.
+L2 Error u: 0.002556938306799193, p: 288.40652183596995
+H1 Error u: 0.2805948808216713, p: 1015.6341401899234
+
+========================================
+Running Config 2 (of 2) [ID: 1]: Re=1.0e6, Da=1.0e-6, alpha_0=0.5, k=1, type=QUAD, method=OSGS
+========================================
+Running MMS for partition 20 x 20
+Calculated MMS Exact Forcing...
+
+>>> Phase 1: EXACT ROOT TEST
+Exactness Diagnostic (Newton root mismatch) -> L2: 0.003194276227697327 | L_inf: 0.00040165117360761553
+  [SUCCESS] EXACTNESS DIAGNOSTIC PASSED. Interpolant root condition met.
+
+>>> Phase 2: ROBUST HOMOTOPY / PERTURBATION TEST
+Attempting nonlinear solve with eps_pert = 0.1 ...
+Iter 0: f(x) inf-norm = 5.098147681792398e-9 | Merit Φ(x) = 2.7425144659339042e-17
+Iter 1: f(x) inf-norm = 6.904663507611986e-10 | Merit Φ = 4.849858013654748e-19 | Step inf-norm = 0.00013604521138891077 | alpha = 1.0
+Iter 2: f(x) inf-norm = 9.478640095039736e-11 | Merit Φ = 8.458763344318888e-21 | Step inf-norm = 4.940665752765223e-5 | alpha = 1.0
+  [Convergence] Residual inf-norm (9.478640095039736e-11) is below tolerance (1.0e-10).
+Convergence achieved with eps_pert = 0.1 in 2 iterations.
+L2 Error u: 0.002556938306799193, p: 288.40652183596995
+H1 Error u: 0.2805948808216713, p: 1015.6341401899234

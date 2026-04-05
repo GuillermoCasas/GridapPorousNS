@@ -1,4 +1,4 @@
-# src/safesolver.jl
+# src/solvers/nonlinear.jl
 using Gridap
 using Gridap.Algebra
 using LinearAlgebra
@@ -10,8 +10,8 @@ struct SafeNewtonSolver <: NonlinearSolver
     xtol::Float64
     stagnation_tol::Float64
     ftol::Float64
-    linesearch_tolerance::Float64
     linesearch_alpha_min::Float64
+    c1::Float64 # Armijo parameter
 end
 
 struct SafeSolverResult
@@ -27,15 +27,15 @@ struct SafeSolverCache
     result::SafeSolverResult
 end
 
-# Inner helper to keep code DRY and prevent memory leaks
 function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::NonlinearOperator, b, A, dx, ls_cache)
     inc_count = 0
     
     residual!(b, op, x)
     norm_b_inf = norm(b, Inf)
-    norm_b_l2  = norm(b, 2)
-    println("Iter 0: f(x) inf-norm = $norm_b_inf | L2-norm = $norm_b_l2")
-    last_norm_l2 = norm_b_l2
+    phi_x = 0.5 * (norm(b, 2)^2)
+    last_phi = phi_x
+    
+    println("Iter 0: f(x) inf-norm = $norm_b_inf | Merit Φ(x) = $phi_x")
     
     if norm_b_inf <= solver.ftol
         println("  [Convergence] Initial residual is below tolerance ($(solver.ftol)).")
@@ -60,17 +60,23 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         x_old .= x
         step_norm_base = norm(dx, Inf)
         
+        # Base step matrix interaction: A * dx
+        Adx = A * dx
+        dir_deriv = - dot(b, Adx)
+        
         norm_b_new_inf = norm_b_inf
-        norm_b_new_l2  = norm_b_l2
+        phi_x_new = phi_x
         
         ls_success = false
         for ls_iter in 1:15
             x .= x_old .- alpha .* dx
             residual!(b, op, x)
             norm_b_new_inf = norm(b, Inf)
-            norm_b_new_l2  = norm(b, 2)
+            phi_x_new = 0.5 * (norm(b, 2)^2)
             
-            if norm_b_new_l2 <= last_norm_l2 * solver.linesearch_tolerance 
+            # Armijo condition for Φ(x) = 1/2 ||F(x)||^2
+            # Φ(x - α d) <= Φ(x) + c1 * α * ∇Φ⋅d
+            if phi_x_new <= phi_x + solver.c1 * alpha * dir_deriv
                 ls_success = true
                 break
             end
@@ -83,13 +89,13 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         if !ls_success
             println("  [Stagnation] Linesearch failed to find a descent direction. Aborting Newton loop.")
             x .= x_old
-            residual!(b, op, x) # Restore residual
+            residual!(b, op, x)
             norm_b_inf = norm(b, Inf)
             break
         end
         
         step_norm = alpha * step_norm_base
-        println("Iter $i: f(x) inf-norm = $norm_b_new_inf | L2-norm = $norm_b_new_l2 | Step inf-norm = $step_norm | alpha = $alpha")
+        println("Iter $i: f(x) inf-norm = $norm_b_new_inf | Merit Φ = $phi_x_new | Step inf-norm = $step_norm | alpha = $alpha | dir_deriv = $dir_deriv")
         
         if norm_b_new_inf <= solver.ftol
             println("  [Convergence] Residual inf-norm ($norm_b_new_inf) is below tolerance ($(solver.ftol)).")
@@ -97,12 +103,12 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
             break
         end
         
-        # SMART DIVERGENCE GUARD: Check L2 norm explosion (>5% growth to ignore noise)
-        if isnan(norm_b_new_l2) || norm_b_new_l2 > last_norm_l2 * 1.05
+        # Divergence guard based on merit.
+        if isnan(phi_x_new) || phi_x_new > last_phi * 1.05
             inc_count += 1
             if inc_count >= solver.max_increases
                 if norm_b_new_inf > 1e-2
-                    error("Solver Diverged: L2 Residual exploded or hit NaN for $(inc_count) iterations.")
+                    error("Solver Diverged: Merit function exploded or hit NaN for $(inc_count) iterations.")
                 else
                     println("  [Stagnation] Solver hit the numerical noise floor. Stopping safely.")
                     norm_b_inf = norm_b_new_inf
@@ -112,9 +118,9 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         else
             inc_count = 0
         end
-        last_norm_l2 = norm_b_new_l2
+        last_phi = phi_x_new
+        phi_x = phi_x_new
         
-        # SMART STAGNATION GUARD: Graceful exit to OSGS stage if stuck near the root
         if step_norm <= solver.xtol
             if norm_b_new_inf > 1e-2
                 error("Solver Stalled: Step jump vanished below xtol ($(solver.xtol)).")
@@ -125,7 +131,6 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
             end
         end
         
-        # SMART MAX ITERS GUARD
         if i == solver.max_iters
             if norm_b_new_inf > 1e-2
                 error("Solver Failed: Reached maximum iterations ($(solver.max_iters)).")

@@ -1,11 +1,13 @@
 {
     "physical_parameters": {
-        "Re": 1.0,
-        "Da": 1.0,
-        "physical_epsilon": 0.0,
-        "numerical_epsilon_coefficient": 0.0001,
+        "nu": 1.0,
         "f_x": 0.0,
-        "f_y": 0.0
+        "f_y": 0.0,
+        "eps_val": 1e-8,
+        "reaction_model": "Forchheimer",
+        "sigma_constant": 1.0,
+        "sigma_linear": 150.0,
+        "sigma_nonlinear": 1.75
     },
     "porosity_field": {
         "alpha_0": 0.4,

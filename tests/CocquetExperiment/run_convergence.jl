@@ -57,11 +57,18 @@ function build_solver(N::Int, config_dict)
 end
 
 function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
-    res_asgs(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h_cf, nothing, alpha_h)
-    jac_asgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h_cf, nothing, alpha_h)
+    form = PorousNSSolver.build_formulation(config)
+    f_cf = VectorValue(config.phys.f_x, config.phys.f_y)
+    
+    c_1 = 4.0 * config.discretization.k_velocity^4
+    c_2 = 2.0 * config.discretization.k_velocity^2
+    tau_reg_lim = config.phys.tau_regularization_limit
+    
+    res_asgs(x, y) = PorousNSSolver.build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim)
+    jac_asgs(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.solver.freeze_jacobian_cusp; is_picard=false)
     
     op_asgs = FEOperator(res_asgs, jac_asgs, X, Y)
-    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_tolerance, config.solver.linesearch_alpha_min)
+    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_alpha_min, 1e-4)
     solver_newton = FESolver(nls_newton)
     
     eval_iters = 0
@@ -75,50 +82,6 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
         nls_cache_asgs = cache_solve isa Tuple ? cache_solve[2] : cache_solve
         eval_iters += nls_cache_asgs.result.iterations
         x_sol = res_solve isa Tuple ? res_solve[1] : res_solve
-        
-        if config.solver.method == "OSGS"
-            println("--> Refining trajectory with OSGS Orthogonal Projections...")
-            osgs_iters = config.solver.osgs_iterations
-            
-            V_pi = TestFESpace(model, refe_u, conformity=:H1)
-            Q_pi = TestFESpace(model, refe_p, conformity=:H1)
-            U_pi = TrialFESpace(V_pi)
-            P_pi = TrialFESpace(Q_pi)
-            
-            for idx in 1:osgs_iters
-                println("   OSGS Outer Iteration $idx/$osgs_iters")
-                u_prev, p_prev = x_sol
-                
-                # Formally calculate $P_h^\perp$ projections wrapping purely analytical closures
-                pi_u_raw, pi_p_raw = PorousNSSolver.project_residuals(u_prev, p_prev, config, dΩ, h_cf, nothing, alpha_h, nothing, V_pi, Q_pi, U_pi, P_pi)
-                
-                let pi_u = pi_u_raw, pi_p = pi_p_raw
-                    res_osgs(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h_cf, nothing, alpha_h, nothing, pi_u, pi_p)
-                    jac_osgs(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h_cf, nothing, alpha_h, nothing, pi_u, pi_p)
-                    
-                    # Stage 2: Try Exact Jacobian first (guarantees steepest descent in the quadratic basin)
-                    op_osgs_exact = FEOperator(res_osgs, X, Y)
-                    
-                    # Dedicated lightweight solver for the inner loop
-                    nls_osgs = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_tolerance, config.solver.linesearch_alpha_min)
-                    solver_osgs = FESolver(nls_osgs)
-                    
-                    try
-                        res2 = solve!(x_sol, solver_osgs, op_osgs_exact)
-                        c2 = res2 isa Tuple ? res2[2] : res2
-                        nl2 = c2 isa Tuple ? c2[2] : c2
-                        eval_iters += nl2.result.iterations
-                    catch e
-                        println("      -> [Warning] Exact AD Jacobian lost coercivity or failed. Falling back to coercive frozen Jacobian.")
-                        op_osgs_frozen = FEOperator(res_osgs, jac_osgs, X, Y)
-                        res2 = solve!(x_sol, solver_osgs, op_osgs_frozen)
-                        c2 = res2 isa Tuple ? res2[2] : res2
-                        nl2 = c2 isa Tuple ? c2[2] : c2
-                        eval_iters += nl2.result.iterations
-                    end
-                end
-            end
-        end
     end
     return x_sol, eval_time, eval_iters
 end
