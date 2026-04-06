@@ -32,7 +32,8 @@ function run_mms(config_file="test_config.json")
     
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
-    h5_path = joinpath(results_dir, "convergence_data.h5")
+    h5_filename = get(test_dict, "h5_filename", "convergence_data.h5")
+    h5_path = joinpath(results_dir, h5_filename)
     
     erase_past = get(test_dict, "erase_past_results", false)
     h5_mode = erase_past ? "w" : "cw"
@@ -140,7 +141,7 @@ function run_mms(config_file="test_config.json")
                 alpha_field = PorousNSSolver.SmoothRadialPorosity(config.porosity.alpha_0, config.porosity.r_1, config.porosity.r_2)
                 
                 rxn = PorousNSSolver.ConstantSigmaLaw(config.phys.sigma_constant)
-                reg = PorousNSSolver.NoRegularization()
+                reg = PorousNSSolver.SmoothVelocityFloor(1e-6, 0.0, 1e-12)
                 proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
                 # Use deviatoric-symmetric formulation per paper
                 form = PorousNSSolver.PaperGeneralFormulation(PorousNSSolver.DeviatoricSymmetricViscosity(), rxn, proj, reg, config.phys.nu, config.phys.eps_val)
@@ -265,6 +266,22 @@ function run_mms(config_file="test_config.json")
                         x0_backup = copy(get_free_dof_values(x0))
                         try
                             solve!(x0, solver_picard, op_picard)
+                            
+                            b_new = allocate_residual(op_picard, x0)
+                            residual!(b_new, op_picard, x0)
+                            res_new = norm(b_new, Inf)
+                            
+                            x0_test = FEFunction(X, x0_backup)
+                            b_test = allocate_residual(op_picard, x0_test)
+                            residual!(b_test, op_picard, x0_test)
+                            res_orig = norm(b_test, Inf)
+                            
+                            if isnan(res_new) || res_new > res_orig * 1.05
+                                println("    -> Picard residual worsened ($res_new vs $res_orig). Reverting.")
+                                get_free_dof_values(x0) .= x0_backup
+                            else
+                                println("    -> Picard residual improved ($res_new vs $res_orig). Accepting as Newton guess.")
+                            end
                         catch e
                             println("    -> Picard phase hit limit/error. Proceeding to exact Newton.")
                             get_free_dof_values(x0) .= x0_backup
@@ -274,7 +291,8 @@ function run_mms(config_file="test_config.json")
                             get_free_dof_values(x0) .= x0_backup
                         end
                         
-                        attempt_success = true
+                        status = :converged
+                        final_res = Inf
                         try
                             local_time = @elapsed begin
                                 res_solve = solve!(x0, solver_newton, op_newton)
@@ -286,18 +304,24 @@ function run_mms(config_file="test_config.json")
                             iter_count_attempt = nls_cache.result.iterations
                             final_res = nls_cache.result.residual_norm
                             if iter_count_attempt >= config.solver.newton_iterations || final_res > max(config.solver.ftol, 1e-10)
-                                attempt_success = false
+                                if final_res < 1e-7 && final_res > 0.0
+                                    status = :stagnated_near_root
+                                else
+                                    status = :failed
+                                end
                             end
                         catch e
-                            attempt_success = false
+                            status = :failed
                         end
                         
-                        if attempt_success
+                        if status === :converged
                             success = true
                             successful_eps = eps_p
                             final_x0 = x0
                             println("Convergence achieved with eps_pert = $eps_p in $iter_count_attempt iterations.")
                             break
+                        elseif status === :stagnated_near_root
+                            println("Stagnated near root with eps_pert = $eps_p in $iter_count_attempt iterations (res = $final_res). Recording status separately.")
                         else
                             println("Diverged with eps_pert = $eps_p.")
                         end

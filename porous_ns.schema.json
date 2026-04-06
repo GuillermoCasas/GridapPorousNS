@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/porous_ns.schema.json",
+  "title": "Porous Navier-Stokes Configuration",
+  "description": "Configuration schema for the Gridap-based Porous Navier-Stokes solver.",
+  "type": "object",
+  "properties": {
+    "physical_parameters": {
+      "type": "object",
+      "title": "Physical Parameters",
+      "description": "Physical properties of the fluid and the porous medium, including numerical floor values and reaction terms.",
+      "properties": {
+        "nu": { "type": "number", "default": 1.0, "description": "Kinematic viscosity of the fluid." },
+        "f_x": { "type": "number", "default": 0.0, "description": "Body force component in the x-direction (e.g., gravity)." },
+        "f_y": { "type": "number", "default": 0.0, "description": "Body force component in the y-direction." },
+        "eps_val": { "type": "number", "default": 1e-8, "description": "Absolute numerical stabilization limit for pressure." },
+        "reaction_model": { "type": "string", "enum": ["Forchheimer", "Darcy", "Constant_Sigma"], "default": "Forchheimer", "description": "Resistance/Reaction model format." },
+        "sigma_constant": { "type": "number", "default": 1.0, "description": "Constant term parameter for the reaction model." },
+        "sigma_linear": { "type": "number", "default": 150.0, "description": "Linear drag coefficient (A) derived from Darcy's law." },
+        "sigma_nonlinear": { "type": "number", "default": 1.75, "description": "Nonlinear drag coefficient (B) from Forchheimer correction." },
+        "u_base_floor_ref": { "type": "number", "default": 1e-4, "description": "Reference base velocity for regularization floor." },
+        "h_floor_weight": { "type": "number", "default": 0.1, "description": "Characteristic length weighting for regularization." },
+        "epsilon_floor": { "type": "number", "default": 1e-12, "description": "Absolute velocity magnitude cutoff to prevent divide-by-zero." },
+        "tau_regularization_limit": { "type": "number", "default": 1e-12, "description": "Minimum limit applied to stabilization parameters (tau)." },
+        "Re": { "type": "number", "description": "Reynolds number (testing overide parameter)." },
+        "Da": { "type": "number", "description": "Darcy number (testing overide parameter)." }
+      },
+      "additionalProperties": true
+    },
+    "porosity_field": {
+      "type": "object",
+      "title": "Porosity Field",
+      "description": "Parameters defining the spatial distribution of the porous medium.",
+      "properties": {
+        "alpha_0": { "type": "number", "default": 0.4, "description": "Background or minimum porosity value." },
+        "r_1": { "type": "number", "default": 0.2, "description": "Inner radius geometry control for porosity field." },
+        "r_2": { "type": "number", "default": 0.5, "description": "Outer radius geometry control for porosity field." }
+      },
+      "additionalProperties": false
+    },
+    "discretization": {
+      "type": "object",
+      "title": "Discretization",
+      "description": "Finite element type and order degrees.",
+      "properties": {
+        "k_velocity": { "type": "integer", "default": 2, "description": "Velocity interpolation polynomial order." },
+        "k_pressure": { "type": "integer", "default": 1, "description": "Pressure interpolation polynomial order." },
+        "equal_order_only": { "type": "boolean", "description": "Flag used primarily in testing to enforce equal-order elements." }
+      },
+      "additionalProperties": false
+    },
+    "mesh": {
+      "type": "object",
+      "title": "Mesh Configuration",
+      "description": "Domain bounds, partitioning, and element geometry.",
+      "properties": {
+        "domain": { 
+          "type": "array", 
+          "items": { "type": "number" }, 
+          "default": [0.0, 1.0, 0.0, 1.0], 
+          "description": "Bounding box lengths for the geometry [xmin, xmax, ymin, ymax]." 
+        },
+        "partition": { 
+          "type": "array", 
+          "items": { "type": "integer" }, 
+          "default": [20, 20], 
+          "description": "Number of elements in each direction [nx, ny]." 
+        },
+        "convergence_partitions": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "default": [10, 20, 30],
+          "description": "Set of partitions for convergence studies (e.g., MMS tests)."
+        },
+        "element_type": { 
+          "type": "string", 
+          "enum": ["QUAD", "TRI", "HEX", "TET"],
+          "default": "QUAD", 
+          "description": "Element type." 
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "title": "Output Configuration",
+      "description": "Path and naming for saving results.",
+      "properties": {
+        "directory": { "type": "string", "default": "results", "description": "Directory name for writing outputs." },
+        "basename": { "type": "string", "default": "porous_ns", "description": "Prefix applied to saved solution files." }
+      },
+      "additionalProperties": false
+    },
+    "solver": {
+      "type": "object",
+      "title": "Solver Configuration",
+      "description": "Hyperparameters controlling the Picard and Exact Newton linear/nonlinear solvers along with stabilization techniques.",
+      "properties": {
+        "picard_iterations": { "type": "integer", "default": 5, "description": "Initial number of Picard iterations before switching to Newton." },
+        "newton_iterations": { "type": "integer", "default": 20, "description": "Maximum allowed exact Newton iterations." },
+        "use_linesearch": { "type": "boolean", "default": true, "description": "Enable Exact L2 energy-based linesearch tracking." },
+        "method": { "type": "string", "enum": ["ASGS", "OSGS", "VMS", "Galerkin"], "default": "ASGS", "description": "Stabilization method selected." },
+        "osgs_iterations": { "type": "integer", "default": 3, "description": "Iterations used for resolving Orthogonal Subgrid Scales." },
+        "xtol": { "type": "number", "default": 1e-8, "description": "Relative norm tolerance for the solution increment (dx)." },
+        "stagnation_tol": { "type": "number", "default": 1e-5, "description": "Threshold at which the relative residual improvement is minimal, indicating convergence stalling." },
+        "ftol": { "type": "number", "default": 1e-10, "description": "Absolute residual tolerance." },
+        "max_increases": { "type": "integer", "default": 2, "description": "Number of successive residual increases before divergence abort." },
+        "freeze_jacobian_cusp": { "type": "boolean", "default": false, "description": "If true, freezes the magnitude of velocity in the nonlinearity Jacobian cross-terms." },
+        "linesearch_tolerance": { "type": "number", "default": 1.0001, "description": "Acceptance threshold. Must strictly decrease residual unless > 1.0 (to ignore noise)." },
+        "linesearch_alpha_min": { "type": "number", "default": 1e-4, "description": "Minimum step size allowed before linesearch fails." },
+        "run_diagnostics": { "type": "boolean", "default": false, "description": "Enable expanded diagnostics / debug print statements." },
+        "ablation_mode": { "type": "string", "enum": ["full", "galerkin", "momentum_only", "mass_only"], "default": "full", "description": "Switch behavior of specific solver terms for systematic testing." },
+        "experimental_reaction_mode": { "type": "string", "enum": ["standard", "remove_adjoint", "remove_tau"], "default": "standard", "description": "Toggles advanced reaction handling behaviors for high-Re modes." }
+      },
+      "additionalProperties": false
+    },
+    "max_n_pert": { "type": "integer", "description": "Maximum noise permutations for MMS execution config." },
+    "epsilon_pert": { "type": "array", "items": { "type": "number" }, "description": "Epsilon perturbations scale for condition tests." },
+    "erase_past_results": { "type": "boolean", "description": "Controls HDF5 cache scrubbing." },
+    "h5_filename": { "type": "string", "description": "Filename of H5 results database used in manufactured solutions." }
+  },
+  "additionalProperties": true
+}

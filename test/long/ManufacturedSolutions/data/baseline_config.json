@@ -1,0 +1,27 @@
+{
+    "$schema": "../../../../porous_ns.schema.json",
+    "physical_parameters": {
+        "Re": 10.0,
+        "Da": 1.0
+    },
+    "porosity_field": {
+        "alpha_0": 0.4
+    },
+    "discretization": {
+        "k_velocity": 2,
+        "k_pressure": 1,
+        "equal_order_only": false
+    },
+    "mesh": {
+        "element_type": "QUAD",
+        "convergence_partitions": [10],
+        "domain": [0.0, 1.0, 0.0, 1.0]
+    },
+    "solver": {
+        "freeze_jacobian_cusp": false
+    },
+    "max_n_pert": 2,
+    "epsilon_pert": [0.001],
+    "erase_past_results": true,
+    "h5_filename": "baseline_data.h5"
+}
