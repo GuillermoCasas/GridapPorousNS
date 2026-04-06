@@ -32,7 +32,7 @@
         "max_increases": 3
     },
     "output": {
-        "directory": "tests/ManufacturedSolutions/results",
+        "directory": "test/long/ManufacturedSolutions/results",
         "basename": "mms_test"
     }
 }

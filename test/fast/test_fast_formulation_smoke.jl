@@ -21,7 +21,7 @@ using LinearAlgebra
         1e-6
     )
 
-    form_pseudo = PorousNSSolver.PseudoTractionFormulation(
+    form_pseudo = PorousNSSolver.Legacy90d5749Mode(
         PorousNSSolver.ConstantSigmaLaw(1.0),
         PorousNSSolver.ProjectFullResidual(),
         PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8),

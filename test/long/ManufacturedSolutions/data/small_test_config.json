@@ -27,7 +27,7 @@
         "element_type": ["QUAD"]
     },
     "output": {
-        "directory": "tests/ManufacturedSolutions/results",
+        "directory": "test/long/ManufacturedSolutions/results",
         "basename": "mms_small"
     },
     "solver": {

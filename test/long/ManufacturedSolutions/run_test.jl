@@ -1,6 +1,6 @@
-# tests/ManufacturedSolutions/run_test.jl
+# test/long/ManufacturedSolutions/run_test.jl
 using Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."))
+Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 
 using PorousNSSolver
 using Gridap
@@ -257,9 +257,9 @@ function run_mms(config_file="test_config.json")
                         
                         println("Attempting nonlinear solve with eps_pert = $eps_p ...")
                         
-                        jac_picard(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim, config.solver.freeze_jacobian_cusp; is_picard=true)
+                        jac_picard(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim, config.solver.freeze_jacobian_cusp, PorousNSSolver.PicardMode())
                         op_picard = FEOperator(res_fn, jac_picard, X, Y)
-                        nls_picard = NLSolver(show_trace=false, method=:newton, iterations=config.solver.picard_iterations)
+                        nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), config.solver.picard_iterations, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_alpha_min, 1e-4)
                         solver_picard = FESolver(nls_picard)
                         
                         x0_backup = copy(get_free_dof_values(x0))
@@ -267,8 +267,10 @@ function run_mms(config_file="test_config.json")
                             solve!(x0, solver_picard, op_picard)
                         catch e
                             println("    -> Picard phase hit limit/error. Proceeding to exact Newton.")
+                            get_free_dof_values(x0) .= x0_backup
                         end
-                        if any(isnan, get_free_dof_values(x0))
+                        # Comprehensive rollback guard for numerical explosion irrespective of NaN
+                        if any(isnan, get_free_dof_values(x0)) || sum(isnan.(get_free_dof_values(x0))) > 0 || norm(get_free_dof_values(x0), Inf) > 1e12
                             get_free_dof_values(x0) .= x0_backup
                         end
                         
@@ -301,7 +303,7 @@ function run_mms(config_file="test_config.json")
                         end
                     end
                     
-                    if success
+                    if success && final_x0 !== nothing
                         x0 = final_x0
                         u_h, p_h = x0
                         

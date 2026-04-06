@@ -1,4 +1,4 @@
-# tests/CocquetExperiment/plot_convergence.py
+# test/long/CocquetExperiment/plot_convergence.py
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np

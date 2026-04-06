@@ -1,5 +1,5 @@
 using Pkg
-Pkg.activate(joinpath(@__DIR__, ".."))
+Pkg.activate(joinpath(@__DIR__, "..", ".."))
 
 using JSON
 using Gridap
@@ -14,9 +14,9 @@ c1 = Dict(
     "discretization" => Dict("k_velocity" => 2, "k_pressure" => 2),
     "solver" => Dict("method" => "ASGS", "xtol" => 1e-8, "stagnation_tol" => 1e-5, "ftol" => 1e-10, "newton_iterations" => 20)
 )
-mkpath("tests/ManufacturedSolutions/data")
-write("tests/ManufacturedSolutions/data/test1.json", JSON.json(c1))
-run(`julia --project=. tests/ManufacturedSolutions/run_test.jl test1.json`)
+mkpath("test/long/ManufacturedSolutions/data")
+write("test/long/ManufacturedSolutions/data/test1.json", JSON.json(c1))
+run(`julia --project=. test/long/ManufacturedSolutions/run_test.jl test1.json`)
 
 println("\n=======================================================")
 println("--- Test 2: Error Throw Test ---")
@@ -24,9 +24,9 @@ println("=======================================================")
 c2 = copy(c1)
 c2["solver"]["newton_iterations"] = 2
 c2["solver"]["max_increases"] = 2
-write("tests/ManufacturedSolutions/data/test2.json", JSON.json(c2))
+write("test/long/ManufacturedSolutions/data/test2.json", JSON.json(c2))
 try
-    run(`julia --project=. tests/ManufacturedSolutions/run_test.jl test2.json`)
+    run(`julia --project=. test/long/ManufacturedSolutions/run_test.jl test2.json`)
 catch
     println("SUCCESS: Test 2 Caught exception!")
 end
@@ -41,10 +41,10 @@ c3 = Dict(
     "discretization" => Dict("k_velocity" => 2, "k_pressure" => 2),
     "solver" => Dict("method" => "ASGS", "xtol" => 1e-12, "stagnation_tol" => 1e-5, "ftol" => 1e-10)
 )
-write("tests/ManufacturedSolutions/data/test3.json", JSON.json(c3))
-run(`julia --project=. tests/ManufacturedSolutions/run_test.jl test3.json`)
+write("test/long/ManufacturedSolutions/data/test3.json", JSON.json(c3))
+run(`julia --project=. test/long/ManufacturedSolutions/run_test.jl test3.json`)
 
 # Cleanup
-rm("tests/ManufacturedSolutions/data/test1.json", force=true)
-rm("tests/ManufacturedSolutions/data/test2.json", force=true)
-rm("tests/ManufacturedSolutions/data/test3.json", force=true)
+rm("test/long/ManufacturedSolutions/data/test1.json", force=true)
+rm("test/long/ManufacturedSolutions/data/test2.json", force=true)
+rm("test/long/ManufacturedSolutions/data/test3.json", force=true)

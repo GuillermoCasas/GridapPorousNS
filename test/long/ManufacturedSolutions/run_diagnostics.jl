@@ -1,7 +1,7 @@
-# tests/ManufacturedSolutions/run_diagnostics.jl
+# test/long/ManufacturedSolutions/run_diagnostics.jl
 
 using Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."))
+Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 
 using PorousNSSolver
 using Gridap

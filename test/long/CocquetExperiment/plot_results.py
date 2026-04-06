@@ -1,4 +1,4 @@
-# tests/CocquetExperiment/plot_results.py
+# test/long/CocquetExperiment/plot_results.py
 import pyvista as pv
 import matplotlib.pyplot as plt
 import os

@@ -1,6 +1,6 @@
-# tests/CocquetExperiment/run_convergence.jl
+# test/long/CocquetExperiment/run_convergence.jl
 using Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."))
+Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 
 using PorousNSSolver
 using Gridap

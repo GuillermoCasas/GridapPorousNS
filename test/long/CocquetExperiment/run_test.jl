@@ -1,7 +1,7 @@
-# tests/CocquetExperiment/run_test.jl
+# test/long/CocquetExperiment/run_test.jl
 
 using Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."))
+Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 
 using PorousNSSolver
 using Gridap
