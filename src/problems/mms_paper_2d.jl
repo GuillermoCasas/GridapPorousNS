@@ -41,7 +41,7 @@ function build_exact_forcing(mms::Paper2DMMS, c_1, c_2)
     return f_ex
 end
 
-function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, X, Y, c_1, c_2, tau_reg_lim)
+function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X, Y, c_1, c_2, tau_reg_lim)
     u_ex_func = get_u_ex(mms)
     p_ex_func = get_p_ex(mms)
     
@@ -51,7 +51,7 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, X, Y, c
     
     # 1. Provide f_ex mathematically matching R_u(u_ex) = 0 internally.
     # Thus f_ex(x) = R_u(u_ex, p_ex; f=0) evaluated exactly!
-    f_ex_raw = eval_strong_residual_u(mms.formulation, u_ex_cf, p_ex_cf, CellField(1.0, Ω), alpha_cf, CellField(VectorValue(0.0,0.0), Ω), c_1, c_2)
+    f_ex_raw = eval_strong_residual_u(mms.formulation, u_ex_cf, p_ex_cf, h_cf, alpha_cf, CellField(VectorValue(0.0,0.0), Ω), c_1, c_2)
     g_ex_raw = eval_strong_residual_p(mms.formulation, u_ex_cf, p_ex_cf, alpha_cf, CellField(0.0, Ω))
     
     # For tests, we use f_ex_raw directly as our forcing term!

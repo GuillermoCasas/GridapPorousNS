@@ -17,10 +17,11 @@ function build_formulation(config::PorousNSConfig)
     end
 
     eps_val = config.phys.eps_val
+    eps_floor = config.phys.eps_floor
     nu = config.phys.nu
     
     # We choose DeviatoricSymmetricViscosity as requested for the exact D_Pi S_Pi mapping
-    form = PaperGeneralFormulation(DeviatoricSymmetricViscosity(), reaction_law, proj, reg, nu, eps_val)
+    form = PaperGeneralFormulation(DeviatoricSymmetricViscosity(), reaction_law, proj, reg, nu, eps_val, eps_floor)
     return form
 end
 

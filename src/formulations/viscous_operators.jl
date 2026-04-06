@@ -54,30 +54,29 @@ end
 # =======================
 # Deviatoric Symmetric Viscosity
 # =======================
+_dyn_dev_tensor(e) = e - (1.0 / size(e, 1)) * tr(e) * one(typeof(e))
+_dyn_div_dev_tensor(lap_u, grad_div_u) = 0.5 * lap_u + 0.5 * grad_div_u - (1.0 / length(lap_u)) * grad_div_u
+
 function strong_viscous_operator(::DeviatoricSymmetricViscosity, u, α, ν)
     # deviatoric(ε(u)) = ε(u) - 1/d * (∇⋅u) * I
     # ∇⋅deviatoric(ε(u)) = ∇⋅ε(u) - 1/d * ∇(∇⋅u)
-    # For 2D, d=2.
-    # div_eps_u = 0.5 * Δ(u) + 0.5 * ∇(∇⋅u)
-    # div_D_u = 0.5 * Δ(u) + 0.5 * ∇(∇⋅u) - 0.5 * ∇(∇⋅u) = 0.5 * Δ(u)
-    # This is a cool property in 2D!
-    D_u = ε(u) - 0.5 * (∇⋅u) * TensorValue(1.0, 0.0, 0.0, 1.0)
-    div_D_u = 0.5 * Δ(u)
+    D_u = Operation(_dyn_dev_tensor)(ε(u))
+    div_D_u = Operation(_dyn_div_dev_tensor)(Δ(u), ∇(∇⋅u))
     return 2.0 * ν * (D_u ⋅ ∇(α)) + 2.0 * α * ν * div_D_u
 end
 
 function weak_viscous_operator(::DeviatoricSymmetricViscosity, u, v, α, ν)
-    D_u = ε(u) - 0.5 * (∇⋅u) * TensorValue(1.0, 0.0, 0.0, 1.0)
+    D_u = Operation(_dyn_dev_tensor)(ε(u))
     return 2.0 * α * ν * ( D_u ⊙ ε(v) )
 end
 
 function weak_viscous_jacobian(::DeviatoricSymmetricViscosity, du, v, α, ν)
-    D_du = ε(du) - 0.5 * (∇⋅du) * TensorValue(1.0, 0.0, 0.0, 1.0)
+    D_du = Operation(_dyn_dev_tensor)(ε(du))
     return 2.0 * α * ν * ( D_du ⊙ ε(v) )
 end
 
 function adjoint_viscous_operator(::DeviatoricSymmetricViscosity, v, α, ν)
-    D_v = ε(v) - 0.5 * (∇⋅v) * TensorValue(1.0, 0.0, 0.0, 1.0)
-    div_D_v = 0.5 * Δ(v) # 2D specific divergence of deviatoric tensor
+    D_v = Operation(_dyn_dev_tensor)(ε(v))
+    div_D_v = Operation(_dyn_div_dev_tensor)(Δ(v), ∇(∇⋅v))
     return 2.0 * ν * (D_v ⋅ ∇(α)) + 2.0 * α * ν * div_D_v
 end

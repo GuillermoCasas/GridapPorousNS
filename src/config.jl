@@ -5,6 +5,7 @@
     f_x::Float64 = 0.0          # Forcing x
     f_y::Float64 = 0.0          # Forcing y
     eps_val::Float64 = 1e-8     # Absolute numerical stabilization limit for pressure
+    eps_floor::Float64 = 1e-8   # Minimum limit applied to eps_val
     reaction_model::String = "Forchheimer"
     sigma_constant::Float64 = 1.0
     sigma_linear::Float64 = 150.0   # A

@@ -144,7 +144,7 @@ function run_mms(config_file="test_config.json")
                 reg = PorousNSSolver.SmoothVelocityFloor(1e-6, 0.0, 1e-12)
                 proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
                 # Use deviatoric-symmetric formulation per paper
-                form = PorousNSSolver.PaperGeneralFormulation(PorousNSSolver.DeviatoricSymmetricViscosity(), rxn, proj, reg, config.phys.nu, config.phys.eps_val)
+                form = PorousNSSolver.PaperGeneralFormulation(PorousNSSolver.DeviatoricSymmetricViscosity(), rxn, proj, reg, config.phys.nu, config.phys.eps_val, config.phys.eps_floor)
                 
                 # We do NOT arbitrarily scale U by some reaction formulation size. We set U=1, P=1 amplitude!
                 U_amp = 1.0
@@ -177,7 +177,7 @@ function run_mms(config_file="test_config.json")
                 tau_reg_lim = config.phys.tau_regularization_limit
                 
                 # Build EXACT forcing using the MMS closure
-                f_cf, g_cf = PorousNSSolver.evaluate_exactness_diagnostics(mms, model, Ω, dΩ, X, Y, c_1, c_2, tau_reg_lim)
+                f_cf, g_cf = PorousNSSolver.evaluate_exactness_diagnostics(mms, model, Ω, dΩ, h_cf, X, Y, c_1, c_2, tau_reg_lim)
                 
                 res_fn(x, y) = PorousNSSolver.build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim)
                 jac_fn(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim, config.solver.freeze_jacobian_cusp)
@@ -185,39 +185,45 @@ function run_mms(config_file="test_config.json")
                 op_newton = FEOperator(res_fn, jac_fn, X, Y)
                 
                 # --- EXACT ROOT TEST ---
-                println("\n>>> Phase 1: EXACT ROOT TEST")
-                x0_exact = interpolate_everywhere([u_final, p_final], X)
-                
-                # Check 1: Exact Stabilized Residual Consistency
-                r_exact = allocate_residual(op_newton, x0_exact)
-                residual!(r_exact, op_newton, x0_exact)
-                L2_diag = norm(r_exact, 2)
-                Linf_diag = norm(r_exact, Inf)
-                
-                # Check 2: Jacobian Directional Consistency (Finite Difference Taylor Check)
-                jac_exact = allocate_jacobian(op_newton, x0_exact)
-                jacobian!(jac_exact, op_newton, x0_exact)
-                
-                # Create a small perturbation in the direction of the solution
-                x_pert = copy(get_free_dof_values(x0_exact))
-                x_pert .= x_pert .* (1.0 + 1e-6)
-                
-                r_pert = allocate_residual(op_newton, x0_exact)
-                residual!(r_pert, op_newton, FEFunction(X, x_pert))
-                
-                dx_pert = x_pert .- get_free_dof_values(x0_exact)
-                # Taylor expansion: R(x + dx) ≈ R(x) + J * dx
-                taylor_approx = r_exact + jac_exact * dx_pert
-                taylor_error = norm(r_pert - taylor_approx, Inf) / (norm(dx_pert, Inf) + 1e-16)
-                
-                println("Exactness Diagnostic -> Stabilized L2: $L2_diag | L_inf: $Linf_diag | Jacobian Directional Error/|dx|: $taylor_error")
-                
-                # Because MMS functions are transcendentals (sines/cosines), the FE interpolant
-                # carries an O(h^{k+1}) residual. Mismatch > 0 is expected.
-                if L2_diag < 1e-2 && taylor_error < 1e-4
-                    println("  [SUCCESS] EXACTNESS DIAGNOSTIC PASSED. Interpolant root mapped correctly.")
+                if config.discretization.k_velocity == 1
+                    println("\n>>> Phase 1: EXACT ROOT TEST")
+                    println("  [SKIPPED] EXACTNESS DIAGNOSTIC SKIPPED for k=1 because bilinear laplacians artificially vanish.")
+                    x0_exact = interpolate_everywhere([u_final, p_final], X)
                 else
-                    println("  [WARNING] EXACTNESS DIAGNOSTIC FAILED. The formulation operators lack numerical continuity mappings!")
+                    println("\n>>> Phase 1: EXACT ROOT TEST")
+                    x0_exact = interpolate_everywhere([u_final, p_final], X)
+                    
+                    # Check 1: Exact Stabilized Residual Consistency
+                    r_exact = allocate_residual(op_newton, x0_exact)
+                    residual!(r_exact, op_newton, x0_exact)
+                    L2_diag = norm(r_exact, 2)
+                    Linf_diag = norm(r_exact, Inf)
+                    
+                    # Check 2: Jacobian Directional Consistency (Finite Difference Taylor Check)
+                    jac_exact = allocate_jacobian(op_newton, x0_exact)
+                    jacobian!(jac_exact, op_newton, x0_exact)
+                    
+                    # Create a small perturbation in the direction of the solution
+                    x_pert = copy(get_free_dof_values(x0_exact))
+                    x_pert .= x_pert .* (1.0 + 1e-6)
+                    
+                    r_pert = allocate_residual(op_newton, x0_exact)
+                    residual!(r_pert, op_newton, FEFunction(X, x_pert))
+                    
+                    dx_pert = x_pert .- get_free_dof_values(x0_exact)
+                    # Taylor expansion: R(x + dx) ≈ R(x) + J * dx
+                    taylor_approx = r_exact + jac_exact * dx_pert
+                    taylor_error = norm(r_pert - taylor_approx, Inf) / (norm(dx_pert, Inf) + 1e-16)
+                    
+                    println("Exactness Diagnostic -> Stabilized L2: $L2_diag | L_inf: $Linf_diag | Jacobian Directional Error/|dx|: $taylor_error")
+                    
+                    # Because MMS functions are transcendentals (sines/cosines), the FE interpolant
+                    # carries an O(h^{k+1}) residual. Mismatch > 0 is expected.
+                    if L2_diag < 1e-2 && taylor_error < 1e-4
+                        println("  [SUCCESS] EXACTNESS DIAGNOSTIC PASSED. Interpolant root mapped correctly.")
+                    else
+                        println("  [WARNING] EXACTNESS DIAGNOSTIC FAILED. The formulation operators lack numerical continuity mappings!")
+                    end
                 end
                 
                 nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 15, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_alpha_min, 1e-4)

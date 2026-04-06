@@ -5,6 +5,7 @@
         "f_x": 0.0,
         "f_y": 0.0,
         "eps_val": 1e-8,
+        "eps_floor": 1e-8,
         "reaction_model": "Forchheimer",
         "sigma_constant": 1.0,
         "sigma_linear": 150.0,

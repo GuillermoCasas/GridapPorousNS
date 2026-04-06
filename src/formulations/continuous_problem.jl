@@ -95,9 +95,10 @@ struct PaperGeneralFormulation{V<:AbstractViscousOperator, R<:AbstractReactionLa
     ν::Float64
     eps_val::Float64
     
-    function PaperGeneralFormulation(v::V, r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64; autocorrect_policy=false) where {V, R, P, Reg}
+    function PaperGeneralFormulation(v::V, r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64, eps_floor::Float64=1e-8; autocorrect_policy=false) where {V, R, P, Reg}
         valid_policy = sanitize_projection_policy(p_in, r; autocorrect=autocorrect_policy)
-        new{V, R, typeof(valid_policy), Reg}(v, r, valid_policy, reg, ν, eps_val)
+        safe_eps = max(eps_val, eps_floor)
+        new{V, R, typeof(valid_policy), Reg}(v, r, valid_policy, reg, ν, safe_eps)
     end
 end
 
@@ -109,9 +110,10 @@ struct Legacy90d5749Mode{R<:AbstractReactionLaw, P<:AbstractProjectionPolicy, Re
     ν::Float64
     eps_val::Float64
     
-    function Legacy90d5749Mode(r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64; autocorrect_policy=false) where {R, P, Reg}
+    function Legacy90d5749Mode(r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64, eps_floor::Float64=1e-8; autocorrect_policy=false) where {R, P, Reg}
         valid_policy = sanitize_projection_policy(p_in, r; autocorrect=autocorrect_policy)
-        new{R, typeof(valid_policy), Reg}(LaplacianPseudoTractionViscosity(), r, valid_policy, reg, ν, eps_val)
+        safe_eps = max(eps_val, eps_floor)
+        new{R, typeof(valid_policy), Reg}(LaplacianPseudoTractionViscosity(), r, valid_policy, reg, ν, safe_eps)
     end
 end
 
@@ -273,14 +275,14 @@ end
 
 function strong_adjoint_momentum(form::PaperGeneralFormulation, u, v, q, α)
     ν = form.ν
-    conv_adj = - α * (∇(v)' ⋅ u)
+    conv_adj = α * (∇(v)' ⋅ u)
     pres_adj = α * ∇(q)
     visc_adj = adjoint_viscous_operator(form.viscous_operator, v, α, ν)
     return conv_adj + pres_adj + visc_adj
 end
 
 function _get_dL_du_star_v(::ExactNewtonMode, form::PaperGeneralFormulation, α, v, du, dsigma_du_val)
-    return - α * (∇(v)' ⋅ du) - (dsigma_du_val * v)
+    return α * (∇(v)' ⋅ du) - (dsigma_du_val * v)
 end
 function _get_dL_du_star_v(::PicardMode, form::PaperGeneralFormulation, α, v, du, dsigma_du_val)
     return 0.0 * (∇(v)' ⋅ du)

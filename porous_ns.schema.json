@@ -14,6 +14,7 @@
         "f_x": { "type": "number", "default": 0.0, "description": "Body force component in the x-direction (e.g., gravity)." },
         "f_y": { "type": "number", "default": 0.0, "description": "Body force component in the y-direction." },
         "eps_val": { "type": "number", "default": 1e-8, "description": "Absolute numerical stabilization limit for pressure." },
+        "eps_floor": { "type": "number", "default": 1e-8, "description": "Minimum limit applied to the pressure stabilization parameter (eps_val). This acts as a safeguard against zero values." },
         "reaction_model": { "type": "string", "enum": ["Forchheimer", "Darcy", "Constant_Sigma"], "default": "Forchheimer", "description": "Resistance/Reaction model format." },
         "sigma_constant": { "type": "number", "default": 1.0, "description": "Constant term parameter for the reaction model." },
         "sigma_linear": { "type": "number", "default": 150.0, "description": "Linear drag coefficient (A) derived from Darcy's law." },
