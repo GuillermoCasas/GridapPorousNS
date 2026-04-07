@@ -12,7 +12,7 @@ function build_formulation(config::PorousNSConfig)
     reg = SmoothVelocityFloor(config.phys.u_base_floor_ref, config.phys.h_floor_weight, config.phys.epsilon_floor)
 
     proj = ProjectFullResidual()
-    if config.solver.experimental_reaction_mode == "standard" && rxn_mode == "Constant_Sigma"
+    if config.numerical_method.solver.experimental_reaction_mode == "standard" && rxn_mode == "Constant_Sigma"
         proj = ProjectResidualWithoutReactionWhenConstantSigma()
     end
 
@@ -33,8 +33,8 @@ function run_simulation(config_path::String;
     config = load_config(config_path)
     model = create_mesh(config)
     
-    kv = config.discretization.k_velocity
-    kp = config.discretization.k_pressure
+    kv = config.numerical_method.element_spaces.k_velocity
+    kp = config.numerical_method.element_spaces.k_pressure
     
     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
     refe_p = ReferenceFE(lagrangian, Float64, kp)
@@ -53,12 +53,12 @@ function run_simulation(config_path::String;
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     
-    is_tri = config.mesh.element_type == "TRI"
+    is_tri = config.numerical_method.mesh.element_type == "TRI"
     cell_measures = get_cell_measure(Ω)
     h_array = lazy_map(v -> is_tri ? sqrt(2.0 * abs(v)) : sqrt(abs(v)), cell_measures)
     h = CellField(h_array, Ω)
     
-    alpha_fn(x) = config.porosity.alpha_0
+    alpha_fn(x) = config.domain.alpha_0
     alpha_cf = CellField(alpha_fn, Ω)
     f_fn(x) = VectorValue(config.phys.f_x, config.phys.f_y)
     f_cf = CellField(f_fn, Ω)
@@ -70,11 +70,11 @@ function run_simulation(config_path::String;
     tau_reg_lim = config.phys.tau_regularization_limit
     
     res(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h, f_cf, alpha_cf, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim)
-    jac(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h, f_cf, alpha_cf, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.solver.freeze_jacobian_cusp; is_picard=false)
+    jac(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h, f_cf, alpha_cf, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.numerical_method.solver.freeze_jacobian_cusp; is_picard=false)
     
     op = FEOperator(res, jac, X, Y)
     
-    nls = SafeNewtonSolver(LUSolver(), config.solver.newton_iterations, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_alpha_min, 1e-4)
+    nls = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4)
     solver = FESolver(nls)
     
     println("Solving non-linear system...")
@@ -88,12 +88,12 @@ function run_simulation(config_path::String;
 end
 
 function run_simulation(op_newton::FEOperator, op_picard::FEOperator, config::PorousNSConfig, model, X)
-    nls_picard = NLSolver(show_trace=true, method=:newton, iterations=config.solver.picard_iterations)
+    nls_picard = NLSolver(show_trace=true, method=:newton, iterations=config.numerical_method.solver.picard_iterations)
     solver_picard = FESolver(nls_picard)
     println("Solving Picard Initialization...")
     x_picard = solve(solver_picard, op_picard)
     
-    nls_newton = SafeNewtonSolver(LUSolver(), config.solver.newton_iterations, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_alpha_min, 1e-4)
+    nls_newton = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4)
     solver_newton = FESolver(nls_newton)
     println("Solving Newton-Raphson...")
     solve!(x_picard, solver_newton, op_newton)

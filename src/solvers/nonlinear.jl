@@ -45,6 +45,11 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     
     final_i = 0
     x_old = similar(x)
+    best_x = copy(x)
+    best_b_inf = norm_b_inf
+    best_phi = phi_x
+    
+    inc_count = 0
     
     for i in 1:solver.max_iters
         final_i = i
@@ -56,6 +61,14 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         ns = numerical_setup(ls_cache, A)
         solve!(dx, ns, b)
         
+        # If linear solve produced NaNs, matrix is singular or completely broken
+        if any(isnan, dx)
+            println("  [Linear Solve Failed] Newton direction contains NaNs. Matrix likely singular. Aborting safely.")
+            x .= best_x
+            norm_b_inf = best_b_inf
+            break
+        end
+        
         alpha = 1.0
         x_old .= x
         step_norm_base = norm(dx, Inf)
@@ -64,18 +77,23 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         Adx = A * dx
         dir_deriv = - dot(b, Adx)
         
+        ls_success = false
         norm_b_new_inf = norm_b_inf
         phi_x_new = phi_x
         
-        ls_success = false
         for ls_iter in 1:15
             x .= x_old .- alpha .* dx
             residual!(b, op, x)
             norm_b_new_inf = norm(b, Inf)
             phi_x_new = 0.5 * (norm(b, 2)^2)
             
+            if isnan(phi_x_new)
+                # If we stepped into a NaN domain, strictly reject this alpha
+                alpha *= 0.5
+                continue
+            end
+            
             # Armijo condition for Φ(x) = 1/2 ||F(x)||^2
-            # Φ(x - α d) <= Φ(x) + c1 * α * ∇Φ⋅d
             if phi_x_new <= phi_x + solver.c1 * alpha * dir_deriv
                 ls_success = true
                 break
@@ -86,16 +104,22 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
             alpha *= 0.5 
         end
         
-        if !ls_success
-            println("  [Stagnation] Linesearch failed to find a descent direction. Aborting Newton loop.")
-            x .= x_old
-            residual!(b, op, x)
-            norm_b_inf = norm(b, Inf)
+        if isnan(phi_x_new) || !ls_success
+            println("  [Stagnation] Linesearch failed to find a valid descent direction or hit pure NaNs. Aborting Newton loop safely.")
+            x .= best_x
+            norm_b_inf = best_b_inf
             break
         end
         
         step_norm = alpha * step_norm_base
         println("Iter $i: f(x) inf-norm = $norm_b_new_inf | Merit Φ = $phi_x_new | Step inf-norm = $step_norm | alpha = $alpha | dir_deriv = $dir_deriv")
+        
+        # Track best state monotonically across the Newton homotopy!
+        if norm_b_new_inf < best_b_inf
+            best_x .= x
+            best_b_inf = norm_b_new_inf
+            best_phi = phi_x_new
+        end
         
         if norm_b_new_inf <= solver.ftol
             println("  [Convergence] Residual inf-norm ($norm_b_new_inf) is below tolerance ($(solver.ftol)).")
@@ -104,39 +128,43 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         end
         
         # Divergence guard based on merit.
-        if isnan(phi_x_new) || phi_x_new > last_phi * 1.05
+        if phi_x_new > last_phi * 1.05
             inc_count += 1
             if inc_count >= solver.max_increases
-                if norm_b_new_inf > 1e-2
-                    error("Solver Diverged: Merit function exploded or hit NaN for $(inc_count) iterations.")
+                if best_b_inf > 1e-2
+                    error("Solver Diverged: Merit function exploded for $(inc_count) iterations.")
                 else
                     println("  [Stagnation] Solver hit the numerical noise floor. Stopping safely.")
-                    norm_b_inf = norm_b_new_inf
+                    x .= best_x
+                    norm_b_inf = best_b_inf
                     break
                 end
             end
         else
             inc_count = 0
         end
+        
         last_phi = phi_x_new
         phi_x = phi_x_new
         
         if step_norm <= solver.xtol
-            if norm_b_new_inf > 1e-2
+            if best_b_inf > 1e-2
                 error("Solver Stalled: Step jump vanished below xtol ($(solver.xtol)).")
             else
                 println("  [Stagnation] Step jump vanished below xtol in the noise floor. Stopping safely.")
-                norm_b_inf = norm_b_new_inf
+                x .= best_x
+                norm_b_inf = best_b_inf
                 break
             end
         end
         
         if i == solver.max_iters
-            if norm_b_new_inf > 1e-2
+            if best_b_inf > 1e-2
                 error("Solver Failed: Reached maximum iterations ($(solver.max_iters)).")
             else
                 println("  [Max Iters] Reached max iterations in the noise floor. Stopping safely.")
-                norm_b_inf = norm_b_new_inf
+                x .= best_x
+                norm_b_inf = best_b_inf
             end
         end
         

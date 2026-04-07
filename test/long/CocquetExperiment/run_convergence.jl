@@ -28,8 +28,8 @@ function build_solver(N::Int, config_dict)
     
     model = PorousNSSolver.create_mesh(local_config)
     
-    refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, local_config.discretization.k_velocity)
-    refe_p = ReferenceFE(lagrangian, Float64, local_config.discretization.k_pressure)
+    refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, local_config.numerical_method.element_spaces.k_velocity)
+    refe_p = ReferenceFE(lagrangian, Float64, local_config.numerical_method.element_spaces.k_pressure)
     
     labels = get_face_labeling(model)
     
@@ -44,7 +44,7 @@ function build_solver(N::Int, config_dict)
     Y = MultiFieldFESpace([V, Q])
     X = MultiFieldFESpace([U, P])
     
-    degree = 2 * local_config.discretization.k_velocity
+    degree = 2 * local_config.numerical_method.element_spaces.k_velocity
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     
@@ -60,15 +60,15 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     form = PorousNSSolver.build_formulation(config)
     f_cf = VectorValue(config.phys.f_x, config.phys.f_y)
     
-    c_1 = 4.0 * config.discretization.k_velocity^4
-    c_2 = 2.0 * config.discretization.k_velocity^2
+    c_1 = 4.0 * config.numerical_method.element_spaces.k_velocity^4
+    c_2 = 2.0 * config.numerical_method.element_spaces.k_velocity^2
     tau_reg_lim = config.phys.tau_regularization_limit
     
     res_asgs(x, y) = PorousNSSolver.build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim)
-    jac_asgs(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.solver.freeze_jacobian_cusp; is_picard=false)
+    jac_asgs(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.numerical_method.solver.freeze_jacobian_cusp; is_picard=false)
     
     op_asgs = FEOperator(res_asgs, jac_asgs, X, Y)
-    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.solver.max_increases, config.solver.xtol, config.solver.stagnation_tol, config.solver.ftol, config.solver.linesearch_alpha_min, 1e-4)
+    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4)
     solver_newton = FESolver(nls_newton)
     
     eval_iters = 0
@@ -97,8 +97,8 @@ function run_convergence()
     
     # Extract the target refinement nodes mathematically from the parsed structs.
     # partition limits are defined as [2*N, N], so N = partition[2] (the vertical subdivision)
-    N_ref = base_config.mesh.partition[2]
-    N_list = base_config.mesh.convergence_partitions
+    N_ref = base_config.numerical_method.mesh.partition[2]
+    N_list = base_config.numerical_method.mesh.convergence_partitions
     
     results_dir = joinpath(@__DIR__, "results")
     if !isdir(results_dir)

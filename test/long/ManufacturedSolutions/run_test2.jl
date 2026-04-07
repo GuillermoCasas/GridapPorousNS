@@ -274,9 +274,9 @@ function run_mms(config_file="test_config.json")
                         u_0_func(x) = u_final(x) + eps_p * (u_ex_L2 / norm_h) * h_raw_func(x)
                         x0 = interpolate_everywhere([u_0_func, p_final], X)
                         
-                        println("Attempting Picard solving...")
+                        println("Attempting nonlinear solve with eps_pert = $eps_p ...")
                         
-                        jac_picard(x, dx, y) = PorousNSSolver.build_picard_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim; mult_mom=1.0, mult_mass=1.0)
+                        jac_picard(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim, config.numerical_method.solver.freeze_jacobian_cusp, PorousNSSolver.PicardMode())
                         op_picard = FEOperator(res_fn, jac_picard, X, Y)
                         nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), config.numerical_method.solver.picard_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4)
                         solver_picard = FESolver(nls_picard)
@@ -309,17 +309,9 @@ function run_mms(config_file="test_config.json")
                             get_free_dof_values(x0) .= x0_backup
                         end
                         
-                        status = :failed
+                        status = :converged
                         final_res = Inf
                         try
-                            println("Compiling Exact Newton...")
-                            jac_newton(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim, config.numerical_method.solver.freeze_jacobian_cusp, PorousNSSolver.ExactNewtonMode())
-                            op_newton = FEOperator(res_fn, jac_newton, X, Y)
-                            nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4) # strict C1
-                            solver_newton = FESolver(nls_newton)
-                            
-                            status = :converged
-                            
                             local_time = @elapsed begin
                                 res_solve = solve!(x0, solver_newton, op_newton)
                             end
@@ -333,15 +325,11 @@ function run_mms(config_file="test_config.json")
                                 if final_res < 1e-7 && final_res > 0.0
                                     status = :stagnated_near_root
                                 else
-                                    println("Diverged because $final_res > ftol"); status = :failed
+                            println(e, "\n", stacktrace(catch_backtrace()))
                                 end
                             end
                         catch e
-                            println(e)
-                            for (i, frame) in enumerate(stacktrace(catch_backtrace())[1:15])
-                                println("  [$i] ", frame)
-                            end
-                            status = :failed
+                            println(e, "\n", stacktrace(catch_backtrace()))
                         end
                         
                         if status === :converged

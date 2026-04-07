@@ -5,9 +5,9 @@
   "description": "Configuration schema for the Gridap-based Porous Navier-Stokes solver.",
   "type": "object",
   "properties": {
-    "physical_parameters": {
+    "physical_properties": {
       "type": "object",
-      "title": "Physical Parameters",
+      "title": "Physical Properties",
       "description": "Physical properties of the fluid and the porous medium, including numerical floor values and reaction terms.",
       "properties": {
         "nu": { "type": "number", "default": 1.0, "description": "Kinematic viscosity of the fluid." },
@@ -28,56 +28,95 @@
       },
       "additionalProperties": true
     },
-    "porosity_field": {
+    "domain": {
       "type": "object",
-      "title": "Porosity Field",
-      "description": "Parameters defining the spatial distribution of the porous medium.",
+      "title": "Domain Configuration",
+      "description": "Geometrical description and dimensions of the domain and the spatial distribution of the porous medium.",
       "properties": {
         "alpha_0": { "type": "number", "default": 0.4, "description": "Background or minimum porosity value." },
         "r_1": { "type": "number", "default": 0.2, "description": "Inner radius geometry control for porosity field." },
-        "r_2": { "type": "number", "default": 0.5, "description": "Outer radius geometry control for porosity field." }
-      },
-      "additionalProperties": false
-    },
-    "discretization": {
-      "type": "object",
-      "title": "Discretization",
-      "description": "Finite element type and order degrees.",
-      "properties": {
-        "k_velocity": { "type": "integer", "default": 2, "description": "Velocity interpolation polynomial order." },
-        "k_pressure": { "type": "integer", "default": 1, "description": "Pressure interpolation polynomial order." },
-        "equal_order_only": { "type": "boolean", "description": "Flag used primarily in testing to enforce equal-order elements." }
-      },
-      "additionalProperties": false
-    },
-    "mesh": {
-      "type": "object",
-      "title": "Mesh Configuration",
-      "description": "Domain bounds, partitioning, and element geometry.",
-      "properties": {
-        "domain": { 
+        "r_2": { "type": "number", "default": 0.5, "description": "Outer radius geometry control for porosity field." },
+        "bounding_box": { 
           "type": "array", 
           "items": { "type": "number" }, 
           "default": [0.0, 1.0, 0.0, 1.0], 
           "description": "Bounding box lengths for the geometry [xmin, xmax, ymin, ymax]." 
+        }
+      },
+      "additionalProperties": false
+    },
+    "numerical_method": {
+      "type": "object",
+      "title": "Numerical Method",
+      "description": "Discretization, stabilization, mesh parsing, and nonlinear solver components.",
+      "properties": {
+        "element_spaces": {
+          "type": "object",
+          "title": "Element Spaces",
+          "description": "Finite element type and order degrees.",
+          "properties": {
+            "k_velocity": { "type": "integer", "default": 2, "description": "Velocity interpolation polynomial order." },
+            "k_pressure": { "type": "integer", "default": 1, "description": "Pressure interpolation polynomial order." },
+            "equal_order_only": { "type": "boolean", "description": "Flag used primarily in testing to enforce equal-order elements." }
+          },
+          "additionalProperties": false
         },
-        "partition": { 
-          "type": "array", 
-          "items": { "type": "integer" }, 
-          "default": [20, 20], 
-          "description": "Number of elements in each direction [nx, ny]." 
+        "stabilization": {
+          "type": "object",
+          "title": "Stabilization Configuration",
+          "description": "Mechanisms for stabilizing the Galerkin solver.",
+          "properties": {
+            "method": { "type": "string", "enum": ["ASGS", "OSGS", "VMS", "Galerkin"], "default": "ASGS", "description": "Stabilization method selected." },
+            "osgs_iterations": { "type": "integer", "default": 3, "description": "Iterations used for resolving Orthogonal Subgrid Scales." }
+          },
+          "additionalProperties": false
         },
-        "convergence_partitions": {
-          "type": "array",
-          "items": { "type": "integer" },
-          "default": [10, 20, 30],
-          "description": "Set of partitions for convergence studies (e.g., MMS tests)."
+        "solver": {
+          "type": "object",
+          "title": "Solver Configuration",
+          "description": "Hyperparameters controlling the Picard and Exact Newton linear/nonlinear solvers.",
+          "properties": {
+            "picard_iterations": { "type": "integer", "default": 5, "description": "Initial number of Picard iterations before switching to Newton." },
+            "newton_iterations": { "type": "integer", "default": 20, "description": "Maximum allowed exact Newton iterations." },
+            "use_linesearch": { "type": "boolean", "default": true, "description": "Enable Exact L2 energy-based linesearch tracking." },
+            "xtol": { "type": "number", "default": 1e-8, "description": "Relative norm tolerance for the solution increment (dx)." },
+            "stagnation_tol": { "type": "number", "default": 1e-5, "description": "Threshold at which the relative residual improvement is minimal, indicating convergence stalling." },
+            "ftol": { "type": "number", "default": 1e-10, "description": "Absolute residual tolerance." },
+            "max_increases": { "type": "integer", "default": 2, "description": "Number of successive residual increases before divergence abort." },
+            "freeze_jacobian_cusp": { "type": "boolean", "default": false, "description": "If true, freezes the magnitude of velocity in the nonlinearity Jacobian cross-terms." },
+            "linesearch_tolerance": { "type": "number", "default": 1.0001, "description": "Acceptance threshold. Must strictly decrease residual unless > 1.0 (to ignore noise)." },
+            "linesearch_alpha_min": { "type": "number", "default": 1e-4, "description": "Minimum step size allowed before linesearch fails." },
+            "run_diagnostics": { "type": "boolean", "default": false, "description": "Enable expanded diagnostics / debug print statements." },
+            "ablation_mode": { "type": "string", "enum": ["full", "galerkin", "momentum_only", "mass_only"], "default": "full", "description": "Switch behavior of specific solver terms for systematic testing." },
+            "experimental_reaction_mode": { "type": "string", "enum": ["standard", "remove_adjoint", "remove_tau"], "default": "standard", "description": "Toggles advanced reaction handling behaviors for high-Re modes." }
+          },
+          "additionalProperties": false
         },
-        "element_type": { 
-          "type": "string", 
-          "enum": ["QUAD", "TRI", "HEX", "TET"],
-          "default": "QUAD", 
-          "description": "Element type." 
+        "mesh": {
+          "type": "object",
+          "title": "Mesh Configuration",
+          "description": "Domain partitioning and element geometry.",
+          "properties": {
+            "partition": { 
+              "type": "array", 
+              "items": { "type": "integer" }, 
+              "default": [20, 20], 
+              "description": "Number of elements in each direction [nx, ny]." 
+            },
+            "convergence_partitions": {
+              "type": "array",
+              "items": { "type": "integer" },
+              "default": [10, 20, 30],
+              "description": "Set of partitions for convergence studies (e.g., MMS tests)."
+            },
+            "element_type": { 
+              "type": "string", 
+              "enum": ["QUAD", "TRI", "HEX", "TET"],
+              "default": "QUAD", 
+              "description": "Element type." 
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -92,33 +131,11 @@
       },
       "additionalProperties": false
     },
-    "solver": {
-      "type": "object",
-      "title": "Solver Configuration",
-      "description": "Hyperparameters controlling the Picard and Exact Newton linear/nonlinear solvers along with stabilization techniques.",
-      "properties": {
-        "picard_iterations": { "type": "integer", "default": 5, "description": "Initial number of Picard iterations before switching to Newton." },
-        "newton_iterations": { "type": "integer", "default": 20, "description": "Maximum allowed exact Newton iterations." },
-        "use_linesearch": { "type": "boolean", "default": true, "description": "Enable Exact L2 energy-based linesearch tracking." },
-        "method": { "type": "string", "enum": ["ASGS", "OSGS", "VMS", "Galerkin"], "default": "ASGS", "description": "Stabilization method selected." },
-        "osgs_iterations": { "type": "integer", "default": 3, "description": "Iterations used for resolving Orthogonal Subgrid Scales." },
-        "xtol": { "type": "number", "default": 1e-8, "description": "Relative norm tolerance for the solution increment (dx)." },
-        "stagnation_tol": { "type": "number", "default": 1e-5, "description": "Threshold at which the relative residual improvement is minimal, indicating convergence stalling." },
-        "ftol": { "type": "number", "default": 1e-10, "description": "Absolute residual tolerance." },
-        "max_increases": { "type": "integer", "default": 2, "description": "Number of successive residual increases before divergence abort." },
-        "freeze_jacobian_cusp": { "type": "boolean", "default": false, "description": "If true, freezes the magnitude of velocity in the nonlinearity Jacobian cross-terms." },
-        "linesearch_tolerance": { "type": "number", "default": 1.0001, "description": "Acceptance threshold. Must strictly decrease residual unless > 1.0 (to ignore noise)." },
-        "linesearch_alpha_min": { "type": "number", "default": 1e-4, "description": "Minimum step size allowed before linesearch fails." },
-        "run_diagnostics": { "type": "boolean", "default": false, "description": "Enable expanded diagnostics / debug print statements." },
-        "ablation_mode": { "type": "string", "enum": ["full", "galerkin", "momentum_only", "mass_only"], "default": "full", "description": "Switch behavior of specific solver terms for systematic testing." },
-        "experimental_reaction_mode": { "type": "string", "enum": ["standard", "remove_adjoint", "remove_tau"], "default": "standard", "description": "Toggles advanced reaction handling behaviors for high-Re modes." }
-      },
-      "additionalProperties": false
-    },
     "max_n_pert": { "type": "integer", "description": "Maximum noise permutations for MMS execution config." },
     "epsilon_pert": { "type": "array", "items": { "type": "number" }, "description": "Epsilon perturbations scale for condition tests." },
     "erase_past_results": { "type": "boolean", "description": "Controls HDF5 cache scrubbing." },
-    "h5_filename": { "type": "string", "description": "Filename of H5 results database used in manufactured solutions." }
+    "h5_filename": { "type": "string", "description": "Filename of H5 results database used in manufactured solutions." },
+    "equal_order_only": { "type": "boolean", "description": "Top-level fallback for testing suites." }
   },
   "additionalProperties": true
 }

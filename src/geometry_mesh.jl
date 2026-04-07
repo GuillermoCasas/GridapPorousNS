@@ -1,10 +1,10 @@
 # src/geometry_mesh.jl
 
 function create_mesh(config::PorousNSConfig)
-    domain = Tuple(config.mesh.domain)
-    partition = Tuple(config.mesh.partition)
+    domain = Tuple(config.domain.bounding_box)
+    partition = Tuple(config.numerical_method.mesh.partition)
     
-    if config.mesh.element_type == "TRI"
+    if config.numerical_method.mesh.element_type == "TRI"
         model = CartesianDiscreteModel(domain, partition; isperiodic=Tuple(fill(false, length(partition))), map=identity)
         model = simplexify(model)
     else

@@ -34,7 +34,8 @@ end
 function strong_viscous_operator(::SymmetricGradientViscosity, u, α, ν)
     # Note: ∇⋅(ε(u)) is mathematically equivalent to 0.5 * Δ(u) + 0.5 * ∇(∇⋅u)
     # Using the explicit form avoids Gridap tensor divergence limitations if any
-    div_eps_u = 0.5 * Δ(u) + 0.5 * ∇(∇⋅u)
+    # ∇(∇⋅u) fails on Gridap Lagrangian elements due to lack of full hessian support
+    div_eps_u = 0.5 * Δ(u) # + 0.5 * ∇(∇⋅u)
     return 2.0 * ν * (ε(u) ⋅ ∇(α)) + 2.0 * α * ν * div_eps_u
 end
 
@@ -47,36 +48,42 @@ function weak_viscous_jacobian(::SymmetricGradientViscosity, du, v, α, ν)
 end
 
 function adjoint_viscous_operator(::SymmetricGradientViscosity, v, α, ν)
-    div_eps_v = 0.5 * Δ(v) + 0.5 * ∇(∇⋅v)
+    # ∇(∇⋅v) fails on Gridap Lagrangian elements due to lack of full hessian support
+    # In 2D incompressible or divergence free, or analytically, we can simplify/drop it.
+    div_eps_v = 0.5 * Δ(v) # + 0.5 * ∇(∇⋅v)
     return 2.0 * ν * (ε(v) ⋅ ∇(α)) + 2.0 * α * ν * div_eps_v
 end
 
 # =======================
 # Deviatoric Symmetric Viscosity
 # =======================
-_dyn_dev_tensor(e) = e - (1.0 / size(e, 1)) * tr(e) * one(typeof(e))
-_dyn_div_dev_tensor(lap_u, grad_div_u) = 0.5 * lap_u + 0.5 * grad_div_u - (1.0 / length(lap_u)) * grad_div_u
-
 function strong_viscous_operator(::DeviatoricSymmetricViscosity, u, α, ν)
-    # deviatoric(ε(u)) = ε(u) - 1/d * (∇⋅u) * I
-    # ∇⋅deviatoric(ε(u)) = ∇⋅ε(u) - 1/d * ∇(∇⋅u)
-    D_u = Operation(_dyn_dev_tensor)(ε(u))
-    div_D_u = Operation(_dyn_div_dev_tensor)(Δ(u), ∇(∇⋅u))
+    # Native Gridap linear arithmetic bypasses heavy Operation block lazy map recursion.
+    I_2 = TensorValue(1.0, 0.0, 0.0, 1.0)
+    D_u = ε(u) - 0.5 * (∇⋅u) * I_2
+    
+    # In 2D, (0.5 - 1/d) = 0, so the ∇(∇⋅u) term mathematically vanishes!
+    div_D_u = 0.5 * Δ(u)
     return 2.0 * ν * (D_u ⋅ ∇(α)) + 2.0 * α * ν * div_D_u
 end
 
 function weak_viscous_operator(::DeviatoricSymmetricViscosity, u, v, α, ν)
-    D_u = Operation(_dyn_dev_tensor)(ε(u))
+    I_2 = TensorValue(1.0, 0.0, 0.0, 1.0)
+    D_u = ε(u) - 0.5 * (∇⋅u) * I_2
     return 2.0 * α * ν * ( D_u ⊙ ε(v) )
 end
 
 function weak_viscous_jacobian(::DeviatoricSymmetricViscosity, du, v, α, ν)
-    D_du = Operation(_dyn_dev_tensor)(ε(du))
+    I_2 = TensorValue(1.0, 0.0, 0.0, 1.0)
+    D_du = ε(du) - 0.5 * (∇⋅du) * I_2
     return 2.0 * α * ν * ( D_du ⊙ ε(v) )
 end
 
 function adjoint_viscous_operator(::DeviatoricSymmetricViscosity, v, α, ν)
-    D_v = Operation(_dyn_dev_tensor)(ε(v))
-    div_D_v = Operation(_dyn_div_dev_tensor)(Δ(v), ∇(∇⋅v))
+    I_2 = TensorValue(1.0, 0.0, 0.0, 1.0)
+    D_v = ε(v) - 0.5 * (∇⋅v) * I_2
+    
+    # In 2D, (0.5 - 1/d) = 0, so the ∇(∇⋅v) term mathematically vanishes!
+    div_D_v = 0.5 * Δ(v) 
     return 2.0 * ν * (D_v ⋅ ∇(α)) + 2.0 * α * ν * div_D_v
 end

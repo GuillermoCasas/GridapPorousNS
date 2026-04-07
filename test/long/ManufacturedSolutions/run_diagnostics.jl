@@ -31,9 +31,9 @@ function close_report(r::Reporter)
 end
 
 function alpha_field(x, config::PorousNSSolver.PorousNSConfig)
-    alpha_0 = config.porosity.alpha_0
-    r1 = config.porosity.r_1
-    r2 = config.porosity.r_2
+    alpha_0 = config.domain.alpha_0
+    r1 = config.domain.r_1
+    r2 = config.domain.r_2
     dx = x[1] - 0.0
     dy = x[2] - 0.0
     r_sq = dx^2 + dy^2
@@ -58,9 +58,9 @@ u_ex(x, config) = (1.0 / PorousNSSolver.get_force_scale(config)) * VectorValue(s
 p_ex(x, config) = cos(pi*x[1])*sin(pi*x[2])
 
 function g_ex(x, config::PorousNSSolver.PorousNSConfig)
-    alpha_0 = config.porosity.alpha_0
-    r1 = config.porosity.r_1
-    r2 = config.porosity.r_2
+    alpha_0 = config.domain.alpha_0
+    r1 = config.domain.r_1
+    r2 = config.domain.r_2
     dx = x[1] - 0.0
     dy = x[2] - 0.0
     r_sq = dx^2 + dy^2
@@ -85,7 +85,7 @@ function g_ex(x, config::PorousNSSolver.PorousNSConfig)
         alpha_val = 1.0
     end
     
-    eps_val = config.phys.eps_val
+    eps_val = config.physical_properties.eps_val
     return eps_val * p_ex(x, config) + (u_ex(x, config) ⋅ grad_alpha_val)
 end
 
@@ -101,9 +101,9 @@ lap_u_ex(x, config) = -2.0 * pi^2 * u_ex(x, config)
 grad_p_ex(x, config) = VectorValue(-pi * sin(pi*x[1])*sin(pi*x[2]), pi * cos(pi*x[1])*cos(pi*x[2]))
 
 function f_ex(x, config::PorousNSSolver.PorousNSConfig, model::M) where {M<:PorousNSSolver.AbstractReactionModel}
-    alpha_0 = config.porosity.alpha_0
-    r1 = config.porosity.r_1
-    r2 = config.porosity.r_2
+    alpha_0 = config.domain.alpha_0
+    r1 = config.domain.r_1
+    r2 = config.domain.r_2
     dx = x[1] - 0.0
     dy = x[2] - 0.0
     r_sq = dx^2 + dy^2
@@ -134,7 +134,7 @@ function f_ex(x, config::PorousNSSolver.PorousNSConfig, model::M) where {M<:Poro
         α_val = 1.0
     end
     
-    ν = config.phys.nu
+    ν = config.physical_properties.nu
     u_val = u_ex(x, config)
     grad_u_val = grad_u_ex(x, config)
     lap_u_val = lap_u_ex(x, config)
@@ -173,18 +173,20 @@ function run_diagnostics()
     
     # We will test the MMS case with Re = 1e6, Da = 1e-6
     override_dict = Dict(
-        "physical_parameters" => Dict("nu" => 1e-6, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1e6, "sigma_linear" => 150.0, "sigma_nonlinear" => 1.75),
-        "porosity_field" => Dict("alpha_0" => 0.5),
-        "discretization" => Dict("k_velocity" => 1, "k_pressure" => 1),
-        "mesh" => Dict("element_type" => "QUAD", "partition" => [20, 20], "domain" => [-0.5, 0.5, -0.5, 0.5]),
-        "solver" => Dict("run_diagnostics" => true, "picard_iterations" => 5, "newton_iterations" => 20)
+        "physical_properties" => Dict("nu" => 1e-6, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1e6, "sigma_linear" => 150.0, "sigma_nonlinear" => 1.75),
+        "domain" => Dict("alpha_0" => 0.5, "bounding_box" => [-0.5, 0.5, -0.5, 0.5]),
+        "numerical_method" => Dict(
+            "element_spaces" => Dict("k_velocity" => 1, "k_pressure" => 1),
+            "mesh" => Dict("element_type" => "QUAD", "partition" => [20, 20]),
+            "solver" => Dict("run_diagnostics" => true, "picard_iterations" => 5, "newton_iterations" => 20)
+        )
     )
     
     base_config = PorousNSSolver.load_config_from_dict(override_dict)
     
     write_report(r, "Configuration:")
     write_report(r, JSON.json(override_dict, 2))
-    write_report(r, "Freeze Jacobian Cusp: $(base_config.solver.freeze_jacobian_cusp)")
+    write_report(r, "Freeze Jacobian Cusp: $(base_config.numerical_method.solver.freeze_jacobian_cusp)")
     write_report(r, "Method: ASGS")
     
     # Mesh and spaces
@@ -192,8 +194,8 @@ function run_diagnostics()
     labels = get_face_labeling(model)
     add_tag_from_tags!(labels, "all_boundaries", [1,2,3,4,5,6,7,8])
     
-    refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, base_config.discretization.k_velocity)
-    refe_p = ReferenceFE(lagrangian, Float64, base_config.discretization.k_pressure)
+    refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, base_config.numerical_method.element_spaces.k_velocity)
+    refe_p = ReferenceFE(lagrangian, Float64, base_config.numerical_method.element_spaces.k_pressure)
     V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["all_boundaries"])
     Q = TestFESpace(model, refe_p, conformity=:H1)
     
@@ -206,7 +208,7 @@ function run_diagnostics()
     X = MultiFieldFESpace([U, P])
     
     Ω = Triangulation(model)
-    degree = 4 * base_config.discretization.k_velocity
+    degree = 4 * base_config.numerical_method.element_spaces.k_velocity
     dΩ = Measure(Ω, degree + 4)
     
     h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
@@ -377,8 +379,8 @@ function run_diagnostics()
     Da_list = [1.0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     for da in Da_list
         loc_cfg = PorousNSSolver.PorousNSConfig(
-            phys=PorousNSSolver.PhysicalParameters(nu=1e-6, eps_val=1e-8, reaction_model="Constant_Sigma", sigma_constant=1.0/da, sigma_linear=150.0/(da*1e6), sigma_nonlinear=1.75),
-            porosity=base_config.porosity, discretization=base_config.discretization, mesh=base_config.mesh, output=base_config.output, solver=base_config.solver
+            physical_properties=PorousNSSolver.PhysicalProperties(nu=1e-6, eps_val=1e-8, reaction_model="Constant_Sigma", sigma_constant=1.0/da, sigma_linear=150.0/(da*1e6), sigma_nonlinear=1.75),
+            domain=base_config.domain, numerical_method=base_config.numerical_method, output=base_config.output
         )
         run_experiment_block("DA SWEEP: Da = $da", loc_cfg, 0.0, false)
     end
@@ -389,7 +391,8 @@ function run_diagnostics()
     write_report(r, "==================================================")
     for mode in ["full", "galerkin", "momentum_only", "mass_only"]
         loc_cfg_solver = PorousNSSolver.SolverConfig(picard_iterations=5, newton_iterations=20, ablation_mode=mode)
-        loc_cfg = PorousNSSolver.PorousNSConfig(phys=base_config.phys, porosity=base_config.porosity, discretization=base_config.discretization, mesh=base_config.mesh, output=base_config.output, solver=loc_cfg_solver)
+        loc_nm = PorousNSSolver.NumericalMethodConfig(element_spaces=base_config.numerical_method.element_spaces, stabilization=base_config.numerical_method.stabilization, mesh=base_config.numerical_method.mesh, solver=loc_cfg_solver)
+        loc_cfg = PorousNSSolver.PorousNSConfig(physical_properties=base_config.physical_properties, domain=base_config.domain, numerical_method=loc_nm, output=base_config.output)
         run_experiment_block("ABLATION: $mode", loc_cfg, 1e-3, true) # true to see cancellation ratio where applicable
     end
     
@@ -399,7 +402,8 @@ function run_diagnostics()
     write_report(r, "==================================================")
     for mode in ["remove_adjoint", "remove_tau"]
         loc_cfg_solver = PorousNSSolver.SolverConfig(picard_iterations=5, newton_iterations=20, ablation_mode="full", experimental_reaction_mode=mode)
-        loc_cfg = PorousNSSolver.PorousNSConfig(phys=base_config.phys, porosity=base_config.porosity, discretization=base_config.discretization, mesh=base_config.mesh, output=base_config.output, solver=loc_cfg_solver)
+        loc_nm = PorousNSSolver.NumericalMethodConfig(element_spaces=base_config.numerical_method.element_spaces, stabilization=base_config.numerical_method.stabilization, mesh=base_config.numerical_method.mesh, solver=loc_cfg_solver)
+        loc_cfg = PorousNSSolver.PorousNSConfig(physical_properties=base_config.physical_properties, domain=base_config.domain, numerical_method=loc_nm, output=base_config.output)
         run_experiment_block("REACTION EXCLUDED: $mode", loc_cfg, 1e-3, true)
     end
     

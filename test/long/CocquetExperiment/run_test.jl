@@ -25,8 +25,8 @@ function run_cocquet()
     
     model = PorousNSSolver.create_mesh(config)
     
-    refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, config.discretization.k_velocity)
-    refe_p = ReferenceFE(lagrangian, Float64, config.discretization.k_pressure)
+    refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, config.numerical_method.element_spaces.k_velocity)
+    refe_p = ReferenceFE(lagrangian, Float64, config.numerical_method.element_spaces.k_pressure)
     
     labels = get_face_labeling(model)
     
@@ -42,7 +42,7 @@ function run_cocquet()
     Y = MultiFieldFESpace([V, Q])
     X = MultiFieldFESpace([U, P])
     
-    degree = 2 * config.discretization.k_velocity
+    degree = 2 * config.numerical_method.element_spaces.k_velocity
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     
@@ -59,18 +59,18 @@ function run_cocquet()
     op_picard = FEOperator(res, jac_picard, X, Y)
     op_newton = FEOperator(res, jac, X, Y)
     
-    if config.solver.use_linesearch
-        nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=config.solver.newton_iterations)
-        nls_picard = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=config.solver.picard_iterations)
+    if config.numerical_method.solver.use_linesearch
+        nls_newton = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=config.numerical_method.solver.newton_iterations)
+        nls_picard = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking(), iterations=config.numerical_method.solver.picard_iterations)
     else
-        nls_newton = NLSolver(show_trace=true, method=:newton, iterations=config.solver.newton_iterations)
-        nls_picard = NLSolver(show_trace=true, method=:newton, iterations=config.solver.picard_iterations)
+        nls_newton = NLSolver(show_trace=true, method=:newton, iterations=config.numerical_method.solver.newton_iterations)
+        nls_picard = NLSolver(show_trace=true, method=:newton, iterations=config.numerical_method.solver.picard_iterations)
     end
     solver_newton = FESolver(nls_newton)
     solver_picard = FESolver(nls_picard)
     
-    if config.solver.picard_iterations > 0
-        println("Solving the uncoupled/porous DBF equations (Picard stage, $(config.solver.picard_iterations) iters)...")
+    if config.numerical_method.solver.picard_iterations > 0
+        println("Solving the uncoupled/porous DBF equations (Picard stage, $(config.numerical_method.solver.picard_iterations) iters)...")
         x_h = solve(solver_picard, op_picard)
         println("Solving the uncoupled/porous DBF equations (Newton stage)...")
         solve!(x_h, solver_newton, op_newton)

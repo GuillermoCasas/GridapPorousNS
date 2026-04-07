@@ -1,6 +1,6 @@
 {
     "$schema": "./porous_ns.schema.json",
-    "physical_parameters": {
+    "physical_properties": {
         "nu": 1.0,
         "f_x": 0.0,
         "f_y": 0.0,
@@ -9,31 +9,62 @@
         "reaction_model": "Forchheimer",
         "sigma_constant": 1.0,
         "sigma_linear": 150.0,
-        "sigma_nonlinear": 1.75
+        "sigma_nonlinear": 1.75,
+        "u_base_floor_ref": 1e-4,
+        "h_floor_weight": 0.1,
+        "epsilon_floor": 1e-12,
+        "tau_regularization_limit": 1e-12
     },
-    "porosity_field": {
+    "domain": {
         "alpha_0": 0.4,
         "r_1": 0.2,
-        "r_2": 0.5
+        "r_2": 0.5,
+        "bounding_box": [
+            0.0,
+            1.0,
+            0.0,
+            1.0
+        ]
     },
-    "discretization": {
-        "k_velocity": 2,
-        "k_pressure": 1
-    },
-    "mesh": {
-        "domain": [0.0, 1.0, 0.0, 1.0],
-        "partition": [20, 20]
+    "numerical_method": {
+        "element_spaces": {
+            "k_velocity": 2,
+            "k_pressure": 1
+        },
+        "stabilization": {
+            "method": "ASGS",
+            "osgs_iterations": 3
+        },
+        "solver": {
+            "picard_iterations": 5,
+            "newton_iterations": 20,
+            "use_linesearch": true,
+            "xtol": 1e-8,
+            "stagnation_tol": 1e-5,
+            "ftol": 1e-8,
+            "max_increases": 3,
+            "freeze_jacobian_cusp": false,
+            "linesearch_tolerance": 1.0001,
+            "linesearch_alpha_min": 1e-4,
+            "run_diagnostics": false,
+            "ablation_mode": "full",
+            "experimental_reaction_mode": "standard"
+        },
+        "mesh": {
+            "partition": [
+                20,
+                20
+            ],
+            "convergence_partitions": [
+                10,
+                20,
+                30
+            ],
+            "element_type": "QUAD"
+        }
     },
     "output": {
         "directory": "results",
         "basename": "porous_ns"
-    },
-    "solver": {
-        "picard_iterations": 5,
-        "newton_iterations": 20,
-        "use_linesearch": true,
-        "xtol": 1e-8,
-        "stagnation_tol": 1e-5,
-        "max_increases": 3
     }
 }

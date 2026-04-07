@@ -2,7 +2,7 @@
     "erase_past_results": false,
     "epsilon_pert": [1.0],
     "max_n_pert": 5,
-    "physical_parameters": {
+    "physical_properties": {
         "Re": [1e-6, 1.0, 1e6],
         "Da": [1e-6, 1.0, 1e6],
         "physical_epsilon": [0.0],
@@ -10,26 +10,28 @@
         "f_x": 0.0,
         "f_y": 0.0
     },
-    "porosity_field": {
+    "domain": {
         "alpha_0": [1.0, 0.5, 0.05],
         "r_1": 0.2,
-        "r_2": 0.4
+        "r_2": 0.4,
+        "bounding_box": [-0.5, 0.5, -0.5, 0.5]
     },
-    "discretization": {
-        "k_velocity": [1, 2],
-        "k_pressure": [1, 2],
-        "equal_order_only": true
-    },
-    "mesh": {
-        "domain": [-0.5, 0.5, -0.5, 0.5],
-        "partition": [10, 10],
-        "convergence_partitions": [25, 50, 100, 200],
-        "element_type": ["QUAD", "TRI"]
-    },
-    "solver": {
-        "xtol": 1e-8,
-        "stagnation_tol": 1e-3,
-        "max_increases": 3
+    "numerical_method": {
+        "element_spaces": {
+            "k_velocity": [1, 2],
+            "k_pressure": [1, 2],
+            "equal_order_only": true
+        },
+        "mesh": {
+            "partition": [10, 10],
+            "convergence_partitions": [25, 50, 100, 200],
+            "element_type": ["QUAD", "TRI"]
+        },
+        "solver": {
+            "xtol": 1e-8,
+            "stagnation_tol": 1e-3,
+            "max_increases": 3
+        }
     },
     "output": {
         "directory": "test/long/ManufacturedSolutions/results",

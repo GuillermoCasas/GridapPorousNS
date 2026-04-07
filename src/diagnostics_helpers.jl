@@ -9,7 +9,7 @@ function weak_form_g_sigma(u, v, config::PorousNSSolver.PorousNSConfig, dΩ, h, 
 end
 
 function _weak_form_g_sigma_impl(u, v, config::PorousNSSolver.PorousNSConfig, model::M, dΩ, h, alpha_custom) where {M<:PorousNSSolver.AbstractReactionModel}
-    α = isnothing(alpha_custom) ? config.porosity.alpha_0 : alpha_custom
+    α = isnothing(alpha_custom) ? config.domain.alpha_0 : alpha_custom
     σ = Operation((u_v, h_v, a_v) -> model(PorousNSSolver.ThermodynamicState(u_v, h_v, a_v)))(u, h, α)
     return ∫( v ⋅ (σ * u) )dΩ
 end
@@ -21,14 +21,14 @@ end
 
 function _weak_form_s_sigma_impl(X, v, config::PorousNSSolver.PorousNSConfig, model::M, dΩ, h, f_custom, alpha_custom) where {M<:PorousNSSolver.AbstractReactionModel}
     u, p = X
-    α = isnothing(alpha_custom) ? config.porosity.alpha_0 : alpha_custom
+    α = isnothing(alpha_custom) ? config.domain.alpha_0 : alpha_custom
     f = isnothing(f_custom) ? VectorValue(config.phys.f_x, config.phys.f_y) : f_custom
     
     let ν = config.phys.nu,
-        k_deg = config.discretization.k_velocity,
-        c_1 = 4.0 * config.discretization.k_velocity^4,
-        c_2 = 2.0 * config.discretization.k_velocity^2,
-        reaction_trait = PorousNSSolver.get_reaction_mode_trait(config.solver.experimental_reaction_mode),
+        k_deg = config.numerical_method.element_spaces.k_velocity,
+        c_1 = 4.0 * config.numerical_method.element_spaces.k_velocity^4,
+        c_2 = 2.0 * config.numerical_method.element_spaces.k_velocity^2,
+        reaction_trait = PorousNSSolver.get_reaction_mode_trait(config.numerical_method.solver.experimental_reaction_mode),
         tau_reg_lim = config.phys.tau_regularization_limit
         
         σ = Operation((u_v, h_v, a_v) -> model(PorousNSSolver.ThermodynamicState(u_v, h_v, a_v)))(u, h, α)
@@ -53,14 +53,14 @@ function evaluate_residual_components(u_h, p_h, config::PorousNSSolver.PorousNSC
 end
 
 function _evaluate_residual_components_impl(u_h, p_h, config::PorousNSSolver.PorousNSConfig, model::M, dΩ, h, f_custom, alpha_custom, g_custom) where {M<:PorousNSSolver.AbstractReactionModel}
-    α = isnothing(alpha_custom) ? config.porosity.alpha_0 : alpha_custom
+    α = isnothing(alpha_custom) ? config.domain.alpha_0 : alpha_custom
     ν = config.phys.nu
-    k_deg = config.discretization.k_velocity
+    k_deg = config.numerical_method.element_spaces.k_velocity
     f = isnothing(f_custom) ? VectorValue(config.phys.f_x, config.phys.f_y) : f_custom
     eps_val = config.phys.eps_val
     g_mass = isnothing(g_custom) ? 0.0 : g_custom
     let ν = config.phys.nu,
-        k_deg = config.discretization.k_velocity,
+        k_deg = config.numerical_method.element_spaces.k_velocity,
         c_1 = 4.0 * k_deg^4,
         c_2 = 2.0 * k_deg^2
         
