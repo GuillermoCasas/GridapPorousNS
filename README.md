@@ -3,69 +3,88 @@
 A modular, mathematically rigorous Finite Element Method (FEM) solver for the stabilized Darcy-Brinkman-Forchheimer (DBF) and Porous Navier-Stokes equations using `Gridap.jl`. This repository is strictly structured around continuous Variational Multiscale (VMS) Mathematics with explicit typed tracking of stabilization branches.
 
 ## Project Purpose
-To provide a highly reliable, testable, and analytically exact nonlinear solver pipeline that reproduces specific literature benchmarks (the "paper") while offering fallback legacy branches. The architecture is explicitly designed to maintain mathematical transparency and separate the continuous weak forms, stabilization parameters, and discrete solvers into non-overlapping domains. 
+To provide a highly reliable, testable, and analytically exact nonlinear solver pipeline that reproduces specific literature benchmarks (the "paper") while offering fallback legacy branches. The architecture is explicitly designed to maintain mathematical transparency and separate the continuous weak forms, stabilization parameters, configuration schemas, and discrete solvers into non-overlapping domains. 
+
+## Core Mathematical Theory (ASGS Stabilization)
+
+This solver rigorously implements the **Algebraic SubGrid Scale (ASGS)** formulation. In the VMS/ASGS framework, the unresolved fine scales $\mathbf{u}'$ are algebraically modeled via the element-wise momentum residual: $\mathbf{u}' \approx -\tau \mathcal{R}_{mom}$.
+
+When substituting this closure into the standard continuous Galerkin weak form $(\mathcal{L}(\bar{\mathbf{u}}), \mathbf{v})$, integration by parts analytically forces the subgrid stress to pair exactly against the **formal adjoint** of the momentum operator $\mathcal{L}^*(\mathbf{v}, q)$. This mathematically dictates that the stabilization weight augmenting the continuous weak solver must be precisely $-\mathcal{L}^*(\mathbf{v}, q)$.
+
+> [!WARNING]
+> **Adjoint Streamline Upwinding Sign Invariant**
+> The formal adjoint of the continuous convective derivative $\mathcal{L}_{conv}(\mathbf{u}) = \mathbf{a} \cdot \nabla \mathbf{u}$ is derived via integration by parts: $\int \mathbf{v} \cdot (\mathbf{a} \cdot \nabla \mathbf{u}) = -\int \mathbf{u} \cdot (\mathbf{a} \cdot \nabla \mathbf{v})$. 
+> Thus, $\mathcal{L}^*_{conv}(\mathbf{v}) = -\mathbf{a} \cdot \nabla \mathbf{v}$. 
+> Because the stabilization term mathematically evaluates to $\langle -\mathcal{L}^*, \tau \mathcal{R} \rangle$, the weighting applied to the convective residual **MUST** strictly be positive ($+\mathbf{a} \cdot \nabla \mathbf{v}$). Reversing this scalar enforces *Anti-SUPG* negative streamline diffusion, which destroys diagonal Jacobian coercivity and triggers catastrophic Newton divergence at high $Re$.
+
+By utilizing the full continuous $-\mathcal{L}^*$, the ASGS formulation ensures robust and mathematically faithful consistency compared to ad-hoc truncated SUPG heuristics.
 
 ## Architecture Map
 
-- **`src/formulations/continuous_problem.jl`**: The overarching stabilized weak-form generator. Exposes canonical strong residuals, exact pointwise tracking of derivatives, and explicit `TypedLinearizationMode` (e.g. `ExactNewtonMode()`, `PicardMode()`) injections.
+- **`src/formulations/continuous_problem.jl`**: The overarching stabilized weak-form generator. Exposes canonical strong residuals, exact pointwise tracking of analytical jacobian derivatives, and explicit `TypedLinearizationMode` (e.g. `ExactNewtonMode()`, `PicardMode()`) injections to completely avoid recursive AST compiler blowouts.
 - **`src/formulations/viscous_operators.jl`**: Explicit integration-by-parts derivations of Strong Viscous Operators (`DeviatoricSymmetricViscosity`, `SymmetricGradientViscosity`, `LaplacianPseudoTractionViscosity`), Weak Pairings, and true adjoint mappings.
 - **`src/models/reaction.jl`**: Contains standard `ConstantSigmaLaw` (used for exact MMS validation) and non-linear `ForchheimerErgunLaw`.
-- **`src/models/regularization.jl`**: Implements differentiable scalar tracking limits (e.g. `SmoothVelocityFloor`) for regularizing inverse norms near $\mathbf{u}=0$.
-- **`src/stabilization/tau.jl`**: Exactly parsed chain-rule evaluations for calculating true $d\tau_1/d\mathbf{u}$ components to drive continuous exact Jacobians.
-- **`src/stabilization/projection.jl`**: Controls the Sub-Grid Scale operator paths (ASGS/OSGS) mapping exact validation constraints conditionally based on physical models.
+- **`src/stabilization/tau.jl`**: Exactly parsed chain-rule evaluations for calculating true $\partial\tau_1/\partial\mathbf{u}$ components to drive continuous exact Jacobians.
 - **`src/solvers/nonlinear.jl`**: An exact custom `SafeNewtonSolver` orchestrating non-linear Newton bounds tracked by a mathematically sound Armijo merit linesearch $\Phi(x) = \frac{1}{2}\| F(x) \|^2$ and robust divergence/stagnation guards.
 
 ---
 
 ## Canonical Formulation Branches
 
-The overarching API dictates exact structural formulations explicitly.
-
 ### Paper-Faithful Branch (`PaperGeneralFormulation`)
 **Validation Status**: Authoritative baseline for exact spatial error scaling.
-**Design Rationale**: Deploys explicit Deviatoric Symmetric viscous conditions (`DeviatoricSymmetricViscosity`) and applies strong operators consistently across all stabilization limits. The adjoint mapping $\mathcal{L}^*(\mathbf{v}, q)$ includes the reaction term (`- \sigma \mathbf{v}`). 
-**Risks When Refactoring**: Any LLM modifying this branch must ensure that exact Manufactured Solution bounds remain intact. Do not change the `DeviatoricSymmetricViscosity` divergence rule unless paper validation is updated.
+**Design Rationale**: Deploys explicit Deviatoric Symmetric viscous conditions (`DeviatoricSymmetricViscosity`). The adjoint mapping $\mathcal{L}^*(\mathbf{v}, q)$ utilizes the complete analytical reaction adjoint (`- \sigma \mathbf{v}`). 
 
 ### Legacy Reference Branch (`Legacy90d5749Mode`)
 **Validation Status**: Exists only for regression against legacy mathematical derivations.
-**Design Rationale**: Replaces deviatoric formulations with a simplfied `LaplacianPseudoTractionViscosity` to bypass complex boundary locking mappings ($\nu\alpha\Delta \mathbf{u}$). Its adjoint does not inherit the full reaction load.
-**What changed from legacy**: Identified and quarantined as a non-physical simplification from commit `90d5749`.
-**Risks When Refactoring**: MUST NOT be used to validate continuous formulation benchmarks against the reference paper. Future agents should treat this as a controlled legacy endpoint and avoid "syncing" it to `PaperGeneralFormulation`.
+**Design Rationale**: A simplified placeholder that utilizes `LaplacianPseudoTractionViscosity` to bypass complex boundary locking mappings. Its associated adjoints explicitly disregard the full reaction load.
+**Risks When Refactoring**: MUST NOT be used to validate continuous formulation benchmarks against the reference paper.
 
 ---
 
 ## Developer Invariants & Numerical Philosophy
 
-### 1. The Nonlinear Solution Pipeline
-- **Exact Newton Homotopy**: The code has transitioned structurally from a monolithic Picard-Newton hybrid to an exact Newton Homotopy tracked by `SafeNewtonSolver`.
-- **Initialization**: A `PicardMode` evaluation is still occasionally used to provide a damped initial condition during harsh perturbations, but it explicitly avoids calculating $\partial\sigma/\partial\mathbf{u}$ or full $\partial\tau/\partial\mathbf{u}$.
-- **Linesearch Merit**: The Armijo merit is derived strictly from the pointwise $L^2$ mapping of the strong residual: $\Phi(x) = \frac{1}{2}\| F(x) \|^2$. Divergence guards will quietly abort execution if $\Phi(x)$ balloons uncontrollably.
+### 1. Hierarchical Configuration Schema
+**Never hardcode physical, numerical, or geometrical properties inline.** The repository relies exclusively on a unified JSON-driven structural schema validated via JSON Schema logic.
+Configuration properties must strictly map to their categorical hierarchy:
+- `physical_properties` (e.g. `Re`, `Da`, `reaction_model`)
+- `domain` (e.g. `alpha_0`, `bounding_box`)
+- `numerical_method` (divided into `element_spaces`, `mesh`, `stabilization`, and `solver` configurations)
+- `output`
 
-### 2. Jacobian Consistency
-- The Fréchet analytical derivative in `build_stabilized_weak_form_jacobian` MUST match the exact finite-difference perturbations of the continuous problem.
-- **Known Pitfalls**: Freezing the temporal $\tau$ derivative (`freeze_cusp`) compromises quadratic convergence. Do not re-enable it blindly without assessing the loss of Newton iteration speed.
+### 2. Full Decoupling of Jacobian Dispatch
+- **Exact Newton Homotopy**: The Fréchet analytical derivative in `build_stabilized_weak_form_jacobian` MUST match the exact finite-difference perturbations of the continuous problem. It is conditionally evaluated under `ExactNewtonMode()`.
+- **Picard Independence**: A lightweight `PicardMode()` evaluates purely zero-gradient conditions for algebraic stabilization derivatives (e.g., setting $\partial\tau/\partial\mathbf{u} = 0$), providing a highly efficient damped initial condition strategy completely abstracted from Deep AST compiler stacking.
 
 ### 3. Verification Workflow (Method of Manufactured Solutions)
-**Philosophy**: Every algorithmic change must pass a zero-root Exactness Diagnostic check.
-- The continuous formulations expect an analytical input (sines, cosines) yielding an exact $O(h^{k+1})$ residual mapping. 
-- If `L2_diag` exceeds $1e-2$ or `taylor_error` surpasses $1e-4$ initially, atmospheric mathematical continuity has been severed.
+**Philosophy**: Every algorithmic change must pass a zero-root Exactness Diagnostic check natively integrated into `test_stacktrace.jl`.
+- If tracking diagnostic roots (`L2_diag` exceeds $1e-2$ or `taylor_error` surpasses $1e-4$), exact finite element continuity has been broken and must be reverted.
 
 ---
 
-## Execution Suites
+## Testing & Execution Suites
 
-Run specific integration tracking pipelines dynamically:
+Run specific mathematical test sweeps natively from the root repository.
 
+### Running Fast Unit Validations
+Small modular operator logic, parameter continuity, and numerical regularization validations:
 ```bash
-# Validating Spatial Error Loops (Manufactured Solutions)
-# This includes strict Exact Root Tests and Taylor Error tracking
-julia --project=. test/long/ManufacturedSolutions/run_test.jl
-
-# Multi-dimensional Parameter Triggers
-julia --project=. test/long/CocquetExperiment/run_convergence.jl
+# Bypass LLVM JIT Compiler overhead natively (-O0) and restrict to main thread (-t 1)
+# to decrease 1x1 cell compilation tracking from several minutes to under 15 seconds.
+julia -O0 -t 1 test/fast/runtests_fast.jl
 ```
 
-## How to Safely Modify the Code
-1. **Never alter Viscous Operators without consulting `PaperGeneralFormulation`**: The specific cancellation of terms in `strong_viscous_operator` relies on precise spatial derivatives (e.g. $\nabla\cdot\mathbf{D} = 0.5 \Delta \mathbf{u}$ in 2D).
-2. **Beware gridap AST growth**: Re-using the same closures multiple times blows up compilation time. If you create a new $\tau$ or strong residual operation, define it as an explicit callable struct (e.g., `SigOp`, `Tau1Op`).
-3. **Respect Parameter Structs**: Do not hardcode arbitrary $Da$ or $1.0/Re$ variables inline; pipe them cleanly through the hierarchical `PhysicalParameters` in `src/config.jl`.
+### Running Top-Level MMS Benchmarks
+The repository utilizes a modular root-level `run_test.jl` script. It automatically translates config bounds deeply into evaluating directories:
+```bash
+# Triggers the Manufactured Solutions suite evaluating spatial error tracking automatically
+julia run_test.jl small_test_config.json
+```
+
+### Reproducing Targeted Convergence Experiments
+Multi-dimensional benchmark targeting topological refinement spaces sequentially:
+```bash
+# From within the target experiment sub-folder:
+cd test/long/CocquetExperiment
+julia --project=../../.. run_convergence.jl
+```
