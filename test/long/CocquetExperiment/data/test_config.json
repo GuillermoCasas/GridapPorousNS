@@ -1,5 +1,5 @@
 {
-    "physical_parameters": {
+    "physical_properties": {
         "Re": 500.0,
         "Da": 1.0,
         "physical_epsilon": 1e-7,
@@ -7,28 +7,30 @@
         "f_x": 0.0,
         "f_y": 0.0
     },
-    "porosity_field": {
+    "domain": {
         "alpha_0": 1.0,
         "r_1": 0.2,
-        "r_2": 0.5
+        "r_2": 0.5,
+        "bounding_box": [0.0, 2.0, 0.0, 1.0]
     },
-    "discretization": {
-        "k_velocity": 2,
-        "k_pressure": 1
-    },
-    "mesh": {
-        "domain": [0.0, 2.0, 0.0, 1.0],
-        "partition": [400, 200],
-        "convergence_partitions": [25, 50, 100],
-        "element_type": "TRI"
+    "numerical_method": {
+        "element_spaces": {
+            "k_velocity": 2,
+            "k_pressure": 1
+        },
+        "mesh": {
+            "partition": [400, 200],
+            "convergence_partitions": [25, 50, 100],
+            "element_type": "TRI"
+        },
+        "solver": {
+            "xtol": 1e-8,
+            "stagnation_tol": 1e-5,
+            "max_increases": 3
+        }
     },
     "output": {
         "directory": "results",
         "basename": "cocquet_flow"
-    },
-    "solver": {
-        "xtol": 1e-8,
-        "stagnation_tol": 1e-5,
-        "max_increases": 3
     }
 }

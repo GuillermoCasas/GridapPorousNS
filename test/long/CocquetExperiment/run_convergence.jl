@@ -23,7 +23,10 @@ function build_solver(N::Int, config_dict)
     # For a Cartesian grid, a grid of 2N x N elements maintains square shape (h = 1/N).
     # Since the paper specifies parameter N, we use partition = [2*N, N].
     local_config_dict = deepcopy(config_dict)
-    local_config_dict["mesh"]["partition"] = [2*N, N]
+    if !haskey(local_config_dict["numerical_method"], "mesh")
+        local_config_dict["numerical_method"]["mesh"] = Dict()
+    end
+    local_config_dict["numerical_method"]["mesh"]["partition"] = [2*N, N]
     local_config = PorousNSSolver.load_config_from_dict(local_config_dict)
     
     model = PorousNSSolver.create_mesh(local_config)
@@ -65,7 +68,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     tau_reg_lim = config.phys.tau_regularization_limit
     
     res_asgs(x, y) = PorousNSSolver.build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim)
-    jac_asgs(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.numerical_method.solver.freeze_jacobian_cusp; is_picard=false)
+    jac_asgs(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.numerical_method.solver.freeze_jacobian_cusp, PorousNSSolver.ExactNewtonMode())
     
     op_asgs = FEOperator(res_asgs, jac_asgs, X, Y)
     nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4)
@@ -114,12 +117,18 @@ function run_convergence()
     
     for method in ["ASGS", "OSGS"]
         println("\n====== STARTING METHOD $method ======")
-        base_config_dict["solver"] = Dict("method" => method, "osgs_iterations" => 3)
+        if !haskey(base_config_dict, "numerical_method")
+            base_config_dict["numerical_method"] = Dict()
+        end
+        base_config_dict["numerical_method"]["stabilization"] = Dict("method" => method, "osgs_iterations" => 3)
         
         for k in [1, 2]
             println("\n   --- EQUAL-ORDER k=$k ---")
-            base_config_dict["discretization"]["k_velocity"] = k
-            base_config_dict["discretization"]["k_pressure"] = k
+            if !haskey(base_config_dict["numerical_method"], "element_spaces")
+                base_config_dict["numerical_method"]["element_spaces"] = Dict()
+            end
+            base_config_dict["numerical_method"]["element_spaces"]["k_velocity"] = k
+            base_config_dict["numerical_method"]["element_spaces"]["k_pressure"] = k
             
             println("Solving Reference Grid (N = $N_ref) -> [$(2*N_ref) x $N_ref] Elements...")
             base_config_dict["output"]["basename"] = "cocquet_ref_$(method)_P$(k)P$(k)_N$(N_ref)"
