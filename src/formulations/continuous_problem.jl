@@ -129,11 +129,25 @@ function get_projection_policy(form::AbstractFormulation)
     return form.projection_policy
 end
 
-get_c1(k_velocity) = 4.0 * k_velocity^4
-get_c2(k_velocity) = 2.0 * k_velocity^2
+# ==============================================================================
+# Discretization Consistent Parameters
+# ==============================================================================
 
-get_quadrature_degree(::Type{PaperGeneralFormulation}, k_velocity::Int) = 4 * k_velocity
-get_quadrature_degree(::Type{Legacy90d5749Mode}, k_velocity::Int) = 4 * k_velocity
+function compute_consistent_quadrature_degree(k_velocity::Int)
+    return 4 * k_velocity
+end
+
+function compute_stabilization_constants(k_velocity::Int)
+    c_1 = 4.0 * k_velocity^4
+    c_2 = 2.0 * k_velocity^2
+    return c_1, c_2
+end
+
+get_quadrature_degree(::Type{PaperGeneralFormulation}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
+get_quadrature_degree(::Type{Legacy90d5749Mode}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
+
+get_c1_c2(::Type{PaperGeneralFormulation}, k_velocity::Int) = compute_stabilization_constants(k_velocity)
+get_c1_c2(::Type{Legacy90d5749Mode}, k_velocity::Int) = compute_stabilization_constants(k_velocity)
 
 # Reusable Operators for Type Stability
 _get_dsigma_du_val(::ExactNewtonMode, law, u, α, h, du, reg, ν, c_1, c_2) = Operation(DSigOp(law, reg, ν, c_1, c_2))(u, ∇(u), α, ∇(α), h, du)

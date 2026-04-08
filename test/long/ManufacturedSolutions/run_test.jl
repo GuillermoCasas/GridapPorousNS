@@ -212,8 +212,7 @@ function run_mms(config_file="test_config.json")
                     
                     Y = MultiFieldFESpace([V, Q])
                     
-                    c_1 = PorousNSSolver.get_c1(kv)
-                    c_2 = PorousNSSolver.get_c2(kv)
+                    c_1, c_2 = PorousNSSolver.get_c1_c2(PorousNSSolver.PaperGeneralFormulation, kv)
                     tau_reg_lim = config.physical_properties.tau_regularization_limit
                     solver_newton_it = config.numerical_method.solver.newton_iterations
                     solver_picard_it = config.numerical_method.solver.picard_iterations
@@ -254,8 +253,10 @@ function run_mms(config_file="test_config.json")
                                 f_cf, g_cf = PorousNSSolver.evaluate_exactness_diagnostics(mms, model, Ω, dΩ, h_cf, X, Y, c_1, c_2, tau_reg_lim)
                                 
                                 ar_c1 = config.numerical_method.solver.armijo_c1
-                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_picard_it, max_inc, xtol, stagnation_tol, ftol, ls_alpha_min, ar_c1)
-                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_newton_it, max_inc, xtol, stagnation_tol, ftol, ls_alpha_min, ar_c1)
+                                div_fac = config.numerical_method.solver.divergence_merit_factor
+                                n_floor = config.numerical_method.solver.stagnation_noise_floor
+                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_picard_it, max_inc, xtol, stagnation_tol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
+                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_newton_it, max_inc, xtol, stagnation_tol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
                                 
                                 solver_picard = FESolver(nls_picard)
                                 solver_newton = FESolver(nls_newton)
@@ -346,8 +347,7 @@ function run_mms(config_file="test_config.json")
                                     push!(results_cache[k_id]["eval_eps"], successful_eps)
                                     
                                     println("  -> L2 u/p: ", round(el2_u, sigdigits=4), " / ", round(el2_p, sigdigits=4), " | H1 u/p: ", round(eh1_u, sigdigits=4), " / ", round(eh1_p, sigdigits=4))
-                                    GC.gc()
-                                end
+                                end # end method
                             end
                         end
                     end

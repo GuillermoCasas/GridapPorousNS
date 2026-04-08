@@ -88,6 +88,8 @@
             "linesearch_tolerance": { "type": "number", "default": 1.0001, "description": "Acceptance threshold. Must strictly decrease residual unless > 1.0 (to ignore noise)." },
             "linesearch_alpha_min": { "type": "number", "default": 1e-4, "description": "Minimum step size allowed before linesearch fails." },
             "armijo_c1": { "type": "number", "default": 1e-4, "description": "Armijo sufficient decrease parameter (c1) for the linesearch." },
+            "divergence_merit_factor": { "type": "number", "default": 1.05, "description": "Factor by which the merit function is allowed to increase before counting as a divergence step." },
+            "stagnation_noise_floor": { "type": "number", "default": 1e-2, "description": "The threshold for the residual inf-norm below which continuous divergence stops safely rather than crashing the solver." },
             "run_diagnostics": { "type": "boolean", "default": false, "description": "Enable expanded diagnostics / debug print statements." },
             "ablation_mode": { "type": "string", "enum": ["full", "galerkin", "momentum_only", "mass_only"], "default": "full", "description": "Switch behavior of specific solver terms for systematic testing." },
             "experimental_reaction_mode": { "type": "string", "enum": ["standard", "remove_adjoint", "remove_tau"], "default": "standard", "description": "Toggles advanced reaction handling behaviors for high-Re modes." }

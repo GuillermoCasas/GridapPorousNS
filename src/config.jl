@@ -55,6 +55,8 @@ end
     linesearch_tolerance::Float64 = 1.0001
     linesearch_alpha_min::Float64 = 1e-4
     armijo_c1::Float64 = 1e-4
+    divergence_merit_factor::Float64 = 1.05
+    stagnation_noise_floor::Float64 = 1e-2
     run_diagnostics::Bool = false
     ablation_mode::String = "full"
     experimental_reaction_mode::String = "standard"

@@ -71,7 +71,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     jac_asgs(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.numerical_method.solver.freeze_jacobian_cusp, PorousNSSolver.ExactNewtonMode())
     
     op_asgs = FEOperator(res_asgs, jac_asgs, X, Y)
-    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4)
+    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4, config.numerical_method.solver.divergence_merit_factor, config.numerical_method.solver.stagnation_noise_floor)
     solver_newton = FESolver(nls_newton)
     
     eval_iters = 0

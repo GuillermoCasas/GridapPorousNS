@@ -65,8 +65,7 @@ function run_simulation(config_path::String;
     
     form = build_formulation(config)
     
-    c_1 = 4.0 * kv^4
-    c_2 = 2.0 * kv^2
+    c_1, c_2 = get_c1_c2(typeof(form), kv)
     tau_reg_lim = config.phys.tau_regularization_limit
     
     res(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h, f_cf, alpha_cf, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim)
@@ -74,7 +73,7 @@ function run_simulation(config_path::String;
     
     op = FEOperator(res, jac, X, Y)
     
-    nls = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, config.numerical_method.solver.armijo_c1)
+    nls = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, config.numerical_method.solver.armijo_c1, config.numerical_method.solver.divergence_merit_factor, config.numerical_method.solver.stagnation_noise_floor)
     solver = FESolver(nls)
     
     println("Solving non-linear system...")
@@ -93,7 +92,7 @@ function run_simulation(op_newton::FEOperator, op_picard::FEOperator, config::Po
     println("Solving Picard Initialization...")
     x_picard = solve(solver_picard, op_picard)
     
-    nls_newton = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, config.numerical_method.solver.armijo_c1)
+    nls_newton = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, config.numerical_method.solver.armijo_c1, config.numerical_method.solver.divergence_merit_factor, config.numerical_method.solver.stagnation_noise_floor)
     solver_newton = FESolver(nls_newton)
     println("Solving Newton-Raphson...")
     solve!(x_picard, solver_newton, op_newton)

@@ -16,6 +16,7 @@ include("models/regularization.jl")
 include("models/reaction.jl")
 
 # Formulations
+include("formulations/gridap_extensions.jl")
 include("formulations/viscous_operators.jl")
 include("stabilization/projection.jl")
 include("formulations/continuous_problem.jl")
