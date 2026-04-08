@@ -1,3 +1,18 @@
+# ==============================================================================================
+# Nature & Intent:
+# Verifies the behavior of varying SubGrid Scale (SGS) fine-scale projection modes.
+# Validates proper calculation of fine-scale velocity and pressure based on whether the 
+# projection operates on the full residual or omits specific matrices (like omitting 
+# Reaction when ConstantSigma is violated, to avoid uninvertible bounds).
+#
+# Mathematical Formulation Alignment:
+# Maps strictly to the VMS logic specifying how the unresolved subscales $\mathbf{v}'$ and $p'$ 
+# are algebraically approximated. Confirms the correct mapping of `ProjectFullResidual` vs fallback modes.
+#
+# Associated Files / Functions:
+# - `src/formulations/projection.jl` (`apply_projection_u`, `apply_projection_p`, `sanitize_projection_policy`)
+# ==============================================================================================
+
 using Test
 using PorousNSSolver
 using Gridap

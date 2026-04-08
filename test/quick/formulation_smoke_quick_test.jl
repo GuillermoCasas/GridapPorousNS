@@ -1,3 +1,20 @@
+# ==============================================================================================
+# Nature & Intent:
+# A critical Gridap AST (Abstract Syntax Tree) compiler hygiene check. Verifies that the nested
+# algebraic complexity within `PaperGeneralFormulation` and `Legacy90d5749Mode` does not overflow 
+# the Julia compiler or trigger extreme >10 minute symbolic auto-differentiation tree build times.
+# Evaluates matrix block assembly without actually solving the resultant linear system.
+#
+# Mathematical Formulation Alignment:
+# Ensures that mathematical abstractions (such as chaining `KinematicState` -> `MediumState` -> 
+# `Reaction` -> `Projection` -> `tau`) remain practically computable. Protects against "refactoring" 
+# closures into infinitely deep trees that break `Gridap.jl` JIT routines.
+#
+# Associated Files / Functions:
+# - `src/formulations/continuous_problem.jl` (`build_stabilized_weak_form_residual`, `build_stabilized_weak_form_jacobian`)
+# - `src/formulations/formulation.jl`
+# ==============================================================================================
+
 using Test
 using PorousNSSolver
 using Gridap

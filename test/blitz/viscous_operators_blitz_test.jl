@@ -1,3 +1,19 @@
+# ==============================================================================================
+# Nature & Intent:
+# Acts as the primary Fréchet exactness check for the viscous continuous formulations 
+# (Pseudo-traction, Symmetric Gradient, Deviatoric). Ensures stability during global matrix assembly
+# on coarse or tiny 2D meshes, confirming pure algebraic compatibility of operations.
+#
+# Mathematical Formulation Alignment:
+# Strictly aligned with continuous calculus exactness. Validates that `weak_viscous_jacobian` 
+# perfectly aligns with the Fréchet derivative of `weak_viscous_operator`. Verifies adjoint limits 
+# ($\mathcal{L}^*(\mathbf{v})$) match exact continuous definitions for VMS consistency.
+#
+# Associated Files / Functions:
+# - `src/formulations/viscous_operators.jl` (`weak_viscous_operator`, `weak_viscous_jacobian`, 
+#   `adjoint_viscous_operator`)
+# ==============================================================================================
+
 using Test
 using PorousNSSolver
 using Gridap

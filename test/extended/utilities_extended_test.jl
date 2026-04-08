@@ -1,3 +1,18 @@
+# ==============================================================================================
+# Nature & Intent:
+# Advanced continuous derivative checks. Verifies complex mathematical logic, specifically that 
+# the analytical gradient definitions of radial smooth bump porosity match finite differences. Also
+# rigorously tests the Gridap AD rules mapping tensor contractions: $(u \cdot \nabla)u \equiv \nabla u^T \cdot u$.
+#
+# Mathematical Formulation Alignment:
+# Ensures that the explicit continuous gradients (used when `freeze_jacobian_cusp=false`) are
+# structurally correct and that mathematical notation translation to Julia operators is sound.
+#
+# Associated Files / Functions:
+# - `src/utils/porosity.jl`
+# - `test/extended/ManufacturedSolutions/run_test.jl`
+# ==============================================================================================
+
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", ".."))
 

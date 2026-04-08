@@ -1,3 +1,18 @@
+# ==============================================================================================
+# Nature & Intent:
+# An orchestration script triggering varying sub-runs of the MMS test pipeline. It asserts that 
+# the parameter parsing, configuration serialization, error tracking, and solver exit codes 
+# (success, exception throws) all trigger accurately across extreme physical regimes (High Re, 
+# High Da, Pristine convergence).
+#
+# Mathematical Formulation Alignment:
+# Mostly architectural. Checks the solver pipeline's ability to digest diverse limits of the 
+# parameter schema and halt properly if bounds are broken.
+#
+# Associated Files / Functions:
+# - `test/extended/ManufacturedSolutions/run_test.jl`
+# ==============================================================================================
+
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", ".."))
 

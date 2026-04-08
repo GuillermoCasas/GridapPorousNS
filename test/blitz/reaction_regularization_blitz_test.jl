@@ -1,3 +1,18 @@
+# ==============================================================================================
+# Nature & Intent:
+# Validates exact algebraic evaluation and Fréchet exactness of derived non-linear 
+# reaction laws (Forchheimer, Constant Дарcy). Ensures the algorithmic models for effective 
+# speed regularizations (e.g., floor limits) accurately avoid division-by-zero singularities.
+#
+# Mathematical Formulation Alignment:
+# Confirms the formulation correctly replicates porous media drag models. Proves that chain rule 
+# linearizations of the macroscopic reaction sink exactly align with scalar scalar limits.
+#
+# Associated Files / Functions:
+# - `src/formulations/reaction.jl` (`sigma`, `dsigma_du`)
+# - `src/formulations/regularization.jl` (`effective_speed`)
+# ==============================================================================================
+
 using Test
 using PorousNSSolver
 using Gridap

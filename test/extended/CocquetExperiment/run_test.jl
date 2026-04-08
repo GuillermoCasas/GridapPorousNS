@@ -1,4 +1,18 @@
 # test/long/CocquetExperiment/run_test.jl
+# ==============================================================================================
+# Nature & Intent:
+# A basic driver for the Cocquet benchmark setup. Implements a fluid flow passing through a smooth 
+# transversal continuous porosity variation $\epsilon(y)$. Used to simply execute a single simulation 
+# run on the physics geometry described in Section 4.2 of the referenced continuum mechanics paper.
+#
+# Mathematical Formulation Alignment:
+# Exact mapping of physical boundary and boundary initial fluid definitions. Guarantees 
+# mathematical translation of the domain bounds and inflow polynomials to the solver framework.
+#
+# Associated Files / Functions:
+# - `test/extended/CocquetExperiment/run_convergence.jl` (Generalizes this base)
+# ==============================================================================================
+
 
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))

@@ -1,4 +1,22 @@
 # test/long/ManufacturedSolutions/run_test.jl
+# ==============================================================================================
+# Nature & Intent:
+# The definitive Method of Manufactured Solutions (MMS) workflow. Constructs an exact artificial 
+# polynomial state $(u_{ex}, p_{ex})$ and evaluates its continuous symbolic derivatives to force the 
+# solver's RHS. By running the full Picard/Newton non-linear steps, it validates the continuous ExactNewton 
+# exactness and global system numerical stabilization properties. Extensively sweeps ($Re, Da, h$) configurations
+# to map asymptotic convergence bounds mapping to the error definitions $O(h^{k+1})$.
+#
+# Mathematical Formulation Alignment:
+# Completely aligns with Equation 1018-1039 of `article.tex`. Uses parameter normalizations ($U_c, P_c$)
+# strictly matching continuum characteristic analysis, forbidding arbitrary rescaling limits.
+#
+# Associated Files / Functions:
+# - `src/formulations/continuous_problem.jl`
+# - `src/solvers/nonlinear.jl` (`solve_system`)
+# - MMS analytical fields mapping (`u_ex`, `p_ex`)
+# ==============================================================================================
+
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 

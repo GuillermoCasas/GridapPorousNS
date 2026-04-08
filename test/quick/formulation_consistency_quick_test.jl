@@ -1,3 +1,18 @@
+# ==============================================================================================
+# Nature & Intent:
+# Tests the strong-weak continuous parity of the mass equation. It feeds an exact continuous analytical
+# divergence field into the finite element weak mass residual, ensuring the numerical integral 
+# strictly matches zero.
+#
+# Mathematical Formulation Alignment:
+# Checks `fast-verification.md` requirement to prove the finite element representation of the 
+# continuous Exact Form matches its analytical roots without invoking a global system solver.
+# Asserts the solver respects the continuous fluid divergence-free constraint and boundary limits.
+#
+# Associated Files / Functions:
+# - `src/formulations/continuous_problem.jl` (`eval_strong_residual_p`)
+# ==============================================================================================
+
 using Test
 using PorousNSSolver
 using Gridap

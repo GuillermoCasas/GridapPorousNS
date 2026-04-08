@@ -1,3 +1,18 @@
+# ==============================================================================================
+# Nature & Intent:
+# Evaluates the scalar Armijo line search decrease condition. Verifies that the internal 
+# nonlinear solver algorithm properly restricts step sizes along the descent direction to ensure
+# the global merit function $\Phi(x) = \frac{1}{2}\|F(x)\|^2$ strictly decreases, preventing 
+# numerical blowups during highly advective or non-linear porous stabilization regimes.
+#
+# Mathematical Formulation Alignment:
+# Reflects the fundamental mathematical logic of globalizing the Newton-Raphson scheme. Not directly 
+# tied to the porous PDE form, but mandatory for stabilizing its Picard/Newton iterations.
+#
+# Associated Files / Functions:
+# - `src/solvers/nonlinear.jl` (`solve_nonlinear_system`, Armijo line search logic)
+# ==============================================================================================
+
 using Test
 using PorousNSSolver
 using LinearAlgebra

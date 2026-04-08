@@ -1,3 +1,18 @@
+# ==============================================================================================
+# Nature & Intent:
+# Verifies the mathematical integrity of the Variational Multiscale (VMS) stabilization parameters 
+# ($\tau_1, \tau_2$) and their exact linearizations via finite difference comparisons. Protects against
+# sign errors or missing chain-rule cross terms in stabilization exactness limits.
+#
+# Mathematical Formulation Alignment:
+# Enforces the core mandate of `ExactNewtonMode`. Proves that continuous state abstractions 
+# (KinematicState, MediumState) evaluate accurately and their chain-ruled derivatives match numerical
+# approximations without simplifying components (such as dropping convective velocity variation effects).
+#
+# Associated Files / Functions:
+# - `src/formulations/tau.jl` (`compute_tau_1`, `compute_tau_2`, `compute_dtau_1_du`, `compute_dtau_2_du`)
+# ==============================================================================================
+
 using Test
 using PorousNSSolver
 using Gridap

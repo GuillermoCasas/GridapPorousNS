@@ -1,4 +1,19 @@
 # test/long/ManufacturedSolutions/run_diagnostics.jl
+# ==============================================================================================
+# Nature & Intent:
+# Deep inspection tool for resolving the high-reaction stall limits of the ASGS formulation. Evaluates
+# residual operator components natively. Tests exactly how the strong continuous continuum representations
+# limit the discrete Jacobian matrices under extreme condition numbers ($Da \to 0$, high porosity gradients).
+#
+# Mathematical Formulation Alignment:
+# Provides explicit proof on structural matrix invertibility constraints mapping directly to the 
+# continuous algebraic subgrid scale choices (Reaction adjoint inclusion/exclusion bounds).
+#
+# Associated Files / Functions:
+# - `src/solvers/nonlinear.jl`
+# - `src/formulations/formulation.jl`
+# ==============================================================================================
+
 
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))

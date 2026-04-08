@@ -1,4 +1,21 @@
 # test/long/CocquetExperiment/run_convergence.jl
+# ==============================================================================================
+# Nature & Intent:
+# The definitive physical benchmark test for solver exactness on non-synthetic data. Unlike MMS, 
+# there is no analytical "exact" polynomial solution, so convergence rates $O(h^{k+1})$ are extracted 
+# by using the highest resolution grid as a surrogate mathematically true baseline.
+# Exact grid prolongation maps coarse fields to fine mesh measure spaces $d\Omega_{ref}$ to eliminate
+# cross-grid interpolation geometry noise and precisely extract the algebraic convergence slope.
+#
+# Mathematical Formulation Alignment:
+# Proves that the VMS/ASGS scheme yields dimensionally optimal $L_2$ and semi-$H_1$ continuum 
+# approximation bounds in the presence of physical varying media (non-constant coefficients).
+#
+# Associated Files / Functions:
+# - `src/run_simulation.jl`
+# - `src/formulations/continuous_problem.jl`
+# ==============================================================================================
+
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 

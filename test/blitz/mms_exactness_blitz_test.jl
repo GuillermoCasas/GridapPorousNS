@@ -1,4 +1,22 @@
 # test/fast/test_fast_mms_exactness.jl
+# ==============================================================================================
+# Nature & Intent:
+# Validates the physical correctness and exactness of the Manufactured Solutions setup. It enforces 
+# the rules in `fast-verification.md` by directly testing the dimensional characteristic scaling 
+# $P_c = (1 + Re + Da) U \nu / L$ from the theoretical formulation without invoking PDE solvers.
+# This prevents ill-posed simulations by asserting that physical parameters loaded from JSON 
+# precisely match the analytical closure properties.
+#
+# Mathematical Formulation Alignment:
+# Highly consistent. Checks adherence to analytical characteristic values, guarding against 
+# parameter drift or incorrect dimensional normalization during configuration loads.
+#
+# Associated Files / Functions:
+# - `src/formulations/continuous_problem.jl` (`get_characteristic_scales`, `build_mms_formulation`)
+# - `src/utils/porosity.jl` (`build_porosity_field`)
+# - `test/extended/ManufacturedSolutions/run_test.jl` (Testing its configuration loading pipeline)
+# ==============================================================================================
+
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", ".."))
 
