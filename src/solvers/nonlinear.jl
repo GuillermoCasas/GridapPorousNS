@@ -25,12 +25,25 @@ struct SafeNewtonSolver <: NonlinearSolver
     max_iters::Int
     max_increases::Int
     xtol::Float64
-    stagnation_tol::Float64
     ftol::Float64
     linesearch_alpha_min::Float64
     c1::Float64 # Armijo parameter
     divergence_merit_factor::Float64
     stagnation_noise_floor::Float64
+end
+
+function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig)
+    return SafeNewtonSolver(
+        ls,
+        cfg.newton_iterations,
+        cfg.max_increases,
+        cfg.xtol,
+        cfg.ftol,
+        cfg.linesearch_alpha_min,
+        cfg.armijo_c1,
+        cfg.divergence_merit_factor,
+        cfg.stagnation_noise_floor
+    )
 end
 
 """

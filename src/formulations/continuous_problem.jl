@@ -18,7 +18,7 @@ struct SigOp{R<:AbstractReactionLaw, Reg<:AbstractVelocityRegularization} <: Fun
     c_1::Float64
     c_2::Float64
 end
-function (op::SigOp)(u_v, grad_v, a_v, grad_a_v, h_v)
+@inline function (op::SigOp)(u_v, grad_v, a_v, grad_a_v, h_v)
     mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
     return sigma(op.law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag)
 end
@@ -30,7 +30,7 @@ struct DSigOp{R<:AbstractReactionLaw, Reg<:AbstractVelocityRegularization} <: Fu
     c_1::Float64
     c_2::Float64
 end
-function (op::DSigOp)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
+@inline function (op::DSigOp)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
     mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
     return dsigma_du(op.law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag, du_v)
 end
@@ -43,7 +43,7 @@ struct Tau1Op{R<:AbstractReactionLaw, Reg<:AbstractVelocityRegularization} <: Fu
     c_2::Float64
     tau_reg_lim::Float64
 end
-function (op::Tau1Op)(u_v, grad_v, a_v, grad_a_v, h_v)
+@inline function (op::Tau1Op)(u_v, grad_v, a_v, grad_a_v, h_v)
     mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
     return compute_tau_1(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), op.ν, op.c_1, op.c_2, op.tau_reg_lim, op.law)
 end
@@ -55,7 +55,7 @@ struct Tau2Op{Reg<:AbstractVelocityRegularization} <: Function
     c_2::Float64
     tau_reg_lim::Float64
 end
-function (op::Tau2Op)(u_v, grad_v, a_v, grad_a_v, h_v)
+@inline function (op::Tau2Op)(u_v, grad_v, a_v, grad_a_v, h_v)
     mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
     return compute_tau_2(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), op.ν, op.c_1, op.c_2, op.tau_reg_lim)
 end
@@ -69,7 +69,7 @@ struct DTau1Op{R<:AbstractReactionLaw, Reg<:AbstractVelocityRegularization} <: F
     tau_reg_lim::Float64
     freeze_cusp::Bool
 end
-function (op::DTau1Op)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
+@inline function (op::DTau1Op)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
     mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
     return compute_dtau_1_du(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), du_v, op.ν, op.c_1, op.c_2, op.tau_reg_lim, op.freeze_cusp, op.law)
 end
@@ -82,7 +82,7 @@ struct DTau2Op{Reg<:AbstractVelocityRegularization} <: Function
     tau_reg_lim::Float64
     freeze_cusp::Bool
 end
-function (op::DTau2Op)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
+@inline function (op::DTau2Op)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
     mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
     return compute_dtau_2_du(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), du_v, op.ν, op.c_1, op.c_2, op.tau_reg_lim, op.freeze_cusp)
 end
@@ -153,11 +153,11 @@ get_c1_c2(::Type{Legacy90d5749Mode}, k_velocity::Int) = compute_stabilization_co
 _get_dsigma_du_val(::ExactNewtonMode, law, u, α, h, du, reg, ν, c_1, c_2) = Operation(DSigOp(law, reg, ν, c_1, c_2))(u, ∇(u), α, ∇(α), h, du)
 _get_dsigma_du_val(::PicardMode, law, u, α, h, du, reg, ν, c_1, c_2) = 0.0 * (u ⋅ du)
 
-_get_dtau_1_du(::ExactNewtonMode, op, u, α, h, du) = op(u, ∇(u), α, ∇(α), h, du)
-_get_dtau_1_du(::PicardMode, op, u, α, h, du) = 0.0 * (u ⋅ du)
+_get_dtau_1_du(::ExactNewtonMode, law, u, α, h, du, reg, ν, c_1, c_2, tau_reg_lim, freeze_cusp) = Operation(DTau1Op(law, reg, ν, c_1, c_2, tau_reg_lim, freeze_cusp))(u, ∇(u), α, ∇(α), h, du)
+_get_dtau_1_du(::PicardMode, law, u, α, h, du, reg, ν, c_1, c_2, tau_reg_lim, freeze_cusp) = 0.0 * (u ⋅ du)
 
-_get_dtau_2_du(::ExactNewtonMode, op, u, α, h, du) = op(u, ∇(u), α, ∇(α), h, du)
-_get_dtau_2_du(::PicardMode, op, u, α, h, du) = 0.0 * (u ⋅ du)
+_get_dtau_2_du(::ExactNewtonMode, u, α, h, du, reg, ν, c_1, c_2, tau_reg_lim, freeze_cusp) = Operation(DTau2Op(reg, ν, c_1, c_2, tau_reg_lim, freeze_cusp))(u, ∇(u), α, ∇(α), h, du)
+_get_dtau_2_du(::PicardMode, u, α, h, du, reg, ν, c_1, c_2, tau_reg_lim, freeze_cusp) = 0.0 * (u ⋅ du)
 
 _get_conv_du(::ExactNewtonMode, α, u, du) = α * (∇(du)' ⋅ u) + α * (∇(u)' ⋅ du)
 _get_conv_du(::PicardMode, α, u, du) = α * (∇(du)' ⋅ u)
@@ -169,18 +169,19 @@ _get_proj_pi_p(pi_p) = pi_p
 _get_proj_pi_p(::Nothing) = 0.0
 
 # Reusable Residual evaluations
-function eval_strong_residual_u(form::AbstractFormulation, u, p, h, α, f_custom, c_1, c_2)
+function eval_strong_residual_u(form::AbstractFormulation, u, p, h, α, f_custom, c_1, c_2; σ=nothing, div_visc_u=nothing)
     ν = form.ν
     conv_u = α * (∇(u)' ⋅ u)
-    div_visc_u = strong_viscous_operator(form.viscous_operator, u, α, ν)
-    grad_u_dummy = ∇(u)
     
-    function _sigma_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return sigma(form.reaction_law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag)
+    if div_visc_u === nothing
+        div_visc_u = strong_viscous_operator(form.viscous_operator, u, α, ν)
     end
     
-    σ = Operation(_sigma_closure)(u, grad_u_dummy, α, ∇(α), h)
+    if σ === nothing
+        grad_u_dummy = ∇(u)
+        sig_op = SigOp(form.reaction_law, form.regularization, ν, c_1, c_2)
+        σ = Operation(sig_op)(u, grad_u_dummy, α, ∇(α), h)
+    end
     
     return conv_u + α * ∇(p) + σ * u - div_visc_u - f_custom
 end
@@ -201,22 +202,13 @@ function build_stabilized_weak_form_residual(X, Y, form::AbstractFormulation, d�
 
     grad_u_dummy = ∇(u)
     
-    function _sigma_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return sigma(form.reaction_law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag)
-    end
-    function _tau1_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return compute_tau_1(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), ν, c_1, c_2, tau_reg_lim, form.reaction_law)
-    end
-    function _tau2_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return compute_tau_2(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), ν, c_1, c_2, tau_reg_lim)
-    end
+    sig_op = SigOp(form.reaction_law, form.regularization, ν, c_1, c_2)
+    tau1_op = Tau1Op(form.reaction_law, form.regularization, ν, c_1, c_2, tau_reg_lim)
+    tau2_op = Tau2Op(form.regularization, ν, c_1, c_2, tau_reg_lim)
     
-    σ = Operation(_sigma_closure)(u, grad_u_dummy, α, ∇(α), h)
-    τ_1 = Operation(_tau1_closure)(u, grad_u_dummy, α, ∇(α), h)
-    τ_2 = Operation(_tau2_closure)(u, grad_u_dummy, α, ∇(α), h)
+    σ = Operation(sig_op)(u, grad_u_dummy, α, ∇(α), h)
+    τ_1 = Operation(tau1_op)(u, grad_u_dummy, α, ∇(α), h)
+    τ_2 = Operation(tau2_op)(u, grad_u_dummy, α, ∇(α), h)
 
     # Base weak operators
     conv_term = v ⋅ (α * (∇(u)' ⋅ u))
@@ -229,7 +221,7 @@ function build_stabilized_weak_form_residual(X, Y, form::AbstractFormulation, d�
     src_term  = v ⋅ f + q * g_mass
 
     # Strong residuals for stabilization
-    R_u = eval_strong_residual_u(form, u, p, h, α, f, c_1, c_2)
+    R_u = eval_strong_residual_u(form, u, p, h, α, f, c_1, c_2; σ=σ)
     R_p = eval_strong_residual_p(form, u, p, α, g_mass)
     
     # Adjoints 
@@ -259,23 +251,13 @@ function build_picard_jacobian(X, dX, Y, form::AbstractFormulation, dΩ, h, f_cu
 
     grad_u_dummy = ∇(u)
     
-    # Pure native evaluations via lightweight localized closures to avoid deep AST stacking
-    function _sigma_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return sigma(form.reaction_law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag)
-    end
-    function _tau1_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return compute_tau_1(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), ν, c_1, c_2, tau_reg_lim, form.reaction_law)
-    end
-    function _tau2_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return compute_tau_2(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), ν, c_1, c_2, tau_reg_lim)
-    end
+    sig_op = SigOp(form.reaction_law, form.regularization, ν, c_1, c_2)
+    tau1_op = Tau1Op(form.reaction_law, form.regularization, ν, c_1, c_2, tau_reg_lim)
+    tau2_op = Tau2Op(form.regularization, ν, c_1, c_2, tau_reg_lim)
     
-    σ = Operation(_sigma_closure)(u, grad_u_dummy, α, ∇(α), h)
-    τ_1 = Operation(_tau1_closure)(u, grad_u_dummy, α, ∇(α), h)
-    τ_2 = Operation(_tau2_closure)(u, grad_u_dummy, α, ∇(α), h)
+    σ = Operation(sig_op)(u, grad_u_dummy, α, ∇(α), h)
+    τ_1 = Operation(tau1_op)(u, grad_u_dummy, α, ∇(α), h)
+    τ_2 = Operation(tau2_op)(u, grad_u_dummy, α, ∇(α), h)
     
     # Picard linearizes convective acceleration as purely u ⋅ ∇(du)
     conv_du = α * (∇(du)' ⋅ u)
@@ -320,45 +302,17 @@ function build_stabilized_weak_form_jacobian(X, dX, Y, form::AbstractFormulation
 
     grad_u_dummy = ∇(u)
     
-    function _sigma_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return sigma(form.reaction_law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag)
-    end
-    function _dsigma_closure(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return dsigma_du(form.reaction_law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag, du_v)
-    end
-    function _tau1_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return compute_tau_1(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), ν, c_1, c_2, tau_reg_lim, form.reaction_law)
-    end
-    function _tau2_closure(u_v, grad_v, a_v, grad_a_v, h_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return compute_tau_2(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), ν, c_1, c_2, tau_reg_lim)
-    end
-    function _dtau1_closure(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return compute_dtau_1_du(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), du_v, ν, c_1, c_2, tau_reg_lim, freeze_cusp, form.reaction_law)
-    end
-    function _dtau2_closure(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
-        mag = effective_speed(form.regularization, u_v, ν, h_v, c_1, c_2)
-        return compute_dtau_2_du(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), du_v, ν, c_1, c_2, tau_reg_lim, freeze_cusp)
-    end
+    sig_op = SigOp(form.reaction_law, form.regularization, ν, c_1, c_2)
+    tau1_op = Tau1Op(form.reaction_law, form.regularization, ν, c_1, c_2, tau_reg_lim)
+    tau2_op = Tau2Op(form.regularization, ν, c_1, c_2, tau_reg_lim)
 
-    σ = Operation(_sigma_closure)(u, grad_u_dummy, α, ∇(α), h)
+    σ = Operation(sig_op)(u, grad_u_dummy, α, ∇(α), h)
+    τ_1 = Operation(tau1_op)(u, grad_u_dummy, α, ∇(α), h)
+    τ_2 = Operation(tau2_op)(u, grad_u_dummy, α, ∇(α), h)
     
-    if lin_mode isa PicardMode
-        dsigma_du_val = 0.0 * (u ⋅ du)
-        dtau_1_du = 0.0 * (u ⋅ du)
-        dtau_2_du = 0.0 * (u ⋅ du)
-    else
-        dsigma_du_val = Operation(_dsigma_closure)(u, grad_u_dummy, α, ∇(α), h, du)
-        dtau_1_du = Operation(_dtau1_closure)(u, grad_u_dummy, α, ∇(α), h, du)
-        dtau_2_du = Operation(_dtau2_closure)(u, grad_u_dummy, α, ∇(α), h, du)
-    end
-    
-    τ_1 = Operation(_tau1_closure)(u, grad_u_dummy, α, ∇(α), h)
-    τ_2 = Operation(_tau2_closure)(u, grad_u_dummy, α, ∇(α), h)
+    dsigma_du_val = _get_dsigma_du_val(lin_mode, form.reaction_law, u, α, h, du, form.regularization, ν, c_1, c_2)
+    dtau_1_du = _get_dtau_1_du(lin_mode, form.reaction_law, u, α, h, du, form.regularization, ν, c_1, c_2, tau_reg_lim, freeze_cusp)
+    dtau_2_du = _get_dtau_2_du(lin_mode, u, α, h, du, form.regularization, ν, c_1, c_2, tau_reg_lim, freeze_cusp)
 
     conv_du = _get_conv_du(lin_mode, α, u, du)
     dL_du_star_v = _get_dL_du_star_v(lin_mode, form, α, v, du, dsigma_du_val)
@@ -378,7 +332,8 @@ function build_stabilized_weak_form_jacobian(X, dX, Y, form::AbstractFormulation
     R_dp = eps_val * dp + div_alpha_du
 
     # Recompute base residual since stabilizing jacobian needs R(u_old)
-    R_u_old = eval_strong_residual_u(form, u, p, h, α, f, c_1, c_2)
+    # Pass `σ` explicitly to prevent recursive AST branch reproduction in Gridap compiler
+    R_u_old = eval_strong_residual_u(form, u, p, h, α, f, c_1, c_2; σ=σ)
     R_p_old = eval_strong_residual_p(form, u, p, α, g_mass)
     
     L_u_star_v = strong_adjoint_momentum(form, u, v, q, α) - (σ * v)

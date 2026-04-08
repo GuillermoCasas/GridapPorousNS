@@ -4,7 +4,7 @@ Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 
 using PorousNSSolver
 using Gridap
-using JSON
+using JSON3
 using HDF5
 using LinearAlgebra
 
@@ -71,7 +71,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     jac_asgs(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_h, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, config.numerical_method.solver.freeze_jacobian_cusp, PorousNSSolver.ExactNewtonMode())
     
     op_asgs = FEOperator(res_asgs, jac_asgs, X, Y)
-    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4, config.numerical_method.solver.divergence_merit_factor, config.numerical_method.solver.stagnation_noise_floor)
+    nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), 12, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4, config.numerical_method.solver.divergence_merit_factor, config.numerical_method.solver.stagnation_noise_floor)
     solver_newton = FESolver(nls_newton)
     
     eval_iters = 0
@@ -93,7 +93,7 @@ function run_convergence()
     println("--- Cocquet Convergence Analysis (N=200 Reference) ---")
     
     base_config_path = joinpath(@__DIR__, "data", "test_config.json")
-    base_config_dict = JSON.parsefile(base_config_path)
+    base_config_dict = JSON3.read(read(base_config_path, String), Dict{String, Any})
     
     # All physical schemas and geometrical limits are universally driven by the native test JSON payload
     base_config = PorousNSSolver.load_config_from_dict(base_config_dict)

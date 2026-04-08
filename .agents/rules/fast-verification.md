@@ -13,12 +13,13 @@ When operating in this codebase, you are a rigorous computational mathematician.
 - You do not rely on ad-hoc numerical heuristics, parameter tuning, or "try it and see" debugging.
 - Local exactness and continuous calculus invariants take absolute precedence over code brevity or global simulation success.
 
-# 1. The Verification Tripwire
+# 1. The Verification Tripwires
 Never default to suggesting full PDE solves, MMS convergence loops, or long nonlinear benchmarks to validate mathematical modifications.
 Whenever you modify continuous formulations, viscous operators, stabilization terms, reaction laws, or Jacobians:
 1. **Stop and explicitly state the mathematical invariant** your change preserves (e.g., strong-weak dual parity, adjoint identity, exact Fréchet derivative).
-2. **Immediately invoke the `porousns-fast-verification` skill.** 
-3. You must write or update the ultra-fast micro-test *before* or alongside your implementation to prove the calculus is correct locally. Refuse to consider a math code change complete without this fast test.
+2. **Blitz Test Execution:** Run the blitz tests (`test/run_blitz_tests.jl`) immediately after *every single code modification* to catch logic syntax or invariant breakages inline.
+3. **Quick Test Execution:** Run the quick tests (`test/run_quick_tests.jl`) after every major refactor or change to the numerical method (formulation, models, stabilization, or solvers).
+4. You must write or update ultra-fast micro-tests before or alongside your implementation to prove the calculus is correct locally. Refuse to consider a math code change complete without this fast test.
 
 # 2. Gridap AST Compiler Hygiene
 Gridap.jl is highly susceptible to deep Abstract Syntax Tree (AST) compiler blowouts and multi-minute compilation times if spatial integration closures are nested improperly.

@@ -5,7 +5,7 @@ Pkg.activate(joinpath(@__DIR__, "..", "..", ".."))
 using PorousNSSolver
 using Gridap
 using Gridap.Algebra
-using JSON
+using JSON3
 using DelimitedFiles
 using HDF5
 using LineSearches
@@ -72,7 +72,7 @@ end
 
 function run_mms(config_file="test_config.json")
     config_path = joinpath(@__DIR__, "data", config_file)
-    test_dict = JSON.parsefile(config_path)
+    test_dict = JSON3.read(read(config_path, String), Dict{String, Any})
     
     as_list(x) = x isa Vector ? x : [x]
     
@@ -255,8 +255,8 @@ function run_mms(config_file="test_config.json")
                                 ar_c1 = config.numerical_method.solver.armijo_c1
                                 div_fac = config.numerical_method.solver.divergence_merit_factor
                                 n_floor = config.numerical_method.solver.stagnation_noise_floor
-                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_picard_it, max_inc, xtol, stagnation_tol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
-                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_newton_it, max_inc, xtol, stagnation_tol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
+                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_picard_it, max_inc, xtol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
+                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_newton_it, max_inc, xtol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
                                 
                                 solver_picard = FESolver(nls_picard)
                                 solver_newton = FESolver(nls_newton)

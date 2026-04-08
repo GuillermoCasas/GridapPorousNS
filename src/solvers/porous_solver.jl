@@ -1,21 +1,21 @@
 # src/solvers/porous_solver.jl
-"""
+#=
     porous_solver.jl
 
 # Role 
 This module acts as the overall Variational Multiscale (VMS) orchestrator for the Porous Navier-Stokes system. It bridges the pure algebraic continuous operators, variational stabilized forms, and Jacobians (defined in `viscous_operators.jl`) with the iterative numerical execution and topological logic needed to achieve discrete convergence (defined in `nonlinear.jl`).
 
 # Methodological Background
-Following the formulation in the companion article, the Galerkin finite element discretization of the generalized Navier-Stokes equations suffers from LBB condition violations for equal-order spaces and instabilities in convection- or reaction-dominated flows. We use VMS to approximate the unresolved sub-grid scales (SGS) ``\\widetilde{U}`` in terms of the resolved scales' residual ``\\mathcal{R}(U_h)`` and a local element matrix of stabilization parameters ``\\boldsymbol{\\tau}_K``. 
+Following the formulation in the companion article, the Galerkin finite element discretization of the generalized Navier-Stokes equations suffers from LBB condition violations for equal-order spaces and instabilities in convection- or reaction-dominated flows. We use VMS to approximate the unresolved sub-grid scales (SGS) ``\widetilde{U}`` in terms of the resolved scales' residual ``\mathcal{R}(U_h)`` and a local element matrix of stabilization parameters ``\boldsymbol{\tau}_K``. 
 
-Depending on the chosen space ``\\widetilde{\\mathcal{X}}`` for the sub-grid scales, two different stabilized methods are implemented here:
-1. **ASGS (Algebraic Sub-Grid Scale)**: The SGS space is taken as the space of finite element residuals. The projection operator onto the SGS space is the identity ``\\widetilde{\\Pi} = \\mathcal{I}``, rendering the FE projection ``\\boldsymbol{\\pi}_h = \\boldsymbol{0}``.
-2. **OSGS (Orthogonal Sub-Grid Scale)**: The SGS space is strictly orthogonal to the finite element space (``\\mathcal{X}_{h0}^{\\perp}``). This requires actively computing the ``L^2``-projection of the residual ``\\boldsymbol{\\pi}_h`` iteratively and subtracting it from the strong residual in the sub-scale equation.
+Depending on the chosen space ``\widetilde{\mathcal{X}}`` for the sub-grid scales, two different stabilized methods are implemented here:
+1. **ASGS (Algebraic Sub-Grid Scale)**: The SGS space is taken as the space of finite element residuals. The projection operator onto the SGS space is the identity ``\widetilde{\Pi} = \mathcal{I}``, rendering the FE projection ``\boldsymbol{\pi}_h = \boldsymbol{0}``.
+2. **OSGS (Orthogonal Sub-Grid Scale)**: The SGS space is strictly orthogonal to the finite element space (``\mathcal{X}_{h0}^{\perp}``). This requires actively computing the ``L^2``-projection of the residual ``\boldsymbol{\pi}_h`` iteratively and subtracting it from the strong residual in the sub-scale equation.
 
 # Relations to other files
-- `src/formulations/viscous_operators.jl`: Contains the translation of the abstract operators (e.g. ``\\mathcal{L}_{\\nu}, \\mathcal{L}_c, \\mathcal{L}_b``) into Gridap closures. `porous_solver.jl` delegates the assembly of `eval_strong_residual`, `build_stabilized_weak_form_jacobian`, etc., to this file.
+- `src/formulations/viscous_operators.jl`: Contains the translation of the abstract operators (e.g. ``\mathcal{L}_{\nu}, \mathcal{L}_c, \mathcal{L}_b``) into Gridap closures. `porous_solver.jl` delegates the assembly of `eval_strong_residual`, `build_stabilized_weak_form_jacobian`, etc., to this file.
 - `src/solvers/nonlinear.jl`: Defines the exact solver execution schemes (`solver_picard`, `solver_newton`) required to converge the coupled nonlinear ASGS/OSGS algebraic problems.
-"""
+=#
 using Gridap
 using Gridap.Algebra
 using LinearAlgebra
@@ -38,14 +38,14 @@ end
 Enforces strict parameter boundaries for the top-level VMS solver configurations, 
 preventing unbounded numerical cascades resulting from malformed JSON properties.
 """
-function check_porous_solver_parameters(method, ftol, stagnation_tol, max_osgs_iters, osgs_tol)
-    if method != "ASGS" && method != "OSGS"
-        throw(ArgumentError("Stabilization method must be strictly 'ASGS' or 'OSGS'. Passed: $method"))
+function check_porous_solver_parameters(stab_cfg::StabilizationConfig, sol_cfg::SolverConfig)
+    if stab_cfg.method != "ASGS" && stab_cfg.method != "OSGS"
+        throw(ArgumentError("Stabilization method must be strictly 'ASGS' or 'OSGS'. Passed: $(stab_cfg.method)"))
     end
-    if ftol <= 0.0 || stagnation_tol <= 0.0 || osgs_tol <= 0.0
-        throw(ArgumentError("Solver outer tolerances (ftol, stagnation_tol, osgs_tol) must be strictly positive floats."))
+    if sol_cfg.ftol <= 0.0 || sol_cfg.stagnation_noise_floor <= 0.0 || stab_cfg.osgs_tolerance <= 0.0
+        throw(ArgumentError("Solver outer tolerances (ftol, stagnation_noise_floor, osgs_tol) must be strictly positive floats."))
     end
-    if max_osgs_iters < 1
+    if stab_cfg.osgs_iterations < 1
         throw(ArgumentError("OSGS maximum iterations must strictly be integers >= 1."))
     end
 end
@@ -58,9 +58,9 @@ Orchestrates the nonlinear solver iteration loops over a defined Variational Mul
 function solve_system(
     X, Y, model, dΩ, Ω, h_cf, 
     f_cf, alpha_cf, g_cf, form, 
-    c_1, c_2, tau_reg_lim, freeze_cusp, 
     solver_picard, solver_newton, 
-    x0, method, ftol, stagnation_tol, max_osgs_iters, osgs_tol
+    x0, c_1, c_2,
+    phys_cfg::PhysicalProperties, stab_cfg::StabilizationConfig, sol_cfg::SolverConfig
 )
     u_h, p_h = x0
     pi_u = nothing
@@ -71,19 +71,20 @@ function solve_system(
     local iter_count = 0
     local eval_time = 0.0
     
-    check_porous_solver_parameters(method, ftol, stagnation_tol, max_osgs_iters, osgs_tol)
+    check_porous_solver_parameters(stab_cfg, sol_cfg)
+    
+    # Primitive unpacking (Critical for Gridap performance)
+    method = stab_cfg.method
+    max_osgs_iters = stab_cfg.osgs_iterations
+    osgs_tol = stab_cfg.osgs_tolerance
+    ftol = sol_cfg.ftol
+    stagnation_tol = sol_cfg.stagnation_noise_floor
+    tau_reg_lim = phys_cfg.tau_regularization_limit
+    freeze_cusp = sol_cfg.freeze_jacobian_cusp
     
     if method == "ASGS"
         # ==============================================================================
         # ALGEBRAIC SUBGRID SCALE (ASGS)
-        # Bypasses iterative projection evaluations entirely. According to the VMS theory 
-        # outlined in the companion article, the ASGS method maps the SGS space to the space 
-        # of finite element residuals, meaning the SGS projection operator is the identity 
-        # ($\\widetilde{\\Pi} = \\mathcal{I}$) and therefore the FE residual projection is exactly zero
-        # ($\\boldsymbol{\\pi}_h = \\boldsymbol{0}$). The unresolvable sub-grid physics are mathematically 
-        # modeled as directly proportional to the local strong residual (`pi_u = nothing`, 
-        # `pi_p = nothing`), mapping cleanly into a single Newton-homotopy execution without
-        # iterative, staggered updates.
         # ==============================================================================
         res_fn(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, pi_u, pi_p, c_1, c_2, tau_reg_lim)
         jac_picard(x, dx, y) = build_picard_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, pi_u, pi_p, c_1, c_2, tau_reg_lim; mult_mom=1.0, mult_mass=1.0)

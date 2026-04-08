@@ -79,13 +79,10 @@
           "properties": {
             "picard_iterations": { "type": "integer", "default": 5, "description": "Initial number of Picard iterations before switching to Newton." },
             "newton_iterations": { "type": "integer", "default": 20, "description": "Maximum allowed exact Newton iterations." },
-            "use_linesearch": { "type": "boolean", "default": true, "description": "Enable Exact L2 energy-based linesearch tracking." },
             "xtol": { "type": "number", "default": 1e-8, "description": "Relative norm tolerance for the solution increment (dx)." },
-            "stagnation_tol": { "type": "number", "default": 1e-5, "description": "Threshold at which the relative residual improvement is minimal, indicating convergence stalling." },
             "ftol": { "type": "number", "default": 1e-10, "description": "Absolute residual tolerance." },
             "max_increases": { "type": "integer", "default": 2, "description": "Number of successive residual increases before divergence abort." },
             "freeze_jacobian_cusp": { "type": "boolean", "default": false, "description": "If true, freezes the magnitude of velocity in the nonlinearity Jacobian cross-terms." },
-            "linesearch_tolerance": { "type": "number", "default": 1.0001, "description": "Acceptance threshold. Must strictly decrease residual unless > 1.0 (to ignore noise)." },
             "linesearch_alpha_min": { "type": "number", "default": 1e-4, "description": "Minimum step size allowed before linesearch fails." },
             "armijo_c1": { "type": "number", "default": 1e-4, "description": "Armijo sufficient decrease parameter (c1) for the linesearch." },
             "divergence_merit_factor": { "type": "number", "default": 1.05, "description": "Factor by which the merit function is allowed to increase before counting as a divergence step." },

@@ -5,22 +5,22 @@ Pkg.activate(joinpath(@__DIR__, "..", ".."))
 using Test
 using PorousNSSolver
 using Gridap
-using JSON
+using JSON3
 
 # Include the test framework builder script directly to ensure we strictly test its assembly pipeline
-include("../long/ManufacturedSolutions/run_test.jl")
+include("../extended/ManufacturedSolutions/run_test.jl")
 
 @testset "MMS Physical Correctness (Da / Re) Check" begin
     # Create the baseline dummy configuration struct exactly as constructed inside run_test.jl
-    config_path_dummy = joinpath(@__DIR__, "..", "long", "ManufacturedSolutions", "data", "test_config.json")
-    test_dict = JSON.parsefile(config_path_dummy)
+    config_path_dummy = joinpath(@__DIR__, "..", "extended", "ManufacturedSolutions", "data", "test_config.json")
+    test_dict = JSON3.read(read(config_path_dummy, String), Dict{String, Any})
     
     # 1. Extract physical boundaries natively from our JSON pipeline instead of hardcoding
     Re_bound = Float64(last(get(get(test_dict, "physical_properties", Dict()), "Re", [1.0e6])))
     Da_bound = Float64(first(get(get(test_dict, "physical_properties", Dict()), "Da", [1.0e-6])))
     
     config_dict = Dict(
-        "physical_properties" => Dict("nu" => 1.0, "eps_val" => 0.0, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
+        "physical_properties" => Dict("nu" => 1.0, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
         "domain" => Dict("alpha_0" => 0.1, "bounding_box" => test_dict["domain"]["bounding_box"]),
         "numerical_method" => Dict(
             "element_spaces" => Dict("k_velocity" => 1, "k_pressure" => 1),

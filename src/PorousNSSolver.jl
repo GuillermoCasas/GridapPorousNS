@@ -1,10 +1,10 @@
 module PorousNSSolver
 
 using Gridap
-using JSON
+using JSON3
+using StructTypes
 using WriteVTK
 using HDF5
-using Parameters
 
 # Core
 include("config.jl")

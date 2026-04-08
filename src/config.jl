@@ -1,87 +1,158 @@
 # src/config.jl
 
-using Parameters
-using JSON
+using JSON3
+using StructTypes
 
-@with_kw struct PhysicalProperties
-    nu::Float64 = 1.0           # Kinematic viscosity
-    f_x::Float64 = 0.0          # Forcing x
-    f_y::Float64 = 0.0          # Forcing y
-    eps_val::Float64 = 1e-8     # Absolute numerical stabilization limit for pressure
-    eps_floor::Float64 = 1e-8   # Minimum limit applied to eps_val
+Base.@kwdef struct PhysicalProperties
+    nu::Float64 = 1.0
+    f_x::Float64 = 0.0
+    f_y::Float64 = 0.0
+    eps_val::Float64 = 1e-8
+    eps_floor::Float64 = 1e-8
     reaction_model::String = "Forchheimer"
     sigma_constant::Float64 = 1.0
-    sigma_linear::Float64 = 150.0   # A
-    sigma_nonlinear::Float64 = 1.75 # B
+    sigma_linear::Float64 = 150.0
+    sigma_nonlinear::Float64 = 1.75
     u_base_floor_ref::Float64 = 1e-4
     h_floor_weight::Float64 = 0.1
     epsilon_floor::Float64 = 1e-12
     tau_regularization_limit::Float64 = 1e-12
 end
 
-@with_kw struct DomainConfig
+Base.@kwdef struct DomainConfig
     alpha_0::Float64 = 0.4
     r_1::Float64 = 0.2
     r_2::Float64 = 0.5
     bounding_box::Vector{Float64} = [0.0, 1.0, 0.0, 1.0]
 end
 
-@with_kw struct ElementSpacesConfig
+Base.@kwdef struct ElementSpacesConfig
     k_velocity::Int = 2
     k_pressure::Int = 1
 end
 
-@with_kw struct StabilizationConfig
+Base.@kwdef struct StabilizationConfig
     method::String = "ASGS"
     osgs_iterations::Int = 3
     osgs_tolerance::Float64 = 1e-5
 end
 
-@with_kw struct MeshConfig
+Base.@kwdef struct MeshConfig
     partition::Vector{Int} = [20, 20]
     convergence_partitions::Vector{Int} = [10, 20, 30]
     element_type::String = "QUAD"
 end
 
-@with_kw struct SolverConfig
+Base.@kwdef struct SolverConfig
     picard_iterations::Int = 5
     newton_iterations::Int = 20
-    use_linesearch::Bool = true
-    xtol::Float64 = 1e-8
-    stagnation_tol::Float64 = 1e-5
     ftol::Float64 = 1e-10
+    xtol::Float64 = 1e-8
     max_increases::Int = 2
     freeze_jacobian_cusp::Bool = false
-    linesearch_tolerance::Float64 = 1.0001
-    linesearch_alpha_min::Float64 = 1e-4
     armijo_c1::Float64 = 1e-4
     divergence_merit_factor::Float64 = 1.05
     stagnation_noise_floor::Float64 = 1e-2
+    linesearch_alpha_min::Float64 = 1e-4
     run_diagnostics::Bool = false
     ablation_mode::String = "full"
     experimental_reaction_mode::String = "standard"
+    # Note: stagnation_tol, use_linesearch, linesearch_tolerance were pruned unless requested.
 end
 
-@with_kw struct NumericalMethodConfig
+Base.@kwdef struct NumericalMethodConfig
     element_spaces::ElementSpacesConfig = ElementSpacesConfig()
     stabilization::StabilizationConfig = StabilizationConfig()
     solver::SolverConfig = SolverConfig()
     mesh::MeshConfig = MeshConfig()
 end
 
-@with_kw struct OutputConfig
+Base.@kwdef struct OutputConfig
     directory::String = "results"
     basename::String = "porous_ns"
 end
 
-@with_kw struct PorousNSConfig
+Base.@kwdef struct PorousNSConfig
     physical_properties::PhysicalProperties = PhysicalProperties()
     domain::DomainConfig = DomainConfig()
     numerical_method::NumericalMethodConfig = NumericalMethodConfig()
     output::OutputConfig = OutputConfig()
+end
+
+# StructTypes definitions
+StructTypes.StructType(::Type{PhysicalProperties}) = StructTypes.Struct()
+StructTypes.StructType(::Type{DomainConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{ElementSpacesConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{StabilizationConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{MeshConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{SolverConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{NumericalMethodConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{OutputConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{PorousNSConfig}) = StructTypes.Struct()
+
+function validate!(cfg::PorousNSConfig)
+    # Physical
+    @assert cfg.physical_properties.nu > 0 "Kinematic viscosity 'nu' must be > 0"
+    @assert cfg.physical_properties.eps_val > 0 "eps_val must be > 0"
     
-    # Keeping compatibility interfaces for internal tests if needed, but the primary API reflects the hierarchy
-    phys::PhysicalProperties = physical_properties
+    # Solver
+    sol = cfg.numerical_method.solver
+    @assert sol.ftol > 0 "Solver ftol must be > 0"
+    @assert sol.xtol > 0 "Solver xtol must be > 0"
+    @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"
+    @assert sol.divergence_merit_factor >= 1.0 "Divergence merit factor must be >= 1.0"
+    @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"
+    
+    # Stabilization
+    stab = cfg.numerical_method.stabilization
+    @assert stab.method in ("ASGS", "OSGS") "Stabilization method must be ASGS or OSGS"
+    @assert stab.osgs_iterations >= 1
+    @assert stab.osgs_tolerance > 0
+    
+    return cfg
+end
+
+function _check_unknown_keys(T::Type, dict::AbstractDict, path::String="")
+    allowed_keys = string.(fieldnames(T))
+    for key in keys(dict)
+        if path == "root" && key == "\$schema"
+            continue
+        end
+        if !(key in allowed_keys)
+            @warn "Unknown JSON config key '$key' at $path in struct $(T). Please check for typos."
+        end
+    end
+end
+
+function _check_unknown_keys_hierarchical(dict::AbstractDict)
+    _check_unknown_keys(PorousNSConfig, dict, "root")
+    
+    if haskey(dict, "physical_properties") && dict["physical_properties"] isa AbstractDict
+        _check_unknown_keys(PhysicalProperties, dict["physical_properties"], "physical_properties")
+    end
+    if haskey(dict, "domain") && dict["domain"] isa AbstractDict
+        _check_unknown_keys(DomainConfig, dict["domain"], "domain")
+    end
+    if haskey(dict, "numerical_method") && dict["numerical_method"] isa AbstractDict
+        nm = dict["numerical_method"]
+        _check_unknown_keys(NumericalMethodConfig, nm, "numerical_method")
+        
+        if haskey(nm, "element_spaces") && nm["element_spaces"] isa AbstractDict
+            _check_unknown_keys(ElementSpacesConfig, nm["element_spaces"], "numerical_method.element_spaces")
+        end
+        if haskey(nm, "stabilization") && nm["stabilization"] isa AbstractDict
+            _check_unknown_keys(StabilizationConfig, nm["stabilization"], "numerical_method.stabilization")
+        end
+        if haskey(nm, "solver") && nm["solver"] isa AbstractDict
+            _check_unknown_keys(SolverConfig, nm["solver"], "numerical_method.solver")
+        end
+        if haskey(nm, "mesh") && nm["mesh"] isa AbstractDict
+            _check_unknown_keys(MeshConfig, nm["mesh"], "numerical_method.mesh")
+        end
+    end
+    if haskey(dict, "output") && dict["output"] isa AbstractDict
+        _check_unknown_keys(OutputConfig, dict["output"], "output")
+    end
 end
 
 function deep_merge!(base::AbstractDict, override::AbstractDict)
@@ -95,77 +166,45 @@ function deep_merge!(base::AbstractDict, override::AbstractDict)
     return base
 end
 
-function load_config(test_config_path::String="")
+function load_config_with_defaults(override_path::String="")
     base_config_path = joinpath(@__DIR__, "..", "base_config.json")
-    base_dict = JSON.parsefile(base_config_path)
+    base_raw = read(base_config_path, String)
+    base_dict = copy(JSON3.read(base_raw, Dict{String, Any}))
     
-    if !isempty(test_config_path) && isfile(test_config_path)
-        test_dict = JSON.parsefile(test_config_path)
+    if !isempty(override_path) && isfile(override_path)
+        test_raw = read(override_path, String)
+        test_dict = JSON3.read(test_raw, Dict{String, Any})
         deep_merge!(base_dict, test_dict)
     end
     
-    return _parse_dict_to_config(base_dict)
+    _check_unknown_keys_hierarchical(base_dict)
+    cfg = JSON3.read(JSON3.write(base_dict), PorousNSConfig)
+    return validate!(cfg)
+end
+
+function load_frozen_config(exact_path::String)
+    if !isfile(exact_path)
+        error("Config file not found: $exact_path")
+    end
+    raw = read(exact_path, String)
+    dict = JSON3.read(raw, Dict{String, Any})
+    _check_unknown_keys_hierarchical(dict)
+    cfg = JSON3.read(raw, PorousNSConfig)
+    return validate!(cfg)
 end
 
 function load_config_from_dict(override::AbstractDict)
     base_config_path = joinpath(@__DIR__, "..", "base_config.json")
-    base_dict = JSON.parsefile(base_config_path)
+    base_raw = read(base_config_path, String)
+    base_dict = copy(JSON3.read(base_raw, Dict{String, Any}))
+    
     deep_merge!(base_dict, override)
-    return _parse_dict_to_config(base_dict)
+    _check_unknown_keys_hierarchical(base_dict)
+    cfg = JSON3.read(JSON3.write(base_dict), PorousNSConfig)
+    return validate!(cfg)
 end
 
-function _parse_dict_to_config(dict::AbstractDict)
-    local_phys = PhysicalProperties()
-    if haskey(dict, "physical_properties")
-        local_phys = PhysicalProperties(; (Symbol(k) => v for (k,v) in dict["physical_properties"] if Symbol(k) in fieldnames(PhysicalProperties))...)
-    elseif haskey(dict, "physical_parameters") # backward compatibility
-        local_phys = PhysicalProperties(; (Symbol(k) => v for (k,v) in dict["physical_parameters"] if Symbol(k) in fieldnames(PhysicalProperties))...)
-    end
-    
-    local_domain = DomainConfig()
-    if haskey(dict, "domain")
-        local_domain = DomainConfig(; (Symbol(k) => v for (k,v) in dict["domain"] if Symbol(k) in fieldnames(DomainConfig))...)
-    end
-    
-    local_elem = ElementSpacesConfig()
-    local_stab = StabilizationConfig()
-    local_solv = SolverConfig()
-    local_mesh = MeshConfig()
-    
-    if haskey(dict, "numerical_method")
-        nm_dict = dict["numerical_method"]
-        if haskey(nm_dict, "element_spaces")
-            local_elem = ElementSpacesConfig(; (Symbol(k) => v for (k,v) in nm_dict["element_spaces"] if Symbol(k) in fieldnames(ElementSpacesConfig))...)
-        end
-        if haskey(nm_dict, "stabilization")
-            local_stab = StabilizationConfig(; (Symbol(k) => v for (k,v) in nm_dict["stabilization"] if Symbol(k) in fieldnames(StabilizationConfig))...)
-        end
-        if haskey(nm_dict, "solver")
-            local_solv = SolverConfig(; (Symbol(k) => v for (k,v) in nm_dict["solver"] if Symbol(k) in fieldnames(SolverConfig))...)
-        end
-        if haskey(nm_dict, "mesh")
-            local_mesh = MeshConfig(; (Symbol(k) => v for (k,v) in nm_dict["mesh"] if Symbol(k) in fieldnames(MeshConfig))...)
-        end
-    else
-        # Backward compatibility fallback
-        if haskey(dict, "discretization")
-            local_elem = ElementSpacesConfig(; (Symbol(k) => v for (k,v) in dict["discretization"] if Symbol(k) in fieldnames(ElementSpacesConfig))...)
-        end
-        if haskey(dict, "mesh")
-            local_mesh = MeshConfig(; (Symbol(k) => v for (k,v) in dict["mesh"] if Symbol(k) in fieldnames(MeshConfig))...)
-        end
-        if haskey(dict, "solver")
-            local_solv = SolverConfig(; (Symbol(k) => v for (k,v) in dict["solver"] if Symbol(k) in fieldnames(SolverConfig))...)
-            local_stab = StabilizationConfig(; (Symbol(k) => v for (k,v) in dict["solver"] if Symbol(k) in fieldnames(StabilizationConfig))...)
-        end
-    end
-    
-    local_nm = NumericalMethodConfig(element_spaces=local_elem, stabilization=local_stab, solver=local_solv, mesh=local_mesh)
-    
-    local_out = OutputConfig()
-    if haskey(dict, "output")
-        local_out = OutputConfig(; (Symbol(k) => v for (k,v) in dict["output"] if Symbol(k) in fieldnames(OutputConfig))...)
-    end
-    
-    return PorousNSConfig(physical_properties=local_phys, phys=local_phys, domain=local_domain, numerical_method=local_nm, output=local_out)
+# Backward compatibility shim
+function load_config(path::String="")
+    return load_config_with_defaults(path)
 end
