@@ -8,7 +8,7 @@
 # cross-grid interpolation geometry noise and precisely extract the algebraic convergence slope.
 #
 # Mathematical Formulation Alignment:
-# Proves that the VMS/ASGS scheme yields dimensionally optimal $L_2$ and semi-$H_1$ continuum 
+# Proves that the VMS scheme yields dimensionally optimal $L_2$ and semi-$H_1$ continuum 
 # approximation bounds in the presence of physical varying media (non-constant coefficients).
 #
 # Associated Files / Functions:
@@ -24,6 +24,22 @@ using Gridap
 using JSON3
 using HDF5
 using LinearAlgebra
+
+function _build_local_mesh(domain_cfg, mesh_cfg)
+    domain = Tuple(domain_cfg.bounding_box)
+    partition = Tuple(mesh_cfg.partition)
+    if mesh_cfg.element_type == "TRI"
+        model = CartesianDiscreteModel(domain, partition; isperiodic=Tuple(fill(false, length(partition))), map=identity)
+        model = simplexify(model)
+    else
+        model = CartesianDiscreteModel(domain, partition)
+    end
+    labels = get_face_labeling(model)
+    add_tag_from_tags!(labels, "inlet", [7])
+    add_tag_from_tags!(labels, "outlet", [8])
+    add_tag_from_tags!(labels, "walls", [1, 2, 3, 4, 5, 6])
+    return model
+end
 
 # Section 4.2 Smooth Porosity Field
 # ε(y) = 0.45 + 0.55 * exp(y - 1.0)
@@ -46,7 +62,7 @@ function build_solver(N::Int, config_dict)
     local_config_dict["numerical_method"]["mesh"]["partition"] = [2*N, N]
     local_config = PorousNSSolver.load_config_from_dict(local_config_dict)
     
-    model = PorousNSSolver.create_mesh(local_config)
+    model = _build_local_mesh(local_config.domain, local_config.numerical_method.mesh)
     
     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, local_config.numerical_method.element_spaces.k_velocity)
     refe_p = ReferenceFE(lagrangian, Float64, local_config.numerical_method.element_spaces.k_pressure)

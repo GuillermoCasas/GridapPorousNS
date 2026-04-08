@@ -22,6 +22,22 @@ using Gridap
 using JSON
 using LineSearches
 
+function _build_local_mesh(domain_cfg, mesh_cfg)
+    domain = Tuple(domain_cfg.bounding_box)
+    partition = Tuple(mesh_cfg.partition)
+    if mesh_cfg.element_type == "TRI"
+        model = CartesianDiscreteModel(domain, partition; isperiodic=Tuple(fill(false, length(partition))), map=identity)
+        model = simplexify(model)
+    else
+        model = CartesianDiscreteModel(domain, partition)
+    end
+    labels = get_face_labeling(model)
+    add_tag_from_tags!(labels, "inlet", [7])
+    add_tag_from_tags!(labels, "outlet", [8])
+    add_tag_from_tags!(labels, "walls", [1, 2, 3, 4, 5, 6])
+    return model
+end
+
 # Section 4.2 Smooth Porosity Field
 # ε(y) = 0.45 + 0.55 * exp(y - 1.0)
 alpha_func(x) = 0.45 + 0.55 * exp(x[2] - 1.0)
@@ -37,7 +53,7 @@ function run_cocquet()
     config_path = joinpath(@__DIR__, "data", "test_config.json")
     config = PorousNSSolver.load_config(config_path)
     
-    model = PorousNSSolver.create_mesh(config)
+    model = _build_local_mesh(config.domain, config.numerical_method.mesh)
     
     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, config.numerical_method.element_spaces.k_velocity)
     refe_p = ReferenceFE(lagrangian, Float64, config.numerical_method.element_spaces.k_pressure)

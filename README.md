@@ -5,9 +5,9 @@ A modular, mathematically rigorous Finite Element Method (FEM) solver for the st
 ## Project Purpose
 To provide a highly reliable, testable, and analytically exact nonlinear solver pipeline that reproduces specific literature benchmarks (the "paper") while offering fallback legacy branches. The architecture is explicitly designed to maintain mathematical transparency and separate the continuous weak forms, stabilization parameters, configuration schemas, and discrete solvers into non-overlapping domains. 
 
-## Core Mathematical Theory (ASGS Stabilization)
+## Core Mathematical Theory (VMS Stabilization)
 
-This solver rigorously implements the **Algebraic SubGrid Scale (ASGS)** formulation. In the VMS/ASGS framework, the unresolved fine scales $\mathbf{u}'$ are algebraically modeled via the element-wise momentum residual: $\mathbf{u}' \approx -\tau \mathcal{R}_{mom}$.
+This solver rigorously implements the **Variational Multiscale (VMS)** formulation, offering both **Algebraic Subgrid Scale (ASGS)** and **Orthogonal Subgrid Scale (OSGS)** flavors. In the VMS framework, the unresolved fine scales $\mathbf{u}'$ are algebraically modeled via the element-wise momentum residual: $\mathbf{u}' \approx -\tau \mathcal{R}_{mom}$.
 
 When substituting this closure into the standard continuous Galerkin weak form $(\mathcal{L}(\bar{\mathbf{u}}), \mathbf{v})$, integration by parts analytically forces the subgrid stress to pair exactly against the **formal adjoint** of the momentum operator $\mathcal{L}^*(\mathbf{v}, q)$. This mathematically dictates that the stabilization weight augmenting the continuous weak solver must be precisely $-\mathcal{L}^*(\mathbf{v}, q)$.
 
@@ -17,7 +17,7 @@ When substituting this closure into the standard continuous Galerkin weak form $
 > Thus, $\mathcal{L}^*_{conv}(\mathbf{v}) = -\mathbf{a} \cdot \nabla \mathbf{v}$. 
 > Because the stabilization term mathematically evaluates to $\langle -\mathcal{L}^*, \tau \mathcal{R} \rangle$, the weighting applied to the convective residual **MUST** strictly be positive ($+\mathbf{a} \cdot \nabla \mathbf{v}$). Reversing this scalar enforces *Anti-SUPG* negative streamline diffusion, which destroys diagonal Jacobian coercivity and triggers catastrophic Newton divergence at high $Re$.
 
-By utilizing the full continuous $-\mathcal{L}^*$, the ASGS formulation ensures robust and mathematically faithful consistency compared to ad-hoc truncated SUPG heuristics.
+By utilizing the full continuous $-\mathcal{L}^*$, the VMS formulation ensures robust and mathematically faithful consistency compared to ad-hoc truncated SUPG heuristics.
 
 ## Architecture Map
 

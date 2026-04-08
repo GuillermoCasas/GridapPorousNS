@@ -8,7 +8,6 @@ using HDF5
 
 # Core
 include("config.jl")
-include("geometry_mesh.jl")
 
 # Models
 include("models/porosity.jl")

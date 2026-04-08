@@ -1,0 +1,16 @@
+  Activating project at `~/repos/porous_NS_with_Gridap`
+ERROR: LoadError: AssertionError: eps_val must be > 0
+Stacktrace:
+ [1] validate!(cfg::PorousNSConfig)
+   @ PorousNSSolver ~/repos/porous_NS_with_Gridap/src/config.jl:96
+ [2] load_config_from_dict(override::Dict{String, Dict{String}})
+   @ PorousNSSolver ~/repos/porous_NS_with_Gridap/src/config.jl:204
+ [3] run_mms(config_file::String)
+   @ Main ~/repos/porous_NS_with_Gridap/test/extended/ManufacturedSolutions/run_test.jl:221
+ [4] top-level scope
+   @ ~/repos/porous_NS_with_Gridap/test/extended/ManufacturedSolutions/run_test.jl:451
+in expression starting at /Users/guillermocasasgonzalez/repos/porous_NS_with_Gridap/test/extended/ManufacturedSolutions/run_test.jl:449
+
+========================================
+BUILDING MESH N = 10 for etype = QUAD, k_v = 1, k_p = 1
+========================================

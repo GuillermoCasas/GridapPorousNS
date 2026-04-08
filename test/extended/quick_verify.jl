@@ -27,7 +27,7 @@ c1 = Dict(
     "porosity_field" => Dict("alpha_0" => 0.5),
     "mesh" => Dict("element_type" => "QUAD", "partition" => [10, 10], "domain" => [0.0, 1.0, 0.0, 1.0]),
     "discretization" => Dict("k_velocity" => 2, "k_pressure" => 2),
-    "solver" => Dict("method" => "ASGS", "xtol" => 1e-8, "stagnation_tol" => 1e-5, "ftol" => 1e-10, "newton_iterations" => 20)
+    "solver" => Dict("method" => "ASGS", "xtol" => 1e-8, "stagnation_noise_floor" => 1e-5, "ftol" => 1e-10, "newton_iterations" => 20)
 )
 mkpath("test/extended/ManufacturedSolutions/data")
 write("test/extended/ManufacturedSolutions/data/test1.json", JSON.json(c1))
@@ -54,7 +54,7 @@ c3 = Dict(
     "porosity_field" => Dict("alpha_0" => 1.0),
     "mesh" => Dict("element_type" => "QUAD", "convergence_partitions" => [5, 10], "domain" => [0.0, 1.0, 0.0, 1.0]),
     "discretization" => Dict("k_velocity" => 2, "k_pressure" => 2),
-    "solver" => Dict("method" => "ASGS", "xtol" => 1e-12, "stagnation_tol" => 1e-5, "ftol" => 1e-10)
+    "solver" => Dict("method" => "ASGS", "xtol" => 1e-12, "stagnation_noise_floor" => 1e-5, "ftol" => 1e-10)
 )
 write("test/extended/ManufacturedSolutions/data/test3.json", JSON.json(c3))
 run(`julia --project=. test/extended/ManufacturedSolutions/run_test.jl test3.json`)

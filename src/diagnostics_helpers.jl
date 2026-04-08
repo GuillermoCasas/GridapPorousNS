@@ -42,7 +42,7 @@ function _weak_form_s_sigma_impl(X, v, config::PorousNSSolver.PorousNSConfig, mo
         end
         R_u = alpha_conv * conv_u + alpha_conv * ∇(p) + σ * u - div_visc_u - f
         
-        # Reaction adjoint contribution within ASGS stabilization
+        # Reaction adjoint contribution within VMS stabilization
         return ∫( (- σ * v) ⋅ (τ_1 * R_u) )dΩ
     end
 end

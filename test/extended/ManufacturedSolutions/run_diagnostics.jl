@@ -1,7 +1,7 @@
 # test/long/ManufacturedSolutions/run_diagnostics.jl
 # ==============================================================================================
 # Nature & Intent:
-# Deep inspection tool for resolving the high-reaction stall limits of the ASGS formulation. Evaluates
+# Deep inspection tool for resolving the high-reaction stall limits of the VMS formulation. Evaluates
 # residual operator components natively. Tests exactly how the strong continuous continuum representations
 # limit the discrete Jacobian matrices under extreme condition numbers ($Da \to 0$, high porosity gradients).
 #
@@ -175,6 +175,22 @@ struct ExactG <: Function; cfg::PorousNSSolver.PorousNSConfig; end
 
 # =========================================================================
 
+function _build_local_mesh(domain_cfg, mesh_cfg)
+    domain = Tuple(domain_cfg.bounding_box)
+    partition = Tuple(mesh_cfg.partition)
+    if mesh_cfg.element_type == "TRI"
+        model = CartesianDiscreteModel(domain, partition; isperiodic=Tuple(fill(false, length(partition))), map=identity)
+        model = simplexify(model)
+    else
+        model = CartesianDiscreteModel(domain, partition)
+    end
+    labels = get_face_labeling(model)
+    add_tag_from_tags!(labels, "inlet", [7])
+    add_tag_from_tags!(labels, "outlet", [8])
+    add_tag_from_tags!(labels, "walls", [1, 2, 3, 4, 5, 6])
+    return model
+end
+
 function run_diagnostics()
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
@@ -205,7 +221,7 @@ function run_diagnostics()
     write_report(r, "Method: ASGS")
     
     # Mesh and spaces
-    model = PorousNSSolver.create_mesh(base_config)
+    model = _build_local_mesh(base_config.domain, base_config.numerical_method.mesh)
     labels = get_face_labeling(model)
     add_tag_from_tags!(labels, "all_boundaries", [1,2,3,4,5,6,7,8])
     
@@ -261,7 +277,7 @@ function run_diagnostics()
         # 2. Picard Stage
         jac_picard(x, dx, y) = PorousNSSolver.weak_form_jacobian_picard(x, dx, y, cfg, dΩ, h, f_cf, alpha_cf, g_cf, nothing, nothing)
         op_picard = FEOperator(res_fn, jac_picard, X, Y)
-        nls_picard = PorousNSSolver.InstrumentedNewtonSolver(LUSolver(), cfg.solver.picard_iterations, cfg.solver.max_increases, cfg.solver.xtol, cfg.solver.stagnation_tol, cfg.solver.ftol, cfg.solver.linesearch_tolerance, cfg.solver.linesearch_alpha_min, (msg) -> write_report(r, "    [Picard] " * msg))
+        nls_picard = PorousNSSolver.InstrumentedNewtonSolver(LUSolver(), cfg.solver.picard_iterations, cfg.solver.max_increases, cfg.solver.xtol, cfg.solver.stagnation_noise_floor, cfg.solver.ftol, cfg.solver.linesearch_tolerance, cfg.solver.linesearch_alpha_min, (msg) -> write_report(r, "    [Picard] " * msg))
         solver_picard = FESolver(nls_picard)
         
         write_report(r, "--> Running Picard...")
@@ -272,7 +288,7 @@ function run_diagnostics()
         end
         
         # 3. Newton Stage
-        nls_newton = PorousNSSolver.InstrumentedNewtonSolver(LUSolver(), cfg.solver.newton_iterations, cfg.solver.max_increases, cfg.solver.xtol, cfg.solver.stagnation_tol, cfg.solver.ftol, cfg.solver.linesearch_tolerance, cfg.solver.linesearch_alpha_min, (msg) -> write_report(r, "    [Newton] " * msg))
+        nls_newton = PorousNSSolver.InstrumentedNewtonSolver(LUSolver(), cfg.solver.newton_iterations, cfg.solver.max_increases, cfg.solver.xtol, cfg.solver.stagnation_noise_floor, cfg.solver.ftol, cfg.solver.linesearch_tolerance, cfg.solver.linesearch_alpha_min, (msg) -> write_report(r, "    [Newton] " * msg))
         solver_newton = FESolver(nls_newton)
         
         if do_deep_diagnostics
@@ -281,7 +297,7 @@ function run_diagnostics()
             
             # Mid-Newton extraction (run 2 iters, test, then resume and finish)
             orig_iters = cfg.solver.newton_iterations
-            nls_newton_mid = PorousNSSolver.InstrumentedNewtonSolver(LUSolver(), 2, cfg.solver.max_increases, cfg.solver.xtol, cfg.solver.stagnation_tol, cfg.solver.ftol, cfg.solver.linesearch_tolerance, cfg.solver.linesearch_alpha_min, (msg) -> write_report(r, "    [Newton-Mid] " * msg))
+            nls_newton_mid = PorousNSSolver.InstrumentedNewtonSolver(LUSolver(), 2, cfg.solver.max_increases, cfg.solver.xtol, cfg.solver.stagnation_noise_floor, cfg.solver.ftol, cfg.solver.linesearch_tolerance, cfg.solver.linesearch_alpha_min, (msg) -> write_report(r, "    [Newton-Mid] " * msg))
             solve!(x0, FESolver(nls_newton_mid), op_newton)
             evaluate_diagnostics(x0, cfg, "MID NEWTON")
         end
@@ -381,10 +397,10 @@ function run_diagnostics()
         end
     end
 
-    # Run Main ASGS Perturbations
+    # Run Main VMS (ASGS mode) Perturbations
     for eps_pert in [0.0, 1e-6, 1e-3, 1e-1]
         deep = (eps_pert == 0.0 || eps_pert == 1e-3)
-        run_experiment_block("MAIN ASGS - Base", base_config, eps_pert, deep)
+        run_experiment_block("MAIN VMS (ASGS mode) - Base", base_config, eps_pert, deep)
     end
     
     # C6. Da continuation sweep
@@ -400,9 +416,9 @@ function run_diagnostics()
         run_experiment_block("DA SWEEP: Da = $da", loc_cfg, 0.0, false)
     end
     
-    # C7. ASGS ablation study
+    # C7. VMS ablation study
     write_report(r, "\n==================================================")
-    write_report(r, "C7. ASGS ABLATION STUDY")
+    write_report(r, "C7. VMS ABLATION STUDY")
     write_report(r, "==================================================")
     for mode in ["full", "galerkin", "momentum_only", "mass_only"]
         loc_cfg_solver = PorousNSSolver.SolverConfig(picard_iterations=5, newton_iterations=20, ablation_mode=mode)
@@ -411,9 +427,9 @@ function run_diagnostics()
         run_experiment_block("ABLATION: $mode", loc_cfg, 1e-3, true) # true to see cancellation ratio where applicable
     end
     
-    # C8. Reaction-excluded ASGS
+    # C8. Reaction-excluded VMS
     write_report(r, "\n==================================================")
-    write_report(r, "C8. REACTION-EXCLUDED ASGS TESTS")
+    write_report(r, "C8. REACTION-EXCLUDED VMS TESTS")
     write_report(r, "==================================================")
     for mode in ["remove_adjoint", "remove_tau"]
         loc_cfg_solver = PorousNSSolver.SolverConfig(picard_iterations=5, newton_iterations=20, ablation_mode="full", experimental_reaction_mode=mode)
@@ -425,8 +441,8 @@ function run_diagnostics()
     write_report(r, "\n==================================================")
     write_report(r, "ANSWERS TO DIAGNOSTIC QUESTIONS")
     write_report(r, "==================================================")
-    write_report(r, "Q1. Is there direct numerical evidence that ASGS nearly cancels the physical reaction term in this regime?")
-    write_report(r, "A1. Yes, refer to the C2 Reaction Cancellation section above in the MAIN ASGS blocks. The ratio ||G_sigma + S_sigma|| / max is printed.")
+    write_report(r, "Q1. Is there direct numerical evidence that VMS nearly cancels the physical reaction term in this regime?")
+    write_report(r, "A1. Yes, refer to the C2 Reaction Cancellation section above in the MAIN VMS blocks. The ratio ||G_sigma + S_sigma|| / max is printed.")
     write_report(r, "Q2. Is the full Jacobian implementation consistent with finite-difference directional derivatives?")
     write_report(r, "A2. Yes, refer to the C3 Jacobian Directional Derivative Test section. Relative differences reliably scale with epsilon.")
     write_report(r, "Q3. Is the Newton direction usually a descent direction for phi = 0.5*||R||^2?")
@@ -435,14 +451,14 @@ function run_diagnostics()
     write_report(r, "A4. Refer to the C6 Da sweep results. Stagnation frequency maps directly to lower Da values (higher reaction dominance).")
     write_report(r, "Q5. Is the issue mainly tied to momentum stabilization?")
     write_report(r, "A5. Refer to the C7 Ablation results. Comparing 'mass_only' vs 'full' isolates the momentum stabilization contribution to the stall.")
-    write_report(r, "Q6. Does removing reaction influence from the ASGS stabilization alleviate the stall?")
+    write_report(r, "Q6. Does removing reaction influence from the VMS stabilization alleviate the stall?")
     write_report(r, "A6. Refer to the C8 results mapping 'remove_adjoint' and 'remove_tau'.")
     write_report(r, "Q7. Is the Picard stage handing Newton a good state or not?")
     write_report(r, "A7. Refer to the 'AFTER PICARD' C1 decomposition logs. It shows whether the state is clean enough to support exact Newton.")
     write_report(r, "Q8. Does freezing tau derivatives materially improve Jacobian quality or final convergence?")
     write_report(r, "A8. The baseline uses freeze_jacobian_cusp = true, which omits tau derivatives to prevent severe rank collapse, improving robustness.")
     write_report(r, "Q9. Based on the data, what is the most likely dominant cause of stagnation?")
-    write_report(r, "A9. The most likely cause is exact cancellation of the continuous Galerkin reaction term by the discrete ASGS reaction adjoint, heavily degrading conditioning and eliminating coercivity.")
+    write_report(r, "A9. The most likely cause is exact cancellation of the continuous Galerkin reaction term by the discrete VMS reaction adjoint, heavily degrading conditioning and eliminating coercivity.")
     
     close_report(r)
     println("Diagnostics completed successfully. Report written to $(r.filepath)")

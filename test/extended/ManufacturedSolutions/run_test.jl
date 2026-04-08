@@ -35,6 +35,22 @@ using LinearAlgebra
 # Helper Constructors
 # ==============================================================================
 
+function _build_local_mesh(domain_cfg, mesh_cfg)
+    domain = Tuple(domain_cfg.bounding_box)
+    partition = Tuple(mesh_cfg.partition)
+    if mesh_cfg.element_type == "TRI"
+        model = CartesianDiscreteModel(domain, partition; isperiodic=Tuple(fill(false, length(partition))), map=identity)
+        model = simplexify(model)
+    else
+        model = CartesianDiscreteModel(domain, partition)
+    end
+    labels = get_face_labeling(model)
+    add_tag_from_tags!(labels, "inlet", [7])
+    add_tag_from_tags!(labels, "outlet", [8])
+    add_tag_from_tags!(labels, "walls", [1, 2, 3, 4, 5, 6])
+    return model
+end
+
 # Creates the domain porosity field structure parameterized by alpha bounds and geometry
 function build_porosity_field(config, alpha_0, alpha_infty)
     PorousNSSolver.SmoothRadialPorosity(Float64(alpha_0), Float64(alpha_infty), config.domain.r_1, config.domain.r_2)
@@ -186,7 +202,7 @@ function run_mms(config_file="test_config.json")
                     # Evaluated EXACTLY ONCE per resolution (n) to bypass intensive julia compilations
                     # ==============================================================================
                     config_dict = Dict(
-                        "physical_properties" => Dict("nu" => 1.0, "eps_val" => 0.0, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
+                        "physical_properties" => Dict("nu" => 1.0, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
                         "domain" => Dict(
                             "alpha_0" => 0.4, 
                             "bounding_box" => test_dict["domain"]["bounding_box"],
@@ -205,7 +221,7 @@ function run_mms(config_file="test_config.json")
                     config = PorousNSSolver.load_config_from_dict(config_dict)
                     
                     # Generate logical cell models natively spanning bounded domain
-                    model = PorousNSSolver.create_mesh(config)
+                    model = _build_local_mesh(config.domain, config.numerical_method.mesh)
                     labels = get_face_labeling(model)
                     add_tag_from_tags!(labels, "all_boundaries", [1,2,3,4,5,6,7,8])
                     
@@ -236,7 +252,7 @@ function run_mms(config_file="test_config.json")
                     solver_picard_it = config.numerical_method.solver.picard_iterations
                     max_inc = config.numerical_method.solver.max_increases
                     xtol = config.numerical_method.solver.xtol
-                    stagnation_tol = config.numerical_method.solver.stagnation_tol
+                    stagnation_tol = config.numerical_method.solver.stagnation_noise_floor
                     ftol = config.numerical_method.solver.ftol
                     ls_alpha_min = config.numerical_method.solver.linesearch_alpha_min
                     freeze_cusp = config.numerical_method.solver.freeze_jacobian_cusp
@@ -322,12 +338,16 @@ function run_mms(config_file="test_config.json")
                                         println("    [Attempt $(attempt+1)/6] eps_pert = $eps_p")
                                         println("      -> Delegating to PorousNSSolver.solve_system ($method)")
                                         
+                                        local_stab_cfg = PorousNSSolver.StabilizationConfig(
+                                            method=method,
+                                            osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
+                                            osgs_tolerance=config.numerical_method.stabilization.osgs_tolerance
+                                        )
                                         sys_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
                                             X, Y, model, dΩ, Ω, h_cf, f_cf, alpha_cf, g_cf, form, 
-                                            c_1, c_2, tau_reg_lim, freeze_cusp, solver_picard, solver_newton, 
-                                            x0, method, ftol, stagnation_tol, 
-                                            config.numerical_method.stabilization.osgs_iterations,
-                                            config.numerical_method.stabilization.osgs_tolerance
+                                            solver_picard, solver_newton, 
+                                            x0, c_1, c_2, 
+                                            config.physical_properties, local_stab_cfg, config.numerical_method.solver
                                         )
                                         
                                         if sys_success

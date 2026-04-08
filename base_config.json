@@ -39,7 +39,7 @@
         "solver": {
             "picard_iterations": 5,
             "newton_iterations": 20,
-            "ftol": 1e-10,
+            "ftol": 1e-8,
             "xtol": 1e-8,
             "max_increases": 2,
             "freeze_jacobian_cusp": false,
