@@ -6,8 +6,46 @@ using LinearAlgebra
 struct Paper2DMMS{F<:AbstractFormulation}
     formulation::F
     U::Float64
-    P_amp::Float64
     alpha_field::AbstractPorosityField
+    L::Float64
+    alpha_infty::Float64
+end
+
+function check_mms_parameters(mms::Paper2DMMS)
+    if mms.L <= 0.0
+        throw(ArgumentError("Characteristic length L must be strictly positive. Passed: $(mms.L)"))
+    end
+    if mms.U <= 0.0
+        throw(ArgumentError("Characteristic velocity U must be strictly positive. Passed: $(mms.U)"))
+    end
+    if mms.formulation.ν <= 0.0
+        throw(ArgumentError("Kinematic viscosity nu must be strictly positive. Passed: $(mms.formulation.ν)"))
+    end
+    
+    if mms.alpha_infty <= 0.0 || mms.alpha_infty > 1.0
+        throw(ArgumentError("Upper porosity bound alpha_infty must be strictly in (0, 1]. Passed: $(mms.alpha_infty)"))
+    end
+    
+    if hasproperty(mms.alpha_field, :alpha_0)
+        alpha_0 = mms.alpha_field.alpha_0
+        if alpha_0 <= 0.0 || alpha_0 > mms.alpha_infty
+            throw(ArgumentError("Base porosity alpha_0 must be strictly within (0, alpha_infty]. Passed: $alpha_0"))
+        end
+    end
+    
+    if hasproperty(mms.alpha_field, :r_1) && hasproperty(mms.alpha_field, :r_2)
+        r_1 = mms.alpha_field.r_1
+        r_2 = mms.alpha_field.r_2
+        if !(0.0 < r_1 < r_2 < mms.L / 2)
+            throw(ArgumentError("Radial bump configuration invalid. Requirement: 0 < r_1 < r_2 < L/2. Passed: r_1=$r_1, r_2=$r_2, L=$(mms.L)"))
+        end
+    end
+end
+
+function Paper2DMMS(form::AbstractFormulation, U::Float64, alpha_field::AbstractPorosityField; L=1.0, alpha_infty=1.0)
+    mms = Paper2DMMS(form, U, alpha_field, L, alpha_infty)
+    check_mms_parameters(mms)
+    return mms
 end
 
 function get_u_ex(mms::Paper2DMMS)
@@ -16,8 +54,28 @@ function get_u_ex(mms::Paper2DMMS)
     return x -> U * (alpha_field.alpha_0 / alpha(alpha_field, x)) * VectorValue(sin(pi*x[1])*sin(pi*x[2]), cos(pi*x[1])*cos(pi*x[2]))
 end
 
+function get_characteristic_scales(mms::Paper2DMMS)
+    nu = mms.formulation.ν
+    
+    # Gridap native parameter extracts
+    sigma_0 = 0.0
+    if hasproperty(mms.formulation.reaction_law, :sigma_constant)
+        sigma_0 = mms.formulation.reaction_law.sigma_constant
+    end
+    
+    L = mms.L
+    alpha_infty = mms.alpha_infty
+    U = mms.U
+    
+    Re = U * L / nu
+    Da = sigma_0 * L^2 / (alpha_infty * nu)
+    
+    P = (1.0 + Re + Da) * U * nu / L
+    return U, P
+end
+
 function get_p_ex(mms::Paper2DMMS)
-    P_amp = mms.P_amp
+    U_amp, P_amp = get_characteristic_scales(mms)
     return x -> P_amp * cos(pi*x[1])*sin(pi*x[2])
 end
 

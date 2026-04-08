@@ -34,6 +34,7 @@ end
 @with_kw struct StabilizationConfig
     method::String = "ASGS"
     osgs_iterations::Int = 3
+    osgs_tolerance::Float64 = 1e-5
 end
 
 @with_kw struct MeshConfig
@@ -53,6 +54,7 @@ end
     freeze_jacobian_cusp::Bool = false
     linesearch_tolerance::Float64 = 1.0001
     linesearch_alpha_min::Float64 = 1e-4
+    armijo_c1::Float64 = 1e-4
     run_diagnostics::Bool = false
     ablation_mode::String = "full"
     experimental_reaction_mode::String = "standard"

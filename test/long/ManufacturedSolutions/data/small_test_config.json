@@ -24,8 +24,8 @@
         },
         "mesh": {
             "partition": [10, 10],
-            "convergence_partitions": [20, 40],
-            "element_type": ["QUAD"]
+            "convergence_partitions": [10, 20, 40, 80, 160, 320, 640],
+            "element_type": ["TRI"]
         },
         "solver": {
             "xtol": 1e-8,

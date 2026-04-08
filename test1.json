@@ -1,1 +1,0 @@
-{"porosity_field":{"alpha_0":0.5},"mesh":{"partition":[10,10],"element_type":"QUAD"},"physical_parameters":{"f_x":10.0,"Re":1.0e6,"Da":1.0},"discretization":{"k_velocity":2,"k_pressure":1},"solver":{"stagnation_tol":1.0e-5,"newton_iterations":60,"method":"ASGS","freeze_jacobian_cusp":true,"ftol":1.0e-10,"xtol":1.0e-8}}

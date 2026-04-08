@@ -33,7 +33,8 @@
         },
         "stabilization": {
             "method": "ASGS",
-            "osgs_iterations": 3
+            "osgs_iterations": 3,
+            "osgs_tolerance": 1e-5
         },
         "solver": {
             "picard_iterations": 5,
@@ -46,6 +47,7 @@
             "freeze_jacobian_cusp": false,
             "linesearch_tolerance": 1.0001,
             "linesearch_alpha_min": 1e-4,
+            "armijo_c1": 1e-4,
             "run_diagnostics": false,
             "ablation_mode": "full",
             "experimental_reaction_mode": "standard"

@@ -67,7 +67,8 @@
           "description": "Mechanisms for stabilizing the Galerkin solver.",
           "properties": {
             "method": { "type": "string", "enum": ["ASGS", "OSGS", "VMS", "Galerkin"], "default": "ASGS", "description": "Stabilization method selected." },
-            "osgs_iterations": { "type": "integer", "default": 3, "description": "Iterations used for resolving Orthogonal Subgrid Scales." }
+            "osgs_iterations": { "type": "integer", "default": 3, "description": "Iterations used for resolving Orthogonal Subgrid Scales." },
+            "osgs_tolerance": { "type": "number", "default": 1e-5, "description": "Tolerance for terminating OSGS iterations before reaching the maximum." }
           },
           "additionalProperties": false
         },
@@ -86,6 +87,7 @@
             "freeze_jacobian_cusp": { "type": "boolean", "default": false, "description": "If true, freezes the magnitude of velocity in the nonlinearity Jacobian cross-terms." },
             "linesearch_tolerance": { "type": "number", "default": 1.0001, "description": "Acceptance threshold. Must strictly decrease residual unless > 1.0 (to ignore noise)." },
             "linesearch_alpha_min": { "type": "number", "default": 1e-4, "description": "Minimum step size allowed before linesearch fails." },
+            "armijo_c1": { "type": "number", "default": 1e-4, "description": "Armijo sufficient decrease parameter (c1) for the linesearch." },
             "run_diagnostics": { "type": "boolean", "default": false, "description": "Enable expanded diagnostics / debug print statements." },
             "ablation_mode": { "type": "string", "enum": ["full", "galerkin", "momentum_only", "mass_only"], "default": "full", "description": "Switch behavior of specific solver terms for systematic testing." },
             "experimental_reaction_mode": { "type": "string", "enum": ["standard", "remove_adjoint", "remove_tau"], "default": "standard", "description": "Toggles advanced reaction handling behaviors for high-Re modes." }

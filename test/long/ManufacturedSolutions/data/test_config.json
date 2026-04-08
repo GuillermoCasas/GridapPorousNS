@@ -24,7 +24,7 @@
         },
         "mesh": {
             "partition": [10, 10],
-            "convergence_partitions": [25, 50, 100, 200],
+            "convergence_partitions": [10, 20, 40, 80, 160, 320, 640],
             "element_type": ["QUAD", "TRI"]
         },
         "solver": {

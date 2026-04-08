@@ -129,6 +129,12 @@ function get_projection_policy(form::AbstractFormulation)
     return form.projection_policy
 end
 
+get_c1(k_velocity) = 4.0 * k_velocity^4
+get_c2(k_velocity) = 2.0 * k_velocity^2
+
+get_quadrature_degree(::Type{PaperGeneralFormulation}, k_velocity::Int) = 4 * k_velocity
+get_quadrature_degree(::Type{Legacy90d5749Mode}, k_velocity::Int) = 4 * k_velocity
+
 # Reusable Operators for Type Stability
 _get_dsigma_du_val(::ExactNewtonMode, law, u, α, h, du, reg, ν, c_1, c_2) = Operation(DSigOp(law, reg, ν, c_1, c_2))(u, ∇(u), α, ∇(α), h, du)
 _get_dsigma_du_val(::PicardMode, law, u, α, h, du, reg, ν, c_1, c_2) = 0.0 * (u ⋅ du)

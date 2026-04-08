@@ -49,7 +49,7 @@ function run_simulation(config_path::String;
     Y = MultiFieldFESpace([V, Q])
     X = MultiFieldFESpace([U, P])
     
-    degree = 4 * kv
+    degree = get_quadrature_degree(typeof(form), kv)
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     
@@ -74,7 +74,7 @@ function run_simulation(config_path::String;
     
     op = FEOperator(res, jac, X, Y)
     
-    nls = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4)
+    nls = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, config.numerical_method.solver.armijo_c1)
     solver = FESolver(nls)
     
     println("Solving non-linear system...")
@@ -93,7 +93,7 @@ function run_simulation(op_newton::FEOperator, op_picard::FEOperator, config::Po
     println("Solving Picard Initialization...")
     x_picard = solve(solver_picard, op_picard)
     
-    nls_newton = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, 1e-4)
+    nls_newton = SafeNewtonSolver(LUSolver(), config.numerical_method.solver.newton_iterations, config.numerical_method.solver.max_increases, config.numerical_method.solver.xtol, config.numerical_method.solver.stagnation_tol, config.numerical_method.solver.ftol, config.numerical_method.solver.linesearch_alpha_min, config.numerical_method.solver.armijo_c1)
     solver_newton = FESolver(nls_newton)
     println("Solving Newton-Raphson...")
     solve!(x_picard, solver_newton, op_newton)

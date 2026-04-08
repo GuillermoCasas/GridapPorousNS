@@ -25,6 +25,7 @@ include("stabilization/tau.jl")
 
 # Solvers
 include("solvers/nonlinear.jl")
+include("solvers/porous_solver.jl")
 
 # Diagnostics and Problems
 include("problems/mms_paper_2d.jl")
