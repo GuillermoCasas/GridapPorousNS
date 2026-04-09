@@ -45,5 +45,6 @@ function dsigma_du(law::ForchheimerErgunLaw, kin::KinematicState, med::MediumSta
     α = med.alpha
     u = kin.u
     b_term = law.sigma_nonlinear * (1.0 - α) / α
-    return b_term * (u ⋅ du) / mag_u
+    mag_u_reg = mag_u + 1e-12
+    return b_term * (u ⋅ du) / mag_u_reg
 end

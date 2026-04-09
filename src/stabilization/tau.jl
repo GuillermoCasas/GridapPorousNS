@@ -30,7 +30,9 @@ function compute_dtau_1_du(kin, med, du_val, ν, c_1, c_2, tau_reg_lim, freeze_c
     sig_val = sigma(rxn_law, kin, med, mag_u)
     τ_1_val = 1.0 / ( (alpha_val * A_NS_val) + sig_val + tau_reg_lim )
     
-    dA_NS_du = (c_2 / h_val) / mag_u * (u_val ⋅ du_val)
+    # Regularize derivative cleanly to avoid Exact Newton NaN evaluations at perfect Dirichlet wall stagnation
+    mag_u_reg = mag_u + 1e-12
+    dA_NS_du = (c_2 / h_val) / mag_u_reg * (u_val ⋅ du_val)
     dsig_du = dsigma_du(rxn_law, kin, med, mag_u, du_val)
     
     dTauInv_du = alpha_val * dA_NS_du + dsig_du
@@ -51,6 +53,7 @@ function compute_dtau_2_du(kin, med, du_val, ν, c_1, c_2, tau_reg_lim, freeze_c
     dA_NS_dmag = c_2 / h_val
     denom = c_1 * alpha_val / A_NS_val + tau_reg_lim
     
-    scalar_deriv = (h_val * h_val) / (denom * denom) * (c_1 * alpha_val) / (A_NS_val * A_NS_val) * dA_NS_dmag / mag_u
+    mag_u_reg = mag_u + 1e-12
+    scalar_deriv = (h_val * h_val) / (denom * denom) * (c_1 * alpha_val) / (A_NS_val * A_NS_val) * dA_NS_dmag / mag_u_reg
     return scalar_deriv * (u_val ⋅ du_val)
 end

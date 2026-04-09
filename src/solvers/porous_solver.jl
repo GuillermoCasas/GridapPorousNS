@@ -96,31 +96,48 @@ function solve_system(
         # Attempt Picard
         println("      -> ASGS: Attempting Picard solver...")
         x0_backup = copy(get_free_dof_values(x0))
-        try
-            solve!(x0, solver_picard, op_picard)
-            if norm(get_free_dof_values(x0), Inf) > 1e12 || any(isnan, get_free_dof_values(x0))
-                println("      -> Picard diverged. Reverting.")
-                get_free_dof_values(x0) .= x0_backup
-            end
-        catch
-            println("      -> Picard threw error. Reverting.")
-            get_free_dof_values(x0) .= x0_backup
-        end
-
-        println("      -> ASGS: Solving Exact Newton...")
+        local picard_success = false
         eval_time = @elapsed begin
             try
-                res_solve = solve!(x0, solver_newton, op_newton)
-                cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
-                nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
-                iter_count = nls_cache.result.iterations
-                final_res = nls_cache.result.residual_norm
-                if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
-                    success = true
+                res_picard = solve!(x0, solver_picard, op_picard)
+                cache_picard = res_picard isa Tuple ? res_picard[2] : res_picard
+                nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
+                
+                final_res_picard = nls_cache_picard.result.residual_norm
+                if final_res_picard <= ftol
+                    picard_success = true
+                    iter_count = nls_cache_picard.result.iterations
+                end
+
+                if norm(get_free_dof_values(x0), Inf) > 1e12 || any(isnan, get_free_dof_values(x0))
+                    println("      -> Picard diverged. Reverting.")
+                    get_free_dof_values(x0) .= x0_backup
+                    picard_success = false
                 end
             catch
-                println("      -> Newton ConvergenceError.")
-                success = false
+                println("      -> Picard threw error. Reverting.")
+                get_free_dof_values(x0) .= x0_backup
+                picard_success = false
+            end
+
+            if picard_success
+                println("      -> ASGS: Picard converged successfully! Skipping Exact Newton.")
+                success = true
+            else
+                println("      -> ASGS: Solving Exact Newton...")
+                try
+                    res_solve = solve!(x0, solver_newton, op_newton)
+                    cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
+                    nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                    iter_count = nls_cache.result.iterations
+                    final_res = nls_cache.result.residual_norm
+                    if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
+                        success = true
+                    end
+                catch
+                    println("      -> Newton ConvergenceError.")
+                    success = false
+                end
             end
         end
         return success, x0, iter_count, eval_time
@@ -139,18 +156,32 @@ function solve_system(
         # the updated primary fields ($U_h$), which are then used to re-project the continuous 
         # residual until discrete equilibrium ($x_{diff} < osgs_{tol}$) is achieved.
         # ==============================================================================
-        println("      -> OSGS Iterative Loop Start")
+        println("\n      [+] Commencing Orthogonal Subgrid Scale (OSGS) fixed-point recursive relaxation loop (allocating for max iterations: $max_osgs_iters)...")
         
         # Gridap L2 Projections inherit boundary conditions from the FESpace they map onto.
-        # Note: Projecting directly onto TrialFESpace `U` will inherently zero out the residual 
-        # errors exactly on Dirichlet boundary layers (since `U` enforces fixed walls/inflow). 
-        # While mathematically imperfect (the continuous residual is not zero on boundary nodes),
-        # this topological choice stabilizes the sub-grid field interior natively without requiring 
-        # a fully disconnected Discontinuous Galerkin L2 field construction loop.
+        # Stabilizing the sub-grid field natively without requiring full DG looping.
         U, P = X
         V, Q = Y
+        
+        # --- Precompute and Cache L2 Mass Matrices ---
+        # The left-hand side mass-matrices for the L2 projections remain functionally invariant 
+        # across the non-linear OSGS scheme, allowing us to factorize them exactly once.
+        println("\n      [+] Initiating pre-assembly & structural factorization for static OSGS L2 Mass Matrices...")
+        M_u = assemble_matrix((u,v) -> ∫(v ⋅ u)dΩ, U, V)
+        M_p = assemble_matrix((p,q) -> ∫(q * p)dΩ, P, Q)
+        
+        ls_u = LUSolver()
+        ls_p = LUSolver()
+        num_u_fac = numerical_setup(symbolic_setup(ls_u, M_u), M_u)
+        num_p_fac = numerical_setup(symbolic_setup(ls_p, M_p), M_p)
 
         eval_time = @elapsed begin
+            local accelerator = nothing
+            if sol_cfg.accelerator.type == "Anderson"
+                println("      [+] Initializing Anderson Acceleration (m = $(sol_cfg.accelerator.m), damping = $(sol_cfg.accelerator.relaxation_factor))")
+                accelerator = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor)
+            end
+
             for osgs_iter in 1:max_osgs_iters
                 println("        [OSGS Iter $osgs_iter]")
                 
@@ -172,33 +203,36 @@ function solve_system(
                     break
                 end
                 
+                if !isnothing(accelerator)
+                    g_k = get_free_dof_values(final_x0)
+                    x_mixed = update!(accelerator, x_prev, g_k)
+                    get_free_dof_values(final_x0) .= x_mixed
+                end
+                
                 x_diff = norm(get_free_dof_values(final_x0) - x_prev, Inf)
-                println("        -> Diff: $x_diff")
+                println("        * Comparing L^inf projection difference against previous relaxation step: \n          x_diff_norm = $x_diff")
                 
                 if x_diff < osgs_tol
-                    println("        -> OSGS Converged!")
+                    println("        [+] OSGS Staggered Fixed-Point loop successfully converged within strict orthogonality tolerance!")
                     success = true
                     break
                 end
                 
-                # Extract updated local solution for projection mapping
                 u_h, p_h = final_x0
-                
-                # Continuous representations of the local analytical residual
                 R_u = inner_projection_u(u_h, p_h, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
                 R_p = inner_projection_p(u_h, p_h, form, dΩ, h_cf, alpha_cf, g_cf)
                 
-                # Explicit L2 continuous projection operator mappings: `∫(v ⋅ pi_u) = ∫(v ⋅ R_u)`
-                # As noted in the article (around Eq. 3.20b), this relies on a simplified standard L2 
-                # inner product approximation (∫(u ⋅ v)dΩ) of the theoretical tau-weighted inner product 
-                # projection (∫(v ⋅ τ ⋅ u)dΩ). This theoretically mild concession favors highly efficient, 
-                # symmetric (often diagonal or easily invertible) mass-matrix based L2 projections while 
-                # preserving analogous subgrid stabilization and resolving properties.
-                pi_u_op = AffineFEOperator((u,v) -> ∫(v ⋅ u)dΩ, v -> ∫(v ⋅ R_u)dΩ, U, V)
-                pi_p_op = AffineFEOperator((p,q) -> ∫(q * p)dΩ, q -> ∫(q * R_p)dΩ, P, Q)
+                # Exclusively assemble dynamic residual right-hand side tracking updated non-linear field
+                println("        * Executing staggered global domain numerical integrals to map abstract analytical residuals onto L2 discrete Right-Hand Side vectors (R_u, R_p)...")
+                b_u = assemble_vector(v -> ∫(v ⋅ R_u)dΩ, V)
+                b_p = assemble_vector(q -> ∫(q * R_p)dΩ, Q)
                 
-                pi_u = solve(pi_u_op)
-                pi_p = solve(pi_p_op)
+                println("        * Projecting analytical algebraic residuals onto discrete sub-grid scale finite element meshes (pi_u, pi_p) via back-substitution...")
+                x_u = allocate_in_domain(M_u); solve!(x_u, num_u_fac, b_u)
+                x_p = allocate_in_domain(M_p); solve!(x_p, num_p_fac, b_p)
+                
+                pi_u = FEFunction(U, x_u)
+                pi_p = FEFunction(P, x_p)
             end
         end
         return success, final_x0, iter_count, eval_time

@@ -31,6 +31,10 @@
             "xtol": 1e-8,
             "stagnation_noise_floor": 1e-3,
             "max_increases": 3
+        },
+        "stabilization": {
+            "method": ["ASGS", "OSGS"],
+            "osgs_iterations": 10
         }
     },
     "output": {

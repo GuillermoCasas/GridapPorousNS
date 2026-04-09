@@ -89,7 +89,7 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     
     inc_count = 0
     
-    println("    => Assembling initial non-linear residual...")
+    println("    [+] Evaluating the initial PDE non-linear residual across the test space (r = b(u_h, v))...")
     residual!(b, op, x)
     
     # Track L_∞ norm of continuous spatial residual formulation for absolute convergence
@@ -120,16 +120,16 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         final_i = i
         
         # Gridap directly links analytical mathematical Jacobian functions mapping onto explicit matrix blocks
-        println("    => Assembling Jacobian matrix (Iteration $i)...")
+        println("    [+] Calculating the exact Fréchet derivative Jacobian matrix via AbstractFEOperators (Iteration $i)...")
         jacobian!(A, op, x)
         
-        println("    => Setting up numerical factorization...")
+        println("    [+] Initializing LU numerical factorization module for the sparse Jacobian...")
         if ls_cache === nothing
             ls_cache = symbolic_setup(solver.ls, A)
         end
         ns = numerical_setup(ls_cache, A)
         
-        println("    => Solving linear system...")
+        println("    [+] Back-substituting to compute the Newton-Raphson descent direction (dx)...")
         solve!(dx, ns, b)
         
         # If linear solve produced NaNs, matrix is singular or completely broken

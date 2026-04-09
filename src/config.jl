@@ -31,6 +31,12 @@ Base.@kwdef struct ElementSpacesConfig
     k_pressure::Int = 1
 end
 
+Base.@kwdef struct AcceleratorConfig
+    type::String = "None"
+    m::Int = 5
+    relaxation_factor::Float64 = 1.0
+end
+
 Base.@kwdef struct StabilizationConfig
     method::String = "ASGS"
     osgs_iterations::Int = 3
@@ -57,6 +63,7 @@ Base.@kwdef struct SolverConfig
     run_diagnostics::Bool = false
     ablation_mode::String = "full"
     experimental_reaction_mode::String = "standard"
+    accelerator::AcceleratorConfig = AcceleratorConfig()
     # Note: stagnation_tol, use_linesearch, linesearch_tolerance were pruned unless requested.
 end
 
@@ -83,6 +90,7 @@ end
 StructTypes.StructType(::Type{PhysicalProperties}) = StructTypes.Struct()
 StructTypes.StructType(::Type{DomainConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ElementSpacesConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{AcceleratorConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{StabilizationConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{MeshConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{SolverConfig}) = StructTypes.Struct()
@@ -102,6 +110,8 @@ function validate!(cfg::PorousNSConfig)
     @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"
     @assert sol.divergence_merit_factor >= 1.0 "Divergence merit factor must be >= 1.0"
     @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"
+    @assert sol.accelerator.m >= 1 "Accelerator history size m must be >= 1"
+    @assert 0.0 < sol.accelerator.relaxation_factor <= 1.0 "Accelerator relaxation_factor must be in (0, 1]"
     
     # Stabilization
     stab = cfg.numerical_method.stabilization
@@ -145,6 +155,9 @@ function _check_unknown_keys_hierarchical(dict::AbstractDict)
         end
         if haskey(nm, "solver") && nm["solver"] isa AbstractDict
             _check_unknown_keys(SolverConfig, nm["solver"], "numerical_method.solver")
+            if haskey(nm["solver"], "accelerator") && nm["solver"]["accelerator"] isa AbstractDict
+                _check_unknown_keys(AcceleratorConfig, nm["solver"]["accelerator"], "numerical_method.solver.accelerator")
+            end
         end
         if haskey(nm, "mesh") && nm["mesh"] isa AbstractDict
             _check_unknown_keys(MeshConfig, nm["mesh"], "numerical_method.mesh")

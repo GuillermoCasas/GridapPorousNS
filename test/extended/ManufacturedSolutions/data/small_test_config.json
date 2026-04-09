@@ -17,6 +17,10 @@
         "bounding_box": [-0.5, 0.5, -0.5, 0.5]
     },
     "numerical_method": {
+        "stabilization": {
+            "method": ["ASGS", "OSGS"],
+            "osgs_iterations": 3
+        },
         "element_spaces": {
             "k_velocity": [1],
             "k_pressure": [1],

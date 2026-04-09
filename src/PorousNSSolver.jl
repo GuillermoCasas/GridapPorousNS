@@ -25,7 +25,9 @@ include("stabilization/tau.jl")
 
 # Solvers
 include("solvers/nonlinear.jl")
+include("solvers/accelerators.jl")
 include("solvers/porous_solver.jl")
+include("metrics.jl")
 
 # Diagnostics and Problems
 include("problems/mms_paper_2d.jl")
@@ -35,5 +37,6 @@ include("run_simulation.jl")
 export run_simulation
 export load_config
 export PorousNSConfig
+export compute_reference_errors
 
 end # module

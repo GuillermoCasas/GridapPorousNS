@@ -114,13 +114,16 @@ function run_mms(config_file="test_config.json")
     Da_list = as_list(test_dict["physical_properties"]["Da"])
     alpha_list = as_list(test_dict["domain"]["alpha_0"])
     
+    
     nm_dict = test_dict["numerical_method"]
     elem_dict = nm_dict["element_spaces"]
     mesh_dict = nm_dict["mesh"]
+    stab_dict = get(nm_dict, "stabilization", Dict("method" => ["ASGS", "OSGS"]))
     
     kv_list = as_list(elem_dict["k_velocity"])
     kp_list = as_list(elem_dict["k_pressure"])
     etype_list = as_list(mesh_dict["element_type"])
+    methods = as_list(get(stab_dict, "method", ["ASGS", "OSGS"]))
     
     equal_order_only = get(test_dict, "equal_order_only", false)
     if haskey(nm_dict, "element_spaces") && haskey(elem_dict, "equal_order_only")
@@ -160,8 +163,8 @@ function run_mms(config_file="test_config.json")
             end
         end
     end
+    close(h5f)
     
-    methods = ["ASGS", "OSGS"]
     conv_parts = mesh_dict["convergence_partitions"]
     
     total_runs = sum(1 for etype in etype_list, kv in kv_list, kp in kp_list, alpha_0 in alpha_list, Da in Da_list, Re in Re_list if !(equal_order_only && kv != kp)) * length(methods)
@@ -335,8 +338,10 @@ function run_mms(config_file="test_config.json")
                                         u_0_func(x) = u_final(x) + eps_p * (u_ex_L2 / norm_h) * h_raw_func(x)
                                         x0 = interpolate_everywhere([u_0_func, p_final], X)
                                         
-                                        println("    [Attempt $(attempt+1)/6] eps_pert = $eps_p")
-                                        println("      -> Delegating to PorousNSSolver.solve_system ($method)")
+                                        println("\n    ==================================================")
+                                        println("    [Attempt $(attempt+1)/$(max_n_pert + 2)] Homotopy Perturbation Scale: eps_pert = $eps_p")
+                                        println("    [!] Delegating orchestration to PDE assembly module via `src/solvers/porous_solver.jl` (Mode: $method)")
+                                        println("    ==================================================")
                                         
                                         local_stab_cfg = PorousNSSolver.StabilizationConfig(
                                             method=method,
@@ -351,7 +356,7 @@ function run_mms(config_file="test_config.json")
                                         )
                                         
                                         if sys_success
-                                            println("      -> Converged gracefully! Breaking loop.")
+                                            println("\n      [✅] Full non-linear algebraic system converged gracefully mathematically! Escaping constraint loop.")
                                             success = true
                                             successful_eps = eps_p
                                             final_x0 = sys_final_x0
@@ -359,7 +364,7 @@ function run_mms(config_file="test_config.json")
                                             iter_count_attempt = sys_iter_count
                                             break
                                         else
-                                            println("      -> Stalled above tolerance threshold or diverged.")
+                                            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$osgs_tol`) or system fully diverged.")
                                         end
                                     end
                                     
@@ -385,70 +390,66 @@ function run_mms(config_file="test_config.json")
                                     push!(results_cache[k_id]["eval_eps"], successful_eps)
                                     
                                     println("  -> L2 u/p: ", round(el2_u, sigdigits=4), " / ", round(el2_p, sigdigits=4), " | H1 u/p: ", round(eh1_u, sigdigits=4), " / ", round(eh1_p, sigdigits=4))
+                                    # =========================================================================================
+                                    # EXPORT CURRENT CURVE TO HDF5 DYNAMICALLY
+                                    # =========================================================================================
+                                    sig_base = (Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp), String(etype))
+                                    if haskey(existing_signatures, sig_base)
+                                        c_idx = existing_signatures[sig_base]
+                                    else
+                                        max_idx += 1
+                                        c_idx = max_idx
+                                        existing_signatures[sig_base] = c_idx
+                                    end
+                                    
+                                    h5open(h5_path, "r+") do h5f_out
+                                        res = results_cache[k_id]
+                                        grp_name = "config_$(c_idx)_$(method)"
+                                        
+                                        if haskey(h5f_out, grp_name)
+                                            delete_object(h5f_out, grp_name)
+                                        end
+                                        
+                                        g = create_group(h5f_out, grp_name)
+                                        g["h"] = res["hs"]
+                                        g["err_u_l2"] = res["err_u_l2"]
+                                        g["err_p_l2"] = res["err_p_l2"]
+                                        g["err_u_h1"] = res["err_u_h1"]
+                                        g["err_p_h1"] = res["err_p_h1"]
+                                        g["eval_times"] = res["eval_times"]
+                                        g["eval_iters"] = res["eval_iters"]
+                                        g["eval_eps"] = res["eval_eps"]
+                                        
+                                        attributes(g)["total_time_s"] = sum(res["eval_times"])
+                                        attributes(g)["total_iters"] = sum(res["eval_iters"])
+                                        attributes(g)["Re"] = Float64(Re)
+                                        attributes(g)["Da"] = Float64(Da)
+                                        attributes(g)["alpha_0"] = Float64(alpha_0)
+                                        attributes(g)["physical_epsilon"] = 0.0
+                                        attributes(g)["numerical_epsilon_coeff"] = 0.0
+                                        attributes(g)["k_velocity"] = Int(kv)
+                                        attributes(g)["k_pressure"] = Int(kp)
+                                        attributes(g)["element_type"] = String(etype)
+                                        attributes(g)["method"] = String(method)
+                                        
+                                        compute_slope(x, y) = sum((x .- sum(x)/length(x)) .* (y .- sum(y)/length(y))) / (sum((x .- sum(x)/length(x)).^2) + 1e-15)
+                                        log_h = log.(res["hs"])
+                                        attributes(g)["rate_u_l2"] = compute_slope(log_h, log.(res["err_u_l2"]))
+                                        attributes(g)["rate_u_h1"] = compute_slope(log_h, log.(res["err_u_h1"]))
+                                        attributes(g)["rate_p_l2"] = compute_slope(log_h, log.(res["err_p_l2"]))
+                                        attributes(g)["rate_p_h1"] = compute_slope(log_h, log.(res["err_p_h1"]))
+                                        
+                                        println("\n    [💾] Appended $(grp_name) accurately to HDF5 file layout. Available for plotting!")
+                                    end
                                 end # end method
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    # 3. Export convergence partitions metrics
-    for etype in etype_list, kv in kv_list, kp in kp_list, alpha_0 in alpha_list, Da in Da_list, Re in Re_list
-        if equal_order_only && kv != kp; continue; end
-        
-        sig_base = (Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp), String(etype))
-        if haskey(existing_signatures, sig_base)
-            c_idx = existing_signatures[sig_base]
-        else
-            max_idx += 1
-            c_idx = max_idx
-            existing_signatures[sig_base] = c_idx
-        end
-        
-        for method in methods
-            k_id = (etype, kv, kp, alpha_0, Da, Re, method)
-            res = results_cache[k_id]
-            
-            grp_name = "config_$(c_idx)_$(method)"
-            if haskey(h5f, grp_name)
-                delete_object(h5f, grp_name)
-            end
-            
-            g = create_group(h5f, grp_name)
-            g["h"] = res["hs"]
-            g["err_u_l2"] = res["err_u_l2"]
-            g["err_p_l2"] = res["err_p_l2"]
-            g["err_u_h1"] = res["err_u_h1"]
-            g["err_p_h1"] = res["err_p_h1"]
-            g["eval_times"] = res["eval_times"]
-            g["eval_iters"] = res["eval_iters"]
-            g["eval_eps"] = res["eval_eps"]
-            
-            attributes(g)["total_time_s"] = sum(res["eval_times"])
-            attributes(g)["total_iters"] = sum(res["eval_iters"])
-            attributes(g)["Re"] = Float64(Re)
-            attributes(g)["Da"] = Float64(Da)
-            attributes(g)["alpha_0"] = Float64(alpha_0)
-            attributes(g)["physical_epsilon"] = 0.0
-            attributes(g)["numerical_epsilon_coeff"] = 0.0
-            attributes(g)["k_velocity"] = Int(kv)
-            attributes(g)["k_pressure"] = Int(kp)
-            attributes(g)["element_type"] = String(etype)
-            attributes(g)["method"] = String(method)
-            
-            compute_slope(x, y) = sum((x .- sum(x)/length(x)) .* (y .- sum(y)/length(y))) / (sum((x .- sum(x)/length(x)).^2) + 1e-15)
-            log_h = log.(res["hs"])
-            attributes(g)["rate_u_l2"] = compute_slope(log_h, log.(res["err_u_l2"]))
-            attributes(g)["rate_u_h1"] = compute_slope(log_h, log.(res["err_u_h1"]))
-            attributes(g)["rate_p_l2"] = compute_slope(log_h, log.(res["err_p_l2"]))
-            attributes(g)["rate_p_h1"] = compute_slope(log_h, log.(res["err_p_h1"]))
-        end
-    end
-    
-    close(h5f)
-end
+                            end # end Re
+                        end # end Da
+                    end # end alpha_0
+                end # end n
+            end # end kp
+        end # end kv
+    end # end etype
+end # end function
 
 if abspath(PROGRAM_FILE) == @__FILE__
     config_file = length(ARGS) > 0 ? ARGS[1] : "test_config.json"

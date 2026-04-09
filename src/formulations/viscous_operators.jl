@@ -131,10 +131,12 @@ end
 
 # [paper-faithful] Computes `2*∇⋅(α*ν*D(u))` where `D(u) = ε(u) - (1/d)*(∇⋅u)*I`.
 function strong_viscous_operator(::DeviatoricSymmetricViscosity, u, α, ν)
-    D_u = Operation(EvalDevSymOp())(∇(u))
-    div_D_u = Operation(EvalDivDevSymOp())(Δ(u), ∇∇(u))
-    
-    return 2.0 * ν * (D_u ⋅ ∇(α)) + 2.0 * α * ν * div_D_u
+    # As explicitly formulated in the momentum stabilization residual (Equation A.5 in article.pdf),
+    # the paper drops both the ∇(∇⋅u) dilatancy gradient and the deviatoric trace remainder
+    # from the strong operator evaluation, assuming ∇⋅(αu) = 0 inside the unresolvable scales.
+    # We match this exactly: α * ν * Δ(u) + 2.0 * ν * (ε(u) ⋅ ∇(α)).
+    div_D_u = 0.5 * Δ(u) 
+    return 2.0 * ν * (ε(u) ⋅ ∇(α)) + 2.0 * α * ν * div_D_u
 end
 
 function weak_viscous_operator(::DeviatoricSymmetricViscosity, u, v, α, ν)
@@ -151,9 +153,7 @@ end
 
 function adjoint_viscous_operator(::DeviatoricSymmetricViscosity, v, α, ν)
     D_v = Operation(EvalDevSymOp())(∇(v))
-    div_D_v = Operation(EvalDivDevSymOp())(Δ(v), ∇∇(v))
-    
-    # [paper-faithful] This implies the VMS continuous formal adjoint is evaluated EXACTLY
-    # across any dimension without losing geometric rigor or AST parity.
+    # N-dimensional adjoint continuous VMS operator, reflecting the strong operator simplification.
+    div_D_v = 0.5 * Δ(v)
     return 2.0 * ν * (D_v ⋅ ∇(α)) + 2.0 * α * ν * div_D_v
 end

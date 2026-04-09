@@ -19,6 +19,17 @@ def plot_cocquet():
         N_list = np.array(file["N_list"])
         h = 1.0 / N_list
         
+        delta = None
+        for k in [1, 2]:
+            for method in ["ASGS", "OSGS"]:
+                group_name = f"{method}/P{k}P{k}"
+                if group_name in file:
+                    if "outlet_truncation_delta" in file[group_name].attrs:
+                        delta = file[group_name].attrs["outlet_truncation_delta"]
+                        break
+            if delta is not None:
+                break
+        
         for k in [1, 2]:
             for method in ["ASGS", "OSGS"]:
                 group_name = f"{method}/P{k}P{k}"
@@ -118,7 +129,8 @@ def plot_cocquet():
     ax2.grid(True, which="both", ls="--")
     ax2.legend(handlelength=4.0)
     
-    plt.suptitle(r'Cocquet Experiment Convergence Analysis: Equal-Order P1 and P2 (Re=500, $c_\text{in}=0.5$)', fontsize=16)
+    delta_str = f", $\delta=${delta}" if delta is not None else ""
+    plt.suptitle(rf'Cocquet Experiment Convergence Analysis: P1 and P2 (Re=500, c_in=0.5{delta_str})', fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     
     plot_file = os.path.join(results_dir, 'convergence_cocquet.png')

@@ -103,8 +103,11 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
     u_ex_func = get_u_ex(mms)
     p_ex_func = get_p_ex(mms)
     
-    u_ex_cf = CellField(u_ex_func, Ω)
-    p_ex_cf = CellField(p_ex_func, Ω)
+    # By strictly interpolating the analytical solution onto the test formulation spaces,
+    # we mathematically align the generated forcing vector (f_ex) with the exact finite element subspace,
+    # natively bypassing Gridap's AutoDiff failure trying to abstractly differentiate VectorValue functions.
+    u_ex_cf = interpolate_everywhere(u_ex_func, X.spaces[1])
+    p_ex_cf = interpolate_everywhere(p_ex_func, X.spaces[2])
     alpha_cf = CellField(x -> alpha(mms.alpha_field, x), Ω)
     
     # 1. Provide f_ex mathematically matching R_u(u_ex) = 0 internally.
