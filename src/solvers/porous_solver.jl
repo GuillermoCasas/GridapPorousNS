@@ -21,15 +21,13 @@ using Gridap.Algebra
 using LinearAlgebra
 
 function inner_projection_u(u, p, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
-    # Define L2 projection for momentum residual
-    R_u = x -> eval_strong_residual_u(form, u, p, h_cf, alpha_cf, f_cf, c_1, c_2)(x)
-    return R_u
+    # Define L2 projection for momentum residual natively as a CellField
+    return eval_strong_residual_u(form, u, p, h_cf, alpha_cf, f_cf, c_1, c_2)
 end
 
 function inner_projection_p(u, p, form, dΩ, h_cf, alpha_cf, g_cf)
-    # Define L2 projection for mass residual
-    R_p = x -> eval_strong_residual_p(form, u, p, alpha_cf, g_cf)(x)
-    return R_p
+    # Define L2 projection for mass residual natively as a CellField
+    return eval_strong_residual_p(form, u, p, alpha_cf, g_cf)
 end
 
 """
@@ -93,50 +91,72 @@ function solve_system(
         op_picard = FEOperator(res_fn, jac_picard, X, Y)
         op_newton = FEOperator(res_fn, jac_newton, X, Y)
 
-        # Attempt Picard
-        println("      -> ASGS: Attempting Picard solver...")
         x0_backup = copy(get_free_dof_values(x0))
-        local picard_success = false
+        
         eval_time = @elapsed begin
+            println("      -> ASGS: Attempting Exact Newton solver initially...")
+            local newton_success = false
             try
-                res_picard = solve!(x0, solver_picard, op_picard)
-                cache_picard = res_picard isa Tuple ? res_picard[2] : res_picard
-                nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
-                
-                final_res_picard = nls_cache_picard.result.residual_norm
-                if final_res_picard <= ftol
-                    picard_success = true
-                    iter_count = nls_cache_picard.result.iterations
+                res_newton = solve!(x0, solver_newton, op_newton)
+                cache_newton = res_newton isa Tuple ? res_newton[2] : res_newton
+                nls_cache = cache_newton isa Tuple ? cache_newton[2] : cache_newton
+                final_res = nls_cache.result.residual_norm
+                iter_count = nls_cache.result.iterations
+                if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
+                    newton_success = true
                 end
-
-                if norm(get_free_dof_values(x0), Inf) > 1e12 || any(isnan, get_free_dof_values(x0))
-                    println("      -> Picard diverged. Reverting.")
-                    get_free_dof_values(x0) .= x0_backup
-                    picard_success = false
-                end
-            catch
-                println("      -> Picard threw error. Reverting.")
-                get_free_dof_values(x0) .= x0_backup
-                picard_success = false
+            catch e
+                println("      -> Newton ConvergenceError. Exception: ", e)
+                newton_success = false
             end
-
-            if picard_success
-                println("      -> ASGS: Picard converged successfully! Skipping Exact Newton.")
+            
+            if newton_success
+                println("      -> ASGS: Exact Newton converged initially! Skipping Picard homotopy.")
                 success = true
             else
-                println("      -> ASGS: Solving Exact Newton...")
+                println("      -> ASGS: Exact Newton aborted. Orchestrating Picard Homotopy fallback...")
+                get_free_dof_values(x0) .= x0_backup
+                
                 try
-                    res_solve = solve!(x0, solver_newton, op_newton)
-                    cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
-                    nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
-                    iter_count = nls_cache.result.iterations
-                    final_res = nls_cache.result.residual_norm
-                    if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
+                    res_picard = solve!(x0, solver_picard, op_picard)
+                    cache_picard = res_picard isa Tuple ? res_picard[2] : res_picard
+                    nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
+                    
+                    final_res_picard = nls_cache_picard.result.residual_norm
+                    iter_count += nls_cache_picard.result.iterations
+                    if final_res_picard <= ftol
+                        println("      -> ASGS: Picard fully converged! Escaping to evaluation.")
                         success = true
                     end
-                catch
-                    println("      -> Newton ConvergenceError.")
+                catch e
+                    # If Picard actually hit the max iteration cutoff safely without blowing up, we WANT this structural state!
+                    if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
+                        println("      -> ASGS: Picard concluded initial smoothing loops.")
+                    else
+                        println("      -> Picard threw unrecoverable error. Exception: ", e)
+                        get_free_dof_values(x0) .= x0_backup
+                    end
+                end
+                
+                # Check for castatrophic matrices (NaNs or infinity escapes)
+                if norm(get_free_dof_values(x0), Inf) > 1e12 || any(isnan, get_free_dof_values(x0))
+                    println("      -> Picard catastrophically diverged. Evaluation impossible.")
                     success = false
+                elseif !success
+                    println("      -> ASGS: Picard smoothing finalized. Re-engaging Exact Newton...")
+                    try
+                        res_solve = solve!(x0, solver_newton, op_newton)
+                        cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
+                        nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                        iter_count += nls_cache.result.iterations
+                        final_res = nls_cache.result.residual_norm
+                        if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
+                            success = true
+                        end
+                    catch e
+                         println("      -> Newton ConvergenceError on Homotopy Pass. Exception: ", e)
+                         success = false
+                    end
                 end
             end
         end

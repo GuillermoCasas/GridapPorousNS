@@ -24,6 +24,7 @@ include("formulations/continuous_problem.jl")
 include("stabilization/tau.jl")
 
 # Solvers
+include("solvers/linear_solvers.jl")
 include("solvers/nonlinear.jl")
 include("solvers/accelerators.jl")
 include("solvers/porous_solver.jl")
@@ -38,5 +39,6 @@ export run_simulation
 export load_config
 export PorousNSConfig
 export compute_reference_errors
+export ILUGMRESSolver
 
 end # module

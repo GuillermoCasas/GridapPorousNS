@@ -89,7 +89,18 @@
             "stagnation_noise_floor": { "type": "number", "default": 1e-2, "description": "The threshold for the residual inf-norm below which continuous divergence stops safely rather than crashing the solver." },
             "run_diagnostics": { "type": "boolean", "default": false, "description": "Enable expanded diagnostics / debug print statements." },
             "ablation_mode": { "type": "string", "enum": ["full", "galerkin", "momentum_only", "mass_only"], "default": "full", "description": "Switch behavior of specific solver terms for systematic testing." },
-            "experimental_reaction_mode": { "type": "string", "enum": ["standard", "remove_adjoint", "remove_tau"], "default": "standard", "description": "Toggles advanced reaction handling behaviors for high-Re modes." }
+            "experimental_reaction_mode": { "type": "string", "enum": ["standard", "remove_adjoint", "remove_tau"], "default": "standard", "description": "Toggles advanced reaction handling behaviors for high-Re modes." },
+            "accelerator": {
+              "type": "object",
+              "title": "Accelerator Configuration",
+              "description": "Smart nonlinear convergence accelerator properties (e.g. Anderson Mixing) to rapidly resolve Fixed-Point loops.",
+              "properties": {
+                 "type": { "type": "string", "enum": ["None", "Anderson"], "default": "None", "description": "Type of sequence extrapolation applied to fixed point iterations." },
+                 "m": { "type": "integer", "default": 5, "description": "Maximum memory depth or historical tracking for the mixing subspace." },
+                 "relaxation_factor": { "type": "number", "default": 1.0, "description": "Standard numerical damping or geometrical relaxation ratio applied to the proposed extrapolation." }
+              },
+              "additionalProperties": false
+            }
           },
           "additionalProperties": false
         },

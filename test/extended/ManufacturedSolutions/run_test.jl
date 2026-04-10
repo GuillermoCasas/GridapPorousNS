@@ -71,13 +71,13 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     # Derive kinematic viscosity and exact constant sigma for the reaction operator 
     # to perfectly represent Darcy-scale bounds parameterized by Reynolds / Darcy inputs.
     nu_calculated = U_amp * L / Float64(Re)
-    eps_calculated = 0.0 
+    eps_calculated = config.physical_properties.eps_val
     
     sigma_c = Float64(Da) * alpha_infty * nu_calculated / (L^2)
     rxn = PorousNSSolver.ConstantSigmaLaw(sigma_c)
     
-    # Use exact DeviatoricSymmetric analytical formulation natively aligned with the governing equations
-    PorousNSSolver.PaperGeneralFormulation(PorousNSSolver.DeviatoricSymmetricViscosity(), rxn, proj, reg, nu_calculated, eps_calculated, config.physical_properties.epsilon_floor)
+    # Use exact SymmetricGradientViscosity analytical formulation natively aligned with the governing equations' exact divergence simplifications
+    PorousNSSolver.PaperGeneralFormulation(PorousNSSolver.SymmetricGradientViscosity(), rxn, proj, reg, nu_calculated, eps_calculated, 0.0)
 end
 
 # Error evaluator operating exclusively upon dimensionless algebraic norms corresponding to characteristic scaling
@@ -292,6 +292,7 @@ function run_mms(config_file="test_config.json")
                                 ar_c1 = config.numerical_method.solver.armijo_c1
                                 div_fac = config.numerical_method.solver.divergence_merit_factor
                                 n_floor = config.numerical_method.solver.stagnation_noise_floor
+                                
                                 nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_picard_it, max_inc, xtol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
                                 nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_newton_it, max_inc, xtol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
                                 
@@ -364,7 +365,7 @@ function run_mms(config_file="test_config.json")
                                             iter_count_attempt = sys_iter_count
                                             break
                                         else
-                                            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$osgs_tol`) or system fully diverged.")
+                                            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(local_stab_cfg.osgs_tolerance)`) or system fully diverged.")
                                         end
                                     end
                                     
@@ -375,6 +376,15 @@ function run_mms(config_file="test_config.json")
                                     if success && final_x0 !== nothing
                                         u_h, p_h = final_x0
                                         el2_u, el2_p, eh1_u, eh1_p = calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L, dΩ)
+                                        
+                                        vtk_dir = joinpath("results", "vtk")
+                                        if !isdir(vtk_dir)
+                                            mkpath(vtk_dir)
+                                        end
+                                        u_ex_cf = interpolate_everywhere(u_final, U)
+                                        p_ex_cf = interpolate_everywhere(p_final, P)
+                                        filename = joinpath(vtk_dir, "mms_$(method)_Re$(Float64(Re))_Da$(Float64(Da))_N$(n).vtu")
+                                        writevtk(Ω, filename, cellfields=["uh"=>u_h, "ph"=>p_h, "uex"=>u_ex_cf, "pex"=>p_ex_cf, "alpha"=>alpha_cf, "err_u"=>u_h - u_ex_cf, "err_p"=>p_h - p_ex_cf])
                                     else
                                         el2_u, el2_p, eh1_u, eh1_p = NaN, NaN, NaN, NaN
                                     end

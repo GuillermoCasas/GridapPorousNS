@@ -1,0 +1,2 @@
+Goal: Ensure the MMS exact forcing oracle strictly aligns with the chosen operators and never silently drifts.
+Changes: Refactor `mms_paper_2d.jl` to enforce strict type-dispatch checking inside `f_ex_oracle` and `g_ex_oracle`. Provide explicit analytical branches for `SymmetricGradientViscosity`, `ConstantSigmaLaw`, etc. If an unsupported operator (like `DeviatoricSymmetricViscosity` lacking analytical Hessian derivatives) is evaluated, throw an immediate descriptive error preventing silent convergence stagnation.

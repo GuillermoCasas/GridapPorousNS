@@ -1,7 +1,7 @@
 # src/models/porosity.jl
 using Gridap
 
-abstract type AbstractPorosityField end
+abstract type AbstractPorosityField <: Function end
 
 struct SmoothRadialPorosity{T} <: AbstractPorosityField
     alpha_0::T
@@ -13,6 +13,12 @@ end
 function SmoothRadialPorosity(alpha_0::T, r_1::T, r_2::T) where T
     return SmoothRadialPorosity(alpha_0, one(T), r_1, r_2)
 end
+
+# Make it natively callable for CellField encapsulation
+(field::SmoothRadialPorosity)(x) = alpha(field, x)
+
+import Gridap.Fields: ∇
+∇(field::SmoothRadialPorosity) = x -> grad_alpha(field, x)
 
 function alpha(field::SmoothRadialPorosity, x)
     alpha_0 = field.alpha_0

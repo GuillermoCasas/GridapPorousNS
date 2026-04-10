@@ -32,8 +32,15 @@
             "element_type": "TRI"
         },
         "solver": {
-            "xtol": 1e-8,
-            "max_increases": 3
+            "picard_iterations": 2,
+            "xtol": 1e-11,
+            "ftol": 1e-11,
+            "max_increases": 3,
+            "accelerator": {
+                "type": "Anderson",
+                "m": 5,
+                "relaxation_factor": 1.0
+            }
         }
     },
     "output": {

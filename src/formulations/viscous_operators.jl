@@ -76,13 +76,25 @@ end
 # Symmetric Gradient Viscosity
 # =======================
 # [code-actual] Computes the positive evaluation `2*∇⋅(α*ν*ε(u))` for the strong residual.
+struct EvalStrongViscSymOp <: Function end
+@inline function (::EvalStrongViscSymOp)(Δu::VectorValue{2, T1}, ∇∇u::ThirdOrderTensorValue{2,2,2,T2}) where {T1, T2}
+    grad_div_u = VectorValue(∇∇u[1,1,1] + ∇∇u[1,2,2], ∇∇u[2,1,1] + ∇∇u[2,2,2])
+    return 0.5 * Δu + 0.5 * grad_div_u
+end
+@inline function (::EvalStrongViscSymOp)(Δu::VectorValue{3, T1}, ∇∇u::ThirdOrderTensorValue{3,3,3,T2}) where {T1, T2}
+    grad_div_u = VectorValue(
+        ∇∇u[1,1,1] + ∇∇u[1,2,2] + ∇∇u[1,3,3], 
+        ∇∇u[2,1,1] + ∇∇u[2,2,2] + ∇∇u[2,3,3],
+        ∇∇u[3,1,1] + ∇∇u[3,2,2] + ∇∇u[3,3,3]
+    )
+    return 0.5 * Δu + 0.5 * grad_div_u
+end
+
 function strong_viscous_operator(::SymmetricGradientViscosity, u, α, ν)
-    # [debugging-lore] Note: ∇⋅(ε(u)) is mathematically equivalent to 0.5 * Δ(u) + 0.5 * ∇(∇⋅u).
-    # Using the explicit divergence form avoids Gridap tensor divergence limitations.
-    # Furthermore, `∇(∇⋅u)` fails on Gridap Lagrangian continuous elements due to a lack 
-    # of full Hessian support. Thus, we explicitly drop it here. 
-    # This implies the strong operator evaluated in the ASGS subgrid-scale residual is mathematically approximate.
-    div_eps_u = 0.5 * Δ(u) # + 0.5 * ∇(∇⋅u)
+    # [gridap-expansion] Gridap's generic AST lacks native chain rule rules to expand `∇(∇⋅u)` globally
+    # over Operations. However, it natively evaluates exact Hessians (push_∇∇) on Lagrangian elements accurately. 
+    # We construct a type-stable closure mapping `∇∇u -> grad_div_u` to evaluate the analytical exact operator robustly!
+    div_eps_u = Operation(EvalStrongViscSymOp())(Δ(u), ∇∇(u))
     return 2.0 * ν * (ε(u) ⋅ ∇(α)) + 2.0 * α * ν * div_eps_u
 end
 
