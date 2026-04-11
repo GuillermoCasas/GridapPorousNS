@@ -234,6 +234,11 @@ function run_mms(config_file="test_config.json")
                     V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["all_boundaries"])
                     Q = TestFESpace(model, refe_p, conformity=:H1)
                     
+                    # Structurally generate topologically unbound sub-grid reference domains 
+                    # stripped of physical inlet/wall definitions for mathematically pure exact L2 bounds mapping
+                    V_free = TestFESpace(model, refe_u, conformity=:H1)
+                    Q_free = TestFESpace(model, refe_p, conformity=:H1)
+                    
                     # Coordinate quadrature degree evaluation recursively mapped back to formulation definitions
                     degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, kv)
                     Ω = Triangulation(model)
@@ -353,7 +358,8 @@ function run_mms(config_file="test_config.json")
                                             X, Y, model, dΩ, Ω, h_cf, f_cf, alpha_cf, g_cf, form, 
                                             solver_picard, solver_newton, 
                                             x0, c_1, c_2, 
-                                            config.physical_properties, local_stab_cfg, config.numerical_method.solver
+                                            config.physical_properties, local_stab_cfg, config.numerical_method.solver;
+                                            V_free=V_free, Q_free=Q_free
                                         )
                                         
                                         if sys_success
@@ -451,6 +457,10 @@ function run_mms(config_file="test_config.json")
                                         
                                         println("\n    [💾] Appended $(grp_name) accurately to HDF5 file layout. Available for plotting!")
                                     end
+                                    
+                                    # Force garbage collection to prevent C-pointer memory leaks from UMFPACK LU factorizations across the N sweeps
+                                    GC.gc()
+                                    
                                 end # end method
                             end # end Re
                         end # end Da

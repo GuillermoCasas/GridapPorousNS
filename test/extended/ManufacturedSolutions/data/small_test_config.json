@@ -18,18 +18,18 @@
     },
     "numerical_method": {
         "stabilization": {
-            "method": ["ASGS"],
+            "method": ["OSGS", "ASGS"],
             "osgs_iterations": 5,
             "osgs_tolerance": 1e-10
         },
         "element_spaces": {
-            "k_velocity": [2],
-            "k_pressure": [2],
+            "k_velocity": [1,2,3],
+            "k_pressure": [1,2,3],
             "equal_order_only": true
         },
         "mesh": {
             "partition": [10, 10],
-            "convergence_partitions": [10, 20, 40, 80, 160, 320],
+            "convergence_partitions": [10, 20, 40, 80, 160, 320, 640],
             "element_type": ["QUAD", "TRI"]
         },
         "solver": {

@@ -83,5 +83,15 @@ function update!(acc::AndersonAccelerator, x_k::Vector{Float64}, g_k::Vector{Flo
     # Final accelerated update
     x_next = x_mixed .+ acc.relaxation_factor .* f_mixed
     
+    # -------------------------------------------------------------------------
+    # SAFETY GUARD: Prevent Anderson Extrapolation Explosion
+    # If the least-squares mapping of historical noise massively shoots the
+    # state out of proportion relative to standard Picard, reject the matrix 
+    # inversion and conservatively map directly to the simple fixed-point jump.
+    # -------------------------------------------------------------------------
+    if norm(x_next .- g_k, Inf) > 10.0 * norm(f_k, Inf)
+        return x_k .+ acc.relaxation_factor .* f_k
+    end
+    
     return x_next
 end

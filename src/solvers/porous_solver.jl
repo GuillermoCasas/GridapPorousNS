@@ -58,7 +58,8 @@ function solve_system(
     f_cf, alpha_cf, g_cf, form, 
     solver_picard, solver_newton, 
     x0, c_1, c_2,
-    phys_cfg::PhysicalProperties, stab_cfg::StabilizationConfig, sol_cfg::SolverConfig
+    phys_cfg::PhysicalProperties, stab_cfg::StabilizationConfig, sol_cfg::SolverConfig;
+    V_free=nothing, Q_free=nothing
 )
     u_h, p_h = x0
     pi_u = nothing
@@ -80,87 +81,99 @@ function solve_system(
     tau_reg_lim = phys_cfg.tau_regularization_limit
     freeze_cusp = sol_cfg.freeze_jacobian_cusp
     
-    if method == "ASGS"
-        # ==============================================================================
-        # ALGEBRAIC SUBGRID SCALE (ASGS)
-        # ==============================================================================
-        res_fn(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, pi_u, pi_p, c_1, c_2, tau_reg_lim)
-        jac_picard(x, dx, y) = build_picard_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, pi_u, pi_p, c_1, c_2, tau_reg_lim; mult_mom=1.0, mult_mass=1.0)
-        jac_newton(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, pi_u, pi_p, c_1, c_2, tau_reg_lim, freeze_cusp, ExactNewtonMode())
+    # ==============================================================================
+    # ALGEBRAIC INITIALIZATION BOUNDS
+    # Even for OSGS, we universally boot up the global PDE using the zero-projection 
+    # (ASGS) formulation to securely map the non-linear fields into the exact Newton 
+    # quadratic basin before fragmenting the state via staggered projections.
+    # ==============================================================================
+    res_fn_init(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim)
+    jac_picard_init(x, dx, y) = build_picard_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim; mult_mom=1.0, mult_mass=1.0)
+    jac_newton_init(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim, freeze_cusp, ExactNewtonMode())
 
-        op_picard = FEOperator(res_fn, jac_picard, X, Y)
-        op_newton = FEOperator(res_fn, jac_newton, X, Y)
+    op_picard_init = FEOperator(res_fn_init, jac_picard_init, X, Y)
+    op_newton_init = FEOperator(res_fn_init, jac_newton_init, X, Y)
 
-        x0_backup = copy(get_free_dof_values(x0))
+    x0_backup = copy(get_free_dof_values(x0))
+    
+    eval_time = @elapsed begin
+        println("      -> ASGS Initializer: Attempting Exact Newton solver initially...")
+        local newton_success = false
+        try
+            res_newton = solve!(x0, solver_newton, op_newton_init)
+            cache_newton = res_newton isa Tuple ? res_newton[2] : res_newton
+            nls_cache = cache_newton isa Tuple ? cache_newton[2] : cache_newton
+            final_res = nls_cache.result.residual_norm
+            local_iters = nls_cache.result.iterations
+            if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
+                newton_success = true
+                iter_count += local_iters
+            else
+                iter_count += local_iters
+            end
+        catch e
+            println("      -> ASGS Initializer: Newton ConvergenceError. Exception: ", e)
+            newton_success = false
+        end
         
-        eval_time = @elapsed begin
-            println("      -> ASGS: Attempting Exact Newton solver initially...")
-            local newton_success = false
+        if newton_success
+            println("      -> ASGS Initializer: Exact Newton converged initially! Skipping Picard homotopy.")
+            success = true
+        else
+            println("      -> ASGS Initializer: Exact Newton aborted. Orchestrating Picard Homotopy fallback...")
+            get_free_dof_values(x0) .= x0_backup
+            
             try
-                res_newton = solve!(x0, solver_newton, op_newton)
-                cache_newton = res_newton isa Tuple ? res_newton[2] : res_newton
-                nls_cache = cache_newton isa Tuple ? cache_newton[2] : cache_newton
-                final_res = nls_cache.result.residual_norm
-                iter_count = nls_cache.result.iterations
-                if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
-                    newton_success = true
+                res_picard = solve!(x0, solver_picard, op_picard_init)
+                cache_picard = res_picard isa Tuple ? res_picard[2] : res_picard
+                nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
+                
+                final_res_picard = nls_cache_picard.result.residual_norm
+                iter_count += nls_cache_picard.result.iterations
+                if final_res_picard <= ftol
+                    println("      -> ASGS Initializer: Picard fully converged! Escaping to evaluation.")
+                    success = true
                 end
             catch e
-                println("      -> Newton ConvergenceError. Exception: ", e)
-                newton_success = false
+                if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
+                    println("      -> ASGS Initializer: Picard concluded initial smoothing loops.")
+                else
+                    println("      -> ASGS Initializer: Picard threw unrecoverable error. Exception: ", e)
+                    get_free_dof_values(x0) .= x0_backup
+                end
             end
             
-            if newton_success
-                println("      -> ASGS: Exact Newton converged initially! Skipping Picard homotopy.")
-                success = true
-            else
-                println("      -> ASGS: Exact Newton aborted. Orchestrating Picard Homotopy fallback...")
-                get_free_dof_values(x0) .= x0_backup
-                
+            if norm(get_free_dof_values(x0), Inf) > 1e12 || any(isnan, get_free_dof_values(x0))
+                println("      -> ASGS Initializer: Picard catastrophically diverged. Evaluation impossible.")
+                success = false
+            elseif !success
+                println("      -> ASGS Initializer: Picard smoothing finalized. Re-engaging Exact Newton...")
                 try
-                    res_picard = solve!(x0, solver_picard, op_picard)
-                    cache_picard = res_picard isa Tuple ? res_picard[2] : res_picard
-                    nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
-                    
-                    final_res_picard = nls_cache_picard.result.residual_norm
-                    iter_count += nls_cache_picard.result.iterations
-                    if final_res_picard <= ftol
-                        println("      -> ASGS: Picard fully converged! Escaping to evaluation.")
+                    res_solve = solve!(x0, solver_newton, op_newton_init)
+                    cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
+                    nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                    iter_count += nls_cache.result.iterations
+                    final_res = nls_cache.result.residual_norm
+                    if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
                         success = true
                     end
                 catch e
-                    # If Picard actually hit the max iteration cutoff safely without blowing up, we WANT this structural state!
-                    if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
-                        println("      -> ASGS: Picard concluded initial smoothing loops.")
-                    else
-                        println("      -> Picard threw unrecoverable error. Exception: ", e)
-                        get_free_dof_values(x0) .= x0_backup
-                    end
-                end
-                
-                # Check for castatrophic matrices (NaNs or infinity escapes)
-                if norm(get_free_dof_values(x0), Inf) > 1e12 || any(isnan, get_free_dof_values(x0))
-                    println("      -> Picard catastrophically diverged. Evaluation impossible.")
-                    success = false
-                elseif !success
-                    println("      -> ASGS: Picard smoothing finalized. Re-engaging Exact Newton...")
-                    try
-                        res_solve = solve!(x0, solver_newton, op_newton)
-                        cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
-                        nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
-                        iter_count += nls_cache.result.iterations
-                        final_res = nls_cache.result.residual_norm
-                        if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
-                            success = true
-                        end
-                    catch e
-                         println("      -> Newton ConvergenceError on Homotopy Pass. Exception: ", e)
-                         success = false
-                    end
+                     println("      -> ASGS Initializer: Newton ConvergenceError on Homotopy Pass. Exception: ", e)
+                     success = false
                 end
             end
         end
-        return success, x0, iter_count, eval_time
+    end
+    
+    if !success
+        return false, x0, iter_count, eval_time
+    end
+
+    final_x0 = x0
+
+    if method == "ASGS"
+        println("\n      [+] ASGS Formulation exclusively resolved. Exiting solver module.")
+        return success, final_x0, iter_count, eval_time
     end
 
     if method == "OSGS"
@@ -179,30 +192,46 @@ function solve_system(
         println("\n      [+] Commencing Orthogonal Subgrid Scale (OSGS) fixed-point recursive relaxation loop (allocating for max iterations: $max_osgs_iters)...")
         
         # Gridap L2 Projections inherit boundary conditions from the FESpace they map onto.
-        # Stabilizing the sub-grid field natively without requiring full DG looping.
+        # Stabilizing the sub-grid field natively without requiring full DG looping. We enforce 
+        # completely unconstrained spaces explicitly to prevent physical wall velocities from crushing
+        # orthogonal projection boundary convergence rates.
         U, P = X
         V, Q = Y
+        
+        V_proj = V_free !== nothing ? V_free : V
+        Q_proj = Q_free !== nothing ? Q_free : Q
+        U_proj = TrialFESpace(V_proj)
+        P_proj = TrialFESpace(Q_proj)
         
         # --- Precompute and Cache L2 Mass Matrices ---
         # The left-hand side mass-matrices for the L2 projections remain functionally invariant 
         # across the non-linear OSGS scheme, allowing us to factorize them exactly once.
         println("\n      [+] Initiating pre-assembly & structural factorization for static OSGS L2 Mass Matrices...")
-        M_u = assemble_matrix((u,v) -> ∫(v ⋅ u)dΩ, U, V)
-        M_p = assemble_matrix((p,q) -> ∫(q * p)dΩ, P, Q)
+        M_u = assemble_matrix((u,v) -> ∫(v ⋅ u)dΩ, U_proj, V_proj)
+        M_p = assemble_matrix((p,q) -> ∫(q * p)dΩ, P_proj, Q_proj)
         
         ls_u = LUSolver()
         ls_p = LUSolver()
         num_u_fac = numerical_setup(symbolic_setup(ls_u, M_u), M_u)
         num_p_fac = numerical_setup(symbolic_setup(ls_p, M_p), M_p)
+        
+        # Override the Exact Newton solver dynamically for OSGS to perform only 1 monolithic iteration 
+        # per sub-scale projection, mapping identically to classic literature practice.
+        base_nls = solver_newton.nls
+        local_osgs_nls = SafeNewtonSolver(base_nls.ls, 1, base_nls.max_increases, base_nls.xtol, base_nls.ftol, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor)
+        local_fesolver = FESolver(local_osgs_nls)
+        
+        # Expand maximum bounds to absorb the monolithic 1-step iteration workflow
+        eff_osgs_iters = max(max_osgs_iters, sol_cfg.newton_iterations + 5)
 
-        eval_time = @elapsed begin
+        eval_time += @elapsed begin
             local accelerator = nothing
             if sol_cfg.accelerator.type == "Anderson"
                 println("      [+] Initializing Anderson Acceleration (m = $(sol_cfg.accelerator.m), damping = $(sol_cfg.accelerator.relaxation_factor))")
                 accelerator = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor)
             end
 
-            for osgs_iter in 1:max_osgs_iters
+            for osgs_iter in 1:eff_osgs_iters
                 println("        [OSGS Iter $osgs_iter]")
                 
                 res_fn_osgs(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, pi_u, pi_p, c_1, c_2, tau_reg_lim)
@@ -213,7 +242,7 @@ function solve_system(
                 x_prev = copy(get_free_dof_values(final_x0))
                 
                 try
-                    res_solve = solve!(final_x0, solver_newton, op_newton_osgs)
+                    res_solve = solve!(final_x0, local_fesolver, op_newton_osgs)
                     cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
                     nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
                     iter_count += nls_cache.result.iterations
@@ -230,10 +259,14 @@ function solve_system(
                 end
                 
                 x_diff = norm(get_free_dof_values(final_x0) - x_prev, Inf)
-                println("        * Comparing L^inf projection difference against previous relaxation step: \n          x_diff_norm = $x_diff")
                 
-                if x_diff < osgs_tol
-                    println("        [+] OSGS Staggered Fixed-Point loop successfully converged within strict orthogonality tolerance!")
+                # Geometrically bind orthogonality tolerance to the exact numerical limitations of the evaluated noise floor
+                dynamic_osgs_tol = max(osgs_tol, stagnation_tol)
+                
+                println("        * Comparing L^inf projection difference against previous relaxation step: \n          x_diff_norm = $x_diff (Dynamic OSGS Tol: $dynamic_osgs_tol)")
+                
+                if x_diff <= dynamic_osgs_tol
+                    println("        [+] OSGS Staggered Fixed-Point loop successfully converged structurally within mathematical boundaries!")
                     success = true
                     break
                 end
@@ -244,15 +277,15 @@ function solve_system(
                 
                 # Exclusively assemble dynamic residual right-hand side tracking updated non-linear field
                 println("        * Executing staggered global domain numerical integrals to map abstract analytical residuals onto L2 discrete Right-Hand Side vectors (R_u, R_p)...")
-                b_u = assemble_vector(v -> ∫(v ⋅ R_u)dΩ, V)
-                b_p = assemble_vector(q -> ∫(q * R_p)dΩ, Q)
+                b_u = assemble_vector(v -> ∫(v ⋅ R_u)dΩ, V_proj)
+                b_p = assemble_vector(q -> ∫(q * R_p)dΩ, Q_proj)
                 
                 println("        * Projecting analytical algebraic residuals onto discrete sub-grid scale finite element meshes (pi_u, pi_p) via back-substitution...")
                 x_u = allocate_in_domain(M_u); solve!(x_u, num_u_fac, b_u)
                 x_p = allocate_in_domain(M_p); solve!(x_p, num_p_fac, b_p)
                 
-                pi_u = FEFunction(U, x_u)
-                pi_p = FEFunction(P, x_p)
+                pi_u = FEFunction(U_proj, x_u)
+                pi_p = FEFunction(P_proj, x_p)
             end
         end
         return success, final_x0, iter_count, eval_time
