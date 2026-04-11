@@ -1,0 +1,36 @@
+{
+    "physical_properties": {
+        "nu": 1.0,
+        "eps_val": 1e-8,
+        "reaction_model": "Constant_Sigma",
+        "sigma_constant": 1.0,
+        "tau_regularization_limit": 0.0
+    },
+    "domain": {
+        "alpha_0": 0.5,
+        "r_1": 0.2,
+        "r_2": 0.4,
+        "bounding_box": [0.0, 1.0, 0.0, 1.0]
+    },
+    "numerical_method": {
+        "mesh": {
+            "partition": [10, 10],
+            "element_type": "QUAD"
+        },
+        "solver": {
+            "experimental_reaction_mode": "standard",
+            "newton_iterations": 15,
+            "picard_iterations": 2,
+            "ftol": 1e-8,
+            "xtol": 1e-8,
+            "max_increases": 3,
+            "stagnation_noise_floor": 1e-5,
+            "run_diagnostics": false,
+            "accelerator": {
+                "type": "Anderson",
+                "m": 5,
+                "relaxation_factor": 1.0
+            }
+        }
+    }
+}

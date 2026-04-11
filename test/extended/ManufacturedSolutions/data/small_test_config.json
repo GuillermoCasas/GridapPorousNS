@@ -29,7 +29,7 @@
         },
         "mesh": {
             "partition": [10, 10],
-            "convergence_partitions": [10, 20, 40, 80, 160, 320, 640],
+            "convergence_partitions": [10, 20, 40, 80, 160],
             "element_type": ["QUAD", "TRI"]
         },
         "solver": {

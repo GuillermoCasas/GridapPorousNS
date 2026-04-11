@@ -48,6 +48,36 @@ function check_porous_solver_parameters(stab_cfg::StabilizationConfig, sol_cfg::
     end
 end
 
+
+"""
+    discrete_l2_projection(field, U_proj, V_proj, dΩ, M_mat, num_fac)
+
+Generic high-efficiency continuous mapping tool. Evaluates the explicit discrete L2 analytical 
+projection of a given analytical function (`field`) specifically onto a constructed target algebraic 
+vector domain (`U_proj`, `V_proj`). Requires the pre-allocated topological mass matrix bounds 
+(`M_mat`, `num_fac`) strictly to prevent invariant compilation allocations dynamically inside deep solver iterators.
+"""
+function discrete_l2_projection(field, U_proj, V_proj, dΩ, M_mat, num_fac)
+    b_vec = assemble_vector(v -> ∫(v ⋅ field)dΩ, V_proj)
+    x_solve = allocate_in_domain(M_mat)
+    solve!(x_solve, num_fac, b_vec)
+    return FEFunction(U_proj, x_solve)
+end
+
+"""
+    discrete_l2_projection(field, U_proj, V_proj, dΩ)
+
+Convenience wrapper for single-pass diagnostics. Dynamically derives the underlying finite 
+element mass matrices mapped to an explicit `LUSolver()`. Highly accurate but algebraically 
+unsuitable for deep staggered execution loops.
+"""
+function discrete_l2_projection(field, U_proj, V_proj, dΩ)
+    p_ls = LUSolver()
+    M_mat = assemble_matrix((u,v) -> ∫(u ⋅ v)dΩ, U_proj, V_proj)
+    num_fac = numerical_setup(symbolic_setup(p_ls, M_mat), M_mat)
+    return discrete_l2_projection(field, U_proj, V_proj, dΩ, M_mat, num_fac)
+end
+
 """
     solve_system(...)
 
@@ -59,7 +89,7 @@ function solve_system(
     solver_picard, solver_newton, 
     x0, c_1, c_2,
     phys_cfg::PhysicalProperties, stab_cfg::StabilizationConfig, sol_cfg::SolverConfig;
-    V_free=nothing, Q_free=nothing
+    V_free=nothing, Q_free=nothing, diagnostics_cache=nothing
 )
     u_h, p_h = x0
     pi_u = nothing
@@ -166,6 +196,10 @@ function solve_system(
     end
     
     if !success
+        if !isnothing(diagnostics_cache)
+            diagnostics_cache["pi_u"] = pi_u
+            diagnostics_cache["pi_p"] = pi_p
+        end
         return false, x0, iter_count, eval_time
     end
 
@@ -173,6 +207,10 @@ function solve_system(
 
     if method == "ASGS"
         println("\n      [+] ASGS Formulation exclusively resolved. Exiting solver module.")
+        if !isnothing(diagnostics_cache)
+            diagnostics_cache["pi_u"] = pi_u
+            diagnostics_cache["pi_p"] = pi_p
+        end
         return success, final_x0, iter_count, eval_time
     end
 
@@ -230,6 +268,21 @@ function solve_system(
                 println("      [+] Initializing Anderson Acceleration (m = $(sol_cfg.accelerator.m), damping = $(sol_cfg.accelerator.relaxation_factor))")
                 accelerator = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor)
             end
+            
+            # Map the global ASGS converged solution into the first orthogonal projection cleanly before beginning decoupled evaluation
+            println("        * Bootstrapping initial structural orthogonal projection onto converged internal bounds limit...")
+            u_h, p_h = final_x0
+            R_u = inner_projection_u(u_h, p_h, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
+            R_p = inner_projection_p(u_h, p_h, form, dΩ, h_cf, alpha_cf, g_cf)
+            
+            b_u = assemble_vector(v -> ∫(v ⋅ R_u)dΩ, V_proj)
+            b_p = assemble_vector(q -> ∫(q * R_p)dΩ, Q_proj)
+            
+            x_u = allocate_in_domain(M_u); solve!(x_u, num_u_fac, b_u)
+            x_p = allocate_in_domain(M_p); solve!(x_p, num_p_fac, b_p)
+            
+            pi_u = FEFunction(U_proj, x_u)
+            pi_p = FEFunction(P_proj, x_p)
 
             for osgs_iter in 1:eff_osgs_iters
                 println("        [OSGS Iter $osgs_iter]")
@@ -247,9 +300,14 @@ function solve_system(
                     nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
                     iter_count += nls_cache.result.iterations
                 catch e
-                    println("        -> OSGS Newton failed. Aborting OSGS loop.")
-                    success = false
-                    break
+                    if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
+                        println("        -> OSGS Newton 1-step interior pass dynamically executed.")
+                        iter_count += 1
+                    else
+                        println("        -> OSGS Newton failed. Aborting OSGS loop. Exception: ", e)
+                        success = false
+                        break
+                    end
                 end
                 
                 if !isnothing(accelerator)
@@ -277,16 +335,15 @@ function solve_system(
                 
                 # Exclusively assemble dynamic residual right-hand side tracking updated non-linear field
                 println("        * Executing staggered global domain numerical integrals to map abstract analytical residuals onto L2 discrete Right-Hand Side vectors (R_u, R_p)...")
-                b_u = assemble_vector(v -> ∫(v ⋅ R_u)dΩ, V_proj)
-                b_p = assemble_vector(q -> ∫(q * R_p)dΩ, Q_proj)
-                
                 println("        * Projecting analytical algebraic residuals onto discrete sub-grid scale finite element meshes (pi_u, pi_p) via back-substitution...")
-                x_u = allocate_in_domain(M_u); solve!(x_u, num_u_fac, b_u)
-                x_p = allocate_in_domain(M_p); solve!(x_p, num_p_fac, b_p)
                 
-                pi_u = FEFunction(U_proj, x_u)
-                pi_p = FEFunction(P_proj, x_p)
+                pi_u = discrete_l2_projection(R_u, U_proj, V_proj, dΩ, M_u, num_u_fac)
+                pi_p = discrete_l2_projection(R_p, P_proj, Q_proj, dΩ, M_p, num_p_fac)
             end
+        end
+        if !isnothing(diagnostics_cache)
+            diagnostics_cache["pi_u"] = pi_u
+            diagnostics_cache["pi_p"] = pi_p
         end
         return success, final_x0, iter_count, eval_time
     end

@@ -27,6 +27,9 @@ Use the runners exactly as defined in the three files you provided:
 - **Quick Tests** (`test/run_quick_tests.jl`) → formulation_consistency, formulation_smoke (6 s – 2 min)
 - **Extended Tests** (`test/run_extended_tests.jl`) → utilities etc. (> 2 min)
 
+**About Naming Tests**
+Always put the word 'test' at the end of the word, to avoid having all the tests begin simiarly.
+
 **Triggers:**
 
 - **Any modification** to mathematical core files  
