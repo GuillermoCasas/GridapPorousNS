@@ -109,7 +109,6 @@ def plot_convergence():
 
                 # Annotate local slopes for each segment
                 alpha = 0.50 if method == 'ASGS' else 0.75
-                offset_pts = 15.0 if method == 'ASGS' else -15.0
 
                 for i in range(len(h)-1):
                     # Points in log space
@@ -118,7 +117,7 @@ def plot_convergence():
                     # Log distances to estimate visual direction
                     d_log_h = np.log(h[i+1]) - np.log(h[i])
                     
-                    def annotate_slope(err_arr, c_plot):
+                    def annotate_slope(err_arr, c_plot, err_name):
                         err_pt = np.exp((1.0 - alpha) * np.log(err_arr[i]) + alpha * np.log(err_arr[i+1]))
                         slope_val = (np.log(err_arr[i+1]) - np.log(err_arr[i])) / (np.log(h[i+1]) - np.log(h[i]))
                         
@@ -138,14 +137,39 @@ def plot_convergence():
                         n_x = -t_y / length
                         n_y = t_x / length
                         
+                        offset_pts = 15.0 if method == 'ASGS' else -15.0
+                        
+                        # Dynamically adjust side if another method exists
+                        for other_method, other_g in methods.items():
+                            if other_method != method:
+                                if err_name in other_g and 'h' in other_g:
+                                    other_h_full = other_g['h'][:]
+                                    other_err_full = other_g[err_name][:]
+                                    other_mask = (other_g['err_u_l2'][:] > 0) & (other_g['err_p_l2'][:] > 0)
+                                    other_h = other_h_full[other_mask]
+                                    other_err = other_err_full[other_mask]
+                                    
+                                    idx1 = np.where(np.isclose(other_h, h[i]))[0]
+                                    idx2 = np.where(np.isclose(other_h, h[i+1]))[0]
+                                    if len(idx1) > 0 and len(idx2) > 0:
+                                        other_err1 = other_err[idx1[0]]
+                                        other_err2 = other_err[idx2[0]]
+                                        other_err_pt = np.exp((1.0 - alpha) * np.log(other_err1) + alpha * np.log(other_err2))
+                                        
+                                        if err_pt > other_err_pt:
+                                            offset_pts = 15.0
+                                        elif err_pt < other_err_pt:
+                                            offset_pts = -15.0
+                                        break
+                        
                         plt.annotate(f'{slope_val:.2f}', xy=(h_pt, err_pt), 
                                      xytext=(n_x * offset_pts, n_y * offset_pts),
                                      textcoords='offset points', ha='center', va='center', 
                                      fontsize=8, color=c_plot, fontweight='bold')
 
-                    annotate_slope(err_u_l2, 'blue')
-                    annotate_slope(err_u_h1, 'blue')
-                    annotate_slope(err_p_l2, 'red')
+                    annotate_slope(err_u_l2, 'blue', 'err_u_l2')
+                    annotate_slope(err_u_h1, 'blue', 'err_u_h1')
+                    annotate_slope(err_p_l2, 'red', 'err_p_l2')
             
             key = (etype, kv, kp)
             if key not in table_data:

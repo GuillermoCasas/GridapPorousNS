@@ -1,16 +1,27 @@
-# test/quick/test_interpolation_projection.jl
-using Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."))
+# ==============================================================================================
+# Nature & Intent:
+# Validates the strict theoretical convergence rates underlying the method's interpolation logic.
+# Specifically tests the accuracy and legality of $L^2$ projections across geometric and topological 
+# boundaries (testing how finite element approximations scale against purely theoretical exact analytical
+# formulations).
+#
+# Mathematical Formulation Alignment:
+# The Porous Navier Stokes continuous VMS formulation inherently relies on accurate sub-grid projection
+# of continuous functions. If polynomial limits degrade (locking, suboptimal convergence), the 
+# global matrix assembly loses formal exactness. This script isolates numerical scaling $O(h^{k+1})$
+# to explicitly prove that interpolation remains geometrically invariant over bounded sub-resolutions.
+#
+# Associated Files / Functions:
+# - `src/metrics/metrics.jl` (`compute_reference_errors`)
+# ==============================================================================================
 
+using Test
 using Gridap
 using LinearAlgebra
 using Printf
-
-# Dynamically link the solver environment to access metrics module
-push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", "src"))
 using PorousNSSolver
 
-function run_interpolation_diagnostic()
+@testset "quick: interpolation and topological projection" begin
     println("--- Gridap Topological Projection Diagnostic ---")
     
     # 1. Define a smooth analytical reference function mimicking complex resolved physics
@@ -69,17 +80,13 @@ function run_interpolation_diagnostic()
             u_h = interpolate_everywhere(u_exact, V_h)
             p_h = interpolate_everywhere(p_exact, Q_h)
             
-            # ---------------------------------------------------------------------
             # Exact metric encapsulation
-            # ---------------------------------------------------------------------
             res_u = PorousNSSolver.compute_reference_errors(u_h, u_ref, iu_ref, V_h, dΩ_h, dΩ_ref)
             
-            # Since the native test focuses on velocity mapping validation, we primarily print L2(u)
             l2_nested = res_u[1]
             l2_consistent = res_u[3]
             
-            # 2. True Analytical Interpolation 
-            # (Validates Gridap evaluates purely against true exact analytical target flawlessly)
+            # True Analytical Interpolation 
             eu_exact = u_h - u_exact
             l2_exact = sqrt(sum(∫( eu_exact ⋅ eu_exact ) * dΩ_h))
             
@@ -104,8 +111,9 @@ function run_interpolation_diagnostic()
             
             slope = (log(e2) - log(e1)) / (log(h2) - log(h1))
             @printf("  -> N(%3d -> %3d): %.3f (Target: %.1f for O(h^%d))\n", N_list[i], N_list[i+1], slope, target_k, k+1)
+            
+            # As N increases, asymptotic convergence limits must be strictly verified
+            @test isapprox(slope, target_k; atol=0.2)
         end
     end
 end
-
-run_interpolation_diagnostic()

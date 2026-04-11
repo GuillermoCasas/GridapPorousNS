@@ -1,13 +1,12 @@
-# test/quick/test_osgs_orthogonality.jl
 # ==================================================================================================
-# PURPOSE:
+# Nature & Intent:
 # This diagnostic test validates the structural and numerical integrity of the core Porous Navier-Stokes
 # Variational Multiscale (VMS) pipeline. It explicitly verifies that the high-level `solve_system()` 
 # orchestration solver can successfully assemble, stabilize, and converge complex non-linear momentum 
 # and mass conservation residuals using BOTH Algebraic Sub-Grid Scale (ASGS) and Orthogonal Sub-Grid 
 # Scale (OSGS) formulations.
 #
-# MATHEMATICAL CONTEXT & HISTORY:
+# Mathematical Formulation Alignment:
 # - ASGS: Approximates the unresolvable sub-grid scales strictly proportional to the continuous FE residual.
 # - OSGS: Constrains the sub-grid scales to be structurally orthogonal to the FE-space by actively iterating 
 #         and subtracting the L2-projection of the explicit FE-residual. 
@@ -25,22 +24,20 @@
 #   Hessian derivatives if deviatoric stress is forced analytically. 
 # - A minimalistic boundary setup is supplied through `osgs_orthogonality_config.json` defining a strictly
 #   bounded, highly smoothed flow (Re = 1.0) to achieve maximal convergence efficiency in CI checks.
+#
+# Associated Files / Functions:
+# - `src/solvers/nonlinear.jl` (`solve_system`)
+# - `src/models/projection.jl`
 # ==================================================================================================
-using Pkg
-Pkg.activate(joinpath(@__DIR__, "..", ".."))
 
+using Test
 using Gridap
 using Gridap.Algebra
 using LinearAlgebra
 using Printf
-
-push!(LOAD_PATH, joinpath(@__DIR__, "..", "..", "src"))
 using PorousNSSolver
 
-function test_osgs_orthogonality()
-    println("=========================================================================")
-    println("        OSGS vs ASGS Orthogonality Verification Diagnostic               ")
-    println("=========================================================================")
+@testset "quick: OSGS vs ASGS Orthogonality Verification" begin
 
     # -----------------------------------------------------------------------------------------
     # 1. CONFIGURATION & GEOMETRY ARCHITECTURE
@@ -162,9 +159,9 @@ function test_osgs_orthogonality()
         
         @printf("      Standard Pipeline L2 Velocity Accuracy: %.8e\n\n", norm_e_u)
         
+        @test success
         if !success
              println("      [FAIL] -> The pipeline explicitly crashed or exceeded tolerance.")
-             error("Pipeline verification failed for method $method.")
         end
 
         # Re-evaluate the exact discrete tracking sub-grid mappings for comparative orthogonality checks
@@ -243,8 +240,8 @@ function test_osgs_orthogonality()
         println("[SMOKING GUN PASS] -> The orthogonality checks conclusively proved that OSGS securely extracts and cancels boundary-invariant topologies (Norm ≈ 0), whereas ASGS natively maintains unconstrained bounds mapping as analytically expected!")
     else
         println("[FAIL] -> The numerical orthogonality validations collapsed. Sub-grid structures did not map to their corresponding mathematical bounds.")
-        error("Orthogonality isolation failure: OSGS Norm ($osgs_norm) | ASGS Norm ($asgs_norm)")
     end
+    
+    @test osgs_norm < 1e-5
+    @test asgs_norm > 1e-4
 end
-
-test_osgs_orthogonality()
