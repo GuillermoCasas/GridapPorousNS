@@ -66,11 +66,11 @@ def plot_cocquet():
                 
                 # Annotate local slopes for each segment dynamically handling collisions
                 for i in range(len(N_list) - 1):
-                    slope_u = (np.log(err_u[i+1]) - np.log(err_u[i])) / (np.log(h[i+1]) - np.log(h[i]))
-                    slope_p = (np.log(err_p[i+1]) - np.log(err_p[i])) / (np.log(h[i+1]) - np.log(h[i]))
+                    slope_u = ((np.log(err_u[i+1]) - np.log(err_u[i])) / (np.log(h[i+1]) - np.log(h[i]))) / opt_u_l2
+                    slope_p = ((np.log(err_p[i+1]) - np.log(err_p[i])) / (np.log(h[i+1]) - np.log(h[i]))) / opt_p_l2
                     
-                    slope_u_h1 = (np.log(err_u_h1[i+1]) - np.log(err_u_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))
-                    slope_p_h1 = (np.log(err_p_h1[i+1]) - np.log(err_p_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))
+                    slope_u_h1 = ((np.log(err_u_h1[i+1]) - np.log(err_u_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))) / opt_u_h1
+                    slope_p_h1 = ((np.log(err_p_h1[i+1]) - np.log(err_p_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))) / opt_p_h1
                     
                     # Split ASGS and OSGS anchors precisely on the interpolating log segment to prevent crashes
                     alpha_point = 0.50 if method == "ASGS" else 0.75

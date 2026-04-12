@@ -95,9 +95,9 @@ def plot_convergence():
                     fme_u = err_u_l2[-1] if len(h) > 0 else float('nan')
                     fme_p = err_p_l2[-1] if len(h) > 0 else float('nan')
                 
-                table_row[f'slope_u_{method}'] = slope_finest_u
+                table_row[f'slope_u_{method}'] = slope_finest_u / opt_u_l2 if opt_u_l2 else float('nan')
                 table_row[f'fme_u_{method}'] = fme_u
-                table_row[f'slope_p_{method}'] = slope_finest_p
+                table_row[f'slope_p_{method}'] = slope_finest_p / opt_p_l2 if opt_p_l2 else float('nan')
                 table_row[f'fme_p_{method}'] = fme_p
                 
                 plt.loglog(h, err_u_l2, marker='o', linestyle=ls, color='blue', linewidth=2, markersize=8,
@@ -117,9 +117,10 @@ def plot_convergence():
                     # Log distances to estimate visual direction
                     d_log_h = np.log(h[i+1]) - np.log(h[i])
                     
-                    def annotate_slope(err_arr, c_plot, err_name):
+                    def annotate_slope(err_arr, c_plot, err_name, opt_slope):
                         err_pt = np.exp((1.0 - alpha) * np.log(err_arr[i]) + alpha * np.log(err_arr[i+1]))
                         slope_val = (np.log(err_arr[i+1]) - np.log(err_arr[i])) / (np.log(h[i+1]) - np.log(h[i]))
+                        slope_ratio = slope_val / opt_slope if opt_slope else float('nan')
                         
                         d_log_e = np.log(err_arr[i+1]) - np.log(err_arr[i])
                         
@@ -162,14 +163,17 @@ def plot_convergence():
                                             offset_pts = -15.0
                                         break
                         
-                        plt.annotate(f'{slope_val:.2f}', xy=(h_pt, err_pt), 
+                        # Generate the visual fraction representation
+                        annot_text = f'{slope_ratio:.2f}'
+                        
+                        plt.annotate(annot_text, xy=(h_pt, err_pt), 
                                      xytext=(n_x * offset_pts, n_y * offset_pts),
                                      textcoords='offset points', ha='center', va='center', 
                                      fontsize=8, color=c_plot, fontweight='bold')
 
-                    annotate_slope(err_u_l2, 'blue', 'err_u_l2')
-                    annotate_slope(err_u_h1, 'blue', 'err_u_h1')
-                    annotate_slope(err_p_l2, 'red', 'err_p_l2')
+                    annotate_slope(err_u_l2, 'blue', 'err_u_l2', opt_u_l2)
+                    annotate_slope(err_u_h1, 'blue', 'err_u_h1', opt_u_h1)
+                    annotate_slope(err_p_l2, 'red', 'err_p_l2', opt_p_l2)
             
             key = (etype, kv, kp)
             if key not in table_data:
@@ -288,10 +292,15 @@ def generate_markdown_report(h5_file, results_dir):
                 err_p_h1_arr = err_p_h1_arr[mask]
                 
                 if len(h_arr) >= 2:
-                    rate_u_l2 = (np.log(err_u_l2_arr[-1]) - np.log(err_u_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))
-                    rate_p_l2 = (np.log(err_p_l2_arr[-1]) - np.log(err_p_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))
-                    rate_u_h1 = (np.log(err_u_h1_arr[-1]) - np.log(err_u_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))
-                    rate_p_h1 = (np.log(err_p_h1_arr[-1]) - np.log(err_p_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))
+                    opt_u_l2 = float(kv + 1)
+                    opt_p_l2 = float(kp if 'kp' in locals() else kv) # fallback if kp not available directly
+                    opt_u_h1 = float(kv)
+                    opt_p_h1 = float(kv - 1)
+                    
+                    rate_u_l2 = ((np.log(err_u_l2_arr[-1]) - np.log(err_u_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) / opt_u_l2
+                    rate_p_l2 = ((np.log(err_p_l2_arr[-1]) - np.log(err_p_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) / opt_p_l2 if opt_p_l2 else float('nan')
+                    rate_u_h1 = ((np.log(err_u_h1_arr[-1]) - np.log(err_u_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) / opt_u_h1 if opt_u_h1 else float('nan')
+                    rate_p_h1 = ((np.log(err_p_h1_arr[-1]) - np.log(err_p_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) / opt_p_h1 if opt_p_h1 else float('nan')
                 else:
                     rate_u_l2 = rate_p_l2 = rate_u_h1 = rate_p_h1 = float('nan')
                 
@@ -301,17 +310,18 @@ def generate_markdown_report(h5_file, results_dir):
                 err_p_h1_last = err_p_h1_arr[-1] if len(err_p_h1_arr) > 0 else float('nan')
                 
                 opt_u_l2 = float(kv + 1)
-                opt_p_l2 = float(kv)
+                opt_p_l2 = float(kv)  # assuming equal order
                 opt_u_h1 = float(kv)
                 opt_p_h1 = float(kv - 1)
                 
+                # We already divided rates by opt, so target is 1.0. We pass 1.0 to format_rate to indicate optimum
                 def format_rate(rate, opt):
                     if np.isnan(rate):
                         return f"  N/A ({int(opt)})"
-                    threshold = opt * 0.90 if opt > 0 else -0.10
+                    threshold = 0.90 # Since normalized, threshold is 0.9
                     if rate < threshold:
-                        return f"<b style='color:red'>{rate:5.2f}</b> ({int(opt)})"
-                    return f" {rate:5.2f} ({int(opt)})"
+                        return f"<b style='color:red'>{rate:5.2f}</b> (1.0)"
+                    return f" {rate:5.2f} (1.0)"
                 
                 def format_sci(v):
                     if np.isnan(v): return "NaN"
