@@ -1,0 +1,376 @@
+
+\section{Elemental matrices} \label{app:ElementalMatrices}
+The different terms that stem from~\cref{eq:NonlinearStabilizedEquation} can be worked out into the following expressions. The left-hand-side Galerkin terms are
+\begin{align}
+  \dualpairing{\partial_i V_h, \mathbf{K}_{ij} \partial_j U_h}  & \VertSpace = 2\nu (\alpha \nabla\boldsymbol{v}, \, \nabla^\text{S}\boldsymbol{u}) - \frac{2\nu}{3}(\alpha \nabla\cdot\boldsymbol{v},\, \nabla\cdot\boldsymbol{u}) \label{eq:ViscousTerm}, \\
+  \dualpairing{V_h, \mathbf{A}_{c,i} \partial_i U_h}            & \VertSpace = (\alpha \boldsymbol{v}, \, \boldsymbol{a}\cdot\nabla \boldsymbol{u}) + (\alpha q,\, \nabla \cdot \boldsymbol{u}) \label{eq:VelocityDerivativeTerm},                          \\
+  - \dualpairing{\partial_i(\mathbf{A}^{\top}_{f,i} V_h) , U_h} & \VertSpace = - (\alpha \nabla \cdot \boldsymbol{v},\,p) - (\nabla \alpha \cdot \boldsymbol{v},\,p)\label{eq:FluxTerm},                                                                    \\
+  \dualpairing{V_h, \mathbf{S} U_h}                             & \VertSpace = (\boldsymbol{v},\,\boldsymbol{\sigma}\boldsymbol{u}) + (q \nabla \alpha,\, \boldsymbol{u}) + (\varepsilon q,\,p). \label{eq:ReactionTerm}
+\end{align}
+And the stabilization terms are
+\begin{align}
+  \HorSpace \smash{- \sum_K{\dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau} \mathcal{L}U_h}_K}} & = ( \tau_{1} \alpha^2 \left (\VertSpace (\boldsymbol{a} \cdot \nabla)\boldsymbol{v} + \nu \overline{\Delta}\boldsymbol{v} + \nu \ViscProj \nabla \boldsymbol{v} \nabla \beta \right. \notag                                                                                     \\
+                                                                                                 & \HorSpace \left.+ \nabla q - \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{v} \right ),\, \notag                                                                                                                                                                               \\
+                                                                                                 & \HorSpace\hphantom{\big(\tau_{1}}\VertSpace (\boldsymbol{a} \cdot \nabla)\boldsymbol{u} - \nu \overline{\Delta}\boldsymbol{u} - \nu \ViscProj \nabla \boldsymbol{u} \nabla \beta + \nabla p + \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{u} ) \notag                        \\
+                                                                                                 & \VertSpace + (\tau_{2} \alpha^2 \left( \nabla \cdot \boldsymbol{v} + \boldsymbol{v} \cdot \nabla \beta - \frac{\varepsilon}{\alpha} q \right),\, \nabla \cdot \boldsymbol{u} + \boldsymbol{u} \cdot \nabla \beta + \frac{\varepsilon}{\alpha} p ), \label{eq:StabilizationLVLU}
+\end{align}
+where $\overline{\Delta} \boldsymbol{w} \coloneqq 2 \nabla \cdot \left ( \nabla^\text{S}\boldsymbol{w} \right ) - \frac{2}{3} \nabla \left ( \nabla \cdot \boldsymbol{w} \right )$, and where we have introduced $\beta \coloneqq \log \alpha$ to simplify the expressions once we pull out the common factor $\alpha$. Note how this way the terms that are new with respect to the Navier{\hyp}Stokes formulation stand out more clearly.
+
+The right-hand-side Galerkin terms are
+\begin{align}
+  \dualpairing{V_h, F}                                                & \VertSpace = \innerprod{\boldsymbol{v}, \boldsymbol{f}} \label{eq:GalerkinForceTerm},                 \\
+  \dualpairing{V_h, {[\boldsymbol{t}_\text{N}; 0]}}_{\Gamma_\text{N}} & \VertSpace = (\boldsymbol{v},\, \boldsymbol{t}_\text{N})_{\Gamma_\text{N}} \label{eq:NeumannBCsTerm},
+\end{align}
+and the right-hand side stabilization terms are
+\begin{align}
+  \smash{ - \sum_K{\dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau} \overline{F} )}_K}} & = ( \tau_{1} \alpha \left ( \VertSpace(\boldsymbol{a} \cdot \nabla)\boldsymbol{v} + \nu \overline{\Delta}\boldsymbol{v} + \nu \ViscProj \nabla \boldsymbol{u} \nabla \beta \right. \notag    \\
+                                                                                        & \HorSpace \left. + \nabla q - \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{v} \right ),\, \overline{\boldsymbol{f}}) \notag                                                                \\
+                                                                                        & \VertSpace + ( \tau_{2} \alpha \left( \nabla \cdot \boldsymbol{v} + \boldsymbol{v} \cdot \nabla \beta - \frac{\varepsilon}{\alpha} q\right),\, \overline{\phi}), \label{eq:StabilizationLVF}
+\end{align}
+where $\boldsymbol{\pi}_h = [\boldsymbol{\pi}_{\text{mom}}; \pi_{\text{mass}}]^\top$, $\overline{U}^n = [\overline{\boldsymbol{u}}^n; \overline{p}^n]^\top$, $\overline{F} = F - \boldsymbol{\pi}_h$ and where
+\begin{align} \label{eq:DefinitionOfMassSourceTerm}
+  \overline{\boldsymbol{f}} \coloneqq \boldsymbol{f} - \boldsymbol{\pi}_{\text{mom}}, \\
+  \overline{\phi} \coloneqq - \pi_{\text{mass}} + \varepsilon p^{n-1},
+\end{align}
+from which we have $\overline{F} = [\overline{\boldsymbol{f}}, \overline{\phi}]^\top$.
+
+Let us first derive the form of the elemental matrices for the OSGS. In order to simplify the expressions, we will make use here of following notation:
+\begin{align}
+  \left ( \boldsymbol{A}, \boldsymbol{B} \right ) \coloneqq \sum_K{\int_K{ \boldsymbol{A} \circ \boldsymbol{B} \, \mathrm{d}\Omega}},\quad
+  \left ( \boldsymbol{A}, \boldsymbol{B} \right )_\Gamma \coloneqq \sum_K{\int_{\partial K \cap \Gamma}{ \boldsymbol{A} \circ \boldsymbol{B} \, \mathrm{d}\Gamma}},\quad
+\end{align}
+where $\circ$ represents the inner product between the tensors $\boldsymbol{A}$ and $\boldsymbol{B}$ of whichever order (Frobenius product; e.g.\, the usual dot product for vectors). Furthermore, we will remove the $h$-subindices from both the velocity and pressure unknowns (and their corresponding test functions) and call the stabilization matrix with the generic name $\boldsymbol{\tau}$ instead of $\boldsymbol{\tau}_K$ for conciseness.
+
+In order to construct the elemental matrices that define the elemental contributions to be assembled, we will proceed by constructing the following submatrices:
+\begin{enumerate}
+  \item $\mathbf{K}_{V, U}$, which contains the contributions of the \emph{momentum} conservation equation due to the \emph{velocity} degrees of freedom.
+  \item $\mathbf{K}_{V, P}$, which contains the contributions of the \emph{momentum} conservation equation due to the \emph{pressure} degrees of freedom.
+  \item $\mathbf{K}_{Q, U}$, which contains the contributions of the \emph{mass} conservation equation due to the \emph{velocity} degrees of freedom.
+  \item $\mathbf{K}_{Q, P}$, which contains the contributions of the \emph{mass} conservation equation due to the \emph{pressure} degrees of freedom.
+\end{enumerate}
+By arranging the elemental unknowns such that the velocity degrees of freedom and the momentum conservation contributions are placed first, one obtains the following decomposition of the left-hand side elemental matrix:
+\begin{equation}
+  \mathbf{K} =
+  \begingroup % keep the change local
+  \setlength\arraycolsep{1.5pt}
+  \begin{bmatrix}
+    \mystrut(20,10)\begin{bmatrix} \makebox[5em]{$\Bigg.\mathbf{K}_{V, U}$} \end{bmatrix} &
+    \begin{bmatrix} \makebox[2.5em]{$\Bigg.\mathbf{K}_{V, P}$} \end{bmatrix}
+    \\[3ex] \mystrut(10,7)
+    \smash{
+      \underbrace{\mystrut(10,7)
+    \begin{bmatrix} \makebox[5em]{$\mathbf{K}_{Q, U}$} \end{bmatrix}}_{n_e d}}            &
+    \smash{
+      \underbrace{\mystrut(10,7)
+        \begin{bmatrix} \makebox[2.5em]{$\mathbf{K}_{Q, P}$} \end{bmatrix}}_{n_e}}
+  \end{bmatrix}\!\!
+  \begin{matrix*}\mystrut(20,10)
+    \left. \vphantom{
+      \begin{matrix*} \makebox[2.5em]{$\Bigg.\mathbf{K}_{V, P}$} \end{matrix*}
+    } \right \rbrace{\scriptstyle n_e d}
+    \\[3ex] \mystrut(10,7)
+    \left. \!\!\!\vphantom{
+      \smash{
+        \underbrace{\mystrut(10,7)
+          \begin{matrix*} \makebox[2.5em]{$\mathbf{K}_{Q, P}$} \end{matrix*}}_{n_e}}
+    } \right \rbrace{\scriptstyle n_e}
+  \end{matrix*}
+  \mystrut(0,35)
+  \endgroup,
+\end{equation}
+where $n_e$ is the number of elemental nodes.
+Similarly, the right-hand side elemental contribution can be decomposed as
+\begin{equation}
+  \mathbf{F} =
+  \begingroup % keep the change local
+  \setlength\arraycolsep{1.5pt}
+  \begin{bmatrix}\mystrut(20,10)
+    \begin{bmatrix} \makebox[2em]{$\Bigg.\mathbf{F}_{V}$} \end{bmatrix}
+    \\[3ex] \mystrut(10,7)
+    \begin{bmatrix} \makebox[2em]{$\mathbf{F}_{Q}$} \end{bmatrix}
+  \end{bmatrix}\!\!
+  \begin{matrix*}\mystrut(20,10)
+    \left. \vphantom{\begin{matrix*} \makebox[2em]{$\Bigg.\mathbf{F}_{V}$} \end{matrix*}} \right \rbrace{\scriptstyle n_e d}
+    \\[3ex] \mystrut(10,7)
+    \left. \!\!\!\vphantom{\begin{matrix*} \makebox[2em]{$\mathbf{F}_{Q}$} \end{matrix*}} \right \rbrace{\scriptstyle n_e}
+  \end{matrix*}
+  \endgroup.
+\end{equation}
+In the following subsections we derive the explicit matrix contributions for equal-order interpolations based on the following expression of the finite element functions (summation implied over the nodes for repeated indices):
+\begin{equation} \label{eq:FEfunction}
+  u_{h,j} = N^b U^b_j, \,\, p_h = N^b P^b,
+\end{equation}
+for $j = 1 \isep d$ and $b=1 \isep n_{\text{nodes}}$; where the $N^b$ are the shape functions and $n_{\text{nodes}}$ is the total number of mesh nodes.
+\subsection{Components of $\mathbf{K}_{V, U}$} \label{sec:KVUComponents}
+Let us assume that, for any term of the form $T(\boldsymbol{v}, \boldsymbol{u})$ in \cref{eq:ViscousTerm,eq:VelocityDerivativeTerm,eq:ReactionTerm,eq:FluxTerm,eq:StabilizationLVLU}, the integral involved is calculated as a quadrature consisting in a weighted sum of the integrands evaluated at certain quadrature points. In such a case, the component $(ai)(bj)$ of the contribution of one of these integrands to the corresponding elemental matrix can be formally calculated as follows (summation is implied over repeated indices):
+\begin{equation} \label{eq:GenericMatrixVU}
+  T_{(ai)(bj)} = \frac{\partial T(N^a \delta_{ik}, U_k^c N^c)}{\partial U_j^b},
+\end{equation}
+where the lower indices run over the spatial coordinates (i.e.\, $i, j, k = 1 \isep d$) and the upper indices run over the element's nodes (i.e.\, $a, b, c = 1 \isep n_e$).
+
+The first terms we will consider are those coming from \cref{eq:ViscousTerm}. The contribution of the first term to the elemental matrix, $\mathbf{G}_S$, and is given by
+\begin{align} \label{eq:GSComponents}
+  G_{S\, (ai)(bj)} & = \alpha \nu \frac{\partial }{\partial U_j^b} \left( \partial_l N^c U_k^c + \partial_k N_c U_l^c \right) \partial_l N^a \delta_{ik} \notag         \\
+                   & \vphantom{\frac{\partial }{\partial U_j^b}} = \alpha \nu \left( \partial_l N^a \partial_l N^b \delta_{ij} + \partial_j N^a \partial_i N^b \right),
+\end{align}
+where the $\delta_{\bullet \bullet}$ and $\delta^{\bullet \bullet}$ are Kronecker delta operators (of the corresponding spatial and nodal indices, respectively).
+The second term, $\mathbf{D}_{\nu D}$, yields
+\begin{align} \label{eq:DDComponents}
+  D_{\nu D\, (ai)(bj)} & = - \frac{2}{3} \alpha \nu \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{il} \partial_m N_c U_m^c \right) = - \frac{2}{3} \alpha \nu \partial_i N^a \partial_j N^b.
+\end{align}
+The first term in \cref{eq:VelocityDerivativeTerm} generates the contribution $\mathbf{V}$, given by
+\begin{align} \label{eq:VComponents}
+  V_{(ai)(bj)} = \alpha \frac{\partial }{\partial U_j^b} \left( N^a \delta_{ik} a_l \partial_l N^c U_k^c \right) = \alpha N^a a_l \partial_l N^b \delta_{ij}.
+\end{align}
+And the first term in \cref{eq:ReactionTerm} generates the contribution $\mathbf{R}_\sigma$:
+\begin{align} \label{eq:ReactionTermComponents}
+  R_{\sigma, (ai)(bj)} & = \frac{\partial }{\partial U_j^b} \left( N^a \sigma_{ik} U^c_k N^c \right) = N^aN^b \sigma_{ij}.
+\end{align}
+Let us now consider the contributions from the stabilization terms from \cref{eq:StabilizationLVLU}, which contributes 40 terms ($\mathbf{A}_A$, $\mathbf{A}_L$, $\mathbf{A}_C$, $\mathbf{A}_{G\beta}$, $\mathbf{A}_{D\beta}$, $\mathbf{A}_\sigma$, $\mathbf{L}_A$, $\mathbf{L}_L$, $\mathbf{L}_C$, $\mathbf{L}_{G\beta}$, $\mathbf{L}_{D\beta}$, $\mathbf{L}_\sigma$, $\mathbf{C}_A$, $\mathbf{C}_L$, $\mathbf{C}_C$, $\mathbf{C}_{G\beta}$, $\mathbf{C}_{D\beta}$, $\mathbf{C}_\sigma$, $\mathbf{G}_{\beta A}$, $\mathbf{G}_{\beta L}$, $\mathbf{G}_{\beta C}$, $\mathbf{G}_{\beta G}$, $\mathbf{G}_{\beta D}$, $\mathbf{G}_{\beta \sigma}$, $\mathbf{D}_{\beta A}$, $\mathbf{D}_{\beta L}$, $\mathbf{D}_{\beta C}$, $\mathbf{D}_{\beta G}$, $\mathbf{D}_{\beta D}$, $\mathbf{D}_{\beta \sigma}$, $\mathbf{R}_{R\sigma}$, $\mathbf{R}_{\sigma A}$, $\mathbf{R}_{\sigma L}$, $\mathbf{R}_{\sigma C}$, $\mathbf{R}_{G\beta}$, $\mathbf{R}_{D\beta}$, $\mathbf{G}_U$, $\mathbf{G}_{D}$, $\mathbf{D}_U$ and $\mathbf{D}_{D}$) to $\mathbf{K}_{V, U}$:
+
+\begin{align}
+  A_{A\, (ai)(bj)}        & = \tau_1 \alpha^2 \frac{\partial }{\partial U_j^b} \left( a_l \partial_l N^a \delta_{ik} a_m \partial_m N^c U_k^c \right) = \tau_1 \alpha^2 a_l \partial_l N^a a_m \partial_m N^b \delta_{ij}, \label{eq:AALHSStabilizationTerm}                                                                              \\
+  A_{L\, (ai)(bj)}        & = - \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( a_l \partial_l N^a \delta_{ik} \partial_m \left(\partial_m N^c U_k^c + \partial_k N^c U_m^c \right) \right) \notag                                                                                                                            \\
+                          & =\vphantom{\frac{\partial }{\partial U_j^b}} - \tau_1 \alpha^2 \nu a_l \partial_l N^a \left( \partial^2_{mm}N^b \delta_{ij} + \partial^2_{ij} N^b \right), \label{eq:ALLHSStabilizationTerm}                                                                                                                  \\
+  A_{C\, (ai)(bj)}        & = \frac{2}{3} \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( a_l \partial_l N^a \delta_{ik} \partial^2_{km} U_m^c N^c\right) = \frac{2}{3} \tau_1 \alpha^2 \nu a_l \partial_l N^a \partial^2_{ij} N^b, \label{eq:ACLHSStabilizationTerm}                                                         \\
+  A_{G \beta \, (ai)(bj)} & = -\tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( a_l \partial_l N^a \delta_{ik} \left( \partial_{ik} N^c U_m^c + \partial_m N^c U_k^c \right) \partial_m \beta \right) \notag                                                                                                                   \\
+                          & = -\tau_1 \alpha \nu a_l \partial_l N^a \left( \partial_i N^b \partial_j \alpha + \partial_m \alpha \partial_m N^b \delta_{ij} \right), \label{eq:AGBetaLHSStabilizationTerm}                                                                                                                                 \\
+  A_{D \beta \, (ai)(bj)} & = \frac{2}{3} \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( a_l \partial_l N^a \delta_{ik} \partial_m N^c U_m^c \partial_k \beta \right) = \frac{2}{3} \tau_1 \alpha \nu a_l \partial_l N^a \partial_i \alpha \partial_j N^b, \label{eq:ADBetaLHSStabilizationTerm}                             \\
+  A_{\sigma\, (ai)(bj)}   & = \tau_1 \alpha \frac{\partial }{\partial U_j^b} \left( a_l \partial_l N^a \delta_{ik} \sigma_{kl} U_l^c N^c \right) = \tau_1 \alpha a_l \partial_l N^a N^b \sigma_{ij},  \label{eq:ASigmaLHSStabilizationTerm}                                                                                               \\
+  L_{A\, (ai)(bj)}        & = \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( \partial_l \left( \partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) a_m \partial_m N^c U_k^c \right) \notag                                                                                                                       \\
+                          & \vphantom{\frac{\partial }{\partial U_j^b}} = \tau_1 \alpha^2 \nu \left( \partial^2_{ll}N^a \delta_{ij} + \partial^2_{ij} N^a \right) a_m \partial_m N^b, \label{eq:LALHSStabilizationTerm}                                                                                                                   \\
+  L_{L\, (ai)(bj)}        & = - \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_l \left(\partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) \partial_m \left( \partial_m N^c U_k^c + \partial_k N^c U_m^c \right) \right) \notag                                                                       \\
+                          & =\vphantom{\frac{\partial }{\partial U_j^b}} - \tau_1 \alpha^2 \nu^2 \left( \partial^2_{ll}N^a \partial^2_{mm}N^b \delta_{ij} + \partial^2_{ll} N^a \partial^2_{ij}N^b \right. \notag                                                                                                                         \\
+                          & \hphantom{{- \tau_1 \alpha^2 \nu^2}=}\vphantom{\frac{\partial }{\partial U_j^b}} + \left. \partial^2_{ij}N^a \partial^2_{mm} N^b + \partial^2_{ik} N^a \partial^2_{jk} N^b \right), \label{eq:LLLHSStabilizationTerm}                                                                                         \\
+  L_{C\, (ai)(bj)}        & = \frac{2}{3}\tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_l \left( \partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) \partial^2_{km} U_m^c N^c \right) \notag                                                                                                         \\
+                          & =\vphantom{\frac{\partial }{\partial U_j^b}} \frac{2}{3}\tau_1 \alpha^2 \nu^2\left( \partial^2_{ll} N^a \partial^2_{ij} N^b + \partial^2_{ik} N^a \partial^2_{kj}N^b \right), \label{eq:SCLHSStabilizationTerm}                                                                                               \\
+  L_{G \beta \, (ai)(bj)} & = - \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_l \left( \partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) \left( \partial_k N^c U_m^c + \partial_m N^c U_k^c \right) \partial \beta \right) \notag                                                                  \\
+                          & = - \tau_1 \alpha \nu^2 \left( \partial_{ll}^2 N^a \left( \partial_i N^b \partial_j \alpha + \partial_m \alpha \partial_m N^b \delta_{ij}\right) + \partial_{ik}^2 N^a \partial_k N^b \partial_j \alpha + \partial_{ij}^2 N^a \partial_m \alpha \partial_m N^b \right), \label{eq:LGBetaLHSStabilizationTerm}
+\end{align}
+\begin{align}
+  L_{D \beta \, (ai)(bj)} & = \frac{2}{3} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_l \left( \partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) \partial_m N^b \delta_{mj} \partial_k \beta \right) \notag                                                                                                                  \\
+                          & = \frac{2}{3} \tau_1 \alpha \nu^2 \left( \partial_{ll}^2 N^a \partial_i \alpha + \partial_k \alpha \partial_{ik}^2 N^a \right) \partial_j N^b, \label{eq:LDBetaLHSStabilizationTerm}                                                                                                                                                      \\
+  L_{\sigma\, (ai)(bj)}   & = \tau_1 \alpha \nu \frac{\partial }{\partial U_j^b} \left( \partial_l \left( \partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) \sigma_{kl} U_l^c N^c \right) \notag                                                                                                                                                        \\
+                          & = \tau_1 \alpha \nu \left( \partial_{ll}^2 N^a \sigma_{ij} N^b + \partial_{ik}^2 N^a \sigma_{kj} N^b \right) \label{eq:LSigmaLHSStabilizationTerm}                                                                                                                                                                                        \\
+  C_{A\, (ai)(bj)}        & = - \frac{2}{3} \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( \partial^2_{kl} N^a \delta_{il} a_m \partial_m N^c U_k^c \right) = - \frac{2}{3} \tau_1 \alpha^2 \nu \partial^2_{ij} N^a a_m \partial_m N^b, \label{eq:CALHSStabilizationTerm}                                                                                \\
+  C_{L\, (ai)(bj)}        & = \frac{2}{3} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial^2_{lk} N^a \delta_{il} \partial_m \left( \partial_m N^c U_k^c + \partial_k N^c U_m^c \right) \right) \notag                                                                                                                                          \\
+                          & =\vphantom{\frac{\partial }{\partial U_j^b}} \frac{2}{3} \tau_1 \alpha^2 \nu^2 \left(\partial^2_{ij} N^a \partial^2_{mm} N^b + \partial^2_{ik} N^a \partial^2_{kj} N^b\right), \label{eq:CLLHSStabilizationTerm}                                                                                                                          \\
+  C_{C\, (ai)(bj)}        & = - \frac{4}{9} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial^2_{kl} N^a \delta_{il} \partial^2_{km} N^c U_m^c \right) = - \frac{4}{9} \tau_1 \alpha^2 \nu^2 \partial^2_{ki} N^a \partial^2_{kj} N^b, \label{eq:CCLHSStabilizationTerm}                                                                          \\
+  C_{G \beta \, (ai)(bj)} & = \frac{2}{3} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_k \left( \partial_l N^a \delta_{il} \right) \left( \partial_k N^c U_m^c + \partial_m N^c U_k^c \right) \partial_m \beta \right) \notag                                                                                                               \\
+                          & = \frac{2}{3} \tau_1 \alpha \nu^2 \left( \partial_{ik}^2 N^a \partial_k N^b \partial_j \alpha + \partial_{ij}^2 N^a \partial_m \alpha \partial_m N^b \right), \label{eq:CGBetaLHSStabilizationTerm}                                                                                                                                       \\
+  C_{D \beta \, (ai)(bj)} & = - \frac{4}{9} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_k \left( \partial_l N^a \delta_{il} \right) \partial_m N^c U_m^c \partial_k \beta \right) = - \frac{4}{9} \tau_1 \alpha \nu^2 \partial_k \alpha \partial_{ik}^2 N^a \partial_j N^b, \label{eq:CDBetaLHSStabilizationTerm}                          \\
+  C_{\sigma\, (ai)(bj)}   & = - \frac{2}{3} \tau_1 \alpha \nu \frac{\partial }{\partial U_j^b} \left( \partial_{kl}^2 N^a \delta_{il} \sigma_{km} U_m^c N^c \right) = - \frac{2}{3} \tau_1 \alpha \nu \left( \partial_{ki}^2 N^a \sigma_{kj} N^b \right), \label{eq:CSigmaLHSStabilizationTerm}                                                                       \\
+  G_{\beta A \, (ai)(bj)} & = \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( \left( \partial_k N^a \delta_{il} + \partial_l N^a \delta_{ik} \right) \partial_l \beta a_m \partial_m N^c U_k^c \right) \notag                                                                                                                                             \\
+                          & = \vphantom{\frac{\partial }{\partial U_j^b}}\tau_1 \alpha \nu \left(\partial_i \alpha \partial_j N^a + \partial_l \alpha \partial_l N^a \delta_{ij} \right) a_m \partial_m N^b, \label{eq:GBetaALHSStabilizationTerm}                                                                                                                    \\
+  G_{\beta L \, (ai)(bj)} & = - \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \left( \partial_k N^a \delta_{il} + \partial_l N^a \delta_{ik} \right) \partial_l \beta \partial_m \left( \partial_m N^c U_k^c + \partial_k N^c U_m^c \right) \right) \notag                                                                                            \\
+                          & = \vphantom{\frac{\partial }{\partial U_j^b}}- \tau_1 \alpha \nu^2 \left( \partial_i \alpha \left( \partial_j  N^a \partial_{mm}^2 N^b + \partial_k N^a \partial_{kj}^2 N^b \right) + \partial_l \alpha \partial_l N^a \left( \partial_{ij}^2 N^b + \partial_{mm}^2 N^b \delta_{ij} \right)\right), \label{eq:GBetaLLHSStabilizationTerm}
+\end{align}
+\begin{align}
+  G_{\beta C \, (ai)(bj)}      & = \frac{2}{3} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \left( \partial_k N^a \delta_{il} + \partial_l N^a \delta_{ik} \right)  \partial_l \beta \partial_k \left( \partial_m N^c U_m^c \right) \right) \notag                                                                                                                                                     \\
+                               & = \vphantom{\frac{\partial }{\partial U_j^b}}\frac{2}{3} \tau_1 \alpha \nu^2 \left( \partial_i \alpha \partial_k N^a \partial_{kj}^2 N^b + \partial_l \alpha \partial_l N^a \partial_{ij}^2 N^b \right), \label{eq:GBetaCLHSStabilizationTerm}                                                                                                                                         \\
+  G_{\beta G \, (ai)(bj)}      & = - \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \left( \partial_k N^a \delta_{il} + \partial_l N^a \delta_{ik} \right) \partial_l \beta \left( \partial_k N^c U_m^c + \partial_m N^c U_k^c \right) \partial_m \beta \right) \notag                                                                                                                                   \\
+                               & =\vphantom{\frac{\partial }{\partial U_j^b}} - \tau_1 \nu^2 \left( \partial_i \alpha \left( \partial_k N^a \partial_k N^b \partial_j \alpha + \partial_j N^a \partial_m \alpha \partial_m N^b \right) + \partial_l \alpha \partial_l N^a \left( \partial_i N^b \partial_j \alpha + \partial_m \alpha \partial_m N^b \delta_{ij} \right) \right), \label{eq:GBetaGLHSStabilizationTerm} \\
+  G_{\beta D \, (ai)(bj)}      & = \frac{2}{3} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \left( \partial_k N^a \delta_{il} + \partial_l N^a \delta_{ik} \right) \partial_l \beta \partial_m N^c U_m^c \partial_k \beta \right) \notag                                                                                                                                                               \\
+                               & = \vphantom{\frac{\partial }{\partial U_j^b}} \frac{2}{3} \tau_1 \nu^2 \left( \partial_k \alpha \partial_k N^a + \partial_l \alpha \partial_l N^a \right) \partial_i \alpha \partial_j N^b, \label{eq:GBetaDLHSStabilizationTerm}                                                                                                                                                      \\
+  G_{\beta \sigma \, (ai)(bj)} & = \tau_1 \alpha \nu \frac{\partial }{\partial U_j^b} \left( \left( \partial_k N^a \delta_{il} + \partial_l N^a \delta_{ik} \right) \partial_l \beta \sigma_{km} U_m^c N^c \right)  \notag                                                                                                                                                                                              \\
+                               & = \vphantom{\frac{\partial }{\partial U_j^b}} \tau_1 \nu \left( \partial_i \alpha \partial_k N^a \sigma_{kj} + \partial_l \alpha \partial_l N^a \sigma_{ij} \right) N^b, \label{eq:GBetaSigmaLHSStabilizationTerm}                                                                                                                                                                     \\
+  D_{\beta A \, (ai)(bj)}      & = - \frac{2}{3} \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{il} \partial_k \beta a_m \partial_m N^c U_k^c \right) = - \frac{2}{3} \tau_1 \alpha \nu \partial_i N^a \partial_j \alpha a_m \partial_m N^b, \label{eq:DBetaALHSStabilizationTerm}                                                                                                  \\
+  D_{\beta L \, (ai)(bj)}      & = \frac{2}{3} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{ik} \partial_k \beta \partial_m \left( \partial_m N^c U_k^c +\partial_k N^c U_m^c \right) \right) \notag                                                                                                                                                                            \\
+                               & = \vphantom{\frac{\partial }{\partial U_j^b}} \frac{2}{3} \tau_1 \alpha \nu^2 \partial_i N^a \left( \partial_j \alpha \partial_{mm}^2 N^b + \partial_k \alpha \partial_{kj}^2 N^b \right), \label{eq:DBetaLLHSStabilizationTerm}                                                                                                                                                       \\
+  D_{\beta C \, (ai)(bj)}      & = - \frac{4}{9} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{il} \partial_k \beta \partial_{km}^2 N^c U_m^c \right) = - \frac{4}{9} \tau_1 \alpha \nu^2 \partial_i N^a \partial_k \alpha \partial_{jk}^2 N^b, \label{eq:DBetaCLHSStabilizationTerm}                                                                                            \\
+  D_{\beta G \, (ai)(bj)}      & = \frac{2}{3} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{il} \partial_k \beta \left( \partial_l N^c U_k^c + \partial_k N^c U_l^c \right) \partial_l \beta \right) \notag                                                                                                                                                                     \\
+                               & = \vphantom{\frac{\partial }{\partial U_j^b}} \frac{4}{3} \tau_1 \nu^2 \partial_i N^a \partial_l \alpha \partial_l N^b \partial_j \alpha, \label{eq:DBetaGLHSStabilizationTerm}                                                                                                                                                                                                        \\
+  D_{\beta D \, (ai)(bj)}      & = -\frac{4}{9} \tau_1 \alpha^2 \nu^2 \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{il} \partial_k \beta \partial_m N^c U_m^c \partial_k \beta \right) = -\frac{4}{9} \tau_1 \nu^2 \partial_k \alpha \partial_k \alpha \partial_i N^a \partial_j N^b, \label{eq:DBetaDLHSStabilizationTerm}                                                                            \\
+  D_{\beta \sigma \, (ai)(bj)} & = - \frac{2}{3} \tau_1 \alpha \nu \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{il} \partial_k \beta \sigma_{km} U_m^c N^c \right) = - \frac{2}{3} \tau_1 \nu \partial_i N^a N^b \partial_k \alpha \sigma_{kj}, \label{eq:DBetaSigmaLHSStabilizationTerm}
+\end{align}
+\begin{align}
+  R_{\sigma A\, (ai)(bj)} & = - \tau_1 \alpha \frac{\partial }{\partial U_j^b} \left( \sigma_{lk} N^a \delta_{il} a_m \partial_m N^c U_k^c \right) = - \tau_1 \alpha N^a a_m \partial_m N^b \sigma_{ij}, \label{eq:RSigmaALHSStabilizationTerm}                                                  \\
+  R_{\sigma L\, (ai)(bj)} & = \tau_1 \alpha \nu \frac{\partial }{\partial U_j^b} \left( \sigma_{lk} N^a \delta_{il} \partial_l \left( \partial_l N^c U_k^c + \partial_k N^c U_l^c \right) \right) \notag                                                                                         \\
+                          & = \tau_1 \alpha \nu N^a \left( \partial_{ll}^2 N^b \sigma_{ij} + \sigma_{ik} \partial_{jk}^2 N^b \right), \label{eq:RSigmaLLHSStabilizationTerm}                                                                                                                     \\
+  R_{\sigma C\, (ai)(bj)} & = - \frac{2}{3} \tau_1 \alpha \nu \frac{\partial }{\partial U_j^b} \left( \sigma_{lk}N^a \delta_{il} \partial_{km}^2 N^c U_m^c \right) = - \frac{2}{3} \tau_1 \alpha \nu \sigma_{ik} N^a \partial_{kj}^2 N^b, \label{eq:RSigmaCLHSStabilizationTerm}                 \\
+  R_{G \beta \, (ai)(bj)} & = \tau_1 \alpha \nu \frac{\partial }{\partial U_j^b} \left( \sigma_{kl} N^a \delta_{il} \left( \partial_k N^c U_m^c + \partial_m N^c U_k^c \right) \partial_m \beta \right) \notag                                                                                   \\
+                          & = \vphantom{\frac{\partial }{\partial U_j^b}} \tau_1 \nu \left( N^a \sigma_{ik} \partial_k N^b \partial_j \alpha + N^a \partial_m \alpha \partial_m N^b \sigma_{ij} \right), \label{eq:RGBetaLHSStabilizationTerm}                                                   \\
+  R_{D \beta \, (ai)(bj)} & = - \frac{2}{3} \tau_1 \alpha \nu \frac{\partial }{\partial U_j^b} \left( \sigma_{kl} N^a \delta_{il} \partial_m N U_m^c \partial_k \beta \right) = - \frac{2}{3} \tau_1 \nu N^a \sigma_{ik} \partial_k \alpha \partial_j N^b, \label{eq:RDBetaLHSStabilizationTerm} \\
+  R_{R\sigma\, (ai)(bj)}  & = - \tau_1 \frac{\partial }{\partial U_j^b} \left( \sigma_{lk} N^a \delta_{il} \sigma_{km} U_m^c N^c \right) = - \tau_1 \sigma_{ik} N^a \sigma_{kj}N^b, \label{eq:RRSigmaLHSStabilizationTerm}                                                                       \\
+  D_{U\, (ai)(bj)}        & = \tau_2 \alpha \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{il} U_m^c N^c \partial_m \alpha \right) = \tau_2 \partial_i N^a \partial_j \alpha N^b, \label{eq:DULHSStabilizationTerm}                                                              \\
+  D_{D\, (ai)(bj)}        & = \tau_2 \frac{\partial }{\partial U_j^b} \left( \partial_l N^a \delta_{il} \alpha^2 \partial_m N^c U_m^c \right) = \tau_2 \alpha^2 \partial_i N^a \partial_j N^b, \label{eq:DAlphaDLHSStabilizationTerm}                                                            \\
+  G_{U\, (ai)(bj)}        & = \tau_2 \alpha^2 \frac{\partial }{\partial U_j^b} \left( N^a \delta_{il} \partial_l \beta U_l^c N^c \partial_l \beta \right) = \tau_2 N^a N^b \partial_i \alpha \partial_j \alpha, \label{eq:GULHSStabilizationTerm}                                                \\
+  G_{D\, (ai)(bj)}        & = \tau_2 \alpha^2 \frac{\partial }{\partial U_j^b} \left( N^a \delta_{il} \partial_l \beta \partial_l N^c U_l^c \right) = \tau_2 \alpha N^a \partial_i \alpha \partial_j N^b. \label{eq:GAlphaDLHSStabilizationTerm}
+\end{align}
+\subsection{Components of $\mathbf{K}_{Q,U}$} \label{sec:KQUComponents}
+In this case, for any term $T(q, \boldsymbol{u})$ in \cref{eq:ViscousTerm,eq:VelocityDerivativeTerm,eq:ReactionTerm,eq:FluxTerm,eq:StabilizationLVLU}, the component $a(bj)$ of its contribution to the matrix can be formally calculated as
+\begin{equation} \label{eq:GenericMatrixQU}
+  T_{a, jb} = \frac{\partial T(N^a, U_k^c N^c)}{\partial U_j^b}.
+\end{equation}
+Thus, the second term in \cref{eq:VelocityDerivativeTerm} produces the contribution $\mathbf{Q}_D$, whose components are
+\begin{equation} \label{eq:QComponents}
+  Q_{D\, a(bj)} = \frac{\partial }{\partial U_j^b} \left( \alpha N^a \partial_l N^c U_l^c \right) = \alpha N^a \partial_j N^b.
+\end{equation}
+The second term in \cref{eq:ReactionTerm} produces $\mathbf{G}_{\alpha D}$:
+\begin{equation} \label{eq:GAlphaComponents}
+  G_{\alpha D\, a(bj)} = \frac{\partial }{\partial U_j^b} \left( N^a \partial_k \alpha U_k^c N^c \right) = N^a N^b \partial_j \alpha.
+\end{equation}
+\cref{eq:StabilizationLVLU} contributes eight more terms ($\mathbf{G}_A$, $\mathbf{G}_L$, $\mathbf{G}_C$, $\mathbf{G}_{G \beta}$, $\mathbf{G}_{D \beta}$, $\mathbf{G}_{R}$, $\mathbf{Q}_{\varepsilon D}$ and $\mathbf{Q}_U$):
+\begin{align}
+  G_{A\, a(bj)}            & = \frac{\partial }{\partial U_j^b} \left( \tau_1 \alpha^2 \partial_k N^a a_l \partial_l N^c U^c_k \right) = \tau_1 \alpha^2 \partial_j N^a a_l \partial_l N^b, \label{eq:GALHSStabilizationTerm}                                                              \\
+  G_{L\, a(bj)}            & = \frac{\partial }{\partial U_j^b} \left( - \tau_1 \nu \alpha^2 \partial_k N^a \partial_l \left( \partial_l N^c U_k^c + \partial_k N^c U_l^c \right) \right) \notag                                                                                           \\
+                           & =\vphantom{\frac{\partial }{\partial U_j^b}} - \tau_1 \nu \alpha^2 \left( \partial_j N^a \partial^2_{ll}N^b + \partial_k N^a \partial^2_{jk} N^b \right), \label{eq:GLLHSStabilizationTerm}                                                                   \\
+  G_{C\, a(bj)}            & = \frac{\partial }{\partial U_j^b} \left( \frac{2}{3} \tau_1 \nu \alpha^2 \partial_k N^a \partial_k \partial_l N^c U_l^c \right) = \frac{2}{3} \tau_1 \nu \alpha^2 \partial_k N^a \partial^2_{kj} N^b, \label{eq:GCLHSStabilizationTerm}                      \\
+  G_{G \beta\, a(bj)}      & = - \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( \partial_k N^a \left( \partial_k N^c U_l^c + \partial_l N^c U_k^c \right) \partial_l \beta \right) = \notag                                                                                   \\
+                           & =\vphantom{\frac{\partial }{\partial U_j^b}} - \tau_1 \alpha \nu \left( \partial_k N^a \partial_k N^b \partial_j \alpha + \partial_j N^a \partial_l \alpha \partial_l N^b \right), \label{eq:GGBetaLHSStabilizationTerm}                                      \\
+  G_{D \beta\, a(bj)}      & = \frac{2}{3} \tau_1 \alpha^2 \nu \frac{\partial }{\partial U_j^b} \left( \partial_k N^a \partial_l N^c U_l^c \partial_k \beta \right) = \frac{2}{3} \tau_1 \alpha \nu \partial_k \alpha \partial_k N^a \partial_j N^b, \label{eq:GDBetaLHSStabilizationTerm} \\
+  G_{R\, a(bj)}            & = \frac{\partial }{\partial U_j^b} \left( \alpha \partial_k N^a \sigma_{kl} U_l^c N^c \right) = \tau_1 \alpha \partial_k N^a \sigma_{kj} N^b, \label{eq:GRLHSStabilizationTerm}                                                                               \\
+  Q_{\varepsilon D\,a(bj)} & = -\frac{\partial }{\partial U_j^b} \left(\tau_2 \varepsilon \alpha N^a \partial_l N^c U_l^c\right) = -\tau_2 \alpha \varepsilon N^a \partial _j N^b, \label{eq:QepsilonDBetaLHSStabilizationTerm}                                                            \\
+  Q_{U\,a(bj)}             & = -\frac{\partial }{\partial U_j^b} \left( \tau_2 \varepsilon N^a N^c U_l^c \partial_l \alpha \right) = -\tau_2 \varepsilon N^a N^b \partial_j \alpha. \label{eq:QULHSStabilizationTerm}
+\end{align}
+
+\subsection{Components of $\mathbf{K}_{V, P}$} \label{sec:KVPComponents}
+The analogous equation to \cref{eq:GenericMatrixVP,eq:GenericMatrixQU} is
+\begin{equation} \label{eq:GenericMatrixVP}
+  T_{(ai)b} = \frac{\partial T(N^a \delta_{ik}, P^c N^c)}{\partial P^b}.
+\end{equation}
+\cref{eq:FluxTerm} contributes two terms, $\mathbf{P}$ and $\mathbf{G}_P$:
+\begin{align} \label{eq:PComponents}
+  P_{(ai)b} =     & \frac{\partial }{\partial P^b} \left( - \alpha P^c N^c \partial_l N^a \delta_{il} \right) = - \alpha \partial_i N^a N^b, \\
+  G_{P \,(ai)b} = & \frac{\partial }{\partial P^b} \left( - \partial_l \alpha N^a \delta_{il} P^c N^c \right) = - \partial_i \alpha N^a N^b,
+\end{align}
+and \cref{eq:StabilizationLVLU} contributes eight more ($\mathbf{A}_G$, $\mathbf{L}_G$, $\mathbf{C}_G$, $\mathbf{G}_G$, $\mathbf{D}_G$, $\mathbf{R}_{\sigma G}$, $\mathbf{D}_P$ and $\mathbf{G}_P$):
+\begin{align}
+  A_{G\, (ai)b}        & = \frac{\partial }{\partial P^b} \left( \tau_1 \alpha^2 a_l \partial_l N^a \delta_{ik} \partial_k N^c P^c \right) = \tau_1 \alpha^2 a_l \partial_l N^a \partial_i N^b, \label{eq:AGLHSStabilizationTerm}                                                              \\
+  L_{G\, (ai)b}        & = \frac{\partial }{\partial P^b} \left( \tau_1 \alpha^2 \nu \partial_l \left( \partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) \partial_k N^c P^c \right) \notag                                                                                       \\
+                       & =\vphantom{\frac{\partial }{\partial U_j^b}} \tau_1 \alpha^2 \nu \left( \partial^2_{ll} N^a \partial_i N^b + \partial^2_{ik} N^a \partial_k N^b \right), \label{eq:LGLHSStabilizationTerm}                                                                            \\
+  C_{G\, (ai)b}        & = \frac{\partial }{\partial P^b} \left( - \frac{2}{3} \tau_1 \alpha^2 \nu \partial_k \partial_l N^a \delta_{il} \partial_k N^c P^c \right) = - \frac{2}{3} \tau_1 \alpha^2 \nu \partial^2_{ik} N^a \partial_k N^b, \label{eq:CGLHSStabilizationTerm}                  \\
+  G_{G\, (ai)b}        & = \tau_1 \alpha^2 \nu \frac{\partial }{\partial P^b} \left( \left( \partial_k N^a \delta_{il} + \partial_l N^a \delta_{ik}\right) \partial_l \beta \partial_k N^c P^c \right) = \notag                                                                                \\
+                       & =\vphantom{\frac{\partial }{\partial U_j^b}} \tau_1 \alpha \nu \left( \partial_i \alpha \partial_k N^a \partial_k N^b + \partial_l \alpha \partial_l N^a \partial_i N^b \right), \label{eq:GGLHSStabilizationTerm}                                                    \\
+  D_{G\, (ai)b}        & = - \frac{2}{3} \tau_1 \alpha^2 \nu \frac{\partial }{\partial P^b} \left( \partial_l N^a \delta_{il} \partial_k \beta \partial_k N^c P^c \right) = - \frac{2}{3} \tau_1 \alpha \nu \partial_i N^a \partial_k \alpha \partial_k N^b, \label{eq:DGLHSStabilizationTerm} \\
+  R_{\sigma G\, (ai)b} & = - \frac{\partial }{\partial P^b} \left( \tau_1 \alpha \sigma_{lk} N^a \delta_{il} \partial_k N^c P^c \right) = - \tau_1 \alpha \sigma_{ik} N^a \partial_k N^b, \label{eq:RGLHSStabilizationTerm}                                                                    \\
+  D_{P\, (ai)b}        & = \frac{\partial }{\partial P^b} \left( \tau_2 \alpha \varepsilon \delta_{il} \partial_l N^a N^c P^c \right) = \tau_2 \alpha \varepsilon \partial_i N^a N^b, \label{eq:DPLHSStabilizationTerm}                                                                        \\
+  G_{P\, (ai)b}        & = \frac{\partial }{\partial P^b} \left( \tau_2 \partial_i \alpha \varepsilon N^c P^c \right) = \tau_2 \alpha \varepsilon \partial_i N^a N^b. \label{eq:GPLHSStabilizationTerm}
+\end{align}
+
+\subsection{Components of $\mathbf{K}_{Q, P}$} \label{sec:KQPComponents}
+The components of this submatrix can be obtained from
+\begin{equation} \label{eq:GenericMatrixQP}
+  T_{ab} = \frac{\partial T(N^a, P^c N^c)}{\partial P^b}.
+\end{equation}
+There are three contributions, $\mathbf{P}_Q$, $\mathbf{Q}_P$ and  $\mathbf{G}$, coming the first from \cref{eq:ReactionTerm} and the others from \cref{eq:StabilizationLVLU}:
+
+\begin{align} \label{eq:PQLHS}
+  P_{Q\, ab} = \frac{\partial }{\partial P^b} \left( \varepsilon  N^a N^c P^c\right) = \varepsilon N^a N^b,
+\end{align}
+
+\begin{align} \label{eq:QPLHSStabilizationTerm}
+  Q_{P\, ab} = -\frac{\partial }{\partial P^b} \left( \tau_2 \varepsilon ^2 N^a N^c P^c\right) = -\tau_2 \varepsilon ^2 N^a N^b,
+\end{align}
+
+\begin{align} \label{eq:GLHSStabilizationTerm}
+  G_{ab} = \frac{\partial }{\partial P^b} \left( \tau_1 \alpha^2 \partial_k N^a \partial_k N^c P^c\right) = \tau_1 \alpha^2 \partial_k N^a \partial_k N^b.
+\end{align}
+
+\subsection{Components of $\mathbf{F}_{V}$}  \label{sec:FVComponents}
+For any generic term $T(\boldsymbol{v})$, they are of the form
+\begin{equation} \label{eq:GenericVFTerm}
+  T_{(ia)} = T(N^a \delta_{ik}).
+\end{equation}
+A single such term, $\boldsymbol{V}_F$, is obtained from \cref{eq:GalerkinForceTerm}:
+\begin{align} \label{eq:GTerm}
+  V_{F(ia)} =  N^a \delta_{ik}f_k = N^a f_i.
+\end{align}
+
+Let us now turn to terms coming from the stabilization method. From \cref{eq:StabilizationLVF} we get  $\mathbf{A}_F$, $\mathbf{L}_F$, $\mathbf{C}_F$, $\mathbf{G}_{\beta F}$, $\mathbf{D}_{\beta F}$, and $\mathbf{R}_{\sigma, F}$:
+\renewcommand{\VertSpace}{\vphantom{\frac{2}{3}}}
+\begin{align}
+  A_{F\, (ia)}        & = \VertSpace\tau_1 \alpha a_l \partial_l N^a \delta_{ik} \overline{f}_k, \label{eq:AFTerm}                                            \\
+  L_{F\, (ia)}        & = \VertSpace\tau_1 \alpha \nu \left(\partial^2_{ll} N^a \overline{f}_i + \partial^2_{ik} N^a \overline{f}_k\right), \label{eq:LFTerm} \\
+  C_{F\, (ia)}        & = - \frac{2}{3} \tau_1 \alpha \nu \partial^2_{ik} N^a \overline{f}_k, \label{eq:CFTerm}                                               \\
+  G_{\beta F\, (ia)}  & = \tau_1 \nu \left( \partial_i \alpha \partial_k N^a + \partial_l \alpha \partial_l N^a \right) \overline{f}_k, \label{eq:GBetaFTerm} \\
+  D_{\beta F\, (ia)}  & = -\frac{2}{3} \tau_1 \nu \partial_i N^a \partial_k \alpha \overline{f}_k, \label{eq:DBetaFTerm}                                      \\
+  R_{\sigma F\, (ia)} & = \VertSpace- \tau_1 N^a \sigma_{ik} \overline{f}_k, \label{eq:RSigmaFTerm}                                                           \\
+  D_{\phi\, (ia)}     & = \VertSpace \tau_2 \alpha \partial_i N^a \overline{\phi}. \label{eq:DPhiTerm}
+\end{align}
+
+\cref{eq:StabilizationLVF} produces two more terms ($\mathbf{V}_{\phi}$ and $\mathbf{Q}_{\phi}$)
+\begin{align}
+  V_{\phi \, (ia)} & = \tau_2 \alpha \overline{\phi} N^a \partial_i \beta \label{eq:VPhiTerm}, \\
+  Q_{\phi \, (ia)} & = \tau_2 \varepsilon N^a \overline{\phi}. \label{eq:QPhiTerm}
+\end{align}
+
+\subsection{Components of $\mathbf{F}_{Q}$} \label{sec:FQComponents}
+Once more, for any generic term $T(q)$, they are of the form
+\begin{equation} \label{eq:GenericQFTerm}
+  T_{a} = T(N^a).
+\end{equation}
+There is only one such term ($\mathbf{Q}_{\alpha F}$), coming from \cref{eq:StabilizationLVF}:
+\begin{equation}
+  Q_{\alpha F\, a} = \tau_1 \alpha \partial_k N^a \overline{f}_k \label{eq:QAlphaFTerm}
+\end{equation}
+
+\subsection{Boundary terms} \label{sec:BoundaryComponents}
+\begin{align} \label{eq:VTerm}
+  V_{T\, (ia)} =  N^a \delta_{ik} t_{N,k}.
+\end{align}
+
+Putting together the results from \cref{sec:FQComponents,sec:FVComponents,sec:KQPComponents,sec:KQUComponents,sec:KVPComponents,sec:KVUComponents}, we obtain the following elemental matrices:
+\begin{align}
+  \mathbf{K} = &
+  \begin{bmatrix}
+    \mathbf{I} & \mathbf{0} \\
+    \mathbf{0} & \mathbf{0}
+  \end{bmatrix} +
+  \begin{bmatrix}
+    \mathbf{G}_S + \mathbf{D}_{\nu D} + \mathbf{V} + \mathbf{G}_{\beta} + \mathbf{D}_{\beta} + \mathbf{R}_\sigma & \mathbf{P} + \mathbf{G}_P \\
+    \mathbf{Q}_D + \mathbf{G}_{\alpha D}                                                                         & \mathbf{P}_Q
+  \end{bmatrix} + \mathbf{K}_{\text{S}}, \\
+  \mathbf{F} = &
+  \begin{bmatrix}
+    \boldsymbol{V}_F \\
+    0
+  \end{bmatrix} + \mathbf{F}_{\text{S}},
+\end{align}
+where $\mathbf{K}_{\text{S}}$ and $\mathbf{F}_{\text{S}}$ are the contributions from the stabilization terms, given by
+\begin{align} \label{eq:GeneralStabilizationMatrices}
+  \mathbf{K}_{\text{S}} = &
+  \begin{bmatrix}
+    \begin{matrix}
+      \mathbf{A}_A + \mathbf{A}_L + \mathbf{A}_C + \mathbf{A}_{G\beta} + \mathbf{A}_{D\beta} + \mathbf{A}_\sigma                                                             \\
+      \vphantom{\mathbf{A}_A} + \mathbf{L}_A + \mathbf{L}_L + \mathbf{L}_C + \mathbf{L}_{G\beta} + \mathbf{L}_{D\beta} + \mathbf{L}_\sigma                                   \\
+      \vphantom{\mathbf{A}_A} + \mathbf{C}_A + \mathbf{C}_L + \mathbf{C}_C + \mathbf{C}_{G\beta} + \mathbf{C}_{D\beta} + \mathbf{C}_\sigma                                   \\
+      \vphantom{\mathbf{A}_A} + \mathbf{G}_{\beta A} + \mathbf{G}_{\beta L} + \mathbf{G}_{\beta C} + \mathbf{G}_{\beta G} + \mathbf{G}_{\beta D} + \mathbf{G}_{\beta \sigma} \\
+      \vphantom{\mathbf{A}_A} + \mathbf{D}_{\beta A} + \mathbf{D}_{\beta L} + \mathbf{D}_{\beta C} + \mathbf{D}_{\beta G} + \mathbf{D}_{\beta D} + \mathbf{D}_{\beta \sigma} \\
+      \vphantom{\mathbf{A}_A} + \mathbf{R}_{R\sigma} + \mathbf{R}_{\sigma A} + \mathbf{R}_{\sigma L} + \mathbf{R}_{\sigma C} + \mathbf{R}_{G\beta} + \mathbf{R}_{D\beta}     \\
+      \vphantom{\mathbf{A}_A} + \mathbf{G}_U + \mathbf{G}_{D} + \mathbf{D}_{U} + \mathbf{D}_{D}
+    \end{matrix} &
+    \begin{matrix}
+      \mathbf{A}_G + \mathbf{L}_G + \mathbf{C}_G \\
+      + \mathbf{G}_G + \mathbf{D}_G + \mathbf{R}_{\sigma G} + \mathbf{D}_P + \mathbf{G}_P
+    \end{matrix}                                                                                                                                 \\
+    \mathbf{G}_A + \mathbf{G}_L + \mathbf{G}_C + \mathbf{G}_{G \beta} + \mathbf{G}_{D \beta} + \mathbf{G}_R  + \mathbf{Q}_{\varepsilon D} + \mathbf{Q}_U                                   & \mathbf{G} + \mathbf{Q}_P
+  \end{bmatrix}, \\
+  \mathbf{F}_{\text{S}} = &
+  \begin{bmatrix}
+    \mathbf{A}_F + \mathbf{L}_F + \mathbf{C}_F + \mathbf{G}_{\beta, F} + \mathbf{D}_{\beta, F} + \mathbf{R}_{\sigma, F} + \mathbf{D}_{\phi} + \mathbf{V}_{\phi} \\
+    \mathbf{Q}_{\alpha F} + \mathbf{Q}_{\phi}
+  \end{bmatrix}.
+\end{align}
+If second-order contributions can be neglected (for example, if only linear finite elements are used) the stabilization matrices become simpler:
+\begin{align} \label{eq:FirstOrdertabilizationMatrices}
+  \mathbf{K}_{\text{S}} = &
+  \begin{bmatrix}
+    \begin{matrix}
+      \mathbf{A}_A + \mathbf{A}_{G\beta} + \mathbf{A}_{D\beta} + \mathbf{A}_\sigma                                             \\
+      \vphantom{\mathbf{A}_A} + \mathbf{G}_{\beta A} + \mathbf{G}_{\beta G} + \mathbf{G}_{\beta D} + \mathbf{G}_{\beta \sigma} \\
+      \vphantom{\mathbf{A}_A} + \mathbf{D}_{\beta A} + \mathbf{D}_{\beta G} + \mathbf{D}_{\beta D} + \mathbf{D}_{\beta \sigma} \\
+      \vphantom{\mathbf{A}_A} + \mathbf{R}_{R\sigma} + \mathbf{R}_{\sigma A} + \mathbf{R}_{G\beta} + \mathbf{R}_{D\beta}       \\
+      \vphantom{\mathbf{A}_A} + \mathbf{G}_U + \mathbf{G}_{D} + \mathbf{D}_{U} + \mathbf{D}_{D}
+    \end{matrix} &
+    \begin{matrix}
+      \mathbf{A}_G + \mathbf{G}_G + \mathbf{D}_G \\ +\mathbf{R}_{\sigma G}  + \mathbf{D}_P + \mathbf{G}_P \\
+    \end{matrix}                                                                  \\
+    \mathbf{G}_A + \mathbf{G}_{G \beta} + \mathbf{G}_{D \beta} + \mathbf{G}_R  + \mathbf{Q}_{\varepsilon D} + \mathbf{Q}_U                   & \mathbf{G} + \mathbf{Q}_P
+  \end{bmatrix}, \\
+  \mathbf{F}_{\text{S}} = &
+  \begin{bmatrix}
+    \mathbf{A}_F + \mathbf{G}_{\beta, F} + \mathbf{D}_{\beta, F} + \mathbf{R}_{\sigma, F} + \mathbf{D}_{\phi} + \mathbf{V}_{\phi} \\
+    \mathbf{Q}_{\alpha F} + \mathbf{Q}_P
+  \end{bmatrix}.
+\end{align}

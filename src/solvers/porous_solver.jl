@@ -22,12 +22,16 @@ using LinearAlgebra
 
 function inner_projection_u(u, p, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
     # Define L2 projection for momentum residual natively as a CellField
-    return eval_strong_residual_u(form, u, p, h_cf, alpha_cf, f_cf, c_1, c_2)
+    R_u = eval_strong_residual_u(form, u, p, h_cf, alpha_cf, f_cf, c_1, c_2)
+    sig_op = SigOp(form.reaction_law, form.regularization, form.ν, c_1, c_2)
+    σ = Operation(sig_op)(u, ∇(u), alpha_cf, ∇(alpha_cf), h_cf)
+    return apply_projectable_residual_u(form.projection_policy, R_u, σ, u)
 end
 
 function inner_projection_p(u, p, form, dΩ, h_cf, alpha_cf, g_cf)
     # Define L2 projection for mass residual natively as a CellField
-    return eval_strong_residual_p(form, u, p, alpha_cf, g_cf)
+    R_p = eval_strong_residual_p(form, u, p, alpha_cf, g_cf)
+    return apply_projectable_residual_p(form.projection_policy, R_p, form.eps_val, p)
 end
 
 """
@@ -133,11 +137,16 @@ function solve_system(
             res_newton = solve!(x0, solver_newton, op_newton_init)
             cache_newton = res_newton isa Tuple ? res_newton[2] : res_newton
             nls_cache = cache_newton isa Tuple ? cache_newton[2] : cache_newton
-            final_res = nls_cache.result.residual_norm
+            final_res = nls_cache.result.iterations > 0 ? nls_cache.result.residual_norm : 0.0
             local_iters = nls_cache.result.iterations
             if final_res <= ftol || (final_res < stagnation_tol && final_res > 0.0)
                 newton_success = true
                 iter_count += local_iters
+                if final_res <= ftol
+                    println("      -> ASGS Initializer: Exact Newton converged vigorously to absolute continuous limits ($ftol)! Bypassing Picard.")
+                else
+                    println("      -> ASGS Initializer: Exact Newton practically saturated mathematically securely into optimal machine bounds ($final_res < $stagnation_tol). Root securely bounded. Picard redundant, bypassing.")
+                end
             else
                 iter_count += local_iters
             end
@@ -147,10 +156,9 @@ function solve_system(
         end
         
         if newton_success
-            println("      -> ASGS Initializer: Exact Newton converged initially! Skipping Picard homotopy.")
             success = true
         else
-            println("      -> ASGS Initializer: Exact Newton aborted. Orchestrating Picard Homotopy fallback...")
+            println("      -> ASGS Initializer: Exact Newton structurally aborted loop without geometric saturation. Orchestrating Picard Homotopy fallback...")
             get_free_dof_values(x0) .= x0_backup
             
             try

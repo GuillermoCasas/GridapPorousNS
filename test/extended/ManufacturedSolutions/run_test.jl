@@ -76,8 +76,17 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     sigma_c = Float64(Da) * alpha_infty * nu_calculated / (L^2)
     rxn = PorousNSSolver.ConstantSigmaLaw(sigma_c)
     
-    # Use exact SymmetricGradientViscosity analytical formulation natively aligned with the governing equations' exact divergence simplifications
-    PorousNSSolver.PaperGeneralFormulation(PorousNSSolver.SymmetricGradientViscosity(), rxn, proj, reg, nu_calculated, eps_calculated, 0.0)
+    # Bound the exact viscous analytical formulation directly targeting the governing operator from the numerical schema definitions
+    visc_type = config.numerical_method.viscous_operator_type
+    if visc_type == "DeviatoricSymmetric"
+        visc_op = PorousNSSolver.DeviatoricSymmetricViscosity()
+    elseif visc_type == "SymmetricGradient"
+        visc_op = PorousNSSolver.SymmetricGradientViscosity()
+    else
+        visc_op = PorousNSSolver.LaplacianPseudoTractionViscosity()
+    end
+    
+    PorousNSSolver.PaperGeneralFormulation(visc_op, rxn, proj, reg, nu_calculated, eps_calculated, 0.0)
 end
 
 # Error evaluator operating exclusively upon dimensionless algebraic norms corresponding to characteristic scaling

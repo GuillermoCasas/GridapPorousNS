@@ -72,6 +72,7 @@ Base.@kwdef struct NumericalMethodConfig
     stabilization::StabilizationConfig = StabilizationConfig()
     solver::SolverConfig = SolverConfig()
     mesh::MeshConfig = MeshConfig()
+    viscous_operator_type::String = "DeviatoricSymmetric"
 end
 
 Base.@kwdef struct OutputConfig
@@ -118,6 +119,9 @@ function validate!(cfg::PorousNSConfig)
     @assert stab.method in ("ASGS", "OSGS") "Stabilization method must be ASGS or OSGS"
     @assert stab.osgs_iterations >= 1
     @assert stab.osgs_tolerance > 0
+    
+    # Formulation Operator validation
+    @assert cfg.numerical_method.viscous_operator_type in ("DeviatoricSymmetric", "SymmetricGradient", "Laplacian") "viscous_operator_type strictly expects DeviatoricSymmetric, SymmetricGradient, or Laplacian"
     
     return cfg
 end

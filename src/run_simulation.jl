@@ -18,13 +18,13 @@ Its purpose is to convert structured, human-readable JSON configurations seamles
 using LineSearches
 
 """
-    build_formulation(phys::PhysicalProperties, solver_cfg::SolverConfig)
+    build_formulation(phys::PhysicalProperties, num_method::NumericalMethodConfig)
 
 Constructs the continuous mathematical formulation object defining the physical model logic.
 This object encapsulates the exact viscous operators, reaction/porosity fluid models 
 (Darcy or Forchheimer-Ergun), and SubGrid scale projection strategies needed for the VMS approach.
 """
-function build_formulation(phys::PhysicalProperties, solver_cfg::SolverConfig)
+function build_formulation(phys::PhysicalProperties, num_method::NumericalMethodConfig)
     # 1. Define the macroscopic drag reaction law imposed by the porous matrix.
     rxn_mode = phys.reaction_model
     if rxn_mode == "Constant_Sigma"
@@ -40,7 +40,7 @@ function build_formulation(phys::PhysicalProperties, solver_cfg::SolverConfig)
     # 3. Determine the algebraic SubGrid projection policy. Normally projects the full 
     # convective residual; optionally trims reactions in legacy comparison modes.
     proj = ProjectFullResidual()
-    if solver_cfg.experimental_reaction_mode == "standard" && rxn_mode == "Constant_Sigma"
+    if num_method.solver.experimental_reaction_mode == "standard" && rxn_mode == "Constant_Sigma"
         proj = ProjectResidualWithoutReactionWhenConstantSigma()
     end
 
@@ -48,8 +48,17 @@ function build_formulation(phys::PhysicalProperties, solver_cfg::SolverConfig)
     eps_floor = phys.eps_floor
     nu = phys.nu
     
+    visc_type = num_method.viscous_operator_type
+    if visc_type == "DeviatoricSymmetric"
+        visc_op = DeviatoricSymmetricViscosity()
+    elseif visc_type == "SymmetricGradient"
+        visc_op = SymmetricGradientViscosity()
+    else
+        visc_op = LaplacianPseudoTractionViscosity()
+    end
+    
     # 4. Bind the canonical PaperGeneralFormulation embodying the authoritative rigorous mathematical baseline.
-    form = PaperGeneralFormulation(DeviatoricSymmetricViscosity(), reaction_law, proj, reg, nu, eps_val, eps_floor)
+    form = PaperGeneralFormulation(visc_op, reaction_law, proj, reg, nu, eps_val, eps_floor)
     return form
 end
 
@@ -124,7 +133,7 @@ function run_simulation(config_path::String;
     X, Y, kv, kp = build_fe_spaces(model, cfg.numerical_method.element_spaces, dirichlet_tags, dirichlet_masks, dirichlet_values)
     
     # Bugfix preservation: Formulate before probing underlying type signatures 
-    form = build_formulation(cfg.phys, cfg.numerical_method.solver)
+    form = build_formulation(cfg.physical_properties, cfg.numerical_method)
     
     # Quadrature logic strictly bound to mathematical formulation identity and velocity polynomial degree
     degree = get_quadrature_degree(typeof(form), kv)

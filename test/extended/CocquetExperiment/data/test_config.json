@@ -1,7 +1,10 @@
 {
     "Re": 500.0,
     "c_in": 0.5,
-    "k_convergence_list": [1, 2],
+    "k_convergence_list": [
+        1,
+        2
+    ],
     "physical_properties": {
         "nu": 0.002,
         "sigma_linear": 0.30,
@@ -13,28 +16,46 @@
         "alpha_0": 1.0,
         "r_1": 0.2,
         "r_2": 0.5,
-        "bounding_box": [0.0, 2.0, 0.0, 1.0]
+        "bounding_box": [
+            0.0,
+            2.0,
+            0.0,
+            1.0
+        ]
     },
     "outlet_truncation_delta": 0.0,
     "interpolate_solution_to_coarser_meshes": false,
     "numerical_method": {
+        "viscous_operator_type": "SymmetricGradient",
         "stabilization": {
-            "method": ["ASGS", "OSGS"],
-            "osgs_iterations": 30
+            "method": [
+                "OSGS",
+                "ASGS"
+            ],
+            "osgs_iterations": 5,
+            "osgs_tolerance": 1e-10
         },
         "element_spaces": {
             "k_velocity": 2,
-            "k_pressure": 1
+            "k_pressure": 2
         },
         "mesh": {
-            "partition": [400, 200],
-            "convergence_partitions": [10, 50, 100],
+            "partition": [
+                400,
+                200
+            ],
+            "convergence_partitions": [
+                10,
+                50,
+                100
+            ],
             "element_type": "TRI"
         },
         "solver": {
             "picard_iterations": 2,
             "xtol": 1e-11,
             "ftol": 1e-11,
+            "stagnation_noise_floor": 1e-5,
             "max_increases": 3,
             "accelerator": {
                 "type": "Anderson",

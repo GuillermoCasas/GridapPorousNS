@@ -4,6 +4,14 @@ struct ProjectFullResidual <: AbstractProjectionPolicy end
 struct ProjectResidualWithoutReactionWhenConstantSigma <: AbstractProjectionPolicy end
 struct ProjectResidualWithoutMassPenalty <: AbstractProjectionPolicy end
 
+function apply_projectable_residual_u(::ProjectFullResidual, R_u, σ, u)
+    return R_u
+end
+
+function apply_projectable_residual_p(::ProjectFullResidual, R_p, eps_val, p)
+    return R_p
+end
+
 function apply_projection_u(::ProjectFullResidual, R_u, σ, u, pi_u, is_osgs)
     if is_osgs
         return R_u - pi_u
@@ -13,6 +21,14 @@ end
 
 function apply_jacobian_projection_u(::ProjectFullResidual, R_du, σ, dsigma_val, u, du, is_osgs)
     return R_du
+end
+
+function apply_projectable_residual_u(::ProjectResidualWithoutReactionWhenConstantSigma, R_u, σ, u)
+    return R_u - (σ * u)
+end
+
+function apply_projectable_residual_p(::ProjectResidualWithoutReactionWhenConstantSigma, R_p, eps_val, p)
+    return R_p - (eps_val * p)
 end
 
 function apply_projection_u(::ProjectResidualWithoutReactionWhenConstantSigma, R_u, σ, u, pi_u, is_osgs)
@@ -56,6 +72,13 @@ function apply_jacobian_projection_p(::ProjectResidualWithoutReactionWhenConstan
 end
 
 # Fallback definitions
+function apply_projectable_residual_u(::ProjectResidualWithoutMassPenalty, R_u, σ, u)
+    return apply_projectable_residual_u(ProjectFullResidual(), R_u, σ, u)
+end
+function apply_projectable_residual_p(::ProjectResidualWithoutMassPenalty, R_p, eps_val, p)
+    return apply_projectable_residual_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_p, eps_val, p)
+end
+
 function apply_projection_u(::ProjectResidualWithoutMassPenalty, R_u, σ, u, pi_u, is_osgs)
     return apply_projection_u(ProjectFullResidual(), R_u, σ, u, pi_u, is_osgs)
 end

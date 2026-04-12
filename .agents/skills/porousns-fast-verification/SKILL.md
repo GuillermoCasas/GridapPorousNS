@@ -212,13 +212,14 @@ Use whenever changing:
 - canonical operator definitions
 - branch-specific operator selection
 
-## B. Weak-vs-strong consistency test
+## B. Weak-vs-strong consistency and Exactness test
 
-For each viscous operator branch being modified, verify on a tiny mesh that the assembled weak form matches the dual action of the strong operator on a smooth enough trial/test pair, up to quadrature tolerance and the stated boundary assumptions.
+For each viscous operator branch being modified, verify on a tiny mesh that the assembled weak form matches the dual action of the strong operator on a smooth enough trial/test pair, up to quadrature tolerance and the stated boundary assumptions. 
+Crucially, **assert that the trial side analytically expands full Hessians `∇∇(u)` without any manual trace dropping** (e.g., verifying `DeviatoricSymmetricViscosity` maps exactly to the MMS oracle).
 
 Purpose:
 - protect `viscous_operators.jl`
-- ensure the weak form actually corresponds to the chosen strong operator
+- ensure the weak form corresponds perfectly to the un-truncated analytical strong operator
 
 This is mandatory whenever modifying:
 - `strong_viscous_operator`

@@ -195,11 +195,11 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
         # actual theoretical derivation of the executed operator.
         viscous_op = mms.formulation.viscous_operator
         if viscous_op isa PorousNSSolver.SymmetricGradientViscosity
-            # Weak form: 2*nu*(α * ε(u) ⊙ ε(v))
+            # Weak form: 2*nu*(α * \SPi\nabla \boldsymbol{u} ⊙ \SPi\nabla \boldsymbol{v})
             # Integrated mathematical equality for the Strong form evaluated in Gridap RHS:
-            # ∇⋅(2Aν ε(u)) = 2ν(ε(u)⋅∇A) + AνΔu + Aν∇(∇⋅u)
-            eps_u = 0.5 * (grad_u + transpose(grad_u))
-            eps_dot_grad_A = eps_u ⋅ grad_A
+            # ∇⋅(2Aν \SPi\nabla \boldsymbol{u}) = 2ν(\SPi\nabla \boldsymbol{u} ⋅ \nabla A) + AνΔu + Aν∇(∇⋅u)
+            SPi_u = 0.5 * (grad_u + transpose(grad_u))
+            SPi_u_dot_grad_A = SPi_u ⋅ grad_A
             
             # The dilatancy gradient ∇(∇⋅u) is crucial for solving $F(u_h) = 0$ at extremely high Re, 
             # where unscaled geometric residuals dictate the limit bounds precisely.
@@ -213,12 +213,24 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
             end
             
             grad_div_u = get_grad_div_u(VectorValue(x[1], x[2]))
-            visc = 2.0 * nu * eps_dot_grad_A + nu * A * lap_u + nu * A * grad_div_u
+            visc = 2.0 * nu * SPi_u_dot_grad_A + nu * A * lap_u + nu * A * grad_div_u
+        elseif viscous_op isa PorousNSSolver.DeviatoricSymmetricViscosity
+            # Weak form: 2*nu*(α * \ViscProj \nabla \boldsymbol{u} ⊙ \SPi\nabla \boldsymbol{v})
+            # Mathematical exact strong mapping: ∇⋅(2Aν \ViscProj \nabla \boldsymbol{u}) = 2ν(\ViscProj \nabla \boldsymbol{u} ⋅ \nabla A) + 2Aν∇⋅(\ViscProj \nabla \boldsymbol{u})
+            # In 2D exactly: ∇⋅(\ViscProj \nabla \boldsymbol{u}) = 0.5Δu, neutralizing the ∇(∇⋅u) dilatancy requirement mathematically!
+            SPi_u = 0.5 * (grad_u + transpose(grad_u))
+            div_u_val = tr(grad_u)
+            
+            # Evaluate \ViscProj \nabla \boldsymbol{u} ⋅ ∇A = \SPi\nabla \boldsymbol{u} ⋅∇A - 0.5*(∇⋅u)*∇A
+            SPi_u_dot_grad_A = SPi_u ⋅ grad_A
+            ViscProj_u_dot_grad_A = SPi_u_dot_grad_A - 0.5 * div_u_val * grad_A
+            
+            visc = 2.0 * nu * ViscProj_u_dot_grad_A + nu * A * lap_u
         elseif viscous_op isa PorousNSSolver.LaplacianPseudoTractionViscosity
             # Strong form: ∇⋅(α ν ∇u) = ν*(∇u ⋅ ∇A) + α*ν*Δu
             visc = nu * (grad_u ⋅ grad_A) + A * nu * lap_u
         else
-            error("MMS Oracle missing native analytical derivation for $(typeof(viscous_op)). The exact ∇(∇⋅u) formulation requires higher-order analytical Hessians of A(x). Please use SymmetricGradientViscosity for strict continuous convergence validations to avoid mathematical drift.")
+            error("MMS Oracle missing native analytical derivation for $(typeof(viscous_op)).")
         end
         
         # STRICT REACTION EVALUATOR DISPATCH

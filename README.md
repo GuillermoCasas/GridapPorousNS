@@ -22,22 +22,20 @@ By utilizing the full continuous $-\mathcal{L}^*$, the VMS formulation ensures r
 ## Architecture Map
 
 - **`src/formulations/continuous_problem.jl`**: `[paper-faithful]` The overarching stabilized weak-form generator. Exposes canonical strong residuals, exact pointwise tracking of analytical jacobian derivatives, and explicit `TypedLinearizationMode` (e.g. `ExactNewtonMode()`, `PicardMode()`) injections to completely avoid recursive AST compiler sub-tree stack overflows.
-- **`src/formulations/viscous_operators.jl`**: Explicit integration-by-parts derivations of Strong Viscous Operators (`DeviatoricSymmetricViscosity`, `SymmetricGradientViscosity`, `LaplacianPseudoTractionViscosity`). `[debugging-lore]` Bypasses Gridap interface limits via strict mathematically expanded tensor extracts defining native Hessian-linked exactness mappings (`EvalStrongViscSymOp`) to preserve continuous sub-grid operator terms $\nabla(\nabla \cdot \mathbf{u})$.
+- **`src/formulations/viscous_operators.jl`**: Explicit integration-by-parts derivations of Strong Viscous Operators (`DeviatoricSymmetricViscosity`, `SymmetricGradientViscosity`, `LaplacianPseudoTractionViscosity`). `[must-test]` The primal formulation enforces **exact continuous deviatoric-symmetric evaluations** mapping natively to `∇⋅(SPi∇u)`, perfectly mirroring the MMS exact oracle. `[debugging-lore]` Gridap effectively handles exact full Hessians `∇∇(u)` on standard trial elements for this evaluation.
 - **`src/models/reaction.jl`**: Contains standard `ConstantSigmaLaw` (used for `[must-test]` exact MMS validations) and non-linear `ForchheimerErgunLaw`. Enforces robust numerical flooring (`SmoothVelocityFloor`) strictly avoiding singular local parameter bounds.
 - **`src/stabilization/tau.jl`**: Exactly parsed chain-rule evaluations calculating true $\partial\tau_1/\partial\mathbf{u}$ components ensuring exact analytical Newton bounds.
 - **`src/solvers/nonlinear.jl`**: `[code-actual]` A robust custom `SafeNewtonSolver` orchestrating non-linear Newton bounds safely tracked mathematically by an Armijo-condition merit bounded linesearch loop with exact physical stagnation limits guarding bounds intrinsically.
 
 ---
 
-## Canonical Formulation Branches
+## Canonical Formulation Branch
 
-### Paper-Faithful Branch (`PaperGeneralFormulation`)
-**Validation Status**: Authoritative baseline for exact spatial convergence evaluations scaling.
-**Design Rationale**: Deploys fully mathematical `SymmetricGradientViscosity` definitions or mathematically consistent `DeviatoricSymmetricViscosity`. The adjoint mapping $\mathcal{L}^*(\mathbf{v}, q)$ securely anchors limits precisely on exact continuous derivatives.
+### Canonical Continuum Implementation (`PaperGeneralFormulation`)
+**Validation Status**: Authoritative baseline evaluating exact continuous operators.
+**Design Rationale**: Deploys the analytically exact `DeviatoricSymmetricViscosity` in the primal equations, preserving the formal properties of the continuous equations down to the finite limit. The test-side adjoint mapping $\mathcal{L}^*(\mathbf{v}, q)$ utilizes the analytically justified simplification `0.5*Δ(v)` because the remaining trace trace natively vanishes for divergence-free test spaces limits, avoiding potentially unstable test-element Hessians while maintaining exact theoretical coherence.
 
-### Legacy Reference Branch (`Legacy90d5749Mode`)
-**Validation Status**: `[legacy]` Exists solely for historical topological regression mappings.
-**Design Rationale**: A simplified placeholder that utilizes `LaplacianPseudoTractionViscosity` proxy operators. Its explicit evaluations diverge profoundly from Exact derivations mapping.
+>`[legacy]` *Note that historically the solver utilized reduced structures (`LaplacianPseudoTractionViscosity`) prior to achieving exact operator mapping architecture. These branches are now formally deprecated.*
 
 ---
 

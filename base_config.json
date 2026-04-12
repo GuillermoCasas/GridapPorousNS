@@ -27,6 +27,7 @@
         ]
     },
     "numerical_method": {
+        "viscous_operator_type": "DeviatoricSymmetric",
         "element_spaces": {
             "k_velocity": 2,
             "k_pressure": 1

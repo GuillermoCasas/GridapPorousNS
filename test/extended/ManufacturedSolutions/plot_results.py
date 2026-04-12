@@ -273,15 +273,32 @@ def generate_markdown_report(h5_file, results_dir):
                 etype = g.attrs['element_type']
                 if isinstance(etype, bytes): etype = etype.decode('utf-8')
                 
-                rate_u_l2 = float(g.attrs['rate_u_l2'])
-                rate_p_l2 = float(g.attrs['rate_p_l2'])
-                rate_u_h1 = float(g.attrs['rate_u_h1'])
-                rate_p_h1 = float(g.attrs['rate_p_h1'])
+                h_arr = g['h'][:]
+                err_u_l2_arr = g['err_u_l2'][:]
+                err_p_l2_arr = g['err_p_l2'][:]
+                err_u_h1_arr = g['err_u_h1'][:]
+                err_p_h1_arr = g['err_p_h1'][:]
                 
-                err_u_l2_last = g['err_u_l2'][-1] if len(g['err_u_l2']) > 0 else float('nan')
-                err_p_l2_last = g['err_p_l2'][-1] if len(g['err_p_l2']) > 0 else float('nan')
-                err_u_h1_last = g['err_u_h1'][-1] if len(g['err_u_h1']) > 0 else float('nan')
-                err_p_h1_last = g['err_p_h1'][-1] if len(g['err_p_h1']) > 0 else float('nan')
+                # Filter valid points
+                mask = (err_u_l2_arr > 0) & (err_p_l2_arr > 0)
+                h_arr = h_arr[mask]
+                err_u_l2_arr = err_u_l2_arr[mask]
+                err_p_l2_arr = err_p_l2_arr[mask]
+                err_u_h1_arr = err_u_h1_arr[mask]
+                err_p_h1_arr = err_p_h1_arr[mask]
+                
+                if len(h_arr) >= 2:
+                    rate_u_l2 = (np.log(err_u_l2_arr[-1]) - np.log(err_u_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))
+                    rate_p_l2 = (np.log(err_p_l2_arr[-1]) - np.log(err_p_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))
+                    rate_u_h1 = (np.log(err_u_h1_arr[-1]) - np.log(err_u_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))
+                    rate_p_h1 = (np.log(err_p_h1_arr[-1]) - np.log(err_p_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))
+                else:
+                    rate_u_l2 = rate_p_l2 = rate_u_h1 = rate_p_h1 = float('nan')
+                
+                err_u_l2_last = err_u_l2_arr[-1] if len(err_u_l2_arr) > 0 else float('nan')
+                err_p_l2_last = err_p_l2_arr[-1] if len(err_p_l2_arr) > 0 else float('nan')
+                err_u_h1_last = err_u_h1_arr[-1] if len(err_u_h1_arr) > 0 else float('nan')
+                err_p_h1_last = err_p_h1_arr[-1] if len(err_p_h1_arr) > 0 else float('nan')
                 
                 opt_u_l2 = float(kv + 1)
                 opt_p_l2 = float(kv)

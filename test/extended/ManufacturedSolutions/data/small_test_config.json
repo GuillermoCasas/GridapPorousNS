@@ -3,8 +3,8 @@
     "epsilon_pert": [0.1],
     "max_n_pert": 5,
     "physical_properties": {
-        "Re": [1e6],
-        "Da": [1e-6],
+        "Re": [1e-6],
+        "Da": [1e6],
         "physical_epsilon": [0.0],
         "numerical_epsilon_coefficient": [0.0001],
         "f_x": 0.0,

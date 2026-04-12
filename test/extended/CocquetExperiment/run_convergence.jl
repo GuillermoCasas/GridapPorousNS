@@ -78,8 +78,10 @@ function build_solver(N::Int, config_dict, Re::Float64, c_in::Float64)
     h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
     h_cf = CellField(h_array, Ω)
     
-    # Emulate Cocquet et al. exactly by nodally interpolating alpha on a linear (P1) element regardless of solver k
-    refe_alpha = ReferenceFE(lagrangian, Float64, 1)
+    # The reference polynomial order must match the velocity space structural order `k`
+    # Otherwise P1 interpolation introduces an O(h^2) modeling error that mathematically caps P2 superconvergence
+    k_v = local_config.numerical_method.element_spaces.k_velocity
+    refe_alpha = ReferenceFE(lagrangian, Float64, k_v)
     V_alpha = TestFESpace(model, refe_alpha, conformity=:H1)
     alpha_h = interpolate(alpha_func, V_alpha)
     
@@ -88,7 +90,7 @@ function build_solver(N::Int, config_dict, Re::Float64, c_in::Float64)
 end
 
 function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
-    form = PorousNSSolver.build_formulation(config.physical_properties, config.numerical_method.solver)
+    form = PorousNSSolver.build_formulation(config.physical_properties, config.numerical_method)
     f_cf = VectorValue(config.physical_properties.f_x, config.physical_properties.f_y)
     g_cf = 0.0
     
@@ -141,19 +143,30 @@ function run_convergence()
     # Store dynamic script parameters before strict schema parsing drops them or warns
     Re = Float64(base_config_dict["Re"])
     c_in = Float64(base_config_dict["c_in"])
-    k_list = convert(Vector{Int}, base_config_dict["k_convergence_list"])
     delta = Float64(get(base_config_dict, "outlet_truncation_delta", 0.0))
     interpolate_bypass = get(base_config_dict, "interpolate_solution_to_coarser_meshes", false)
     
-    # Remove to prevent loud strict-schema warnings
+    # Support mixed-order native schemas (e.g. Taylor-Hood P2/P1) directly from the JSON without equal-order script clamping
+    k_v = base_config_dict["numerical_method"]["element_spaces"]["k_velocity"]
+    k_p = base_config_dict["numerical_method"]["element_spaces"]["k_pressure"]
+    
+    # Remove script variables to prevent strict-schema enforcement warnings during formal validation API loading
     delete!(base_config_dict, "Re")
     delete!(base_config_dict, "c_in")
-    delete!(base_config_dict, "k_convergence_list")
+    if haskey(base_config_dict, "k_convergence_list")
+        delete!(base_config_dict, "k_convergence_list")
+    end
     delete!(base_config_dict, "outlet_truncation_delta")
     delete!(base_config_dict, "interpolate_solution_to_coarser_meshes")
     
     # All physical schemas and geometrical limits are universally driven by the native test JSON payload
+    # Temporary override to prevent strict parser crashing on dynamic iteration array
+    original_method = base_config_dict["numerical_method"]["stabilization"]["method"]
+    base_config_dict["numerical_method"]["stabilization"]["method"] = "ASGS"
+    
     base_config = PorousNSSolver.load_config_from_dict(base_config_dict)
+    
+    base_config_dict["numerical_method"]["stabilization"]["method"] = original_method
     
     L_max = base_config.domain.bounding_box[2]
     bounding_rule = x -> x[1] <= (L_max - delta)
@@ -181,25 +194,17 @@ function run_convergence()
     methods = as_list(get(stab_dict, "method", ["ASGS", "OSGS"]))
     
     for method in methods
-        for k in k_list
             println("\n\n==========================================================================================")
-            println("[!] INITIATING BENCHMARK SEQUENCE | INTERPOLATION: P$(k)/P$(k) | STABILIZATION: $method")
+            println("[!] INITIATING BENCHMARK SEQUENCE | INTERPOLATION: P$(k_v)/P$(k_p) | STABILIZATION: $method")
             println("==========================================================================================")
             
             println("\n   [+] Assembling High-Fidelity Reference Mesh Solution (N = $N_ref) natively...")
-            if !haskey(base_config_dict, "numerical_method")
-                base_config_dict["numerical_method"] = Dict()
-            end
-            base_config_dict["numerical_method"]["stabilization"] = Dict("method" => method, "osgs_iterations" => 3)
             
-            if !haskey(base_config_dict["numerical_method"], "element_spaces")
-                base_config_dict["numerical_method"]["element_spaces"] = Dict()
-            end
-            base_config_dict["numerical_method"]["element_spaces"]["k_velocity"] = k
-            base_config_dict["numerical_method"]["element_spaces"]["k_pressure"] = k
+            # Map method directly to config structure without purging any user-provided tuning params
+            base_config_dict["numerical_method"]["stabilization"]["method"] = method
             
             println("Solving Reference Grid (N = $N_ref) -> [$(2*N_ref) x $N_ref] Elements...")
-            base_config_dict["output"]["basename"] = "cocquet_ref_$(method)_P$(k)P$(k)_N$(N_ref)"
+            base_config_dict["output"]["basename"] = "cocquet_ref_$(method)_P$(k_v)P$(k_p)_N$(N_ref)"
             mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref = build_solver(N_ref, base_config_dict, Re, c_in)
             xh_ref, time_ref, iters_ref = execute_solver(mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref)
             u_ref, p_ref = xh_ref
@@ -226,7 +231,7 @@ function run_convergence()
                 println("\n   ==============================================================")
                 println("   [+] Launching Coarse Grid Algebraic Evaluation Space for N = $N")
                 println("   ==============================================================")
-                base_config_dict["output"]["basename"] = "cocquet_$(method)_P$(k)P$(k)_N$(N)"
+                base_config_dict["output"]["basename"] = "cocquet_$(method)_P$(k_v)P$(k_p)_N$(N)"
                 mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h = build_solver(N, base_config_dict, Re, c_in)
                 
                 if interpolate_bypass
@@ -278,10 +283,10 @@ function run_convergence()
                 GC.gc()
             end
             
-            println("Writing $(method)/P$(k)P$(k) slice to HDF5...")
+            println("Writing $(method)/P$(k_v)P$(k_p) slice to HDF5...")
             # Automatically open the file in read-write (r+) without erasing the file layout
             h5open(h5_path, "r+") do file
-                group_name = "$method/P$(k)P$(k)"
+                group_name = "$method/P$(k_v)P$(k_p)"
                 # if exists delete to overwrite successfully
                 if haskey(file, group_name)
                     delete_object(file, group_name)
@@ -298,7 +303,6 @@ function run_convergence()
                 attributes(g)["total_iters"] = sum(eval_iters)
                 attributes(g)["outlet_truncation_delta"] = delta
             end
-        end
     end
     println("\nConvergence Data Generated and Exported to convergence_cocquet.h5")
 end

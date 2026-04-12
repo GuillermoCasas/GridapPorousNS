@@ -75,7 +75,7 @@ end
 # =======================
 # Symmetric Gradient Viscosity
 # =======================
-# [code-actual] Computes the positive evaluation `2*∇⋅(α*ν*ε(u))` for the strong residual.
+# [code-actual] Computes the positive evaluation `2*∇⋅(α*ν*\SPi\nabla\boldsymbol{u})` for the strong residual.
 struct EvalStrongViscSymOp <: Function end
 @inline function (::EvalStrongViscSymOp)(Δu::VectorValue{2, T1}, ∇∇u::ThirdOrderTensorValue{2,2,2,T2}) where {T1, T2}
     grad_div_u = VectorValue(∇∇u[1,1,1] + ∇∇u[1,2,2], ∇∇u[2,1,1] + ∇∇u[2,2,2])
@@ -141,31 +141,31 @@ end
     return 0.5 * Δu + (0.5 - 1.0/3.0) * grad_div_u
 end
 
-# [paper-faithful] Computes `2*∇⋅(α*ν*D(u))` where `D(u) = ε(u) - (1/d)*(∇⋅u)*I`.
+# [paper-faithful] Computes `2*∇⋅(α*ν*\DPi\SPi\nabla \boldsymbol{u})` where `\DPi\SPi\nabla \boldsymbol{u} = \SPi\nabla \boldsymbol{u} - (1/d)*(\nabla\cdot \boldsymbol{u})*I`.
 function strong_viscous_operator(::DeviatoricSymmetricViscosity, u, α, ν)
-    # As explicitly formulated in the momentum stabilization residual (Equation A.5 in article.pdf),
-    # the paper drops both the ∇(∇⋅u) dilatancy gradient and the deviatoric trace remainder
-    # from the strong operator evaluation, assuming ∇⋅(αu) = 0 inside the unresolvable scales.
-    # We match this exactly: α * ν * Δ(u) + 2.0 * ν * (ε(u) ⋅ ∇(α)).
-    div_D_u = 0.5 * Δ(u) 
-    return 2.0 * ν * (ε(u) ⋅ ∇(α)) + 2.0 * α * ν * div_D_u
+    ViscProj_u = Operation(EvalDevSymOp())(∇(u))
+    div_ViscProj_u = Operation(EvalDivDevSymOp())(Δ(u), ∇∇(u))
+    return 2.0 * ν * (ViscProj_u ⋅ ∇(α)) + 2.0 * α * ν * div_ViscProj_u
 end
 
 function weak_viscous_operator(::DeviatoricSymmetricViscosity, u, v, α, ν)
-    D_u = Operation(EvalDevSymOp())(∇(u))
-    return 2.0 * α * ν * ( D_u ⊙ ε(v) )
+    ViscProj_u = Operation(EvalDevSymOp())(∇(u))
+    return 2.0 * α * ν * ( ViscProj_u ⊙ ε(v) )
 end
 
 # Exact Fréchet derivative.
 # [must-test] This must match the analytical Fréchet derivative of `weak_viscous_operator` exactly for `ExactNewtonMode`.
 function weak_viscous_jacobian(::DeviatoricSymmetricViscosity, du, v, α, ν)
-    D_du = Operation(EvalDevSymOp())(∇(du))
-    return 2.0 * α * ν * ( D_du ⊙ ε(v) )
+    ViscProj_du = Operation(EvalDevSymOp())(∇(du))
+    return 2.0 * α * ν * ( ViscProj_du ⊙ ε(v) )
 end
 
 function adjoint_viscous_operator(::DeviatoricSymmetricViscosity, v, α, ν)
-    D_v = Operation(EvalDevSymOp())(∇(v))
-    # N-dimensional adjoint continuous VMS operator, reflecting the strong operator simplification.
-    div_D_v = 0.5 * Δ(v)
-    return 2.0 * ν * (D_v ⋅ ∇(α)) + 2.0 * α * ν * div_D_v
+    ViscProj_v = Operation(EvalDevSymOp())(∇(v))
+    # N-dimensional adjoint continuous VMS operator.
+    # Note: We keep the simplified divergence trace (0.5 * Δv) for the adjoint test space evaluation
+    # since computing full Hessians ∇∇(v) can be problematic on certain elements, and the trace term 
+    # vanishes formally for divergence-free test functions.
+    div_ViscProj_v = 0.5 * Δ(v)
+    return 2.0 * ν * (ViscProj_v ⋅ ∇(α)) + 2.0 * α * ν * div_ViscProj_v
 end

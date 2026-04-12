@@ -64,10 +64,9 @@ function run_cocquet()
     V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["inlet", "walls"])
     U = TrialFESpace(V, [u_in, u_wall])
     
-    # Pressure spaces: fix p at outlet to 0 to prevent nullspace
-    # In standard Navier-Stokes, this implies an outflow boundary condition when velocity is free.
-    Q = TestFESpace(model, refe_p, conformity=:H1, labels=labels, dirichlet_tags=["outlet"])
-    P = TrialFESpace(Q, x -> 0.0)
+    # Pressure is left completely free (Neumann outlet provides pressure pinning naturally)
+    Q = TestFESpace(model, refe_p, conformity=:H1)
+    P = TrialFESpace(Q)
     
     Y = MultiFieldFESpace([V, Q])
     X = MultiFieldFESpace([U, P])
@@ -79,8 +78,10 @@ function run_cocquet()
     h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
     h = CellField(h_array, Ω)
     
-    # Interpolate alpha_func to a boundary-unconstrained space matching Q so it avoids zeroing out the outlet Dirichlet nodes
-    Q_alpha = TestFESpace(model, refe_p, conformity=:H1)
+    # Nodal interpolation degree must rigorously match the velocity field polynomial to preserve superconvergent bounds!
+    k_v = config.numerical_method.element_spaces.k_velocity
+    refe_alpha = ReferenceFE(lagrangian, Float64, k_v)
+    Q_alpha = TestFESpace(model, refe_alpha, conformity=:H1)
     alpha_h = interpolate_everywhere(alpha_func, Q_alpha)
     res(x, y) = PorousNSSolver.weak_form_residual(x, y, config, dΩ, h, nothing, alpha_h)
     jac(x, dx, y) = PorousNSSolver.weak_form_jacobian(x, dx, y, config, dΩ, h, nothing, alpha_h)
