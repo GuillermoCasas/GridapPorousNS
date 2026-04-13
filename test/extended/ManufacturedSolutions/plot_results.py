@@ -64,7 +64,7 @@ def plot_convergence():
             plt.figure(figsize=(10, 8))
             
             table_row = {
-                'Re': float(Re), 'Da': float(Da), 'alpha_0': float(alpha_0)
+                'c_idx': c_idx, 'Re': float(Re), 'Da': float(Da), 'alpha_0': float(alpha_0)
             }
             
             for method, g in methods.items():
@@ -99,6 +99,10 @@ def plot_convergence():
                 table_row[f'fme_u_{method}'] = fme_u
                 table_row[f'slope_p_{method}'] = slope_finest_p / opt_p_l2 if opt_p_l2 else float('nan')
                 table_row[f'fme_p_{method}'] = fme_p
+                
+                eval_times = g['eval_times'][:] if 'eval_times' in g else []
+                total_time = float(g.attrs.get('total_time_s', sum(eval_times) if len(eval_times) > 0 else 0.0))
+                table_row[f'time_{method}'] = total_time
                 
                 plt.loglog(h, err_u_l2, marker='o', linestyle=ls, color='blue', linewidth=2, markersize=8,
                            label=f'{method} $L_2$ Velocity ({opt_u_l2})')
@@ -216,9 +220,10 @@ def write_summary_tables(table_data, results_dir):
             
             # Velocity Table Matrix
             f.write("velocity\n")
-            f.write(f"                        ASGS ({opt_u})                   OSGS ({opt_u})    \n")
-            f.write("Re          Da          α0      slope        FME          slope        FME\n")
+            f.write(f"                              ASGS ({opt_u})                                  OSGS ({opt_u})    \n")
+            f.write("Cfg   Re          Da          α0      slope        FME          Time(s)      slope        FME          Time(s)\n")
             for row in data:
+                c_idx_str = f"C{row['c_idx']}"
                 Re_str = format_scientific(row['Re'])
                 Da_str = format_scientific(row['Da'])
                 a0_str = f"{row['alpha_0']:.2f}"
@@ -228,17 +233,24 @@ def write_summary_tables(table_data, results_dir):
                 
                 slope_a = fmt_slope(row.get('slope_u_ASGS', np.nan))
                 fme_a = fmt_fme(row.get('fme_u_ASGS', np.nan))
+                t_a = row.get('time_ASGS', np.nan)
+                time_a = "N/A" if np.isnan(t_a) else f"{t_a:.1f}"
+                
                 slope_o = fmt_slope(row.get('slope_u_OSGS', np.nan))
                 fme_o = fmt_fme(row.get('fme_u_OSGS', np.nan))
-                f.write(f"{Re_str:<11} {Da_str:<11} {a0_str:<7} {slope_a:<12} {fme_a:<12} {slope_o:<12} {fme_o:<12}\n")
+                t_o = row.get('time_OSGS', np.nan)
+                time_o = "N/A" if np.isnan(t_o) else f"{t_o:.1f}"
+                
+                f.write(f"{c_idx_str:<5} {Re_str:<11} {Da_str:<11} {a0_str:<7} {slope_a:<12} {fme_a:<12} {time_a:<12} {slope_o:<12} {fme_o:<12} {time_o:<12}\n")
             
             f.write("\n")
             
             # Pressure Table Matrix
             f.write("pressure\n")
-            f.write(f"                        ASGS ({opt_p})                   OSGS ({opt_p})    \n")
-            f.write("Re          Da          α0      slope        FME          slope        FME\n")
+            f.write(f"                              ASGS ({opt_p})                                  OSGS ({opt_p})    \n")
+            f.write("Cfg   Re          Da          α0      slope        FME          Time(s)      slope        FME          Time(s)\n")
             for row in data:
+                c_idx_str = f"C{row['c_idx']}"
                 Re_str = format_scientific(row['Re'])
                 Da_str = format_scientific(row['Da'])
                 a0_str = f"{row['alpha_0']:.2f}"
@@ -248,9 +260,15 @@ def write_summary_tables(table_data, results_dir):
                 
                 slope_a = fmt_slope(row.get('slope_p_ASGS', np.nan))
                 fme_a = fmt_fme(row.get('fme_p_ASGS', np.nan))
+                t_a = row.get('time_ASGS', np.nan)
+                time_a = "N/A" if np.isnan(t_a) else f"{t_a:.1f}"
+                
                 slope_o = fmt_slope(row.get('slope_p_OSGS', np.nan))
                 fme_o = fmt_fme(row.get('fme_p_OSGS', np.nan))
-                f.write(f"{Re_str:<11} {Da_str:<11} {a0_str:<7} {slope_a:<12} {fme_a:<12} {slope_o:<12} {fme_o:<12}\n")
+                t_o = row.get('time_OSGS', np.nan)
+                time_o = "N/A" if np.isnan(t_o) else f"{t_o:.1f}"
+                
+                f.write(f"{c_idx_str:<5} {Re_str:<11} {Da_str:<11} {a0_str:<7} {slope_a:<12} {fme_a:<12} {time_a:<12} {slope_o:<12} {fme_o:<12} {time_o:<12}\n")
             
             f.write("\n========================================================================================================\n\n")
             
@@ -260,9 +278,11 @@ def generate_markdown_report(h5_file, results_dir):
     report_file = os.path.join(results_dir, "convergence_report.md")
     with open(report_file, "w") as io:
         io.write("# Convergence Rate and FME Table\n\n")
-        io.write("| Config | Method | Re | Da | α_0 | k | Elem | Iters | Converged | epsilon_pert | rate_u_L2 (opt) | rate_p_L2 (opt) | rate_u_H1 (opt) | rate_p_H1 (opt) | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |\n")
-        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+        io.write("| Config | Method | Source JSON | Re | Da | α_0 | k | Elem | Time (s) | Iters | Converged | epsilon_pert | rate_u_L2 | rate_p_L2 | rate_u_H1 | rate_p_H1 | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |\n")
+        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
         
+        import collections
+        config_file_to_cidx = collections.defaultdict(set)
         with robust_open_h5(h5_file, 'r') as h5f:
             groups = sorted(h5f.keys(), key=lambda x: int(x.split('_')[1]))
             for group_name in groups:
@@ -276,6 +296,10 @@ def generate_markdown_report(h5_file, results_dir):
                 kv = int(g.attrs['k_velocity'])
                 etype = g.attrs['element_type']
                 if isinstance(etype, bytes): etype = etype.decode('utf-8')
+                
+                cf_name = g.attrs.get('config_file', 'unknown.json')
+                if isinstance(cf_name, bytes): cf_name = cf_name.decode('utf-8')
+                config_file_to_cidx[cf_name].add(c_idx)
                 
                 h_arr = g['h'][:]
                 err_u_l2_arr = g['err_u_l2'][:]
@@ -297,10 +321,10 @@ def generate_markdown_report(h5_file, results_dir):
                     opt_u_h1 = float(kv)
                     opt_p_h1 = float(kv - 1)
                     
-                    rate_u_l2 = ((np.log(err_u_l2_arr[-1]) - np.log(err_u_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) / opt_u_l2
-                    rate_p_l2 = ((np.log(err_p_l2_arr[-1]) - np.log(err_p_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) / opt_p_l2 if opt_p_l2 else float('nan')
-                    rate_u_h1 = ((np.log(err_u_h1_arr[-1]) - np.log(err_u_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) / opt_u_h1 if opt_u_h1 else float('nan')
-                    rate_p_h1 = ((np.log(err_p_h1_arr[-1]) - np.log(err_p_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) / opt_p_h1 if opt_p_h1 else float('nan')
+                    rate_u_l2 = ((np.log(err_u_l2_arr[-1]) - np.log(err_u_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2])))
+                    rate_p_l2 = ((np.log(err_p_l2_arr[-1]) - np.log(err_p_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) if opt_p_l2 else float('nan')
+                    rate_u_h1 = ((np.log(err_u_h1_arr[-1]) - np.log(err_u_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) if opt_u_h1 else float('nan')
+                    rate_p_h1 = ((np.log(err_p_h1_arr[-1]) - np.log(err_p_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) if opt_p_h1 else float('nan')
                 else:
                     rate_u_l2 = rate_p_l2 = rate_u_h1 = rate_p_h1 = float('nan')
                 
@@ -309,19 +333,13 @@ def generate_markdown_report(h5_file, results_dir):
                 err_u_h1_last = err_u_h1_arr[-1] if len(err_u_h1_arr) > 0 else float('nan')
                 err_p_h1_last = err_p_h1_arr[-1] if len(err_p_h1_arr) > 0 else float('nan')
                 
-                opt_u_l2 = float(kv + 1)
-                opt_p_l2 = float(kv)  # assuming equal order
-                opt_u_h1 = float(kv)
-                opt_p_h1 = float(kv - 1)
-                
-                # We already divided rates by opt, so target is 1.0. We pass 1.0 to format_rate to indicate optimum
                 def format_rate(rate, opt):
                     if np.isnan(rate):
-                        return f"  N/A ({int(opt)})"
-                    threshold = 0.90 # Since normalized, threshold is 0.9
+                        return "  N/A"
+                    threshold = 0.90 * opt
                     if rate < threshold:
-                        return f"<b style='color:red'>{rate:5.2f}</b> (1.0)"
-                    return f" {rate:5.2f} (1.0)"
+                        return f"<b style='color:red'>{rate:4.2f} ({opt:.0f})</b>"
+                    return f"{rate:4.2f} ({opt:.0f})"
                 
                 def format_sci(v):
                     if np.isnan(v): return "NaN"
@@ -341,18 +359,49 @@ def generate_markdown_report(h5_file, results_dir):
                 
                 eval_iters = g['eval_iters'][:] if 'eval_iters' in g else []
                 total_iters = int(g.attrs.get('total_iters', sum(eval_iters) if len(eval_iters) > 0 else 0))
+                total_time = float(g.attrs.get('total_time_s', 0.0))
                 
                 eval_eps = g['eval_eps'][:] if 'eval_eps' in g else []
-                eps_val = np.min(eval_eps) if len(eval_eps) > 0 else float('nan')
+                valid_eps = [e for e in eval_eps if e >= 0.0]
+                eps_val = np.min(valid_eps) if len(valid_eps) > 0 else float('nan')
                 
-                if method == 'ASGS':
-                    converged = "<b style='color:red'>No</b>" if any(it >= 15 for it in eval_iters) else "Yes"
-                else: # OSGS takes max 4 iters per outer, typically 3 outer loops
-                    converged = "<b style='color:red'>No</b>" if any(it >= 12 for it in eval_iters) else "Yes"
+                # Mark as Converged if ALL meshes successfully completed their requested evaluation maps (no -1.0 sentinel failure values)
+                failed_homotopy = True
+                if len(eval_eps) > 0 and all(e >= 0.0 for e in eval_eps):
+                    failed_homotopy = False
+                converged = "<b style='color:red'>No</b>" if failed_homotopy else "Yes"
                 
-                io.write(f"| C{c_idx} | {method} | {jl_fmt(re)} | {jl_fmt(da)} | {a0:.2f} | {kv} | {etype} | {total_iters} | {converged} | {format_sci(eps_val)} | {ru2} | {rp2} | {ru1} | {rp1} | {format_sci(err_u_l2_last)} | {format_sci(err_p_l2_last)} | {format_sci(err_u_h1_last)} | {format_sci(err_p_h1_last)} |\n")
+                io.write(f"| C{c_idx} | {method} | {cf_name} | {jl_fmt(re)} | {jl_fmt(da)} | {a0:.2f} | {kv} | {etype} | {total_time:.1f} | {total_iters} | {converged} | {format_sci(eps_val)} | {ru2} | {rp2} | {ru1} | {rp1} | {format_sci(err_u_l2_last)} | {format_sci(err_p_l2_last)} | {format_sci(err_u_h1_last)} | {format_sci(err_p_h1_last)} |\n")
+        
+        append_configuration_reference_map(io, report_file, config_file_to_cidx)
                 
     print(f"Convergence Markdown report generated explicitly securely to: {report_file}")
+
+def append_configuration_reference_map(io, report_file, config_file_to_cidx):
+    """
+    Scans the local data directory and appends identically formatted JSON dictionaries mappings
+    traced back to the Configuration IDs evaluating dynamically.
+    """
+    io.write("\n## Simulation Configuration Reference Map\n")
+    import glob
+    import json
+    import os
+    base_dir = os.path.dirname(os.path.dirname(report_file))
+    data_dir = os.path.join(base_dir, 'data')
+    json_files = glob.glob(os.path.join(data_dir, '*.json'))
+    for j_file in json_files:
+        bname = os.path.basename(j_file)
+        c_ids = sorted(list(config_file_to_cidx.get(bname, [])), key=lambda x: int(x))
+        c_ids_str = ", ".join([f"C{x}" for x in c_ids]) if c_ids else "N/A"
+        try:
+            with open(j_file, 'r') as f:
+                cfg_data = json.load(f)
+                io.write(f"\n<details><summary><b>{bname} (Config IDs Map: {c_ids_str})</b></summary>\n")
+                io.write("<pre><code class=\"json\">\n")
+                io.write(json.dumps(cfg_data, indent=4))
+                io.write("\n</code></pre>\n</details>\n")
+        except Exception as e:
+            io.write(f"\n<!-- Error loading config {os.path.basename(j_file)}: {e} -->\n")
 
 def format_scientific(val):
     if val == 1.0:

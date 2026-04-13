@@ -20,6 +20,7 @@
         "stabilization": {
             "method": ["OSGS", "ASGS"],
             "osgs_iterations": 5,
+            "osgs_inner_newton_iters": 20,
             "osgs_tolerance": 1e-10
         },
         "element_spaces": {
@@ -40,8 +41,8 @@
             "max_increases": 3,
             "accelerator": {
                 "type": "Anderson",
-                "m": 5,
-                "relaxation_factor": 1.0
+                "m": 10,
+                "relaxation_factor": 0.8
             }
         }
     },

@@ -10,7 +10,6 @@ using LinearAlgebra
 include("test_utils.jl")
 
 files = [
-    "formulation_consistency_quick_test.jl",
     "formulation_smoke_quick_test.jl",
     "interpolation_projection_quick_test.jl",
     "osgs_orthogonality_quick_test.jl"

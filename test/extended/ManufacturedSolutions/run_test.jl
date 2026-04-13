@@ -139,6 +139,14 @@ function run_mms(config_file="test_config.json")
         equal_order_only = elem_dict["equal_order_only"]
     end
     
+    mms_verification_enabled = get(test_dict, "mms_verification_enabled", false)
+    mms_tau_err = Float64(get(test_dict, "mms_tau_err", 1e-4))
+    mms_eps_u_l2 = Float64(get(test_dict, "mms_eps_u_l2", 1e-12))
+    mms_eps_u_h1 = Float64(get(test_dict, "mms_eps_u_h1", 1e-12))
+    mms_eps_p_l2 = Float64(get(test_dict, "mms_eps_p_l2", 1e-12))
+    mms_max_extra_cycles = Int(get(test_dict, "mms_max_extra_cycles", 5))
+    mms_require_consecutive_passes = Int(get(test_dict, "mms_require_consecutive_passes", 2))
+    
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
     h5_filename = get(test_dict, "h5_filename", "convergence_data.h5")
@@ -224,7 +232,10 @@ function run_mms(config_file="test_config.json")
                         "numerical_method" => Dict(
                             "element_spaces" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
                             "mesh" => Dict("element_type" => String(etype), "partition" => [n, n]),
-                            "stabilization" => Dict("method" => "ASGS"),
+                            "stabilization" => Dict(
+                                "method" => "ASGS", 
+                                "osgs_inner_newton_iters" => get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3)
+                            ),
                             "solver" => get(get(test_dict, "numerical_method", Dict()), "solver", Dict())
                         )
                     )
@@ -361,15 +372,40 @@ function run_mms(config_file="test_config.json")
                                         local_stab_cfg = PorousNSSolver.StabilizationConfig(
                                             method=method,
                                             osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
+                                            osgs_inner_newton_iters=config.numerical_method.stabilization.osgs_inner_newton_iters,
                                             osgs_tolerance=config.numerical_method.stabilization.osgs_tolerance
                                         )
+                                        
+                                        local_diagnostics_cache = Dict{String, Any}()
+                                        
+                                        if mms_verification_enabled
+                                            mms_cfg = (
+                                                enabled = true,
+                                                tau_err = mms_tau_err,
+                                                eps_u_l2 = mms_eps_u_l2,
+                                                eps_u_h1 = mms_eps_u_h1,
+                                                eps_p_l2 = mms_eps_p_l2,
+                                                max_extra_cycles = mms_max_extra_cycles,
+                                                require_consecutive_passes = mms_require_consecutive_passes,
+                                                oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, u_final, p_final, U_c, P_c, L, dΩ)
+                                            )
+                                        else
+                                            mms_cfg = nothing
+                                        end
+                                        
                                         sys_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
                                             X, Y, model, dΩ, Ω, h_cf, f_cf, alpha_cf, g_cf, form, 
                                             solver_picard, solver_newton, 
                                             x0, c_1, c_2, 
                                             config.physical_properties, local_stab_cfg, config.numerical_method.solver;
-                                            V_free=V_free, Q_free=Q_free
+                                            V_free=V_free, Q_free=Q_free, diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
                                         )
+                                        
+                                        if haskey(local_diagnostics_cache, "mms_stop_reason")
+                                            println("    -> MMS Plateau Reason: ", local_diagnostics_cache["mms_stop_reason"])
+                                            println("    -> Base Convergence Reached: ", get(local_diagnostics_cache, "base_convergence_reached", false))
+                                            println("    -> MMS Plateau Reached: ", get(local_diagnostics_cache, "mms_plateau_reached", false))
+                                        end
                                         
                                         if sys_success
                                             println("\n      [✅] Full non-linear algebraic system converged gracefully mathematically! Escaping constraint loop.")
@@ -456,6 +492,7 @@ function run_mms(config_file="test_config.json")
                                         attributes(g)["k_pressure"] = Int(kp)
                                         attributes(g)["element_type"] = String(etype)
                                         attributes(g)["method"] = String(method)
+                                        attributes(g)["config_file"] = String(config_file)
                                         
                                         compute_slope(x, y) = sum((x .- sum(x)/length(x)) .* (y .- sum(y)/length(y))) / (sum((x .- sum(x)/length(x)).^2) + 1e-15)
                                         log_h = log.(res["hs"])

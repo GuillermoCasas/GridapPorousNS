@@ -1,12 +1,12 @@
 # src/solvers/accelerators.jl
-
 using LinearAlgebra
 
 """
     AndersonAccelerator
 
 Maintains the history of states `X` and fixed-point residuals `F` to compute 
-Anderson Mixing (Anderson Acceleration) extrapolations.
+Anderson Mixing (Anderson Acceleration) extrapolations. Supports optional block-weighted 
+mass matrices for physically accurate least-squares mappings across separate physical domains.
 """
 mutable struct AndersonAccelerator
     m::Int                       # Maximum depth of history
@@ -14,9 +14,10 @@ mutable struct AndersonAccelerator
     iter::Int                    # Current iteration count
     history_X::Vector{Vector{Float64}}
     history_F::Vector{Vector{Float64}}
-    
-    function AndersonAccelerator(m::Int, relaxation_factor::Float64=1.0)
-        new(m, relaxation_factor, 0, Vector{Vector{Float64}}(), Vector{Vector{Float64}}())
+    M_mat::Union{Nothing, AbstractMatrix}                   # Optional mass matrix for L2 weighted least-squares
+
+    function AndersonAccelerator(m::Int, relaxation_factor::Float64=1.0, M_mat::Union{Nothing, AbstractMatrix}=nothing)
+        new(m, relaxation_factor, 0, Vector{Vector{Float64}}(), Vector{Vector{Float64}}(), M_mat)
     end
 end
 
@@ -43,15 +44,12 @@ function update!(acc::AndersonAccelerator, x_k::Vector{Float64}, g_k::Vector{Flo
     
     acc.iter += 1
     
-    # If not enough history, just perform standard relaxed Picard
+    # If not enough history, perform standard relaxed Picard
     if length(acc.history_X) < 2
         return x_k .+ acc.relaxation_factor .* f_k
     end
     
     n_history = length(acc.history_X)
-    
-    # Construct Delta F matrix and Delta X matrix
-    # Columns are f_k - f_i
     m_active = n_history - 1
     dof_size = length(f_k)
     
@@ -59,19 +57,19 @@ function update!(acc::AndersonAccelerator, x_k::Vector{Float64}, g_k::Vector{Flo
     DeltaX = zeros(Float64, dof_size, m_active)
     
     for i in 1:m_active
-        # history_F[i] is an older residual, f_k is the newest
         DeltaF[:, i] .= f_k .- acc.history_F[i]
         DeltaX[:, i] .= x_k .- acc.history_X[i]
     end
     
-    # Solve least squares problem: DeltaF * gamma = f_k
-    # gamma = argmin || DeltaF * gamma - f_k ||_2
-    # We use standard QR via the backslash operator.
-    gamma = DeltaF \ f_k
-    
-    # The mixed state and mixed residual:
-    # x_mixed = x_k - sum(gamma_i * DeltaX_i)
-    # f_mixed = f_k - sum(gamma_i * DeltaF_i)
+    if acc.M_mat !== nothing
+        # Weighted least squares using mass matrix: argmin || M^(1/2) (DeltaF * gamma - f_k) ||_2^2
+        # Normal equations: (DeltaF^T * M * DeltaF) * gamma = DeltaF^T * M * f_k
+        A_ls = DeltaF' * (acc.M_mat * DeltaF)
+        b_ls = DeltaF' * (acc.M_mat * f_k)
+        gamma = A_ls \ b_ls
+    else
+        gamma = DeltaF \ f_k
+    end
     
     x_mixed = copy(x_k)
     f_mixed = copy(f_k)
@@ -80,15 +78,8 @@ function update!(acc::AndersonAccelerator, x_k::Vector{Float64}, g_k::Vector{Flo
         f_mixed .-= gamma[i] .* DeltaF[:, i]
     end
     
-    # Final accelerated update
     x_next = x_mixed .+ acc.relaxation_factor .* f_mixed
     
-    # -------------------------------------------------------------------------
-    # SAFETY GUARD: Prevent Anderson Extrapolation Explosion
-    # If the least-squares mapping of historical noise massively shoots the
-    # state out of proportion relative to standard Picard, reject the matrix 
-    # inversion and conservatively map directly to the simple fixed-point jump.
-    # -------------------------------------------------------------------------
     if norm(x_next .- g_k, Inf) > 10.0 * norm(f_k, Inf)
         return x_k .+ acc.relaxation_factor .* f_k
     end

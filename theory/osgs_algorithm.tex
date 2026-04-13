@@ -1,0 +1,183 @@
+\documentclass{article}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\geometry{a4paper, margin=1in}
+
+\title{Mathematical Formulation of the Porous Navier-Stokes Solvers}
+\author{Antigravity AI \and Project Authors}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This document outlines the formulation of the Orthogonal Sub-Grid Scales (OSGS) stabilization method and the nonlinear globalization strategy for the generalized porous Navier--Stokes equations. The algorithmic structure strictly separates the continuous finite element operator assembly from the discrete algebraic safeguarding mechanisms.
+
+\section{Solver Parameters}
+All bounds mapping to the internal runtime configuration are classified below.
+
+\begin{table}[h]
+\centering
+\caption{Nonlinear and Staggered Solver Configuration Parameters}
+\label{tab:params}
+\begin{tabularx}{\textwidth}{@{} l l X @{}}
+\toprule
+\textbf{Symbol} & \textbf{Code Property} & \textbf{Description} \\
+\midrule
+$N_{\text{OSGS}}$         & \texttt{stab\_cfg.osgs\_iterations}       & Maximum number of outer staggered loops permitted. \\
+$N_{\text{inner}}$        & \texttt{stab\_cfg.osgs\_inner\_newton\_iters} & Iteration limit for each inner monolithic Newton-Raphson solve. \\
+$N_{\text{inc}}$          & \texttt{sol\_cfg.max\_increases}          & Allowable successive iterations where the scalar merit function expands. \\
+$N_{\text{plateau}}$      & \texttt{mms\_cfg.require\_consecutive\_passes} & Number of consecutive error verifications achieving steady reduction. \\
+$\alpha_{\text{min}}$     & \texttt{sol\_cfg.linesearch\_alpha\_min}  & Minimum allowable geometric step size. \\
+$c_1$                     & \texttt{sol\_cfg.armijo\_c1}              & Armijo condition parameter evaluating sufficient residual descent. \\
+$F_{\text{div}}$          & \texttt{sol\_cfg.divergence\_merit\_factor} & Expansion threshold evaluating catastrophic divergence bounds. \\
+\midrule
+$\tau_{\text{OSGS}}$      & \texttt{stab\_cfg.osgs\_tolerance}        & Tolerance evaluating acceptable outer state continuity. \\
+$\tau_{\text{proj}}$      & \texttt{stab\_cfg.osgs\_projection\_tol}  & Tolerance evaluating sub-grid spatial projection limits. \\
+$\tau_{\text{ftol}}$      & \texttt{sol\_cfg.ftol}                    & Terminal nonlinear residual tolerance bounding the sequence $\ell^\infty$ norm. \\
+$\tau_{\text{xtol}}$      & \texttt{sol\_cfg.xtol}                    & Coordinate step norm limit halting sequence updates. \\
+$\tau_{\text{stagnation}}$& \texttt{sol\_cfg.stagnation\_noise\_floor}& Noise-floor limit preventing spurious machine-epsilon stalls. \\
+$\tau_{\text{error}}$     & \texttt{mms\_cfg.tau\_err}                & Plateau relative error bound verifying MMS limits. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Algorithmic Structure}
+
+Let the primary velocity-pressure state be $U_h = (\boldsymbol{u}_h, p_h) \in \mathcal{X}_h$. The continuous sub-grid projection variables are $\boldsymbol{\pi}_h = (\boldsymbol{\pi}_{h,u}, \pi_{h,p})^\top \in \mathcal{X}_h$. 
+
+To natively balance the numerical disparity between the momentum and mass conservation equations without \textit{a priori} macroscopic scaling, we extract an element-wise scaling vector from the exact Jacobian at each iteration: $w_k = \max( |[\mathcal{J}]_{kk}|, \epsilon_{\text{mach}} \|\text{diag}(\mathcal{J})\|_\infty, \epsilon_{\text{mach}} )$. The diagonally equilibrated dimensionless merit function is defined as:
+\begin{equation}
+    \Phi_{\boldsymbol{w}}(\boldsymbol{x}) = \frac{1}{2} \sum_{k=1}^N \left( \frac{b_k(\boldsymbol{x})}{w_k} \right)^2
+\end{equation}
+
+\begin{algorithm}[H]
+\caption{Algorithm A: Safeguarded Exact Newton-Raphson Subsolver}
+\SetAlgoLined
+\KwIn{Initial guess $\boldsymbol{x}$, Operator yielding $(\boldsymbol{b}(\boldsymbol{x}), \mathcal{J}(\boldsymbol{x}))$, dynamic tolerance $\tau$.}
+Initialize $\boldsymbol{x}_{\text{best}} = \boldsymbol{x}, \boldsymbol{b}_{\text{best}} = \|\boldsymbol{b}(\boldsymbol{x})\|_\infty$\;
+$I_{\text{up}} = 0$\;
+\If{$\|\boldsymbol{b}(\boldsymbol{x})\|_\infty \leq \tau$}{ \Return $\boldsymbol{x}$ (Exit: \texttt{initial\_ftol})\; }
+
+\For{$i = 1, \dots, N_{\text{inner}}$}{
+    Compute Jacobian $\mathcal{J}_i = \mathcal{J}(\boldsymbol{x})$ and residual $\boldsymbol{b}_i = \boldsymbol{b}(\boldsymbol{x})$\;
+    Update weights $\boldsymbol{w} = \max(|\text{diag}(\mathcal{J}_i)|, \epsilon_{\text{mach}}\|\text{diag}(\mathcal{J}_i)\|_\infty, \epsilon_{\text{mach}})$\;
+    Evaluate $\Phi_{\text{curr}} = \Phi_{\boldsymbol{w}}(\boldsymbol{x})$\;
+    
+    \textbf{try} \{ \\
+    \quad Solve linear system $\mathcal{J}_i \delta\boldsymbol{x} = \boldsymbol{b}_i$\;
+    \} \textbf{catch} \{ \\
+    \quad Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return (Exit: \texttt{linear\_solve\_exception})\;
+    \} \\
+    
+    \If{$\delta\boldsymbol{x}$ contains NaNs}{
+        Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return (Exit: \texttt{linear\_solve\_nan})\;
+    }
+    
+    \tcc{Exact analytical directional derivative ($D = -\boldsymbol{b}_i^\top \boldsymbol{w}^{-2} \mathcal{J}_i \delta\boldsymbol{x} = -2\Phi_{\text{curr}}$)}
+    $D = -2.0 \cdot \Phi_{\text{curr}}$\;
+    
+    $\alpha = 1.0, S_{\text{step\_accepted}} = \text{false}$\;
+    \For{$j = 1, \dots, 15$}{
+        $\boldsymbol{x}_{\text{trial}} = \boldsymbol{x} - \alpha \delta\boldsymbol{x}$\;
+        Compute $\hat{\boldsymbol{b}} = \boldsymbol{b}(\boldsymbol{x}_{\text{trial}})$ and $\hat{\Phi}_{\boldsymbol{w}} = \Phi_{\boldsymbol{w}}(\boldsymbol{x}_{\text{trial}})$\;
+        \If{\textnormal{\textbf{not}} $\text{isnan}(\hat{\Phi}_{\boldsymbol{w}})$ \textnormal{\textbf{and}} $\hat{\Phi}_{\boldsymbol{w}} \leq \Phi_{\text{curr}} + c_1 \alpha D$}{
+            $S_{\text{step\_accepted}} = \text{true}$. \textbf{break}\;
+        }
+        $\alpha = 0.5 \alpha$\;
+        \If{$\alpha \leq \alpha_{\text{min}}$}{\textbf{break}\;}
+    }
+    
+    \If{\textnormal{\textbf{not}} $S_{\text{step\_accepted}}$}{
+        Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return (Exit: \texttt{linesearch\_failed})\;
+    }
+    
+    $\boldsymbol{x} \gets \boldsymbol{x}_{\text{trial}}$ \tcp*{Accept step}
+    
+    \If{$\|\hat{\boldsymbol{b}}\|_\infty < \boldsymbol{b}_{\text{best}}$}{
+        $\boldsymbol{x}_{\text{best}} = \boldsymbol{x}, \boldsymbol{b}_{\text{best}} = \|\hat{\boldsymbol{b}}\|_\infty$\;
+    }
+    
+    \tcc{Terminal Verifications}
+    \If{$\|\hat{\boldsymbol{b}}\|_\infty \leq \tau$}{ \Return $\boldsymbol{x}$ (Exit: \texttt{ftol\_reached})\; }
+    \If{$\alpha \|\delta\boldsymbol{x}\|_\infty \leq \tau_{\text{xtol}}$}{ \Return $\boldsymbol{x}$ (Exit: \texttt{xtol\_stagnation})\; }
+    \If{$\hat{\Phi}_{\boldsymbol{w}} > \Phi_{\text{curr}} \cdot F_{\text{div}}$}{
+        $I_{\text{up}} = I_{\text{up}} + 1$\;
+        \If{$I_{\text{up}} \geq N_{\text{inc}}$}{ Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return (Exit: \texttt{merit\_divergence\_escaped})\;}
+    } \Else { $I_{\text{up}} = 0$\; }
+}
+\Return $\boldsymbol{x}_{\text{best}}$\;
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Algorithm B: Canonical ASGS Baseline Solver}
+\SetAlgoLined
+\KwIn{Initial array $\boldsymbol{x}^0$, full continuous algebraic system definitions.}
+Configure parameters zeroing sub-grid scales: $\boldsymbol{\pi}_h = \mathbf{0}$\;
+Attempt Newton resolution via Algorithm A targeting $\tau_{\text{ftol}}$\;
+\If{Algorithm A aborts or diverges}{
+    Compute standard Picard smoothing iteration to bypass ill-conditioned regions\;
+    Re-evaluate Newton resolution via Algorithm A targeting $\tau_{\text{ftol}}$\;
+}
+\Return Accepted converged baseline state $U_h^{\text{ASGS}}$\;
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Algorithm C: OSGS Lagged Projection Refinement}
+\SetAlgoLined
+\KwIn{Accepted $U_h^{\text{ASGS}}$ and invariant mass matrices $M_u, M_p$.}
+Initialize $U_h^0 = U_h^{\text{ASGS}}$\;
+Bootstrap initial sub-grid projections:
+$\boldsymbol{\pi}_{h,u}^0 = \Pi_{\boldsymbol{V}}(\mathcal{R}_{u}(U_h^0))$ and $\pi_{h,p}^0 = \Pi_{Q}(\mathcal{R}_p(U_h^0))$\;
+\For{$m = 1, \dots, N_{\text{OSGS}}$}{
+    Set inner tolerance limit: $\tau_{\text{inner}}^m = (m \leq 2) \; ? \; \max(\tau_{\text{ftol}}, 10^{-3}) : \tau_{\text{ftol}}$\;
+    
+    Set $\boldsymbol{\pi}_h = \boldsymbol{\pi}_h^{m-1}$ fixed, resolve continuous nonlinear problem yielding $U_h^m$ using Algorithm A solving to $\tau_{\text{inner}}^m$\;
+    
+    \tcc{Evaluate continuous spatial state drift exactly via functional integration:}
+    $d_{\text{state}}^m = \max \left( \| \boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1} \|_{L^2(\Omega)}, \; \| p_h^m - p_h^{m-1} \|_{L^2(\Omega)} \right)$\;
+    
+    Update continuous evaluations: $\boldsymbol{\mathcal{R}}_u^m = \mathcal{R}_u(U_h^m)$ and $\mathcal{R}_p^m = \mathcal{R}_p(U_h^m)$\;
+    Update continuous orthogonal projections:
+    $(\boldsymbol{\pi}_{h,u}^m, \pi_{h,p}^m) = \left( \Pi_{\boldsymbol{V}}(\boldsymbol{\mathcal{R}}_u^m), \Pi_Q(\mathcal{R}_p^m) \right)$\;
+    
+    \tcc{Independent Block-Weighted Anderson Acceleration}
+    \textit{(Optional)} Filter limits through separated bounds using $L^2$ mass matrices:
+    \begin{align*}
+        \boldsymbol{\pi}_{h,u}^m &\gets \text{Anderson}( \text{History}_u, \boldsymbol{\pi}_{h,u}^{m-1}, \boldsymbol{\pi}_{h,u}^m, M_u ) \\
+        \pi_{h,p}^m &\gets \text{Anderson}( \text{History}_p, \pi_{h,p}^{m-1}, \pi_{h,p}^m, M_p )
+    \end{align*}
+    
+    \tcc{Define orthogonal projection drift explicitly evaluating algebraic block arrays:}
+    $d_\pi^m = \max \left( \sqrt{(\delta\boldsymbol{\pi}_{h,u}^m)^\top M_u \delta\boldsymbol{\pi}_{h,u}^m}, \; \sqrt{(\delta\pi_{h,p}^m)^\top M_p \delta\pi_{h,p}^m} \right)$\;
+    
+    \If{$\left( d_{\text{state}}^m \leq \max(\tau_{\text{OSGS}}, \tau_{\text{stagnation}}) \right)$ \textnormal{\textbf{AND/OR}} $\left( d_\pi^m \leq \max(\tau_{\text{proj}}, \tau_{\text{stagnation}}) \right)$}{
+        \Return Validated staggered boundary $U_h^m$\;
+    }
+}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Algorithm D: MMS Plateau Verification Wrapper}
+\SetAlgoLined
+\KwIn{Analytical field distributions $U_{\text{exact}}$, accepted convergence coordinate bounds $E_{L^2}^{m-1}$.}
+Compute continuous tracking errors via explicit integrals:
+$E_{\boldsymbol{u}, L^2}^m = \| \boldsymbol{u}_h^m - \boldsymbol{u}_{\text{ex}} \|_{L^2(\Omega)}$,
+$E_{p, L^2}^m = \| p_h^m - p_{\text{ex}} \|_{L^2(\Omega)}$\;
+Compute maximum relative error ratios:
+$r_{\text{max}} = \max \left( \frac{|E_{\boldsymbol{u}, L^2}^m - E_{\boldsymbol{u}, L^2}^{m-1}|}{\max(E_{\boldsymbol{u}, L^2}^m, E_{\boldsymbol{u}, L^2}^{m-1}, \epsilon_{\text{err}})}, \; \dots \right)$\;
+\If{$r_{\text{max}} \leq \tau_{\text{error}}$}{
+    $I_{\text{passes}} = I_{\text{passes}} + 1$\;
+} \Else {
+    $I_{\text{passes}} = 0$\;
+}
+\If{$I_{\text{passes}} \geq N_{\text{plateau}}$}{
+    \Return \texttt{mms\_plateau\_satisfied}\;
+}
+\end{algorithm}
+
+\end{document}

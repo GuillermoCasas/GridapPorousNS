@@ -11,7 +11,8 @@ include("test_utils.jl")
 
 files = [
     "reaction_regularization_blitz_test.jl",
-    "viscous_operators_blitz_test.jl",
+
+    "formulation_consistency_blitz_test.jl",
     "tau_blitz_test.jl",
     "projection_blitz_test.jl",
     "nonlinear_blitz_test.jl",

@@ -10,21 +10,110 @@
       "title": "Physical Properties",
       "description": "Physical properties of the fluid and the porous medium, including numerical floor values and reaction terms.",
       "properties": {
-        "nu": { "type": "number", "default": 1.0, "description": "Kinematic viscosity of the fluid." },
-        "f_x": { "type": "number", "default": 0.0, "description": "Body force component in the x-direction (e.g., gravity)." },
-        "f_y": { "type": "number", "default": 0.0, "description": "Body force component in the y-direction." },
-        "eps_val": { "type": "number", "default": 1e-8, "description": "Absolute numerical stabilization limit for pressure." },
-        "eps_floor": { "type": "number", "default": 1e-8, "description": "Minimum limit applied to the pressure stabilization parameter (eps_val). This acts as a safeguard against zero values." },
-        "reaction_model": { "type": "string", "enum": ["Forchheimer", "Darcy", "Constant_Sigma"], "default": "Forchheimer", "description": "Resistance/Reaction model format." },
-        "sigma_constant": { "type": "number", "default": 1.0, "description": "Constant term parameter for the reaction model." },
-        "sigma_linear": { "type": "number", "default": 150.0, "description": "Linear drag coefficient (A) derived from Darcy's law." },
-        "sigma_nonlinear": { "type": "number", "default": 1.75, "description": "Nonlinear drag coefficient (B) from Forchheimer correction." },
-        "u_base_floor_ref": { "type": "number", "default": 1e-4, "description": "Reference base velocity for regularization floor." },
-        "h_floor_weight": { "type": "number", "default": 0.1, "description": "Characteristic length weighting for regularization." },
-        "epsilon_floor": { "type": "number", "default": 1e-12, "description": "Absolute velocity magnitude cutoff to prevent divide-by-zero." },
-        "tau_regularization_limit": { "type": "number", "default": 1e-12, "description": "Minimum limit applied to stabilization parameters (tau)." },
-        "Re": { "type": "number", "description": "Reynolds number (testing overide parameter)." },
-        "Da": { "type": "number", "description": "Darcy number (testing overide parameter)." }
+        "nu": {
+          "type": "number",
+          "description": "Kinematic viscosity of the fluid.",
+          "examples": [
+            1.0
+          ]
+        },
+        "f_x": {
+          "type": "number",
+          "description": "Body force component in the x-direction (e.g., gravity).",
+          "examples": [
+            0.0
+          ]
+        },
+        "f_y": {
+          "type": "number",
+          "description": "Body force component in the y-direction.",
+          "examples": [
+            0.0
+          ]
+        },
+        "eps_val": {
+          "type": "number",
+          "description": "Absolute numerical stabilization limit for pressure.",
+          "examples": [
+            1e-08
+          ]
+        },
+        "eps_floor": {
+          "type": "number",
+          "description": "Minimum limit applied to the pressure stabilization parameter (eps_val). This acts as a safeguard against zero values.",
+          "examples": [
+            1e-08
+          ]
+        },
+        "reaction_model": {
+          "type": "string",
+          "enum": [
+            "Forchheimer",
+            "Darcy",
+            "Constant_Sigma"
+          ],
+          "description": "Resistance/Reaction model format.",
+          "examples": [
+            "Forchheimer"
+          ]
+        },
+        "sigma_constant": {
+          "type": "number",
+          "description": "Constant term parameter for the reaction model.",
+          "examples": [
+            1.0
+          ]
+        },
+        "sigma_linear": {
+          "type": "number",
+          "description": "Linear drag coefficient (A) derived from Darcy's law.",
+          "examples": [
+            150.0
+          ]
+        },
+        "sigma_nonlinear": {
+          "type": "number",
+          "description": "Nonlinear drag coefficient (B) from Forchheimer correction.",
+          "examples": [
+            1.75
+          ]
+        },
+        "u_base_floor_ref": {
+          "type": "number",
+          "description": "Reference base velocity for regularization floor.",
+          "examples": [
+            0.0001
+          ]
+        },
+        "h_floor_weight": {
+          "type": "number",
+          "description": "Characteristic length weighting for regularization.",
+          "examples": [
+            0.1
+          ]
+        },
+        "epsilon_floor": {
+          "type": "number",
+          "description": "Absolute velocity magnitude cutoff to prevent divide-by-zero.",
+          "examples": [
+            1e-12
+          ]
+        },
+        "tau_regularization_limit": {
+          "type": "number",
+          "description": "Minimum limit applied to stabilization parameters (tau).",
+          "examples": [
+            1e-12
+          ]
+        },
+        "Re": {
+          "type": "number",
+          "description": "Reynolds number (testing overide parameter)."
+        },
+        "Da": {
+          "type": "number",
+          "description": "Darcy number (testing overide parameter)."
+        }
       },
       "additionalProperties": true
     },
@@ -33,14 +122,41 @@
       "title": "Domain Configuration",
       "description": "Geometrical description and dimensions of the domain and the spatial distribution of the porous medium.",
       "properties": {
-        "alpha_0": { "type": "number", "default": 0.4, "description": "Background or minimum porosity value." },
-        "r_1": { "type": "number", "default": 0.2, "description": "Inner radius geometry control for porosity field." },
-        "r_2": { "type": "number", "default": 0.5, "description": "Outer radius geometry control for porosity field." },
-        "bounding_box": { 
-          "type": "array", 
-          "items": { "type": "number" }, 
-          "default": [0.0, 1.0, 0.0, 1.0], 
-          "description": "Bounding box lengths for the geometry [xmin, xmax, ymin, ymax]." 
+        "alpha_0": {
+          "type": "number",
+          "description": "Background or minimum porosity value.",
+          "examples": [
+            0.4
+          ]
+        },
+        "r_1": {
+          "type": "number",
+          "description": "Inner radius geometry control for porosity field.",
+          "examples": [
+            0.2
+          ]
+        },
+        "r_2": {
+          "type": "number",
+          "description": "Outer radius geometry control for porosity field.",
+          "examples": [
+            0.5
+          ]
+        },
+        "bounding_box": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Bounding box lengths for the geometry [xmin, xmax, ymin, ymax].",
+          "examples": [
+            [
+              0.0,
+              1.0,
+              0.0,
+              1.0
+            ]
+          ]
         }
       },
       "additionalProperties": false
@@ -55,9 +171,24 @@
           "title": "Element Spaces",
           "description": "Finite element type and order degrees.",
           "properties": {
-            "k_velocity": { "type": "integer", "default": 2, "description": "Velocity interpolation polynomial order." },
-            "k_pressure": { "type": "integer", "default": 1, "description": "Pressure interpolation polynomial order." },
-            "equal_order_only": { "type": "boolean", "description": "Flag used primarily in testing to enforce equal-order elements." }
+            "k_velocity": {
+              "type": "integer",
+              "description": "Velocity interpolation polynomial order.",
+              "examples": [
+                2
+              ]
+            },
+            "k_pressure": {
+              "type": "integer",
+              "description": "Pressure interpolation polynomial order.",
+              "examples": [
+                1
+              ]
+            },
+            "equal_order_only": {
+              "type": "boolean",
+              "description": "Flag used primarily in testing to enforce equal-order elements."
+            }
           },
           "additionalProperties": false
         },
@@ -66,9 +197,33 @@
           "title": "Stabilization Configuration",
           "description": "Mechanisms for stabilizing the Galerkin solver.",
           "properties": {
-            "method": { "type": "string", "enum": ["ASGS", "OSGS", "VMS", "Galerkin"], "default": "ASGS", "description": "Stabilization method selected." },
-            "osgs_iterations": { "type": "integer", "default": 3, "description": "Iterations used for resolving Orthogonal Subgrid Scales." },
-            "osgs_tolerance": { "type": "number", "default": 1e-5, "description": "Tolerance for terminating OSGS iterations before reaching the maximum." }
+            "method": {
+              "type": "string",
+              "enum": [
+                "ASGS",
+                "OSGS",
+                "VMS",
+                "Galerkin"
+              ],
+              "description": "Stabilization method selected.",
+              "examples": [
+                "ASGS"
+              ]
+            },
+            "osgs_iterations": {
+              "type": "integer",
+              "description": "Iterations used for resolving Orthogonal Subgrid Scales.",
+              "examples": [
+                3
+              ]
+            },
+            "osgs_tolerance": {
+              "type": "number",
+              "description": "Tolerance for terminating OSGS iterations before reaching the maximum.",
+              "examples": [
+                1e-05
+              ]
+            }
           },
           "additionalProperties": false
         },
@@ -77,27 +232,138 @@
           "title": "Solver Configuration",
           "description": "Hyperparameters controlling the Picard and Exact Newton linear/nonlinear solvers.",
           "properties": {
-            "picard_iterations": { "type": "integer", "default": 5, "description": "Initial number of Picard iterations before switching to Newton." },
-            "newton_iterations": { "type": "integer", "default": 20, "description": "Maximum allowed exact Newton iterations." },
-            "xtol": { "type": "number", "default": 1e-8, "description": "Relative norm tolerance for the solution increment (dx)." },
-            "ftol": { "type": "number", "default": 1e-10, "description": "Absolute residual tolerance." },
-            "max_increases": { "type": "integer", "default": 2, "description": "Number of successive residual increases before divergence abort." },
-            "freeze_jacobian_cusp": { "type": "boolean", "default": false, "description": "If true, freezes the magnitude of velocity in the nonlinearity Jacobian cross-terms." },
-            "linesearch_alpha_min": { "type": "number", "default": 1e-4, "description": "Minimum step size allowed before linesearch fails." },
-            "armijo_c1": { "type": "number", "default": 1e-4, "description": "Armijo sufficient decrease parameter (c1) for the linesearch." },
-            "divergence_merit_factor": { "type": "number", "default": 1.05, "description": "Factor by which the merit function is allowed to increase before counting as a divergence step." },
-            "stagnation_noise_floor": { "type": "number", "default": 1e-2, "description": "The threshold for the residual inf-norm below which continuous divergence stops safely rather than crashing the solver." },
-            "run_diagnostics": { "type": "boolean", "default": false, "description": "Enable expanded diagnostics / debug print statements." },
-            "ablation_mode": { "type": "string", "enum": ["full", "galerkin", "momentum_only", "mass_only"], "default": "full", "description": "Switch behavior of specific solver terms for systematic testing." },
-            "experimental_reaction_mode": { "type": "string", "enum": ["standard", "remove_adjoint", "remove_tau"], "default": "standard", "description": "Toggles advanced reaction handling behaviors for high-Re modes." },
+            "picard_iterations": {
+              "type": "integer",
+              "description": "Initial number of Picard iterations before switching to Newton.",
+              "examples": [
+                5
+              ]
+            },
+            "newton_iterations": {
+              "type": "integer",
+              "description": "Maximum allowed exact Newton iterations.",
+              "examples": [
+                20
+              ]
+            },
+            "xtol": {
+              "type": "number",
+              "description": "Relative norm tolerance for the solution increment (dx).",
+              "examples": [
+                1e-08
+              ]
+            },
+            "ftol": {
+              "type": "number",
+              "description": "Absolute residual tolerance.",
+              "examples": [
+                1e-10
+              ]
+            },
+            "max_increases": {
+              "type": "integer",
+              "description": "Number of successive residual increases before divergence abort.",
+              "examples": [
+                2
+              ]
+            },
+            "freeze_jacobian_cusp": {
+              "type": "boolean",
+              "description": "If true, freezes the magnitude of velocity in the nonlinearity Jacobian cross-terms.",
+              "examples": [
+                false
+              ]
+            },
+            "linesearch_alpha_min": {
+              "type": "number",
+              "description": "Minimum step size allowed before linesearch fails.",
+              "examples": [
+                0.0001
+              ]
+            },
+            "armijo_c1": {
+              "type": "number",
+              "description": "Armijo sufficient decrease parameter (c1) for the linesearch.",
+              "examples": [
+                0.0001
+              ]
+            },
+            "divergence_merit_factor": {
+              "type": "number",
+              "description": "Factor by which the merit function is allowed to increase before counting as a divergence step.",
+              "examples": [
+                1.05
+              ]
+            },
+            "stagnation_noise_floor": {
+              "type": "number",
+              "description": "The threshold for the residual inf-norm below which continuous divergence stops safely rather than crashing the solver.",
+              "examples": [
+                0.01
+              ]
+            },
+            "run_diagnostics": {
+              "type": "boolean",
+              "description": "Enable expanded diagnostics / debug print statements.",
+              "examples": [
+                false
+              ]
+            },
+            "ablation_mode": {
+              "type": "string",
+              "enum": [
+                "full",
+                "galerkin",
+                "momentum_only",
+                "mass_only"
+              ],
+              "description": "Switch behavior of specific solver terms for systematic testing.",
+              "examples": [
+                "full"
+              ]
+            },
+            "experimental_reaction_mode": {
+              "type": "string",
+              "enum": [
+                "standard",
+                "remove_adjoint",
+                "remove_tau"
+              ],
+              "description": "Toggles advanced reaction handling behaviors for high-Re modes.",
+              "examples": [
+                "standard"
+              ]
+            },
             "accelerator": {
               "type": "object",
               "title": "Accelerator Configuration",
               "description": "Smart nonlinear convergence accelerator properties (e.g. Anderson Mixing) to rapidly resolve Fixed-Point loops.",
               "properties": {
-                 "type": { "type": "string", "enum": ["None", "Anderson"], "default": "None", "description": "Type of sequence extrapolation applied to fixed point iterations." },
-                 "m": { "type": "integer", "default": 5, "description": "Maximum memory depth or historical tracking for the mixing subspace." },
-                 "relaxation_factor": { "type": "number", "default": 1.0, "description": "Standard numerical damping or geometrical relaxation ratio applied to the proposed extrapolation." }
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "None",
+                    "Anderson"
+                  ],
+                  "description": "Type of sequence extrapolation applied to fixed point iterations.",
+                  "examples": [
+                    "None"
+                  ]
+                },
+                "m": {
+                  "type": "integer",
+                  "description": "Maximum memory depth or historical tracking for the mixing subspace.",
+                  "examples": [
+                    5
+                  ]
+                },
+                "relaxation_factor": {
+                  "type": "number",
+                  "description": "Standard numerical damping or geometrical relaxation ratio applied to the proposed extrapolation.",
+                  "examples": [
+                    1.0
+                  ]
+                }
               },
               "additionalProperties": false
             }
@@ -109,23 +375,45 @@
           "title": "Mesh Configuration",
           "description": "Domain partitioning and element geometry.",
           "properties": {
-            "partition": { 
-              "type": "array", 
-              "items": { "type": "integer" }, 
-              "default": [20, 20], 
-              "description": "Number of elements in each direction [nx, ny]." 
+            "partition": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "description": "Number of elements in each direction [nx, ny].",
+              "examples": [
+                [
+                  20,
+                  20
+                ]
+              ]
             },
             "convergence_partitions": {
               "type": "array",
-              "items": { "type": "integer" },
-              "default": [10, 20, 30],
-              "description": "Set of partitions for convergence studies (e.g., MMS tests)."
+              "items": {
+                "type": "integer"
+              },
+              "description": "Set of partitions for convergence studies (e.g., MMS tests).",
+              "examples": [
+                [
+                  10,
+                  20,
+                  30
+                ]
+              ]
             },
-            "element_type": { 
-              "type": "string", 
-              "enum": ["QUAD", "TRI", "HEX", "TET"],
-              "default": "QUAD", 
-              "description": "Element type." 
+            "element_type": {
+              "type": "string",
+              "enum": [
+                "QUAD",
+                "TRI",
+                "HEX",
+                "TET"
+              ],
+              "description": "Element type.",
+              "examples": [
+                "QUAD"
+              ]
             }
           },
           "additionalProperties": false
@@ -138,16 +426,46 @@
       "title": "Output Configuration",
       "description": "Path and naming for saving results.",
       "properties": {
-        "directory": { "type": "string", "default": "results", "description": "Directory name for writing outputs." },
-        "basename": { "type": "string", "default": "porous_ns", "description": "Prefix applied to saved solution files." }
+        "directory": {
+          "type": "string",
+          "description": "Directory name for writing outputs.",
+          "examples": [
+            "results"
+          ]
+        },
+        "basename": {
+          "type": "string",
+          "description": "Prefix applied to saved solution files.",
+          "examples": [
+            "porous_ns"
+          ]
+        }
       },
       "additionalProperties": false
     },
-    "max_n_pert": { "type": "integer", "description": "Maximum noise permutations for MMS execution config." },
-    "epsilon_pert": { "type": "array", "items": { "type": "number" }, "description": "Epsilon perturbations scale for condition tests." },
-    "erase_past_results": { "type": "boolean", "description": "Controls HDF5 cache scrubbing." },
-    "h5_filename": { "type": "string", "description": "Filename of H5 results database used in manufactured solutions." },
-    "equal_order_only": { "type": "boolean", "description": "Top-level fallback for testing suites." }
+    "max_n_pert": {
+      "type": "integer",
+      "description": "Maximum noise permutations for MMS execution config."
+    },
+    "epsilon_pert": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Epsilon perturbations scale for condition tests."
+    },
+    "erase_past_results": {
+      "type": "boolean",
+      "description": "Controls HDF5 cache scrubbing."
+    },
+    "h5_filename": {
+      "type": "string",
+      "description": "Filename of H5 results database used in manufactured solutions."
+    },
+    "equal_order_only": {
+      "type": "boolean",
+      "description": "Top-level fallback for testing suites."
+    }
   },
   "additionalProperties": true
 }

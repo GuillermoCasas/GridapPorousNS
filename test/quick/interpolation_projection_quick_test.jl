@@ -15,6 +15,9 @@
 # - `src/metrics/metrics.jl` (`compute_reference_errors`)
 # ==============================================================================================
 
+import Pkg
+Pkg.activate(joinpath(@__DIR__, "..", ".."))
+
 using Test
 using Gridap
 using LinearAlgebra

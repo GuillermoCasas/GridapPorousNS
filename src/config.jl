@@ -4,87 +4,90 @@ using JSON3
 using StructTypes
 
 Base.@kwdef struct PhysicalProperties
-    nu::Float64 = 1.0
-    f_x::Float64 = 0.0
-    f_y::Float64 = 0.0
-    eps_val::Float64 = 1e-8
-    eps_floor::Float64 = 1e-8
-    reaction_model::String = "Forchheimer"
-    sigma_constant::Float64 = 1.0
-    sigma_linear::Float64 = 150.0
-    sigma_nonlinear::Float64 = 1.75
-    u_base_floor_ref::Float64 = 1e-4
-    h_floor_weight::Float64 = 0.1
-    epsilon_floor::Float64 = 1e-12
-    tau_regularization_limit::Float64 = 1e-12
+    nu::Float64
+    f_x::Float64
+    f_y::Float64
+    eps_val::Float64
+    eps_floor::Float64
+    reaction_model::String
+    sigma_constant::Float64
+    sigma_linear::Float64
+    sigma_nonlinear::Float64
+    u_base_floor_ref::Float64
+    h_floor_weight::Float64
+    epsilon_floor::Float64
+    tau_regularization_limit::Float64
 end
 
 Base.@kwdef struct DomainConfig
-    alpha_0::Float64 = 0.4
-    r_1::Float64 = 0.2
-    r_2::Float64 = 0.5
-    bounding_box::Vector{Float64} = [0.0, 1.0, 0.0, 1.0]
+    alpha_0::Float64
+    r_1::Float64
+    r_2::Float64
+    bounding_box::Vector{Float64}
 end
 
 Base.@kwdef struct ElementSpacesConfig
-    k_velocity::Int = 2
-    k_pressure::Int = 1
+    k_velocity::Int
+    k_pressure::Int
 end
 
 Base.@kwdef struct AcceleratorConfig
-    type::String = "None"
-    m::Int = 5
-    relaxation_factor::Float64 = 1.0
+    type::String
+    m::Int
+    relaxation_factor::Float64
 end
 
 Base.@kwdef struct StabilizationConfig
-    method::String = "ASGS"
-    osgs_iterations::Int = 3
-    osgs_tolerance::Float64 = 1e-5
+    method::String
+    osgs_iterations::Int
+    osgs_inner_newton_iters::Int
+    osgs_tolerance::Float64
+    osgs_stopping_mode::String
+    osgs_projection_tolerance::Float64
+    osgs_state_drift_scale::String
 end
 
 Base.@kwdef struct MeshConfig
-    partition::Vector{Int} = [20, 20]
-    convergence_partitions::Vector{Int} = [10, 20, 30]
-    element_type::String = "QUAD"
+    partition::Vector{Int}
+    convergence_partitions::Vector{Int}
+    element_type::String
 end
 
 Base.@kwdef struct SolverConfig
-    picard_iterations::Int = 5
-    newton_iterations::Int = 20
-    ftol::Float64 = 1e-10
-    xtol::Float64 = 1e-8
-    max_increases::Int = 2
-    freeze_jacobian_cusp::Bool = false
-    armijo_c1::Float64 = 1e-4
-    divergence_merit_factor::Float64 = 1.05
-    stagnation_noise_floor::Float64 = 1e-2
-    linesearch_alpha_min::Float64 = 1e-4
-    run_diagnostics::Bool = false
-    ablation_mode::String = "full"
-    experimental_reaction_mode::String = "standard"
-    accelerator::AcceleratorConfig = AcceleratorConfig()
-    # Note: stagnation_tol, use_linesearch, linesearch_tolerance were pruned unless requested.
+    picard_iterations::Int
+    newton_iterations::Int
+    ftol::Float64
+    xtol::Float64
+    max_increases::Int
+    freeze_jacobian_cusp::Bool
+    armijo_c1::Float64
+    divergence_merit_factor::Float64
+    stagnation_noise_floor::Float64
+    linesearch_alpha_min::Float64
+    run_diagnostics::Bool
+    ablation_mode::String
+    experimental_reaction_mode::String
+    accelerator::AcceleratorConfig
 end
 
 Base.@kwdef struct NumericalMethodConfig
-    element_spaces::ElementSpacesConfig = ElementSpacesConfig()
-    stabilization::StabilizationConfig = StabilizationConfig()
-    solver::SolverConfig = SolverConfig()
-    mesh::MeshConfig = MeshConfig()
-    viscous_operator_type::String = "DeviatoricSymmetric"
+    element_spaces::ElementSpacesConfig
+    stabilization::StabilizationConfig
+    solver::SolverConfig
+    mesh::MeshConfig
+    viscous_operator_type::String
 end
 
 Base.@kwdef struct OutputConfig
-    directory::String = "results"
-    basename::String = "porous_ns"
+    directory::String
+    basename::String
 end
 
 Base.@kwdef struct PorousNSConfig
-    physical_properties::PhysicalProperties = PhysicalProperties()
-    domain::DomainConfig = DomainConfig()
-    numerical_method::NumericalMethodConfig = NumericalMethodConfig()
-    output::OutputConfig = OutputConfig()
+    physical_properties::PhysicalProperties
+    domain::DomainConfig
+    numerical_method::NumericalMethodConfig
+    output::OutputConfig
 end
 
 # StructTypes definitions
@@ -119,6 +122,9 @@ function validate!(cfg::PorousNSConfig)
     @assert stab.method in ("ASGS", "OSGS") "Stabilization method must be ASGS or OSGS"
     @assert stab.osgs_iterations >= 1
     @assert stab.osgs_tolerance > 0
+    @assert stab.osgs_projection_tolerance > 0
+    @assert stab.osgs_stopping_mode in ("state_drift", "projection_drift", "both") "osgs_stopping_mode must be 'state_drift', 'projection_drift', or 'both'"
+    @assert stab.osgs_state_drift_scale in ("Linf", "L2_mass") "osgs_state_drift_scale must be 'Linf' or 'L2_mass'"
     
     # Formulation Operator validation
     @assert cfg.numerical_method.viscous_operator_type in ("DeviatoricSymmetric", "SymmetricGradient", "Laplacian") "viscous_operator_type strictly expects DeviatoricSymmetric, SymmetricGradient, or Laplacian"
