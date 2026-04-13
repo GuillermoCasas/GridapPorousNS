@@ -58,18 +58,17 @@ function build_solver(N::Int, config_dict, Re::Float64, c_in::Float64)
     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, local_config.numerical_method.element_spaces.k_velocity)
     refe_p = ReferenceFE(lagrangian, Float64, local_config.numerical_method.element_spaces.k_pressure)
     
-    labels = get_face_labeling(model)
+    # Generate Trial and Test spaces, dynamically inheriting boundary limits
+    X, Y, kv, kp = PorousNSSolver.build_fe_spaces(
+        model, 
+        local_config.numerical_method.element_spaces, 
+        ["inlet", "walls"], 
+        [(true,true), (true,true)],
+        [u_in, u_wall]
+    )
     
-    # Inlet [7], Outlet [8] left traction-free (Neumann), Walls [1,2,3,4,5,6] (Dirichlet 0)
-    V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["inlet", "walls"])
-    U = TrialFESpace(V, [u_in, u_wall])
-    
-    # Pressure is left completely free (Neumann outlet provides pressure pinning naturally)
-    Q = TestFESpace(model, refe_p, conformity=:H1)
-    P = TrialFESpace(Q)
-    
-    Y = MultiFieldFESpace([V, Q])
-    X = MultiFieldFESpace([U, P])
+    U, P = X
+    V, Q = Y
     
     degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, local_config.numerical_method.element_spaces.k_velocity)
     Ω = Triangulation(model)
@@ -95,7 +94,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     g_cf = 0.0
     
     k = config.numerical_method.element_spaces.k_velocity
-    c_1, c_2 = PorousNSSolver.get_c1_c2(PorousNSSolver.PaperGeneralFormulation, k)
+    c_1, c_2 = PorousNSSolver.get_c1_c2(typeof(form), k)
     
     ls = LUSolver()
     div_fac = config.numerical_method.solver.divergence_merit_factor
@@ -114,11 +113,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     
     x0 = FEFunction(X, zeros(num_free_dofs(X)))
     
-    stab_cfg = PorousNSSolver.StabilizationConfig(
-        method=config.numerical_method.stabilization.method,
-        osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
-        osgs_tolerance=config.numerical_method.stabilization.osgs_tolerance
-    )
+    stab_cfg = config.numerical_method.stabilization
     
     # Generate unbound functional spaces specifically for pure mapping projections structurally independent of physical walls
     V_free = TestFESpace(model, refe_u, conformity=:H1)
@@ -144,7 +139,6 @@ function run_convergence()
     Re = Float64(base_config_dict["Re"])
     c_in = Float64(base_config_dict["c_in"])
     delta = Float64(get(base_config_dict, "outlet_truncation_delta", 0.0))
-    interpolate_bypass = get(base_config_dict, "interpolate_solution_to_coarser_meshes", false)
     
     # Support mixed-order native schemas (e.g. Taylor-Hood P2/P1) directly from the JSON without equal-order script clamping
     k_v = base_config_dict["numerical_method"]["element_spaces"]["k_velocity"]
@@ -157,7 +151,6 @@ function run_convergence()
         delete!(base_config_dict, "k_convergence_list")
     end
     delete!(base_config_dict, "outlet_truncation_delta")
-    delete!(base_config_dict, "interpolate_solution_to_coarser_meshes")
     
     # All physical schemas and geometrical limits are universally driven by the native test JSON payload
     # Temporary override to prevent strict parser crashing on dynamic iteration array
@@ -234,22 +227,9 @@ function run_convergence()
                 base_config_dict["output"]["basename"] = "cocquet_$(method)_P$(k_v)P$(k_p)_N$(N)"
                 mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h = build_solver(N, base_config_dict, Re, c_in)
                 
-                if interpolate_bypass
-                    # TEMPORARY EXPERIMENT: Bypass Formulation Solver entirely.
-                    time_h = 0.0
-                    iters_h = 0
-                    
-                    U_h = X_h[1]
-                    P_h = X_h[2]
-                    
-                    # Purely map the exact N_ref evaluated reference bounds down into the coarse algebraic topological space
-                    u_h = interpolate(iu_ref, U_h)
-                    p_h = interpolate(ip_ref, P_h)
-                else
-                    # STANDARD EXECUTION: Solve the actual FEM numerical formulation on the coarse grid natively
-                    xh_h, time_h, iters_h = execute_solver(mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h)
-                    u_h, p_h = xh_h
-                end
+                # STANDARD EXECUTION: Solve the actual FEM numerical formulation on the coarse grid natively
+                xh_h, time_h, iters_h = execute_solver(mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h)
+                u_h, p_h = xh_h
                 
                 # ---------------------------------------------------------------------
                 # EXACT ERROR EVALUATION 
