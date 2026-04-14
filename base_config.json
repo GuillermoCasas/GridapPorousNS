@@ -39,7 +39,9 @@
             "osgs_tolerance": 1e-5,
             "osgs_stopping_mode": "state_drift",
             "osgs_projection_tolerance": 1e-5,
-            "osgs_state_drift_scale": "Linf"
+            "osgs_state_drift_scale": "Linf",
+            "osgs_warmup_iterations": 2,
+            "osgs_warmup_tolerance": 1e-3
         },
         "solver": {
             "picard_iterations": 5,
@@ -52,6 +54,8 @@
             "armijo_c1": 1e-4,
             "divergence_merit_factor": 1.05,
             "stagnation_noise_floor": 1e-2,
+            "max_linesearch_iterations": 15,
+            "linesearch_contraction_factor": 0.5,
             "run_diagnostics": false,
             "ablation_mode": "full",
             "experimental_reaction_mode": "standard",

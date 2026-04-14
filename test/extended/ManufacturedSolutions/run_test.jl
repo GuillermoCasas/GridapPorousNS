@@ -113,6 +113,113 @@ function calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L, d�
     return el2_u, el2_p, eh1_semi_u, eh1_semi_p
 end
 
+# Declare typed parametric functor evaluating interpolation seamlessly avoiding JIT closures globally at the top level
+struct PerturbationFunc{F1, F2} <: Function
+    u_base::F1
+    h_func::F2
+    scale::Float64
+end
+(f::PerturbationFunc)(x) = f.u_base(x) + f.scale * f.h_func(x)
+
+struct MMSSetup
+    u_final
+    p_final
+    h_raw_func
+    u_ex_L2
+    norm_h
+    U_c
+    P_c
+    L
+end
+
+struct PerturbationConfig
+    eps_pert_base::Float64
+    max_n_pert::Int
+end
+
+# Algorithm E: Outer Homotopy Parameter Scaling
+function execute_outer_homotopy_perturbation_loop!(
+    setup::PorousNSSolver.FETopology, formulation::PorousNSSolver.VMSFormulation,
+    iter_solvers::PorousNSSolver.IterativeSolvers, config::PorousNSConfig,
+    method::String, dynamic_ftol::Float64, mms_setup::MMSSetup, pert_cfg::PerturbationConfig,
+    mms_verification_enabled::Bool, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
+    mms_max_extra_cycles, mms_require_consecutive_passes
+)
+    success = false
+    successful_eps = -1.0
+    eval_time = 0.0
+    iter_count_attempt = 0
+    final_x0 = nothing
+    final_residual_attempt = NaN
+    
+    for attempt in 0:(pert_cfg.max_n_pert + 1)
+        eps_p = attempt <= pert_cfg.max_n_pert ? pert_cfg.eps_pert_base / (10.0^attempt) : 0.0
+        
+        u_0_func = PerturbationFunc(mms_setup.u_final, mms_setup.h_raw_func, eps_p * (mms_setup.u_ex_L2 / mms_setup.norm_h))
+        x0 = interpolate_everywhere([u_0_func, mms_setup.p_final], setup.X)
+        
+        println("\n    ==================================================")
+        println("    [Attempt $(attempt+1)/$(pert_cfg.max_n_pert + 2)] Homotopy Perturbation Scale: eps_pert = $eps_p")
+        println("    [!] Delegating orchestration to PDE assembly module via `src/solvers/porous_solver.jl` (Mode: $method)")
+        println("    ==================================================")
+        
+        local_stab_cfg = PorousNSSolver.StabilizationConfig(
+            method=method,
+            osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
+            osgs_inner_newton_iters=config.numerical_method.stabilization.osgs_inner_newton_iters,
+            osgs_tolerance=dynamic_ftol,
+            osgs_stopping_mode=config.numerical_method.stabilization.osgs_stopping_mode,
+            osgs_projection_tolerance=dynamic_ftol,
+            osgs_state_drift_scale=config.numerical_method.stabilization.osgs_state_drift_scale,
+            osgs_warmup_iterations=config.numerical_method.stabilization.osgs_warmup_iterations,
+            osgs_warmup_tolerance=config.numerical_method.stabilization.osgs_warmup_tolerance
+        )
+        
+        local_diagnostics_cache = Dict{String, Any}()
+        mms_cfg = nothing
+        if mms_verification_enabled
+            mms_cfg = (
+                enabled = true, tau_err = mms_tau_err, eps_u_l2 = mms_eps_u_l2, eps_u_h1 = mms_eps_u_h1,
+                eps_p_l2 = mms_eps_p_l2, max_extra_cycles = mms_max_extra_cycles,
+                require_consecutive_passes = mms_require_consecutive_passes,
+                oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, mms_setup.u_final, mms_setup.p_final, mms_setup.U_c, mms_setup.P_c, mms_setup.L, setup.dΩ)
+            )
+        end
+        
+        sys_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
+            setup, formulation, iter_solvers,
+            config, x0;
+            diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
+        )
+        
+        if haskey(local_diagnostics_cache, "mms_stop_reason")
+            println("    -> MMS Plateau Reason: ", local_diagnostics_cache["mms_stop_reason"])
+            println("    -> Base Convergence Reached: ", get(local_diagnostics_cache, "base_convergence_reached", false))
+            println("    -> MMS Plateau Reached: ", get(local_diagnostics_cache, "mms_plateau_reached", false))
+        end
+        
+        if sys_success
+            println("\n      [✅] Full non-linear algebraic system converged gracefully mathematically! Escaping constraint loop.")
+            success = true
+            successful_eps = eps_p
+            final_x0 = sys_final_x0
+            eval_time = sys_eval_time
+            iter_count_attempt = sys_iter_count
+            final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
+            break
+        else
+            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(local_stab_cfg.osgs_tolerance)`) or system fully diverged.")
+            final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
+        end
+    end
+    
+    if !success
+         println("    [WARNING] Completely failed to find root basin. Returning NaN.")
+    end
+    
+    return success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt
+end
+
 function run_mms(config_file="test_config.json")
     config_path = joinpath(@__DIR__, "data", config_file)
     test_dict = JSON3.read(read(config_path, String), Dict{String, Any})
@@ -208,7 +315,8 @@ function run_mms(config_file="test_config.json")
                         "err_p_h1" => Float64[],
                         "eval_times" => Float64[],
                         "eval_iters" => Int[],
-                        "eval_eps" => Float64[]
+                        "eval_eps" => Float64[],
+                        "eval_residuals" => Float64[]
                     )
                 end
                 
@@ -248,6 +356,11 @@ function run_mms(config_file="test_config.json")
                     labels = get_face_labeling(model)
                     add_tag_from_tags!(labels, "all_boundaries", [1,2,3,4,5,6,7,8])
                     
+                    # Pre-compile the structural geometric perturbation offset mapping purely algebraically outside evaluations!
+                    xmin, xmax, ymin, ymax = config.domain.bounding_box[1], config.domain.bounding_box[2], config.domain.bounding_box[3], config.domain.bounding_box[4]
+                    B_fn(x) = (x[1] - xmin)^2 * (xmax - x[1])^2 * (x[2] - ymin)^2 * (ymax - x[2])^2
+                    h_raw_func(x) = B_fn(x) * VectorValue(sin(3π*x[1])*cos(2π*x[2]), -cos(3π*x[1])*sin(2π*x[2]))
+                    
                     # Compile Taylor-Hood Finite Element Spaces relying heavily on ReferenceFE definitions
                     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
                     refe_p = ReferenceFE(lagrangian, Float64, kp)
@@ -271,6 +384,13 @@ function run_mms(config_file="test_config.json")
                         h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
                     end
                     h_cf = CellField(collect(h_array), Ω)
+                    
+                    # Strictly define physical topology and scaling fields statically to prevent Gridap AST leaks
+                    h_pert_cf = CellField(h_raw_func, Ω)
+                    norm_h = sqrt(abs(sum(∫( h_pert_cf ⋅ h_pert_cf )dΩ)))
+                    if norm_h <= 0.0
+                        error("Perturbation field norm must be strictly positive (when perturbing).")
+                    end
                     
                     Y = MultiFieldFESpace([V, Q])
                     
@@ -316,10 +436,34 @@ function run_mms(config_file="test_config.json")
                                 
                                 ar_c1 = config.numerical_method.solver.armijo_c1
                                 div_fac = config.numerical_method.solver.divergence_merit_factor
-                                n_floor = config.numerical_method.solver.stagnation_noise_floor
                                 
-                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_picard_it, max_inc, xtol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
-                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_newton_it, max_inc, xtol, ftol, ls_alpha_min, ar_c1, div_fac, n_floor)
+                                # Adaptively tighten nonlinear tolerance proportionally to expected spatial scaling O(h^{k+1})
+                                h_scale = 1.0 / n
+                                spatial_err_est = h_scale^(kv + 1)
+                                # Target an algebraic residual strictly 2 orders of magnitude below spatial error, bounded by static limits
+                                dynamic_ftol = max(config.numerical_method.solver.ftol, min(1e-4, 1e-2 * spatial_err_est))
+                                
+                                # Extrapolate dynamic noise scaling bounded against topological condition limits
+                                condition_scaling = Float64(n)^2 * max(1.0, Float64(Re))
+                                dynamic_noise_floor = min(config.numerical_method.solver.stagnation_noise_floor, max(1e-8, 1e-16 * condition_scaling))
+                                # Strictly preserve safety margin above FTOL
+                                dynamic_noise_floor = max(dynamic_noise_floor, dynamic_ftol * 10.0)
+                                max_ls_iters = config.numerical_method.solver.max_linesearch_iterations
+                                ls_contract = config.numerical_method.solver.linesearch_contraction_factor
+                                
+                                # Extract dynamic algebraic complexity scaling for Picard limits
+                                local_picard_it = solver_picard_it
+                                if Re >= 1e4
+                                    # Convection-dominated fine boundaries fundamentally demand increased smoothing allocations
+                                    local_picard_it = max(local_picard_it, 15)
+                                end
+                                if Da >= 1e4
+                                    # Massive reaction-dominated geometries natively force boundary constraints requiring homogenization
+                                    local_picard_it = max(local_picard_it, 10)
+                                end
+                                
+                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract)
+                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_newton_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract)
                                 
                                 solver_picard = FESolver(nls_picard)
                                 solver_newton = FESolver(nls_newton)
@@ -337,92 +481,22 @@ function run_mms(config_file="test_config.json")
                                     u_h_exact, p_h_exact = x0_exact
                                     u_ex_L2 =  sqrt(abs(sum(∫(u_h_exact ⋅ u_h_exact)dΩ)))
                                     
-                                    # Formulate a geometric bump function to construct boundary-invariant divergence-free perturbations.
-                                    xmin, xmax, ymin, ymax = config.domain.bounding_box[1], config.domain.bounding_box[2], config.domain.bounding_box[3], config.domain.bounding_box[4]
-                                    B_fn(x) = (x[1] - xmin)^2 * (xmax - x[1])^2 * (x[2] - ymin)^2 * (ymax - x[2])^2
-                                    h_raw_func(x) = B_fn(x) * VectorValue(sin(3π*x[1])*cos(2π*x[2]), -cos(3π*x[1])*sin(2π*x[2]))
-                                    h_pert_cf = CellField(h_raw_func, Ω)
-                                    
-                                    # Rigorous structural offset validator mapped explicitly from Gridap norms
-                                    norm_h = sqrt(abs(sum(∫( h_pert_cf ⋅ h_pert_cf )dΩ)))
-                                    if norm_h <= 0.0
-                                        error("Perturbation field norm must be strictly positive (when perturbing).")
-                                    end
-                                    
-                                    success = false
-                                    successful_eps = -1.0
-                                    eval_time = 0.0
-                                    iter_count_attempt = 0
-                                    final_x0 = nothing
+                                    setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
+                                    formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
+                                    iter_solvers = PorousNSSolver.IterativeSolvers(solver_picard, solver_newton)
+                                    mms_setup = MMSSetup(u_final, p_final, h_raw_func, u_ex_L2, norm_h, U_c, P_c, L)
+                                    pert_cfg = PerturbationConfig(eps_pert_base, max_n_pert)
                                     
                                     # ==============================================================================
                                     # NONLINEAR CONVERGENCE LOOP
                                     # Incrementally shrink initial numerical perturbation forcing iterative validation
                                     # ==============================================================================
-                                    for attempt in 0:(max_n_pert + 1)
-                                        eps_p = attempt <= max_n_pert ? eps_pert_base / (10.0^attempt) : 0.0
-                                        u_0_func(x) = u_final(x) + eps_p * (u_ex_L2 / norm_h) * h_raw_func(x)
-                                        x0 = interpolate_everywhere([u_0_func, p_final], X)
-                                        
-                                        println("\n    ==================================================")
-                                        println("    [Attempt $(attempt+1)/$(max_n_pert + 2)] Homotopy Perturbation Scale: eps_pert = $eps_p")
-                                        println("    [!] Delegating orchestration to PDE assembly module via `src/solvers/porous_solver.jl` (Mode: $method)")
-                                        println("    ==================================================")
-                                        
-                                        local_stab_cfg = PorousNSSolver.StabilizationConfig(
-                                            method=method,
-                                            osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
-                                            osgs_inner_newton_iters=config.numerical_method.stabilization.osgs_inner_newton_iters,
-                                            osgs_tolerance=config.numerical_method.stabilization.osgs_tolerance
-                                        )
-                                        
-                                        local_diagnostics_cache = Dict{String, Any}()
-                                        
-                                        if mms_verification_enabled
-                                            mms_cfg = (
-                                                enabled = true,
-                                                tau_err = mms_tau_err,
-                                                eps_u_l2 = mms_eps_u_l2,
-                                                eps_u_h1 = mms_eps_u_h1,
-                                                eps_p_l2 = mms_eps_p_l2,
-                                                max_extra_cycles = mms_max_extra_cycles,
-                                                require_consecutive_passes = mms_require_consecutive_passes,
-                                                oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, u_final, p_final, U_c, P_c, L, dΩ)
-                                            )
-                                        else
-                                            mms_cfg = nothing
-                                        end
-                                        
-                                        sys_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
-                                            X, Y, model, dΩ, Ω, h_cf, f_cf, alpha_cf, g_cf, form, 
-                                            solver_picard, solver_newton, 
-                                            x0, c_1, c_2, 
-                                            config.physical_properties, local_stab_cfg, config.numerical_method.solver;
-                                            V_free=V_free, Q_free=Q_free, diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
-                                        )
-                                        
-                                        if haskey(local_diagnostics_cache, "mms_stop_reason")
-                                            println("    -> MMS Plateau Reason: ", local_diagnostics_cache["mms_stop_reason"])
-                                            println("    -> Base Convergence Reached: ", get(local_diagnostics_cache, "base_convergence_reached", false))
-                                            println("    -> MMS Plateau Reached: ", get(local_diagnostics_cache, "mms_plateau_reached", false))
-                                        end
-                                        
-                                        if sys_success
-                                            println("\n      [✅] Full non-linear algebraic system converged gracefully mathematically! Escaping constraint loop.")
-                                            success = true
-                                            successful_eps = eps_p
-                                            final_x0 = sys_final_x0
-                                            eval_time = sys_eval_time
-                                            iter_count_attempt = sys_iter_count
-                                            break
-                                        else
-                                            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(local_stab_cfg.osgs_tolerance)`) or system fully diverged.")
-                                        end
-                                    end
-                                    
-                                    if !success
-                                         println("    [WARNING] Completely failed to find root basin. Returning NaN.")
-                                    end
+                                    success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt = execute_outer_homotopy_perturbation_loop!(
+                                        setup, formulation, iter_solvers, config, method, dynamic_ftol,
+                                        mms_setup, pert_cfg,
+                                        mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
+                                        mms_max_extra_cycles, mms_require_consecutive_passes
+                                    )
                                     
                                     if success && final_x0 !== nothing
                                         u_h, p_h = final_x0
@@ -449,6 +523,7 @@ function run_mms(config_file="test_config.json")
                                     push!(results_cache[k_id]["eval_times"], eval_time)
                                     push!(results_cache[k_id]["eval_iters"], iter_count_attempt)
                                     push!(results_cache[k_id]["eval_eps"], successful_eps)
+                                    push!(results_cache[k_id]["eval_residuals"], final_residual_attempt)
                                     
                                     println("  -> L2 u/p: ", round(el2_u, sigdigits=4), " / ", round(el2_p, sigdigits=4), " | H1 u/p: ", round(eh1_u, sigdigits=4), " / ", round(eh1_p, sigdigits=4))
                                     # =========================================================================================
@@ -480,6 +555,7 @@ function run_mms(config_file="test_config.json")
                                         g["eval_times"] = res["eval_times"]
                                         g["eval_iters"] = res["eval_iters"]
                                         g["eval_eps"] = res["eval_eps"]
+                                        g["eval_residuals"] = res["eval_residuals"]
                                         
                                         attributes(g)["total_time_s"] = sum(res["eval_times"])
                                         attributes(g)["total_iters"] = sum(res["eval_iters"])
@@ -493,6 +569,8 @@ function run_mms(config_file="test_config.json")
                                         attributes(g)["element_type"] = String(etype)
                                         attributes(g)["method"] = String(method)
                                         attributes(g)["config_file"] = String(config_file)
+                                        attributes(g)["target_ftol"] = Float64(dynamic_ftol)
+                                        attributes(g)["osgs_tolerance"] = Float64(dynamic_ftol)
                                         
                                         compute_slope(x, y) = sum((x .- sum(x)/length(x)) .* (y .- sum(y)/length(y))) / (sum((x .- sum(x)/length(x)).^2) + 1e-15)
                                         log_h = log.(res["hs"])

@@ -45,6 +45,8 @@ Base.@kwdef struct StabilizationConfig
     osgs_stopping_mode::String
     osgs_projection_tolerance::Float64
     osgs_state_drift_scale::String
+    osgs_warmup_iterations::Int
+    osgs_warmup_tolerance::Float64
 end
 
 Base.@kwdef struct MeshConfig
@@ -64,6 +66,8 @@ Base.@kwdef struct SolverConfig
     divergence_merit_factor::Float64
     stagnation_noise_floor::Float64
     linesearch_alpha_min::Float64
+    max_linesearch_iterations::Int
+    linesearch_contraction_factor::Float64
     run_diagnostics::Bool
     ablation_mode::String
     experimental_reaction_mode::String
@@ -114,6 +118,8 @@ function validate!(cfg::PorousNSConfig)
     @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"
     @assert sol.divergence_merit_factor >= 1.0 "Divergence merit factor must be >= 1.0"
     @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"
+    @assert sol.max_linesearch_iterations >= 1 "Linesearch iterations must be strictly bounded >= 1"
+    @assert 0.0 < sol.linesearch_contraction_factor < 1.0 "Linesearch contraction map alpha must strictly be in (0, 1)"
     @assert sol.accelerator.m >= 1 "Accelerator history size m must be >= 1"
     @assert 0.0 < sol.accelerator.relaxation_factor <= 1.0 "Accelerator relaxation_factor must be in (0, 1]"
     

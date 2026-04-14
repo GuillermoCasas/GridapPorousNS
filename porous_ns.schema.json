@@ -223,6 +223,20 @@
               "examples": [
                 1e-05
               ]
+            },
+            "osgs_warmup_iterations": {
+              "type": "integer",
+              "description": "Transition frame halting OSGS decoupled initialization.",
+              "examples": [
+                2
+              ]
+            },
+            "osgs_warmup_tolerance": {
+              "type": "number",
+              "description": "Relaxation floor bounding initial uncoupled OSGS inner iterations.",
+              "examples": [
+                0.001
+              ]
             }
           },
           "additionalProperties": false
@@ -300,6 +314,20 @@
               "description": "The threshold for the residual inf-norm below which continuous divergence stops safely rather than crashing the solver.",
               "examples": [
                 0.01
+              ]
+            },
+            "max_linesearch_iterations": {
+              "type": "integer",
+              "description": "The strict upper limit mapped structurally dynamically onto exact armijo linesearch cycles avoiding topological float exhaustion.",
+              "examples": [
+                15
+              ]
+            },
+            "linesearch_contraction_factor": {
+              "type": "number",
+              "description": "Linesearch scalar parameter tracking geometric bounds across inner iterations recursively bounding unconstrained domains. (alpha *= factor).",
+              "examples": [
+                0.5
               ]
             },
             "run_diagnostics": {

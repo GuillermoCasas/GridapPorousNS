@@ -20,6 +20,8 @@ using PorousNSSolver
 using Gridap
 using LinearAlgebra
 
+include("../test_utils.jl")
+
 @testset "fast: formulation smoke assembly" begin
     model = tiny_model_2d(n=(1,1))
     X, Y, V, Q = tiny_spaces_2d(model; kv=1, kp=1)
@@ -28,6 +30,8 @@ using LinearAlgebra
     αf = CellField(alpha_lin, Ω)
     ff = CellField(f_zero, Ω)
     gf = CellField(g_zero, Ω)
+
+    setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, nothing, nothing, h, ff, αf, gf)
 
     form_paper = PorousNSSolver.PaperGeneralFormulation(
         PorousNSSolver.SymmetricGradientViscosity(),
@@ -46,20 +50,31 @@ using LinearAlgebra
         1e-6
     )
 
+    formulation_paper = PorousNSSolver.VMSFormulation(form_paper, 4.0, 2.0)
+    formulation_pseudo = PorousNSSolver.VMSFormulation(form_pseudo, 4.0, 2.0)
+    
+    # Fake Phys Config
+    phys_cfg = PorousNSSolver.PhysicalProperties(
+        nu=1e-2, f_x=0.0, f_y=0.0, eps_val=1e-6, eps_floor=1e-8,
+        reaction_model="Constant", sigma_constant=1.0, sigma_linear=0.0,
+        sigma_nonlinear=0.0, u_base_floor_ref=1e-2, h_floor_weight=1.0,
+        epsilon_floor=1e-12, tau_regularization_limit=1e-8
+    )
+
     x = interpolate_everywhere([u_poly, p_poly], X)
 
     res_paper(y) = PorousNSSolver.build_stabilized_weak_form_residual(
-        x, y, form_paper, dΩ, h, ff, αf, gf, nothing, nothing, 4.0, 2.0, 1e-8
+        x, y, setup, formulation_paper, phys_cfg; pi_u=nothing, pi_p=nothing
     )
-    jac_paper(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(
-        x, dx, y, form_paper, dΩ, h, ff, αf, gf, nothing, nothing, 4.0, 2.0, 1e-8, false, PorousNSSolver.ExactNewtonMode()
+    jac_paper(x0, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(
+        x0, dx, y, setup, formulation_paper, phys_cfg, false, PorousNSSolver.ExactNewtonMode(); pi_u=nothing, pi_p=nothing
     )
 
     res_pseudo(y) = PorousNSSolver.build_stabilized_weak_form_residual(
-        x, y, form_pseudo, dΩ, h, ff, αf, gf, nothing, nothing, 4.0, 2.0, 1e-8
+        x, y, setup, formulation_pseudo, phys_cfg; pi_u=nothing, pi_p=nothing
     )
-    jac_pseudo(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(
-        x, dx, y, form_pseudo, dΩ, h, ff, αf, gf, nothing, nothing, 4.0, 2.0, 1e-8, false, PorousNSSolver.ExactNewtonMode()
+    jac_pseudo(x0, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(
+        x0, dx, y, setup, formulation_pseudo, phys_cfg, false, PorousNSSolver.ExactNewtonMode(); pi_u=nothing, pi_p=nothing
     )
 
     # Smoke Test: actual sparse structure assembly

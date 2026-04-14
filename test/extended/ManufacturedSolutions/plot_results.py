@@ -278,8 +278,8 @@ def generate_markdown_report(h5_file, results_dir):
     report_file = os.path.join(results_dir, "convergence_report.md")
     with open(report_file, "w") as io:
         io.write("# Convergence Rate and FME Table\n\n")
-        io.write("| Config | Method | Source JSON | Re | Da | α_0 | k | Elem | Time (s) | Iters | Converged | epsilon_pert | rate_u_L2 | rate_p_L2 | rate_u_H1 | rate_p_H1 | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |\n")
-        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+        io.write("| Config | Method | Source JSON | Re | Da | α_0 | k | Elem | Time (s) | Iters | Converged | epsilon_pert | Final Res. | rate_u_L2 | rate_p_L2 | rate_u_H1 | rate_p_H1 | FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |\n")
+        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
         
         import collections
         config_file_to_cidx = collections.defaultdict(set)
@@ -315,12 +315,12 @@ def generate_markdown_report(h5_file, results_dir):
                 err_u_h1_arr = err_u_h1_arr[mask]
                 err_p_h1_arr = err_p_h1_arr[mask]
                 
+                opt_u_l2 = float(kv + 1)
+                opt_p_l2 = float(kp if 'kp' in locals() else kv) # fallback if kp not available directly
+                opt_u_h1 = float(kv)
+                opt_p_h1 = float(kv - 1)
+                
                 if len(h_arr) >= 2:
-                    opt_u_l2 = float(kv + 1)
-                    opt_p_l2 = float(kp if 'kp' in locals() else kv) # fallback if kp not available directly
-                    opt_u_h1 = float(kv)
-                    opt_p_h1 = float(kv - 1)
-                    
                     rate_u_l2 = ((np.log(err_u_l2_arr[-1]) - np.log(err_u_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2])))
                     rate_p_l2 = ((np.log(err_p_l2_arr[-1]) - np.log(err_p_l2_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) if opt_p_l2 else float('nan')
                     rate_u_h1 = ((np.log(err_u_h1_arr[-1]) - np.log(err_u_h1_arr[-2])) / (np.log(h_arr[-1]) - np.log(h_arr[-2]))) if opt_u_h1 else float('nan')
@@ -371,7 +371,15 @@ def generate_markdown_report(h5_file, results_dir):
                     failed_homotopy = False
                 converged = "<b style='color:red'>No</b>" if failed_homotopy else "Yes"
                 
-                io.write(f"| C{c_idx} | {method} | {cf_name} | {jl_fmt(re)} | {jl_fmt(da)} | {a0:.2f} | {kv} | {etype} | {total_time:.1f} | {total_iters} | {converged} | {format_sci(eps_val)} | {ru2} | {rp2} | {ru1} | {rp1} | {format_sci(err_u_l2_last)} | {format_sci(err_p_l2_last)} | {format_sci(err_u_h1_last)} | {format_sci(err_p_h1_last)} |\n")
+                eval_residuals = g['eval_residuals'][:] if 'eval_residuals' in g else []
+                valid_res = [r for r in eval_residuals if not np.isnan(r)]
+                final_res_val = valid_res[-1] if len(valid_res) > 0 else float('nan')
+                
+                target_tol_val = float(g.attrs.get('osgs_tolerance', g.attrs.get('target_ftol', 1e-10))) if method == "OSGS" else float(g.attrs.get('target_ftol', 1e-10))
+                
+                res_formatted = f"{format_sci(final_res_val)} ({format_sci(target_tol_val)})"
+                
+                io.write(f"| C{c_idx} | {method} | {cf_name} | {jl_fmt(re)} | {jl_fmt(da)} | {a0:.2f} | {kv} | {etype} | {total_time:.1f} | {total_iters} | {converged} | {format_sci(eps_val)} | {res_formatted} | {ru2} | {rp2} | {ru1} | {rp1} | {format_sci(err_u_l2_last)} | {format_sci(err_p_l2_last)} | {format_sci(err_u_h1_last)} | {format_sci(err_p_h1_last)} |\n")
         
         append_configuration_reference_map(io, report_file, config_file_to_cidx)
                 

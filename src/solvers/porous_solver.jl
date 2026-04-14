@@ -82,19 +82,50 @@ function discrete_l2_projection(field, U_proj, V_proj, dΩ)
     return discrete_l2_projection(field, U_proj, V_proj, dΩ, M_mat, num_fac)
 end
 
+struct FETopology
+    X
+    Y
+    model
+    Ω
+    dΩ
+    V_free
+    Q_free
+    h_cf
+    f_cf
+    alpha_cf
+    g_cf
+end
+
+struct VMSFormulation
+    form
+    c_1
+    c_2
+end
+
+struct IterativeSolvers
+    picard
+    newton
+end
+
 """
     solve_system(...)
 
 Orchestrates the nonlinear solver iteration loops over a defined Variational Multiscale space.
 """
-function solve_system(
-    X, Y, model, dΩ, Ω, h_cf, 
-    f_cf, alpha_cf, g_cf, form, 
-    solver_picard, solver_newton, 
-    x0, c_1, c_2,
-    phys_cfg::PhysicalProperties, stab_cfg::StabilizationConfig, sol_cfg::SolverConfig;
-    V_free=nothing, Q_free=nothing, diagnostics_cache=nothing, mms_cfg=nothing
-)
+function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solvers::IterativeSolvers,
+                      config::PorousNSConfig, x0;
+                      diagnostics_cache=nothing, mms_cfg=nothing)
+                      
+    X, Y, model, dΩ, Ω = setup.X, setup.Y, setup.model, setup.dΩ, setup.Ω
+    h_cf, f_cf, alpha_cf, g_cf = setup.h_cf, setup.f_cf, setup.alpha_cf, setup.g_cf
+    V_free, Q_free = setup.V_free, setup.Q_free
+    
+    form, c_1, c_2 = formulation.form, formulation.c_1, formulation.c_2
+    solver_picard, solver_newton = iter_solvers.picard, iter_solvers.newton
+    
+    phys_cfg = config.physical_properties
+    stab_cfg = config.numerical_method.stabilization
+    sol_cfg  = config.numerical_method.solver
     diag_cache = isnothing(diagnostics_cache) ? Dict{String, Any}() : diagnostics_cache
     u_h, p_h = x0
     pi_u = nothing
@@ -123,15 +154,15 @@ function solve_system(
     # (ASGS) formulation to securely map the non-linear fields into the exact Newton 
     # quadratic basin before fragmenting the state via staggered projections.
     # ==============================================================================
-    res_fn_init(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim)
-    jac_picard_init(x, dx, y) = build_picard_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim; mult_mom=1.0, mult_mass=1.0)
-    jac_newton_init(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, nothing, nothing, c_1, c_2, tau_reg_lim, freeze_cusp, ExactNewtonMode())
+    res_fn_init(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing)
+    jac_picard_init(x, dx, y) = build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
+    jac_newton_init(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=nothing, pi_p=nothing)
 
     op_picard_init = FEOperator(res_fn_init, jac_picard_init, X, Y)
     op_newton_init = FEOperator(res_fn_init, jac_newton_init, X, Y)
     
     base_nls_global = solver_newton.nls
-    solver_newton_asgs = FESolver(SafeNewtonSolver(base_nls_global.ls, base_nls_global.max_iters, base_nls_global.max_increases, base_nls_global.xtol, base_nls_global.ftol, base_nls_global.linesearch_alpha_min, base_nls_global.c1, base_nls_global.divergence_merit_factor, base_nls_global.stagnation_noise_floor))
+    solver_newton_asgs = FESolver(SafeNewtonSolver(base_nls_global.ls, base_nls_global.max_iters, base_nls_global.max_increases, base_nls_global.xtol, base_nls_global.ftol, base_nls_global.linesearch_alpha_min, base_nls_global.c1, base_nls_global.divergence_merit_factor, base_nls_global.stagnation_noise_floor, base_nls_global.max_linesearch_iterations, base_nls_global.linesearch_contraction_factor))
 
     x0_backup = copy(get_free_dof_values(x0))
     
@@ -195,12 +226,18 @@ function solve_system(
                     nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
                     iter_count += nls_cache.result.iterations
                     final_res = nls_cache.result.residual_norm
-                    if final_res <= ftol
+                    
+                    stop_reason = nls_cache.result.stop_reason
+                    if stop_reason == "ftol_reached" || stop_reason == "initial_ftol"
                         println("      -> ASGS Initializer: Newton Homotopy Pass achieved exact theoretical tolerance ($ftol).")
-                    else
+                        success = true
+                    elseif stop_reason == "stagnation_noise_floor_reached"
                         println("      -> ASGS Initializer: Newton Homotopy Pass cleanly saturated at numerical noise floor ($final_res). Approving.")
+                        success = true
+                    else
+                        println("      -> ASGS Initializer: Newton Homotopy Pass structurally failed (Reason: $stop_reason). Bounding collapse.")
+                        success = false
                     end
-                    success = true
                 catch e
                      println("      -> ASGS Initializer: Newton ConvergenceError on Homotopy Pass. Exception: ", e)
                      success = false
@@ -232,7 +269,7 @@ function solve_system(
             consecutive_passes = 0
             
             base_nls = solver_newton.nls
-            local_asgs_nls = SafeNewtonSolver(base_nls.ls, 1, base_nls.max_increases, base_nls.xtol, base_nls.ftol, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor)
+            local_asgs_nls = SafeNewtonSolver(base_nls.ls, 1, base_nls.max_increases, base_nls.xtol, base_nls.ftol, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor, base_nls.max_linesearch_iterations, base_nls.linesearch_contraction_factor)
             local_fesolver = FESolver(local_asgs_nls)
             
             eval_time += @elapsed begin
@@ -383,13 +420,13 @@ function solve_system(
             for osgs_iter in 1:eff_osgs_iters
                 println("        [OSGS Iter $osgs_iter]")
                 
-                tau_inner_m = osgs_iter <= 2 ? max(ftol, 1e-3) : ftol
+                tau_inner_m = osgs_iter <= stab_cfg.osgs_warmup_iterations ? max(ftol, stab_cfg.osgs_warmup_tolerance) : ftol
                 
-                local_osgs_nls = SafeNewtonSolver(base_nls.ls, stab_cfg.osgs_inner_newton_iters, base_nls.max_increases, base_nls.xtol, tau_inner_m, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor)
+                local_osgs_nls = SafeNewtonSolver(base_nls.ls, stab_cfg.osgs_inner_newton_iters, base_nls.max_increases, base_nls.xtol, tau_inner_m, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor, base_nls.max_linesearch_iterations, base_nls.linesearch_contraction_factor)
                 local_fesolver = FESolver(local_osgs_nls)
                 
-                res_fn_osgs(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, pi_u, pi_p, c_1, c_2, tau_reg_lim)
-                jac_newton_osgs(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h_cf, f_cf, alpha_cf, g_cf, pi_u, pi_p, c_1, c_2, tau_reg_lim, freeze_cusp, ExactNewtonMode())
+                res_fn_osgs(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p)
+                jac_newton_osgs(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u, pi_p=pi_p)
                 
                 op_newton_osgs = FEOperator(res_fn_osgs, jac_newton_osgs, X, Y)
                 
@@ -408,6 +445,12 @@ function solve_system(
                         step_norm = nls_cache.result.step_norm,
                         stop_reason = nls_cache.result.stop_reason
                     ))
+                    
+                    if nls_cache.result.stop_reason == "linesearch_failed" || nls_cache.result.stop_reason == "merit_divergence_escaped" || nls_cache.result.stop_reason == "linear_solve_nan"
+                        println("        -> OSGS Inner Newton sweep failed algebraically (Reason: $(nls_cache.result.stop_reason)). Aborting OSGS nested sequence.")
+                        success = false
+                        break
+                    end
                 catch e
                     if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
                         println("        -> OSGS Newton 1-step interior pass dynamically executed.")
@@ -548,6 +591,10 @@ function solve_system(
                         diag_cache["mms_stop_reason"] = "base_convergence_only"
                         success = true
                         break
+                    end
+                else
+                    if !isnothing(mms_cfg) && mms_cfg.enabled
+                        diag_cache["mms_consecutive_passes"] = 0
                     end
                 end
                 

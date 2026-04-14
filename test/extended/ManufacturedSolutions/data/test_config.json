@@ -29,19 +29,22 @@
         },
         "solver": {
             "picard_iterations": 2,
-            "xtol": 1e-11,
-            "ftol": 1e-11,
-            "stagnation_noise_floor": 1e-3,
+            "xtol": 1e-10,
+            "ftol": 1e-10,
+            "stagnation_noise_floor": 1e-5,
+            "max_linesearch_iterations": 15,
+            "linesearch_contraction_factor": 0.5,
             "max_increases": 3,
             "accelerator": {
                 "type": "Anderson",
-                "m": 5,
-                "relaxation_factor": 1.0
+                "m": 10,
+                "relaxation_factor": 0.8
             }
         },
         "stabilization": {
             "method": ["ASGS", "OSGS"],
-            "osgs_iterations": 10,
+            "osgs_iterations": 5,
+            "osgs_inner_newton_iters": 1,
             "osgs_tolerance": 1e-10
         }
     },

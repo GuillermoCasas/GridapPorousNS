@@ -192,13 +192,21 @@ function eval_strong_residual_p(form::AbstractFormulation, u, p, α, g_custom)
     return eps_val * p + div_alpha_u - g_custom
 end
 
-function build_stabilized_weak_form_residual(X, Y, form::AbstractFormulation, dΩ, h, f_custom, alpha_custom, g_custom, pi_u, pi_p, c_1, c_2, tau_reg_lim; mult_mom=1.0, mult_mass=1.0)
+function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
     u, p = X; v, q = Y
-    α = alpha_custom
-    f = f_custom
-    g_mass = g_custom
+    α = setup.alpha_cf
+    f = setup.f_cf
+    g_mass = setup.g_cf
+    h = setup.h_cf
+    dΩ = setup.dΩ
+    
+    form = formulation.form
     ν = form.ν
     eps_val = form.eps_val
+    c_1 = formulation.c_1
+    c_2 = formulation.c_2
+    
+    tau_reg_lim = phys_cfg.tau_regularization_limit
 
     grad_u_dummy = ∇(u)
     
@@ -241,13 +249,21 @@ function build_stabilized_weak_form_residual(X, Y, form::AbstractFormulation, d�
     return ∫( conv_term + visc_term + pres_term + res_term + mass_term - src_term + stab_mom + stab_mass )dΩ
 end
 
-function build_picard_jacobian(X, dX, Y, form::AbstractFormulation, dΩ, h, f_custom, alpha_custom, g_custom, pi_u, pi_p, c_1, c_2, tau_reg_lim; mult_mom=1.0, mult_mass=1.0)
+function build_picard_jacobian(X, dX, Y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
     u, p = X; du, dp = dX; v, q = Y
-    α = alpha_custom
-    f = f_custom
-    g_mass = g_custom
+    α = setup.alpha_cf
+    f = setup.f_cf
+    g_mass = setup.g_cf
+    h = setup.h_cf
+    dΩ = setup.dΩ
+    
+    form = formulation.form
     ν = form.ν
     eps_val = form.eps_val
+    c_1 = formulation.c_1
+    c_2 = formulation.c_2
+    
+    tau_reg_lim = phys_cfg.tau_regularization_limit
 
     grad_u_dummy = ∇(u)
     
@@ -292,13 +308,21 @@ function build_picard_jacobian(X, dX, Y, form::AbstractFormulation, dΩ, h, f_cu
     return ∫( conv_term_jac + visc_term_jac + pres_term_jac + res_term_jac + mass_term_jac + stab_mom_jac + stab_mass_jac )dΩ
 end
 
-function build_stabilized_weak_form_jacobian(X, dX, Y, form::AbstractFormulation, dΩ, h, f_custom, alpha_custom, g_custom, pi_u, pi_p, c_1, c_2, tau_reg_lim, freeze_cusp, lin_mode::AbstractLinearizationMode=ExactNewtonMode(); mult_mom=1.0, mult_mass=1.0)
+function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_cfg, freeze_cusp, lin_mode::AbstractLinearizationMode=ExactNewtonMode(); pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
     u, p = X; du, dp = dX; v, q = Y
-    α = alpha_custom
-    f = f_custom
-    g_mass = g_custom
+    α = setup.alpha_cf
+    f = setup.f_cf
+    g_mass = setup.g_cf
+    h = setup.h_cf
+    dΩ = setup.dΩ
+    
+    form = formulation.form
     ν = form.ν
     eps_val = form.eps_val
+    c_1 = formulation.c_1
+    c_2 = formulation.c_2
+    
+    tau_reg_lim = phys_cfg.tau_regularization_limit
 
     grad_u_dummy = ∇(u)
     

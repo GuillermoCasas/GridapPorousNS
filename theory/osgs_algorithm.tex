@@ -30,6 +30,7 @@ All bounds mapping to the internal runtime configuration are classified below.
 \midrule
 $N_{\text{OSGS}}$         & \texttt{stab\_cfg.osgs\_iterations}       & Maximum number of outer staggered loops permitted. \\
 $N_{\text{inner}}$        & \texttt{stab\_cfg.osgs\_inner\_newton\_iters} & Iteration limit for each inner monolithic Newton-Raphson solve. \\
+$m_{\text{warmup}}$       & \texttt{stab\_cfg.osgs\_warmup\_iterations} & Transition frame halting OSGS decoupled initialization. \\
 $N_{\text{inc}}$          & \texttt{sol\_cfg.max\_increases}          & Allowable successive iterations where the scalar merit function expands. \\
 $N_{\text{plateau}}$      & \texttt{mms\_cfg.require\_consecutive\_passes} & Number of consecutive error verifications achieving steady reduction. \\
 $\alpha_{\text{min}}$     & \texttt{sol\_cfg.linesearch\_alpha\_min}  & Minimum allowable geometric step size. \\
@@ -38,6 +39,7 @@ $F_{\text{div}}$          & \texttt{sol\_cfg.divergence\_merit\_factor} & Expans
 \midrule
 $\tau_{\text{OSGS}}$      & \texttt{stab\_cfg.osgs\_tolerance}        & Tolerance evaluating acceptable outer state continuity. \\
 $\tau_{\text{proj}}$      & \texttt{stab\_cfg.osgs\_projection\_tol}  & Tolerance evaluating sub-grid spatial projection limits. \\
+$\tau_{\text{warmup}}$    & \texttt{stab\_cfg.osgs\_warmup\_tolerance} & Relaxation floor bounding initial uncoupled OSGS inner iterations. \\
 $\tau_{\text{ftol}}$      & \texttt{sol\_cfg.ftol}                    & Terminal nonlinear residual tolerance bounding the sequence $\ell^\infty$ norm. \\
 $\tau_{\text{xtol}}$      & \texttt{sol\_cfg.xtol}                    & Coordinate step norm limit halting sequence updates. \\
 $\tau_{\text{stagnation}}$& \texttt{sol\_cfg.stagnation\_noise\_floor}& Noise-floor limit preventing spurious machine-epsilon stalls. \\
@@ -45,6 +47,34 @@ $\tau_{\text{error}}$     & \texttt{mms\_cfg.tau\_err}                & Plateau 
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\section{Algorithmic Abstractions and Code Equivalence}
+
+To bridge the gap between pure mathematical representations and the programmatic implementation, we rigorously define the equivalence between the algorithm functions presented in this section and their corresponding typed Julia structures.
+
+\begin{table}[h]
+\centering
+\caption{Equivalence Between Mathematical Functions and Code Subroutines}
+\label{tab:functions}
+\begin{tabularx}{\textwidth}{@{} l X @{}}
+\toprule
+\textbf{Mathematical Function} & \textbf{Code Signature Equivalent} \\
+\midrule
+$\operatorname{ExactNewtonPipeline}(\boldsymbol{x}^0)$ & \texttt{Gridap.Algebra.solve!(x, solver, op\_newton\_init)} \\
+$\operatorname{SolveLinearSystem}(\mathcal{J}_i, \boldsymbol{b}_i)$ & \texttt{eval\_linear\_system\_resolution!(dx, A, b, solver, cache)} \\
+$\operatorname{ArmijoLinesearch}(\dots)$ & \texttt{eval\_armijo\_linesearch\_pass!(x, x\_old, b, dx, op, dir\_deriv, solver, w, state)} \\
+$\operatorname{EvaluateSafeguards}(\dots)$ & \texttt{eval\_safeguard\_termination\_bounds!(solver, state)} \\
+$\operatorname{PicardFallback}(\dots)$ & Iterative mapping fallback executing \texttt{solve!(x, solver\_picard, op\_picard)} within \texttt{solve\_system()} \\
+$\operatorname{OSGSFractionalRelaxation}(\dots)$ & Outer fixed-point evaluation recursively yielding converged OSGS projections terminal to \texttt{solve\_system()} \\
+$\operatorname{VerifyMMSPlateau}(U_h^m, U_{\text{ex}})$ & Explicit residual error plateau verification intercept evaluated geometrically via \texttt{mms\_cfg.oracle()} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Let $\Theta_{\text{params}}$ denote the grouped parameters for nonlinear iteration constraints, scalar tolerances, and bounds. When algorithms dynamically query these structures, they formally extract from:
+\begin{equation}
+    \Theta_{\text{params}} = \{N_{\text{inner}}, N_{\text{inc}}, N_{\text{ls\_max}}, \tau_{\text{ftol}}, \tau_{\text{xtol}}, \tau_{\text{stagnation}}, \alpha_{\text{min}}, F_{\text{div}}\}
+\end{equation}
 
 \section{Algorithmic Structure}
 
@@ -56,92 +86,161 @@ To natively balance the numerical disparity between the momentum and mass conser
 \end{equation}
 
 \begin{algorithm}[H]
-\caption{Algorithm A: Safeguarded Exact Newton-Raphson Subsolver}
+\caption{\textbf{Algorithm A:} $\operatorname{ExactNewtonPipeline}$}
+\label{alg:A}
 \SetAlgoLined
-\KwIn{Initial guess $\boldsymbol{x}$, Operator yielding $(\boldsymbol{b}(\boldsymbol{x}), \mathcal{J}(\boldsymbol{x}))$, dynamic tolerance $\tau$.}
-Initialize $\boldsymbol{x}_{\text{best}} = \boldsymbol{x}, \boldsymbol{b}_{\text{best}} = \|\boldsymbol{b}(\boldsymbol{x})\|_\infty$\;
-$I_{\text{up}} = 0$\;
-\If{$\|\boldsymbol{b}(\boldsymbol{x})\|_\infty \leq \tau$}{ \Return $\boldsymbol{x}$ (Exit: \texttt{initial\_ftol})\; }
+\textbf{Numerical Parameters:} $\tau_{\text{ftol}}, N_{\text{inner}}, N_{\text{inc}}, \tau_{\text{stagnation}}, \tau_{\text{xtol}}$ \\
+\KwIn{Initial geometric fields $\boldsymbol{x}^0 \in \mathcal{X}_h$}
+\KwOut{$(S_{\text{success}} \in \{\text{True}, \text{False}\}, \; I_{\text{iters}} \in \mathbb{N}, \; \|\boldsymbol{b}\|_\infty \in \mathbb{R})$}
+\vspace{0.2cm}
+\hrule
+\vspace{0.2cm}
+Initialize $\boldsymbol{b}_{\text{best}} = \|\boldsymbol{b}(\boldsymbol{x}^0)\|_\infty, I_{\text{up}} = 0$\;
+\If{$\|\boldsymbol{b}(\boldsymbol{x}^0)\|_\infty \leq \tau_{\text{ftol}}$}{ \Return \textsf{Success} (Exit: \textsf{Initial F-Tol}) }
 
 \For{$i = 1, \dots, N_{\text{inner}}$}{
-    Compute Jacobian $\mathcal{J}_i = \mathcal{J}(\boldsymbol{x})$ and residual $\boldsymbol{b}_i = \boldsymbol{b}(\boldsymbol{x})$\;
-    Update weights $\boldsymbol{w} = \max(|\text{diag}(\mathcal{J}_i)|, \epsilon_{\text{mach}}\|\text{diag}(\mathcal{J}_i)\|_\infty, \epsilon_{\text{mach}})$\;
-    Evaluate $\Phi_{\text{curr}} = \Phi_{\boldsymbol{w}}(\boldsymbol{x})$\;
-    
-    \textbf{try} \{ \\
-    \quad Solve linear system $\mathcal{J}_i \delta\boldsymbol{x} = \boldsymbol{b}_i$\;
-    \} \textbf{catch} \{ \\
-    \quad Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return (Exit: \texttt{linear\_solve\_exception})\;
-    \} \\
-    
-    \If{$\delta\boldsymbol{x}$ contains NaNs}{
-        Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return (Exit: \texttt{linear\_solve\_nan})\;
+    Compute continuous variables: $\mathcal{J}_i, \boldsymbol{b}_i, \boldsymbol{w}, \Phi_{\text{curr}}$\;
+    $S_{\text{fail}}, \delta\boldsymbol{x} \gets \operatorname{SolveLinearSystem}(\mathcal{J}_i, \boldsymbol{b}_i)$\;
+    \If{$S_{\text{fail}}$}{
+        Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return $(S_{\text{conv}}=\text{False}, I_{\text{iters}}=i, \|\boldsymbol{b}_{\text{best}}\|_\infty)$\;
     }
     
-    \tcc{Exact analytical directional derivative ($D = -\boldsymbol{b}_i^\top \boldsymbol{w}^{-2} \mathcal{J}_i \delta\boldsymbol{x} = -2\Phi_{\text{curr}}$)}
-    $D = -2.0 \cdot \Phi_{\text{curr}}$\;
+    $S_{\text{step}}, \alpha, L_{\text{step}}, \hat{\boldsymbol{b}}, \hat{\Phi} \gets \operatorname{ArmijoLinesearch}(\boldsymbol{x}, \boldsymbol{x}_{\text{old}}, \boldsymbol{b}, \delta\boldsymbol{x}, \Phi_{\text{curr}})$\;
     
-    $\alpha = 1.0, S_{\text{step\_accepted}} = \text{false}$\;
-    \For{$j = 1, \dots, 15$}{
-        $\boldsymbol{x}_{\text{trial}} = \boldsymbol{x} - \alpha \delta\boldsymbol{x}$\;
-        Compute $\hat{\boldsymbol{b}} = \boldsymbol{b}(\boldsymbol{x}_{\text{trial}})$ and $\hat{\Phi}_{\boldsymbol{w}} = \Phi_{\boldsymbol{w}}(\boldsymbol{x}_{\text{trial}})$\;
-        \If{\textnormal{\textbf{not}} $\text{isnan}(\hat{\Phi}_{\boldsymbol{w}})$ \textnormal{\textbf{and}} $\hat{\Phi}_{\boldsymbol{w}} \leq \Phi_{\text{curr}} + c_1 \alpha D$}{
-            $S_{\text{step\_accepted}} = \text{true}$. \textbf{break}\;
-        }
-        $\alpha = 0.5 \alpha$\;
-        \If{$\alpha \leq \alpha_{\text{min}}$}{\textbf{break}\;}
-    }
-    
-    \If{\textnormal{\textbf{not}} $S_{\text{step\_accepted}}$}{
-        Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return (Exit: \texttt{linesearch\_failed})\;
-    }
-    
-    $\boldsymbol{x} \gets \boldsymbol{x}_{\text{trial}}$ \tcp*{Accept step}
-    
-    \If{$\|\hat{\boldsymbol{b}}\|_\infty < \boldsymbol{b}_{\text{best}}$}{
+    \If{\textnormal{\textbf{not}} $S_{\text{step}}$ \textnormal{ \textbf{or} } $\|\hat{\boldsymbol{b}}\|_\infty < \boldsymbol{b}_{\text{best}}$}{
         $\boldsymbol{x}_{\text{best}} = \boldsymbol{x}, \boldsymbol{b}_{\text{best}} = \|\hat{\boldsymbol{b}}\|_\infty$\;
     }
     
-    \tcc{Terminal Verifications}
-    \If{$\|\hat{\boldsymbol{b}}\|_\infty \leq \tau$}{ \Return $\boldsymbol{x}$ (Exit: \texttt{ftol\_reached})\; }
-    \If{$\alpha \|\delta\boldsymbol{x}\|_\infty \leq \tau_{\text{xtol}}$}{ \Return $\boldsymbol{x}$ (Exit: \texttt{xtol\_stagnation})\; }
-    \If{$\hat{\Phi}_{\boldsymbol{w}} > \Phi_{\text{curr}} \cdot F_{\text{div}}$}{
-        $I_{\text{up}} = I_{\text{up}} + 1$\;
-        \If{$I_{\text{up}} \geq N_{\text{inc}}$}{ Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$. \Return (Exit: \texttt{merit\_divergence\_escaped})\;}
-    } \Else { $I_{\text{up}} = 0$\; }
+    $R_{\text{stop}}, S_{\text{conv}}, S_{\text{break}}, I_{\text{up}} \gets \operatorname{EvaluateSafeguards}(i, S_{\text{step}}, L_{\text{step}}, \hat{\boldsymbol{b}}, \hat{\Phi}, \Phi_{\text{curr}})$\;
+    \If{$S_{\text{break}}$}{
+        \If{\textnormal{\textbf{not}} $S_{\text{conv}}$}{ Restore $\boldsymbol{x} \gets \boldsymbol{x}_{\text{best}}$ }
+        \Return $(S_{\text{conv}}, i, \|\boldsymbol{b}_{\text{best}}\|_\infty)$\;
+    }
 }
-\Return $\boldsymbol{x}_{\text{best}}$\;
 \end{algorithm}
 
 \begin{algorithm}[H]
-\caption{Algorithm B: Canonical ASGS Baseline Solver}
+\caption{\textbf{Algorithm A.1:} $\operatorname{SolveLinearSystem}$}
+\label{alg:A1}
 \SetAlgoLined
-\KwIn{Initial array $\boldsymbol{x}^0$, full continuous algebraic system definitions.}
+\textbf{Numerical Parameters:} (None) \\
+\KwIn{Sparse continuous Jacobian $\mathcal{J}_i$, Residual array $\boldsymbol{b}_i$}
+\KwOut{$(S_{\text{fail}} \in \{\text{True}, \text{False}\}, \; \delta\boldsymbol{x} \in \mathbb{R}^N)$}
+\vspace{0.2cm}
+\hrule
+\vspace{0.2cm}
+\textbf{try} \{ \\
+\quad Solve linear system functionally: $\mathcal{J}_i \delta\boldsymbol{x} = \boldsymbol{b}_i$\;
+\} \textbf{catch} \{ \\
+\quad \Return $(\text{True}, \delta\boldsymbol{x}_{\text{undefined}})$ \tcp*{\textsf{Linear Solve Exception}}
+\} \\
+\If{$\delta\boldsymbol{x}$ contains NaNs}{
+    \Return $(\text{True}, \delta\boldsymbol{x}_{\text{undefined}})$ \tcp*{\textsf{Catastrophic Math Failure}}
+}
+\Return $(\text{False}, \delta\boldsymbol{x})$ \tcp*{\textsf{Linear System Bounded}}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{\textbf{Algorithm A.2:} $\operatorname{ArmijoLinesearch}$}
+\label{alg:A2}
+\SetAlgoLined
+\textbf{Numerical Parameters:} $\alpha_{\text{min}}, c_1, \gamma, N_{\text{ls\_max}}$ (extracted from $\Theta_{\text{params}}$) \\
+\KwIn{State fields $\boldsymbol{x}, \boldsymbol{x}_{\text{old}}, \boldsymbol{b}$, step mapping $\delta\boldsymbol{x}$, exact directional derivative $D$, current merit $\Phi_{\text{curr}}$}
+\KwOut{$(S_{\text{accepted}} \in \{\text{True}, \text{False}\}, \; \alpha \in \mathbb{R}^+, \; L_{\text{step}} = \|\alpha \delta\boldsymbol{x}\| \in \mathbb{R}^+, \; \|\hat{\boldsymbol{b}}\|_\infty \in \mathbb{R}, \; \hat{\Phi}_{\boldsymbol{w}} \in \mathbb{R})$}
+\vspace{0.2cm}
+\hrule
+\vspace{0.2cm}
+Initialize $\alpha = 1.0, S_{\text{step\_accepted}} = \text{false}$\;
+\For{$j = 1, \dots, N_{\text{ls\_max}}$}{
+    $\boldsymbol{x}_{\text{trial}} = \boldsymbol{x}_{\text{old}} - \alpha \delta\boldsymbol{x}$\;
+    Compute $\hat{\boldsymbol{b}} = \boldsymbol{b}(\boldsymbol{x}_{\text{trial}})$ and $\hat{\Phi}_{\boldsymbol{w}} = \Phi_{\boldsymbol{w}}(\boldsymbol{x}_{\text{trial}})$\;
+    \If{\textnormal{\textbf{not}} $\text{isnan}(\hat{\Phi}_{\boldsymbol{w}})$ \textnormal{\textbf{and}} $\hat{\Phi}_{\boldsymbol{w}} \leq \Phi_{\text{curr}} + c_1 \alpha (-2\Phi_{\text{curr}})$}{
+        $S_{\text{step\_accepted}} = \text{true}$. \textbf{break}\;
+    }
+    $\alpha = \gamma \alpha$\;
+    \If{$\alpha \leq \alpha_{\text{min}}$}{\textbf{break}\;}
+}
+\Return $(S_{\text{step\_accepted}}, \; \alpha, \; \|\alpha \delta\boldsymbol{x}\|, \; \|\hat{\boldsymbol{b}}\|_\infty, \; \hat{\Phi}_{\boldsymbol{w}})$\;
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{\textbf{Algorithm A.3:} $\operatorname{EvaluateSafeguards}$}
+\label{alg:A3}
+\SetAlgoLined
+\textbf{Numerical Parameters:} $\tau_{\text{ftol}}, \tau_{\text{stagnation}}, \tau_{\text{xtol}}, N_{\text{inner}}, N_{\text{inc}}, F_{\text{div}}$ (extracted from $\Theta_{\text{params}}$) \\
+\KwIn{Iteration $i$, Validation $S_{\text{step\_accepted}}$, step norm $L_{\text{step}}$, current residual $\|\hat{\boldsymbol{b}}\|_\infty$, scalar merit $\hat{\Phi}_{\boldsymbol{w}}$, base merit $\Phi_{\text{curr}}$}
+\KwOut{$(R_{\text{stop}}, \; S_{\text{conv}} \in \{\text{True}, \text{False}\}, \; S_{\text{break}} \in \{\text{True}, \text{False}\}, \; I_{\text{up}} \in \mathbb{N})$}
+\vspace{0.2cm}
+\hrule
+\vspace{0.2cm}
+\If{$\|\hat{\boldsymbol{b}}\|_\infty \leq \tau_{\text{ftol}}$}{ \Return \textsf{F-Tol Reached}, \texttt{true}, \texttt{true}, $I_{\text{up}}$\; }
+\If{\textnormal{\textbf{not}} $S_{\text{step\_accepted}}$}{ 
+    \If{$\|\hat{\boldsymbol{b}}\|_\infty \leq \tau_{\text{stagnation}}$}{ \Return \textsf{Noise Floor Stagnation}, \texttt{true}, \texttt{true}, $I_{\text{up}}$\; }
+    \Return \textsf{Linesearch Failed}, \texttt{false}, \texttt{true}, $I_{\text{up}}$\; 
+}
+\If{$\hat{\Phi}_{\boldsymbol{w}} > \Phi_{\text{curr}} \cdot F_{\text{div}}$}{
+    $I_{\text{up}} = I_{\text{up}} + 1$\;
+    \If{$I_{\text{up}} \geq N_{\text{inc}}$}{ \Return \textsf{Merit Divergence Escaped}, \texttt{false}, \texttt{true}, $I_{\text{up}}$\; }
+} \Else { $I_{\text{up}} = 0$\; }
+\If{$L_{\text{step}} \leq \tau_{\text{xtol}}$}{
+    \If{$\|\hat{\boldsymbol{b}}\|_\infty \leq \tau_{\text{stagnation}}$}{ \Return \textsf{Noise Floor Stagnation}, \texttt{true}, \texttt{true}, $I_{\text{up}}$\; }
+    \Return \textsf{X-Tol Stagnation}, \texttt{false}, \texttt{true}, $I_{\text{up}}$\; 
+}
+\If{$i == N_{\text{inner}}$}{
+    \If{$\|\hat{\boldsymbol{b}}\|_\infty \leq \tau_{\text{stagnation}}$}{ \Return \textsf{Noise Floor Stagnation}, \texttt{true}, \texttt{true}, $I_{\text{up}}$\; }
+    \Return \textsf{Iteration Cap Stagnation}, \texttt{false}, \texttt{true}, $I_{\text{up}}$\; 
+}
+\Return \textsf{In-Progress}, \texttt{false}, \texttt{false}, $I_{\text{up}}$\;
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{\textbf{Algorithm B:} $\operatorname{PicardFallback}$}
+\label{alg:B}
+\SetAlgoLined
+\textbf{Numerical Parameters:} $\tau_{\text{ftol}}, \tau_{\text{stagnation}}$ \\
+\KwIn{Initial field guess $\boldsymbol{x}^0 \in \mathcal{X}_h$, Preconditioner backup $\boldsymbol{x}^0_{\text{backup}} \in \mathcal{X}_h$}
+\KwOut{$(S_{\text{success}} \in \{\text{True}, \text{False}\}, \; I_{\text{iters}} \in \mathbb{N}, \; \|\boldsymbol{b}\|_\infty \in \mathbb{R})$}
+\vspace{0.2cm}
+\hrule
+\vspace{0.2cm}
 Configure parameters zeroing sub-grid scales: $\boldsymbol{\pi}_h = \mathbf{0}$\;
-Attempt Newton resolution via Algorithm A targeting $\tau_{\text{ftol}}$\;
-\If{Algorithm A aborts or diverges}{
-    Compute standard Picard smoothing iteration to bypass ill-conditioned regions\;
-    Re-evaluate Newton resolution via Algorithm A targeting $\tau_{\text{ftol}}$\;
+Attempt Newton resolution: $S_{\text{N}}, \dots \gets \operatorname{ExactNewtonPipeline}(\boldsymbol{x}^0)$ targeting $\tau_{\text{ftol}}$\;
+\If{$S_{\text{N}}$ formally aborts (Exit via \textsf{Linesearch Failed} or \textsf{Merit Divergence Escaped})}{
+    Evaluate strictly guarded Picard Homotopy pass smoothing fields towards stable continuous initial geometry quadratic basins\;
+    Re-evaluate Newton sequence definitively mapping cleanly: $S_{\text{success}}, I_{\text{iters}}, \|\boldsymbol{b}\|_\infty \gets \operatorname{ExactNewtonPipeline}(\boldsymbol{x}^0_{\text{smoothed}})$\;
+    \If{Terminal evaluation fundamentally bypasses both \textsf{F-Tol Reached} and \textsf{Noise Floor Stagnation} structures}{
+        \Return $(\text{False}, I_{\text{iters}}, \|\boldsymbol{b}\|_\infty)$ \tcp*{\textsf{Catastrophic Algebraic Sequence Stagnation}}
+    }
 }
-\Return Accepted converged baseline state $U_h^{\text{ASGS}}$\;
+\Return $(\text{True}, I_{\text{iters}}, \|\boldsymbol{b}\|_\infty)$ \tcp*{\textsf{Mathematically Locked Globally Bounded State}}
 \end{algorithm}
 
 \begin{algorithm}[H]
-\caption{Algorithm C: OSGS Lagged Projection Refinement}
+\caption{\textbf{Algorithm C:} $\operatorname{OSGSFractionalRelaxation}$}
+\label{alg:C}
 \SetAlgoLined
-\KwIn{Accepted $U_h^{\text{ASGS}}$ and invariant mass matrices $M_u, M_p$.}
+\textbf{Numerical Parameters:} $N_{\text{OSGS}}, m_{\text{warmup}}, \tau_{\text{warmup}}, \tau_{\text{ftol}}, \tau_{\text{OSGS}}, \tau_{\text{proj}}, \tau_{\text{stagnation}}$ \\
+\KwIn{Converged steady state $U_h^{\text{ASGS}} \in \mathcal{X}_h$, Algebraic forms $(\mathcal{R}_u, \mathcal{R}_p)$}
+\KwOut{$(S_{\text{success}} \in \{\text{True}, \text{False}\}, \; \boldsymbol{\pi}_{h,u} \in \boldsymbol{V}_h, \; \pi_{h,p} \in Q_h, \; I_{\text{iters}} \in \mathbb{N}, \; \|\boldsymbol{b}\|_\infty \in \mathbb{R})$}
+\vspace{0.2cm}
+\hrule
+\vspace{0.2cm}
+Pre-allocate strictly invariant orthogonal mappings: $M_u \gets \int V \cdot U d\Omega, M_p \gets \int Q \cdot P d\Omega$\;
 Initialize $U_h^0 = U_h^{\text{ASGS}}$\;
 Bootstrap initial sub-grid projections:
 $\boldsymbol{\pi}_{h,u}^0 = \Pi_{\boldsymbol{V}}(\mathcal{R}_{u}(U_h^0))$ and $\pi_{h,p}^0 = \Pi_{Q}(\mathcal{R}_p(U_h^0))$\;
 \For{$m = 1, \dots, N_{\text{OSGS}}$}{
-    Set inner tolerance limit: $\tau_{\text{inner}}^m = (m \leq 2) \; ? \; \max(\tau_{\text{ftol}}, 10^{-3}) : \tau_{\text{ftol}}$\;
+    Set inner tolerance limit: $\tau_{\text{inner}}^m = (m \leq m_{\text{warmup}}) \; ? \; \max(\tau_{\text{ftol}}, \tau_{\text{warmup}}) : \tau_{\text{ftol}}$\;
     
-    Set $\boldsymbol{\pi}_h = \boldsymbol{\pi}_h^{m-1}$ fixed, resolve continuous nonlinear problem yielding $U_h^m$ using Algorithm A solving to $\tau_{\text{inner}}^m$\;
+    Set $\boldsymbol{\pi}_h = \boldsymbol{\pi}_h^{m-1}$ fixed, resolve continuous algebraic system executing strict fraction mapping via $\operatorname{ExactNewtonPipeline}$ targeting limited iterations $N_{\text{inner}}$\;
+    \If{Monolithic sweep returns algebraic collapse natively \textnormal{(}\textsf{Linesearch Failed} \textnormal{\textbf{or}} \textsf{Merit Divergence Escaped}\textnormal{)}}{
+        Abort structural iteration immediately (mathematically divergent algebraic boundaries violated)\;
+    }
     
-    \tcc{Evaluate continuous spatial state drift exactly via functional integration:}
-    $d_{\text{state}}^m = \max \left( \| \boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1} \|_{L^2(\Omega)}, \; \| p_h^m - p_h^{m-1} \|_{L^2(\Omega)} \right)$\;
+    \tcc{Evaluate geometric state fraction shift explicitly evaluating explicit mass vectors linearly:}
+    $d_{\text{state}}^m = \max \left( \| \boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1} \|_{L^\infty(\Omega)}, \; \| p_h^m - p_h^{m-1} \|_{L^\infty(\Omega)} \right)$\;
     
-    Update continuous evaluations: $\boldsymbol{\mathcal{R}}_u^m = \mathcal{R}_u(U_h^m)$ and $\mathcal{R}_p^m = \mathcal{R}_p(U_h^m)$\;
+    Update continuous evaluation geometries arrays natively: $\boldsymbol{\mathcal{R}}_u^m = \mathcal{R}_u(U_h^m)$ and $\mathcal{R}_p^m = \mathcal{R}_p(U_h^m)$\;
     Update continuous orthogonal projections:
     $(\boldsymbol{\pi}_{h,u}^m, \pi_{h,p}^m) = \left( \Pi_{\boldsymbol{V}}(\boldsymbol{\mathcal{R}}_u^m), \Pi_Q(\mathcal{R}_p^m) \right)$\;
     
@@ -156,28 +255,93 @@ $\boldsymbol{\pi}_{h,u}^0 = \Pi_{\boldsymbol{V}}(\mathcal{R}_{u}(U_h^0))$ and $\
     $d_\pi^m = \max \left( \sqrt{(\delta\boldsymbol{\pi}_{h,u}^m)^\top M_u \delta\boldsymbol{\pi}_{h,u}^m}, \; \sqrt{(\delta\pi_{h,p}^m)^\top M_p \delta\pi_{h,p}^m} \right)$\;
     
     \If{$\left( d_{\text{state}}^m \leq \max(\tau_{\text{OSGS}}, \tau_{\text{stagnation}}) \right)$ \textnormal{\textbf{AND/OR}} $\left( d_\pi^m \leq \max(\tau_{\text{proj}}, \tau_{\text{stagnation}}) \right)$}{
-        \Return Validated staggered boundary $U_h^m$\;
+        \Return \texttt{true}, $\boldsymbol{\pi}_{h,u}^m, \pi_{h,p}^m, I_{\text{iters}}, \|\boldsymbol{b}\|_\infty$ \tcp*{\textsf{Validated Staggered Boundary}}
     }
 }
+\Return \texttt{false}, $\boldsymbol{\pi}_{h,u}^m, \pi_{h,p}^m, I_{\text{iters}}, \|\boldsymbol{b}\|_\infty$ \tcp*{\textsf{Catastrophic OSGS Divergence Abort}}
 \end{algorithm}
 
 \begin{algorithm}[H]
-\caption{Algorithm D: MMS Plateau Verification Wrapper}
+\caption{\textbf{Algorithm D:} $\operatorname{VerifyMMSPlateau}$}
+\label{alg:D}
 \SetAlgoLined
-\KwIn{Analytical field distributions $U_{\text{exact}}$, accepted convergence coordinate bounds $E_{L^2}^{m-1}$.}
+\textbf{Numerical Parameters:} $N_{\text{plateau}}, \tau_{\text{error}}$ \\
+\KwIn{Candidate field state $U_h^m \in \mathcal{X}_h$, Exact analytical state $U_{\text{exact}} \in \mathcal{X}$}
+\KwOut{$(S_{\text{plateau\_valid}} \in \{\text{True}, \text{False}\}, \; I_{\text{iters}} \in \mathbb{N}, \; \|\boldsymbol{b}\|_\infty \in \mathbb{R})$}
+\vspace{0.2cm}
+\hrule
+\vspace{0.2cm}
 Compute continuous tracking errors via explicit integrals:
 $E_{\boldsymbol{u}, L^2}^m = \| \boldsymbol{u}_h^m - \boldsymbol{u}_{\text{ex}} \|_{L^2(\Omega)}$,
 $E_{p, L^2}^m = \| p_h^m - p_{\text{ex}} \|_{L^2(\Omega)}$\;
-Compute maximum relative error ratios:
-$r_{\text{max}} = \max \left( \frac{|E_{\boldsymbol{u}, L^2}^m - E_{\boldsymbol{u}, L^2}^{m-1}|}{\max(E_{\boldsymbol{u}, L^2}^m, E_{\boldsymbol{u}, L^2}^{m-1}, \epsilon_{\text{err}})}, \; \dots \right)$\;
+Define local error variance tracking ratios over strictly isolated elements:
+\begin{equation}
+    r_{\text{max}} = \max \left( \frac{|E_{\boldsymbol{u}, L^2}^m - E_{\boldsymbol{u}, L^2}^{m-1}|}{\max(E_{\boldsymbol{u}, L^2}^m, E_{\boldsymbol{u}, L^2}^{m-1}, \epsilon_{\text{err}})}, \quad \frac{|E_{p, L^2}^m - E_{p, L^2}^{m-1}|}{\max(E_{p, L^2}^m, E_{p, L^2}^{m-1}, \epsilon_{\text{err}})} \right)
+\end{equation}\;
 \If{$r_{\text{max}} \leq \tau_{\text{error}}$}{
     $I_{\text{passes}} = I_{\text{passes}} + 1$\;
 } \Else {
     $I_{\text{passes}} = 0$\;
 }
 \If{$I_{\text{passes}} \geq N_{\text{plateau}}$}{
-    \Return \texttt{mms\_plateau\_satisfied}\;
+    \Return \texttt{true}, $I_{\text{iters}}, \|\boldsymbol{b}\|_\infty$ \tcp*{\textsf{MMS Plateau Satisfied}}
 }
+\Return \texttt{false}, $I_{\text{iters}}, \|\boldsymbol{b}\|_\infty$ \tcp*{\textsf{MMS Budget Exhausted}}
 \end{algorithm}
+
+\section{Structural Orchestration and Convergence Analysis}
+
+The solver pipeline rigorously separates pure Newton-Raphson mathematics from physical boundary analysis through a cascading fallback strategy. By explicitly monitoring algorithmic exit bounds, the system aggressively tests fast evaluations while preserving mathematical robustness across dimensionless parameter extrema (e.g., $Re, Da \sim 10^6$).
+
+\subsection{Algorithmic Fallback Progression}
+Robustness is achieved by evaluating nonlinear failures geometrically rather than relying exclusively on continuous float exceptions. The progression orchestrates the solvers as follows:
+\begin{enumerate}
+    \item \textbf{Aggressive Exact Newton Initialization (\hyperref[alg:A]{Algorithm A}):} The solver unconditionally attempts to root the initial guess directly inside the quadratic convergence basin using pure analytic derivatives. The internal logic delegates the mathematical updates to linear resolution (\textbf{Algorithm A.1}), safe bounded fractional steps (\textbf{Algorithm A.2}), and strict termination guards (\textbf{Algorithm A.3}).
+    \item \textbf{Picard Globalization Fallback (\hyperref[alg:B]{Algorithm B}):} If \textbf{Algorithm A} aborts aggressively due to linesearch depletion evaluated via \textbf{Algorithm A.3} (\textsf{Linesearch Failed}) or chaotic divergence (\textsf{Merit Divergence Escaped}), the sequence retreats securely. It temporarily abandons exact Jacobian symmetry and invokes classical Picard iterations. Because the Picard Jacobian actively drops the advective coupling tensor, it stabilizes chaotic boundaries, smoothing the global fields strictly into the local quadratic basin before dynamically re-engaging \textbf{Algorithm A} seamlessly to securely polish the algebraic residual.
+    \subitem \textit{Dynamic Adaptivity:} The structural limits mapping the Picard configuration unconditionally adapt structurally evaluating the convection Reynolds bounds ($Re$) and reaction Damköhler extents ($Da$). Highly convective geometry thresholds ($Re \geq 10^4$) explicitly expand iterative smoothing limits dynamically allowing sufficient boundary layer relaxation preventing subsequent Newton convergence breakdown arrays.
+\end{enumerate}
+
+\subsection{Dynamic Stagnation bounds and Mathematical Truthfulness}
+As established in \textbf{Algorithm A.3}, the $\tau_{\text{stagnation}}$ check functions explicitly as an absolute terminating safety net rather than an unconditional shortcut. The algebraic noise floor is strictly verified \textit{only} if a catastrophic structural exit (\textsf{Linesearch Failed}, \textsf{Iteration Cap}) terminates the sequence gracefully prior to mathematically striking the $\tau_{\text{ftol}}$ bound identically.
+
+\textbf{False Equivalency Failsafe:} It is mathematically critical to logically decouple \textit{noise floor saturation} from \textit{step exhaustion}. If the inner solver terminates natively via iteration budget depletion (\textsf{Iteration Cap Stagnation}) or extreme coordinate stalling (\textsf{X-Tol Stagnation}) while tracking an algebraic residual strictly above the dynamic noise floor ($\|\boldsymbol{b}\|_\infty \gg \tau_{\text{stagnation}}$), the pipeline classifies the state as an unconditional numerical failure. The orchestration framework explicitly forbids coercing unconditionally exhausted sequences into "pseudo-converged" approvals, natively protecting the staggering fractional structures from bootstrapping completely unresolved mathematical topologies.
+
+Because classical double precision noise floors explicitly skew dynamically as fine mesh matrices scale topologically (condition parameter $K \approx \mathcal{O}(h^{-2})$), the orchestration logic natively maps dynamic extrapolation extracting algebraic condition limits bounding against target physical norms ($\tau_{\text{stagnation}} \propto 10^{-16} N_{\text{dofs}}^2 \max(1, Re)$). Natively ensuring that these bounds remain distinctly superior linearly to $\tau_{\text{ftol}}$ rigorously prevents the fine-mesh algorithms from aborting physically viable solution sequences prematurely.
+
+\subsection{Fractional Verification Requirements}
+Instead of implicitly treating fractional evaluation success as mathematically rigorous, \textbf{Algorithm C (OSGS)} binds independent mathematical criteria:
+A fractional update sweep is deemed converged exclusively when \textit{either} or \textit{both} the spatial $L^\infty(\Omega)$ coordinate drift ($d_{\text{state}}^m$) \textit{and/or} orthogonal projection vectors ($d_\pi^m$) independently hit continuous equilibrium $\tau_{\text{OSGS}}$. If the inner linear fractional solver mapped via \textbf{Algorithm A} collapses (\textsf{Linesearch Failed}), the staggered loop abruptly halts instantly recording a native fraction abort rather than falsely reporting stable limits conditionally.
+
+\subsection{OSGS Fractional Relaxation (\hyperref[alg:C]{Algorithm C}) Mechanics}
+The Orthogonal Sub-Grid Scales (OSGS) algorithm represents the core physical stabilization technique for convection- and reaction-dominated porous flow regimes. Rather than absorbing the finite element residuals unconditionally into the unresolved sub-grid scales (as the classical ASGS method does), OSGS rigorously restricts the sub-grid scales purely to the orthogonal complement of the finite element space ($\mathcal{X}_{h0}^{\perp}$). Mathematical orthogonality requires computing the $L^2$-projection of the continuous primary residuals onto the finite element spaces, $\boldsymbol{\pi}_h = (\boldsymbol{\pi}_{h,u}, \pi_{h,p})$, and isolating it from the strong residual loop via \textbf{Algorithm C}.
+
+\subsubsection{Algorithmic Modus Operandi \& Goals}
+To avert generating an intractable, dense, monolithic Jacobian comprising the exact Fréchet derivatives of the continuous $L^2$ projection operator, \textbf{Algorithm C} utilizes a staggered (fixed-point) geometric block-relaxation architecture:
+\begin{enumerate}
+    \item \textbf{Implicit Monolithic Kinematic Sweep:} The primary generalized variables $U_h = (\boldsymbol{u}_h, p_h)$ are resolved natively employing \textbf{Algorithm A} (\texttt{ExactNewtonPipeline}), holding the orthogonal residual projections $\boldsymbol{\pi}_h$ temporarily frozen.
+    \item \textbf{Analytical Projection:} The updated robust residuals $\mathcal{R}_u(U_h)$ and $\mathcal{R}_p(U_h)$ are explicitly evaluated and projected onto $\boldsymbol{V}_h$ and $Q_h$. To securely execute this within sub-millisecond budgets, stationary $L^2$ mass matrices ($M_u, M_p$) are geometrically pre-factored via \texttt{LUSolver()} prior to the main sequence.
+    \item \textbf{Diagnostic Drift Measurement:} The structural distance evaluated across explicit consecutive steps in \textbf{Algorithm C} determines geometric convergence. Both the Cartesian state magnitude ($d_{\text{state}}$) and the mass-weighted sub-grid variance ($d_\pi$) are mapped out.
+\end{enumerate}
+
+\subsubsection{Numerical Parameter Controls}
+The physical staggering explicitly binds bounded geometric configuration constraints:
+\begin{itemize}
+    \item \textbf{$N_{\text{OSGS}}$} (\texttt{osgs\_iterations}): Establishes an absolute physical loop ceiling. It structurally terminates cycles averting limit-cycle bounds if iterative projection drifting never formally stagnates algebraically.
+    \item \textbf{$\tau_{\text{OSGS}}$} (\texttt{osgs\_tolerance}) \& \textbf{$\tau_{\text{proj}}$}: Distinguish the staggered stopping criteria from continuous inner solver algebraic saturation ($\tau_{\text{ftol}}$). They dictate precisely when the orthogonal step geometrically locks—often several orders of magnitude above strict Newton terminal zeroes.
+    \item \textbf{$m_{\text{warmup}}$} \& \textbf{$\tau_{\text{warmup}}$}: Prevent chaotic, rigid over-solving natively in early fractional limits before the frozen explicit fields settle. They forcefully cap inner Newton resolution explicitly yielding soft staggered updates first.
+\end{itemize}
+
+\subsection{Block-Weighted Anderson Acceleration}
+In regimes of extreme stiffness, particularly at high Damköhler ($Da$) and Reynolds ($Re$) numbers, the iterative resolution of the sub-grid scales can degenerate into limit-cycle oscillations. To bypass these rigid algebraic cycles, the pipeline employs a sequence extrapolation method based on Anderson Acceleration.
+
+Unlike global Newton accelerators, this module operates strictly on the continuous sub-grid projections ($\boldsymbol{\pi}_{h,u}, \pi_{h,p}$). To mathematically respect the spatial topology without artificially filtering distinct fields, the sequence extrapolation is executed through independent bounded blocks utilizing the pre-factored $L^2$ invariant mass matrices ($M_u$, $M_p$):
+\begin{enumerate}
+    \item \textbf{Block Isolation:} Velocity ($\boldsymbol{\pi}_{h,u}$) and pressure ($\pi_{h,p}$) histories are mapped and solved orthogonally averting cross-dimensional float pollution.
+    \item \textbf{Topology-Constrained Minimization:} The optimization explicitly minimizes the residual sequence $\min_{\alpha} \| R_k \alpha \|_{L^2(\Omega)}^2$ by internally leveraging the exact mass inner products $R_k^\top M R_k$ instead of ambiguous continuous vector scalar dot products.
+\end{enumerate}
+This physical tracking ensures that the accelerated fraction optimally navigates the physical domains strictly avoiding mathematically false numerical bounds.
+
+\subsection{Method of Manufactured Solutions Verification (\hyperref[alg:D]{Algorithm D})}
+During convergence and formulation verification sweeps, continuous tracking algorithms are externally monitored via \textbf{Algorithm D}. The plateau methodology ensures that iterative bounds are evaluated utilizing true algebraic stability. Instead of relying solely on the terminal Newton bounds of \textbf{Algorithm A}, \textbf{Algorithm D} measures the physical $L^2$ continuous variance of sequential solutions dynamically mapped against analytic exact solutions ($U_{\text{exact}}$). This cleanly separates numerical noise-floor convergence bounds from the true continuous Galerkin sequence mappings natively.
 
 \end{document}

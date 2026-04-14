@@ -159,24 +159,36 @@ function run_simulation(config_path::String;
     # Establish specific stabilization weights for momentum convective and viscous tau evaluations
     c_1, c_2 = get_c1_c2(typeof(form), kv)
     
-    # CRITICAL: Prevent Julia implicit struct boxing inside inner iterative closures.
-    # Extracted here locally to guarantee completely flat and explicitly type-stable Gridap AST structures.
-    tau_reg_lim = cfg.phys.tau_regularization_limit
-    freeze_cusp = cfg.numerical_method.solver.freeze_jacobian_cusp
+    # Construct unconstrained test spaces natively required as base topological maps for OSGS L2 Subgrid tracking
+    refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
+    refe_p = ReferenceFE(lagrangian, Float64, kp)
+    V_free = TestFESpace(model, refe_u, conformity=:H1)
+    Q_free = TestFESpace(model, refe_p, conformity=:H1)
     
-    # --- NON-LINEAR FE OPERATOR CLOSURES ---
-    res(x, y) = build_stabilized_weak_form_residual(x, y, form, dΩ, h, f_cf, alpha_cf, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim)
-    # Bugfix preservation: Exact Newtonian routing prevents exact cross-term dropping which guarantees ideal Fréchet gradients
-    jac(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, form, dΩ, h, f_cf, alpha_cf, 0.0, nothing, nothing, c_1, c_2, tau_reg_lim, freeze_cusp, ExactNewtonMode())
+    setup = FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h, f_cf, alpha_cf, CellField(0.0, Ω))
+    formulation = VMSFormulation(form, c_1, c_2)
     
-    op = FEOperator(res, jac, X, Y)
+    sol_cfg = cfg.numerical_method.solver
+    p_ls = LUSolver()
     
-    # Implement nonlinear iteration mechanism with explicit exact LU decomposition 
-    nls = SafeNewtonSolver(LUSolver(), cfg.numerical_method.solver)
-    solver = FESolver(nls)
+    nls_picard = SafeNewtonSolver(p_ls, sol_cfg.picard_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor)
+    fe_picard = FESolver(nls_picard)
     
-    println("Solving non-linear system...")
-    x_h = solve(solver, op)
+    nls_newton = SafeNewtonSolver(p_ls, sol_cfg.newton_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor)
+    fe_newton = FESolver(nls_newton)
+    
+    iter_solvers = IterativeSolvers(fe_picard, fe_newton)
+    
+    x0 = interpolate_everywhere([VectorValue(0.0,0.0), 0.0], X)
+    
+    println("\n[!] Bridging simulation logic into robust VMS algorithm architecture...")
+    success, final_x0, iters, eval_time = solve_system(setup, formulation, iter_solvers, cfg, x0)
+    
+    if !success
+        @warn "Simulation orchestration structurally failed to map physical nonlinear bounds."
+    end
+    
+    x_h = final_x0
     
     u_h, p_h = x_h
     

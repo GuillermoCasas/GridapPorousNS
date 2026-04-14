@@ -36,6 +36,7 @@ using Gridap.Algebra
 using LinearAlgebra
 using Printf
 using PorousNSSolver
+using JSON3
 
 @testset "quick: OSGS vs ASGS Orthogonality Verification" begin
 
@@ -102,9 +103,11 @@ using PorousNSSolver
     # -----------------------------------------------------------------------------------------
     sol_cfg = cfg.numerical_method.solver
     p_ls = LUSolver()
-    nls_picard = PorousNSSolver.SafeNewtonSolver(p_ls, sol_cfg.picard_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor)
+    
+    nls_picard = PorousNSSolver.SafeNewtonSolver(p_ls, sol_cfg.picard_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor)
     fe_picard = FESolver(nls_picard)
-    nls_newton = PorousNSSolver.SafeNewtonSolver(p_ls, sol_cfg.newton_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor)
+    
+    nls_newton = PorousNSSolver.SafeNewtonSolver(p_ls, sol_cfg.newton_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor)
     fe_newton = FESolver(nls_newton)
 
     # 5. Setup Gridap parameter Extractions for Solver Module Initialization
@@ -134,14 +137,27 @@ using PorousNSSolver
         # For OSGS, it organically triggers staggered iterative sub-grid residual L2 projections.
         # For ASGS, it proceeds cleanly through a single monolithic Exact Newton convergence framework.
         # -----------------------------------------------------------------------------------------
-        stab_cfg = PorousNSSolver.StabilizationConfig(method=method, osgs_iterations=5, osgs_tolerance=1e-7)
+        cfg_dict = JSON3.read(read(config_path, String), Dict{String, Any})
+        
+        cfg_dict["numerical_method"]["stabilization"] = Dict{String, Any}(
+            "method" => method, 
+            "osgs_iterations" => 5, 
+            "osgs_inner_newton_iters" => cfg.numerical_method.stabilization.osgs_inner_newton_iters,
+            "osgs_tolerance" => 1e-7,
+            "osgs_stopping_mode" => cfg.numerical_method.stabilization.osgs_stopping_mode,
+            "osgs_projection_tolerance" => cfg.numerical_method.stabilization.osgs_projection_tolerance,
+            "osgs_state_drift_scale" => cfg.numerical_method.stabilization.osgs_state_drift_scale
+        )
+        local_cfg = PorousNSSolver.load_config_from_dict(cfg_dict)
         diag_cache = Dict{String, Any}()
 
+        setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, fx, alpha_cf, gx)
+        formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
+        iter_solvers = PorousNSSolver.IterativeSolvers(fe_picard, fe_newton)
+
         success, final_x0, iters, eval_time = PorousNSSolver.solve_system(
-            X, Y, model, dΩ, Ω, h_cf, fx, alpha_cf, gx, form,
-            fe_picard, fe_newton, FEFunction(X, copy(get_free_dof_values(x0))), c_1, c_2,
-            cfg.physical_properties, stab_cfg, cfg.numerical_method.solver; 
-            V_free=V_free, Q_free=Q_free, diagnostics_cache=diag_cache
+            setup, formulation, iter_solvers, local_cfg, FEFunction(X, copy(get_free_dof_values(x0))); 
+            diagnostics_cache=diag_cache
         )
 
         println("\n  -> Method Converged: $success | Iterations: $iters | Time: $(round(eval_time, digits=2)) s")
