@@ -57,6 +57,10 @@ end
 
 Base.@kwdef struct SolverConfig
     picard_iterations::Int
+    dynamic_picard_re_threshold::Float64
+    dynamic_picard_re_iterations::Int
+    dynamic_picard_da_threshold::Float64
+    dynamic_picard_da_iterations::Int
     newton_iterations::Int
     ftol::Float64
     dynamic_ftol_ceiling::Float64
@@ -67,6 +71,9 @@ Base.@kwdef struct SolverConfig
     armijo_c1::Float64
     divergence_merit_factor::Float64
     stagnation_noise_floor::Float64
+    condition_noise_floor_baseline::Float64
+    condition_noise_floor_absolute_min::Float64
+    condition_noise_floor_safety_factor::Float64
     linesearch_alpha_min::Float64
     max_linesearch_iterations::Int
     linesearch_contraction_factor::Float64

@@ -447,21 +447,24 @@ function run_mms(config_file="test_config.json")
                                 
                                 # Extrapolate dynamic noise scaling bounded against topological condition limits
                                 condition_scaling = Float64(n)^2 * max(1.0, Float64(Re))
-                                dynamic_noise_floor = min(config.numerical_method.solver.stagnation_noise_floor, max(1e-8, 1e-16 * condition_scaling))
+                                n_base = config.numerical_method.solver.condition_noise_floor_baseline
+                                n_min = config.numerical_method.solver.condition_noise_floor_absolute_min
+                                n_sf = config.numerical_method.solver.condition_noise_floor_safety_factor
+                                dynamic_noise_floor = min(config.numerical_method.solver.stagnation_noise_floor, max(n_min, n_base * condition_scaling))
                                 # Strictly preserve safety margin above FTOL
-                                dynamic_noise_floor = max(dynamic_noise_floor, dynamic_ftol * 10.0)
+                                dynamic_noise_floor = max(dynamic_noise_floor, dynamic_ftol * n_sf)
                                 max_ls_iters = config.numerical_method.solver.max_linesearch_iterations
                                 ls_contract = config.numerical_method.solver.linesearch_contraction_factor
                                 
                                 # Extract dynamic algebraic complexity scaling for Picard limits
                                 local_picard_it = solver_picard_it
-                                if Re >= 1e4
+                                if Re >= config.numerical_method.solver.dynamic_picard_re_threshold
                                     # Convection-dominated fine boundaries fundamentally demand increased smoothing allocations
-                                    local_picard_it = max(local_picard_it, 15)
+                                    local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_re_iterations)
                                 end
-                                if Da >= 1e4
+                                if Da >= config.numerical_method.solver.dynamic_picard_da_threshold
                                     # Massive reaction-dominated geometries natively force boundary constraints requiring homogenization
-                                    local_picard_it = max(local_picard_it, 10)
+                                    local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_da_iterations)
                                 end
                                 
                                 nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract)

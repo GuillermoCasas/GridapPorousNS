@@ -29,14 +29,18 @@
         },
         "solver": {
             "picard_iterations": 2,
+            "newton_iterations": 10,
             "xtol": 1e-10,
             "ftol": 1e-10,
             "dynamic_ftol_ceiling": 1e-4,
             "dynamic_ftol_spatial_safety_factor": 1e-2,
             "stagnation_noise_floor": 1e-5,
-            "max_linesearch_iterations": 15,
+            "linesearch_alpha_min": 1e-10,
+            "max_linesearch_iterations": 25,
             "linesearch_contraction_factor": 0.5,
             "max_increases": 3,
+            "divergence_merit_factor": 1.05,
+            "armijo_c1": 1e-4,
             "accelerator": {
                 "type": "Anderson",
                 "m": 10,
@@ -44,7 +48,7 @@
             }
         },
         "stabilization": {
-            "method": ["ASGS", "OSGS"],
+            "method": ["ASGS"],
             "osgs_iterations": 5,
             "osgs_inner_newton_iters": 1,
             "osgs_tolerance": 1e-10
