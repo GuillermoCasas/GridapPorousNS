@@ -59,6 +59,8 @@ Base.@kwdef struct SolverConfig
     picard_iterations::Int
     newton_iterations::Int
     ftol::Float64
+    dynamic_ftol_ceiling::Float64
+    dynamic_ftol_spatial_safety_factor::Float64
     xtol::Float64
     max_increases::Int
     freeze_jacobian_cusp::Bool
@@ -114,6 +116,8 @@ function validate!(cfg::PorousNSConfig)
     # Solver
     sol = cfg.numerical_method.solver
     @assert sol.ftol > 0 "Solver ftol must be > 0"
+    @assert sol.dynamic_ftol_ceiling >= sol.ftol "Solver dynamic_ftol_ceiling must be strictly >= base ftol"
+    @assert 0.0 < sol.dynamic_ftol_spatial_safety_factor <= 1.0 "Solver dynamic_ftol_spatial_safety_factor must be in (0, 1]"
     @assert sol.xtol > 0 "Solver xtol must be > 0"
     @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"
     @assert sol.divergence_merit_factor >= 1.0 "Divergence merit factor must be >= 1.0"

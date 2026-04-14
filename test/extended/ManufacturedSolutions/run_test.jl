@@ -440,8 +440,10 @@ function run_mms(config_file="test_config.json")
                                 # Adaptively tighten nonlinear tolerance proportionally to expected spatial scaling O(h^{k+1})
                                 h_scale = 1.0 / n
                                 spatial_err_est = h_scale^(kv + 1)
-                                # Target an algebraic residual strictly 2 orders of magnitude below spatial error, bounded by static limits
-                                dynamic_ftol = max(config.numerical_method.solver.ftol, min(1e-4, 1e-2 * spatial_err_est))
+                                # Target an algebraic residual strictly bounded physically scaling by spatial discretization tolerances
+                                c_ceil = config.numerical_method.solver.dynamic_ftol_ceiling
+                                c_sf = config.numerical_method.solver.dynamic_ftol_spatial_safety_factor
+                                dynamic_ftol = max(config.numerical_method.solver.ftol, min(c_ceil, c_sf * spatial_err_est))
                                 
                                 # Extrapolate dynamic noise scaling bounded against topological condition limits
                                 condition_scaling = Float64(n)^2 * max(1.0, Float64(Re))

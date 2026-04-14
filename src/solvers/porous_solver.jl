@@ -143,8 +143,8 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     method = stab_cfg.method
     max_osgs_iters = stab_cfg.osgs_iterations
     osgs_tol = stab_cfg.osgs_tolerance
-    ftol = sol_cfg.ftol
-    stagnation_tol = sol_cfg.stagnation_noise_floor
+    ftol = solver_newton.nls.ftol
+    stagnation_tol = solver_newton.nls.stagnation_noise_floor
     tau_reg_lim = phys_cfg.tau_regularization_limit
     freeze_cusp = sol_cfg.freeze_jacobian_cusp
     

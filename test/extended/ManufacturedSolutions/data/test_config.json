@@ -31,6 +31,8 @@
             "picard_iterations": 2,
             "xtol": 1e-10,
             "ftol": 1e-10,
+            "dynamic_ftol_ceiling": 1e-4,
+            "dynamic_ftol_spatial_safety_factor": 1e-2,
             "stagnation_noise_floor": 1e-5,
             "max_linesearch_iterations": 15,
             "linesearch_contraction_factor": 0.5,

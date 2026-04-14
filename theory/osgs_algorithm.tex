@@ -301,6 +301,13 @@ Robustness is achieved by evaluating nonlinear failures geometrically rather tha
     \subitem \textit{Dynamic Adaptivity:} The structural limits mapping the Picard configuration unconditionally adapt structurally evaluating the convection Reynolds bounds ($Re$) and reaction Damköhler extents ($Da$). Highly convective geometry thresholds ($Re \geq 10^4$) explicitly expand iterative smoothing limits dynamically allowing sufficient boundary layer relaxation preventing subsequent Newton convergence breakdown arrays.
 \end{enumerate}
 
+\subsection{Adaptive Spatial \(\tau_{\text{ftol}}\) Constraint Constraints}
+In continuous parameter extraction runs, maintaining rigidly static algebraic stopping conditions structurally disrupts fine-mesh evaluations. The orchestration pipeline continuously scales $\tau_{\text{ftol}}$ conditionally proportionate directly against the projected analytical error variance: 
+\begin{equation}
+    \tau_{\text{ftol, dynamic}} = \max\left(\tau_{\text{ftol, static}}, \; \min(C_{\text{ceiling}}, \; C_{\text{sf}} \times h^{k+1})\right)
+\end{equation}
+Where $h$ represents the linear block resolution scalar and $k$ represents the velocity finite element interpolant order. Natively adapting these limits using the bounding scalar $C_{\text{sf}}$ (spatial safety factor) ensures the non-linear algebraic root is consistently evaluated proportionally beneath topological precision barriers ($C_{\text{sf}} \times h^{k+1}$). The absolute constraint ceiling $C_{\text{ceiling}}$ intrinsically proves algorithmic execution avoids catastrophically locking the non-linear matrices natively seeking functionally impossible precision topologies bounds on ultra-coarse grid spans.
+
 \subsection{Dynamic Stagnation bounds and Mathematical Truthfulness}
 As established in \textbf{Algorithm A.3}, the $\tau_{\text{stagnation}}$ check functions explicitly as an absolute terminating safety net rather than an unconditional shortcut. The algebraic noise floor is strictly verified \textit{only} if a catastrophic structural exit (\textsf{Linesearch Failed}, \textsf{Iteration Cap}) terminates the sequence gracefully prior to mathematically striking the $\tau_{\text{ftol}}$ bound identically.
 
