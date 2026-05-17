@@ -439,12 +439,21 @@ a few quadrature points per cell.
 
 Document the trade-off in the function's docstring.
 
-### Item §3.6 — Pressure mean removal in projection
+### Item §3.6 — Pressure mean removal in projection — **DEFERRED**
+
+**Status.** Excluded from the Phase 5 batch by user direction during planning;
+the deferral with rationale, regime dependence, two implementation options
+(post-hoc mean removal vs. constrained projection space), and re-evaluation
+triggers is captured in
+[paper-code-divergences.md §6](paper-code-divergences.md). When this item
+is taken up again, that ledger entry is the canonical source for what
+needs to happen, not the recipe below.
 
 **Where.** [src/solvers/porous_solver.jl:485-488](../src/solvers/porous_solver.jl#L485-L488)
 (the `discrete_l2_projection` call for `pi_p_next`).
 
-**How.** After computing `pi_p_next`, subtract its $L^2$ mean:
+**How (Option A — plan's original recipe; cheap, post-hoc).** After
+computing `pi_p_next`, subtract its $L^2$ mean:
 
 ```julia
 pi_p_next_mean = sum(∫(pi_p_next)dΩ) / sum(∫(1.0)dΩ)
@@ -455,6 +464,24 @@ This removes the constant mode that would otherwise pollute `d_π^m`.
 
 Optional but recommended: do the same for the bootstrap projection (or
 the new `π_h^0 = 0` if Phase 1 is done — in which case nothing to do).
+
+**Caveats applying when this is eventually landed.**
+
+1. Option A as above is only paper-compatible in the **all-Dirichlet
+   velocity** regime; it would *degrade* paper compatibility under mixed
+   BCs (open outlet) where the continuous pressure space is full $L^2$.
+   A real implementation must therefore branch on the configured Dirichlet
+   tags and only apply mean removal when all velocity DOFs are Dirichlet-
+   constrained at the domain boundary.
+2. **Option B** (project onto `Q_free` $\ominus \{1\}$ explicitly via a
+   Lagrange multiplier on the Gram matrix) is the rigorous form and is
+   the recommended path if/when this item is reopened. See
+   [paper-code-divergences.md §6](paper-code-divergences.md).
+3. Do NOT apply mean removal to the pressure variable itself
+   (`final_x0`). The $\varepsilon > 0$ gauge fixing in the mass equation
+   is a softly-enforced feedback; mean-removing the pressure each
+   iteration would fight it. §3.6 modifies only the *projection*
+   $\pi_h^p$.
 
 ### Item §5.1 — `h`-scaling MMS floors
 

@@ -112,8 +112,12 @@ These items each shift MMS error magnitudes slightly. The plan groups them
 to amortize re-baselining:
 
 - §3.1 block-equilibrated merit function
-- §3.5 adaptive quadrature for Forchheimer
-- §3.6 pressure mean removal in projection
+- §3.5 adaptive quadrature for Forchheimer (per-reaction-law trait dispatch)
+- ~~§3.6 pressure mean removal in projection~~ — **deferred**, see
+  [paper-code-divergences.md §6](paper-code-divergences.md) and
+  [algorithm-improvement-plan.md §3.6](algorithm-improvement-plan.md) for
+  the full rationale (regime-dependence on Dirichlet/mixed BCs, Option A
+  vs Option B forms, and re-evaluation triggers).
 - §5.1 h-scaling MMS floors
 - §5.2 rate-aware plateau verification
 
@@ -122,9 +126,13 @@ in small_test_config.json (see "Bridge state" section below). Until P5
 lands, those floors stay as regime-specific overrides.
 
 After P5: re-run small_test_config.json end-to-end and re-baseline the
-finest-mesh u_L2 table above. Expect pressure rates to **improve slightly**
-(per §3.1 and §3.6); velocity rates should be at least as good. Any
-regression is a bug, not a feature.
+finest-mesh u_L2 table above. Expect pressure rates to improve slightly
+from §3.1 (block-equilibrated merit removing the velocity-bias in line
+search); velocity rates should be at least as good. Any regression is a
+bug, not a feature. The §3.6 improvement (constant-mode removal from
+projection-drift metric) is **not** part of this batch, so the
+post-Phase-5 baseline is the reference against which a future §3.6
+commit will be judged.
 
 ### Phase 6 — Continuation driver (§2.1, §2.3, ~~§2.4~~)
 
