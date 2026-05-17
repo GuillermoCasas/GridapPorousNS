@@ -400,18 +400,13 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                 accel_p = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor, M_p)
             end
             
-            # Map the global ASGS converged solution into the first orthogonal projection cleanly before beginning decoupled evaluation
-            println("        * Bootstrapping initial structural orthogonal projection onto converged internal bounds limit...")
-            u_h, p_h = final_x0
-            R_u = inner_projection_u(u_h, p_h, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
-            R_p = inner_projection_p(u_h, p_h, form, dΩ, h_cf, alpha_cf, g_cf)
-            
-            b_u = assemble_vector(v -> ∫(v ⋅ R_u)dΩ, V_proj)
-            b_p = assemble_vector(q -> ∫(q * R_p)dΩ, Q_proj)
-            
-            x_u = allocate_in_domain(M_u); solve!(x_u, num_u_fac, b_u)
-            x_p = allocate_in_domain(M_p); solve!(x_p, num_p_fac, b_p)
-            
+            # Initialize the orthogonal projection π_h^0 = 0. The first OSGS outer
+            # iteration then re-solves U_h against π_h = 0 — which IS the ASGS problem,
+            # already converged — and produces the first non-trivial projection naturally.
+            # Avoids the off-distribution bootstrap that the warmup phase had to unwind.
+            println("        * Initializing orthogonal projection π_h^0 = 0 (first iter re-derives from ASGS state)...")
+            x_u = allocate_in_domain(M_u); fill!(x_u, 0.0)
+            x_p = allocate_in_domain(M_p); fill!(x_p, 0.0)
             pi_u = FEFunction(U_proj, x_u)
             pi_p = FEFunction(P_proj, x_p)
             
@@ -534,8 +529,12 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                 end
                 
                 if x_diff_inf <= stagnation_tol && osgs_iter >= 2
-                    # Stagnation noise floor exclusively hit uniformly, structurally breaking limits avoids infinite tracking
-                    overall_converged = true
+                    if stab_cfg.osgs_stopping_mode == "state_drift"
+                        # Stagnation noise floor on ℓ∞ acts as a safety net only when state drift
+                        # is the binding criterion. In "projection_drift" and "both" modes, the
+                        # projection may still be drifting legitimately — don't short-circuit.
+                        overall_converged = true
+                    end
                 end
                 
                 println("        * Comparing limits against previous relaxation step: \n          x_diff_inf = $x_diff_inf | x_diff_mode_$(stab_cfg.osgs_state_drift_scale) = $x_diff \n          pi_u_drift = $pi_u_drift | pi_p_drift = $pi_p_drift \n          overall_converged = $overall_converged")
