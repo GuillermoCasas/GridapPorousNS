@@ -11,13 +11,14 @@ mass matrices for physically accurate least-squares mappings across separate phy
 mutable struct AndersonAccelerator
     m::Int                       # Maximum depth of history
     relaxation_factor::Float64   # Damping factor
+    safety_factor::Float64       # Powell-style restart threshold (rejects step + clears history when tripped)
     iter::Int                    # Current iteration count
     history_X::Vector{Vector{Float64}}
     history_F::Vector{Vector{Float64}}
     M_mat::Union{Nothing, AbstractMatrix}                   # Optional mass matrix for L2 weighted least-squares
 
-    function AndersonAccelerator(m::Int, relaxation_factor::Float64=1.0, M_mat::Union{Nothing, AbstractMatrix}=nothing)
-        new(m, relaxation_factor, 0, Vector{Vector{Float64}}(), Vector{Vector{Float64}}(), M_mat)
+    function AndersonAccelerator(m::Int, relaxation_factor::Float64, safety_factor::Float64, M_mat::Union{Nothing, AbstractMatrix}=nothing)
+        new(m, relaxation_factor, safety_factor, 0, Vector{Vector{Float64}}(), Vector{Vector{Float64}}(), M_mat)
     end
 end
 
@@ -66,9 +67,13 @@ function update!(acc::AndersonAccelerator, x_k::Vector{Float64}, g_k::Vector{Flo
         # Normal equations: (DeltaF^T * M * DeltaF) * gamma = DeltaF^T * M * f_k
         A_ls = DeltaF' * (acc.M_mat * DeltaF)
         b_ls = DeltaF' * (acc.M_mat * f_k)
-        gamma = A_ls \ b_ls
+        λ = eps(Float64) * (tr(A_ls) / size(A_ls, 1))
+        gamma = (A_ls + λ * I) \ b_ls
     else
-        gamma = DeltaF \ f_k
+        A_ls = DeltaF' * DeltaF
+        b_ls = DeltaF' * f_k
+        λ = eps(Float64) * (tr(A_ls) / size(A_ls, 1))
+        gamma = (A_ls + λ * I) \ b_ls
     end
     
     x_mixed = copy(x_k)
@@ -80,7 +85,10 @@ function update!(acc::AndersonAccelerator, x_k::Vector{Float64}, g_k::Vector{Flo
     
     x_next = x_mixed .+ acc.relaxation_factor .* f_mixed
     
-    if norm(x_next .- g_k, Inf) > 10.0 * norm(f_k, Inf)
+    if norm(x_next .- g_k, Inf) > acc.safety_factor * norm(f_k, Inf)
+        empty!(acc.history_X)
+        empty!(acc.history_F)
+        acc.iter = 0
         return x_k .+ acc.relaxation_factor .* f_k
     end
     

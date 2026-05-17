@@ -398,6 +398,13 @@
                   "examples": [
                     1.0
                   ]
+                },
+                "safety_factor": {
+                  "type": "number",
+                  "description": "Powell-style restart threshold. If ||x_next - g_k||_inf exceeds safety_factor * ||f_k||_inf, the Anderson step is rejected, history is cleared, and we fall back to relaxed Picard. Must be >= 1.",
+                  "examples": [
+                    10.0
+                  ]
                 }
               },
               "additionalProperties": false

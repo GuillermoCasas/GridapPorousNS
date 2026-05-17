@@ -19,6 +19,7 @@ Last updated: **2026-05-17**.
 | `1caa633` | Phase 3 — §1.1 | `src/solvers/nonlinear.jl`, `src/run_simulation.jl`, 3 test files | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
 | `9c4e1db` | Phase 4 part 1 — §1.4 | `src/config.jl`, `porous_ns.schema.json`, `base_config.json`, `src/run_simulation.jl` | Blitz 32/32, Quick 10/10 |
 | `110e0d7` | Phase 4 part 2 — §1.3 | `src/solvers/porous_solver.jl` | Blitz 32/32, Quick 10/10 |
+| _pending_ | Phase 2 — §3.3 Anderson hardening | `src/solvers/accelerators.jl`, `src/solvers/porous_solver.jl`, `src/config.jl`, `porous_ns.schema.json`, `base_config.json`, `theory/osgs_algorithm.tex` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
 
 ### Headline empirical result
 
@@ -83,14 +84,26 @@ OSGS: L2 Velocity Error = 3.39545818e-02 ; Proj(Subgrid_R) ≈ 1.5e-14
 
 | Sub-item | Effort | Risk | Notes |
 |---|---|---|---|
-| §3.3 Anderson hardening (3 fixes) | Small (~1-2 hr) | Low | Independent of P2 Cholesky; do first. |
+| ~~§3.3 Anderson hardening~~ | ~~Small~~ | ~~Low~~ | **Done** in the row above. Three fixes landed: configurable `safety_factor` (was hard-coded `10.0`), history clear on safety trigger, Tikhonov shift on the LS solve. probe_k1 bit-identical confirms Anderson code path (probe_k1 has `type: "Anderson"`, `m: 10`, `β: 0.8`) is unchanged in well-conditioned regime. |
 | §3.2 Cholesky factorization | Medium (1 day) | Medium | Requires Gridap LinearSolver interface adaptation; may be a rabbit hole in Gridap 0.18.6. |
 
-§3.3 is three independent fixes: configurable safety_factor, history restart
-on safety trigger, Tikhonov regularization on the LS solve. All in
-[src/solvers/accelerators.jl](../src/solvers/accelerators.jl). §3.3 also
-needs an `AcceleratorConfig.safety_factor` field — that's a schema +
-base_config + validate! update (same pattern as §1.4's `picard_handoff_ftol`).
+§3.3 landed: configurable `safety_factor` field added to `AcceleratorConfig`
+following the §1.4 pattern (schema + base_config + validate! assertion
+`safety_factor >= 1.0`), history-clearing safety trigger in
+[src/solvers/accelerators.jl:88-93](../src/solvers/accelerators.jl#L88-L93),
+and Tikhonov shift $\lambda = \varepsilon_{\mathrm{mach}}\,\mathrm{tr}(A)/n$
+on both LS branches in
+[src/solvers/accelerators.jl:65-77](../src/solvers/accelerators.jl#L65-L77).
+Default `safety_factor = 10.0` preserves prior behaviour bit-identical.
+Theory write-up updated in
+[theory/osgs_algorithm.tex §"Block-wise Anderson acceleration"](osgs_algorithm.tex)
+(Tikhonov paragraph + safety-fallback paragraph rewritten; parameter
+table extended with $C_{\mathrm{sf}}^{\mathrm{And}}$).
+
+Picard-side payoff is unverified in the current Re=1e-6 regime (Anderson
+extrapolates cleanly without ever tripping the safety check). The hardened
+paths will be exercised properly by Phase 6 continuation runs and the
+stiff-regime probe config that the progress doc flags as needed.
 
 ### Phase 5 — Rate-affecting batch (bundle; re-baseline once)
 

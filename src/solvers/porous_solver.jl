@@ -395,9 +395,9 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
             local accel_u = nothing
             local accel_p = nothing
             if sol_cfg.accelerator.type == "Anderson"
-                println("      [+] Initializing Blocked Anderson Acceleration (m = $(sol_cfg.accelerator.m), damping = $(sol_cfg.accelerator.relaxation_factor))")
-                accel_u = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor, M_u)
-                accel_p = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor, M_p)
+                println("      [+] Initializing Blocked Anderson Acceleration (m = $(sol_cfg.accelerator.m), damping = $(sol_cfg.accelerator.relaxation_factor), safety = $(sol_cfg.accelerator.safety_factor))")
+                accel_u = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor, sol_cfg.accelerator.safety_factor, M_u)
+                accel_p = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor, sol_cfg.accelerator.safety_factor, M_p)
             end
             
             # Initialize the orthogonal projection π_h^0 = 0. The first OSGS outer

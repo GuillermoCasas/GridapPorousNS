@@ -35,6 +35,7 @@ Base.@kwdef struct AcceleratorConfig
     type::String
     m::Int
     relaxation_factor::Float64
+    safety_factor::Float64
 end
 
 Base.@kwdef struct StabilizationConfig
@@ -135,6 +136,7 @@ function validate!(cfg::PorousNSConfig)
     @assert 0.0 < sol.linesearch_contraction_factor < 1.0 "Linesearch contraction map alpha must strictly be in (0, 1)"
     @assert sol.accelerator.m >= 1 "Accelerator history size m must be >= 1"
     @assert 0.0 < sol.accelerator.relaxation_factor <= 1.0 "Accelerator relaxation_factor must be in (0, 1]"
+    @assert sol.accelerator.safety_factor >= 1.0 "Accelerator safety_factor must be >= 1.0 (Powell-style restart threshold; values < 1 would restart every step)"
     
     # Stabilization
     stab = cfg.numerical_method.stabilization

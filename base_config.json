@@ -72,7 +72,8 @@
             "accelerator": {
                 "type": "None",
                 "m": 5,
-                "relaxation_factor": 1.0
+                "relaxation_factor": 1.0,
+                "safety_factor": 10.0
             }
         },
         "mesh": {
