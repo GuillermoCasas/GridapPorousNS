@@ -143,7 +143,9 @@ function execute_outer_homotopy_perturbation_loop!(
     iter_solvers::PorousNSSolver.IterativeSolvers, config::PorousNSConfig,
     method::String, dynamic_ftol::Float64, mms_setup::MMSSetup, pert_cfg::PerturbationConfig,
     mms_verification_enabled::Bool, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
-    mms_max_extra_cycles, mms_require_consecutive_passes
+    mms_max_extra_cycles, mms_require_consecutive_passes,
+    n::Int, kv::Int   # §5.1: mesh partition count and velocity polynomial order
+                      # for h-scaled plateau floors.
 )
     success = false
     successful_eps = -1.0
@@ -182,6 +184,8 @@ function execute_outer_homotopy_perturbation_loop!(
                 enabled = true, tau_err = mms_tau_err, eps_u_l2 = mms_eps_u_l2, eps_u_h1 = mms_eps_u_h1,
                 eps_p_l2 = mms_eps_p_l2, max_extra_cycles = mms_max_extra_cycles,
                 require_consecutive_passes = mms_require_consecutive_passes,
+                h_local = 1.0 / n,   # §5.1: mesh size for h-scaling plateau floors
+                kv = kv,             # §5.1: velocity polynomial order for the scaling exponent
                 oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, mms_setup.u_final, mms_setup.p_final, mms_setup.U_c, mms_setup.P_c, mms_setup.L, setup.dΩ)
             )
         end
@@ -504,7 +508,8 @@ function run_mms(config_file="test_config.json")
                                         setup, formulation, iter_solvers, config, method, dynamic_ftol,
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
-                                        mms_max_extra_cycles, mms_require_consecutive_passes
+                                        mms_max_extra_cycles, mms_require_consecutive_passes,
+                                        n, kv
                                     )
                                     
                                     if success && final_x0 !== nothing

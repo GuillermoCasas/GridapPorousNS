@@ -312,13 +312,21 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                     
                     E_u2_prev, E_p2_prev, E_u1_prev, E_p1_prev = mms_err_hist[end-1]
                     
-                    r_u2 = abs(E_u2_k - E_u2_prev) / max(E_u2_k, E_u2_prev, mms_cfg.eps_u_l2)
-                    r_u1 = abs(E_u1_k - E_u1_prev) / max(E_u1_k, E_u1_prev, mms_cfg.eps_u_h1)
-                    r_p2 = abs(E_p2_k - E_p2_prev) / max(E_p2_k, E_p2_prev, mms_cfg.eps_p_l2)
-                    
+                    # §5.1: scale plateau floors by the FE discretization budget.
+                    # L² convergence rate is h^(kv+1); H¹ rate is h^kv. The config field
+                    # `mms_cfg.eps_*` is now a *baseline* (dimensionless) coefficient;
+                    # the effective floor is baseline × h^(rate).
+                    eps_u_l2_eff = mms_cfg.eps_u_l2 * mms_cfg.h_local^(mms_cfg.kv + 1)
+                    eps_u_h1_eff = mms_cfg.eps_u_h1 * mms_cfg.h_local^mms_cfg.kv
+                    eps_p_l2_eff = mms_cfg.eps_p_l2 * mms_cfg.h_local^(mms_cfg.kv + 1)
+
+                    r_u2 = abs(E_u2_k - E_u2_prev) / max(E_u2_k, E_u2_prev, eps_u_l2_eff)
+                    r_u1 = abs(E_u1_k - E_u1_prev) / max(E_u1_k, E_u1_prev, eps_u_h1_eff)
+                    r_p2 = abs(E_p2_k - E_p2_prev) / max(E_p2_k, E_p2_prev, eps_p_l2_eff)
+
                     push!(mms_rc_hist, (r_u2, r_p2, r_u1))
                     max_r = max(r_u2, r_u1, r_p2)
-                    
+
                     println("        * [Verification Cycle $cycle] Plateau max ratio: $max_r (Target: $(mms_cfg.tau_err))")
                     
                     if max_r < mms_cfg.tau_err
@@ -670,9 +678,15 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                             push!(mms_err_hist, (E_u2_k, E_p2_k, E_u1_k, E_p1_k))
                             
                             E_u2_prev, E_p2_prev, E_u1_prev, E_p1_prev = mms_err_hist[end-1]
-                            r_u2 = abs(E_u2_k - E_u2_prev) / max(E_u2_k, E_u2_prev, mms_cfg.eps_u_l2)
-                            r_u1 = abs(E_u1_k - E_u1_prev) / max(E_u1_k, E_u1_prev, mms_cfg.eps_u_h1)
-                            r_p2 = abs(E_p2_k - E_p2_prev) / max(E_p2_k, E_p2_prev, mms_cfg.eps_p_l2)
+
+                            # §5.1: h-scaled plateau floors (see ASGS site for full comment).
+                            eps_u_l2_eff = mms_cfg.eps_u_l2 * mms_cfg.h_local^(mms_cfg.kv + 1)
+                            eps_u_h1_eff = mms_cfg.eps_u_h1 * mms_cfg.h_local^mms_cfg.kv
+                            eps_p_l2_eff = mms_cfg.eps_p_l2 * mms_cfg.h_local^(mms_cfg.kv + 1)
+
+                            r_u2 = abs(E_u2_k - E_u2_prev) / max(E_u2_k, E_u2_prev, eps_u_l2_eff)
+                            r_u1 = abs(E_u1_k - E_u1_prev) / max(E_u1_k, E_u1_prev, eps_u_h1_eff)
+                            r_p2 = abs(E_p2_k - E_p2_prev) / max(E_p2_k, E_p2_prev, eps_p_l2_eff)
                             
                             mms_rc_hist = diag_cache["mms_relative_change_history"]
                             push!(mms_rc_hist, (r_u2, r_p2, r_u1))
