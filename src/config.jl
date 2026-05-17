@@ -63,6 +63,7 @@ Base.@kwdef struct SolverConfig
     dynamic_picard_da_iterations::Int
     newton_iterations::Int
     ftol::Float64
+    picard_handoff_ftol::Float64
     dynamic_ftol_ceiling::Float64
     dynamic_ftol_spatial_safety_factor::Float64
     xtol::Float64
@@ -123,6 +124,7 @@ function validate!(cfg::PorousNSConfig)
     # Solver
     sol = cfg.numerical_method.solver
     @assert sol.ftol > 0 "Solver ftol must be > 0"
+    @assert sol.picard_handoff_ftol >= sol.ftol "Solver picard_handoff_ftol must be >= ftol (Picard is a smoother, not a precise solver)"
     @assert sol.dynamic_ftol_ceiling >= sol.ftol "Solver dynamic_ftol_ceiling must be strictly >= base ftol"
     @assert 0.0 < sol.dynamic_ftol_spatial_safety_factor <= 1.0 "Solver dynamic_ftol_spatial_safety_factor must be in (0, 1]"
     @assert sol.xtol > 0 "Solver xtol must be > 0"
