@@ -104,7 +104,7 @@ using JSON3
     sol_cfg = cfg.numerical_method.solver
     p_ls = LUSolver()
     
-    nls_picard = PorousNSSolver.SafeNewtonSolver(p_ls, sol_cfg.picard_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor)
+    nls_picard = PorousNSSolver.SafeNewtonSolver(p_ls, sol_cfg.picard_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor; mode=:picard)
     fe_picard = FESolver(nls_picard)
     
     nls_newton = PorousNSSolver.SafeNewtonSolver(p_ls, sol_cfg.newton_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor)

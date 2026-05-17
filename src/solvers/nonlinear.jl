@@ -11,17 +11,31 @@ struct SafeNewtonSolver <: NonlinearSolver
     xtol::Float64
     ftol::Float64
     linesearch_alpha_min::Float64
-    c1::Float64 
+    c1::Float64
     divergence_merit_factor::Float64
     stagnation_noise_floor::Float64
     max_linesearch_iterations::Int
     linesearch_contraction_factor::Float64
+    mode::Symbol  # :newton (Armijo on Jacobian-scaled merit) or :picard (monotone residual)
 end
-function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig)
+
+# Convenience constructor: keeps existing positional Newton call sites untouched,
+# while letting Picard call sites opt in with `mode = :picard`.
+function SafeNewtonSolver(ls::LinearSolver, max_iters::Int, max_increases::Int,
+                          xtol::Float64, ftol::Float64, linesearch_alpha_min::Float64,
+                          c1::Float64, divergence_merit_factor::Float64,
+                          stagnation_noise_floor::Float64, max_linesearch_iterations::Int,
+                          linesearch_contraction_factor::Float64; mode::Symbol = :newton)
+    return SafeNewtonSolver(ls, max_iters, max_increases, xtol, ftol, linesearch_alpha_min,
+                            c1, divergence_merit_factor, stagnation_noise_floor,
+                            max_linesearch_iterations, linesearch_contraction_factor, mode)
+end
+
+function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig; mode::Symbol = :newton)
     return SafeNewtonSolver(
         ls, cfg.newton_iterations, cfg.max_increases, cfg.xtol, cfg.ftol,
         cfg.linesearch_alpha_min, cfg.armijo_c1, cfg.divergence_merit_factor, cfg.stagnation_noise_floor,
-        cfg.max_linesearch_iterations, cfg.linesearch_contraction_factor
+        cfg.max_linesearch_iterations, cfg.linesearch_contraction_factor; mode=mode
     )
 end
 
@@ -30,6 +44,7 @@ function check_solver_parameters(s::SafeNewtonSolver)
     if s.divergence_merit_factor < 1.0 throw(ArgumentError("Divergence merit factor must be >= 1.0.")) end
     if s.xtol <= 0.0 || s.ftol <= 0.0 || s.stagnation_noise_floor <= 0.0 throw(ArgumentError("Tolerances must be > 0.")) end
     if s.linesearch_alpha_min <= 0.0 || s.linesearch_alpha_min > 1.0 throw(ArgumentError("alpha_min must be in (0, 1].")) end
+    if !(s.mode in (:newton, :picard)) throw(ArgumentError("SafeNewtonSolver mode must be :newton or :picard, got $(s.mode).")) end
 end
 
 struct SafeSolverResult
@@ -92,22 +107,35 @@ function eval_armijo_linesearch_pass!(x, x_old, b, dx, op, dir_deriv, solver::Sa
         x .= x_old .- alpha .* dx
         residual!(b, op, x)
         state.phi_x_new = eval_merit_W(b)
-        
-        if isnan(state.phi_x_new)
+        state.norm_b_new_inf = norm(b, Inf)
+
+        if isnan(state.phi_x_new) || isnan(state.norm_b_new_inf)
             alpha *= solver.linesearch_contraction_factor
             continue
         end
-        
-        # Armijo Condition
-        if state.phi_x_new <= state.phi_x + solver.c1 * alpha * dir_deriv
-            state.ls_success = true
-            state.norm_b_new_inf = norm(b, Inf)
-            break
+
+        # Acceptance test by mode:
+        #   :newton — Armijo on Jacobian-diagonal-scaled merit Φ with D = -2Φ.
+        #             Valid because exact-Newton direction makes the cancellation hold.
+        #   :picard — monotone residual ‖b_new‖_∞ ≤ (1 - c1·α) ‖b_old‖_∞.
+        #             Removes the merit function from Picard's accept/reject loop,
+        #             which is required because the true Picard D ≠ -2Φ (the Jacobian
+        #             approximation drops cross-terms). Bank & Rose 1980 reference.
+        if solver.mode === :newton
+            if state.phi_x_new <= state.phi_x + solver.c1 * alpha * dir_deriv
+                state.ls_success = true
+                break
+            end
+        else  # :picard
+            if state.norm_b_new_inf <= (1.0 - solver.c1 * alpha) * state.norm_b_inf
+                state.ls_success = true
+                break
+            end
         end
         if alpha <= solver.linesearch_alpha_min
             break
         end
-        alpha *= solver.linesearch_contraction_factor 
+        alpha *= solver.linesearch_contraction_factor
     end
     
     state.step_norm = alpha * step_norm_base
