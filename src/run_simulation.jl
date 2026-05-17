@@ -135,8 +135,9 @@ function run_simulation(config_path::String;
     # Bugfix preservation: Formulate before probing underlying type signatures 
     form = build_formulation(cfg.physical_properties, cfg.numerical_method)
     
-    # Quadrature logic strictly bound to mathematical formulation identity and velocity polynomial degree
-    degree = get_quadrature_degree(typeof(form), kv)
+    # Quadrature logic strictly bound to mathematical formulation identity, velocity
+    # polynomial degree, and the reaction law's own minimum requirement (§3.5).
+    degree = get_quadrature_degree(typeof(form), kv, form.reaction_law)
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     

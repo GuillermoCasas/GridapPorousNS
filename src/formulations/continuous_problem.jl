@@ -143,6 +143,18 @@ function compute_stabilization_constants(k_velocity::Int)
     return c_1, c_2
 end
 
+# Reaction-law-aware quadrature degree (primary API, §3.5). Each reaction
+# law declares `min_quadrature_degree` (defaults to 0); the formulation
+# combines that with the formulation's base rule via `max`. Callers should
+# prefer this 3-arg form.
+get_quadrature_degree(::Type{PaperGeneralFormulation}, k_velocity::Int, rxn_law::AbstractReactionLaw) =
+    max(compute_consistent_quadrature_degree(k_velocity), min_quadrature_degree(rxn_law, k_velocity))
+get_quadrature_degree(::Type{Legacy90d5749Mode}, k_velocity::Int, rxn_law::AbstractReactionLaw) =
+    max(compute_consistent_quadrature_degree(k_velocity), min_quadrature_degree(rxn_law, k_velocity))
+
+# Legacy reaction-law-agnostic API. Returns the base rule only; misses any
+# reaction-specific bump (e.g. Forchheimer's ⌊k_v/2⌋). Retained for callers
+# that cannot supply a reaction law at the quadrature decision point.
 get_quadrature_degree(::Type{PaperGeneralFormulation}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
 get_quadrature_degree(::Type{Legacy90d5749Mode}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
 

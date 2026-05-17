@@ -372,8 +372,12 @@ function run_mms(config_file="test_config.json")
                     V_free = TestFESpace(model, refe_u, conformity=:H1)
                     Q_free = TestFESpace(model, refe_p, conformity=:H1)
                     
-                    # Coordinate quadrature degree evaluation recursively mapped back to formulation definitions
-                    degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, kv)
+                    # Coordinate quadrature degree evaluation recursively mapped back to formulation definitions.
+                    # The MMS runner always uses ConstantSigmaLaw (see build_mms_formulation above), whose
+                    # min_quadrature_degree default is 0, so the result matches the legacy base rule.
+                    # Passing the law explicitly per §3.5 future-proofs against a future MMS variant that
+                    # uses Forchheimer (which would otherwise silently under-integrate the inertial term).
+                    degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, kv, PorousNSSolver.ConstantSigmaLaw(0.0))
                     Ω = Triangulation(model)
                     dΩ = Measure(Ω, degree + 4) # Extra numeric points exactly resolving high order source integration
                     

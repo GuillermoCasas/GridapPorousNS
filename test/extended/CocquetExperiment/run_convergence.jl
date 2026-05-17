@@ -70,7 +70,13 @@ function build_solver(N::Int, config_dict, Re::Float64, c_in::Float64)
     U, P = X
     V, Q = Y
     
-    degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, local_config.numerical_method.element_spaces.k_velocity)
+    # Build a type-representative reaction law from the config so the §3.5 quadrature
+    # decision sees Forchheimer's non-polynomial bump when applicable. Coefficients are
+    # irrelevant for the dispatch — only the law's type drives `min_quadrature_degree`.
+    local_rxn_law = local_config.physical_properties.reaction_model == "Constant_Sigma" ?
+        PorousNSSolver.ConstantSigmaLaw(0.0) :
+        PorousNSSolver.ForchheimerErgunLaw(0.0, 0.0)
+    degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, local_config.numerical_method.element_spaces.k_velocity, local_rxn_law)
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     
