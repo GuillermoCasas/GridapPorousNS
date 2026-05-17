@@ -20,7 +20,7 @@ Last updated: **2026-05-17**.
 | `9c4e1db` | Phase 4 part 1 — §1.4 | `src/config.jl`, `porous_ns.schema.json`, `base_config.json`, `src/run_simulation.jl` | Blitz 32/32, Quick 10/10 |
 | `110e0d7` | Phase 4 part 2 — §1.3 | `src/solvers/porous_solver.jl` | Blitz 32/32, Quick 10/10 |
 | `e702c16` | Phase 2 — §3.3 Anderson hardening | `src/solvers/accelerators.jl`, `src/solvers/porous_solver.jl`, `src/config.jl`, `porous_ns.schema.json`, `base_config.json` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
-| _pending_ | Phase 6 part 1 — §2.4 `!isfinite` guards | `src/solvers/porous_solver.jl` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
+| `41c55ec` | Phase 6 part 1 — §2.4 `!isfinite` guards | `src/solvers/porous_solver.jl` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
 
 ### Headline empirical result
 
