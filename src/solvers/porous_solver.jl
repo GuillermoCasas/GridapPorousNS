@@ -339,6 +339,18 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                         println("        [+] ASGS MMS Plateau formally established natively ($consecutive_passes consecutive < $(mms_cfg.tau_err)).")
                         diag_cache["mms_plateau_reached"] = true
                         diag_cache["mms_stop_reason"] = "mms_plateau_satisfied"
+
+                        # §5.2: rate-aware sanity check. If the converged L² velocity error
+                        # exceeds the FE accuracy budget by more than `rate_check_factor`,
+                        # the iteration plateaued at a non-FE-optimal state. Flag via the
+                        # stop reason; keep success in the calling context (the plateau IS
+                        # established, just at a sub-optimal level).
+                        budget = mms_cfg.h_local^(mms_cfg.kv + 1)
+                        if E_u2_k > mms_cfg.rate_check_factor * budget
+                            diag_cache["mms_stop_reason"] = "mms_plateau_at_suboptimal_rate"
+                            println("        [!] Plateau at sub-optimal rate: E_u2=$E_u2_k > $(mms_cfg.rate_check_factor) × h^(kv+1)=$(mms_cfg.rate_check_factor * budget). Flagged for inspection.")
+                        end
+
                         break
                     end
                 end
@@ -706,6 +718,14 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                                 println("        [+] OSGS MMS Plateau formally established natively ($pass_count consecutive < $(mms_cfg.tau_err)).")
                                 diag_cache["mms_plateau_reached"] = true
                                 diag_cache["mms_stop_reason"] = "mms_plateau_satisfied"
+
+                                # §5.2: rate-aware sanity check (see ASGS site for full comment).
+                                budget = mms_cfg.h_local^(mms_cfg.kv + 1)
+                                if E_u2_k > mms_cfg.rate_check_factor * budget
+                                    diag_cache["mms_stop_reason"] = "mms_plateau_at_suboptimal_rate"
+                                    println("        [!] Plateau at sub-optimal rate: E_u2=$E_u2_k > $(mms_cfg.rate_check_factor) × h^(kv+1)=$(mms_cfg.rate_check_factor * budget). Flagged for inspection.")
+                                end
+
                                 success = true
                                 break
                             end

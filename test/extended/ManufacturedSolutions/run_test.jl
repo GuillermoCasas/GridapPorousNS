@@ -144,6 +144,8 @@ function execute_outer_homotopy_perturbation_loop!(
     method::String, dynamic_ftol::Float64, mms_setup::MMSSetup, pert_cfg::PerturbationConfig,
     mms_verification_enabled::Bool, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
     mms_max_extra_cycles, mms_require_consecutive_passes,
+    mms_rate_check_factor,   # §5.2: factor above FE budget that flags a plateau as
+                             # sub-optimal-rate (still success, just flagged).
     n::Int, kv::Int   # §5.1: mesh partition count and velocity polynomial order
                       # for h-scaled plateau floors.
 )
@@ -186,6 +188,7 @@ function execute_outer_homotopy_perturbation_loop!(
                 require_consecutive_passes = mms_require_consecutive_passes,
                 h_local = 1.0 / n,   # §5.1: mesh size for h-scaling plateau floors
                 kv = kv,             # §5.1: velocity polynomial order for the scaling exponent
+                rate_check_factor = mms_rate_check_factor,   # §5.2: sub-optimal-rate flag threshold
                 oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, mms_setup.u_final, mms_setup.p_final, mms_setup.U_c, mms_setup.P_c, mms_setup.L, setup.dΩ)
             )
         end
@@ -257,6 +260,12 @@ function run_mms(config_file="test_config.json")
     mms_eps_p_l2 = Float64(get(test_dict, "mms_eps_p_l2", 1e-12))
     mms_max_extra_cycles = Int(get(test_dict, "mms_max_extra_cycles", 5))
     mms_require_consecutive_passes = Int(get(test_dict, "mms_require_consecutive_passes", 2))
+    # §5.2: tolerance multiplier above the FE budget at which the established
+    # plateau is flagged as "sub-optimal rate" (still success). Default 100.0:
+    # allow up to 2 orders of magnitude above the discretization scale before
+    # flagging — anything larger is the iteration plateauing at a non-FE-optimal
+    # state rather than a genuine MMS convergence.
+    mms_rate_check_factor = Float64(get(test_dict, "mms_rate_check_factor", 100.0))
     
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
@@ -509,6 +518,7 @@ function run_mms(config_file="test_config.json")
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
                                         mms_max_extra_cycles, mms_require_consecutive_passes,
+                                        mms_rate_check_factor,
                                         n, kv
                                     )
                                     
