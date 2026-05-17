@@ -19,7 +19,8 @@ Last updated: **2026-05-17**.
 | `1caa633` | Phase 3 — §1.1 | `src/solvers/nonlinear.jl`, `src/run_simulation.jl`, 3 test files | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
 | `9c4e1db` | Phase 4 part 1 — §1.4 | `src/config.jl`, `porous_ns.schema.json`, `base_config.json`, `src/run_simulation.jl` | Blitz 32/32, Quick 10/10 |
 | `110e0d7` | Phase 4 part 2 — §1.3 | `src/solvers/porous_solver.jl` | Blitz 32/32, Quick 10/10 |
-| _pending_ | Phase 2 — §3.3 Anderson hardening | `src/solvers/accelerators.jl`, `src/solvers/porous_solver.jl`, `src/config.jl`, `porous_ns.schema.json`, `base_config.json`, `theory/osgs_algorithm.tex` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
+| `e702c16` | Phase 2 — §3.3 Anderson hardening | `src/solvers/accelerators.jl`, `src/solvers/porous_solver.jl`, `src/config.jl`, `porous_ns.schema.json`, `base_config.json` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
+| _pending_ | Phase 6 part 1 — §2.4 `!isfinite` guards | `src/solvers/porous_solver.jl` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
 
 ### Headline empirical result
 
@@ -125,12 +126,35 @@ finest-mesh u_L2 table above. Expect pressure rates to **improve slightly**
 (per §3.1 and §3.6); velocity rates should be at least as good. Any
 regression is a bug, not a feature.
 
-### Phase 6 — Continuation driver (§2.1, §2.3, §2.4)
+### Phase 6 — Continuation driver (§2.1, §2.3, ~~§2.4~~)
 
-Biggest single phase. Stage-I cascade currently bails on hard divergence;
-Phase 6 adds a `(Re, Da)` ramp continuation wrapper plus best-state retention
-and `!isfinite` guards. Enables high-Re / high-Da cases that currently
-fail outright.
+Biggest remaining phase. Stage-I cascade currently bails on hard divergence;
+Phase 6 §2.1 adds a `(Re, Da)` ramp continuation wrapper, §2.3 adds best-state
+retention, and §2.4 (the `!isfinite` guards) has now landed — see the
+"What has landed" table. §2.4 was promoted from Phase 6 because it's
+independent of the continuation driver and "essentially free" per this doc's
+"Strongly recommended" section; landing it now means high-Re/high-Da
+continuation runs (when §2.1 lands) will fail-cleanly instead of NaN-leaking.
+
+§2.4 covers six guard sites in [src/solvers/porous_solver.jl](../src/solvers/porous_solver.jl):
+three in the Stage I Newton-Picard-Newton cascade (initial Newton, Picard
+fallback, second Newton) and three in the OSGS inner cascade (added by §1.3
+in `110e0d7`: inner Newton, Picard fallback, inner second Newton). Each
+guard checks `any(!isfinite, get_free_dof_values(x))` immediately after
+the corresponding `solve!`, restores from the appropriate backup
+(`x0_backup` in Stage I, `x_prev` in OSGS inner), and short-circuits the
+local control flow to the natural failure branch (fall-through to Picard
+for the first Newton sites, `success = false` + `break` elsewhere). One
+pre-existing Stage I Picard guard was strengthened to also restore from
+`x0_backup`; the §1.3 OSGS Picard guard was already correct and is
+unchanged.
+
+Verification in current Re=1e-6 regime is "no regression": Anderson,
+Newton, Picard, and OSGS all stay well-conditioned, so the guards never
+trip. The defensive value is realised only in the stiff regimes Phase 6
+§2.1 will unlock — at which point a deliberately divergent case should
+exit with a clean abort and a "produced non-finite state" diagnostic
+rather than propagating NaN through `diag_cache` and the MMS pipeline.
 
 ### Phase 7 — Quality-of-life
 
@@ -296,11 +320,9 @@ pending items are essential vs optional:
 
 - **Phase 5 §3.6 (pressure mean removal).** Constant-mode pollution at
   `α₀ = 0.05` corrupts pressure rate measurements.
-- **Phase 6 §2.4 (!isfinite guards).** Belt-and-suspenders against NaN
-  propagation through `diag_cache`. Essentially free to add.
-- **Phase 2 §3.3 (Anderson hardening).** Higher Re/Da needs more OSGS outer
-  iterations; the current Anderson can stall on near-rank-deficient
-  histories. Three small fixes per plan.
+- ~~**Phase 6 §2.4 (!isfinite guards).**~~ **Done** (commit pending); six
+  symmetric guards across Stage I + OSGS-inner cascades.
+- ~~**Phase 2 §3.3 (Anderson hardening).**~~ **Done** in `e702c16`.
 
 ### Nice to have
 

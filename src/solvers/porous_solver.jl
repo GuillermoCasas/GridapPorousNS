@@ -173,17 +173,23 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
             res_newton = solve!(x0, solver_newton_asgs, op_newton_init)
             cache_newton = res_newton isa Tuple ? res_newton[2] : res_newton
             nls_cache = cache_newton isa Tuple ? cache_newton[2] : cache_newton
-            final_res = nls_cache.result.iterations > 0 ? nls_cache.result.residual_norm : 0.0
-            diag_cache["final_residual_norm"] = final_res
-            local_iters = nls_cache.result.iterations
-            if final_res <= ftol
-                newton_success = true
-                iter_count += local_iters
-                println("      -> ASGS Initializer: Exact Newton converged vigorously to absolute continuous limits ($ftol)! Bypassing Picard.")
+            if any(!isfinite, get_free_dof_values(x0))
+                println("      -> ASGS Initializer: Exact Newton produced non-finite state. Restoring backup, falling through to Picard.")
+                get_free_dof_values(x0) .= x0_backup
+                newton_success = false
             else
-                # When initializing, if it hits noise floor but not ftol, we still allow Picard to attempt homotopy
-                # to strictly guarantee we enter the quadratic basin, so we leave newton_success = false.
-                iter_count += local_iters
+                final_res = nls_cache.result.iterations > 0 ? nls_cache.result.residual_norm : 0.0
+                diag_cache["final_residual_norm"] = final_res
+                local_iters = nls_cache.result.iterations
+                if final_res <= ftol
+                    newton_success = true
+                    iter_count += local_iters
+                    println("      -> ASGS Initializer: Exact Newton converged vigorously to absolute continuous limits ($ftol)! Bypassing Picard.")
+                else
+                    # When initializing, if it hits noise floor but not ftol, we still allow Picard to attempt homotopy
+                    # to strictly guarantee we enter the quadratic basin, so we leave newton_success = false.
+                    iter_count += local_iters
+                end
             end
         catch e
             println("      -> ASGS Initializer: Newton ConvergenceError. Exception: ", e)
@@ -218,7 +224,8 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
             end
             
             if any(!isfinite, get_free_dof_values(x0))
-                println("      -> ASGS Initializer: Picard catastrophically diverged. Evaluation impossible.")
+                println("      -> ASGS Initializer: Picard catastrophically diverged. Restoring backup, evaluation impossible.")
+                get_free_dof_values(x0) .= x0_backup
                 success = false
             elseif !success
                 println("      -> ASGS Initializer: Picard smoothing finalized. Re-engaging Exact Newton...")
@@ -226,20 +233,27 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                     res_solve = solve!(x0, solver_newton_asgs, op_newton_init)
                     cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
                     nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
-                    iter_count += nls_cache.result.iterations
-                    final_res = nls_cache.result.residual_norm
-                    diag_cache["final_residual_norm"] = final_res
 
-                    stop_reason = nls_cache.result.stop_reason
-                    if stop_reason == "ftol_reached" || stop_reason == "initial_ftol"
-                        println("      -> ASGS Initializer: Newton Homotopy Pass achieved exact theoretical tolerance ($ftol).")
-                        success = true
-                    elseif stop_reason == "stagnation_noise_floor_reached"
-                        println("      -> ASGS Initializer: Newton Homotopy Pass cleanly saturated at numerical noise floor ($final_res). Approving.")
-                        success = true
-                    else
-                        println("      -> ASGS Initializer: Newton Homotopy Pass structurally failed (Reason: $stop_reason). Bounding collapse.")
+                    if any(!isfinite, get_free_dof_values(x0))
+                        println("      -> ASGS Initializer: Newton Homotopy Pass produced non-finite state. Restoring backup, marking failure.")
+                        get_free_dof_values(x0) .= x0_backup
                         success = false
+                    else
+                        iter_count += nls_cache.result.iterations
+                        final_res = nls_cache.result.residual_norm
+                        diag_cache["final_residual_norm"] = final_res
+
+                        stop_reason = nls_cache.result.stop_reason
+                        if stop_reason == "ftol_reached" || stop_reason == "initial_ftol"
+                            println("      -> ASGS Initializer: Newton Homotopy Pass achieved exact theoretical tolerance ($ftol).")
+                            success = true
+                        elseif stop_reason == "stagnation_noise_floor_reached"
+                            println("      -> ASGS Initializer: Newton Homotopy Pass cleanly saturated at numerical noise floor ($final_res). Approving.")
+                            success = true
+                        else
+                            println("      -> ASGS Initializer: Newton Homotopy Pass structurally failed (Reason: $stop_reason). Bounding collapse.")
+                            success = false
+                        end
                     end
                 catch e
                      println("      -> ASGS Initializer: Newton ConvergenceError on Homotopy Pass. Exception: ", e)
@@ -442,19 +456,26 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                     res_solve = solve!(final_x0, local_fesolver, op_newton_osgs)
                     cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
                     nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
-                    iter_count += nls_cache.result.iterations
 
-                    push!(diag_cache["inner_osgs_diagnostics"], (
-                        iterations = nls_cache.result.iterations,
-                        initial_res = nls_cache.result.initial_residual_norm,
-                        final_res = nls_cache.result.residual_norm,
-                        step_norm = nls_cache.result.step_norm,
-                        stop_reason = nls_cache.result.stop_reason
-                    ))
-                    diag_cache["final_residual_norm"] = nls_cache.result.residual_norm
-
-                    if nls_cache.result.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
+                    if any(!isfinite, get_free_dof_values(final_x0))
+                        println("        -> OSGS Inner Newton produced non-finite state. Restoring previous iterate, engaging Picard fallback.")
+                        get_free_dof_values(final_x0) .= x_prev
                         newton_failed = true
+                    else
+                        iter_count += nls_cache.result.iterations
+
+                        push!(diag_cache["inner_osgs_diagnostics"], (
+                            iterations = nls_cache.result.iterations,
+                            initial_res = nls_cache.result.initial_residual_norm,
+                            final_res = nls_cache.result.residual_norm,
+                            step_norm = nls_cache.result.step_norm,
+                            stop_reason = nls_cache.result.stop_reason
+                        ))
+                        diag_cache["final_residual_norm"] = nls_cache.result.residual_norm
+
+                        if nls_cache.result.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
+                            newton_failed = true
+                        end
                     end
                 catch e
                     if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
@@ -514,6 +535,14 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                         res_solve2 = solve!(final_x0, local_fesolver, op_newton_osgs)
                         cache_solve2 = res_solve2 isa Tuple ? res_solve2[2] : res_solve2
                         nls_cache2 = cache_solve2 isa Tuple ? cache_solve2[2] : cache_solve2
+
+                        if any(!isfinite, get_free_dof_values(final_x0))
+                            println("        -> OSGS Inner Newton retry produced non-finite state. Restoring previous iterate, aborting OSGS nested sequence.")
+                            get_free_dof_values(final_x0) .= x_prev
+                            success = false
+                            break
+                        end
+
                         iter_count += nls_cache2.result.iterations
 
                         push!(diag_cache["inner_osgs_diagnostics"], (
