@@ -1,5 +1,6 @@
 {
     "erase_past_results": true,
+    "h5_filename": "probe_k2.h5",
     "epsilon_pert": [0.1],
     "max_n_pert": 5,
     "physical_properties": {
@@ -30,14 +31,14 @@
             "osgs_warmup_tolerance": 1e-3
         },
         "element_spaces": {
-            "k_velocity": [1, 2, 3],
-            "k_pressure": [1, 2, 3],
+            "k_velocity": [2],
+            "k_pressure": [2],
             "equal_order_only": true
         },
         "mesh": {
             "partition": [10, 10],
-            "convergence_partitions": [10, 20, 40, 80, 160],
-            "element_type": ["QUAD", "TRI"]
+            "convergence_partitions": [20, 40],
+            "element_type": ["QUAD"]
         },
         "solver": {
             "picard_iterations": 2,
@@ -73,6 +74,6 @@
     },
     "output": {
         "directory": "test/long/ManufacturedSolutions/results",
-        "basename": "mms_small"
+        "basename": "probe_k2"
     }
 }

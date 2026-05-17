@@ -1,0 +1,64 @@
+\contentsline {section}{\numberline {1}Overview and Algorithmic Challenges}{2}{section.1}%
+\contentsline {paragraph}{Nonlinearity from convection and Forchheimer drag.}{2}{section*.2}%
+\contentsline {paragraph}{Implicit OSGS projection.}{2}{section*.3}%
+\contentsline {paragraph}{Architecture of the response.}{2}{section*.4}%
+\contentsline {section}{\numberline {2}Parameter Taxonomy and Code Equivalence}{3}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Numerical parameters}{3}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Algorithm--to--code correspondence}{3}{subsection.2.2}%
+\contentsline {section}{\numberline {3}The Outermost Orchestration: Algorithm\nobreakspace {}\ref {alg:O}}{3}{section.3}%
+\contentsline {paragraph}{Step by step.}{4}{section*.5}%
+\contentsline {paragraph}{Failure propagation.}{4}{section*.6}%
+\contentsline {paragraph}{Anderson and MMS coupling.}{4}{section*.7}%
+\contentsline {section}{\numberline {4}The Inner Newton Machinery}{4}{section.4}%
+\contentsline {subsection}{\numberline {4.1}The merit function and its diagonal preconditioning}{4}{subsection.4.1}%
+\contentsline {paragraph}{Why equilibrate?}{4}{section*.8}%
+\contentsline {paragraph}{An algebraic identity that simplifies the line search.}{4}{section*.9}%
+\contentsline {subsection}{\numberline {4.2}Algorithm A: the safeguarded Newton outer loop}{5}{subsection.4.2}%
+\contentsline {paragraph}{Reading the box.}{5}{section*.10}%
+\contentsline {subsection}{\numberline {4.3}Algorithm A.1: linear-system solve and NaN guard}{6}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Algorithm A.2: Armijo backtracking line search}{6}{subsection.4.4}%
+\contentsline {paragraph}{What the parameters do.}{6}{section*.11}%
+\contentsline {paragraph}{NaN handling.}{7}{section*.12}%
+\contentsline {subsection}{\numberline {4.5}Algorithm A.3: termination safeguards}{7}{subsection.4.5}%
+\contentsline {paragraph}{Why six exit reasons?}{7}{section*.13}%
+\contentsline {paragraph}{The role of $F_{\mathrm {div}}$ and $N_{\mathrm {inc}}$ together.}{8}{section*.14}%
+\contentsline {section}{\numberline {5}The Picard Fallback}{8}{section.5}%
+\contentsline {paragraph}{Why Picard works where Newton fails.}{9}{section*.15}%
+\contentsline {paragraph}{Triggers.}{9}{section*.16}%
+\contentsline {paragraph}{The catastrophic-state guard.}{9}{section*.17}%
+\contentsline {paragraph}{Connection to Algorithm\nobreakspace {}\ref {alg:O}.}{9}{section*.18}%
+\contentsline {section}{\numberline {6}OSGS Staggered Relaxation}{9}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Algorithm C}{10}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}The bootstrap and why the ASGS state matters}{10}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Why projection happens on the unconstrained spaces}{11}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Mass-matrix pre-factoring}{11}{subsection.6.4}%
+\contentsline {subsection}{\numberline {6.5}Warmup phase}{11}{subsection.6.5}%
+\contentsline {subsection}{\numberline {6.6}State drift: $\ell ^\infty $ vs continuous $L^2$}{11}{subsection.6.6}%
+\contentsline {paragraph}{The \texttt {Linf} mode.}{11}{section*.19}%
+\contentsline {paragraph}{The \texttt {L2\_mass} mode.}{11}{section*.20}%
+\contentsline {subsection}{\numberline {6.7}Projection drift, in the mass-weighted inner product}{11}{subsection.6.7}%
+\contentsline {subsection}{\numberline {6.8}Choosing the stopping mode}{12}{subsection.6.8}%
+\contentsline {subsection}{\numberline {6.9}Block-wise Anderson acceleration}{12}{subsection.6.9}%
+\contentsline {paragraph}{Block isolation.}{12}{section*.21}%
+\contentsline {paragraph}{Mass-weighted normal equations.}{12}{section*.22}%
+\contentsline {paragraph}{Safety fallback.}{12}{section*.23}%
+\contentsline {subsection}{\numberline {6.10}The reaction-projection trim}{12}{subsection.6.10}%
+\contentsline {subsection}{\numberline {6.11}Failure of the inner Newton}{13}{subsection.6.11}%
+\contentsline {section}{\numberline {7}MMS Plateau Verification}{13}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Numerical convergence versus discretisation convergence}{13}{subsection.7.1}%
+\contentsline {subsection}{\numberline {7.2}Algorithm D}{13}{subsection.7.2}%
+\contentsline {subsection}{\numberline {7.3}Three norms, three floors}{13}{subsection.7.3}%
+\contentsline {subsection}{\numberline {7.4}Consecutive passes and budget exhaustion}{14}{subsection.7.4}%
+\contentsline {subsection}{\numberline {7.5}Two entry points and how they differ}{14}{subsection.7.5}%
+\contentsline {paragraph}{ASGS path.}{14}{section*.24}%
+\contentsline {paragraph}{OSGS path.}{14}{section*.25}%
+\contentsline {section}{\numberline {8}The MMS Sweep Harness}{14}{section.8}%
+\contentsline {subsection}{\numberline {8.1}Adaptive $\tau _{\mathrm {ftol}}$}{14}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Adaptive noise floor}{15}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Per-case Picard widening}{15}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Closing remark}{15}{subsection.8.4}%
+\contentsline {section}{\numberline {9}Convergence-Analysis Notes}{15}{section.9}%
+\contentsline {subsection}{\numberline {9.1}The false-equivalency failsafe}{15}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Why $\tau _{\mathrm {stag}}$ must scale with conditioning}{16}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}Why the OSGS stopping mode matters}{16}{subsection.9.3}%
+\contentsline {section}{\numberline {A}Code--Notation Correspondence}{16}{appendix.A}%
