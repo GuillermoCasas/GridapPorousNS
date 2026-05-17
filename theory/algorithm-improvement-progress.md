@@ -21,6 +21,11 @@ Last updated: **2026-05-17**.
 | `110e0d7` | Phase 4 part 2 — §1.3 | `src/solvers/porous_solver.jl` | Blitz 32/32, Quick 10/10 |
 | `e702c16` | Phase 2 — §3.3 Anderson hardening | `src/solvers/accelerators.jl`, `src/solvers/porous_solver.jl`, `src/config.jl`, `porous_ns.schema.json`, `base_config.json` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
 | `41c55ec` | Phase 6 part 1 — §2.4 `!isfinite` guards | `src/solvers/porous_solver.jl` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
+| `dc8f302` | Phase 5 — §3.6 deferral (docs only) | `theory/paper-code-divergences.md`, plan, progress | — |
+| `a307bcd` | Phase 5 part 1 — §3.5 reaction-law-aware quadrature | `src/models/reaction.jl`, `src/formulations/continuous_problem.jl`, `src/run_simulation.jl`, 2 test runners | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
+| `f72c819` | Phase 5 part 2 — §3.1 block-equilibrated merit | `src/solvers/nonlinear.jl` | Blitz 32/32, Quick 10/10, probe_k1 state bit-identical (Φ values differ as expected, line search never fires here) |
+| `af0bf07` | Phase 5 part 3 — §5.1 h-scaled MMS plateau floors | `src/solvers/porous_solver.jl`, `test/extended/ManufacturedSolutions/run_test.jl` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
+| `af05173` | Phase 5 part 4 — §5.2 rate-aware plateau verification | `src/solvers/porous_solver.jl`, `test/extended/ManufacturedSolutions/run_test.jl` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
 
 ### Headline empirical result
 
@@ -59,16 +64,28 @@ config_1_ASGS / OSGS:
 ASGS and OSGS must produce identical numbers to ≥ 8 decimal places (constant-σ
 trim makes the projection ≈ 0).
 
-### small_test_config.json finest-mesh u_L2 (post-Phase-4)
+### small_test_config.json finest-mesh u_L2 (post-Phase-5, `af05173`)
 
 | Config | k | Elem | u_L2 (n=160) |
 |---|---|---|---|
-| C1 | 1 | QUAD | 3.3040e-04 |
-| C2 | 2 | QUAD | 5.9384e-06 |
-| C3 | 3 | QUAD | 3.8680e-08 |
-| C4 | 1 | TRI  | 3.3561e-04 |
-| C5 | 2 | TRI  | 1.5443e-05 |
-| C6 | 3 | TRI  | 6.6947e-08 |
+| C1 | 1 | QUAD | 3.304e-04 |
+| C2 | 2 | QUAD | 5.938e-06 |
+| C3 | 3 | QUAD | 3.868e-08 |
+| C4 | 1 | TRI  | 3.356e-04 |
+| C5 | 2 | TRI  | 1.544e-05 |
+| C6 | 3 | TRI  | 6.695e-08 |
+
+Bit-identical to the post-Phase-4 baseline across all six configs (only
+display precision differs — the underlying HDF5 numbers match to ≥ 4
+displayed digits in every case). All 60 (config × mesh × method) entries
+in the sweep hit `base_convergence_only` → the Phase 5 plateau verifier
+(§5.1, §5.2) was dead code in this Re=1e-6 regime; the §3.1 line-search
+merit never fires here (Newton converges in 1–2 iters at α=1 throughout);
+and §3.5's Forchheimer quadrature bump is a no-op because the MMS runner
+uses `ConstantSigmaLaw`. The Phase 5 changes are therefore *latent* — they
+hardened the harness for stiff-regime tests Phase 6 will unlock, without
+shifting any visible number in the current regression suite. Wall-clock
+~19 minutes (matching the post-P4 baseline within noise).
 
 ### Quick tier orthogonality test
 
@@ -106,33 +123,45 @@ extrapolates cleanly without ever tripping the safety check). The hardened
 paths will be exercised properly by Phase 6 continuation runs and the
 stiff-regime probe config that the progress doc flags as needed.
 
-### Phase 5 — Rate-affecting batch (bundle; re-baseline once)
+### Phase 5 — Rate-affecting batch — **LANDED** (`a307bcd`–`af05173`)
 
-These items each shift MMS error magnitudes slightly. The plan groups them
-to amortize re-baselining:
+Four of the five planned items landed; §3.6 was explicitly deferred
+(documented in [paper-code-divergences.md §6](paper-code-divergences.md)
+and the plan's §3.6 entry).
 
-- §3.1 block-equilibrated merit function
-- §3.5 adaptive quadrature for Forchheimer (per-reaction-law trait dispatch)
+- ~~§3.1 block-equilibrated merit function~~ — landed in `f72c819`.
+- ~~§3.5 adaptive quadrature for Forchheimer~~ — landed in `a307bcd`
+  via a `min_quadrature_degree(::AbstractReactionLaw, k_v)` trait that
+  each reaction law overrides (default 0; Forchheimer adds ⌊k_v/2⌋).
 - ~~§3.6 pressure mean removal in projection~~ — **deferred**, see
-  [paper-code-divergences.md §6](paper-code-divergences.md) and
-  [algorithm-improvement-plan.md §3.6](algorithm-improvement-plan.md) for
-  the full rationale (regime-dependence on Dirichlet/mixed BCs, Option A
-  vs Option B forms, and re-evaluation triggers).
-- §5.1 h-scaling MMS floors
-- §5.2 rate-aware plateau verification
+  [paper-code-divergences.md §6](paper-code-divergences.md).
+- ~~§5.1 h-scaling MMS floors~~ — landed in `af0bf07`.
+- ~~§5.2 rate-aware plateau verification~~ — landed in `af05173` with
+  configurable `mms_rate_check_factor` (default 100×).
 
-**§5.1 + §5.2 are the items that will let us revert the bridge floors**
-in small_test_config.json (see "Bridge state" section below). Until P5
-lands, those floors stay as regime-specific overrides.
+Re-baseline observation. small_test_config.json re-ran in ~19 min
+(matching pre-P5 wall-clock within noise). All six configs at n=160
+produced **bit-identical** u_L2 values vs the post-P4 reference
+(see the table above). All 60 (config × mesh × method) cases exited
+via `base_convergence_only` — the plateau verifier was never engaged
+in this regime, so §5.1 and §5.2 were dead code throughout. §3.1's
+line-search merit never fires here (Newton always succeeds in 1–2
+iters at α=1), and §3.5's Forchheimer bump is a no-op because the MMS
+runner uses `ConstantSigmaLaw` exclusively. The Phase 5 changes are
+therefore **latent harness improvements** — they preserve current
+behaviour bit-identical, and their effect surfaces only when:
 
-After P5: re-run small_test_config.json end-to-end and re-baseline the
-finest-mesh u_L2 table above. Expect pressure rates to improve slightly
-from §3.1 (block-equilibrated merit removing the velocity-bias in line
-search); velocity rates should be at least as good. Any regression is a
-bug, not a feature. The §3.6 improvement (constant-mode removal from
-projection-drift metric) is **not** part of this batch, so the
-post-Phase-5 baseline is the reference against which a future §3.6
-commit will be judged.
+1. Newton-OSGS has to iterate enough times for the merit's velocity-vs-
+   pressure bias to matter (stiff regimes Phase 6 unlocks).
+2. The plateau verifier is engaged (also stiff-regime / corner cells).
+3. A Forchheimer MMS variant is added (currently every MMS config
+   builds `ConstantSigmaLaw` via `build_mms_formulation`).
+
+The post-P5 baseline above is the reference against which a future §3.6
+commit will be judged for actual numerical improvement. The bridge
+floors in small_test_config.json are still in place — they're solver
+tolerances, not MMS plateau floors; reverting them is a separate cleanup
+that can happen once Phase 6 has built enough confidence to do so safely.
 
 ### Phase 6 — Continuation driver (§2.1, §2.3, ~~§2.4~~)
 
@@ -312,30 +341,30 @@ pending items are essential vs optional:
 
 ### Necessary
 
-- **Phase 5 §5.1 + §5.2 (h-scaling MMS floors and rate-aware plateau).**
-  The current bridge floors only work because `P_c ≈ 1e12` is fixed. The
-  full sweep has `P_c` from ~3 to ~1e12; no single fixed `ftol` covers it.
-  Without P5 you'd need 9 sets of regime-specific floors — impractical.
-  **Without P5, the full sweep is fundamentally not portable.**
+- ~~**Phase 5 §5.1 + §5.2.**~~ **Done** in `af0bf07` (h-scaling) and
+  `af05173` (rate-aware plateau). The plateau verifier is now
+  discretization-budget-scaled; bridge floors in `small_test_config.json`
+  can be revisited once Phase 6 has been validated.
 - **Phase 6 §2.1 (continuation driver).** The `(Re=1e6, Da=1e6, α₀=0.05)`
   corner is strong convection + strong reaction + narrow channel. Newton
   and Picard from a generic initial guess will not converge there.
   Continuation ramping `(Re, Da)` along log steps with warm starts is the
-  only way to enter those basins. **Likely the highest-impact remaining
+  only way to enter those basins. **Now the highest-impact remaining
   item; without it, corner cells of the sweep fail outright.**
 
 ### Strongly recommended (needed for some cells, not all)
 
 - **Phase 5 §3.6 (pressure mean removal).** Constant-mode pollution at
-  `α₀ = 0.05` corrupts pressure rate measurements.
-- ~~**Phase 6 §2.4 (!isfinite guards).**~~ **Done** (commit pending); six
-  symmetric guards across Stage I + OSGS-inner cascades.
+  `α₀ = 0.05` corrupts pressure rate measurements. **Deferred** with full
+  rationale in [paper-code-divergences.md §6](paper-code-divergences.md);
+  re-evaluation triggers documented there.
+- ~~**Phase 6 §2.4 (!isfinite guards).**~~ **Done** in `41c55ec`.
 - ~~**Phase 2 §3.3 (Anderson hardening).**~~ **Done** in `e702c16`.
 
 ### Nice to have
 
 - **Phase 2 §3.2 (Cholesky).** Pure speed.
-- **Phase 5 §3.1, §3.5.** Refines constants, not rates.
+- ~~**Phase 5 §3.1, §3.5.**~~ **Done** in `f72c819` and `a307bcd`.
 - **Phase 7 §3.4, §4.3.** Debugging aids.
 
 ### Not necessary
