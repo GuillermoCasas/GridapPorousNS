@@ -1,6 +1,8 @@
 # src/solvers/nonlinear.jl
 using Gridap
 using Gridap.Algebra
+using Gridap.FESpaces: get_test, num_free_dofs
+using Gridap.MultiField: MultiFieldFESpace
 using LinearAlgebra
 using SparseArrays: diag
 
@@ -190,13 +192,87 @@ function eval_safeguard_termination_bounds!(solver::SafeNewtonSolver, state::Saf
     return stop_reason, converged, should_break
 end
 
+"""
+    _detect_field_blocks(op) -> Union{Nothing, Vector{UnitRange{Int}}}
+
+Returns the per-field free-DOF index ranges of the operator's test space
+when the space is a `MultiFieldFESpace` (assumes `ConsecutiveMultiFieldStyle`,
+the only style this codebase uses). Returns `nothing` for single-field
+spaces or when the test space cannot be introspected, in which case the
+merit equilibration falls back to its legacy global rule.
+
+Gridap may wrap an `FEOperatorFromWeakForm` inside `AlgebraicOpFromFEOp`
+before it reaches `Gridap.Algebra.solve!`; the wrapper exposes only a
+`.feop` field, while the bare `FEOperatorFromWeakForm` has `.test`
+directly. This helper handles both.
+
+Used by `_update_merit_weights!` (§3.1, block-equilibrated merit).
+"""
+function _detect_field_blocks(op::NonlinearOperator)
+    test_space = nothing
+    if hasproperty(op, :feop)
+        test_space = get_test(op.feop)
+    elseif hasproperty(op, :test)
+        test_space = op.test
+    end
+
+    if test_space isa MultiFieldFESpace
+        offsets = Int[0]
+        for field in test_space.spaces
+            push!(offsets, offsets[end] + num_free_dofs(field))
+        end
+        return [(offsets[i] + 1):offsets[i + 1] for i in 1:length(offsets) - 1]
+    end
+    return nothing
+end
+
+"""
+    _update_merit_weights!(w, d_A, field_blocks)
+
+Refreshes the row-equilibration weight vector `w` used by the Armijo merit
+function `Φ = ½ ‖b./w‖²`. When `field_blocks === nothing`, falls back to the
+legacy single-block rule `w_k = max(|J_kk|, eps·‖diag J‖_∞, eps)`. Otherwise
+applies the same rule independently per field block (§3.1, block-
+equilibrated merit): the velocity rows are equilibrated against the
+velocity-block diagonal scale, the pressure rows against the pressure-
+block diagonal scale. This prevents the velocity scale from dominating the
+merit (the typical saddle-point case where pressure-pressure block has
+zero diagonal except for the stabilization term) and removes the line-
+search bias that under-weights mass-residual decrease relative to
+momentum-residual decrease.
+"""
+function _update_merit_weights!(w, d_A, field_blocks)
+    if field_blocks === nothing
+        w .= max.(abs.(d_A), eps(Float64) * norm(d_A, Inf), eps(Float64))
+    else
+        for rng in field_blocks
+            block_max = 0.0
+            @inbounds for j in rng
+                a = abs(d_A[j])
+                if a > block_max
+                    block_max = a
+                end
+            end
+            scale = max(eps(Float64) * block_max, eps(Float64))
+            @inbounds for j in rng
+                w[j] = max(abs(d_A[j]), scale)
+            end
+        end
+    end
+end
+
 function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::NonlinearOperator, b, A, dx, ls_cache)
     check_solver_parameters(solver)
-    
+
+    # Per-field DOF index ranges for block-equilibrated merit (§3.1). `nothing`
+    # if the test space is single-field, in which case the legacy global
+    # equilibration is used.
+    field_blocks = _detect_field_blocks(op)
+
     println("    [+] Evaluating initial PDE residual...")
     residual!(b, op, x)
     norm_b_inf = norm(b, Inf)
-    
+
     # Preallocate zero-allocation weights
     w = ones(length(b))
     eval_merit_W(b_vec) = 0.5 * sum(idx -> (b_vec[idx] / w[idx])^2, eachindex(b_vec))
@@ -225,9 +301,11 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         
         jacobian!(A, op, x)
         
-        # Dynamically scale the merit function using the exact Jacobian diagonal
+        # Dynamically scale the merit function using the exact Jacobian diagonal.
+        # Block-equilibrated when the test space is multi-field (§3.1); falls back
+        # to the legacy global rule for single-field problems.
         d_A = diag(A)
-        w .= max.(abs.(d_A), eps(Float64) * norm(d_A, Inf), eps(Float64))
+        _update_merit_weights!(w, d_A, field_blocks)
         state.phi_x = eval_merit_W(b)
         
         solve_failed, ls_cache = eval_linear_system_resolution!(dx, A, b, solver, ls_cache)
