@@ -423,20 +423,27 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                 
                 local_osgs_nls = SafeNewtonSolver(base_nls.ls, stab_cfg.osgs_inner_newton_iters, base_nls.max_increases, base_nls.xtol, tau_inner_m, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor, base_nls.max_linesearch_iterations, base_nls.linesearch_contraction_factor)
                 local_fesolver = FESolver(local_osgs_nls)
-                
+
+                local_osgs_nls_picard = SafeNewtonSolver(base_nls.ls, stab_cfg.osgs_inner_newton_iters, base_nls.max_increases, base_nls.xtol, sol_cfg.picard_handoff_ftol, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor, base_nls.max_linesearch_iterations, base_nls.linesearch_contraction_factor; mode=:picard)
+                local_fesolver_picard = FESolver(local_osgs_nls_picard)
+
                 res_fn_osgs(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p)
                 jac_newton_osgs(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u, pi_p=pi_p)
-                
+                jac_picard_osgs(x, dx, y) = build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p, mult_mom=1.0, mult_mass=1.0)
+
                 op_newton_osgs = FEOperator(res_fn_osgs, jac_newton_osgs, X, Y)
-                
+                op_picard_osgs = FEOperator(res_fn_osgs, jac_picard_osgs, X, Y)
+
                 x_prev = copy(get_free_dof_values(final_x0))
-                
+
+                # --- Attempt 1: OSGS Inner Newton ---
+                newton_failed = false
                 try
                     res_solve = solve!(final_x0, local_fesolver, op_newton_osgs)
                     cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
                     nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
                     iter_count += nls_cache.result.iterations
-                    
+
                     push!(diag_cache["inner_osgs_diagnostics"], (
                         iterations = nls_cache.result.iterations,
                         initial_res = nls_cache.result.initial_residual_norm,
@@ -445,20 +452,92 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                         stop_reason = nls_cache.result.stop_reason
                     ))
                     diag_cache["final_residual_norm"] = nls_cache.result.residual_norm
-                    
-                    if nls_cache.result.stop_reason == "linesearch_failed" || nls_cache.result.stop_reason == "merit_divergence_escaped" || nls_cache.result.stop_reason == "linear_solve_nan"
-                        println("        -> OSGS Inner Newton sweep failed algebraically (Reason: $(nls_cache.result.stop_reason)). Aborting OSGS nested sequence.")
-                        success = false
-                        break
+
+                    if nls_cache.result.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
+                        newton_failed = true
                     end
                 catch e
                     if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
                         println("        -> OSGS Newton 1-step interior pass dynamically executed.")
                         iter_count += 1
                     else
-                        println("        -> OSGS Newton failed. Aborting OSGS loop. Exception: ", e)
+                        println("        -> OSGS Newton threw unrecoverable exception: ", e, ". Attempting Picard fallback.")
+                        newton_failed = true
+                    end
+                end
+
+                # --- Attempt 2 (only if Newton failed): Picard smoother, then Attempt 3: Newton retry ---
+                if newton_failed
+                    println("        -> OSGS Inner Newton failed. Restoring previous iterate and engaging Picard smoother...")
+                    get_free_dof_values(final_x0) .= x_prev
+                    picard_completed = false
+                    try
+                        res_picard = solve!(final_x0, local_fesolver_picard, op_picard_osgs)
+                        cache_picard = res_picard isa Tuple ? res_picard[2] : res_picard
+                        nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
+                        iter_count += nls_cache_picard.result.iterations
+
+                        push!(diag_cache["inner_osgs_diagnostics"], (
+                            iterations = nls_cache_picard.result.iterations,
+                            initial_res = nls_cache_picard.result.initial_residual_norm,
+                            final_res = nls_cache_picard.result.residual_norm,
+                            step_norm = nls_cache_picard.result.step_norm,
+                            stop_reason = "picard:" * nls_cache_picard.result.stop_reason
+                        ))
+                        diag_cache["final_residual_norm"] = nls_cache_picard.result.residual_norm
+                        picard_completed = true
+                    catch e
+                        if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
+                            println("        -> OSGS Picard concluded smoothing loops.")
+                            picard_completed = true
+                        else
+                            println("        -> OSGS Picard threw unrecoverable exception: ", e, ". Restoring backup and aborting OSGS.")
+                            get_free_dof_values(final_x0) .= x_prev
+                        end
+                    end
+
+                    if any(!isfinite, get_free_dof_values(final_x0))
+                        println("        -> OSGS Picard catastrophically diverged. Restoring and aborting OSGS.")
+                        get_free_dof_values(final_x0) .= x_prev
                         success = false
                         break
+                    end
+
+                    if !picard_completed
+                        success = false
+                        break
+                    end
+
+                    # --- Attempt 3: re-engage Newton on the Picard-smoothed iterate ---
+                    println("        -> OSGS Picard smoothing finalized. Re-engaging Newton...")
+                    try
+                        res_solve2 = solve!(final_x0, local_fesolver, op_newton_osgs)
+                        cache_solve2 = res_solve2 isa Tuple ? res_solve2[2] : res_solve2
+                        nls_cache2 = cache_solve2 isa Tuple ? cache_solve2[2] : cache_solve2
+                        iter_count += nls_cache2.result.iterations
+
+                        push!(diag_cache["inner_osgs_diagnostics"], (
+                            iterations = nls_cache2.result.iterations,
+                            initial_res = nls_cache2.result.initial_residual_norm,
+                            final_res = nls_cache2.result.residual_norm,
+                            step_norm = nls_cache2.result.step_norm,
+                            stop_reason = "retry:" * nls_cache2.result.stop_reason
+                        ))
+                        diag_cache["final_residual_norm"] = nls_cache2.result.residual_norm
+
+                        if nls_cache2.result.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
+                            println("        -> OSGS Inner Newton retry also failed (Reason: $(nls_cache2.result.stop_reason)). Aborting OSGS nested sequence.")
+                            success = false
+                            break
+                        end
+                    catch e
+                        if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
+                            iter_count += 1
+                        else
+                            println("        -> OSGS Newton retry threw unrecoverable exception: ", e, ". Aborting OSGS loop.")
+                            success = false
+                            break
+                        end
                     end
                 end
                 
