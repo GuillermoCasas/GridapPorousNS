@@ -174,6 +174,7 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
             cache_newton = res_newton isa Tuple ? res_newton[2] : res_newton
             nls_cache = cache_newton isa Tuple ? cache_newton[2] : cache_newton
             final_res = nls_cache.result.iterations > 0 ? nls_cache.result.residual_norm : 0.0
+            diag_cache["final_residual_norm"] = final_res
             local_iters = nls_cache.result.iterations
             if final_res <= ftol
                 newton_success = true
@@ -201,6 +202,7 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                 nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
                 
                 final_res_picard = nls_cache_picard.result.residual_norm
+                diag_cache["final_residual_norm"] = final_res_picard
                 iter_count += nls_cache_picard.result.iterations
                 if final_res_picard <= ftol
                     println("      -> ASGS Initializer: Picard fully converged! Escaping to evaluation.")
@@ -226,7 +228,8 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                     nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
                     iter_count += nls_cache.result.iterations
                     final_res = nls_cache.result.residual_norm
-                    
+                    diag_cache["final_residual_norm"] = final_res
+
                     stop_reason = nls_cache.result.stop_reason
                     if stop_reason == "ftol_reached" || stop_reason == "initial_ftol"
                         println("      -> ASGS Initializer: Newton Homotopy Pass achieved exact theoretical tolerance ($ftol).")
@@ -279,6 +282,7 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                         cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
                         nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
                         iter_count += nls_cache.result.iterations
+                        diag_cache["final_residual_norm"] = nls_cache.result.residual_norm
                     catch e
                         if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
                             iter_count += 1
@@ -445,6 +449,7 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                         step_norm = nls_cache.result.step_norm,
                         stop_reason = nls_cache.result.stop_reason
                     ))
+                    diag_cache["final_residual_norm"] = nls_cache.result.residual_norm
                     
                     if nls_cache.result.stop_reason == "linesearch_failed" || nls_cache.result.stop_reason == "merit_divergence_escaped" || nls_cache.result.stop_reason == "linear_solve_nan"
                         println("        -> OSGS Inner Newton sweep failed algebraically (Reason: $(nls_cache.result.stop_reason)). Aborting OSGS nested sequence.")
