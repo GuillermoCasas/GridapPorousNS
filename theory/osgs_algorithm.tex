@@ -6,6 +6,9 @@
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, calc, fit, backgrounds, shadows.blur}
 \geometry{a4paper, margin=1in}
 
 \newcommand{\code}[1]{\texttt{\small #1}}
@@ -13,6 +16,49 @@
 \newcommand{\textstag}{\tau_{\mathrm{stag}}}
 \newcommand{\textxtol}{\tau_{\mathrm{xtol}}}
 \newcommand{\ftolinner}[1]{\tau^{\,\mathrm{inner}}_{\mathrm{ftol},#1}}
+
+% --- Extension highlighting ---------------------------------------------
+\definecolor{extcolor}{rgb}{0.00,0.35,0.70}
+\newcommand{\ext}[1]{{\color{extcolor}\textbf{[ext]}\ #1}}
+\newcommand{\extline}[1]{{\color{extcolor}#1}}
+
+% --- Module-interface card ---------------------------------------------
+% A small grey box rendered immediately above each algorithm declaration.
+% Arguments: 1=called by, 2=calls, 3=inputs, 4=outputs.
+\newtcolorbox{interfacecard}{
+    colback=gray!5, colframe=gray!55, boxrule=0.4pt, arc=2pt,
+    left=8pt, right=8pt, top=4pt, bottom=4pt,
+    width=\textwidth, before skip=4pt, after skip=2pt
+}
+\newcommand{\moduleinterface}[4]{%
+\begin{interfacecard}
+\footnotesize
+\begin{tabular}{@{}r@{\quad}p{0.82\textwidth}@{}}
+\textit{Called by:} & #1 \\
+\textit{Calls:}     & #2 \\
+\textit{Inputs:}    & #3 \\
+\textit{Outputs:}   & #4 \\
+\end{tabular}
+\end{interfacecard}
+}
+
+% Diagram styling
+\tikzset{
+    modnode/.style    = {draw, rounded corners=3pt, align=center, font=\small,
+                         inner sep=5pt, fill=blue!8, drop shadow={opacity=0.2,
+                         shadow xshift=0.5pt, shadow yshift=-0.5pt}},
+    leafnode/.style   = {modnode, fill=blue!5},
+    extnode/.style    = {modnode, fill=extcolor!10, draw=extcolor!70},
+    edge/.style       = {-{Stealth[scale=0.9]}, thick, gray!70},
+    edgelbl/.style    = {font=\scriptsize\itshape, fill=white, inner sep=1pt},
+}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=black,
+    citecolor=black
+}
 
 \title{Algorithmic Structure of the Stabilized Porous Navier--Stokes Solver}
 \author{Antigravity AI \and Project Authors}
@@ -22,29 +68,42 @@
 \maketitle
 
 \begin{abstract}
-This document specifies the complete algorithmic pipeline that drives a single
-invocation of \code{run\_simulation} in the stabilized porous Navier--Stokes
-solver. The pipeline is presented as a cascade of seven nested
-algorithms---one outermost orchestration box, three for the inner Newton
-machinery, one for the Picard globalization fallback, one for the staggered
-Orthogonal Sub-Grid Scale (OSGS) outer loop, and one for the Method of
-Manufactured Solutions (MMS) plateau verifier. For each algorithm we provide
-both rigorous pseudocode and pedagogical exposition: what the algorithm does,
-why each branch exists, how its numerical parameters influence cost and
-robustness, and how it couples to its neighbours in the cascade. A separate
-section documents three adaptations that live exclusively in the MMS sweep
-harness and do \emph{not} participate in single-shot \code{run\_simulation}
-invocations.
+\sloppy
+This document specifies the nonlinear solver pipeline that drives a
+single invocation of \code{run\_simulation} in the stabilized porous
+Navier--Stokes solver. The pipeline is presented as a strict module
+hierarchy: at the top sits the orchestrator (Algorithm O), which calls
+two mid-level routines (Algorithms B and C, the Stage I and Stage II
+solvers), each of which in turn invokes a shared Newton kernel
+(Algorithm A), which is itself composed of three leaf primitives
+(Algorithms A.1, A.2, A.3). A graphical map of this hierarchy is given
+in Section~\ref{sec:tree}. Each algorithm is documented in two parts:
+a brief \emph{interface card} listing its callers, callees, inputs and
+outputs; and a procedural pseudocode box.
+
+The presentation is organised in two strict tiers. Part~\ref{part:core}
+describes the \emph{core algorithm}. Part~\ref{part:ext} documents two
+\emph{optional extensions} that augment the core algorithm in specific
+settings: a plateau verifier based on the Method of Manufactured
+Solutions, which fires only when a candidate exact solution is supplied;
+and a parameter-sweep harness that re-tunes a small number of
+tolerances on a per-case basis. The two tiers are kept strictly
+separate: passages and algorithm-line additions belonging to the
+extensions are typeset in \extline{this colour} throughout.
 \end{abstract}
 
 \tableofcontents
 
 % ============================================================
+\part{The Core Algorithm}
+\label{part:core}
+% ============================================================
+
 \section{Overview and Algorithmic Challenges}
 \label{sec:overview}
 
-The continuous problem is the stationary, incompressible, generalized porous
-Navier--Stokes system on a domain $\Omega \subset \mathbb{R}^d$,
+The continuous problem is the stationary, incompressible, generalized
+porous Navier--Stokes system on a domain $\Omega \subset \mathbb{R}^d$,
 \begin{equation}
     \label{eq:strong}
     \begin{aligned}
@@ -56,80 +115,149 @@ Navier--Stokes system on a domain $\Omega \subset \mathbb{R}^d$,
     \nabla \cdot \boldsymbol{u} &= 0,
     \end{aligned}
 \end{equation}
-discretised by an equal-order Lagrangian pair $(\boldsymbol{V}_h, Q_h)$ of
-degree $(k_v, k_p) = (k, k)$ and stabilised by a Variational Multiscale (VMS)
-formulation. The drag tensor $\sigma(\alpha, \boldsymbol{u})
-= a(\alpha) + b(\alpha) |\boldsymbol{u}|$ couples the Darcy--Forchheimer regime
-to the convective momentum balance; the porosity field $\alpha$ varies in
-space, and the high-$\mathrm{Re}$, high-$\mathrm{Da}$ regimes the solver must
-handle are exactly those in which the system becomes simultaneously
+discretised by an equal-order Lagrangian pair $(\boldsymbol{V}_h, Q_h)$
+of degree $(k_v, k_p) = (k, k)$ and stabilised by a Variational
+Multiscale (VMS) formulation. The drag tensor
+$\sigma(\alpha, \boldsymbol{u}) = a(\alpha) + b(\alpha) |\boldsymbol{u}|$
+couples the Darcy--Forchheimer regime to the convective momentum
+balance; the porosity field $\alpha$ varies in space, and the
+high-$\mathrm{Re}$, high-$\mathrm{Da}$ regimes the solver must handle
+are exactly those in which the system becomes simultaneously
 convection-dominated, reaction-dominated, and stiff.
 
-Two algorithmic challenges follow.
-
 \paragraph{Nonlinearity from convection and Forchheimer drag.}  Newton's
-method converges quadratically once the iterate enters its quadratic basin,
-but locating that basin from an arbitrary initial guess is non-trivial when
-both $\boldsymbol{u}\cdot\nabla\boldsymbol{u}$ and the $|\boldsymbol{u}|$
-factor in $\sigma$ amplify any error in $\boldsymbol{u}$. Outside the basin,
-a raw Newton step typically over-corrects, and the merit function
-$\Phi(\boldsymbol{x}) = \tfrac{1}{2}\|\boldsymbol{b}(\boldsymbol{x})\|^2$
-grows. The solver must detect this divergence and respond---either by
-shortening the step (line search), by switching the iteration map to one with
-a wider basin of attraction (Picard), or by aborting cleanly.
+method converges quadratically once the iterate enters its quadratic
+basin, but locating that basin from an arbitrary initial guess is
+non-trivial when both $\boldsymbol{u}\cdot\nabla\boldsymbol{u}$ and the
+$|\boldsymbol{u}|$ factor in $\sigma$ amplify any error in
+$\boldsymbol{u}$. The solver must detect divergence and respond---either
+by shortening the step (line search), by switching to an iteration map
+with a wider basin (Picard), or by aborting cleanly.
 
 \paragraph{Implicit OSGS projection.}  In the Orthogonal Sub-Grid Scale
 formulation the sub-grid component lives in the orthogonal complement
 $\mathcal{X}_{h0}^{\perp}$ of the finite element space; in practice the
-projection $\boldsymbol{\pi}_h \in \mathcal{X}_h$ of the strong residual is
-computed, and the sub-grid scale is identified with $(I-\Pi_h)\mathcal{R}$.
-The projection itself depends on the primary fields $U_h = (\boldsymbol{u}_h,
-p_h)$, so a fully monolithic Jacobian would embed the
-Fr\'echet derivative of an $L^2$ projection operator. Rather than carrying
-this dense block, the solver freezes $\boldsymbol{\pi}_h$, solves the
-nonlinear primary system, then re-projects, in a staggered (block-coordinate)
-fixed point.
+projection $\boldsymbol{\pi}_h \in \mathcal{X}_h$ of the strong residual
+is computed, and the sub-grid scale is identified with
+$(I-\Pi_h)\mathcal{R}$. The projection itself depends on
+$U_h = (\boldsymbol{u}_h, p_h)$, so a fully monolithic Jacobian would
+embed the Fr\'echet derivative of an $L^2$ projection operator. Rather
+than carrying this dense block, the solver freezes $\boldsymbol{\pi}_h$,
+solves the nonlinear primary system, then re-projects, in a staggered
+(block-coordinate) fixed point.
 
-\paragraph{Architecture of the response.}  The architecture that emerges is a
-two-stage cascade. \emph{Stage~I} drives the algebraic system to a converged
-ASGS state, regardless of the final stabilization method requested. It
-composes an exact-Newton attempt, a Picard fallback, and a final Newton
-polish (Algorithms~\ref{alg:A} and~\ref{alg:B}). \emph{Stage~II} either
-reports the ASGS state directly or, when the user has selected OSGS, runs
-a staggered outer loop on $(U_h, \boldsymbol{\pi}_h)$ initialised at the
-Stage~I solution (Algorithm~\ref{alg:C}). An optional MMS verifier
-(Algorithm~\ref{alg:D}) extends each Stage~II loop with a plateau test that
-distinguishes \emph{algebraic} convergence (small nonlinear residual) from
-\emph{discretisation} convergence (small error against an exact solution).
-The outermost orchestration (Algorithm~\ref{alg:O}) wires all of these
-together. The reader who wants a single mental model should hold:
+\paragraph{Architecture of the response.}  The architecture that emerges
+is a two-stage cascade. \emph{Stage~I} drives the algebraic system to a
+converged ASGS state, regardless of the final stabilization method
+requested. \emph{Stage~II} either reports the ASGS state directly or,
+when the user has selected OSGS, runs a staggered outer loop on
+$(U_h, \boldsymbol{\pi}_h)$ initialised at the Stage~I solution. The
+outermost orchestration (Algorithm~\ref{alg:O}) wires all of these
+together.
 
 \begin{quote}
 \itshape
-ASGS is always run first; OSGS, when requested, refines the ASGS state by
-a staggered projection loop; MMS verification, when enabled, runs as a
-plateau gate sitting at the top of whichever Stage~II loop is active.
+ASGS is always run first; OSGS, when requested, refines the ASGS state
+through a staggered projection loop.
 \end{quote}
+
+% ============================================================
+\section{Module Hierarchy}
+\label{sec:tree}
+
+The algorithms below are organised in a strict call hierarchy. The
+orchestrator (Algorithm~\ref{alg:O}) sits at the top and dispatches to
+two stage solvers (Algorithms~\ref{alg:B} and~\ref{alg:C}), both of
+which build on a single shared Newton kernel
+(Algorithm~\ref{alg:A}). The Newton kernel itself is built from three
+leaf primitives (Algorithms~\ref{alg:A1}, \ref{alg:A2}, \ref{alg:A3}).
+Figure~\ref{fig:hierarchy} shows the full tree.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[node distance=14mm and 10mm]
+
+\node[modnode] (O)
+    {\textbf{Algorithm~\ref{alg:O}}\\$\mathrm{SimulationOrchestration}$\\
+     \footnotesize entry point};
+
+\node[modnode, below left=18mm and 22mm of O] (B)
+    {\textbf{Algorithm~\ref{alg:B}}\\$\mathrm{RobustNonlinearCascade}$\\
+     \footnotesize Newton$\to$Picard$\to$Newton cascade};
+
+\node[modnode, below right=18mm and 22mm of O] (C)
+    {\textbf{Algorithm~\ref{alg:C}}\\$\mathrm{OSGSFractionalRelaxation}$\\
+     \footnotesize Stage~II (OSGS mode)};
+
+\node[modnode, below=30mm of O] (A)
+    {\textbf{Algorithm~\ref{alg:A}}\\$\mathrm{ExactNewtonPipeline}$\\
+     \footnotesize shared Newton kernel};
+
+\node[leafnode, below left=14mm and 8mm of A] (A1)
+    {\textbf{Algorithm~\ref{alg:A1}}\\$\mathrm{SolveLinearSystem}$};
+\node[leafnode, below=14mm of A] (A2)
+    {\textbf{Algorithm~\ref{alg:A2}}\\$\mathrm{ArmijoLinesearch}$};
+\node[leafnode, below right=14mm and 8mm of A] (A3)
+    {\textbf{Algorithm~\ref{alg:A3}}\\$\mathrm{EvaluateSafeguards}$};
+
+\draw[edge] (O.south) to[bend right=12]
+    node[edgelbl, midway] {Stage~I} (B.north);
+\draw[edge] (O.south) to[bend left=12]
+    node[edgelbl, midway] {Stage~II (OSGS only)} (C.north);
+\draw[edge] (B.south) to[bend right=5]
+    node[edgelbl, midway, fill=white] {Newton / Picard mode} (A.north west);
+\draw[edge] (C.south) to[bend left=5]
+    node[edgelbl, midway, fill=white] {inner cascade (per outer iter.)} (A.north east);
+\draw[edge, dashed] (C.west) to[bend right=20]
+    node[edgelbl, midway, fill=white] {reuses (Alg.~\ref{alg:B})} (B.east);
+\draw[edge] (A.south) -- (A1.north);
+\draw[edge] (A.south) -- (A2.north);
+\draw[edge] (A.south) -- (A3.north);
+
+\end{tikzpicture}
+\caption{Module hierarchy of the core algorithm. Arrows point from
+caller to callee. Each edge is annotated with the calling context.
+Algorithm~\ref{alg:A} is the shared workhorse: Algorithm~\ref{alg:B}
+invokes it three times in sequence (Newton, then Picard, then Newton)
+with different Jacobians, and is itself reused by Algorithm~\ref{alg:C}
+once per staggered outer iteration with the projection
+$\boldsymbol{\pi}_h$ frozen (the dashed edge). Leaf primitives
+A.1--A.3 are pure procedures with no further dependencies.}
+\label{fig:hierarchy}
+\end{figure}
+
+\paragraph{Reading order.}  This document presents the modules
+top-down: first the orchestrator (§\ref{sec:orchestration}), then the
+two stage solvers (§\ref{sec:picard}, §\ref{sec:osgs}), then the shared
+Newton kernel and its leaves (§\ref{sec:newton}). Each algorithm is
+introduced by a short \emph{interface card} that summarises its
+position in the tree---callers, callees, inputs, outputs---before the
+procedural box. Mathematical preliminaries shared by several algorithms
+(the diagonally equilibrated merit function and its directional
+derivative identity) are gathered in §\ref{sec:math-prelim}.
 
 % ============================================================
 \section{Parameter Taxonomy and Code Equivalence}
 \label{sec:params}
 
-\subsection{Numerical parameters}
+\subsection{Numerical parameters of the core algorithm}
 
-Table~\ref{tab:params} enumerates every numerical parameter consumed by the
-algorithms below, grouped by role. Parameters marked \emph{harness-only} live
-in the configuration schema but are read \emph{only} by the MMS sweep harness
-(\code{test/extended/ManufacturedSolutions/run\_test.jl}); see
-Section~\ref{sec:harness}. All remaining parameters participate in a single
-\code{run\_simulation} call.
+Table~\ref{tab:params} enumerates every numerical parameter consumed by
+the algorithms of Part~\ref{part:core}, grouped by role. Parameters
+that belong to the optional extensions of Part~\ref{part:ext} are
+tabulated separately in the corresponding sections.
 
 \begin{table}[h]
 \centering
-\caption{Numerical parameters of the nonlinear solver pipeline. The
-``Effect'' column summarises the dominant influence of each parameter on
-robustness or cost. Each parameter participates in every \code{run\_simulation}
-call except those flagged \emph{harness-only}; see Section~\ref{sec:harness}.}
+\caption{Numerical parameters of the core nonlinear-solver pipeline.
+Throughout the table, $\code{sol} = \code{config.numerical\_method.solver}$
+(a flat \code{SolverConfig} \code{@kwdef} struct) and
+$\code{stab} = \code{config.numerical\_method.stabilization}$. The
+\code{SafeNewtonSolver} struct that runs the inner cascade is built from
+these fields by \code{SafeNewtonSolver(::LinearSolver, ::SolverConfig)};
+its post-construction field names (e.g.\ \code{c1}, \code{max\_iters})
+are shorter aliases of the config field names. Code-side references in
+this table are written against the config struct, not the built solver.}
 \label{tab:params}
 \footnotesize
 \begin{tabularx}{\textwidth}{@{} l l X @{}}
@@ -139,100 +267,189 @@ call except those flagged \emph{harness-only}; see Section~\ref{sec:harness}.}
 \multicolumn{3}{l}{\emph{Inner Newton iteration controls}} \\
 $N_{\mathrm{N}}$         & \code{sol.newton\_iterations}           & Cap on inner Newton iterations. \\
 $N_{\mathrm{P}}$         & \code{sol.picard\_iterations}           & Cap on Picard fallback iterations. \\
-$N_{\mathrm{inc}}$       & \code{sol.max\_increases}               & Consecutive merit-function expansions tolerated before declaring divergence. Smaller is stricter; larger is more permissive at the cost of slower failure detection. \\
+$N_{\mathrm{inc}}$       & \code{sol.max\_increases}               & Consecutive merit-function expansions tolerated before declaring divergence. \\
 $\textftol$              & \code{sol.ftol}                          & Terminal residual tolerance in $\ell^\infty$; the dominant convergence criterion. \\
 $\textxtol$              & \code{sol.xtol}                          & Lower bound on the accepted step norm $\|\alpha\delta\boldsymbol{x}\|$ before declaring coordinate stagnation. \\
 $\textstag$              & \code{sol.stagnation\_noise\_floor}      & Noise-floor residual; a non-converged exit below this may still be classified as success (Sec.~\ref{sec:falseEquiv}). \\
-$\alpha_{\min}$          & \code{sol.linesearch\_alpha\_min}        & Smallest line-search step before giving up. Smaller means more aggressive descent, but more failed Newton iterations per outer call. \\
-$c_1$                    & \code{sol.armijo\_c1}                    & Armijo descent constant. Smaller means easier step acceptance and a weaker guarantee. \\
-$\gamma$                 & \code{sol.linesearch\_contraction\_factor} & Backtracking factor: $\alpha \leftarrow \gamma\alpha$. Smaller tries fewer step sizes but explores more coarsely. \\
+$\alpha_{\min}$          & \code{sol.linesearch\_alpha\_min}        & Smallest line-search step before giving up. \\
+$c_1$                    & \code{sol.armijo\_c1}                    & Armijo / monotone-residual descent constant. \\
+$\gamma$                 & \code{sol.linesearch\_contraction\_factor} & Backtracking factor: $\alpha \leftarrow \gamma\alpha$. \\
 $N_{\mathrm{ls}}$        & \code{sol.max\_linesearch\_iterations}   & Bound on line-search inner iterations. \\
-$F_{\mathrm{div}}$       & \code{sol.divergence\_merit\_factor}     & Threshold by which the merit must expand to count as one ``increase''. Smaller is a stricter divergence detector. \\
+$F_{\mathrm{div}}$       & \code{sol.divergence\_merit\_factor}     & Threshold by which the merit must expand to count as one ``increase''. \\
+$\mathfrak{m}$           & (built into the \code{SafeNewtonSolver} as \code{.mode})  & Cascade mode: \code{:newton} (merit-Armijo) or \code{:picard} (monotone residual reduction); cf.\ §\ref{sec:dir-deriv} and Alg.~\ref{alg:A2}. \\
 \code{freeze\_cusp} & \code{sol.freeze\_jacobian\_cusp}   & Boolean: skip Jacobian recomputation at Forchheimer cusps to avoid singular updates. \\
 \midrule
 \multicolumn{3}{l}{\emph{OSGS staggered outer loop}} \\
 $N_{\mathrm{OSGS}}$      & \code{stab.osgs\_iterations}             & Cap on outer (staggered) iterations. \\
-$N_{\mathrm{inner}}$     & \code{stab.osgs\_inner\_newton\_iters}   & Cap on inner Newton iterations per outer step. Smaller makes each sweep cheap and forces more outer iterations; larger means a deeper inner solve and fewer outer iterations. \\
+$N_{\mathrm{inner}}$     & \code{stab.osgs\_inner\_newton\_iters}   & Cap on inner Newton iterations per outer step. \\
 $\tau_{\mathrm{OSGS}}$   & \code{stab.osgs\_tolerance}              & Tolerance on the state drift $d_{\mathrm{state}}^m$. \\
 $\tau_{\mathrm{proj}}$   & \code{stab.osgs\_projection\_tolerance}  & Tolerance on the mass-weighted projection drift $d_{\pi}^m$. \\
-$m_{\mathrm{w}}$         & \code{stab.osgs\_warmup\_iterations}     & Outer iterations during which the inner Newton uses a relaxed tolerance, to avoid polishing iterates against a stale projection. \\
-$\tau_{\mathrm{w}}$      & \code{stab.osgs\_warmup\_tolerance}      & Relaxed inner tolerance during warmup; the effective inner tolerance is $\max(\textftol,\tau_{\mathrm{w}})$. \\
-$\mathsf{Mode}_{\mathrm{drift}}$ & \code{stab.osgs\_state\_drift\_scale} & Drift metric: \code{Linf} (raw $\ell^\infty$ on DOFs) or \code{L2\_mass} (per-block continuous $L^2(\Omega)$). See Sec.~\ref{sec:drift-modes}. \\
-$\mathsf{Mode}_{\mathrm{stop}}$  & \code{stab.osgs\_stopping\_mode}      & Convergence predicate: \code{state\_drift}, \code{projection\_drift}, or \code{both} (conjunction; the default). \\
-$m$, $\beta$             & \code{sol.accelerator.\{m,relaxation\_factor\}} & Anderson history depth and damping. The accelerator is enabled by setting \code{sol.accelerator.type} to \code{"Anderson"}. \\
-\midrule
-\multicolumn{3}{l}{\emph{MMS plateau verification}} \\
-$N_{\mathrm{plat}}$      & \code{mms.require\_consecutive\_passes}  & Consecutive passes of $r_{\max} \le \tau_{\mathrm{err}}$ required before declaring a plateau. \\
-$\tau_{\mathrm{err}}$    & \code{mms.tau\_err}                       & Relative-change tolerance against which $r_{\max}$ is tested. \\
-$\varepsilon_{u,L^2}, \varepsilon_{u,H^1}, \varepsilon_{p,L^2}$ & \code{mms.eps\_u\_l2,\_u\_h1,\_p\_l2} & Per-norm floors guarding the denominator in $r_{\max}$. \\
-$K_{\mathrm{extra}}$     & \code{mms.max\_extra\_cycles}             & Cap on extension cycles (ASGS path) or staggered iterations added to the OSGS budget (OSGS path) for plateau verification. \\
-\midrule
-\multicolumn{3}{l}{\emph{Harness-only adaptations} (Section~\ref{sec:harness})} \\
-$C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{sol.dynamic\_ftol\_ceiling}, \code{\_spatial\_safety\_factor} & Clamps for the adaptive $\textftol$ rule of Sec.~\ref{sec:harness-ftol}. \\
-$n^{\mathrm{base}}, n^{\min}, n^{\mathrm{sf}}$ & \code{sol.condition\_noise\_floor\_*} & Adaptive noise-floor controls (Sec.~\ref{sec:harness-noise}). \\
-$\mathrm{Re}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Re}}$ & \code{sol.dynamic\_picard\_re\_*} & Per-case Picard widening trigger and budget for high Reynolds. \\
-$\mathrm{Da}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Da}}$ & \code{sol.dynamic\_picard\_da\_*} & Per-case Picard widening trigger and budget for high Damk\"ohler. \\
+$m_{\mathrm{w}}$         & \code{stab.osgs\_warmup\_iterations}     & Outer iterations during which the inner Newton uses a relaxed tolerance. \\
+$\tau_{\mathrm{w}}$      & \code{stab.osgs\_warmup\_tolerance}      & Relaxed inner tolerance during warmup. \\
+$\mathsf{Mode}_{\mathrm{drift}}$ & \code{stab.osgs\_state\_drift\_scale} & Drift metric: \code{Linf} or \code{L2\_mass}. See Sec.~\ref{sec:drift-modes}. \\
+$\mathsf{Mode}_{\mathrm{stop}}$  & \code{stab.osgs\_stopping\_mode}      & Convergence predicate: \code{state\_drift}, \code{projection\_drift}, or \code{both}. \\
+$m$, $\beta$             & \code{sol.accelerator.\{m,relaxation\_factor\}} & Anderson history depth and damping. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \subsection{Algorithm--to--code correspondence}
 
-Table~\ref{tab:functions} pins each algorithm presented below to its Julia
-entry point.
-
 \begin{table}[h]
 \centering
-\caption{Algorithm $\leftrightarrow$ code signature mapping.}
+\caption{Algorithm $\leftrightarrow$ code signature mapping (core algorithm).}
 \label{tab:functions}
 \small
 \begin{tabularx}{\textwidth}{@{} l X @{}}
 \toprule
 \textbf{Algorithm} & \textbf{Code entry point} \\
 \midrule
-$\mathrm{SimulationOrchestration}$ (Alg.~\ref{alg:O})   & \code{run\_simulation(path)} $\to$ \code{solve\_system(setup, form, solvers, cfg, x0)} (\code{src/run\_simulation.jl}, \code{src/solvers/porous\_solver.jl}). \\
-$\mathrm{ExactNewtonPipeline}$ (Alg.~\ref{alg:A})       & \code{Gridap.Algebra.solve!(x, FESolver(SafeNewtonSolver(\dots)), op)} dispatching into \code{\_safe\_solve\_inner!} (\code{src/solvers/nonlinear.jl}). The same routine is reused with an \code{ExactNewtonMode()} Jacobian or a Picard Jacobian; the safeguard logic does not change. \\
+$\mathrm{SimulationOrchestration}$ (Alg.~\ref{alg:O})   & \code{run\_simulation(path)} $\to$ \code{solve\_system(setup, form, solvers, cfg, x0)}. \\
+$\mathrm{RobustNonlinearCascade}$ (Alg.~\ref{alg:B})    & The Newton$\to$Picard$\to$Newton cascade inside \code{solve\_system}; appears twice---once for Stage~I (ASGS operators, $\boldsymbol{x}^0_{\mathrm{backup}}$) and once inside the OSGS outer-loop body of Algorithm~\ref{alg:C} (OSGS operators, $\boldsymbol{x}_{\mathrm{prev}}$ at the start of each outer iteration). \\
+$\mathrm{OSGSFractionalRelaxation}$ (Alg.~\ref{alg:C})  & The OSGS staggered loop inside \code{solve\_system}. \\
+$\mathrm{ExactNewtonPipeline}$ (Alg.~\ref{alg:A})       & \code{\_safe\_solve\_inner!} (\code{src/solvers/nonlinear.jl}), reused with either an exact-Newton or a Picard Jacobian. \\
 $\mathrm{SolveLinearSystem}$ (Alg.~\ref{alg:A1})        & \code{eval\_linear\_system\_resolution!(dx, A, b, solver, cache)}. \\
-$\mathrm{ArmijoLinesearch}$ (Alg.~\ref{alg:A2})         & \code{eval\_armijo\_linesearch\_pass!(x, x\_old, b, dx, op, dir\_deriv, solver, w, state)}. \\
-$\mathrm{EvaluateSafeguards}$ (Alg.~\ref{alg:A3})       & \code{eval\_safeguard\_termination\_bounds!(solver, state)}. \\
-$\mathrm{PicardFallback}$ (Alg.~\ref{alg:B})            & The Newton$\to$Picard$\to$Newton cascade in \code{solve\_system}, lines 169--246 of \code{src/solvers/porous\_solver.jl}. \\
-$\mathrm{OSGSFractionalRelaxation}$ (Alg.~\ref{alg:C})  & The \code{for osgs\_iter in 1:eff\_osgs\_iters} block in \code{solve\_system}, lines 340--615. \\
-$\mathrm{VerifyMMSPlateau}$ (Alg.~\ref{alg:D})          & The extended-cycle loop in \code{solve\_system} (ASGS entry, lines 258--337) and the in-loop plateau gate (OSGS entry, lines 546--587). \\
+$\mathrm{ArmijoLinesearch}$ (Alg.~\ref{alg:A2})         & \code{eval\_armijo\_linesearch\_pass!}. \\
+$\mathrm{EvaluateSafeguards}$ (Alg.~\ref{alg:A3})       & \code{eval\_safeguard\_termination\_bounds!}. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 % ============================================================
-\section{The Outermost Orchestration: \texorpdfstring{Algorithm~\ref{alg:O}}{Algorithm O}}
+\section{Mathematical Preliminaries}
+\label{sec:math-prelim}
+
+Two mathematical objects are referenced repeatedly by several
+algorithm boxes below. We define them once here so that the boxes
+themselves remain procedural.
+
+\subsection{The diagonally equilibrated merit function}
+\label{sec:merit}
+
+Let $\boldsymbol{b}(\boldsymbol{x}) \in \mathbb{R}^N$ be the assembled
+residual of the (possibly stabilised) discrete weak form, and
+$\mathcal{J}(\boldsymbol{x}) = \partial \boldsymbol{b}/\partial \boldsymbol{x}$
+its Jacobian. The line-search merit function used throughout the
+cascade is the diagonally equilibrated quadratic
+\begin{equation}
+    \label{eq:merit}
+    \Phi_{\boldsymbol{w}}(\boldsymbol{x})
+        = \tfrac{1}{2} \sum_{k=1}^{N}
+            \left( \frac{b_k(\boldsymbol{x})}{w_k} \right)^{2}.
+\end{equation}
+The weights $w_k$ are recomputed at every Newton iteration from the
+diagonal of the current Jacobian. Their definition is mode-dependent:
+when the discrete trial space is a multi-field FE space with a
+$\mathrm{ConsecutiveMultiFieldStyle}$ DOF ordering (the only case used
+in this codebase: velocity $\oplus$ pressure), the equilibration is
+performed \emph{per block}. Let $\{\mathcal{B}_q\}_{q}$ denote the
+disjoint per-field DOF index ranges (so $\bigcup_q \mathcal{B}_q
+= \{1,\dots,N\}$). Then
+\begin{equation}
+    \label{eq:merit-weights}
+    w_k =
+    \begin{cases}
+        \max\!\bigl(|\mathcal{J}_{kk}|,\ \varepsilon_{\mathrm{mach}}\,
+            \max_{j \in \mathcal{B}_{q(k)}} |\mathcal{J}_{jj}|,\
+            \varepsilon_{\mathrm{mach}} \bigr)
+            & \text{multi-field, $k \in \mathcal{B}_{q(k)}$,} \\[1mm]
+        \max\!\bigl(|\mathcal{J}_{kk}|,\ \varepsilon_{\mathrm{mach}}\,
+            \|\mathrm{diag}(\mathcal{J})\|_\infty,\
+            \varepsilon_{\mathrm{mach}} \bigr)
+            & \text{single-field fallback.}
+    \end{cases}
+\end{equation}
+The first form is the production rule for the saddle-point system at
+issue; the second is the legacy global rule, retained only for the
+unrealistic single-field case in which $\mathcal{B}_q$ cannot be
+detected.
+
+\paragraph{Why equilibrate?}  The discrete residual mixes momentum-balance
+rows---measured in physical units of force per unit volume, and possibly
+amplified by a large Reynolds or Damk\"ohler number---with mass-balance
+rows, whose natural magnitude is dimensionally different. A raw unweighted
+merit $\tfrac{1}{2}\|\boldsymbol{b}\|^2$ would let the momentum rows
+dominate entirely, so the line search would be quietly indifferent to
+mass-conservation errors. Equilibrating by $w_k$ rescales every row to
+its own natural unit. The lower-bound floor
+$\varepsilon_{\mathrm{mach}}\,\max_{j \in \mathcal{B}_{q(k)}} |\mathcal{J}_{jj}|$
+prevents a genuinely small diagonal entry from triggering division by
+zero.
+
+\paragraph{Why per block?}  A global $\|\mathrm{diag}(\mathcal{J})\|_\infty$
+in the floor would be dominated by the momentum-block diagonal whenever
+the Reynolds or Darcy regime is severe; the pressure-block floor
+would then be so close to $\varepsilon_{\mathrm{mach}}\,$(momentum scale)
+that mass-residual rows would still be effectively un-weighted relative
+to momentum-residual rows, defeating the equilibration entirely. The
+per-block floor scales each field's residual against \emph{its own}
+diagonal magnitudes, which is the only choice that gives the line search
+a faithful view of mass-residual descent.
+
+\subsection{The Gauss--Newton directional-derivative identity}
+\label{sec:dir-deriv}
+
+For a Newton step $\delta\boldsymbol{x}$ satisfying
+$\mathcal{J}\delta\boldsymbol{x} = \boldsymbol{b}$, the directional
+derivative of $\Phi_{\boldsymbol{w}}$ along $-\delta\boldsymbol{x}$ at
+$\boldsymbol{x}$ is
+\begin{equation}
+    \label{eq:dir-deriv}
+    D \;=\; -\sum_k w_k^{-2}\, b_k\,(\mathcal{J}\delta\boldsymbol{x})_k
+        \;=\; -\sum_k w_k^{-2}\, b_k^2
+        \;=\; -2\,\Phi_{\boldsymbol{w}}(\boldsymbol{x}).
+\end{equation}
+The Newton-mode Armijo predicate of Algorithm~\ref{alg:A2} therefore
+reduces to $\hat\Phi \le \Phi(1 - 2 c_1 \alpha)$, which requires no extra
+gradient evaluation.
+
+\paragraph{Picard mode invalidates the identity.}  The identity~\eqref{eq:dir-deriv}
+holds \emph{only} because the search direction is the exact Newton step.
+The Picard Jacobian drops the linearised convective cross-term and the
+linearised Forchheimer term (cf.\ §\ref{sec:picard}), so the resulting
+$\delta\boldsymbol{x}$ does not satisfy $\mathcal{J}\delta\boldsymbol{x}
+= \boldsymbol{b}$ for the true $\mathcal{J}$; the cancellation in the
+second equality above breaks and $D$ is in general not $-2\Phi$. Forcing
+the merit-based Armijo predicate on a Picard step would either reject
+descent directions for the wrong reason or accept ascent directions
+spuriously. The implementation therefore branches the acceptance test by
+solver mode: Newton uses the merit-based Armijo above; Picard uses the
+monotone residual reduction
+$\|\hat{\boldsymbol{b}}\|_\infty \le (1 - c_1 \alpha)\|\boldsymbol{b}\|_\infty$,
+which is mode-agnostic because it depends only on the residuals at the
+two iterates. This branching is shown explicitly inside
+Algorithm~\ref{alg:A2}.
+
+% ============================================================
+\section{The Top: Algorithm O (Orchestrator)}
 \label{sec:orchestration}
 
-The orchestration drives one simulation end-to-end. Its central organising
-principle is the two-stage cascade described in
-Section~\ref{sec:overview}: an unconditional ASGS algebraic
-initialisation followed by a method-dependent dispatch. Notice that
-Stage~I runs even when the user has requested OSGS, because the staggered
-projection loop is much better conditioned when initialised at a converged
-ASGS state than at a zero initial guess.
+The orchestration drives one simulation end-to-end. Its central
+organising principle is a two-stage cascade: an unconditional ASGS
+algebraic initialisation followed by a method-dependent dispatch.
+Stage~I runs even when the user has requested OSGS, because the
+staggered projection loop is much better conditioned when initialised
+at a converged ASGS state than at a zero initial guess.
+
+\moduleinterface
+    {(top-level entry point; not called from elsewhere)}
+    {Algorithm~\ref{alg:B} (Stage~I); Algorithm~\ref{alg:C} (Stage~II, OSGS mode only)}
+    {Configuration $\Theta$ (validated JSON)}
+    {Final fields $(u_h, p_h, \boldsymbol{\pi}_h)$; success flag $S$}
 
 \begin{algorithm}[H]
 \caption{$\mathrm{SimulationOrchestration}$: end-to-end driver.}
 \label{alg:O}
 \SetAlgoLined
-\KwIn{Configuration path $P$.}
-\KwOut{$(u_h, p_h, \boldsymbol{\pi}_h)$, success flag $S$, total inner-iteration count.}
+\KwIn{Configuration $\Theta$.}
+\KwOut{$(u_h, p_h, \boldsymbol{\pi}_h)$, success flag $S$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
 
-$\Theta \gets \mathrm{load\_config\_with\_defaults}(P)$ \tcp*{validate; reject unknown keys}
-$M \gets \mathrm{build\_default\_mesh}(\Theta)$\;
-$(X, Y, k_v, k_p) \gets \mathrm{build\_fe\_spaces}(M, \Theta)$ \tcp*{Dirichlet-constrained trial/test pairs}
-$(V_{\mathrm{free}}, Q_{\mathrm{free}}) \gets$ unconstrained mirrors of $(X,Y)$ \tcp*{projection spaces}
-$F \gets \mathrm{build\_formulation}(\Theta)$ \tcp*{viscous + reaction + $\tau$ + projection policy}
-$T \gets \mathrm{FETopology}(X,Y,M,\Omega,\mathrm{d}\Omega,V_{\mathrm{free}},Q_{\mathrm{free}}, h, \boldsymbol{f}, \alpha)$\;
-$\boldsymbol{x}^{0} \gets \mathrm{interpolate\_everywhere}(0, X)$\;
+build mesh $M$, FE pair $(X, Y)$, unconstrained mirrors $(V_{\mathrm{free}}, Q_{\mathrm{free}})$, formulation $F$, topology $T$, initial guess $\boldsymbol{x}^{0}$\;
 
 \vspace{0.15cm}
 \tcc{\textbf{Stage I.} Algebraic initialisation in ASGS mode ($\boldsymbol{\pi}_h \equiv 0$).}
-$(S, U_h^{\mathrm{ASGS}}) \gets \mathrm{PicardFallback}(\boldsymbol{x}^0,\ \boldsymbol{x}^0_{\mathrm{backup}})$ \tcp*{Alg.~\ref{alg:B}}
+$(S, U_h^{\mathrm{ASGS}}) \gets \mathrm{RobustNonlinearCascade}(\boldsymbol{x}^0,\ \boldsymbol{x}^0_{\mathrm{backup}},\ \mathrm{op}_{\mathrm{N}}^{\mathrm{ASGS}},\ \mathrm{op}_{\mathrm{P}}^{\mathrm{ASGS}})$ \tcp*{Alg.~\ref{alg:B}}
 \If{\textnormal{\textbf{not }} $S$}{
     \Return failure (no fields written)\;
 }
@@ -240,126 +457,177 @@ $(S, U_h^{\mathrm{ASGS}}) \gets \mathrm{PicardFallback}(\boldsymbol{x}^0,\ \bold
 \vspace{0.15cm}
 \tcc{\textbf{Stage II.} Method dispatch.}
 \If{$\Theta.\mathrm{method} = \mathrm{ASGS}$}{
-    \If{$\Theta.\mathrm{mms}.\mathrm{enabled}$}{
-        run $K_{\mathrm{extra}}$ extension cycles, calling $\mathrm{VerifyMMSPlateau}$ each cycle (Alg.~\ref{alg:D}, ASGS entry)\;
-    }
-    \Return $(U_h^{\mathrm{ASGS}}, \boldsymbol{\pi}_h \equiv 0, \dots)$\;
+    \extline{\If{$\code{mms\_cfg.enabled}$}{
+        $I_{\mathrm{pass}} \gets 0$;\quad initialise plateau-history $\mathcal{H}$ at $U_h^{\mathrm{ASGS}}$\;
+        \For{$\mathrm{cycle} = 1, \dots, K_{\mathrm{extra}}$}{
+            run one Newton iteration on top of $U_h^{\mathrm{ASGS}}$\;
+            $(S_{\mathrm{plat}}, I_{\mathrm{pass}}) \gets \mathrm{VerifyMMSPlateau}(\dots)$ \tcp*{Alg.~\ref{alg:D}}
+            \If{$S_{\mathrm{plat}}$}{ \textbf{break}\; }
+        }
+    }}
+    \Return $(U_h^{\mathrm{ASGS}}, \boldsymbol{\pi}_h \equiv 0)$\;
 }
 \If{$\Theta.\mathrm{method} = \mathrm{OSGS}$}{
     pre-assemble and LU-factor $M_u = (V_{\mathrm{free}}, U_{\mathrm{free}})_{L^2}$, $M_p = (Q_{\mathrm{free}}, P_{\mathrm{free}})_{L^2}$ once\;
-    $\boldsymbol{\pi}_h^{0} \gets L^2$-projection of $\mathcal{R}(U_h^{\mathrm{ASGS}})$ onto $(V_{\mathrm{free}}, Q_{\mathrm{free}})$\;
-    run $\mathrm{OSGSFractionalRelaxation}(U_h^{\mathrm{ASGS}}, \boldsymbol{\pi}_h^{0})$ (Alg.~\ref{alg:C}) \tcp*{embeds Alg.~\ref{alg:D} as plateau gate}
+    $\boldsymbol{\pi}_h^{0} \gets 0$ \tcp*{deliberate zero bootstrap; see §\ref{sec:osgs-bootstrap}}
+    \extline{\If{$\code{mms\_cfg.enabled}$}{
+        $N_{\mathrm{OSGS}}^{\mathrm{eff}} \gets N_{\mathrm{OSGS}} + K_{\mathrm{extra}}$ \tcp*{inflate outer-loop budget for plateau verification}
+    }}
+    $(S, \boldsymbol{\pi}_h) \gets \mathrm{OSGSFractionalRelaxation}(U_h^{\mathrm{ASGS}}, \boldsymbol{\pi}_h^{0})$ \tcp*{Alg.~\ref{alg:C}; MMS hook in Alg.~\ref{alg:C} fires when \code{mms\_cfg.enabled}}
 }
 
 \vspace{0.15cm}
 $\mathrm{export\_results}(\mathrm{VTK} \mid \mathrm{HDF5})$\;
 \end{algorithm}
 
-\paragraph{Step by step.}  Lines~1--7 load and validate the configuration,
-build the mesh, and assemble the finite-element pair. The unconstrained
-spaces $V_{\mathrm{free}}, Q_{\mathrm{free}}$ are required \emph{only} by the
-OSGS projection step (Section~\ref{sec:osgs}); they carry no Dirichlet data,
-because projecting onto a Dirichlet-constrained space introduces an $O(1)$
-boundary residual that destroys the expected $O(h^{k+1})$ MMS rate. The
-\code{FETopology} bundle simply ties together the geometry, the test/trial
-spaces, the per-element mesh size $h$, and the loading data
-$(\boldsymbol{f}, \alpha)$.
+\paragraph{Step by step.}  The construction lines build the mesh, the
+finite-element pair, and the unconstrained projection mirrors. The
+unconstrained spaces $V_{\mathrm{free}}, Q_{\mathrm{free}}$ are required
+only by the OSGS projection step (§\ref{sec:osgs}); they carry no
+Dirichlet data, because projecting onto a Dirichlet-constrained space
+introduces an $O(1)$ boundary residual that destroys the expected
+$O(h^{k+1})$ FE convergence rate.
 
-Stage~I (line~8) is the workhorse: it calls $\mathrm{PicardFallback}$
-(Algorithm~\ref{alg:B}), which composes an exact-Newton attempt, a
-Picard globalisation pass, and a final Newton polish, all with
+\paragraph{Stage I.}  A single call to $\mathrm{RobustNonlinearCascade}$
+(Algorithm~\ref{alg:B}) composes an exact-Newton attempt, a Picard
+globalisation pass, and a final Newton polish, all with
 $\boldsymbol{\pi}_h \equiv 0$. The output $U_h^{\mathrm{ASGS}}$ is the
-algebraic root of the ASGS system; when Stage~II is OSGS, the staggered loop
-will descend from this state with an already-converged primary field.
+algebraic root of the ASGS system; when Stage~II is OSGS, the
+staggered loop descends from this state with an already-converged
+primary field. The same cascade module is reused inside Stage~II
+(Algorithm~\ref{alg:C}) with the OSGS operators and a per-outer-iteration
+restore vector.
 
-The Stage~II dispatch (lines~11--19) is intentionally simple: either accept
-the ASGS state, optionally extended by an MMS plateau check, or hand off to
-the OSGS outer loop. The mass matrices $M_u, M_p$ are pre-assembled and
-LU-factored exactly once before the OSGS loop begins (line~16). Because the
-projection target spaces $V_{\mathrm{free}}, Q_{\mathrm{free}}$ never change
-during the loop, these factorisations are reused at every outer iteration,
-which converts every $L^2$ projection into a constant-cost forward/back
-substitution.
+\paragraph{Stage II.}  Either accept the ASGS state, or hand off to the
+OSGS outer loop. The mass matrices $M_u, M_p$ are pre-assembled and
+LU-factored exactly once before the OSGS loop begins. Because the
+projection target spaces never change during the loop, these
+factorisations are reused at every outer iteration, which converts
+every $L^2$ projection into a constant-cost forward/back substitution.
 
 \paragraph{Failure propagation.}  If Stage~I returns $S = \mathrm{False}$,
-the orchestrator returns immediately without writing output (lines~9--10).
-The diagnostics cache carries the algebraic exit reason so the calling
+the orchestrator returns immediately without writing output. The
+diagnostics cache carries the algebraic exit reason so the calling
 script can distinguish a divergent run from a converged one.
 
-\paragraph{Anderson and MMS coupling.}  Two side-effects of $\Theta$ deserve
-mention. First, if the configured accelerator type is \code{"Anderson"},
-the OSGS loop constructs a pair of block-wise Anderson accelerators
-(Section~\ref{sec:anderson}); the orchestrator itself does not allocate
-them, but their presence changes the iterate produced at each outer step.
-Second, when $\Theta.\mathrm{mms}.\mathrm{enabled}$, the OSGS outer-iteration
-budget $N_{\mathrm{OSGS}}$ is silently inflated by $K_{\mathrm{extra}}$ so
-that the plateau verifier has room to run after the staggered fixed point
-itself has converged. Without this inflation, the verifier would chronically
-exhaust the budget on the very first extension cycle.
+% ============================================================
+\section{The shared cascade: Algorithm B (RobustNonlinearCascade)}
+\label{sec:picard}
+
+When the safeguarded Newton loop terminates without converging, the
+orchestration does not give up: it transitions to a Picard iteration
+map and then re-engages Newton. Algorithm~\ref{alg:B} packages this
+Newton $\to$ Picard $\to$ Newton cascade as a single \emph{generic}
+module that does not depend on which stabilisation mode it is driving.
+It is therefore reused as-is by both Stage~I (called from
+Algorithm~\ref{alg:O} with $\boldsymbol{\pi}_h \equiv 0$ and exact-Newton
+and Picard ASGS operators) and the inner solve of Stage~II (called from
+Algorithm~\ref{alg:C} once per staggered outer iteration with
+$\boldsymbol{\pi}_h$ frozen at the previous projection and OSGS-mode
+operators).
+
+The only behavioural axis that varies between the two callers is the
+\emph{restore vector} used when Picard's first attempt has to be reset.
+Stage~I restores to a copy of the original initial guess
+$\boldsymbol{x}^0_{\mathrm{backup}}$ taken at the very start of the
+simulation; Stage~II restores to the iterate at the start of the
+current outer staggered iteration $\boldsymbol{x}_{\mathrm{prev}}$. The
+algorithm box below takes the restore vector as an explicit parameter,
+so that both callers reuse a single module without
+caller-specific branching.
+
+\moduleinterface
+    {Algorithm~\ref{alg:O} (Stage~I); Algorithm~\ref{alg:C} (OSGS inner solve, per outer staggered iteration)}
+    {Algorithm~\ref{alg:A} (invoked up to three times in sequence, with different Jacobians)}
+    {Initial guess $\boldsymbol{x}^0$; restore vector $\boldsymbol{x}_{\mathrm{restore}}$; exact-Newton and Picard nonlinear operators $\mathrm{op}_{\mathrm{N}}, \mathrm{op}_{\mathrm{P}}$}
+    {Success flag $S$ and the converged or best-seen iterate $\boldsymbol{x}^\star$}
+
+\begin{algorithm}[H]
+\caption{$\mathrm{RobustNonlinearCascade}$: the Newton $\to$ Picard $\to$ Newton cascade. Stage I instantiates $\boldsymbol{x}_{\mathrm{restore}}$ with a backup copy of the initial guess; Algorithm~\ref{alg:C} instantiates it with the iterate at the start of the current outer staggered iteration.}
+\label{alg:B}
+\SetAlgoLined
+\textbf{Parameters:} $N_{\mathrm{N}}, N_{\mathrm{P}}, \textftol, \textstag$ and all Newton/line-search parameters from Table~\ref{tab:params}.\\
+\KwIn{Initial guess $\boldsymbol{x}^0$; restore vector $\boldsymbol{x}_{\mathrm{restore}}$; exact-Newton operator $\mathrm{op}_{\mathrm{N}}$; Picard operator $\mathrm{op}_{\mathrm{P}}$.}
+\KwOut{$(S, \boldsymbol{x}^\star)$.}
+\vspace{0.2cm}\hrule\vspace{0.2cm}
+$(\boldsymbol{x}^\star, S_{\mathrm{N}}, \dots) \gets \mathrm{ExactNewtonPipeline}(\boldsymbol{x}^0,\ \mathrm{op}_{\mathrm{N}})$\;
+\If{$S_{\mathrm{N}} = \mathrm{True}$}{
+    \Return $(\mathrm{True}, \boldsymbol{x}^\star)$ \tcp*{Newton sufficed; no fallback}
+}
+
+restore $\boldsymbol{x} \gets \boldsymbol{x}_{\mathrm{restore}}$\;
+$(\boldsymbol{x}^\star, S_{\mathrm{P}}, \dots) \gets \mathrm{ExactNewtonPipeline}(\boldsymbol{x},\ \mathrm{op}_{\mathrm{P}})$\;
+\If{any component of $\boldsymbol{x}^\star$ is non-finite}{
+    \Return $(\mathrm{False}, \boldsymbol{x}_{\mathrm{restore}})$ \tcp*{catastrophic state}
+}
+\If{$S_{\mathrm{P}} = \mathrm{True}$}{
+    \Return $(\mathrm{True}, \boldsymbol{x}^\star)$\;
+}
+
+\tcc{Re-engage Newton from wherever Picard left the iterate.}
+$(\boldsymbol{x}^\star, S_{\mathrm{N2}}, \dots) \gets \mathrm{ExactNewtonPipeline}(\boldsymbol{x}^\star,\ \mathrm{op}_{\mathrm{N}})$\;
+\Return $(S_{\mathrm{N2}} \vee S_{\mathrm{P}},\ \boldsymbol{x}^\star)$\;
+\end{algorithm}
+
+\paragraph{Why Picard works where Newton fails.}  The Newton Jacobian
+contains the linearised convective term
+$\boldsymbol{u}^k \cdot \nabla \delta\boldsymbol{u} + \delta\boldsymbol{u} \cdot \nabla \boldsymbol{u}^k$
+and the linearised Forchheimer term
+$\partial\sigma/\partial\boldsymbol{u}$. Both become large in the
+difficult regimes, and the Jacobian can develop a near-null direction
+where a small change in $\boldsymbol{u}$ produces an outsize change in
+the residual. Newton near such a cusp produces a step that diverges.
+The Picard Jacobian drops the dependence of
+$\boldsymbol{u}\cdot\nabla\boldsymbol{u}$ and of $\sigma$ on the
+increment $\delta\boldsymbol{u}$, retaining only the ``frozen''
+coefficient form. The resulting iteration map is a contraction in a
+wider region than Newton's quadratic basin, at the cost of linear
+convergence. Picard does not converge to within $\textftol$ in
+general---but it does push the iterate into a region where the
+subsequent Newton retry has a fighting chance.
+
+\paragraph{Triggers.}  Any non-converged Newton exit triggers the
+fallback, including $\mathsf{Xtol}$ stagnation, $\mathsf{IterationCap}$,
+the linear-solver exception path, and any uncaught exception during
+the Newton call. All of these states leave $\boldsymbol{x}^0$ outside
+the basin, and a Picard pass on top costs the same regardless of which
+symptom triggered the entry.
+
+\paragraph{The catastrophic-state guard.}  Picard is not bounded in
+general. After the Picard call, the orchestration checks
+$\mathrm{any}(!\mathrm{isfinite}, \boldsymbol{x}^\star)$. A NaN or Inf
+in the iterate is a hard signal that even Picard could not keep the
+model evaluable, and the fallback restores the supplied
+$\boldsymbol{x}_{\mathrm{restore}}$ and returns failure. Without this
+guard the subsequent Newton call would crash on its first residual
+evaluation.
 
 % ============================================================
-\section{The Inner Newton Machinery}
+\section{The Newton Kernel: Algorithm A and Its Leaves}
 \label{sec:newton}
 
-\subsection{The merit function and its diagonal preconditioning}
-\label{sec:merit}
+Both Algorithms~\ref{alg:B} and~\ref{alg:C} call into a single
+safeguarded Newton routine. Beneath this kernel sit three leaf
+primitives: a linear-solve helper (A.1), an Armijo backtracking line
+search (A.2), and a termination-safeguard arbiter (A.3). This section
+documents the kernel first, then its leaves.
 
-Let $\boldsymbol{b}(\boldsymbol{x}) \in \mathbb{R}^N$ be the assembled residual
-of the (possibly stabilised) discrete weak form, and $\mathcal{J}(\boldsymbol{x})
-= \partial \boldsymbol{b}/\partial \boldsymbol{x}$ its Jacobian. The merit
-function used by the line search is the diagonally equilibrated quadratic
-\begin{equation}
-    \label{eq:merit}
-    \Phi_{\boldsymbol{w}}(\boldsymbol{x})
-        = \tfrac{1}{2} \sum_{k=1}^{N}
-            \left( \frac{b_k(\boldsymbol{x})}{w_k} \right)^{2},
-    \qquad
-    w_k = \max\!\bigl(|\mathcal{J}_{kk}|,\ \varepsilon_{\mathrm{mach}}
-            \|\mathrm{diag}(\mathcal{J})\|_\infty,\ \varepsilon_{\mathrm{mach}} \bigr).
-\end{equation}
-The weights $w_k$ are recomputed at every Newton iteration from the diagonal
-of the current Jacobian.
+% --------------------------------------------------------------
+\subsection{Algorithm A: ExactNewtonPipeline}
 
-\paragraph{Why equilibrate?}  The discrete residual mixes momentum-balance
-rows---measured in physical units of force per unit volume, and possibly
-amplified by a large Reynolds or Damk\"ohler number---with mass-balance rows,
-whose natural magnitude is dimensionally different. A raw unweighted merit
-$\tfrac{1}{2}\|\boldsymbol{b}\|^2$ would let the momentum rows dominate
-entirely, so the line search would be quietly indifferent to mass-conservation
-errors. Equilibrating by $w_k$ rescales every row to its own natural unit, and
-the line search now respects both balances simultaneously. The lower bound
-$\varepsilon_{\mathrm{mach}}\|\mathrm{diag}(\mathcal{J})\|_\infty$ prevents a
-genuinely small diagonal entry (e.g.\ a pressure row when the system is
-saddle-point-like) from triggering division by zero.
-
-\paragraph{An algebraic identity that simplifies the line search.}  For a
-Newton step $\delta\boldsymbol{x}$ satisfying $\mathcal{J}\delta\boldsymbol{x}
-= \boldsymbol{b}$, the directional derivative of $\Phi_{\boldsymbol{w}}$
-along $-\delta\boldsymbol{x}$ at $\boldsymbol{x}$ is
-\begin{equation}
-    \label{eq:dir-deriv}
-    D \;=\; -\sum_k w_k^{-2} b_k(\mathcal{J}\delta\boldsymbol{x})_k
-        \;=\; -\sum_k w_k^{-2} b_k^2
-        \;=\; -2\,\Phi_{\boldsymbol{w}}(\boldsymbol{x}).
-\end{equation}
-The code exploits this identity directly: \code{dir\_deriv = -2.0 * state.phi\_x}
-at \code{nonlinear.jl:216}. The implication for Algorithm~\ref{alg:A2} is
-that the Armijo predicate $\hat\Phi \le \Phi + c_1\alpha D$ becomes
-$\hat\Phi \le \Phi(1 - 2 c_1 \alpha)$, which never requires an extra
-gradient evaluation. The identity holds \emph{only} because the search
-direction is the exact Newton step; a Picard step in general violates it,
-which is one reason the Picard fallback in Algorithm~\ref{alg:B} runs with
-its own (cruder) line-search settings.
-
-\subsection{Algorithm A: the safeguarded Newton outer loop}
+\moduleinterface
+    {Algorithm~\ref{alg:B} (three times per Stage~I); Algorithm~\ref{alg:C} (once per outer staggered iteration)}
+    {Algorithm~\ref{alg:A1} (linear solve); Algorithm~\ref{alg:A2} (Armijo line search); Algorithm~\ref{alg:A3} (safeguards)}
+    {Initial fields $\boldsymbol{x}^0 \in \mathcal{X}_h$; nonlinear operator $\mathrm{op}$ (encoding the chosen Jacobian variant)}
+    {Final iterate $\boldsymbol{x}^\star$; success flag $S$; iteration count $I$; residual norm $\|\boldsymbol{b}^\star\|_\infty$; exit reason $r$ (Table~\ref{tab:reasons})}
 
 \begin{algorithm}[H]
 \caption{$\mathrm{ExactNewtonPipeline}$: safeguarded Newton iteration with merit-based line search.}
 \label{alg:A}
 \SetAlgoLined
 \textbf{Parameters:} $N_{\mathrm{N}}$, $\textftol$, $\textxtol$, $\textstag$, $c_1$, $\gamma$, $\alpha_{\min}$, $N_{\mathrm{ls}}$, $F_{\mathrm{div}}$, $N_{\mathrm{inc}}$.\\
-\KwIn{Initial fields $\boldsymbol{x}^0 \in \mathcal{X}_h$, nonlinear operator $\mathrm{op}$ (encoding either an exact-Newton or a Picard Jacobian).}
-\KwOut{$(\boldsymbol{x}^{\star}, S \in \{\mathrm{True},\mathrm{False}\}, I, \|\boldsymbol{b}^{\star}\|_\infty, r)$, where $r$ is the exit reason (Table~\ref{tab:reasons}).}
+\KwIn{$\boldsymbol{x}^0 \in \mathcal{X}_h$, nonlinear operator $\mathrm{op}$.}
+\KwOut{$(\boldsymbol{x}^{\star}, S, I, \|\boldsymbol{b}^{\star}\|_\infty, r)$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
 
 $\boldsymbol{b} \gets \boldsymbol{b}(\boldsymbol{x}^0)$;\quad
@@ -368,21 +636,20 @@ $\boldsymbol{b} \gets \boldsymbol{b}(\boldsymbol{x}^0)$;\quad
 }
 $\boldsymbol{x}_{\mathrm{best}} \gets \boldsymbol{x}^0$;\quad
 $b_{\mathrm{best}} \gets \|\boldsymbol{b}\|_\infty$;\quad
-$I_{\mathrm{up}} \gets 0$;\quad
-$r \gets \mathsf{IterationCap}$\;
+$I_{\mathrm{up}} \gets 0$\;
 \For{$i = 1, \dots, N_{\mathrm{N}}$}{
     $\mathcal{J} \gets \mathcal{J}(\boldsymbol{x})$;\quad
-    update weights $\boldsymbol{w}$ via~\eqref{eq:merit};\quad
+    recompute weights $\boldsymbol{w}$ from $\mathrm{diag}(\mathcal{J})$ as in~\eqref{eq:merit};\quad
     $\Phi \gets \Phi_{\boldsymbol{w}}(\boldsymbol{x})$\;
     $(S_{\mathrm{LS}}^{\mathrm{lin}}, \delta\boldsymbol{x}) \gets \mathrm{SolveLinearSystem}(\mathcal{J}, \boldsymbol{b})$ \tcp*{Alg.~\ref{alg:A1}}
     \If{$S_{\mathrm{LS}}^{\mathrm{lin}} = \mathrm{Failed}$}{
         $\boldsymbol{x} \gets \boldsymbol{x}_{\mathrm{best}}$;\quad
         \Return $(\boldsymbol{x},\ \mathrm{False},\ i,\ b_{\mathrm{best}},\ \mathsf{LinearSolveNaN})$\;
     }
-    set $D \gets -2\Phi$;\quad
+    set $D \gets -2\Phi$ via the identity~\eqref{eq:dir-deriv} (used by the Newton branch of A.2 only)\;
     $(S_{\mathrm{LS}}, \alpha, L, \hat b, \hat \Phi)
         \gets \mathrm{ArmijoLinesearch}(\boldsymbol{x},\boldsymbol{x}_{\mathrm{old}},
-              \boldsymbol{b},\delta\boldsymbol{x}, D, \boldsymbol{w}, \Phi)$ \tcp*{Alg.~\ref{alg:A2}}
+              \boldsymbol{b},\delta\boldsymbol{x}, D, \boldsymbol{w}, \Phi, \mathfrak{m})$ \tcp*{Alg.~\ref{alg:A2}, $\mathfrak{m}$ from \code{op}}
     \If{$\hat{b} < b_{\mathrm{best}}$}{ $\boldsymbol{x}_{\mathrm{best}} \gets \boldsymbol{x}$;\quad $b_{\mathrm{best}} \gets \hat{b}$\; }
     $(r, S_{\mathrm{conv}}, S_{\mathrm{brk}}, I_{\mathrm{up}})
         \gets \mathrm{EvaluateSafeguards}(i, S_{\mathrm{LS}}, L, \hat b, \hat \Phi, \Phi, I_{\mathrm{up}})$ \tcp*{Alg.~\ref{alg:A3}}
@@ -396,45 +663,43 @@ $r \gets \mathsf{IterationCap}$\;
 \Return $(\boldsymbol{x},\ \mathrm{False},\ N_{\mathrm{N}},\ \|\boldsymbol{b}\|_\infty,\ \mathsf{IterationCap})$\;
 \end{algorithm}
 
-\paragraph{Reading the box.}  The outer loop is a textbook safeguarded
-Newton iteration: at each step compute the Jacobian, solve a linear system
-for the Newton direction, search along it for a step that decreases the
-merit, and ask the safeguard module whether to keep going. Three details
-are worth highlighting because they are easy to miss.
+\paragraph{Reading the box.}  Each outer iteration computes the Jacobian,
+delegates the linear solve to Algorithm~\ref{alg:A1}, performs an
+Armijo backtracking line search via Algorithm~\ref{alg:A2}, and asks
+Algorithm~\ref{alg:A3} whether to break, continue, or declare
+convergence.
 
-\begin{itemize}
-\item \emph{The safeguard's role is not just to detect convergence.} It also
-detects \emph{progress without convergence} (residual is dropping; keep
-going), \emph{stuck progress} (step is shrinking faster than the residual;
-declare $\mathsf{Xtol}$ stagnation), and \emph{merit explosion} (the line
-search succeeded but the new merit is far above the old; count an
-``increase'' and abort if too many accumulate).
-
-\item \emph{Best-state retention.}  Whenever the residual strictly improves,
-$(\boldsymbol{x}_{\mathrm{best}}, b_{\mathrm{best}})$ is updated. On most
-non-converged exits the code restores the iterate to this best-seen point,
-so the caller never receives a state worse than what was already produced
-during the iteration. Three exits intentionally \emph{do not} restore:
+\paragraph{Best-state retention.}  Whenever the residual strictly
+improves, $(\boldsymbol{x}_{\mathrm{best}}, b_{\mathrm{best}})$ is
+updated. On most non-converged exits the iterate is restored to this
+best-seen point. Three exits intentionally do not restore:
 $\mathsf{Ftol}$ and $\mathsf{NoiseFloor}$ are already at or below the
-target, and $\mathsf{Xtol}$ stagnation reflects a state the iterate could
-not move beyond---restoring would discard the most current information.
+target, and $\mathsf{Xtol}$ stagnation reflects a state the iterate
+could not move beyond---restoring would discard the most current
+information.
 
-\item \emph{Exact-Newton vs Picard reuse.}  The same loop is reused for the
-Picard fallback in Algorithm~\ref{alg:B}; the only difference is the
-Jacobian wired into \code{op}. The merit, line search, and safeguards apply
-unchanged. This is what makes the cascade in Algorithm~\ref{alg:B} cheap to
-maintain.
-\end{itemize}
+\paragraph{Mode independence.}  The same loop is reused with either an
+exact-Newton or a Picard Jacobian. The merit function, line search,
+and safeguards apply unchanged; only the operator \code{op} differs.
+This is what allows Algorithm~\ref{alg:B} to compose three calls to
+this single kernel.
 
-\subsection{Algorithm A.1: linear-system solve and NaN guard}
+% --------------------------------------------------------------
+\subsection{Algorithm A.1: SolveLinearSystem}
+
+\moduleinterface
+    {Algorithm~\ref{alg:A} (once per Newton iteration)}
+    {Configured linear solver (LU by default)}
+    {Jacobian $\mathcal{J}$; residual $\boldsymbol{b}$}
+    {Failure flag $S_{\mathrm{Failed}}$; step $\delta\boldsymbol{x}$}
 
 \begin{algorithm}[H]
-\caption{$\mathrm{SolveLinearSystem}$.}
+\caption{$\mathrm{SolveLinearSystem}$: factor and solve, with NaN guard.}
 \label{alg:A1}
 \SetAlgoLined
 \textbf{Parameters:} (none).\\
-\KwIn{Jacobian $\mathcal{J}$, residual $\boldsymbol{b}$.}
-\KwOut{$(S_{\mathrm{Failed}} \in \{\mathrm{True},\mathrm{False}\}, \delta\boldsymbol{x})$.}
+\KwIn{$\mathcal{J}$, $\boldsymbol{b}$.}
+\KwOut{$(S_{\mathrm{Failed}}, \delta\boldsymbol{x})$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
 \textbf{try} \{ Solve $\mathcal{J} \delta\boldsymbol{x} = \boldsymbol{b}$ via the configured linear solver \} \textbf{catch} \{ \Return $(\mathrm{True}, \delta\boldsymbol{x})$ \tcp*{linear-solver exception} \} \\
 \If{any element of $\delta\boldsymbol{x}$ is NaN}{
@@ -443,37 +708,48 @@ maintain.
 \Return $(\mathrm{False}, \delta\boldsymbol{x})$\;
 \end{algorithm}
 
-The linear solve is the cheapest place to detect a near-singular Jacobian:
-either the factorisation aborts with an exception (the \code{try/catch} on
-\code{nonlinear.jl:54--61}) or it returns a vector contaminated by NaNs.
-Either way the outer loop must restore $\boldsymbol{x}_{\mathrm{best}}$ and
-exit. Without this guard, a single NaN propagates through the residual
-evaluation and silently destroys the iterate.
+The linear solve is the cheapest place to detect a near-singular
+Jacobian: either the factorisation aborts with an exception or it
+returns a vector contaminated by NaNs. Either way the caller restores
+$\boldsymbol{x}_{\mathrm{best}}$ and exits.
 
-\subsection{Algorithm A.2: Armijo backtracking line search}
+% --------------------------------------------------------------
+\subsection{Algorithm A.2: ArmijoLinesearch}
+
+\moduleinterface
+    {Algorithm~\ref{alg:A} (once per Newton iteration)}
+    {(none; pure procedure)}
+    {Current iterate $\boldsymbol{x}$; reference iterate $\boldsymbol{x}_{\mathrm{old}}$; residual $\boldsymbol{b}$; step $\delta\boldsymbol{x}$; directional derivative $D = -2\Phi$ (cf.\ §\ref{sec:dir-deriv}); weights $\boldsymbol{w}$; base merit $\Phi$; mode $\mathfrak{m} \in \{\textsc{Newton}, \textsc{Picard}\}$}
+    {Acceptance flag $S_{\mathrm{LS}}$; step size $\alpha$; step norm $L$; post-step residual $\|\hat{\boldsymbol{b}}\|_\infty$ and merit $\hat\Phi$}
 
 \begin{algorithm}[H]
 \caption{$\mathrm{ArmijoLinesearch}$.}
 \label{alg:A2}
 \SetAlgoLined
 \textbf{Parameters:} $\alpha_{\min}$, $c_1$, $\gamma$, $N_{\mathrm{ls}}$.\\
-\KwIn{$\boldsymbol{x}$, $\boldsymbol{x}_{\mathrm{old}}$, $\boldsymbol{b}$, $\delta\boldsymbol{x}$, directional derivative $D = -2\Phi$, weights $\boldsymbol{w}$, current merit $\Phi$.}
-\KwOut{$(S_{\mathrm{LS}} \in \{\mathrm{True},\mathrm{False}\}, \alpha, L, \|\hat{\boldsymbol{b}}\|_\infty, \hat\Phi)$.}
+\KwIn{$\boldsymbol{x}, \boldsymbol{x}_{\mathrm{old}}, \boldsymbol{b}, \delta\boldsymbol{x}, D, \boldsymbol{w}, \Phi, \mathfrak{m}$.}
+\KwOut{$(S_{\mathrm{LS}}, \alpha, L, \|\hat{\boldsymbol{b}}\|_\infty, \hat\Phi)$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
 $\alpha \gets 1$;\quad $S_{\mathrm{LS}} \gets \mathrm{False}$\;
 \For{$j = 1, \dots, N_{\mathrm{ls}}$}{
     $\boldsymbol{x} \gets \boldsymbol{x}_{\mathrm{old}} - \alpha\,\delta\boldsymbol{x}$;\quad
     $\hat{\boldsymbol{b}} \gets \boldsymbol{b}(\boldsymbol{x})$;\quad
     $\hat{\Phi} \gets \Phi_{\boldsymbol{w}}(\hat{\boldsymbol{b}})$\;
-    \If{$\hat\Phi$ is NaN}{
+    \If{$\hat\Phi$ \textnormal{\textbf{or}} $\|\hat{\boldsymbol{b}}\|_\infty$ is NaN}{
         $\alpha \gets \gamma \alpha$;\quad
-        \textbf{continue} \tcp*{shrink and retry without testing Armijo}
+        \textbf{continue} \tcp*{shrink and retry without testing acceptance}
     }
-    \If{$\hat\Phi \le \Phi + c_1 \alpha D$}{
-        $S_{\mathrm{LS}} \gets \mathrm{True}$;\quad \textbf{break}\;
+    \If{$\mathfrak{m} = \textsc{Newton}$}{
+        \If{$\hat\Phi \le \Phi + c_1 \alpha D$}{
+            $S_{\mathrm{LS}} \gets \mathrm{True}$;\quad \textbf{break} \tcp*{merit-Armijo accept}
+        }
+    }\Else(\tcp*[h]{$\mathfrak{m} = \textsc{Picard}$}){
+        \If{$\|\hat{\boldsymbol{b}}\|_\infty \le (1 - c_1\alpha) \|\boldsymbol{b}\|_\infty$}{
+            $S_{\mathrm{LS}} \gets \mathrm{True}$;\quad \textbf{break} \tcp*{monotone-residual accept}
+        }
     }
     \If{$\alpha \le \alpha_{\min}$}{
-        \textbf{break} \tcp*{return with $S_{\mathrm{LS}} = \mathrm{False}$}
+        \textbf{break} \tcp*{return $S_{\mathrm{LS}} = \mathrm{False}$}
     }
     $\alpha \gets \gamma \alpha$\;
 }
@@ -481,41 +757,47 @@ $L \gets \alpha \|\delta\boldsymbol{x}\|_\infty$\;
 \Return $(S_{\mathrm{LS}}, \alpha, L, \|\hat{\boldsymbol{b}}\|_\infty, \hat\Phi)$\;
 \end{algorithm}
 
-\paragraph{What the parameters do.}
-\begin{itemize}
-\item $c_1$ controls how aggressive the descent must be. Setting $c_1$
-small (say $10^{-4}$) accepts almost any step that lowers the merit at all;
-setting $c_1$ close to $1$ demands a step that almost matches the full
-linearised decrease. Newton implementations typically choose $c_1 \sim
-10^{-4}$ because the Newton direction itself is steep enough.
-\item $\gamma \in (0,1)$ is the contraction factor. A typical choice is
-$\gamma = 1/2$; smaller $\gamma$ tries fewer step sizes but explores more
-coarsely.
-\item $\alpha_{\min}$ is the smallest step size accepted before declaring
-the line search dead. Too small and the algorithm wastes iterations on
-machine-epsilon steps; too large and it gives up on legitimately stiff
-descent paths.
-\item $N_{\mathrm{ls}}$ caps the inner iteration count and is in practice
-the dominant cost knob: each iteration is a full residual evaluation.
-\end{itemize}
+\paragraph{Mode branching.}  The Newton branch implements the standard
+sufficient-decrease test on the equilibrated merit (§\ref{sec:dir-deriv});
+the Picard branch uses a monotone residual reduction in
+$\ell^\infty$. The acceptance criterion is mode-dependent because the
+$D = -2\Phi$ identity (eq.~\eqref{eq:dir-deriv}) relies on the search
+direction being the exact Newton step. Picard steps drop the linearised
+convective cross-term and the Forchheimer derivative from
+$\mathcal{J}$, so the identity is generically violated; the merit-based
+predicate would then be miscalibrated. Replacing it with a contraction
+test on the $\ell^\infty$ residual decouples Picard's accept/reject
+loop from $\Phi$ entirely, recovering a sound globalisation step for
+the fixed-point map. The condition
+$\|\hat{\boldsymbol{b}}\|_\infty \le (1 - c_1\alpha)\|\boldsymbol{b}\|_\infty$
+is the standard Bank--Rose monotone-residual test for damped Picard.
 
-\paragraph{NaN handling.}  When the residual evaluation at the trial point
-produces a NaN merit (typically because the Forchheimer factor
-$|\boldsymbol{u}|$ blew up under a too-aggressive step), the line search
-shrinks $\alpha$ without testing Armijo. This is critical near the
-quadratic-basin boundary: a Newton step pushing $\boldsymbol{u}$ into a
-region where the model momentarily becomes non-evaluable should not be
-recorded as a failed Armijo step; it should simply be retried at a smaller
-size.
+\paragraph{NaN handling.}  When the residual evaluation at the trial
+point produces a NaN merit \emph{or} a NaN $\ell^\infty$ residual norm
+(typically because the Forchheimer factor $|\boldsymbol{u}|$ blew up
+under a too-aggressive step), the line search shrinks $\alpha$ without
+testing acceptance. The check on $\|\hat{\boldsymbol{b}}\|_\infty$ is
+required because the Picard branch never reads $\hat\Phi$, and a
+non-finite residual norm could otherwise reach the contraction test.
+A Newton step pushing $\boldsymbol{u}$ into a region where the model
+momentarily becomes non-evaluable should not be recorded as a failed
+acceptance step; it should simply be retried at a smaller size.
 
-\subsection{Algorithm A.3: termination safeguards}
+% --------------------------------------------------------------
+\subsection{Algorithm A.3: EvaluateSafeguards}
+
+\moduleinterface
+    {Algorithm~\ref{alg:A} (once per Newton iteration, after the line search)}
+    {(none; pure decision procedure)}
+    {Outer iteration index $i$; line-search success $S_{\mathrm{LS}}$; step norm $L$; post-step residual $\|\hat{\boldsymbol{b}}\|_\infty$ and merit $\hat\Phi$; base merit $\Phi$; increase counter $I_{\mathrm{up}}$}
+    {Exit reason $r$; convergence flag $S_{\mathrm{conv}}$; break flag $S_{\mathrm{brk}}$; updated counter $I_{\mathrm{up}}'$}
 
 \begin{algorithm}[H]
-\caption{$\mathrm{EvaluateSafeguards}$.}
+\caption{$\mathrm{EvaluateSafeguards}$: termination arbiter.}
 \label{alg:A3}
 \SetAlgoLined
 \textbf{Parameters:} $\textftol$, $\textstag$, $\textxtol$, $F_{\mathrm{div}}$, $N_{\mathrm{N}}$, $N_{\mathrm{inc}}$.\\
-\KwIn{Outer index $i$, line-search success $S_{\mathrm{LS}}$, step norm $L$, post-step residual $\|\hat{\boldsymbol{b}}\|_\infty$, post-step merit $\hat\Phi$, base merit $\Phi$, increase counter $I_{\mathrm{up}}$.}
+\KwIn{$i, S_{\mathrm{LS}}, L, \|\hat{\boldsymbol{b}}\|_\infty, \hat\Phi, \Phi, I_{\mathrm{up}}$.}
 \KwOut{$(r, S_{\mathrm{conv}}, S_{\mathrm{brk}}, I_{\mathrm{up}}')$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
 \If{$\|\hat{\boldsymbol{b}}\|_\infty \le \textftol$}{
@@ -548,265 +830,112 @@ size.
 \Return $(\mathsf{InProgress}, \mathrm{False}, \mathrm{False}, I_{\mathrm{up}})$\;
 \end{algorithm}
 
-\noindent
-In the implementation $I_{\mathrm{up}}$ is not returned explicitly but carried
-in the \code{inc\_count} field of a mutable \code{SafeIterationState}
-struct that the same routine updates in place; the box treats it as a
-returned value for mathematical clarity.
+\noindent In the implementation $I_{\mathrm{up}}$ is carried in the
+\code{inc\_count} field of a mutable \code{SafeIterationState} struct
+that the routine updates in place; the box treats it as a returned
+value for mathematical clarity.
 
-\paragraph{Why six exit reasons?}  The safeguard logic distinguishes
-states that classical Newton implementations conflate, because in the
-context of the present cascade \emph{the choice of reason changes what
-happens next}.
+\paragraph{Why six exit reasons?}  The arbiter distinguishes states
+that classical Newton implementations conflate, because the choice of
+reason changes what the caller does next.
 \begin{itemize}
-\item $\mathsf{Ftol}$ and $\mathsf{InitialFtol}$ are unambiguous successes;
-the caller (Algorithm~\ref{alg:B} or~\ref{alg:O}) proceeds to Stage~II or
-exports results.
-\item $\mathsf{NoiseFloor}$ is a \emph{conditional} success: the residual
-sits below $\textstag$, which is itself far above floating-point noise but
-well below physical interest. The caller treats this as a success
-intentionally (Section~\ref{sec:falseEquiv} discusses the conditions under
-which this classification is and is not safe).
-\item $\mathsf{LinesearchFailed}$ and $\mathsf{MeritDivergence}$ both trigger
-the Picard fallback (Algorithm~\ref{alg:B}). They differ in cause:
-$\mathsf{LinesearchFailed}$ says the Newton direction itself is useful in
-direction but cannot find a length that descends; $\mathsf{MeritDivergence}$
-says the Newton direction is actively pushing the iterate uphill.
-\item $\mathsf{Xtol}$ flags an iterate that has stopped moving even though
-the residual is non-trivial; the orchestrator treats this as failure unless
-the residual has slipped below $\textstag$ (in which case it is silently
-relabelled as $\mathsf{NoiseFloor}$).
-\item $\mathsf{IterationCap}$ is the budget-exhausted failure. As with
-$\mathsf{Xtol}$, a sufficiently small residual converts it to
-$\mathsf{NoiseFloor}$.
-\item $\mathsf{LinearSolveNaN}$ aborts the loop unconditionally; the caller
-falls back to Picard, which may produce a non-singular linearisation.
+\item $\mathsf{Ftol}$ and $\mathsf{InitialFtol}$ are unambiguous
+successes.
+\item $\mathsf{NoiseFloor}$ is a \emph{conditional} success: the
+residual sits below $\textstag$, which is far above floating-point
+noise but well below physical interest. The caller treats this as
+success intentionally (§\ref{sec:falseEquiv}).
+\item $\mathsf{LinesearchFailed}$ and $\mathsf{MeritDivergence}$ both
+trigger the Picard fallback (Algorithm~\ref{alg:B}).
+\item $\mathsf{Xtol}$ flags an iterate that has stopped moving even
+though the residual is non-trivial; failure unless the residual has
+slipped below $\textstag$ (in which case it is silently relabelled as
+$\mathsf{NoiseFloor}$).
+\item $\mathsf{IterationCap}$ is the budget-exhausted failure.
+\item $\mathsf{LinearSolveNaN}$ aborts the kernel unconditionally.
 \end{itemize}
-The asymmetry between failures that promote to $\mathsf{NoiseFloor}$ and
-failures that do not is intentional: a stalled iterate \emph{with a small
-residual} is a converged iterate that simply cannot be improved further by
-the inner solver, whereas $\mathsf{LinesearchFailed}$ and
-$\mathsf{MeritDivergence}$ never appear with a small residual---they are
-signals from the iteration map itself, not from how close the iterate is to
-the root.
 
 \paragraph{The role of $F_{\mathrm{div}}$ and $N_{\mathrm{inc}}$ together.}
-A single merit-expansion event is not a divergence: Newton near a saddle can
-take one or two steps that increase the merit before the quadratic basin
-captures the iterate. Requiring $N_{\mathrm{inc}}$ \emph{consecutive}
-expansions, each by at least a factor $F_{\mathrm{div}}$, separates this
-transient overshooting from a genuine repeated divergence. Choosing
-$N_{\mathrm{inc}}$ small ($\le 2$) makes the guard trip almost immediately
-on hard problems and forces an early Picard hand-off; choosing it large
-($\ge 5$) lets Newton recover from non-trivial overshoots but at the cost of
-diverging further before failing.
+A single merit-expansion event is not a divergence: Newton near a
+saddle can take one or two steps that increase the merit before the
+quadratic basin captures the iterate. Requiring $N_{\mathrm{inc}}$
+\emph{consecutive} expansions, each by at least a factor
+$F_{\mathrm{div}}$, separates transient overshooting from genuine
+repeated divergence.
 
 % ============================================================
-\section{The Picard Fallback}
-\label{sec:picard}
-
-When the safeguarded Newton loop terminates without converging, the
-orchestration does not give up: it transitions to a Picard iteration map
-and then re-engages Newton.
-
-\begin{algorithm}[H]
-\caption{$\mathrm{PicardFallback}$: the Stage~I cascade.}
-\label{alg:B}
-\SetAlgoLined
-\textbf{Parameters:} $N_{\mathrm{N}}, N_{\mathrm{P}}, \textftol, \textstag, $ all Newton/line-search parameters.\\
-\KwIn{Initial guess $\boldsymbol{x}^0 \in \mathcal{X}_h$ and a backup copy $\boldsymbol{x}^0_{\mathrm{backup}}$.}
-\KwOut{$(S, \boldsymbol{x}^\star)$ where $S$ is the overall success flag.}
-\vspace{0.2cm}\hrule\vspace{0.2cm}
-configure $\boldsymbol{\pi}_h \gets 0$ \tcp*{ASGS-mode residual and Jacobian}
-$(\boldsymbol{x}^\star, S_{\mathrm{N}}, \dots, r_{\mathrm{N}}) \gets \mathrm{ExactNewtonPipeline}(\boldsymbol{x}^0,\ \mathrm{ExactNewton\ Jacobian})$\;
-\If{$S_{\mathrm{N}} = \mathrm{True}$}{
-    \Return $(\mathrm{True}, \boldsymbol{x}^\star)$ \tcp*{Newton sufficed; no fallback}
-}
-
-restore $\boldsymbol{x}^0 \gets \boldsymbol{x}^0_{\mathrm{backup}}$\;
-$(\boldsymbol{x}^\star, S_{\mathrm{P}}, \dots, r_{\mathrm{P}}) \gets \mathrm{ExactNewtonPipeline}(\boldsymbol{x}^0,\ \mathrm{Picard\ Jacobian})$\;
-\If{any component of $\boldsymbol{x}^\star$ is non-finite}{
-    \Return $(\mathrm{False}, \boldsymbol{x}^0_{\mathrm{backup}})$ \tcp*{catastrophic state}
-}
-\If{$S_{\mathrm{P}} = \mathrm{True}$}{
-    \Return $(\mathrm{True}, \boldsymbol{x}^\star)$\;
-}
-
-\tcc{Re-engage Newton from wherever Picard left the iterate.}
-$(\boldsymbol{x}^\star, S_{\mathrm{N2}}, \dots, r_{\mathrm{N2}}) \gets \mathrm{ExactNewtonPipeline}(\boldsymbol{x}^\star,\ \mathrm{ExactNewton\ Jacobian})$\;
-\Return $(S_{\mathrm{N2}} \vee S_{\mathrm{P}},\ \boldsymbol{x}^\star)$\;
-\end{algorithm}
-
-\paragraph{Why Picard works where Newton fails.}  The Newton Jacobian for
-the porous Navier--Stokes system contains the linearised convective term
-$\boldsymbol{u}^k \cdot \nabla \delta\boldsymbol{u}
-+ \delta\boldsymbol{u} \cdot \nabla \boldsymbol{u}^k$ and the linearised
-Forchheimer term $\partial\sigma/\partial\boldsymbol{u}$. Both of these
-become large in the difficult regimes, and the Jacobian can develop a near-null
-direction where a small change in $\boldsymbol{u}$ produces an outsize change
-in the residual. Newton near such a cusp produces a step that diverges. The
-Picard Jacobian drops the dependence of $\boldsymbol{u}\cdot\nabla\boldsymbol{u}$
-and of $\sigma$ on the increment $\delta\boldsymbol{u}$, retaining only the
-``frozen'' coefficient form. The resulting iteration map is a contraction in
-a wider region than Newton's quadratic basin, at the cost of linear (rather
-than quadratic) convergence rate. Picard does not converge to within
-$\textftol$ in general---but it does push the iterate into a region where
-the subsequent Newton retry has a fighting chance.
-
-\paragraph{Triggers.}  The original algorithm box in earlier drafts of this
-document restricted the Picard entry to two exit reasons. The current
-implementation is more permissive: \emph{any} non-converged Newton exit
-triggers the fallback, including $\mathsf{Xtol}$ stagnation,
-$\mathsf{IterationCap}$, the linear-solver exception path, and any uncaught
-Julia exception during the Newton call. This is appropriate because all of
-these states leave $\boldsymbol{x}^0$ outside the basin, and a Picard pass
-on top costs the same regardless of which symptom triggered the entry.
-
-\paragraph{The catastrophic-state guard.}  Picard, while contractive in
-benign regimes, is not bounded in general. After the Picard call, the
-orchestration checks $\mathrm{any}(!\mathrm{isfinite}, \boldsymbol{x}^\star)$.
-A NaN or Inf in the iterate is a hard signal that even Picard could not
-keep the model evaluable, and the fallback restores the original backup and
-returns failure. Without this guard the subsequent Newton call would crash
-on its first residual evaluation.
-
-\paragraph{Connection to Algorithm~\ref{alg:O}.}  Stage~I of the
-orchestration is exactly one call to $\mathrm{PicardFallback}$. The
-``Picard-smoothed'' state produced by line~8 of Algorithm~\ref{alg:B} is
-$U_h^{\mathrm{ASGS}}$ in Algorithm~\ref{alg:O}, and it is the seed for the
-OSGS staggered loop.
-
-% ============================================================
-\section{OSGS Staggered Relaxation}
+\section{Stage II: Algorithm C (OSGSFractionalRelaxation)}
 \label{sec:osgs}
 
-The orthogonal sub-grid scale formulation augments the discrete weak form
-with a stabilisation term that depends on the $L^2$ projection
+The orthogonal sub-grid scale formulation augments the discrete weak
+form with a stabilisation term that depends on the $L^2$ projection
 $\boldsymbol{\pi}_h$ of the strong residual. To avoid carrying the
-Fr\'echet derivative of $\Pi_h$ in the global Jacobian, the algorithm
-treats the pair $(U_h, \boldsymbol{\pi}_h)$ by block-coordinate
-relaxation: freeze $\boldsymbol{\pi}_h$, solve the inner nonlinear primary
-system for $U_h$, then re-project to get the next $\boldsymbol{\pi}_h$.
+Fr\'echet derivative of $\Pi_h$ in the global Jacobian,
+Algorithm~\ref{alg:C} treats the pair $(U_h, \boldsymbol{\pi}_h)$ by
+block-coordinate relaxation: freeze $\boldsymbol{\pi}_h$, solve the
+inner nonlinear primary system for $U_h$ via the Newton kernel
+(Algorithm~\ref{alg:A}), then re-project to get the next
+$\boldsymbol{\pi}_h$.
 
-\subsection{Algorithm C}
+\moduleinterface
+    {Algorithm~\ref{alg:O} (Stage~II, OSGS mode only)}
+    {Algorithm~\ref{alg:B} (once per outer iteration, with $\boldsymbol{\pi}_h$ frozen; the cascade itself invokes Alg.~\ref{alg:A} up to three times)}
+    {Stage~I state $U_h^{\mathrm{ASGS}}$; pre-factored mass solvers $(M_u^{-1}, M_p^{-1})$; optional block-wise Anderson accelerators}
+    {Success flag $S$; converged projection pair $(\boldsymbol{\pi}_{h,u}, \pi_{h,p})$}
 
 \begin{algorithm}[H]
 \caption{$\mathrm{OSGSFractionalRelaxation}$: staggered fixed point on $(U_h, \boldsymbol{\pi}_h)$.}
 \label{alg:C}
 \SetAlgoLined
 \textbf{Parameters:} $N_{\mathrm{OSGS}}, N_{\mathrm{inner}}, m_{\mathrm{w}}, \tau_{\mathrm{w}}, \textftol, \tau_{\mathrm{OSGS}}, \tau_{\mathrm{proj}}, \textstag, \mathsf{Mode}_{\mathrm{drift}}, \mathsf{Mode}_{\mathrm{stop}}$.\\
-\KwIn{Stage--I converged state $U_h^{\mathrm{ASGS}}$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$; pre-factored mass solvers $(M_u^{-1}, M_p^{-1})$; optional Anderson accelerators.}
-\KwOut{$(S, \boldsymbol{\pi}_{h,u}, \pi_{h,p}, \dots)$.}
+\KwIn{$U_h^{\mathrm{ASGS}}$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$; mass-matrix solvers; optional accelerators.}
+\KwOut{$(S, \boldsymbol{\pi}_{h,u}, \pi_{h,p})$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
-$U_h^{0} \gets U_h^{\mathrm{ASGS}}$\;
-$\boldsymbol{\pi}_{h,u}^{0} \gets \Pi_{V_{\mathrm{free}}}(\mathcal{R}_u(U_h^{0}))$;\quad
-$\pi_{h,p}^{0} \gets \Pi_{Q_{\mathrm{free}}}(\mathcal{R}_p(U_h^{0}))$\;
+$U_h^{0} \gets U_h^{\mathrm{ASGS}}$;\quad
+$\boldsymbol{\pi}_{h,u}^{0} \gets 0$;\quad $\pi_{h,p}^{0} \gets 0$ \tcp*{see §\ref{sec:osgs-bootstrap}}
 \For{$m = 1, \dots, N_{\mathrm{OSGS}}$}{
     set effective inner tolerance $\ftolinner{m} \gets (m \le m_{\mathrm{w}}) \,?\, \max(\textftol, \tau_{\mathrm{w}}) : \textftol$\;
     fix $\boldsymbol{\pi}_h \gets \boldsymbol{\pi}_h^{m-1}$;\quad
-    $(U_h^{m}, S_m^{\mathrm{inner}}, \dots, r_m^{\mathrm{inner}}) \gets \mathrm{ExactNewtonPipeline}(U_h^{m-1})$ with cap $N_{\mathrm{inner}}$ and tolerance $\ftolinner{m}$\;
-    \If{$r_m^{\mathrm{inner}} \in \{\mathsf{LinesearchFailed}, \mathsf{MeritDivergence}, \mathsf{LinearSolveNaN}\}$}{
-        \Return $(\mathrm{False}, \boldsymbol{\pi}_{h,u}^{m-1}, \pi_{h,p}^{m-1}, \dots)$ \tcp*{abort: structural OSGS divergence}
+    $\boldsymbol{x}_{\mathrm{prev}} \gets U_h^{m-1}$ \tcp*{restore vector for the inner cascade}
+    $(S_m^{\mathrm{inner}}, U_h^{m}) \gets \mathrm{RobustNonlinearCascade}(U_h^{m-1},\ \boldsymbol{x}_{\mathrm{prev}},\ \mathrm{op}_{\mathrm{N}}^{\mathrm{OSGS}}(\boldsymbol{\pi}_h),\ \mathrm{op}_{\mathrm{P}}^{\mathrm{OSGS}}(\boldsymbol{\pi}_h))$ \tcp*{Alg.~\ref{alg:B}; inner cap $N_{\mathrm{inner}}$, tolerance $\ftolinner{m}$}
+    \If{$S_m^{\mathrm{inner}} = \mathrm{False}$ \textnormal{\textbf{and}} the cascade aborted with a structural failure}{
+        \Return $(\mathrm{False}, \boldsymbol{\pi}_{h,u}^{m-1}, \pi_{h,p}^{m-1})$ \tcp*{see §\ref{sec:osgs-inner-failure}}
     }
 
-    \tcc{State drift, in the configured metric.}
-    \If{$\mathsf{Mode}_{\mathrm{drift}} = \code{L2\_mass}$}{
-        $d_{\mathrm{state}}^m \gets \max\!\bigl(\|\boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1}\|_{L^2(\Omega)},\ \|p_h^m - p_h^{m-1}\|_{L^2(\Omega)}\bigr)$\;
-    }\Else{
-        $d_{\mathrm{state}}^m \gets \|\boldsymbol{X}_h^m - \boldsymbol{X}_h^{m-1}\|_{\ell^\infty}$ over the global DOF vector\;
-    }
+    $d_{\mathrm{state}}^m \gets \mathrm{StateDrift}(U_h^m, U_h^{m-1};\, \mathsf{Mode}_{\mathrm{drift}})$ \tcp*{see §\ref{sec:drift-modes}}
 
     re-project: $\boldsymbol{\pi}_{h,u}^{m} \gets \Pi_{V_{\mathrm{free}}}(\mathcal{R}_u(U_h^m))$;\quad
     $\pi_{h,p}^{m} \gets \Pi_{Q_{\mathrm{free}}}(\mathcal{R}_p(U_h^m))$\;
 
-    \tcc{Optional block-wise Anderson acceleration on each projection.}
     \If{accelerator present}{
-        $\boldsymbol{\pi}_{h,u}^{m} \gets \mathrm{Anderson}_u(\boldsymbol{\pi}_{h,u}^{m-1}, \boldsymbol{\pi}_{h,u}^{m})$;\quad
-        $\pi_{h,p}^{m} \gets \mathrm{Anderson}_p(\pi_{h,p}^{m-1}, \pi_{h,p}^{m})$\;
+        $\boldsymbol{\pi}_{h,u}^{m} \gets \mathrm{Anderson}_u(\boldsymbol{\pi}_{h,u}^{m-1}, \boldsymbol{\pi}_{h,u}^{m})$ \tcp*{safety fallback (§\ref{sec:anderson}) handled internally}
+        $\pi_{h,p}^{m} \gets \mathrm{Anderson}_p(\pi_{h,p}^{m-1}, \pi_{h,p}^{m})$ \tcp*{idem}
     }
 
     $d_\pi^m \gets \max\!\bigl(
-        \sqrt{(\Delta\boldsymbol{\pi}_{h,u}^m)^\top M_u (\Delta\boldsymbol{\pi}_{h,u}^m)},\
-        \sqrt{(\Delta\pi_{h,p}^m)^\top M_p (\Delta\pi_{h,p}^m)} \bigr)$\;
+        \|\Delta\boldsymbol{\pi}_{h,u}^m\|_{M_u},\
+        \|\Delta\pi_{h,p}^m\|_{M_p}\bigr)$ \tcp*{see §\ref{sec:proj-drift}}
 
-    \tcc{Convergence predicate, noise-floor protected.}
     $\tau_{\mathrm{OSGS}}^{\mathrm{eff}} \gets \max(\tau_{\mathrm{OSGS}}, \textstag)$;\quad
     $\tau_{\mathrm{proj}}^{\mathrm{eff}} \gets \max(\tau_{\mathrm{proj}}, \textstag)$\;
-    $S_{\mathrm{state}} \gets (d_{\mathrm{state}}^m \le \tau_{\mathrm{OSGS}}^{\mathrm{eff}})$;\quad
-    $S_{\mathrm{proj}}  \gets (d_\pi^m       \le \tau_{\mathrm{proj}}^{\mathrm{eff}})$\;
-    $S_{\mathrm{conv}} \gets \begin{cases}
-        S_{\mathrm{state}} & \mathsf{Mode}_{\mathrm{stop}} = \code{state\_drift}, \\
-        S_{\mathrm{proj}}  & \mathsf{Mode}_{\mathrm{stop}} = \code{projection\_drift}, \\
-        S_{\mathrm{state}} \wedge S_{\mathrm{proj}} & \mathsf{Mode}_{\mathrm{stop}} = \code{both}.
-    \end{cases}$\;
+    decide $S_{\mathrm{conv}}$ from $\mathsf{Mode}_{\mathrm{stop}}$, $d_{\mathrm{state}}^m$, $d_\pi^m$ (see §\ref{sec:stopping-mode})\;
     \If{$m \ge 2$ \textnormal{\textbf{and}} $\|\boldsymbol{X}_h^m - \boldsymbol{X}_h^{m-1}\|_{\ell^\infty} \le \textstag$}{
         $S_{\mathrm{conv}} \gets \mathrm{True}$ \tcp*{absolute noise-floor short circuit}
     }
     \If{$S_{\mathrm{conv}}$}{
-        \textbf{[}\,if MMS enabled, run $\mathrm{VerifyMMSPlateau}$ (Alg.~\ref{alg:D})\,\textbf{]}\;
-        \Return $(\mathrm{True}, \boldsymbol{\pi}_{h,u}^m, \pi_{h,p}^m, \dots)$\;
+        \extline{\If{$\code{mms\_cfg.enabled}$ \textnormal{\textbf{and}} first $S_{\mathrm{conv}}$ event}{
+            initialise plateau-history $\mathcal{H}$ at $U_h^m$;\quad $I_{\mathrm{pass}} \gets 0$\;
+            \textbf{continue} \tcp*{do not exit yet; collect a plateau sample}
+        }
+        \If{$\code{mms\_cfg.enabled}$}{
+            $(S_{\mathrm{plat}}, I_{\mathrm{pass}}) \gets \mathrm{VerifyMMSPlateau}(U_h^m, U_{\mathrm{ex}}, \mathcal{H}, I_{\mathrm{pass}})$ \tcp*{Alg.~\ref{alg:D}}
+            \If{$\neg S_{\mathrm{plat}}$}{ \textbf{continue}\; }
+        }}
+        \Return $(\mathrm{True}, \boldsymbol{\pi}_{h,u}^m, \pi_{h,p}^m)$\;
     }
 }
-\Return $(\mathrm{False}, \boldsymbol{\pi}_{h,u}^{N_{\mathrm{OSGS}}}, \pi_{h,p}^{N_{\mathrm{OSGS}}}, \dots)$\;
+\Return $(\mathrm{False}, \boldsymbol{\pi}_{h,u}^{N_{\mathrm{OSGS}}}, \pi_{h,p}^{N_{\mathrm{OSGS}}})$\;
 \end{algorithm}
-
-\subsection{The bootstrap and why the ASGS state matters}
-
-The first sub-grid projection $\boldsymbol{\pi}_h^0$ is the $L^2$ projection
-of the strong residual evaluated at $U_h^{\mathrm{ASGS}}$, not at the zero
-initial guess. There are two reasons for this.
-
-First, when the ASGS system has converged, $\mathcal{R}_u(U_h^{\mathrm{ASGS}})$
-and $\mathcal{R}_p(U_h^{\mathrm{ASGS}})$ are small in $L^2$, so
-$\boldsymbol{\pi}_h^0$ is already close to its fixed-point value.
-The staggered loop is then a perturbation around an existing solution
-rather than a global search.
-
-Second, an ASGS-converged primary field gives the inner Newton solve
-at $m = 1$ an initial residual that is small in absolute terms, so the
-Newton iteration usually converges within a handful of inner iterations.
-Starting OSGS from $\boldsymbol{x}^0 = 0$, by contrast, would force the
-solver to chase both the primary nonlinearity and the projection coupling
-simultaneously, which empirically diverges in stiff regimes.
-
-\subsection{Why projection happens on the unconstrained spaces}
-
-The projection target $V_{\mathrm{free}}, Q_{\mathrm{free}}$ has no
-Dirichlet constraints. If the projection were performed onto the
-constrained trial spaces $U, P$, the boundary residual---which is
-non-zero in general---would be assigned to the projection's boundary DOFs,
-producing an artefact of order $O(1)$ along $\partial\Omega$. That artefact
-then enters the stabilisation term, where it pollutes the convergence rate of
-the FE method to $O(1)$ rather than the expected $O(h^{k+1})$, destroying any
-MMS rate verification. See \code{theory/paper-code-divergences.md}.
-
-\subsection{Mass-matrix pre-factoring}
-
-Each projection $\Pi_{V_{\mathrm{free}}}, \Pi_{Q_{\mathrm{free}}}$ is the
-solution of an SPD linear system with the mass matrices $M_u, M_p$. Because
-the spaces $V_{\mathrm{free}}, Q_{\mathrm{free}}$ do not change between
-outer iterations, the matrices and their LU factorisations are assembled
-\emph{once} (Algorithm~\ref{alg:O}, line~16). At every outer iteration the
-projection cost is then one forward and one back substitution per block;
-the cubic factorisation cost is amortised over the full $N_{\mathrm{OSGS}}$
-budget.
-
-\subsection{Warmup phase}
-
-For the first $m_{\mathrm{w}}$ outer iterations the inner Newton tolerance is
-relaxed to $\max(\textftol, \tau_{\mathrm{w}})$. The motivation is purely
-economic: while $\boldsymbol{\pi}_h^0$ is still being computed off a
-not-yet-stationary residual, driving the inner solve to a tight $\textftol$
-``polishes'' the iterate against a projection that will be replaced
-immediately. Relaxing the inner tolerance during this phase trades a tiny
-amount of accuracy in the early iterates for a noticeable cut in inner-Newton
-budget. Once $m > m_{\mathrm{w}}$ the inner tolerance reverts to the global
-$\textftol$ and the staggered loop tightens.
-
-A practical default has $m_{\mathrm{w}} \in \{1,2,3\}$ and $\tau_{\mathrm{w}}
-= 10\cdot\textftol$ or so. Increasing $m_{\mathrm{w}}$ further wastes
-fewer Newton iterations early but risks the staggered fixed point
-``locking'' on a coarse projection.
 
 \subsection{State drift: \texorpdfstring{$\ell^\infty$ vs continuous $L^2$}{Linf vs L2}}
 \label{sec:drift-modes}
@@ -823,29 +952,24 @@ The state drift between consecutive outer iterations
             & \mathsf{Mode}_{\mathrm{drift}} = \code{Linf},
     \end{cases}
 \end{equation}
-admits two metrics with subtly different meanings.
+admits two metrics with subtly different meanings. The \code{Linf}
+mode is the raw vector-space $\ell^\infty$ norm of the concatenated
+free-DOF array; it is cheap but pathological in mixed-physics systems
+because it lets the field with larger numerical magnitude dominate.
+The \code{L2\_mass} mode computes two independent continuous
+$L^2(\Omega)$ norms,
+$\sqrt{\int_\Omega (\boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1})\cdot(\boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1})\,\mathrm{d}\Omega}$
+and analogously for the pressure block, evaluated by Gridap quadrature
+on the same measure $\mathrm{d}\Omega$ used by the formulation, and
+takes their maximum. The distinction matters: \code{L2\_mass} is the
+continuous functional norm of the difference FE function, whereas
+\code{Linf} is the discrete maximum coefficient deviation, which is
+basis-dependent and mixes physical units across blocks. Only
+\code{L2\_mass} measures velocity and pressure in their own natural
+functional norms.
 
-\paragraph{The \texttt{Linf} mode.}  This is the cheapest possible drift:
-the raw vector-space $\ell^\infty$ norm of the concatenated free-DOF array.
-It costs one BLAS sweep and no quadrature. The pathology, however, is that
-the same array stores velocity and pressure DOFs interleaved by the
-multi-field layout, so a velocity DOF expressed in (dimensional) units of
-$[\mathrm{m/s}]$ sits beside a pressure DOF in $[\mathrm{Pa}]$. The
-$\ell^\infty$ norm is then dominated by whichever field happens to have the
-larger numerical magnitude---a scale-mixing artefact, not a physical drift
-measurement. In regimes where pressure and velocity are well balanced this
-mode works adequately and is fast. In regimes where one field dominates,
-the drift signal can become essentially blind to the other.
-
-\paragraph{The \texttt{L2\_mass} mode.}  Computes two independent continuous
-$L^2(\Omega)$ norms via quadrature, one for each block, and takes their
-maximum. This is the recommended default (and the invariant codified in
-\code{CLAUDE.md}): velocity and pressure are measured in their own
-natural functional norms, with no possibility of cross-pollution. The
-cost is two mass-weighted quadratures per outer iteration, dominated in
-practice by the inner Newton solve itself.
-
-\subsection{Projection drift, in the mass-weighted inner product}
+\subsection{Projection drift in the mass-weighted inner product}
+\label{sec:proj-drift}
 
 The projection drift
 \begin{equation}
@@ -855,308 +979,146 @@ The projection drift
         \sqrt{(\Delta\pi_{h,p}^m)^\top M_p (\Delta\pi_{h,p}^m)} \Bigr)
 \end{equation}
 is the natural distance in the inner product that defines the $L^2$
-projection itself. Because the projection is the minimiser of a quadratic
-in $M$, the appropriate measure of progress toward the fixed point is the
-$M$-weighted norm; the Euclidean DOF norm would conflate it with
-inverse-mass scaling and report misleading drift values on graded meshes.
-The factorisations $M_u^{-1}, M_p^{-1}$ are not needed for this norm; only
-the matrix-vector products $M_u \Delta\pi, M_p \Delta\pi$ are required, and
-those reuse the same assembled sparse matrices used in the projection step.
+projection itself. The Euclidean DOF norm would conflate this with
+inverse-mass scaling and report misleading drift values on graded
+meshes.
 
 \subsection{Choosing the stopping mode}
+\label{sec:stopping-mode}
 
 The user selects $\mathsf{Mode}_{\mathrm{stop}}$ between three options:
 \begin{itemize}
-\item \code{state\_drift}: terminate when $d_{\mathrm{state}}^m
-\le \tau_{\mathrm{OSGS}}^{\mathrm{eff}}$. Use when the primary fields are
-the only quantities of interest and the projection is a means to an end.
-\item \code{projection\_drift}: terminate when $d_\pi^m \le
-\tau_{\mathrm{proj}}^{\mathrm{eff}}$. Use when sub-grid scale accuracy is
-the goal and one expects the primary field to be approximately stationary
-already.
-\item \code{both} (default): require both predicates. The most defensive
-option and the one that aligns with the mathematical definition of the
-fixed point.
+\item \code{state\_drift}: terminate when $d_{\mathrm{state}}^m \le \tau_{\mathrm{OSGS}}^{\mathrm{eff}}$.
+\item \code{projection\_drift}: terminate when $d_\pi^m \le \tau_{\mathrm{proj}}^{\mathrm{eff}}$.
+\item \code{both} (default): require both predicates.
 \end{itemize}
-In all three cases an additional absolute short-circuit fires when the raw
-$\ell^\infty$ DOF drift drops below $\textstag$ for $m \ge 2$; this protects
-against limit-cycle oscillations in which the iterate ping-pongs between
-two nearby states without either drift ever cleanly dropping below
-$\tau_{\mathrm{OSGS}}$.
+\code{both} is the strictest and corresponds to the mathematical
+definition of the staggered fixed point. The single-criterion modes
+sacrifice one of the two conditions in exchange for fewer iterations
+and are appropriate only when the user knows that the slacker
+condition is already satisfied. In all three cases an additional
+absolute short-circuit fires when the raw $\ell^\infty$ DOF drift drops
+below $\textstag$ for $m \ge 2$; this protects against limit-cycle
+oscillations that never cleanly satisfy $\tau_{\mathrm{OSGS}}$ or
+$\tau_{\mathrm{proj}}$.
+
+\subsection{Bootstrap, mass-matrix pre-factoring, and warmup}
+\label{sec:osgs-bootstrap}
+
+\paragraph{Zero bootstrap of $\boldsymbol{\pi}_h^0$.}  The first sub-grid
+projection is initialised to zero, $\boldsymbol{\pi}_h^0 \equiv 0$,
+\emph{not} to the $L^2$ projection of the strong residual at
+$U_h^{\mathrm{ASGS}}$. The choice is deliberate. Solving the OSGS
+inner problem at $m = 1$ with $\boldsymbol{\pi}_h \equiv 0$ is, by
+definition, exactly the ASGS problem, and Stage~I has already converged
+that system to within $\textftol$. The very first inner solve therefore
+starts and ends at $U_h^{\mathrm{ASGS}}$, and the first non-trivial
+projection $\boldsymbol{\pi}_h^1$ is produced naturally by the
+$L^2$-projection step at the bottom of the outer-loop body. Pre-seeding
+$\boldsymbol{\pi}_h^0$ with $\Pi(\mathcal{R}(U_h^{\mathrm{ASGS}}))$
+would instead drive the $m = 1$ inner solve away from $U_h^{\mathrm{ASGS}}$
+to satisfy a stabilisation term whose projection has not yet been
+relaxed by an outer iteration---an ``off-distribution'' bootstrap that
+historically required the warmup phase (see below) to unwind.
+
+\paragraph{Mass-matrix pre-factoring.}  Each projection is the solution
+of an SPD linear system with $M_u$ or $M_p$. Because the projection
+target spaces never change between outer iterations, the matrices and
+their LU factorisations are assembled once (in Algorithm~\ref{alg:O})
+and reused: every projection is a constant-cost forward/back
+substitution.
+
+\paragraph{Warmup phase.}  The warmup phase ($m \le m_{\mathrm{w}}$)
+relaxes the inner-cascade tolerance to $\max(\textftol, \tau_{\mathrm{w}})$.
+Even with the zero bootstrap of $\boldsymbol{\pi}_h^0$, the projection
+$\boldsymbol{\pi}_h^{m}$ for small $m$ is still moving rapidly between
+outer iterations; driving the inner solve to a tight $\textftol$ in this
+regime would polish the iterate against a projection that gets replaced
+immediately. Relaxing the inner tolerance during the warmup trades a
+small amount of accuracy in the early iterates for a meaningful cut in
+inner-solver budget.
+
+\subsection{Projection policy and the constant-$\sigma$ trim}
+\label{sec:proj-policy}
+
+The projection step
+$\boldsymbol{\pi}_h^{m} \gets \Pi(\mathcal{R}(U_h^m))$ does not always
+project the full strong residual; the policy is configurable, and the
+choice is determined jointly by the discrete formulation and the
+reaction model.
+
+The default policy projects the full residual. When the reaction
+tensor $\sigma(\alpha, \boldsymbol{u})$ is a constant
+($\code{reaction\_model = "Constant\_Sigma"}$ in
+\code{stabilization\_config}, paired with the
+\code{ProjectResidualWithoutReactionWhenConstantSigma} policy), the
+reaction term $\sigma \boldsymbol{u}_h$ is omitted from the residual
+before projection. The justification is exactness: when $\sigma$ is a
+spatial constant, $\sigma \boldsymbol{u}_h$ lies entirely in the FE
+velocity space $\boldsymbol{V}_h$ (which is closed under multiplication
+by a scalar), so its $L^2$ projection onto $V_{\mathrm{free}}$ is the
+function itself; subtracting it again in the orthogonal complement
+$I - \Pi_h$ gives exactly zero. Including the reaction term in the
+projection step would amount to projecting and re-subtracting an FE
+function---a no-op in exact arithmetic, but one that introduces avoidable
+floating-point noise. Removing it from the projected residual eliminates
+that noise at no cost. This corresponds to Section~4.4 of the parent
+paper.
+
+For non-constant $\sigma$ (e.g.\ the Forchheimer--Ergun law), the
+reaction term is \emph{not} an FE function and its projection is
+non-trivial; the trim does not apply and the policy reverts to the
+default of projecting the full residual.
 
 \subsection{Block-wise Anderson acceleration}
 \label{sec:anderson}
 
-For high-$\mathrm{Re}$, high-$\mathrm{Da}$ flows the staggered fixed point
-on $\boldsymbol{\pi}_h$ can stall in slow limit-cycle oscillations. Anderson
-acceleration extrapolates a new $\boldsymbol{\pi}_h^m$ from the history of
-the last $m$ fixed-point residuals by solving a small mass-weighted
-least-squares problem
+For stiff fixed points on $\boldsymbol{\pi}_h$, Anderson acceleration
+extrapolates a new iterate from the last $m$ fixed-point residuals by
+solving a small mass-weighted least-squares problem
 \begin{equation}
-    \min_\gamma\ \|(\Delta F)\gamma - f_k\|_M^2,
+    \min_\gamma\ \|(\Delta F)\gamma - f_k\|_M^2.
 \end{equation}
-where $\Delta F$ is the matrix of residual increments and the inner product
-$\|\cdot\|_M^2 = (\cdot)^\top M (\cdot)$ uses the appropriate mass matrix.
-Two architectural choices make this robust in the present setting:
+The accelerator operates independently on $\boldsymbol{\pi}_{h,u}$ and
+$\pi_{h,p}$, each with its own mass matrix; combining the blocks would
+force a cross-physical mixing that the OSGS formulation goes out of
+its way to avoid. The least-squares system uses the same $L^2$ inner
+product that defines the underlying projection. A safety fallback
+discards the extrapolation and reverts to a relaxed Picard step when
+the extrapolated state lies more than a fixed multiple of the
+unextrapolated residual away from the raw fixed-point candidate.
 
-\paragraph{Block isolation.}  The accelerator operates independently on
-$\boldsymbol{\pi}_{h,u}$ and $\pi_{h,p}$, each with its own mass matrix
-($M_u$ and $M_p$ respectively). Combining the blocks into a single
-extrapolation problem would force a cross-physical mixing that the OSGS
-formulation goes out of its way to avoid in the first place.
+\subsection{Failure of the inner cascade}
+\label{sec:osgs-inner-failure}
 
-\paragraph{Mass-weighted normal equations.}  The least-squares system
-uses the same $L^2$ inner product that defines the underlying projection,
-not the Euclidean dot product of DOF vectors. This is the natural way to
-make the extrapolation respect mesh grading.
+The inner solve inside Algorithm~\ref{alg:C} is the same
+$\mathrm{RobustNonlinearCascade}$ used in Stage~I, supplied with
+OSGS operators (so the Jacobian depends on the frozen projection
+$\boldsymbol{\pi}_h^{m-1}$) and with the iteration cap reduced to
+$N_{\mathrm{inner}}$ on each inner $\mathrm{ExactNewtonPipeline}$ call.
+The restore vector is $\boldsymbol{x}_{\mathrm{prev}} = U_h^{m-1}$,
+i.e.\ the iterate at the start of the current outer iteration; this
+differs from Stage~I, which restores to the global initial guess
+$\boldsymbol{x}^0_{\mathrm{backup}}$.
 
-\paragraph{Safety fallback.}  The implementation contains a sanity check:
-if the extrapolated state $x_{\mathrm{next}}$ lies further than $10$ times
-the unextrapolated residual from the raw fixed-point candidate $g_k$, the
-extrapolation is discarded and the iteration falls back to a relaxed
-Picard step $x_k + \beta f_k$. The factor $10$ is a conservative bound
-chosen so that the safety net does not interfere with legitimate
-Anderson acceleration on well-behaved problems while still catching
-catastrophic over-extrapolation in degenerate cases.
-
-\subsection{The reaction-projection trim}
-
-When the configured \code{experimental\_reaction\_mode} is \code{"standard"}
-\emph{and} the reaction law is \code{ConstantSigmaLaw}, the projected
-residual omits the $\sigma\boldsymbol{u}$ term entirely
-(\code{src/stabilization/projection.jl}:26--40). Mathematically this is
-the observation that for constant $\sigma$ the $L^2$ projection of
-$\sigma\boldsymbol{u}$ onto the FE space is itself, so the contribution
-to $\Pi_h(\mathcal{R}_u)$ exactly cancels in the OSGS residual. Skipping it
-saves an assembly per outer iteration without altering the converged state.
-For non-constant reaction laws (e.g.\ Forchheimer--Ergun) the trim is
-invalid and the projection-policy sanitiser rejects this option.
-
-\subsection{Failure of the inner Newton}
-
-The inner Newton call inside Algorithm~\ref{alg:C} runs on the same
-$\mathrm{ExactNewtonPipeline}$ used in Algorithm~\ref{alg:A}, but with the
-iteration cap reduced to $N_{\mathrm{inner}}$ (typically a small number,
-e.g.\ $3$--$5$) and the tolerance possibly relaxed during warmup. When the
-inner exit reason is one of $\mathsf{LinesearchFailed}$,
-$\mathsf{MeritDivergence}$, or $\mathsf{LinearSolveNaN}$, the staggered
-outer loop aborts immediately: these reasons reflect structural failure of
-the inner iteration map, and continuing the outer relaxation would only
-re-feed the broken state into another projection. Other exit reasons
-(notably $\mathsf{IterationCap}$ from exhausting $N_{\mathrm{inner}}$
-without converging to the effective inner tolerance) are treated as
-progress: the next outer iteration simply re-engages with the updated
-projection.
-
-% ============================================================
-\section{MMS Plateau Verification}
-\label{sec:mms}
-
-\subsection{Numerical convergence versus discretisation convergence}
-
-The inner Newton stops when $\|\boldsymbol{b}\|_\infty \le \textftol$.
-That is convergence in the \emph{algebraic} sense: the iterate is close to
-the root of the discrete system. It says nothing about whether the discrete
-system itself is close to the true PDE solution. The Method of Manufactured
-Solutions (MMS) provides exactly that second test: it injects an exact
-analytical $(\boldsymbol{u}_{\mathrm{ex}}, p_{\mathrm{ex}})$, recomputes
-the appropriate source terms, and measures
-$\|U_h - U_{\mathrm{ex}}\|$ in physical norms. The expected discretisation
-behaviour is $O(h^{k+1})$ in the $L^2$ norms (and one order weaker in the
-$H^1$-semi norm).
-
-For a single mesh, plateau verification asks a different question: once
-the iterate is close enough to the root that further iterations do not
-move the FE error, the FE error has \emph{plateaued} at its discretisation
-floor. Detecting this plateau certifies that the algebraic convergence
-criterion was tight enough to expose the discretisation error.
-
-\subsection{Algorithm D}
-
-\begin{algorithm}[H]
-\caption{$\mathrm{VerifyMMSPlateau}$: relative-change plateau test.}
-\label{alg:D}
-\SetAlgoLined
-\textbf{Parameters:} $N_{\mathrm{plat}}, \tau_{\mathrm{err}}, \varepsilon_{u,L^2}, \varepsilon_{u,H^1}, \varepsilon_{p,L^2}$.\\
-\KwIn{Current iterate $U_h^m$, exact reference $U_{\mathrm{ex}}$, history $\mathcal{H}$ of past error tuples.}
-\KwOut{$(S_{\mathrm{plat}})$.}
-\vspace{0.2cm}\hrule\vspace{0.2cm}
-compute $E_{u,L^2}^m = \|\boldsymbol{u}_h^m - \boldsymbol{u}_{\mathrm{ex}}\|_{L^2}$,
-        $E_{u,H^1}^m = |\boldsymbol{u}_h^m - \boldsymbol{u}_{\mathrm{ex}}|_{H^1}$,
-        $E_{p,L^2}^m = \|p_h^m - p_{\mathrm{ex}}\|_{L^2}$\;
-append to $\mathcal{H}$; let $E^{m-1}_\bullet$ be the previous entry\;
-$r_{u,L^2} \gets |E_{u,L^2}^m - E_{u,L^2}^{m-1}| / \max(E_{u,L^2}^m,E_{u,L^2}^{m-1}, \varepsilon_{u,L^2})$\;
-$r_{u,H^1} \gets |E_{u,H^1}^m - E_{u,H^1}^{m-1}| / \max(E_{u,H^1}^m,E_{u,H^1}^{m-1}, \varepsilon_{u,H^1})$\;
-$r_{p,L^2} \gets |E_{p,L^2}^m - E_{p,L^2}^{m-1}| / \max(E_{p,L^2}^m,E_{p,L^2}^{m-1}, \varepsilon_{p,L^2})$\;
-$r_{\max} \gets \max(r_{u,L^2},r_{u,H^1},r_{p,L^2})$\;
-\If{$r_{\max} \le \tau_{\mathrm{err}}$}{
-    $I_{\mathrm{pass}} \gets I_{\mathrm{pass}} + 1$\;
-}\Else{
-    $I_{\mathrm{pass}} \gets 0$\;
-}
-\If{$I_{\mathrm{pass}} \ge N_{\mathrm{plat}}$}{
-    \Return $\mathrm{True}$ \tcp*{plateau satisfied}
-}
-\Return $\mathrm{False}$ \tcp*{continue extending}
-\end{algorithm}
-
-\subsection{Three norms, three floors}
-
-The verifier tracks \emph{three} error quantities, not two: $L^2$ of
-velocity, $L^2$ of pressure, and the $H^1$-semi-norm
-$|\boldsymbol{u}_h - \boldsymbol{u}_{\mathrm{ex}}|_{H^1}
-= \sqrt{\int_\Omega \nabla(\boldsymbol{u}_h - \boldsymbol{u}_{\mathrm{ex}}) :
-\nabla(\boldsymbol{u}_h - \boldsymbol{u}_{\mathrm{ex}})\,\mathrm{d}\Omega}$.
-The third norm matters because pressure $L^2$ and velocity $L^2$ can
-plateau while the velocity gradient---which is what the convective and
-viscous terms actually feel---still drifts. Without the $H^1$-semi norm a
-silent gradient drift would be invisible to the plateau test.
-
-Each ratio is taken with respect to its own per-norm floor
-$\varepsilon_\bullet$. Without these floors, when an error first drops to
-$10^{-15}$ the ratio between consecutive iterations becomes numerically
-meaningless. The floors are configured high enough above floating-point
-noise to remain stable on fine meshes, but low enough that they do not
-artificially declare convergence for genuinely coarse runs.
-
-\subsection{Consecutive passes and budget exhaustion}
-
-The plateau is declared only after $N_{\mathrm{plat}}$ \emph{consecutive}
-passes, and the counter resets to zero on the first failure. This catches
-intermittent drift---e.g.\ a sequence
-$(r_{\max}^k)_k = (10^{-4}, 10^{-3}, 10^{-4}, \ldots)$
-that looks safe sample-by-sample but actually has not stabilised.
-A typical choice is $N_{\mathrm{plat}} \in \{2,3\}$.
-
-\subsection{Two entry points and how they differ}
-
-The verifier is invoked from two distinct contexts.
-
-\paragraph{ASGS path.}  After Stage~I converges and the method is ASGS, the
-orchestration enters a dedicated extension loop of length $K_{\mathrm{extra}}$
-(\code{solve\_system}, lines~258--337). Each iteration calls
-$\mathrm{ExactNewtonPipeline}$ with $N_{\mathrm{N}} = 1$ followed by
-$\mathrm{VerifyMMSPlateau}$. The loop exits when the plateau passes or the
-budget is exhausted; either way the iterate is returned. The ``one inner
-Newton step then verify'' cadence is deliberate: it gives the plateau test
-a chance to observe how a single extra Newton step changes the FE error.
-
-\paragraph{OSGS path.}  Within $\mathrm{OSGSFractionalRelaxation}$
-(Algorithm~\ref{alg:C}), the verifier runs only after the staggered
-predicate $S_{\mathrm{conv}}$ has fired, not at every outer iteration.
-The first successful staggered iteration triggers a fresh MMS error history;
-subsequent successful iterations append to it and test for the plateau. The
-budget inflation $K_{\mathrm{extra}}$ allows the staggered loop to keep
-producing additional converged iterates after first hitting the fixed point.
-This entry point is gated rather than per-iteration because the FE error is
-defined relative to the discrete system, and that system itself is moving
-between staggered iterations until $\boldsymbol{\pi}_h$ stabilises.
-
-% ============================================================
-\section{The MMS Sweep Harness}
-\label{sec:harness}
-
-The discussion above applies to a single \code{run\_simulation} call.
-The MMS sweep harness under \code{test/}\allowbreak\code{extended/}\allowbreak\code{ManufacturedSolutions/}
-wraps many \code{run\_simulation} runs in a triple loop over Reynolds number
-$\mathrm{Re}$,
-Damk\"ohler number $\mathrm{Da}$, and mesh resolution $h$, and reports
-convergence-rate tables across the resulting sweep. Because the harness sees
-many cases of widely varying difficulty, it injects three per-case
-adaptations that the main \code{run\_simulation} flow deliberately does not
-attempt. We describe them here in one place so that the reader does not
-mistake them for parts of the orchestration.
-
-\subsection{Adaptive \texorpdfstring{$\textftol$}{ftol}}
-\label{sec:harness-ftol}
-
-Two error scales matter in an FE method. The \emph{algebraic error} is the
-distance between the iterate and the discrete root, governed by $\textftol$.
-The \emph{discretisation error} is the distance between the discrete root
-and the true PDE solution, which behaves as $O(h^{k_v+1})$ for the chosen
-velocity element order. Setting $\textftol$ much tighter than $O(h^{k_v+1})$
-wastes Newton iterations driving the algebraic residual far below the
-discretisation floor---adjustments that cannot improve the discretisation
-error. Setting $\textftol$ much looser than $O(h^{k_v+1})$ lets the
-algebraic error dominate and pollutes the observed convergence rate.
-
-The harness therefore re-derives $\textftol$ per case:
-\begin{equation}
-    \label{eq:dynamic-ftol}
-    \textftol^{\,\mathrm{dyn}}
-    = \max\!\Bigl(\textftol^{\,\mathrm{static}},\
-        \min(C_{\mathrm{ceil}},\ C_{\mathrm{sf}} \cdot h^{k_v+1}) \Bigr).
-\end{equation}
-The right-most term ties the tolerance to the discretisation scale via a
-spatial safety factor $C_{\mathrm{sf}}$ (a typical choice is $10^{-2}$,
-i.e.\ the algebraic residual must drop one to two orders of magnitude
-below the predicted discretisation error). The ceiling $C_{\mathrm{ceil}}$
-prevents trivially loose tolerances on absurdly coarse meshes. The outer
-$\max$ prevents the formula from descending below the user-supplied
-$\textftol^{\,\mathrm{static}}$, which serves as a sanity bound. The
-adaptive $\textftol^{\,\mathrm{dyn}}$ is then plugged into every
-\code{SafeNewtonSolver} the harness constructs for that case
-(\code{run\_test.jl}:440--446, 470--471).
-
-The main \code{run\_simulation} driver does not use this scaling because
-in production work the user typically picks one mesh and one tolerance
-deliberately, and an adaptive rule would silently override that choice.
-
-\subsection{Adaptive noise floor}
-\label{sec:harness-noise}
-
-Linear-system conditioning grows as $\mathcal{O}(h^{-2})$ for elliptic
-operators and is further amplified by convective and reactive terms. A
-static $\textstag$ that is appropriate on a coarse mesh will be far above
-the genuine round-off floor on a fine mesh, causing the
-$\mathsf{NoiseFloor}$ classification of Algorithm~\ref{alg:A3} to fire
-prematurely. The harness consequently scales
-\begin{equation}
-    \textstag^{\,\mathrm{dyn}}
-    = \min\!\Bigl(\textstag,\ \max(n^{\min},\ n^{\mathrm{base}} \cdot N^2 \cdot \max(1, \mathrm{Re}))\Bigr),
-\end{equation}
-clipped above by the user-supplied $\textstag$ and below by an absolute
-floor $n^{\min}$. The factor $N^2$ tracks the elliptic conditioning growth
-(with $N$ the partition count per direction, so $h \propto 1/N$); the
-$\max(1,\mathrm{Re})$ factor accounts for convective amplification.
-A final $\textstag^{\,\mathrm{dyn}} \gets
-\max(\textstag^{\,\mathrm{dyn}}, n^{\mathrm{sf}}\,\textftol^{\,\mathrm{dyn}})$
-clamp preserves the strict ordering $\textstag^{\,\mathrm{dyn}} >
-\textftol^{\,\mathrm{dyn}}$, without which Algorithm~\ref{alg:A3} would
-collapse the two predicates.
-
-\subsection{Per-case Picard widening}
-\label{sec:harness-picard}
-
-In a $(\mathrm{Re}, \mathrm{Da}, h)$ sweep, the easy cases require few
-Picard iterations and the hard ones need many. Setting a uniform
-$N_{\mathrm{P}}$ across the sweep forces an unhappy choice: large enough
-for the hard cases (wastefully slow on the easy ones) or small enough for
-the easy ones (insufficient on the hard ones). The harness therefore
-\emph{widens} the Picard budget when a stiffness threshold is exceeded
-(\code{run\_test.jl}:459--468):
-\begin{equation}
-    \begin{aligned}
-    N_{\mathrm{P}}^{\,\mathrm{local}} &\gets N_{\mathrm{P}}, \\
-    \text{if } \mathrm{Re} \ge \mathrm{Re}^{\mathrm{th}}: \quad
-    N_{\mathrm{P}}^{\,\mathrm{local}} &\gets \max(N_{\mathrm{P}}^{\,\mathrm{local}}, N_{\mathrm{P}}^{\mathrm{Re}}), \\
-    \text{if } \mathrm{Da} \ge \mathrm{Da}^{\mathrm{th}}: \quad
-    N_{\mathrm{P}}^{\,\mathrm{local}} &\gets \max(N_{\mathrm{P}}^{\,\mathrm{local}}, N_{\mathrm{P}}^{\mathrm{Da}}).
-    \end{aligned}
-\end{equation}
-$N_{\mathrm{P}}^{\,\mathrm{local}}$ is then plugged into the local
-\code{SafeNewtonSolver} for that case. The defaults
-$\mathrm{Re}^{\mathrm{th}} = \mathrm{Da}^{\mathrm{th}} = 10^4$ are crude
-break-points between regimes where the convective or reactive coupling
-becomes the dominant difficulty.
-
-\subsection{Closing remark}
-
-None of the adaptations of Sections~\ref{sec:harness-ftol}--\ref{sec:harness-picard}
-fire inside a single \code{run\_simulation} call. The configuration schema
-exposes them so that the harness can read them from a shared JSON file,
-but the production driver simply uses the static $\textftol$, $\textstag$,
-and $N_{\mathrm{P}}$ written in the user's configuration.
+Three failure modes are propagated as structural divergence and abort
+the outer loop:
+\begin{itemize}
+\item The first exact-Newton attempt produces a non-finite iterate
+\emph{and} the Picard attempt subsequently produces a non-finite
+iterate as well (the cascade then returns
+$\boldsymbol{x}_{\mathrm{restore}}$ with $S = \mathrm{False}$).
+\item The Picard attempt itself raises an unrecoverable exception
+(distinct from the benign ``reached maximum iterations'' exception
+that is reinterpreted as a completed Picard smoothing pass).
+\item The terminal Newton retry, after a Picard smoothing pass,
+returns with one of $\mathsf{LinesearchFailed}$,
+$\mathsf{MeritDivergence}$, or $\mathsf{LinearSolveNaN}$.
+\end{itemize}
+All other exit configurations (notably $\mathsf{IterationCap}$ from
+exhausting $N_{\mathrm{inner}}$ inside one of the cascade's three
+sub-calls) are treated as progress: the next outer iteration simply
+re-engages with the updated projection.
 
 % ============================================================
 \section{Convergence-Analysis Notes}
@@ -1174,50 +1136,22 @@ the iteration ran out of budget while still far from any noise floor.
 the iteration may have stopped for any reason, but the residual is below
 the noise floor we set for ``effectively converged''.
 \end{itemize}
-The orchestration treats only the second as success. Coercing the first
-into a converged state---``it ran for many iterations and stopped; close
-enough''---is forbidden, because doing so would feed an unresolved iterate
-into Stage~II of the cascade. In OSGS in particular, an unresolved
-$U_h$ produces a stale $\boldsymbol{\pi}_h$ whose subsequent fixed-point
-iterations cannot recover.
-
-To make this concrete: imagine a coarse-mesh MMS run in which Newton
-stops at $\mathsf{IterationCap}$ with $\|\boldsymbol{b}\|_\infty = 10^{-3}$,
-above $\textstag = 10^{-5}$ but well above $\textftol = 10^{-10}$. The
-discretisation error on that mesh might be $10^{-4}$. If $\mathsf{IterationCap}$
-were silently relabelled as converged, the verifier in
-Algorithm~\ref{alg:D} would compute relative-change ratios that reflect a
-non-stationary iterate, the plateau test would either oscillate or fail
-spuriously, and the reported $O(h^{k+1})$ rate would be corrupted. The
-asymmetry in Algorithm~\ref{alg:A3} prevents exactly this.
-
-\subsection{Why $\textstag$ must scale with conditioning}
-
-The same invariant explains why the harness adapts $\textstag$ to the
-mesh and to $\mathrm{Re}$ (Section~\ref{sec:harness-noise}). On a fine
-mesh the legitimate machine-noise floor lies well below the coarse-mesh
-value, and a fixed $\textstag$ would silently rule out states that, while
-not at $\textftol$, are genuinely as close to it as the floating-point
-arithmetic allows. The scaling
-$\textstag \propto N^2 \cdot \max(1, \mathrm{Re})$ tracks the
-condition number well enough to keep the $\mathsf{NoiseFloor}$
-classification meaningful across the sweep.
+The orchestration treats only the second as success. Coercing the
+first into a converged state---``it ran for many iterations and
+stopped; close enough''---is forbidden, because doing so would feed an
+unresolved iterate into Stage~II of the cascade. In OSGS in particular,
+an unresolved $U_h$ produces a stale $\boldsymbol{\pi}_h$ whose
+subsequent fixed-point iterations cannot recover.
 
 \subsection{Why the OSGS stopping mode matters}
 
-Algorithm~\ref{alg:C} accepts three convergence predicates. The default
-\code{both} is the strictest and corresponds to the mathematical
-definition of the staggered fixed point: $(U_h, \boldsymbol{\pi}_h)$ is
-the converged pair when neither moves between outer iterations. The
-relaxed modes \code{state\_drift} and \code{projection\_drift} sacrifice
-one of the two conditions in exchange for fewer iterations. They are
-appropriate only when the user knows that the slacker condition is
-already satisfied---e.g.\ because the projection naturally lies in a
-regime where it has stabilised quickly, but the primary fields are still
-adjusting. Using a single-criterion mode without that knowledge introduces
-exactly the false-convergence trap that the noise-floor invariant
-forbids: the staggered loop declares victory while one of the two
-quantities is still drifting.
+The default \code{both} predicate corresponds to the mathematical
+definition of the staggered fixed point: $(U_h, \boldsymbol{\pi}_h)$
+is the converged pair when neither moves between outer iterations. The
+relaxed modes are appropriate only when the user knows that the
+slacker condition is already satisfied; using a single-criterion mode
+without that knowledge introduces the false-convergence trap that the
+noise-floor invariant forbids.
 
 % ============================================================
 \appendix
@@ -1238,26 +1172,302 @@ algorithm boxes to the string literal returned by the implementation.
 \midrule
 $\mathsf{Ftol}$               & \code{"ftol\_reached"}                 & $\|\boldsymbol{b}\|_\infty \le \textftol$ after a successful line search. \\
 $\mathsf{InitialFtol}$        & \code{"initial\_ftol"}                  & Initial guess already satisfies $\textftol$; no Newton step taken. \\
-$\mathsf{NoiseFloor}$         & \code{"stagnation\_noise\_floor\_reached"} & $\|\boldsymbol{b}\|_\infty \le \textstag$ on a non-converged exit; treated as success. \\
+$\mathsf{NoiseFloor}$         & \code{"stagnation\_noise\_floor\_reached"} & $\|\boldsymbol{b}\|_\infty \le \textstag$ on a non-converged exit. \\
 $\mathsf{LinesearchFailed}$   & \code{"linesearch\_failed"}             & Line-search step shrank to $\alpha \le \alpha_{\min}$ without descent. \\
 $\mathsf{MeritDivergence}$    & \code{"merit\_divergence\_escaped"}     & Merit function expanded by $\ge F_{\mathrm{div}}$ for $N_{\mathrm{inc}}$ consecutive steps. \\
 $\mathsf{Xtol}$               & \code{"xtol\_stagnation"}               & Step norm $L \le \textxtol$ with residual still above $\textstag$. \\
 $\mathsf{IterationCap}$       & \code{"max\_iters\_stagnation"}         & Iteration budget exhausted with residual still above $\textstag$. \\
 $\mathsf{LinearSolveNaN}$     & \code{"linear\_solve\_nan"}             & Linear-solve exception or NaN in $\delta\boldsymbol{x}$. \\
-$\mathsf{InProgress}$         & \code{""}                                & Sentinel for ``no break this iteration''; never visible to the caller. \\
+$\mathsf{InProgress}$         & \code{""}                                & Sentinel for ``no break this iteration''. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-The \code{SafeNewtonSolver} struct in \code{src/solvers/nonlinear.jl}
-declares all Newton-side numerical parameters explicitly via its
-constructor signature; the \code{StabilizationConfig} struct in
-\code{src/config.jl} declares the OSGS-side parameters; the
-\code{AcceleratorConfig} sub-struct declares the Anderson parameters.
-Every parameter listed in Table~\ref{tab:params} corresponds to exactly one
-field across these three structures, validated by the \code{validate!}
-routine of \code{src/config.jl}; the routine rejects unknown JSON keys
-and enforces strict ranges (e.g.\ $0 < c_1 < 1$, $F_{\mathrm{div}} \ge 1$,
-$\alpha_{\min} \in (0,1]$).
+% ============================================================
+\part{Optional Extensions}
+\label{part:ext}
+% ============================================================
+
+\begin{tcolorbox}[colback=extcolor!5!white, colframe=extcolor, boxrule=0.5pt, arc=2pt, left=6pt, right=6pt, top=4pt, bottom=4pt]
+\small
+\extline{The remainder of this document describes \emph{optional extensions}
+to the core algorithm of Part~\ref{part:core}. These extensions are not
+part of a generic \code{run\_simulation} call: each is activated by a
+specific configuration setting or a specific calling context (a
+parameter sweep, a verification harness, etc.). Where an extension
+augments a core algorithm box, the additional lines are shown in this
+colour. Removing every \extline{coloured} line from this part yields
+the core algorithm of Part~\ref{part:core}, byte-for-byte.}
+\end{tcolorbox}
+
+\section{Extension Hierarchy}
+
+Two extensions are documented. The first
+(§\ref{sec:mms}) adds an MMS plateau verifier (Algorithm~\ref{alg:D})
+that hooks into the orchestrator (Algorithm~\ref{alg:O}) and the OSGS
+loop (Algorithm~\ref{alg:C}) by inserting coloured \extline{\extline{}}
+lines directly in those algorithm boxes (§\ref{sec:mms-hooks}). The
+second (§\ref{sec:harness}) is a set of parameter substitutions applied
+by the sweep harness; it does not introduce new algorithm boxes.
+Figure~\ref{fig:ext-hierarchy} overlays the extension onto the core
+tree of Figure~\ref{fig:hierarchy}.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[node distance=14mm and 10mm]
+
+\node[modnode] (O)
+    {\textbf{Algorithm~\ref{alg:O}}\\$\mathrm{Orchestration}$};
+
+\node[modnode, below left=14mm and 14mm of O] (B)
+    {\textbf{Algorithm~\ref{alg:B}}\\$\mathrm{PicardFallback}$};
+\node[modnode, below right=14mm and 14mm of O] (C)
+    {\textbf{Algorithm~\ref{alg:C}}\\$\mathrm{OSGS}$};
+
+\node[modnode, below=18mm of O] (A)
+    {\textbf{Algorithm~\ref{alg:A}}\\$\mathrm{NewtonKernel}$};
+
+\node[extnode, right=22mm of O] (D)
+    {\extline{\textbf{Algorithm~\ref{alg:D}}}\\\extline{$\mathrm{VerifyMMSPlateau}$}\\
+     \extline{\footnotesize plateau gate}};
+
+\draw[edge] (O.south) -- (B.north);
+\draw[edge] (O.south) -- (C.north);
+\draw[edge] (B.south) -- (A.north west);
+\draw[edge] (C.south) -- (A.north east);
+
+\draw[->, extcolor, thick, dashed]
+    (O.east) to[bend left=15]
+    node[edgelbl, midway, fill=white, text=extcolor]
+    {\extline{ASGS extension cycles (inline in Alg.~\ref{alg:O})}} (D.west);
+\draw[->, extcolor, thick, dashed]
+    (C.east) to[bend right=10]
+    node[edgelbl, midway, fill=white, text=extcolor]
+    {\extline{post-convergence gate (inline in Alg.~\ref{alg:C})}} (D.south west);
+
+\end{tikzpicture}
+\caption{Extension hierarchy. The MMS plateau verifier
+(\extline{Algorithm~\ref{alg:D}}, blue) is hooked directly into the
+core orchestrator (Algorithm~\ref{alg:O}) and the core OSGS loop
+(Algorithm~\ref{alg:C}) by inline \extline{\textbackslash extline\{\}}
+blue lines, displayed within the respective core algorithm boxes
+(§\ref{sec:mms-hooks}). Solid arrows reproduce the core hierarchy of
+Figure~\ref{fig:hierarchy}; \extline{dashed coloured arrows} mark the
+extension hooks.}
+\label{fig:ext-hierarchy}
+\end{figure}
+
+\section{Method of Manufactured Solutions Plateau Verifier}
+\label{sec:mms}
+
+\subsection{When this extension fires}
+
+This extension is active whenever the solver is supplied with a
+configuration \code{mms\_cfg} whose \code{enabled} flag is true. The
+\code{mms\_cfg} object carries an analytical reference solution
+$U_{\mathrm{exact}} = (\boldsymbol{u}_{\mathrm{ex}}, p_{\mathrm{ex}})$
+(via an \code{oracle} callback) and a small set of plateau-test
+parameters. When \code{mms\_cfg} is absent or disabled, the core
+orchestration runs unchanged.
+
+\subsection{Numerical versus discretisation convergence}
+
+The inner Newton stops when $\|\boldsymbol{b}\|_\infty \le \textftol$.
+That is convergence in the \emph{algebraic} sense: the iterate is
+close to the root of the discrete system. It says nothing about
+whether the discrete system is close to the true PDE solution. The
+Method of Manufactured Solutions (MMS) provides exactly that second
+test: it injects an exact analytical
+$(\boldsymbol{u}_{\mathrm{ex}}, p_{\mathrm{ex}})$, recomputes the
+appropriate source terms, and measures $\|U_h - U_{\mathrm{ex}}\|$ in
+physical norms. The expected discretisation behaviour is $O(h^{k+1})$
+in the $L^2$ norms (one order weaker in the $H^1$-semi norm).
+
+For a single mesh, plateau verification asks a different question:
+once the iterate is close enough to the root that further iterations
+do not move the FE error, the FE error has \emph{plateaued} at its
+discretisation floor.
+
+\subsection{Algorithm D and its interface}
+
+\extline{Algorithm~\ref{alg:D} is itself a leaf---a single side-by-side
+comparison of consecutive FE errors against the exact solution. It
+does not advance the iterate.}
+
+\begin{tcolorbox}[colback=extcolor!5!white, colframe=extcolor, boxrule=0.4pt, arc=2pt, left=8pt, right=8pt, top=4pt, bottom=4pt, width=\textwidth, before skip=4pt, after skip=2pt]
+\footnotesize
+\extline{%
+\begin{tabular}{@{}r@{\quad}p{0.82\textwidth}@{}}
+\textit{Called by:} & Inline blue hook in Algorithm~\ref{alg:O} (per extension cycle in the ASGS path); inline blue hook in Algorithm~\ref{alg:C} (per OSGS staggered iteration once $S_{\mathrm{conv}}$ has fired). See §\ref{sec:mms-hooks}. \\
+\textit{Calls:}     & (none; pure procedure) \\
+\textit{Inputs:}    & Current iterate $U_h^m$; exact reference $U_{\mathrm{ex}}$; running error history $\mathcal{H}$; pass counter $I_{\mathrm{pass}}$ \\
+\textit{Outputs:}   & Plateau flag $S_{\mathrm{plat}}$; updated counter $I_{\mathrm{pass}}'$ \\
+\end{tabular}}
+\end{tcolorbox}
+
+\begin{algorithm}[H]
+\caption{\extline{$\mathrm{VerifyMMSPlateau}$: relative-change plateau test (optional extension).}}
+\label{alg:D}
+\SetAlgoLined
+\textcolor{extcolor}{\textbf{Parameters:} $N_{\mathrm{plat}}, \tau_{\mathrm{err}}, \varepsilon_{u,L^2}, \varepsilon_{u,H^1}, \varepsilon_{p,L^2}$.\\
+\KwIn{$U_h^m$, $U_{\mathrm{ex}}$, $\mathcal{H}$, $I_{\mathrm{pass}}$.}
+\KwOut{$(S_{\mathrm{plat}}, I_{\mathrm{pass}}')$.}
+\vspace{0.2cm}\hrule\vspace{0.2cm}
+compute $E_{u,L^2}^m$, $E_{u,H^1}^m$, $E_{p,L^2}^m$\;
+append to $\mathcal{H}$; let $E^{m-1}_\bullet$ be the previous entry\;
+$r_\bullet \gets |E_\bullet^m - E_\bullet^{m-1}| / \max(E_\bullet^m, E_\bullet^{m-1}, \varepsilon_\bullet)$ for each norm\;
+$r_{\max} \gets \max_\bullet r_\bullet$\;
+\If{$r_{\max} \le \tau_{\mathrm{err}}$}{
+    $I_{\mathrm{pass}} \gets I_{\mathrm{pass}} + 1$\;
+}\Else{
+    $I_{\mathrm{pass}} \gets 0$\;
+}
+\If{$I_{\mathrm{pass}} \ge N_{\mathrm{plat}}$}{
+    \Return $(\mathrm{True}, I_{\mathrm{pass}})$ \tcp*{plateau satisfied}
+}
+\Return $(\mathrm{False}, I_{\mathrm{pass}})$ \tcp*{continue extending}}
+\end{algorithm}
+
+\extline{The verifier tracks three error quantities, not two: $L^2$
+of velocity, $L^2$ of pressure, and the $H^1$-semi-norm of velocity.
+The third matters because the $L^2$ errors can plateau while the
+velocity gradient---which is what the convective and viscous terms
+actually feel---still drifts. The plateau is declared only after
+$N_{\mathrm{plat}}$ \emph{consecutive} passes, and the counter resets
+to zero on the first failure.}
+
+\subsection{How Algorithm D hooks into the core}
+\label{sec:mms-hooks}
+
+\extline{The MMS plateau verifier is wired into the core algorithms by
+two short blocks of conditional logic, displayed inline in
+Algorithm~\ref{alg:O} (Stage~II dispatch) and Algorithm~\ref{alg:C}
+(post-$S_{\mathrm{conv}}$ branch) and typeset in this colour. The
+core path is recovered byte-for-byte by deleting every coloured line.}
+
+\extline{In the ASGS branch of Algorithm~\ref{alg:O}, when
+\code{mms\_cfg.enabled} is true, the orchestrator enters a bounded
+plateau loop: up to $K_{\mathrm{extra}}$ extra single-Newton-step cycles
+are run on top of the converged $U_h^{\mathrm{ASGS}}$, each followed
+by a call to Algorithm~\ref{alg:D}. The loop exits as soon as the
+plateau condition is satisfied or the budget is exhausted.}
+
+\extline{In the OSGS branch, the augmentation has two parts.
+The orchestrator inflates the outer-loop budget
+($N_{\mathrm{OSGS}}^{\mathrm{eff}} \gets N_{\mathrm{OSGS}} + K_{\mathrm{extra}}$)
+to leave room for the plateau samples. Inside Algorithm~\ref{alg:C},
+the $S_{\mathrm{conv}}$ branch is no longer terminal: the first
+$S_{\mathrm{conv}}$ event is intercepted to seed the plateau history
+and is followed by a \texttt{continue}, so the outer loop runs one
+more iteration to collect a sample; on subsequent $S_{\mathrm{conv}}$
+events, Algorithm~\ref{alg:D} is called and the loop either exits
+(plateau satisfied) or continues (still extending).}
+
+\subsection{Parameters of this extension}
+
+\begin{table}[h]
+\centering
+\caption{\extline{Numerical parameters of the MMS plateau verifier (extension-only).}}
+\label{tab:mms-params}
+\footnotesize
+\textcolor{extcolor}{%
+\begin{tabularx}{\textwidth}{@{} l l X @{}}
+\toprule
+\textbf{Symbol} & \textbf{Field in code} & \textbf{Role / effect} \\
+\midrule
+$N_{\mathrm{plat}}$ & \code{mms.require\_consecutive\_passes} & Consecutive passes of $r_{\max} \le \tau_{\mathrm{err}}$ required before declaring a plateau. \\
+$\tau_{\mathrm{err}}$ & \code{mms.tau\_err} & Relative-change tolerance against which $r_{\max}$ is tested. \\
+$\varepsilon_{u,L^2}, \varepsilon_{u,H^1}, \varepsilon_{p,L^2}$ & \code{mms.eps\_u\_l2,\_u\_h1,\_p\_l2} & Per-norm floors guarding the denominator in $r_{\max}$. \\
+$K_{\mathrm{extra}}$ & \code{mms.max\_extra\_cycles} & Cap on extension cycles (ASGS path) or staggered iterations added to the OSGS budget (OSGS path) for plateau verification. \\
+\bottomrule
+\end{tabularx}}
+\end{table}
+
+\section{Parameter-Sweep Harness Adaptations}
+\label{sec:harness}
+
+\subsection{When this extension fires}
+
+\extline{These adaptations are active only when the solver is driven by
+the project's parameter-sweep harness, which wraps the core
+\code{run\_simulation} pipeline in a triple loop over $\mathrm{Re}$,
+$\mathrm{Da}$, and the mesh-resolution parameter. In an ad-hoc
+\code{run\_simulation} call, none of these adaptations fires; the core
+algorithm of Part~\ref{part:core} uses the static parameters of
+Table~\ref{tab:params} verbatim. The harness changes parameter
+\emph{values} only; the algorithm boxes themselves are unchanged, so
+no $\mathrm{O}'$ or $\mathrm{B}'$ variants are needed.}
+
+\subsection{Adaptive \texorpdfstring{$\textftol$}{ftol}}
+\label{sec:harness-ftol}
+
+\extline{Two error scales matter in an FE method. The \emph{algebraic
+error} is the distance between the iterate and the discrete root,
+governed by $\textftol$. The \emph{discretisation error} is the
+distance between the discrete root and the true PDE solution, which
+behaves as $O(h^{k_v+1})$. The harness therefore re-derives $\textftol$
+per case:}
+\begin{equation}
+    \label{eq:dynamic-ftol}
+    \textcolor{extcolor}{\textftol^{\,\mathrm{dyn}}
+    = \max\!\Bigl(\textftol^{\,\mathrm{static}},\
+        \min(C_{\mathrm{ceil}},\ C_{\mathrm{sf}} \cdot h^{k_v+1}) \Bigr).}
+\end{equation}
+\extline{The right-most term ties the tolerance to the discretisation
+scale via a spatial safety factor $C_{\mathrm{sf}}$; the ceiling
+$C_{\mathrm{ceil}}$ prevents trivially loose tolerances on coarse
+meshes; the outer $\max$ prevents the formula from descending below
+the user-supplied $\textftol^{\,\mathrm{static}}$.}
+
+\subsection{Adaptive noise floor}
+\label{sec:harness-noise}
+
+\extline{Linear-system conditioning grows as $\mathcal{O}(h^{-2})$ for
+elliptic operators and is amplified by convective and reactive terms.
+A static $\textstag$ appropriate on a coarse mesh becomes far above
+the genuine round-off floor on a fine mesh. The harness scales}
+\begin{equation}
+    \textcolor{extcolor}{\textstag^{\,\mathrm{dyn}}
+    = \min\!\Bigl(\textstag,\ \max(n^{\min},\ n^{\mathrm{base}} \cdot N^2 \cdot \max(1, \mathrm{Re}))\Bigr),}
+\end{equation}
+\extline{with the additional clamp
+$\textstag^{\,\mathrm{dyn}} \gets \max(\textstag^{\,\mathrm{dyn}}, n^{\mathrm{sf}}\textftol^{\,\mathrm{dyn}})$
+preserving the strict ordering
+$\textstag^{\,\mathrm{dyn}} > \textftol^{\,\mathrm{dyn}}$.}
+
+\subsection{Per-case Picard widening}
+\label{sec:harness-picard}
+
+\extline{In a $(\mathrm{Re}, \mathrm{Da}, h)$ sweep, the harness widens
+the Picard iteration budget when a stiffness threshold is exceeded:}
+\begin{equation}
+    \textcolor{extcolor}{\begin{aligned}
+    N_{\mathrm{P}}^{\,\mathrm{local}} &\gets N_{\mathrm{P}}, \\
+    \text{if } \mathrm{Re} \ge \mathrm{Re}^{\mathrm{th}}: \quad
+    N_{\mathrm{P}}^{\,\mathrm{local}} &\gets \max(N_{\mathrm{P}}^{\,\mathrm{local}}, N_{\mathrm{P}}^{\mathrm{Re}}), \\
+    \text{if } \mathrm{Da} \ge \mathrm{Da}^{\mathrm{th}}: \quad
+    N_{\mathrm{P}}^{\,\mathrm{local}} &\gets \max(N_{\mathrm{P}}^{\,\mathrm{local}}, N_{\mathrm{P}}^{\mathrm{Da}}).
+    \end{aligned}}
+\end{equation}
+
+\subsection{Parameters of this extension}
+
+\begin{table}[h]
+\centering
+\caption{\extline{Numerical parameters of the parameter-sweep harness adaptations (extension-only).}}
+\label{tab:harness-params}
+\footnotesize
+\textcolor{extcolor}{%
+\begin{tabularx}{\textwidth}{@{} l l X @{}}
+\toprule
+\textbf{Symbol} & \textbf{Field in code} & \textbf{Role / effect} \\
+\midrule
+$C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{sol.dynamic\_ftol\_ceiling}, \code{\_spatial\_safety\_factor} & Clamps for the adaptive $\textftol$ rule, \S\ref{sec:harness-ftol}. \\
+$n^{\mathrm{base}}, n^{\min}, n^{\mathrm{sf}}$ & \code{sol.condition\_noise\_floor\_*} & Adaptive noise-floor controls, \S\ref{sec:harness-noise}. \\
+$\mathrm{Re}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Re}}$ & \code{sol.dynamic\_picard\_re\_*} & Per-case Picard widening trigger and budget for high Reynolds. \\
+$\mathrm{Da}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Da}}$ & \code{sol.dynamic\_picard\_da\_*} & Per-case Picard widening trigger and budget for high Damk\"ohler. \\
+\bottomrule
+\end{tabularx}}
+\end{table}
 
 \end{document}

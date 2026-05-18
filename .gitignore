@@ -25,3 +25,7 @@ Manifest.toml
 *.so
 *.dylib
 *.dylib.*
+
+# Ignore repomix outputs
+repomix-output.*
+*.repomix-output.*
