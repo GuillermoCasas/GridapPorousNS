@@ -538,7 +538,20 @@ state and would otherwise be silently accepted.
 
 ## Phase 6 — Higher-level robustness
 
-### Item §2.1 — Automatic `(Re, Da)` continuation
+### Item §2.1 — Automatic `(Re, Da)` continuation — **DEFERRED**
+
+**Status (2026-05-18).** Investigated and deferred without implementation.
+The canonical record of the deferral, including the empirical evidence
+that overturned the original motivation, the live hypotheses about what
+the failing-case symptoms actually mean (Jacobian conditioning vs.
+no-nearby-root vs. τ stabilisation breakdown), and the probes (C/D/E)
+that would settle which hypothesis is correct, lives in the "Phase 6
+§2.1 — DEFERRED" section of
+[algorithm-improvement-progress.md](algorithm-improvement-progress.md).
+The recipe below is preserved as a starting point if §2.1 is ever
+revisited under different evidence (e.g., a case where the failure
+pathology is demonstrably a Newton-basin failure that continuation
+can fix).
 
 **What.** When Stage I fails, wrap it in a continuation driver that ramps
 `Re` and `Da` from tame values to the target.

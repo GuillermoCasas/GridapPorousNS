@@ -193,6 +193,146 @@ trip. The defensive value is realised only in the stiff regimes Phase 6
 exit with a clean abort and a "produced non-finite state" diagnostic
 rather than propagating NaN through `diag_cache` and the MMS pipeline.
 
+### Phase 6 §2.1 — Continuation driver — **DEFERRED pending evidence**
+
+Status as of 2026-05-18: not landed; **not justified by current empirical
+evidence**.
+
+#### Pre-investigation framing
+
+The plan and earlier progress-doc revisions described §2.1 as "the
+highest-impact remaining item" on the grounds that the high-Re/high-Da
+corner cells of [test_config.json](../test/extended/ManufacturedSolutions/data/test_config.json)
+would *fail outright* without continuation. That framing was inherited
+from the original critical-analysis document; **it was never
+empirically tested**.
+
+#### What was actually tested
+
+A focused diagnostic sweep at the asymptotic corner of the
+parameter space, executed via four scaffolding configs in
+[test/extended/ManufacturedSolutions/data/](../test/extended/ManufacturedSolutions/data/):
+
+- [probe_stiff.json](../test/extended/ManufacturedSolutions/data/probe_stiff.json)
+  — single case `(Re=1e6, Da=1e6, α₀=0.05, k=1, n=10, ASGS)`.
+- [probe_stiff_diag.json](../test/extended/ManufacturedSolutions/data/probe_stiff_diag.json)
+  — 2×2×2 isolation grid `(Re, Da, α₀) ∈ {tame, stiff}³` at `k=1, n=10`.
+- [probe_stiff_n80.json](../test/extended/ManufacturedSolutions/data/probe_stiff_n80.json)
+  — h-refinement sweep `n ∈ {40, 80, 160}` on the failing case.
+- [probe_stiff_psweep.json](../test/extended/ManufacturedSolutions/data/probe_stiff_psweep.json)
+  — p-refinement sweep `k ∈ {1, 2, 3}` at `n=10` on the failing case.
+
+#### Findings
+
+**The 2×2×2 isolation revealed only ONE genuinely difficult cell:**
+
+| α | Re | Da | Outcome | Required `eps_pert` |
+|---|---|---|---|---|
+| 0.5 | × | × | × | All 4 cells: ✅ clean, `eps_pert = 0.1` (first attempt) |
+| 0.05 | 1 | 1 | ✅ clean | `eps_pert = 0.1` |
+| 0.05 | 1e6 | **1** | ❌ ALL 7 attempts fail | nothing works |
+| 0.05 | 1 | 1e6 | ✅ clean | `eps_pert = 0.1` |
+| 0.05 | 1e6 | 1e6 | ⚠️ noise-floor saturation | `eps_pert = 1e-5` |
+
+The "expected corner cell" `(α=0.05, Re=1e6, Da=1e6)` is **not** the hard
+one — it converges, just slowly. The genuinely hard cell is the
+*opposite of intuition*: **high Re + narrow channel + LOW Da**. With
+`Da = 1` the reaction term `σ ≈ 1e-6` is effectively switched off,
+removing the Darcy damping that otherwise stabilises high-Re flow in
+the confined geometry.
+
+**Neither h- nor p-refinement rescues this cell:**
+
+| Refinement | k | n | $\|R(u_{\mathrm{ex}})\|_\infty$ at iter 0 | Outcome |
+|---|---|---|---|---|
+| (baseline) | 1 | 10  | 2.15e-1 | ❌ |
+| h-refine | 1 | 40  | 1.13e-2 | ❌ |
+| h-refine | 1 | 80  | 1.88e-3 | ❌ |
+| h-refine | 1 | 160 | 1.95e-4 | ❌ |
+| p-refine | 2 | 10  | 2.18e-3 | ❌ |
+| p-refine | 3 | 10  | 1.27e-3 | ❌ |
+
+The FE consistency residual at $u_{\mathrm{ex}}$ shrinks at the expected
+$\mathcal{O}(h^{k+1})$ rate, but Newton/Picard cannot find any nearby
+discrete root at any combination tried — including `eps_pert = 0`
+(exact MMS solution as initial guess) at n=160 where the consistency
+residual is only ~$10^{-4}$.
+
+#### Implications for §2.1
+
+The corner cell that motivated §2.1 turns out **not** to be a
+basin-of-attraction failure. It's not rescued by:
+- Better initial guess (`eps_pert = 0` at any tested resolution fails);
+- More mesh resolution (h-sweep up to n=160 fails);
+- Higher polynomial order (p-sweep up to k=3 fails).
+
+§2.1 (Re/Da ramp continuation) produces *warm-starts*; the worst-case
+warm-start it could possibly deliver is no better than $u_{\mathrm{ex}}$
+itself, and $u_{\mathrm{ex}}$ as a warm-start has already been shown to
+fail. So §2.1 cannot rescue this case. The general value proposition
+of §2.1 (rescuing cases where the *discrete root exists and Newton
+basin is just narrow*) is not falsified — but **no such case has been
+identified in this codebase**. Every case in `small_test_config.json`
+converges trivially; every case in the 2×2×2 isolation grid either
+converges trivially or fails for the structural reason below.
+
+§2.1 is therefore deferred until either (a) a case appears that
+demonstrably has the basin-failure pathology continuation can fix, or
+(b) the codebase is extended beyond MMS validation toward general
+engineering use (where exact-solution warm-starts are unavailable and
+continuation becomes the only realistic strategy).
+
+#### What this case probably IS — open question
+
+The failure pattern matches one of three live hypotheses, undiscriminated
+by the experiments so far:
+
+- **H2 — Jacobian ill-conditioning at the asymptotic corner.** With
+  `σ ≈ 1e-6` and `ν ≈ 1e-6`, the discrete momentum block loses its
+  dominant diagonal and the per-element Reynolds number is ~$10^5$.
+- **H3 — discrete VMS has no fixed point with residual ≤ ftol nearby.**
+  The stabilised system's coercivity proof in
+  [article.tex](article.tex) degrades as `ν, σ → 0`; the discrete
+  solution may not exist in the strong sense the test demands.
+- **H4 — τ stabilisation breaks down asymptotically.** At
+  `Da=1 + Re=1e6` both viscous and reactive contributions to `τ_1`
+  vanish, leaving `τ_1 ≈ h/(c_2·|a|)` — pure convective stabilisation.
+  Whether this provides sufficient crosswind dissipation as `Re → ∞`
+  is exactly the regime the paper's analysis pushes against.
+
+#### Where to look next (probes deliberately NOT run in this session)
+
+Each probe targets one of H2/H3/H4 and would cost ~30 min of scripting
+plus < 1 min of compute. A future session that wants to settle the
+question should write a standalone Julia script in
+[test/extended/ManufacturedSolutions/](../test/extended/ManufacturedSolutions/)
+that mirrors the failing case's FE setup (mesh, spaces, formulation,
+$u_{\mathrm{ex}}$ interpolation) and performs:
+
+- **Probe D — Jacobian condition number.** Assemble the exact-Newton
+  Jacobian at $u_{\mathrm{ex}}$ via `jacobian!(A, op, x0)` where
+  `op = FEOperator(res_fn, jac_newton, X, Y)` and `x0` is the
+  interpolated exact solution. Compute `cond(Matrix(A))` or
+  `svdvals(Matrix(A))[end] / svdvals(Matrix(A))[1]`. A value $> 10^{14}$
+  is a smoking gun for H2.
+- **Probe C — Picard-only iteration from $u_{\mathrm{ex}}$.** Construct
+  the cascade's Picard `FESolver` (`SafeNewtonSolver(...; mode=:picard)`)
+  and run `solve!(x0, fe_solver_picard, op_picard)` from
+  $u_{\mathrm{ex}}$. If Picard converges where Newton fails, the
+  iteration map has a fixed point and Newton's Jacobian is the obstacle
+  (H2 confirmed). If Picard also wanders, the discrete fixed point
+  doesn't exist in the contraction-mapping sense (H3 / H4).
+- **Probe E — residual landscape line probe.** Compute the Newton
+  step `δ = -J\b` at $u_{\mathrm{ex}}$, then evaluate
+  `‖R(u_ex + s·δ)‖_∞` for `s ∈ [-1, 1.5]` at ~40 sample points. Plot.
+  A clear minimum near `s = 1` indicates a usable Newton direction
+  Newton's step-size policy isn't taking; a featureless / oscillatory
+  landscape supports H3 (no nearby root) or H4 (stabilisation pathology).
+
+The four probe configs listed above stay committed as scaffolding so
+the next session can reuse the exact same `(Re, Da, α₀, n, k)`
+combinations.
+
 ### Phase 7 — Quality-of-life
 
 Low-risk, low-effort polish:
@@ -319,6 +459,20 @@ scaffolding for per-phase regression tests. `probe_k1.json` is the
 cheapest (~1-2 min) and exercises both ASGS and OSGS paths; it's the
 default fast smoke test.
 
+Four additional stiffness-frontier probes were added in the 2026-05-18
+investigation that deferred Phase 6 §2.1:
+
+- `probe_stiff.json` — single stiff cell `(Re=1e6, Da=1e6, α=0.05)`.
+- `probe_stiff_diag.json` — 2×2×2 isolation grid over `(Re, Da, α)`.
+- `probe_stiff_n80.json` — h-refinement sweep `n ∈ {40, 80, 160}` on the
+  failing cell.
+- `probe_stiff_psweep.json` — p-refinement sweep `k ∈ {1, 2, 3}` on the
+  failing cell.
+
+These are not regression tests — they're scaffolding for future
+diagnostic work. See the "Phase 6 §2.1 — DEFERRED" section above for
+how to use them and what probes (C/D/E) remain unanswered.
+
 ### Per-commit conventions used this session
 
 - One commit per plan sub-item (or pair, when items are tightly coupled).
@@ -345,12 +499,16 @@ pending items are essential vs optional:
   `af05173` (rate-aware plateau). The plateau verifier is now
   discretization-budget-scaled; bridge floors in `small_test_config.json`
   can be revisited once Phase 6 has been validated.
-- **Phase 6 §2.1 (continuation driver).** The `(Re=1e6, Da=1e6, α₀=0.05)`
-  corner is strong convection + strong reaction + narrow channel. Newton
-  and Picard from a generic initial guess will not converge there.
-  Continuation ramping `(Re, Da)` along log steps with warm starts is the
-  only way to enter those basins. **Now the highest-impact remaining
-  item; without it, corner cells of the sweep fail outright.**
+- ~~**Phase 6 §2.1 (continuation driver).**~~ **Deferred** as of 2026-05-18.
+  The "highest-impact remaining item" framing was overturned by direct
+  empirical investigation: the corner cell that motivated §2.1
+  (`Re=1e6, Da=1, α₀=0.05` — note: low Da, not high Da as originally
+  framed) fails for a reason continuation cannot fix — it fails even
+  with the exact MMS solution as initial guess, at every tested mesh up
+  to n=160, and at every polynomial order up to k=3. See the "Phase 6
+  §2.1 — DEFERRED" section above for the full investigation,
+  alternative hypotheses, and the C/D/E probes that would settle which
+  hypothesis is correct.
 
 ### Strongly recommended (needed for some cells, not all)
 
