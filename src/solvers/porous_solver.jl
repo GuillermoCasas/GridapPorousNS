@@ -758,9 +758,6 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
         diag_cache["inner_osgs_diagnostics"] = []
         diag_cache["outer_osgs_diagnostics"] = []
 
-        prev_pi_drift = 1.0
-        prev_x_diff = 1.0
-
         for osgs_iter in 1:eff_osgs_iters
             println("        [OSGS Iter $osgs_iter]")
 
@@ -806,9 +803,6 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
                 pi_p_drift = pi_p_drift,
                 R_u_norm = R_u_algebraic_norm
             ))
-
-            prev_x_diff = x_diff
-            prev_pi_drift = max(pi_u_drift, pi_p_drift)
 
             overall_converged = _decide_osgs_convergence(
                 x_diff, x_diff_inf, pi_u_drift, pi_p_drift,
@@ -941,7 +935,6 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     stab_cfg = config.numerical_method.stabilization
     sol_cfg  = config.numerical_method.solver
     diag_cache = isnothing(diagnostics_cache) ? Dict{String, Any}() : diagnostics_cache
-    u_h, p_h = x0
     pi_u = nothing
     pi_p = nothing
 
