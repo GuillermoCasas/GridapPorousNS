@@ -63,6 +63,8 @@ Base.@kwdef struct SolverConfig
     dynamic_picard_da_threshold::Float64
     dynamic_picard_da_iterations::Int
     newton_iterations::Int
+    dynamic_newton_re_threshold::Float64
+    dynamic_newton_re_iterations::Int
     ftol::Float64
     picard_handoff_ftol::Float64
     dynamic_ftol_ceiling::Float64
@@ -132,6 +134,8 @@ function validate!(cfg::PorousNSConfig)
     @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"
     @assert sol.divergence_merit_factor >= 1.0 "Divergence merit factor must be >= 1.0"
     @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"
+    @assert sol.dynamic_newton_re_threshold >= 1.0 "dynamic_newton_re_threshold must be >= 1"
+    @assert sol.dynamic_newton_re_iterations >= 1 "dynamic_newton_re_iterations must be >= 1"
     @assert sol.max_linesearch_iterations >= 1 "Linesearch iterations must be strictly bounded >= 1"
     @assert 0.0 < sol.linesearch_contraction_factor < 1.0 "Linesearch contraction map alpha must strictly be in (0, 1)"
     @assert sol.accelerator.m >= 1 "Accelerator history size m must be >= 1"

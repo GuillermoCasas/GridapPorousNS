@@ -6,7 +6,7 @@ This file tracks which plan items have landed, what verification was done,
 what state is pending, and the recommended order for resuming work in a
 future session. Update it after each phase commit.
 
-Last updated: **2026-05-17**.
+Last updated: **2026-05-19**.
 
 ---
 
@@ -26,6 +26,52 @@ Last updated: **2026-05-17**.
 | `f72c819` | Phase 5 part 2 — §3.1 block-equilibrated merit | `src/solvers/nonlinear.jl` | Blitz 32/32, Quick 10/10, probe_k1 state bit-identical (Φ values differ as expected, line search never fires here) |
 | `af0bf07` | Phase 5 part 3 — §5.1 h-scaled MMS plateau floors | `src/solvers/porous_solver.jl`, `test/extended/ManufacturedSolutions/run_test.jl` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
 | `af05173` | Phase 5 part 4 — §5.2 rate-aware plateau verification | `src/solvers/porous_solver.jl`, `test/extended/ManufacturedSolutions/run_test.jl` | Blitz 32/32, Quick 10/10, probe_k1 bit-identical |
+
+## What has landed (next session, 2026-05-19) — Phase 6 §2.1 *resolution*
+
+| Commit (pending) | Plan item | Files | Verification |
+|---|---|---|---|
+| (uncommitted) | Phase 6 §2.1 — diagnostic harness + Fix 1 (Picard safeguard) + Fix 2 (dynamic Newton budget) | `src/solvers/nonlinear.jl` (Picard divergence safeguard tracks `‖R‖_∞`), `src/config.jl` + `base_config.json` (new `dynamic_newton_re_threshold`/`dynamic_newton_re_iterations` fields), `test/extended/ManufacturedSolutions/run_test.jl` (wire dynamic Newton budget), `test/extended/ManufacturedSolutions/probe_stiff_diagnose.jl` (new diagnostic script), `test/extended/ManufacturedSolutions/data/probe_stiff_failing.json` (new probe config), `test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md` + `probe_stiff_raw.md` (write-up) | Blitz 32/32, Quick 10/10 bit-identical (ASGS L2 3.12525176e-02, OSGS L2 3.39545818e-02, proj norm ~1.5e-14), probe_k1 bit-identical (iters=[2,1], residuals=[6.87e-5, 1.85e-4], u_L2/p_L2 match), probe_stiff_diag.json 2×2×2 grid now **8/8** (was 7/8 — the historically failing `(Re=1e6,Da=1,α=0.05)` cell converges, `‖R‖_∞ = 5.47e-4` at iter 91), probe_stiff_failing.json now ✅ converges (was ❌ all 7 attempts fail) |
+
+### Headline result — Phase 6 §2.1 deferral overturned
+
+The cell the previous session (2026-05-18) ruled "irrecoverable by continuation"
+— `(Re=1e6, Da=1, α₀=0.05, k=1, n=10, QUAD, ASGS, eps_pert=0)` — now **converges
+cleanly** under defaults. ‖R‖_∞ drops 0.215 → 5.47e-4, exits via
+`stagnation_noise_floor_reached`, L2 u/p errors 0.127 / 0.025. The H2/H3/H4
+diagnostic settled the question:
+
+- **H2 (Jacobian ill-conditioning) ruled out.** Probe D: `cond(J) = 2.72e7` at
+  u_ex — well-conditioned. The easy cell at the same α₀=0.05 actually has
+  `cond = 2.25e18` (P_c scaling dominates), so cond is not a useful sanity
+  criterion in this codebase.
+- **H3 (no discrete root) ruled out.** Probe C: Picard makes monotone ‖R‖
+  progress; full cascade reaches the root once safeguards stop misfiring.
+- **H4 (τ-stabilisation breakdown) partial / secondary.** Probe E shows isolated
+  residual-landscape spikes along the Newton line, compatible with
+  `SmoothVelocityFloor` / τ-regularisation thresholds — but they don't block
+  convergence, just slow it (more line-search backtracking → more Newton iters
+  needed).
+
+**Root cause: two compounding solver-safeguard bugs**:
+
+1. **Picard mode's `divergence_merit_factor` safeguard tracks Φ growth.** Φ is
+   a Newton-merit metric (`½‖b/w‖²` with `w = diag(J_Newton)`). Across Picard
+   iterations the weights `w` shift because the Picard Jacobian's diagonal
+   differs from Newton's, making Φ non-stationary even when `‖R‖_∞` shrinks
+   monotonically. Fix: in `:picard` mode, compare `‖R‖_∞` growth instead.
+   [src/solvers/nonlinear.jl:166-180](../src/solvers/nonlinear.jl#L166).
+2. **`newton_iterations = 20` is too tight at high Re.** With Fix 1 in place,
+   the second Newton pass (after Picard fallback) trends down to ‖R‖_∞ ≈ 0.014
+   but hits the 20-iter cap. Adding 40+ iterations covers both the transient
+   smoothing-out phase (where line-search backtracks through spikes) and the
+   quadratic tail. Fix: new `dynamic_newton_re_*` config pair mirroring the
+   existing `dynamic_picard_re_*` pattern, default `threshold = 1e4`,
+   `iterations = 60`. Low-Re regimes unchanged.
+
+Full write-up with probe data, line-probe landscape, and verdict in
+[test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md](../test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md).
+Raw probe output auto-dumped to `probe_stiff_raw.md` each script run.
 
 ### Headline empirical result
 
@@ -193,7 +239,46 @@ trip. The defensive value is realised only in the stiff regimes Phase 6
 exit with a clean abort and a "produced non-finite state" diagnostic
 rather than propagating NaN through `diag_cache` and the MMS pipeline.
 
-### Phase 6 §2.1 — Continuation driver — **DEFERRED pending evidence**
+### Phase 6 §2.1 — Continuation driver — **DEFERRAL CONFIRMED; cell unblocked via solver-safeguard fixes (2026-05-19)**
+
+**Status as of 2026-05-19:** §2.1 (Re/Da ramp continuation) remains not landed,
+**and the cell that motivated it now converges without it.** Diagnostic probes
+C/D/E (deliberately not run on 2026-05-18) settled the live H2/H3/H4 hypotheses
+and pointed at two solver-safeguard bugs, not the basin-of-attraction issue
+continuation would have addressed.
+
+**Fix 1 — Picard divergence safeguard tracks `‖R‖_∞`** (was Φ growth, a
+Newton-merit metric that fluctuates spuriously across Picard iterations as the
+Jacobian-diagonal weights shift).
+[src/solvers/nonlinear.jl:166-180](../src/solvers/nonlinear.jl#L166).
+Newton-mode bit-identical.
+
+**Fix 2 — Dynamic Newton iteration budget at high Re.** Added
+`dynamic_newton_re_threshold` / `dynamic_newton_re_iterations` config pair
+mirroring the existing `dynamic_picard_re_*` pattern. Default
+`threshold = 10000`, `iterations = 60`. Low-Re regimes unchanged. Wired into
+[run_test.jl:485-498](../test/extended/ManufacturedSolutions/run_test.jl#L485);
+non-MMS `run_simulation.jl` not yet plumbed (its `cfg.phys.nu` doesn't expose
+characteristic Re).
+
+After both fixes, [probe_stiff_failing.json](../test/extended/ManufacturedSolutions/data/probe_stiff_failing.json)
+(the exact failing cell, `Re=1e6, Da=1, α₀=0.05, k=1, n=10, QUAD, ASGS`)
+converges on the first homotopy attempt with `‖R‖_∞ → 5.47e-4`, stop reason
+`stagnation_noise_floor_reached`, L2 u/p errors `0.127 / 0.025`. Full
+investigation lives in
+[test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md](../test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md).
+
+§2.1 remains a valid future item *if* a case appears where the **discrete root
+exists** AND **no warm-start within Newton's basin can be constructed from the
+existing initial-guess machinery** AND **the cell can't be unlocked by larger
+solver budgets**. None of those conditions are currently demonstrated in this
+codebase.
+
+---
+
+### Phase 6 §2.1 — DEFERRED (pre-2026-05-19 framing, preserved for context)
+
+The remainder of this section preserves the 2026-05-18 investigation framing for historical reference. The verdict above supersedes it.
 
 Status as of 2026-05-18: not landed; **not justified by current empirical
 evidence**.

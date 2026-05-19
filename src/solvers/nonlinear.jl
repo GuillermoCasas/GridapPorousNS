@@ -163,7 +163,21 @@ function eval_safeguard_termination_bounds!(solver::SafeNewtonSolver, state::Saf
         return "linesearch_failed", false, true
     end
     
-    if state.phi_x_new > state.phi_x * solver.divergence_merit_factor
+    # Divergence safeguard. In :newton mode we compare Φ_new to Φ_old because the
+    # Armijo line search is itself driving Φ down; if Φ grows by factor
+    # `divergence_merit_factor`, something is structurally wrong.
+    # In :picard mode the line search accepts on ‖b‖_∞ (line ~132), so we must
+    # use the same metric here — Φ is meaningless across Picard iterations because
+    # the merit weights `w = diag(J)` are refreshed each iter from a different Jacobian
+    # (Picard's, which differs from Newton's), and Φ can grow even when ‖b‖_∞ shrinks
+    # monotonically. Using Φ here causes premature `merit_divergence_escaped` exits
+    # — see test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md.
+    diverged = if solver.mode === :picard
+        state.norm_b_new_inf > state.norm_b_inf * solver.divergence_merit_factor
+    else
+        state.phi_x_new > state.phi_x * solver.divergence_merit_factor
+    end
+    if diverged
         state.inc_count += 1
         if state.inc_count >= solver.max_increases
             println("  [Merit Divergence] Sequence catastrophically expanded beyond allowed bounds. Extracted state exhibits unbounded divergence.")

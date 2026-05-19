@@ -1,0 +1,44 @@
+{
+    "erase_past_results": true,
+    "h5_filename": "probe_stiff_failing.h5",
+    "epsilon_pert": [0.1],
+    "max_n_pert": 5,
+    "physical_properties": {
+        "Re": [1e6],
+        "Da": [1.0],
+        "physical_epsilon": [0.0],
+        "numerical_epsilon_coefficient": [0.0001],
+        "f_x": 0.0,
+        "f_y": 0.0
+    },
+    "domain": {
+        "alpha_0": [0.05],
+        "r_1": 0.2,
+        "r_2": 0.4,
+        "bounding_box": [-0.5, 0.5, -0.5, 0.5]
+    },
+    "numerical_method": {
+        "viscous_operator_type": "DeviatoricSymmetric",
+        "stabilization": {
+            "method": ["ASGS"],
+            "osgs_iterations": 3,
+            "osgs_inner_newton_iters": 3,
+            "osgs_tolerance": 1e-5,
+            "osgs_projection_tolerance": 1e-5,
+            "osgs_stopping_mode": "state_drift",
+            "osgs_state_drift_scale": "L2_mass",
+            "osgs_warmup_iterations": 2,
+            "osgs_warmup_tolerance": 1e-3
+        },
+        "element_spaces": {
+            "k_velocity": [1],
+            "k_pressure": [1],
+            "equal_order_only": true
+        },
+        "mesh": {
+            "partition": [10, 10],
+            "convergence_partitions": [10],
+            "element_type": ["QUAD"]
+        }
+    }
+}

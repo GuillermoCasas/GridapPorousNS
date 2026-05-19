@@ -50,6 +50,8 @@
             "dynamic_picard_da_threshold": 10000.0,
             "dynamic_picard_da_iterations": 10,
             "newton_iterations": 20,
+            "dynamic_newton_re_threshold": 10000.0,
+            "dynamic_newton_re_iterations": 60,
             "ftol": 1e-8,
             "picard_handoff_ftol": 1e-3,
             "dynamic_ftol_ceiling": 1e-4,

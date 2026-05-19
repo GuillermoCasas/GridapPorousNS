@@ -483,9 +483,21 @@ function run_mms(config_file="test_config.json")
                                     # Massive reaction-dominated geometries natively force boundary constraints requiring homogenization
                                     local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_da_iterations)
                                 end
-                                
+
+                                # Newton budget bumped in high-Re convection-dominated regimes — the Armijo line
+                                # search has to backtrack many times near the iso-spikes the SmoothVelocityFloor /
+                                # τ-regularisation introduce along the search line, so the iteration budget needs
+                                # to span both the smoothing-out phase and the quadratic-convergence tail. See
+                                # test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md for the
+                                # Re=1e6, Da=1, α=0.05 case that motivates this. The schema default leaves
+                                # well-resolved (low-Re) regimes bit-identical.
+                                local_newton_it = solver_newton_it
+                                if Re >= config.numerical_method.solver.dynamic_newton_re_threshold
+                                    local_newton_it = max(local_newton_it, config.numerical_method.solver.dynamic_newton_re_iterations)
+                                end
+
                                 nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard)
-                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), solver_newton_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract)
+                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_newton_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract)
                                 
                                 solver_picard = FESolver(nls_picard)
                                 solver_newton = FESolver(nls_newton)
