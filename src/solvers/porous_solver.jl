@@ -583,7 +583,7 @@ function _run_asgs_mms_extension!(final_x0, op_newton_init, solver_newton, mms_c
     consecutive_passes = 0
 
     base_nls = solver_newton.nls
-    local_asgs_nls = SafeNewtonSolver(base_nls.ls, 1, base_nls.max_increases, base_nls.xtol, base_nls.ftol, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor, base_nls.max_linesearch_iterations, base_nls.linesearch_contraction_factor)
+    local_asgs_nls = _with_overrides(base_nls; max_iters=1)
     local_fesolver = FESolver(local_asgs_nls)
 
     elapsed = @elapsed begin
@@ -763,10 +763,10 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
 
             tau_inner_m = osgs_iter <= stab_cfg.osgs_warmup_iterations ? max(ftol, stab_cfg.osgs_warmup_tolerance) : ftol
 
-            local_osgs_nls = SafeNewtonSolver(base_nls.ls, stab_cfg.osgs_inner_newton_iters, base_nls.max_increases, base_nls.xtol, tau_inner_m, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor, base_nls.max_linesearch_iterations, base_nls.linesearch_contraction_factor)
+            local_osgs_nls = _with_overrides(base_nls; max_iters=stab_cfg.osgs_inner_newton_iters, ftol=tau_inner_m)
             local_fesolver = FESolver(local_osgs_nls)
 
-            local_osgs_nls_picard = SafeNewtonSolver(base_nls.ls, stab_cfg.osgs_inner_newton_iters, base_nls.max_increases, base_nls.xtol, sol_cfg.picard_handoff_ftol, base_nls.linesearch_alpha_min, base_nls.c1, base_nls.divergence_merit_factor, base_nls.stagnation_noise_floor, base_nls.max_linesearch_iterations, base_nls.linesearch_contraction_factor; mode=:picard)
+            local_osgs_nls_picard = _with_overrides(base_nls; max_iters=stab_cfg.osgs_inner_newton_iters, ftol=sol_cfg.picard_handoff_ftol, mode=:picard)
             local_fesolver_picard = FESolver(local_osgs_nls_picard)
 
             res_fn_osgs(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p)
@@ -969,7 +969,11 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     op_newton_init = FEOperator(res_fn_init, jac_newton_init, X, Y)
 
     base_nls_global = solver_newton.nls
-    solver_newton_asgs = FESolver(SafeNewtonSolver(base_nls_global.ls, base_nls_global.max_iters, base_nls_global.max_increases, base_nls_global.xtol, base_nls_global.ftol, base_nls_global.linesearch_alpha_min, base_nls_global.c1, base_nls_global.divergence_merit_factor, base_nls_global.stagnation_noise_floor, base_nls_global.max_linesearch_iterations, base_nls_global.linesearch_contraction_factor))
+    # Verbatim re-wrap of the configured Newton solver (no field overrides) —
+    # the explicit FESolver(_with_overrides(base_nls_global)) form expresses
+    # "use the configured solver verbatim" without depending on `solver_newton`'s
+    # FESolver wrapper identity.
+    solver_newton_asgs = FESolver(_with_overrides(base_nls_global))
 
     x0_backup = copy(get_free_dof_values(x0))
 

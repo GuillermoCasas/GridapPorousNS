@@ -41,6 +41,28 @@ function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig; mode::Symbol = :n
     )
 end
 
+# Copy-with-overrides for the three fields ever overridden at call sites in
+# `porous_solver.jl` (`max_iters`, `ftol`, `mode`). All other fields are
+# inherited from `nls` verbatim. `nothing` for any kwarg means "keep `nls`'s
+# value". Replaces the previous verbose field-by-field SafeNewtonSolver()
+# rebuilds, which were vulnerable to silently dropping new struct fields.
+function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing, mode=nothing)
+    return SafeNewtonSolver(
+        nls.ls,
+        isnothing(max_iters) ? nls.max_iters : max_iters,
+        nls.max_increases,
+        nls.xtol,
+        isnothing(ftol) ? nls.ftol : ftol,
+        nls.linesearch_alpha_min,
+        nls.c1,
+        nls.divergence_merit_factor,
+        nls.stagnation_noise_floor,
+        nls.max_linesearch_iterations,
+        nls.linesearch_contraction_factor,
+        isnothing(mode) ? nls.mode : mode,
+    )
+end
+
 function check_solver_parameters(s::SafeNewtonSolver)
     if !(0.0 < s.c1 < 1.0) throw(ArgumentError("Armijo 'c1' must be in (0, 1).")) end
     if s.divergence_merit_factor < 1.0 throw(ArgumentError("Divergence merit factor must be >= 1.0.")) end
