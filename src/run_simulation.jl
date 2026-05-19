@@ -8,7 +8,7 @@ This file is the high-level orchestration layer and primary entry point for the 
 Its purpose is to convert structured, human-readable JSON configurations seamlessly into fully solved physical simulations.
 
 # Pipeline Overview
-1. **Configuration**: Parses hierarchical JSON parameters into strongly-typed physical and numerical schemas (`load_config_with_defaults`).
+1. **Configuration**: Parses hierarchical JSON parameters into strongly-typed physical and numerical schemas (`load_frozen_config`, the strict single-file loader — see plan Fix 7 / P-011).
 2. **Topology & Spaces**: Generates the geometric mesh and constructs the finite element Trial and Test function spaces, natively applying required boundary conditions (`build_fe_spaces`).
 3. **Formulation Binding**: Dynamically constructs the mathematical `AbstractFormulation` (encapsulating exact viscous stress operators, drag laws, and projection policies) based on the inputs (`build_formulation`).
 4. **Assembly**: Computes fundamental geometric scales (like element characteristic sizes `h`) and safely translates the theoretical continuous operators into discrete, evaluatable `FEOperator` closures.
@@ -45,9 +45,8 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
     end
 
     eps_val = phys.eps_val
-    eps_floor = phys.eps_floor
     nu = phys.nu
-    
+
     visc_type = num_method.viscous_operator_type
     if visc_type == "DeviatoricSymmetric"
         visc_op = DeviatoricSymmetricViscosity()
@@ -56,9 +55,9 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
     else
         visc_op = LaplacianPseudoTractionViscosity()
     end
-    
+
     # 4. Bind the canonical PaperGeneralFormulation embodying the authoritative rigorous mathematical baseline.
-    form = PaperGeneralFormulation(visc_op, reaction_law, proj, reg, nu, eps_val, eps_floor)
+    form = PaperGeneralFormulation(visc_op, reaction_law, proj, reg, nu, eps_val)
     return form
 end
 
@@ -127,7 +126,7 @@ function run_simulation(config_path::String;
                         dirichlet_values=[VectorValue(0.0,0.0)])
     
     # Enforce pure mathematical parameter hierarchy (Zero internal hardcoding allowed).
-    cfg = load_config_with_defaults(config_path)
+    cfg = load_frozen_config(config_path)
     model = _build_default_mesh(cfg.domain, cfg.numerical_method.mesh)
     
     X, Y, kv, kp = build_fe_spaces(model, cfg.numerical_method.element_spaces, dirichlet_tags, dirichlet_masks, dirichlet_values)
@@ -183,7 +182,7 @@ function run_simulation(config_path::String;
     x0 = interpolate_everywhere([VectorValue(0.0,0.0), 0.0], X)
     
     println("\n[!] Bridging simulation logic into robust VMS algorithm architecture...")
-    success, final_x0, iters, eval_time = solve_system(setup, formulation, iter_solvers, cfg, x0)
+    success, mms_plateau_success, final_x0, iters, eval_time = solve_system(setup, formulation, iter_solvers, cfg, x0)
     
     if !success
         @warn "Simulation orchestration structurally failed to map physical nonlinear bounds."

@@ -95,10 +95,10 @@ struct PaperGeneralFormulation{V<:AbstractViscousOperator, R<:AbstractReactionLa
     ν::Float64
     eps_val::Float64
     
-    function PaperGeneralFormulation(v::V, r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64, eps_floor::Float64=1e-8; autocorrect_policy=false) where {V, R, P, Reg}
+    function PaperGeneralFormulation(v::V, r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64; autocorrect_policy=false) where {V, R, P, Reg}
+        eps_val >= 0.0 || throw(ArgumentError("eps_val must be nonnegative; got $eps_val"))
         valid_policy = sanitize_projection_policy(p_in, r; autocorrect=autocorrect_policy)
-        safe_eps = max(eps_val, eps_floor)
-        new{V, R, typeof(valid_policy), Reg}(v, r, valid_policy, reg, ν, safe_eps)
+        new{V, R, typeof(valid_policy), Reg}(v, r, valid_policy, reg, ν, eps_val)
     end
 end
 
@@ -109,11 +109,11 @@ struct Legacy90d5749Mode{R<:AbstractReactionLaw, P<:AbstractProjectionPolicy, Re
     regularization::Reg
     ν::Float64
     eps_val::Float64
-    
-    function Legacy90d5749Mode(r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64, eps_floor::Float64=1e-8; autocorrect_policy=false) where {R, P, Reg}
+
+    function Legacy90d5749Mode(r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64; autocorrect_policy=false) where {R, P, Reg}
+        eps_val >= 0.0 || throw(ArgumentError("eps_val must be nonnegative; got $eps_val"))
         valid_policy = sanitize_projection_policy(p_in, r; autocorrect=autocorrect_policy)
-        safe_eps = max(eps_val, eps_floor)
-        new{R, typeof(valid_policy), Reg}(LaplacianPseudoTractionViscosity(), r, valid_policy, reg, ν, safe_eps)
+        new{R, typeof(valid_policy), Reg}(LaplacianPseudoTractionViscosity(), r, valid_policy, reg, ν, eps_val)
     end
 end
 

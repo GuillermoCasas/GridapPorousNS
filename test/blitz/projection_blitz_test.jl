@@ -52,13 +52,13 @@ using LinearAlgebra
               R_p - eps_val*p - pi_p
     end
 
-    @testset "ProjectResidualWithoutMassPenalty fallback behavior" begin
+    @testset "ProjectResidualWithoutPressurePenalty fallback behavior" begin
         R_p = 2.0
         p = 0.3
         pi_p = 0.4
         eps_val = 0.1
 
-        @test PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutMassPenalty(), R_p, eps_val, p, pi_p, true) ==
+        @test PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutPressurePenalty(), R_p, eps_val, p, pi_p, true) ==
               PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma(), R_p, eps_val, p, pi_p, true)
     end
     

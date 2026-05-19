@@ -32,7 +32,7 @@
                 "OSGS",
                 "ASGS"
             ],
-            "osgs_iterations": 5,
+            "osgs_iterations": 15,
             "osgs_tolerance": 1e-10
         },
         "element_spaces": {

@@ -2,7 +2,7 @@
 abstract type AbstractProjectionPolicy end
 struct ProjectFullResidual <: AbstractProjectionPolicy end
 struct ProjectResidualWithoutReactionWhenConstantSigma <: AbstractProjectionPolicy end
-struct ProjectResidualWithoutMassPenalty <: AbstractProjectionPolicy end
+struct ProjectResidualWithoutPressurePenalty <: AbstractProjectionPolicy end
 
 function apply_projectable_residual_u(::ProjectFullResidual, R_u, σ, u)
     return R_u
@@ -72,23 +72,23 @@ function apply_jacobian_projection_p(::ProjectResidualWithoutReactionWhenConstan
 end
 
 # Fallback definitions
-function apply_projectable_residual_u(::ProjectResidualWithoutMassPenalty, R_u, σ, u)
+function apply_projectable_residual_u(::ProjectResidualWithoutPressurePenalty, R_u, σ, u)
     return apply_projectable_residual_u(ProjectFullResidual(), R_u, σ, u)
 end
-function apply_projectable_residual_p(::ProjectResidualWithoutMassPenalty, R_p, eps_val, p)
+function apply_projectable_residual_p(::ProjectResidualWithoutPressurePenalty, R_p, eps_val, p)
     return apply_projectable_residual_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_p, eps_val, p)
 end
 
-function apply_projection_u(::ProjectResidualWithoutMassPenalty, R_u, σ, u, pi_u, is_osgs)
+function apply_projection_u(::ProjectResidualWithoutPressurePenalty, R_u, σ, u, pi_u, is_osgs)
     return apply_projection_u(ProjectFullResidual(), R_u, σ, u, pi_u, is_osgs)
 end
-function apply_jacobian_projection_u(::ProjectResidualWithoutMassPenalty, R_du, σ, dsigma_val, u, du, is_osgs)
+function apply_jacobian_projection_u(::ProjectResidualWithoutPressurePenalty, R_du, σ, dsigma_val, u, du, is_osgs)
     return apply_jacobian_projection_u(ProjectFullResidual(), R_du, σ, dsigma_val, u, du, is_osgs)
 end
-function apply_projection_p(::ProjectResidualWithoutMassPenalty, R_p, eps_val, p, pi_p, is_osgs)
+function apply_projection_p(::ProjectResidualWithoutPressurePenalty, R_p, eps_val, p, pi_p, is_osgs)
     return apply_projection_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_p, eps_val, p, pi_p, is_osgs)
 end
-function apply_jacobian_projection_p(::ProjectResidualWithoutMassPenalty, R_dp, eps_val, dp, is_osgs)
+function apply_jacobian_projection_p(::ProjectResidualWithoutPressurePenalty, R_dp, eps_val, dp, is_osgs)
     return apply_jacobian_projection_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_dp, eps_val, dp, is_osgs)
 end
 

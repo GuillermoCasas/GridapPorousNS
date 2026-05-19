@@ -33,6 +33,147 @@ Last updated: **2026-05-19**.
 |---|---|---|---|
 | (uncommitted) | Phase 6 §2.1 — diagnostic harness + Fix 1 (Picard safeguard) + Fix 2 (dynamic Newton budget) | `src/solvers/nonlinear.jl` (Picard divergence safeguard tracks `‖R‖_∞`), `src/config.jl` + `base_config.json` (new `dynamic_newton_re_threshold`/`dynamic_newton_re_iterations` fields), `test/extended/ManufacturedSolutions/run_test.jl` (wire dynamic Newton budget), `test/extended/ManufacturedSolutions/probe_stiff_diagnose.jl` (new diagnostic script), `test/extended/ManufacturedSolutions/data/probe_stiff_failing.json` (new probe config), `test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md` + `probe_stiff_raw.md` (write-up) | Blitz 32/32, Quick 10/10 bit-identical (ASGS L2 3.12525176e-02, OSGS L2 3.39545818e-02, proj norm ~1.5e-14), probe_k1 bit-identical (iters=[2,1], residuals=[6.87e-5, 1.85e-4], u_L2/p_L2 match), probe_stiff_diag.json 2×2×2 grid now **8/8** (was 7/8 — the historically failing `(Re=1e6,Da=1,α=0.05)` cell converges, `‖R‖_∞ = 5.47e-4` at iter 91), probe_stiff_failing.json now ✅ converges (was ❌ all 7 attempts fail) |
 
+## What has landed (next session, 2026-05-20) — external-audit response
+
+External AI raised 11 paper-vs-code claims (theory/Code Audit Findings.md). Triage in
+`/Users/guillermocasasgonzalez/.claude/plans/please-read-carefully-the-silly-lark.md` —
+verdicts: 1 real math defect (3D viscous adjoint), 4 real software defects, 1 naming
+fix, 2 doc/test traceability gaps, 3 misreads.
+
+| Commit (pending) | Plan item | Files | Verification |
+|---|---|---|---|
+| (uncommitted) | Audit-response Fix 4b (eps_val floor), Fix 5 (OSGS budget), Fix 6 (MMS plateau split, 2 commits), Fix 7 (strict config loader), Fix 8 (rename) — **all in one bundle since they're all paper-vs-code-honesty fixes** | **Code**: `src/formulations/continuous_problem.jl` (drop `eps_floor` default + clamp; validate `eps_val ≥ 0`); `src/solvers/porous_solver.jl` (drop silent `max(osgs_iters, newton_iters+5)` expansion; split `solve_system` return to `(solver_success, mms_plateau_success::Union{Bool,Nothing}, …)`; P-003 code-comment back-pointer at L496); `src/stabilization/projection.jl` (rename `ProjectResidualWithoutMassPenalty` → `ProjectResidualWithoutPressurePenalty`); `src/config.jl` (rename `load_config_with_defaults` → `load_config_with_base_template`; flip `load_config` shim to strict `load_frozen_config`; drop `eps_floor` field); `src/run_simulation.jl` (use strict loader); `src/formulations/viscous_operators.jl` (Fix 4a: adjoint reuses `EvalDivDevSymOp(Δ(v), ∇∇(v))` / `EvalStrongViscSymOp(Δ(v), ∇∇(v))` — paper-faithful in any `d`). **Schema/configs**: `porous_ns.schema.json` (synced with struct: added missing `dynamic_picard_*`, `dynamic_newton_re_*`, `dynamic_ftol_*`, `condition_noise_floor_*`, `osgs_inner_newton_iters`, `osgs_projection_tolerance`, `osgs_stopping_mode`, `osgs_state_drift_scale`; removed `eps_floor`); `base_config.json` (dropped `eps_floor`); 13 MMS / probe / Cocquet configs (bumped `osgs_iterations` to previous-effective `max(osgs, newton+5)` to preserve numerical baseline). **Tests**: new `test/blitz/config_strict_loader_blitz_test.jl` (2 subtests locking the strict-loader contract); `test/blitz/tau_blitz_test.jl` (P-001/P-008 invariance subtests — `τ₂` independent of `eps_val`, `τ₁` independent of `∇α`); `test/blitz/projection_blitz_test.jl` (rename); `test/quick/osgs_orthogonality_quick_test.jl` (uses `load_config_with_base_template` explicitly, osgs_iterations=25); `test/quick/formulation_smoke_quick_test.jl` (drop `eps_floor` from inline phys_cfg); `test/extended/ManufacturedSolutions/run_test.jl` (caller-logic migration: receive + record `mms_plateau_success` + `overall_verification_success`); `test/extended/ManufacturedSolutions/parse_test.jl` (unpacking signature); `test/extended/ManufacturedSolutions/probe_stiff_diagnose.jl` (constructor signature); `test/extended/CocquetExperiment/run_convergence.jl` (unpacking signature). **Docs**: `theory/paper-code-divergences.md` (new §4b for simplified τ forms with paper-line refs + worst-case `h\|∇α\|/α` bound + re-evaluation triggers; rewritten §2 for viscous adjoint now exact in any d); `theory/osgs_algorithm.tex` (stopping-mode short-circuit gated to `state_drift` in both prose and Algorithm C pseudocode). | Blitz **37/37** (was 32; +2 strict-loader, +3 tau invariance). Quick **10/10**. probe_k1 bit-identical (u_L2=[1.902, 1.254e-3], p_L2=[2.63e-3, 4.065e-5]). Orthogonality smoke: OSGS proj norm 1.61e-14 ✓; OSGS L2 shifted `3.39545818e-02 → 3.33665493e-02` (-1.7%) because the test uses `SymmetricGradientViscosity` where the now-restored `0.5·∇(∇·v)` adjoint term is non-zero in 2D — paper-correct, not a regression. MMS sweep `DeviatoricSymmetricViscosity` 2D unaffected (`(0.5 − 1/d) = 0` in 2D). |
+
+### Headline impact — paper-faithful 3D viscous adjoint + no-silent-defaults config
+
+The audit-response bundle closes five real defects (one mathematical, four
+software/configuration) and adds three regression-anchor tests. The big-picture
+shifts:
+
+1. **Formal viscous adjoint is now exact in any dimension** (Fix 4a). Before:
+   `adjoint_viscous_operator` for `DeviatoricSymmetric` and `SymmetricGradient`
+   variants dropped the `∇(∇·v)` contribution, which is paper-faithful in 2D for
+   Deviatoric only (`(0.5 − 1/d) = 0`) but incomplete in 3D for Deviatoric
+   (`+1/6`) and in any dimension for SymmetricGradient (`+0.5`). After: the
+   adjoint reuses the same dimension-aware `EvalDivDevSymOp` / `EvalStrongViscSymOp`
+   machinery the strong operator already uses, so `L*V` matches
+   [article.tex:479](article.tex#L479) exactly.
+
+2. **No silent defaults in the PDE** (Fix 4b). The `eps_val = max(eps_val, 1e-8)`
+   constructor floor that silently changed `ε = 0` into `ε = 10⁻⁸` is removed.
+   The `eps_floor` config field is gone from the schema, struct, and `base_config.json`.
+
+3. **No silent OSGS budget expansion** (Fix 5). The `max(stab.osgs_iterations,
+   sol.newton_iterations + 5)` clamp is gone. Each MMS/probe/Cocquet config now
+   declares an explicit `osgs_iterations` value matching its previous-effective
+   budget — so the baseline is bit-identical but the policy is now auditable.
+
+4. **MMS plateau success vs solver success are now separated** (Fix 6). `solve_system`
+   returns `(solver_success, mms_plateau_success::Union{Bool,Nothing}, …)`. The MMS
+   sweep records both per-cell and computes `overall_verification_success`
+   accordingly. Previously a budget-exhausted MMS plateau would still record
+   `success = true`; now it records `solver_success = true, mms_plateau_success = false`
+   and prints a `[⚠]` flag.
+
+5. **`load_config` is strict** (Fix 7). The production single-file loader no longer
+   merges with `base_config.json`. Template-based test configs use the explicitly
+   named `load_config_with_base_template` (`osgs_orthogonality_quick_test.jl` is the
+   one such consumer; MMS sweeps build configs at runtime via `load_config_from_dict`
+   which is unchanged). The `porous_ns.schema.json` is now in 3-way agreement with
+   `SolverConfig`/`StabilizationConfig` + `base_config.json` for every field.
+
+6. **Misleading type name fixed** (Fix 8). `ProjectResidualWithoutMassPenalty` →
+   `ProjectResidualWithoutPressurePenalty`. The policy strips `ε·p` from the
+   pressure-side projection — that's a pressure-equation gauge term, not a reaction
+   term.
+
+7. **Documentation traceability** (Doc 1, 3a, 3b, 3c).
+   [paper-code-divergences.md §4b](paper-code-divergences.md) traces the simplified
+   `eq:Tau1Final` / `eq:Tau2Final` forms used in `compute_tau_1` / `compute_tau_2`,
+   records the empirical well-resolved-porosity bound (worst-case `h|∇α|/α ≈ 0.5`
+   at the coarsest mesh, well within `eq:SmallPorosityGradient`), and gives explicit
+   re-evaluation triggers. [paper-code-divergences.md §2](paper-code-divergences.md)
+   is rewritten to reflect the post-Fix-4a state. A blitz regression test locks
+   in both simplifications (`τ₂` invariant under `eps_val`, `τ₁` invariant under
+   `∇α`) so a future audit reaches the divergence-ledger note and fails the test
+   rather than re-raising the same finding. `osgs_algorithm.tex` §"Choosing the
+   stopping mode" + Algorithm C pseudocode now state correctly that the ℓ∞
+   short-circuit is gated to `state_drift` mode only.
+
+## What has landed (next session, 2026-05-20 cont.) — Gemini-review follow-ups #4 + #2
+
+External Gemini review (2026-05-20) raised four additional points. The user
+vetoed #1 (`run_simulation.jl` dynamic budgets — non-trivial generalization,
+extra params). #3 (pressure-gauge §3.6) stays deferred per `paper-code-divergences.md
+§6` and Tier 1 results. #4 (cascade refactor) and #2 (Cholesky) landed here.
+
+| Commit (pending) | Plan item | Files | Verification |
+|---|---|---|---|
+| (uncommitted) | Gemini #4 — extract cascade boilerplate into `safe_fe_solve!` | [src/solvers/porous_solver.jl](../src/solvers/porous_solver.jl) — new `safe_fe_solve!` helper (~50 LoC) above `solve_system`, 6 call sites converted (Stage I Newton 1, Stage I Picard, Stage I Newton 2 retry; OSGS inner Newton 1, OSGS Picard fallback, OSGS Newton 2 retry). The duplicated try/catch + tuple-unwrap + non-finite-DOF guard + max-iters-exception classification is now in one place; the call-site-specific success/failure criteria and structured diagnostic recording stay inline at each site because they legitimately differ. [theory/osgs_algorithm.tex](osgs_algorithm.tex) — Algorithm A3 signature gains `\|b\|_∞` and mode `\mathfrak{m}`; the merit-divergence rule is rewritten mode-aware (Newton: `\hat\Phi > F_div Φ`; Picard: `\|\hat b\|_∞ > F_div \|b\|_∞`); the "Picard mode invalidates the identity" paragraph after §"directional derivative" extends to A3 with an explicit reference to `probe_stiff_findings.md` 2026-05-19; new `dynamic_newton_re_*` row added to the test-harness parameter table. | Blitz **37/37**. Quick **10/10**, OSGS L2 **3.33665493e-02** bit-identical to post-Fix-4a baseline, proj norm 1.61e-14 ✓. probe_k1 bit-identical (u_L2 = [1.902, 1.254e-3], p_L2 = [2.63e-3, 4.065e-5]). |
+| (uncommitted) | Gemini #2 — Cholesky for OSGS mass-matrix factorization (Phase 2 §3.2) | [src/solvers/linear_solvers.jl](../src/solvers/linear_solvers.jl) — new `CholeskySolver <: Gridap.Algebra.LinearSolver` with `symbolic_setup`/`numerical_setup`/`numerical_setup!`/`solve!` methods that dispatch through Julia's `cholesky(Symmetric(M))` → CHOLMOD for sparse SPD, LAPACK POTRF for dense. The in-place `numerical_setup!` uses CHOLMOD's `cholesky!` fast-path with a try/catch fallback to a fresh factorization if the symbolic structure changed. `solve!` uses `x .= fac \ b` because CHOLMOD doesn't implement the 2-arg `ldiv!` that `LinearAlgebra.ldiv!(x, A, b)` would dispatch to internally. [src/solvers/porous_solver.jl](../src/solvers/porous_solver.jl) — `LUSolver()` replaced with `CholeskySolver()` at the OSGS mass-matrix setup ([porous_solver.jl:478](../src/solvers/porous_solver.jl#L478)) and at the convenience overload [`discrete_l2_projection`](../src/solvers/porous_solver.jl#L83). | Blitz **37/37**. Quick **10/10**, ASGS L2 and OSGS L2 bit-identical to displayed precision; OSGS proj norm shifted machine-epsilon-level (`1.61e-14 → 1.76e-14`) as expected from a different SPD factorization. probe_k1 bit-identical (u_L2/p_L2 to 4 sig figs). |
+
+### Headline impact
+
+**#4 (cascade refactor)** removed 6× duplicated `try`/`catch` + tuple-unwrap +
+non-finite-DOF guard + max-iters-exception classification. The control-flow
+semantics at each call site (Stage I vs OSGS, with different success criteria
+and diagnostic recording) remain inline — that variation isn't accidental
+duplication, it's the actual call-site logic. The refactor reduces the line
+count, makes the boilerplate auditable in one place, and gives future readers
+a single function to test. Bit-identical verification on Blitz + Quick + probe_k1
+brings the regression risk to ~0.
+
+**#2 (Cholesky)** brings the L² projection mass-matrix factorization into
+mathematical alignment with the fact that `M_u, M_p` are SPD. The previous
+`LUSolver()` (UMFPack with partial pivoting) did extra work and could introduce
+asymmetric permutation. The Cholesky path is faster (no pivoting tree) and
+mathematically honest. The numerical change is at machine-epsilon level
+(visible only in the projection norm at the 1e-14 scale) — way below the FE
+error budget, so all L2/H1 rate measurements are unaffected.
+
+**Algorithm document is now in sync with the fa8aaec divergence-safeguard fix.**
+The .tex previously described Algorithm A3 with an unconditional `\hat\Phi >
+F_div Φ` divergence test. After `fa8aaec` the code branched this by mode; the
+algorithm doc only described the prose of "Picard mode invalidates the
+identity" as it applies to A.2 (line search), missing the parallel logic for
+A.3 (safeguard arbiter). The 2026-05-20 update extends the explanation,
+updates the A3 pseudocode signature, and adds the `dynamic_newton_re_*`
+parameter row.
+
+### Items deliberately NOT addressed
+
+- **Gemini #1** (`run_simulation.jl` dynamic budgets): the user vetoed — fix
+  requires either a characteristic-Re config field (new schema params) or a
+  manual override switch, both of which add complexity. Users running production
+  at high effective Re can simply bump `newton_iterations` in their config
+  directly.
+- **Gemini #3** (pressure-gauge §3.6): stays deferred per
+  [paper-code-divergences.md §6](paper-code-divergences.md). Tier 1 sweep
+  (running) will reveal whether constant-mode pollution at α₀=0.05 actually
+  degrades pressure rates; re-decide after the sweep.
+
+---
+
+## Original audit findings deliberately NOT changed (preserved from 2026-05-20 entry)
+
+### Audit findings the bundle deliberately does NOT change
+
+- **P-001** (τ₂ missing ε·h²) and **P-008** (τ₁ missing C_α): paper itself
+  documents these as deliberate simplifications (`eq:Tau2Final`, `eq:Tau1Final`).
+  Code matches the simplified forms. Documented + regression-anchored.
+- **P-003** (OSGS treating `xtol_stagnation` / `max_iters_stagnation` as
+  progress): the algorithm spec explicitly says these are progress
+  ([osgs_algorithm.tex §1.2.4 L1118](osgs_algorithm.tex)). Code follows the
+  spec. Code-comment back-pointer added at the inner-failure classification
+  site so future readers don't re-raise.
+- **P-009** (pressure projection on unconstrained `Q_free`): still deferred per
+  [paper-code-divergences.md §6](paper-code-divergences.md). Re-evaluation
+  triggers documented there have not fired.
+- **P-010** (auditor's claim that `ProjectResidualWithoutMassPenalty` was broader
+  than the paper's reaction trim): auditor misread the file. The policy was
+  always just the documented reaction-term trim — the name was misleading and
+  has been fixed by Fix 8.
+
 ### Headline result — Phase 6 §2.1 deferral overturned
 
 The cell the previous session (2026-05-18) ruled "irrecoverable by continuation"
@@ -657,3 +798,244 @@ is the goal, P5 + P6 are both essential.
 4. **Pressure rates are super-optimal** (h^{k+1} instead of h^k) in the
    current data. The plan predicts §3.1 + §3.6 will improve them
    "slightly". If they get worse, that's a regression bug.
+
+---
+
+## Required next steps for robust optimal convergence (post-audit, 2026-05-20)
+
+**Goal.** Reach a state where every cell of the paper's manufactured-solutions
+parameter space converges at the theoretical FE rate without manual per-regime
+tuning. The audit-response bundle landed the last batch of paper-vs-code
+honesty items; what remains is *validation* (running the sweep and seeing what
+falls out) and a small set of *coverage extensions* (3D, Forchheimer-σ MMS,
+open-outlet MMS) plus the still-deferred §3.6.
+
+### Tier 1 — Run the full-range sweep on the post-audit baseline (load-bearing)
+
+This is the single largest unknown right now. The full
+[test_config.json](../test/extended/ManufacturedSolutions/data/test_config.json)
+sweep (~1300 cases over `Re ∈ {1e-6, 1, 1e6} × Da ∈ {1e-6, 1, 1e6} × α₀ ∈
+{1, 0.5, 0.05} × k ∈ {1, 2} × n ∈ {10, 20, 40, 80, 160, 320}`, both element
+types, both ASGS/OSGS) has **not** been executed end-to-end since `fa8aaec`
+unblocked the stiff cell and the audit-response bundle re-baselined `osgs_iterations`
+everywhere.
+
+The output we need is a triage of: (a) cells that converge cleanly at
+theoretical rate; (b) cells that converge but at a sub-optimal rate
+(`mms_stop_reason = "mms_plateau_at_suboptimal_rate"`); (c) cells that
+exhaust the MMS budget (`mms_plateau_success = false`, exposed by Fix 6 Commit 2);
+(d) cells that don't converge at all. Without this triage, the items below
+are speculative.
+
+**Action.**
+```bash
+cd test/extended/ManufacturedSolutions
+julia --project=../../.. run_test.jl test_config.json
+```
+Expected wall-clock: hours, possibly ~1 day depending on machine — the
+`small_test_config.json` sub-sweep takes ~19 minutes, and `test_config.json`
+is order-of-magnitude larger.
+
+**Expected output to scrutinise.**
+1. The `[⚠]` flag now printed when `solver_success = true` but
+   `mms_plateau_success = false` (Fix 6 Commit 2) — count these and
+   classify by `(Re, Da, α₀, k)` corner.
+2. The rate sub-optimality flag `mms_plateau_at_suboptimal_rate`
+   (Phase 5 §5.2) — was previously dead code; will now fire for cells
+   that plateau above the FE budget.
+3. Convergence-rate plots per `(method, k, etype)` — should show
+   `O(h^(kv+1))` velocity L², `O(h^kv)` velocity H¹, `O(h^(kv+1))` pressure
+   L² (paper §6). Deviations beyond ±0.15 of theoretical are the failure
+   class to fix.
+
+### Tier 2 — Coverage extensions the paper exercises but the suite doesn't
+
+#### 2a. 3D MMS test bench (unlocks Fix 4a verification)
+
+Fix 4a made the viscous adjoint paper-faithful in 3D, but **the entire MMS
+suite is 2D** so the new term `(0.5 − 1/d)·∇(∇·v)` is exercised at coefficient
+zero. The fix is theoretically correct and compiles cleanly, but is empirically
+unverified.
+
+**Minimum sufficient.**
+- A 3D analytical manufactured solution (paper §6 — confirm whether it gives
+  an explicit 3D `u_ex(x, y, z)`, `p_ex(x, y, z)`, `α(x, y, z)`; if not,
+  construct a polynomial one of comparable structure to the 2D MMS).
+- Extend [`Paper2DMMS`](../src/PorousNSSolver.jl) to a `Paper3DMMS` (or
+  generalise) with the corresponding `f`, `g`, `Δu`, `∇∇u` analytics.
+- One small 3D config (`probe_3d.json` with `bounding_box` length-6 and
+  `partition = [n, n, n]`), small enough to run in `< 5` min.
+- A 3D adjoint-identity blitz test would be cheaper still: build a tiny 3D
+  Lagrangian space, interpolate smooth polynomial fields with zero trace,
+  evaluate `∫ (L_visc u)·v` and `∫ u·(L*_visc v)` numerically, assert
+  agreement to quadrature tolerance. **This is the cheapest empirical
+  verification of Fix 4a** and should land before any 3D rate sweep.
+
+#### 2b. Forchheimer-σ MMS variant (unlocks Phase 5 §3.5)
+
+Every MMS config currently builds `ConstantSigmaLaw` via `build_mms_formulation`.
+The Forchheimer-aware quadrature bump landed in `a307bcd` (`min_quadrature_degree(::ForchheimerErgunLaw, k_v)` adds `⌊k_v/2⌋`) is therefore dead code in
+the regression suite. Without exercising it the §3.5 path is unverified for
+correctness.
+
+**Minimum sufficient.** A `probe_forchheimer.json` config that swaps the MMS
+oracle's σ-law to `ForchheimerErgunLaw`. The oracle's `f` source term must be
+re-derived against the new reaction so the MMS is exact; this is a small
+analytics change in the oracle module. One k=2 mesh-refinement series
+suffices to confirm optimal rates.
+
+#### 2c. Open-outlet MMS variant (unlocks pressure-space regime branch + P-009 re-evaluation)
+
+All current MMS configs are all-Dirichlet on velocity. The paper's continuous
+pressure space switches at the BC regime ([article.tex L407](article.tex#L407)):
+all-Dirichlet → `L²₀`, mixed BCs → `L²`. The deferred §3.6 (pressure mean
+removal) is BC-regime-conditional — currently we can't even test the conditional
+because no open-outlet MMS exists.
+
+**Minimum sufficient.** A `probe_outlet.json` MMS variant with one boundary
+patch as an open outlet. Re-derive the MMS source so the analytical solution
+satisfies the outlet condition. If this triggers the previously-undocumented
+constant-mode pollution at low `α₀`, that's the re-evaluation trigger for
+P-009 / §3.6.
+
+### Tier 3 — Items that may move rates (already-planned, still open)
+
+These are inherited from the original `algorithm-improvement-plan.md`. Run
+Tier 1 first; the sweep results will tell us which are load-bearing.
+
+#### 3a. §3.6 — Pressure mean removal in OSGS projection (DEFERRED)
+
+Constant-mode pollution at small `α₀` may inflate the projection-drift
+metric `d_π^m` and corrupt pressure-rate measurements. See
+[paper-code-divergences.md §6](paper-code-divergences.md) for the deferred
+patch (Option A: post-hoc mean removal; Option B: constrained projection
+space). The re-evaluation triggers documented there:
+
+1. A non-all-Dirichlet MMS config appears in the suite (covered by Tier 2c).
+2. Post-sweep results show pressure-rate sub-optimality traceable to the
+   constant mode (revealed by Tier 1).
+3. Narrow-channel runs at `α₀ = 0.05` show corner-cell pressure-rate
+   degradation (also revealed by Tier 1).
+4. Another mass-side divergence-ledger entry interacts with the pressure
+   space (no current pressure).
+
+If Tier 1 shows pressure-rate degradation at `α₀ = 0.05` traceable to the
+constant mode, land §3.6 **as Option B with the BC-regime conditional**
+(Option A alone would silently degrade Tier 2c).
+
+#### 3b. §2.3 — Best-state retention across cascade stages
+
+[algorithm-improvement-plan.md §2.3](algorithm-improvement-plan.md) — record
+`best_residual_so_far` / `best_x0` after each cascade stage, restore on
+fall-through failure. Cheap and obviously correct. Helpful for corner cells
+where Stage I succeeds in an intermediate Newton pass but a later cascade step
+diverges before exit. **Recommended once Tier 1 identifies cells that fail
+this way.**
+
+#### 3c. §2.1 — Automatic `(Re, Da)` continuation (deferred → still deferred)
+
+The 2026-05-19 resolution overturned the previous "must-have" framing: the
+sole cell that motivated §2.1 now converges without continuation. Keep §2.1
+on the long-term ledger; it is justified only if Tier 1 surfaces a corner
+cell where (i) the discrete root exists, (ii) no warm-start within Newton's
+basin can be constructed from existing initial-guess machinery, AND (iii) the
+cell can't be unlocked by larger solver budgets. None of those conditions is
+currently demonstrated.
+
+#### 3d. §3.2 — Cholesky factorisation of the mass matrices
+
+[algorithm-improvement-plan.md §3.2](algorithm-improvement-plan.md) — pure
+speed (LU on SPD is 2× the work). Does not affect correctness or rates.
+Suggested only if profiling after Tier 1 identifies mass-matrix factorisation
+as a hot path; given OSGS pre-factorises both matrices once per
+mesh ([porous_solver.jl:409-415](../src/solvers/porous_solver.jl#L409-L415)),
+the speed-up is bounded by the number of distinct `n` values in the sweep,
+i.e. small.
+
+### Tier 4 — Empirical anchors for assumptions documented but not stress-tested
+
+#### 4a. 3D viscous-adjoint identity blitz test
+
+Already mentioned in Tier 2a. Single small blitz test:
+```julia
+# build small 3D Lagrangian space, k_v = 2
+# interpolate smooth polynomial u, v with zero trace on ∂Ω
+# assert ∫ (L_visc u) ⋅ v ≈ ∫ u ⋅ (L*_visc v) to quadrature tolerance
+```
+This is the load-bearing empirical check for Fix 4a's correctness.
+Recommended **before** any 3D rate sweep — if the identity fails the
+sweep results will be uninterpretable.
+
+#### 4b. Steep-porosity-gradient stress test
+
+The simplified `eq:Tau1Final` form is justified by `h|∇α|/α ≲ α` per
+[article.tex L765](article.tex#L765). The current MMS suite satisfies this
+with worst-case `~0.5` (recorded in
+[paper-code-divergences.md §4b](paper-code-divergences.md)). A stress probe
+with a narrow transition layer (`r₁ = 0.2, r₂ = 0.201` instead of `r₂ = 0.4`)
+would violate the assumption and either:
+- confirm the simplified form still gives optimal rates (the assumption is
+  more permissive than the inequality suggests), or
+- show rate degradation that triggers implementing the full `eq:Tau1` with
+  `C_α = α + (h/|k_0|)|∇α|` (the `grad_alpha` field is already plumbed in
+  `MediumState`, so the switch is local).
+
+This is **not** required for the paper's MMS as written but is the natural
+empirical check that pins down where the simplification breaks. Low priority.
+
+#### 4c. Equal-order LBB stability
+
+The paper allows equal-order interpolation `k_v = k_p`. The schema has an
+`equal_order_only` field but the current test suite uses Taylor-Hood-like
+`k_v > k_p` by default. Equal-order with VMS stabilisation is exactly what
+the τ₁/τ₂ machinery is supposed to make work — it should be tested at least
+once. **Recommended as a single config (`probe_equal_order_k2.json`).** Low
+priority unless Tier 1 surfaces a paper-relevant equal-order claim that's
+not covered.
+
+### Tier 5 — Validation against the paper's Cocquet reference experiment
+
+[test/extended/CocquetExperiment](../test/extended/CocquetExperiment) exists
+but uses `α ≡ 1` (constant porosity), so it doesn't exercise the porous side
+of the formulation. Per the audit-response findings the Cocquet driver is
+plumbed but the actual paper-faithful Cocquet run hasn't been re-validated
+since Phase 5 + the audit-response bundle. A confirmation run with the new
+code state would be a useful end-to-end sanity check.
+
+### Recommended order of execution
+
+1. **Tier 1** — run the full-range sweep, get triage data. **One commit.**
+2. **Tier 4a** — 3D adjoint-identity blitz test. **One small commit.**
+3. **Tier 2a** — 3D MMS oracle + driver + small rate config. **Largest single
+   item.** Skip if no 3D claim needs to be made for the paper.
+4. **Tier 2b** — Forchheimer-σ MMS. **One commit.**
+5. **Tier 2c** — open-outlet MMS. **One commit.** This is the natural
+   precursor to (6).
+6. **Tier 3a** — §3.6 pressure mean removal, conditional on BC regime. Land
+   only after Tier 2c provides the test config that distinguishes regimes.
+7. **Tier 3b** — §2.3 best-state retention. Cheap; can land anytime after
+   Tier 1 surfaces the failure mode it addresses.
+8. **Tier 5** — Cocquet re-run. **One commit.**
+9. **Tier 4b, 4c, Tier 3d** — only if Tier 1 / Tier 5 surface a need; otherwise
+   defer indefinitely.
+
+### Honest assessment of the gap remaining
+
+After this bundle the code is **paper-faithful at the formulation level**
+in every respect we know about (tau formulas, viscous adjoint, OSGS projection,
+config strictness, MMS plateau semantics). The remaining gap to "robust
+optimal convergence across the paper's full parameter range" is largely
+**empirical validation work**, not new algorithmic content. The biggest
+unknowns are:
+
+- Does the post-audit baseline give optimal rates across all ~1300 cells of
+  the full sweep? Unknown until Tier 1 runs.
+- Does the paper-faithful 3D adjoint actually integrate correctly in Gridap
+  0.18.6 for `k_v = 2` test functions on hex/tet meshes? Unknown until Tier
+  4a runs.
+- Does the constant-mode pressure pollution at `α₀ = 0.05` actually visibly
+  degrade rates? Unknown until Tier 1 + Tier 2c run.
+
+If all three answer favourably with no new defects, the code is in shape.
+If any one surfaces a new failure mode, the diagnostic harness built in
+2026-05-19 (`probe_stiff_diagnose.jl`) is the template for the next round.

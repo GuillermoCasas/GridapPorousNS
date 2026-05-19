@@ -21,7 +21,7 @@
         "viscous_operator_type": "DeviatoricSymmetric",
         "stabilization": {
             "method": ["ASGS"],
-            "osgs_iterations": 3,
+            "osgs_iterations": 25,
             "osgs_inner_newton_iters": 3,
             "osgs_tolerance": 1e-5,
             "osgs_projection_tolerance": 1e-5,

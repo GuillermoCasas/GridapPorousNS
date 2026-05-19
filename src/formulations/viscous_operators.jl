@@ -109,10 +109,10 @@ end
 
 # [code-actual] Formal continuous adjoint is `-2*∇⋅(α*ν*ε(v))`, returned with positive sign.
 function adjoint_viscous_operator(::SymmetricGradientViscosity, v, α, ν)
-    # [debugging-lore] `∇(∇⋅v)` fails on Gridap Lagrangian elements due to lack of full Hessian support.
-    # In 2D incompressible or analytically divergence-free limits, we can mathematically drop it.
-    # Otherwise, this omission represents a loss of exact formal mathematical symmetry in the VMS stabilization.
-    div_eps_v = 0.5 * Δ(v) # + 0.5 * ∇(∇⋅v)
+    # Formal adjoint per article.tex:479. For the symmetric-gradient case, ∇·ε(v) expands
+    # to 0.5·Δv + 0.5·∇(∇·v) (no deviatoric trace). Reuse EvalStrongViscSymOp which is
+    # already dimension-aware and includes both terms.
+    div_eps_v = Operation(EvalStrongViscSymOp())(Δ(v), ∇∇(v))
     return 2.0 * ν * (ε(v) ⋅ ∇(α)) + 2.0 * α * ν * div_eps_v
 end
 
@@ -162,10 +162,11 @@ end
 
 function adjoint_viscous_operator(::DeviatoricSymmetricViscosity, v, α, ν)
     ViscProj_v = Operation(EvalDevSymOp())(∇(v))
-    # N-dimensional adjoint continuous VMS operator.
-    # Note: We keep the simplified divergence trace (0.5 * Δv) for the adjoint test space evaluation
-    # since computing full Hessians ∇∇(v) can be problematic on certain elements, and the trace term 
-    # vanishes formally for divergence-free test functions.
-    div_ViscProj_v = 0.5 * Δ(v)
+    # Formal adjoint per article.tex:479 `L*V = -∂_i(K_{ji}^T ∂_j V)`. For the deviatoric
+    # viscous case, ∇·ε^d(v) expands to 0.5·Δv + (0.5 − 1/d)·∇(∇·v). In 2D the second
+    # coefficient is 0; in 3D it is +1/6. Reuse the same EvalDivDevSymOp machinery the
+    # strong operator already uses on trial fields. For kv = 1 the Hessian ∇∇(v) is zero
+    # so the new term contributes nothing regardless of dimension.
+    div_ViscProj_v = Operation(EvalDivDevSymOp())(Δ(v), ∇∇(v))
     return 2.0 * ν * (ViscProj_v ⋅ ∇(α)) + 2.0 * α * ν * div_ViscProj_v
 end

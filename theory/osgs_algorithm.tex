@@ -420,6 +420,24 @@ which is mode-agnostic because it depends only on the residuals at the
 two iterates. This branching is shown explicitly inside
 Algorithm~\ref{alg:A2}.
 
+The same mode-awareness extends to the \emph{divergence} safeguard in
+Algorithm~\ref{alg:A3}: in Newton mode we compare $\hat\Phi$ against
+$\Phi$, because the Armijo line search is itself driving $\Phi$ down
+between successive iterates and a sustained $\Phi$-growth signals a
+structural problem. In Picard mode we cannot use $\Phi$ for this purpose,
+because the merit weights $\boldsymbol{w} = \mathrm{diag}(\mathbf{J})$ are
+refreshed every iteration from a Picard Jacobian whose diagonal differs
+from Newton's, so $\Phi$ is not even monotone-comparable across iterations
+even when $\|\boldsymbol{b}\|_\infty$ is shrinking monotonically. Picard
+mode therefore compares $\|\hat{\boldsymbol{b}}\|_\infty$ against
+$\|\boldsymbol{b}\|_\infty$ directly. Empirically, applying the
+$\Phi$-based check unconditionally produced spurious
+$\mathsf{MeritDivergence}$ exits at high Reynolds whenever Picard
+fallbacks fired; the corrected mode-aware rule unblocked the
+$(\mathrm{Re} = 10^6,\, \mathrm{Da} = 1,\, \alpha_0 = 0.05)$ stiff cell
+without any continuation driver (see \code{probe\_stiff\_findings.md},
+2026-05-19).
+
 % ============================================================
 \section{The Top: Algorithm O (Orchestrator)}
 \label{sec:orchestration}
@@ -652,7 +670,7 @@ $I_{\mathrm{up}} \gets 0$\;
               \boldsymbol{b},\delta\boldsymbol{x}, D, \boldsymbol{w}, \Phi, \mathfrak{m})$ \tcp*{Alg.~\ref{alg:A2}, $\mathfrak{m}$ from \code{op}}
     \If{$\hat{b} < b_{\mathrm{best}}$}{ $\boldsymbol{x}_{\mathrm{best}} \gets \boldsymbol{x}$;\quad $b_{\mathrm{best}} \gets \hat{b}$\; }
     $(r, S_{\mathrm{conv}}, S_{\mathrm{brk}}, I_{\mathrm{up}})
-        \gets \mathrm{EvaluateSafeguards}(i, S_{\mathrm{LS}}, L, \hat b, \hat \Phi, \Phi, I_{\mathrm{up}})$ \tcp*{Alg.~\ref{alg:A3}}
+        \gets \mathrm{EvaluateSafeguards}(i, S_{\mathrm{LS}}, L, \hat b, \|\boldsymbol{b}\|_\infty, \hat \Phi, \Phi, I_{\mathrm{up}}, \mathfrak{m})$ \tcp*{Alg.~\ref{alg:A3}}
     \If{$S_{\mathrm{brk}}$}{
         \If{$\neg S_{\mathrm{conv}}$ \textnormal{\textbf{and}} $r \notin \{\mathsf{Ftol}, \mathsf{NoiseFloor}, \mathsf{Xtol}\}$}{
             $\boldsymbol{x} \gets \boldsymbol{x}_{\mathrm{best}}$\;
@@ -797,7 +815,7 @@ acceptance step; it should simply be retried at a smaller size.
 \label{alg:A3}
 \SetAlgoLined
 \textbf{Parameters:} $\textftol$, $\textstag$, $\textxtol$, $F_{\mathrm{div}}$, $N_{\mathrm{N}}$, $N_{\mathrm{inc}}$.\\
-\KwIn{$i, S_{\mathrm{LS}}, L, \|\hat{\boldsymbol{b}}\|_\infty, \hat\Phi, \Phi, I_{\mathrm{up}}$.}
+\KwIn{$i, S_{\mathrm{LS}}, L, \|\hat{\boldsymbol{b}}\|_\infty, \|\boldsymbol{b}\|_\infty, \hat\Phi, \Phi, I_{\mathrm{up}}, \mathfrak{m} \in \{\textsc{Newton}, \textsc{Picard}\}$.}
 \KwOut{$(r, S_{\mathrm{conv}}, S_{\mathrm{brk}}, I_{\mathrm{up}}')$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
 \If{$\|\hat{\boldsymbol{b}}\|_\infty \le \textftol$}{
@@ -809,7 +827,8 @@ acceptance step; it should simply be retried at a smaller size.
     }
     \Return $(\mathsf{LinesearchFailed}, \mathrm{False}, \mathrm{True}, I_{\mathrm{up}})$\;
 }
-\If{$\hat\Phi > F_{\mathrm{div}} \Phi$}{
+\tcp{Mode-aware divergence check: Newton compares the Armijo merit $\Phi$ (which the Newton line search itself drives down); Picard compares $\|\boldsymbol{b}\|_\infty$ directly, because the merit's weights $\boldsymbol{w} = \mathrm{diag}(\mathbf{J})$ are refreshed each iter from a Jacobian that differs structurally between Newton and Picard. $\Phi$ can grow across Picard iterations even when $\|\boldsymbol{b}\|_\infty$ shrinks monotonically; using $\Phi$ in Picard mode causes spurious $\mathsf{MeritDivergence}$ exits at high $\mathrm{Re}$ (settled in \code{probe\_stiff\_findings.md}, 2026-05-19).}
+\If{$\mathfrak{m} = \textsc{Newton}$ \textnormal{\textbf{and}} $\hat\Phi > F_{\mathrm{div}} \Phi$ \textnormal{\textbf{or}} $\mathfrak{m} = \textsc{Picard}$ \textnormal{\textbf{and}} $\|\hat{\boldsymbol{b}}\|_\infty > F_{\mathrm{div}} \|\boldsymbol{b}\|_\infty$}{
     $I_{\mathrm{up}} \gets I_{\mathrm{up}} + 1$;\quad
     \If{$I_{\mathrm{up}} \ge N_{\mathrm{inc}}$}{
         \Return $(\mathsf{MeritDivergence}, \mathrm{False}, \mathrm{True}, I_{\mathrm{up}})$\;
@@ -919,8 +938,8 @@ $\boldsymbol{\pi}_{h,u}^{0} \gets 0$;\quad $\pi_{h,p}^{0} \gets 0$ \tcp*{see §\
     $\tau_{\mathrm{OSGS}}^{\mathrm{eff}} \gets \max(\tau_{\mathrm{OSGS}}, \textstag)$;\quad
     $\tau_{\mathrm{proj}}^{\mathrm{eff}} \gets \max(\tau_{\mathrm{proj}}, \textstag)$\;
     decide $S_{\mathrm{conv}}$ from $\mathsf{Mode}_{\mathrm{stop}}$, $d_{\mathrm{state}}^m$, $d_\pi^m$ (see §\ref{sec:stopping-mode})\;
-    \If{$m \ge 2$ \textnormal{\textbf{and}} $\|\boldsymbol{X}_h^m - \boldsymbol{X}_h^{m-1}\|_{\ell^\infty} \le \textstag$}{
-        $S_{\mathrm{conv}} \gets \mathrm{True}$ \tcp*{absolute noise-floor short circuit}
+    \If{$\mathsf{Mode}_{\mathrm{stop}} = \code{state\_drift}$ \textnormal{\textbf{and}} $m \ge 2$ \textnormal{\textbf{and}} $\|\boldsymbol{X}_h^m - \boldsymbol{X}_h^{m-1}\|_{\ell^\infty} \le \textstag$}{
+        $S_{\mathrm{conv}} \gets \mathrm{True}$ \tcp*{absolute noise-floor short circuit; gated to \code{state\_drift} only (§\ref{sec:stopping-mode})}
     }
     \If{$S_{\mathrm{conv}}$}{
         \extline{\If{$\code{mms\_cfg.enabled}$ \textnormal{\textbf{and}} first $S_{\mathrm{conv}}$ event}{
@@ -996,11 +1015,16 @@ The user selects $\mathsf{Mode}_{\mathrm{stop}}$ between three options:
 definition of the staggered fixed point. The single-criterion modes
 sacrifice one of the two conditions in exchange for fewer iterations
 and are appropriate only when the user knows that the slacker
-condition is already satisfied. In all three cases an additional
-absolute short-circuit fires when the raw $\ell^\infty$ DOF drift drops
-below $\textstag$ for $m \ge 2$; this protects against limit-cycle
-oscillations that never cleanly satisfy $\tau_{\mathrm{OSGS}}$ or
-$\tau_{\mathrm{proj}}$.
+condition is already satisfied. Only under \code{state\_drift} does
+an additional absolute short-circuit fire when the raw $\ell^\infty$
+DOF drift drops below $\textstag$ for $m \ge 2$; this protects against
+limit-cycle oscillations that never cleanly satisfy
+$\tau_{\mathrm{OSGS}}$. The short-circuit is \emph{deliberately
+disabled} in \code{projection\_drift} and \code{both} modes: when
+projection drift is part of the binding criterion, $\boldsymbol{\pi}_h$
+may legitimately continue moving even while the primary state appears
+stagnant, and short-circuiting on $\ell^\infty$ alone could return a
+non-fixed-point on the pair $(U_h, \boldsymbol{\pi}_h)$.
 
 \subsection{Bootstrap, mass-matrix pre-factoring, and warmup}
 \label{sec:osgs-bootstrap}
@@ -1466,6 +1490,7 @@ $C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{sol.dynamic\_ftol\_ceiling}, \cod
 $n^{\mathrm{base}}, n^{\min}, n^{\mathrm{sf}}$ & \code{sol.condition\_noise\_floor\_*} & Adaptive noise-floor controls, \S\ref{sec:harness-noise}. \\
 $\mathrm{Re}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Re}}$ & \code{sol.dynamic\_picard\_re\_*} & Per-case Picard widening trigger and budget for high Reynolds. \\
 $\mathrm{Da}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Da}}$ & \code{sol.dynamic\_picard\_da\_*} & Per-case Picard widening trigger and budget for high Damk\"ohler. \\
+$\mathrm{Re}^{\mathrm{th,N}}, N_{\mathrm{N}}^{\mathrm{Re}}$ & \code{sol.dynamic\_newton\_re\_*} & Per-case Newton widening trigger and budget for high Reynolds. Mirrors the Picard pair; landed 2026-05-19 (\code{fa8aaec}) to absorb the transient smoothing phase the corrected mode-aware divergence safeguard exposes when Newton has to backtrack through residual-landscape spikes at $\mathrm{Re} \ge \mathrm{Re}^{\mathrm{th,N}}$. \\
 \bottomrule
 \end{tabularx}}
 \end{table}

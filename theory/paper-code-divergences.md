@@ -15,12 +15,49 @@ Any discrepancies introduced due to numerical stability limits, algebraic bounds
 > *"Note that, strictly speaking, one has the term $\frac{1}{\alpha}\nabla \cdot (\alpha \boldsymbol{a}) \boldsymbol{v}_h$ in the expansion of $\mathcal{L}^* V_h$. The inclusion of such term generates a number of crossed terms in (\ref{eq:StabilityEstimate}) that actually harm stability. [...] Here, we have opted for simplifying the formulation by removing the aforementioned term from $\mathcal{L}^* V_h$, leading to a simpler formulation with similar stability properties."*  
 Thus, the code omitting this term is a literal, faithful transcription of the exact simplified VMS operator specified in the theoretical methodology.
 
-## 2. 2D Dilatancy Gradient Subgrid Cancellation
-**Location**: `src/formulations/viscous_operators.jl`
+## 2. Viscous Operator and its Formal Adjoint — `[paper-faithful]`
+**Location**: [src/formulations/viscous_operators.jl](../src/formulations/viscous_operators.jl)
 
-**Paper Theory**: The Exact Viscous Operator definitions explicitly utilize $\nabla(\nabla \cdot u)$ (strong dilatancy) for resolving symmetric physical boundaries (Eq A.5 and Eq 206 limits). The baseline derivation allows the dropping of the dilatancy gradient entirely from the momentum stabilization residual acting on $\tau \mathcal{R}_{mom}$, based on theoretical limits assuming local mass balance natively. 
+**Paper Theory**: The strong viscous operator and its formal adjoint `L*V` per
+[article.tex:479](article.tex#L479) both involve the divergence of the (deviatoric or full
+symmetric) strain tensor, which expands as
 
-**Code Reality**: `[paper-faithful]` For `SymmetricGradientViscosity`, the codebase has structurally preserved the full native $\nabla(\nabla \cdot u)$ by utilizing exact internal Hessian map injections (`EvalStrongViscSymOp`), averting AST interface blowouts. For `DeviatoricSymmetricViscosity` in 2D limits, the structural term mathematically evaluates directly to $0.5 - 1/d \equiv 0$, identically canceling. Therefore, the codebase maintains robust zero-approximation theoretical fidelity scaling up through precision bounds, exactly paralleling the continuous equations.
+$$\nabla\cdot \varepsilon^{\mathrm{d}}(u) \;=\; \tfrac{1}{2}\Delta u \;+\; \bigl(\tfrac{1}{2} - \tfrac{1}{d}\bigr)\, \nabla(\nabla\cdot u)$$
+
+for the deviatoric case, or
+
+$$\nabla\cdot \varepsilon(u) \;=\; \tfrac{1}{2}\Delta u \;+\; \tfrac{1}{2}\, \nabla(\nabla\cdot u)$$
+
+for the symmetric-gradient case. The `∇(∇·u)` contribution is dimension-dependent for the
+deviatoric variant (coefficient `0` in 2D, `+1/6` in 3D) and always present for the
+symmetric-gradient variant.
+
+**Code Reality**: `[paper-faithful]` Both the strong operator and its formal adjoint use
+the same dimension-aware Hessian-evaluation Operations:
+
+- [`strong_viscous_operator(::DeviatoricSymmetricViscosity, ...)`](../src/formulations/viscous_operators.jl#L145) — `EvalDivDevSymOp(Δ(u), ∇∇(u))`
+- [`adjoint_viscous_operator(::DeviatoricSymmetricViscosity, ...)`](../src/formulations/viscous_operators.jl#L163) — `EvalDivDevSymOp(Δ(v), ∇∇(v))`
+- [`strong_viscous_operator(::SymmetricGradientViscosity, ...)`](../src/formulations/viscous_operators.jl#L93) — `EvalStrongViscSymOp(Δ(u), ∇∇(u))`
+- [`adjoint_viscous_operator(::SymmetricGradientViscosity, ...)`](../src/formulations/viscous_operators.jl#L111) — `EvalStrongViscSymOp(Δ(v), ∇∇(v))`
+
+Both `EvalDivDevSymOp` and `EvalStrongViscSymOp` are dimension-dispatched callable structs
+(one method each for `d = 2` and `d = 3`) that compute the exact divergence-of-strain
+expansion. Gridap evaluates `∇∇(u)` for trial fields and `∇∇(v)` for test fields cleanly
+on Lagrangian elements; for `k_v = 1` the Hessian is identically zero so the
+`∇(∇·)` contribution vanishes regardless of dimension, exactly as the analytic operator
+demands.
+
+**Historical note (audit P-004)**: Before the Fix 4a commit, the adjoint dropped the
+`∇(∇·v)` contribution and returned only `0.5·Δ(v)`. In 2D for the deviatoric variant this
+was harmless (`(1/2 − 1/d) = 0`); in 3D for the deviatoric variant and in any dimension
+for the symmetric-gradient variant it was a loss of formal symmetry against the paper's
+`L*V`. The fix re-uses the strong-operator machinery on `v`, so the adjoint is now exact
+in any dimension. The orthogonality smoke test (`osgs_orthogonality_quick_test.jl`) uses
+`SymmetricGradientViscosity` and consequently saw a small numerical shift after the fix
+(OSGS L2 `3.39545818e-02 → 3.33665493e-02`); the orthogonality property
+`‖Π_h(R_h(u))‖ ≈ 10^{-14}` is unchanged. The MMS sweep (which uses
+`DeviatoricSymmetricViscosity` per `base_config.json`) is bit-identical to the
+post-`fa8aaec` baseline.
 
 ## 3. Adjoint Streamline Mapping Positivity
 **Location**: `src/formulations/continuous_problem.jl`
@@ -37,6 +74,37 @@ Therefore, returning the positive evaluation in the code is structurally identic
 **Paper Theory**: The Jacobian bounds over limits of non-linear parameter expansions are considered mathematically continuously differentiable over the local phase transitions.
 
 **Code Reality**: `[code-actual]` A strictly applied numerical flooring coefficient natively injects a safe non-zero structural element bounded securely by $O(1e-15)$ (via `SmoothVelocityFloor`) within geometric evaluations. It mathematically governs exact continuous Jacobians limits when structural magnitudes approach algebraic zero limits precisely where analytical derivatives of absolute norms structurally fracture.
+
+## 4b. Simplified Stabilization Parameters (eq:Tau1Final / eq:Tau2Final) — [paper-faithful]
+**Location**: [src/stabilization/tau.jl](../src/stabilization/tau.jl) — `compute_tau_1`, `compute_tau_2`.
+
+**Apparent Divergence**: Compared to the full paper definitions, the code drops:
+1. The `ε h²` contribution from `τ₂`'s denominator (full form: [article.tex:755 `eq:Tau2`](article.tex#L755); simplified: [`eq:Tau2Final` L778](article.tex#L778)).
+2. The porosity-gradient `(h/|k_0|)|∇α|` term inside `C_α` for `τ₁` (full form: [article.tex:754 `eq:Tau1`](article.tex#L754); simplified: [`eq:Tau1Final` L777](article.tex#L777)).
+
+**Paper Alignment**: `[paper-faithful]` Both omissions are explicitly justified in the paper itself:
+
+- For `τ₂`, [article.tex L762](article.tex#L762) states: *"The second term in `eq:Tau2` is only strictly necessary for large `ε`."*
+- For `τ₁`, [article.tex L764–768](article.tex#L764) states: *"the second term in the definition of `C_α` is in fact unnecessary if `(h/|k_0|)|∇α| ≲ α`. That is, if the porosity changes are well resolved by the mesh. We will assume this to hold in the following, leaving issues related to steep porosity gradients to future work."*
+
+The simplified analysis in §4.2 uses `eq:Tau1Final` and `eq:Tau2Final` directly ([article.tex L775](article.tex#L775)). [tau.jl:5–16](../src/stabilization/tau.jl#L5) implements those final forms verbatim.
+
+**Empirical verification of the well-resolved porosity assumption**: every MMS sweep config in the current regression suite uses `SmoothRadialPorosity` with `r₁=0.2, r₂=0.4` (transition width `Δr = 0.2`). The worst-case ratio is
+
+$$\frac{h\,|\nabla\alpha|}{\alpha} \approx \frac{h \cdot (1-\alpha_0)/\Delta r}{\alpha_0}.$$
+
+At the coarsest mesh (`h = 0.1`, `α₀ = 0.5`) this gives `~0.5`; at the finest (`h = 0.003`, `α₀ = 0.5`) it gives `~0.015`. The Cocquet experiment uses `α ≡ 1` so `|∇α| = 0` trivially. The assumption holds across the entire current sweep.
+
+**Regression anchor**: [test/blitz/tau_blitz_test.jl](../test/blitz/tau_blitz_test.jl) `@testset "Tau1/Tau2 simplified paper form is intentional [P-001, P-008]"` locks in both simplifications:
+1. `compute_tau_2` does not take `eps_val` and produces values exactly matching the closed-form `h²/(c₁ α τ_NS + reg)`.
+2. `compute_tau_1` is bit-identical when `med.grad_alpha` varies by orders of magnitude while local `α` is held fixed.
+
+A future audit that re-raises P-001 ("τ₂ missing ε·h²") or P-008 ("τ₁ missing C_α") should reach this section first and then fail the anchor test rather than file a regression.
+
+### Re-evaluation triggers (when to switch to the full forms)
+
+- **Switch to `eq:Tau2` (with `ε h²`)** if a future config drives `ε` large enough that `ε h²` becomes comparable to `c₁ α τ_NS`. The `eps_val` field already flows through `phys_cfg`; the switch is a local change in `compute_tau_2` and its derivative `compute_dtau_2_du`.
+- **Switch to `eq:Tau1` (with `C_α`)** if a future config has `h|∇α|/α ≳ 1` (steep porosity gradient under-resolved). `grad_alpha` is already plumbed through `MediumState`, so the implementation is unblocked when triggered.
 
 ## 5. OSGS Preconditioning \u0026 Linearization Architecture
 **Location**: `src/solvers/porous_solver.jl`

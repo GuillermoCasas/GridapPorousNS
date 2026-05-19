@@ -132,7 +132,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
     formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
     iter_solvers = PorousNSSolver.IterativeSolvers(solver_picard, solver_newton)
 
-    success, final_x0, iter_count, eval_time = PorousNSSolver.solve_system(
+    success, _mms_plateau_unused, final_x0, iter_count, eval_time = PorousNSSolver.solve_system(
         setup, formulation, iter_solvers, config, x0
     )
     

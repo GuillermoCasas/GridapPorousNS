@@ -76,7 +76,7 @@ element mass matrices mapped to an explicit `LUSolver()`. Highly accurate but al
 unsuitable for deep staggered execution loops.
 """
 function discrete_l2_projection(field, U_proj, V_proj, dΩ)
-    p_ls = LUSolver()
+    p_ls = CholeskySolver()  # SPD mass matrix — see `CholeskySolver` in `linear_solvers.jl`.
     M_mat = assemble_matrix((u,v) -> ∫(u ⋅ v)dΩ, U_proj, V_proj)
     num_fac = numerical_setup(symbolic_setup(p_ls, M_mat), M_mat)
     return discrete_l2_projection(field, U_proj, V_proj, dΩ, M_mat, num_fac)
@@ -105,6 +105,63 @@ end
 struct IterativeSolvers
     picard
     newton
+end
+
+"""
+    safe_fe_solve!(x, fesolver, op; backup=nothing)
+
+Single-attempt FE-solver wrapper that absorbs the boilerplate every cascade
+site in `solve_system` repeats: tuple unwrapping of Gridap's `solve!` return
+value, non-finite-DOF guard with optional backup restoration, and exception
+classification (Gridap's old "Reached maximum iterations" string vs other
+exceptions).
+
+Does NOT classify success/failure or do logging — the criteria differ across
+the six call sites (Stage I Newton 1 / Picard / Newton 2 and OSGS inner
+Newton 1 / Picard / Newton 2 retry), so each caller owns its own decision
+logic. This helper exists purely to eliminate the duplicated try/catch +
+tuple-unwrap + finite-check boilerplate.
+
+Returns a `NamedTuple` with field `state`:
+- `:ok` — finite state; also carries `iterations`, `residual_norm`,
+  `initial_residual_norm`, `step_norm`, `stop_reason` from the result cache.
+- `:nonfinite` — at least one DOF was non-finite; if `backup !== nothing`,
+  the state was restored from `backup` before returning.
+- `:max_iters_caught` — `solve!` threw a "Reached max(imum) iterations"
+  exception. This is a legacy Gridap contract; `SafeNewtonSolver` uses
+  `stop_reason = "max_iters_stagnation"` on the `:ok` path instead. Kept
+  for defence against legacy or non-`SafeNewtonSolver` solver instances.
+- `:exception` — `solve!` threw any other exception. Field `exc` holds it.
+
+The backup restoration on `:nonfinite` is the only side effect beyond
+`solve!`'s in-place mutation of `x`.
+"""
+function safe_fe_solve!(x, fesolver, op; backup=nothing)
+    try
+        res = solve!(x, fesolver, op)
+        cache = res isa Tuple ? res[2] : res
+        nls_cache = cache isa Tuple ? cache[2] : cache
+        if any(!isfinite, get_free_dof_values(x))
+            if backup !== nothing
+                get_free_dof_values(x) .= backup
+            end
+            return (state = :nonfinite,)
+        end
+        r = nls_cache.result
+        return (state = :ok,
+                iterations = r.iterations,
+                residual_norm = r.residual_norm,
+                initial_residual_norm = r.initial_residual_norm,
+                step_norm = r.step_norm,
+                stop_reason = r.stop_reason)
+    catch e
+        msg = string(e)
+        if occursin("Reached maximum iterations", msg) || occursin("Reached max iterations", msg)
+            return (state = :max_iters_caught,)
+        else
+            return (state = :exception, exc = e)
+        end
+    end
 end
 
 """
@@ -169,31 +226,33 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     eval_time = @elapsed begin
         println("      -> ASGS Initializer: Attempting Exact Newton solver initially...")
         local newton_success = false
-        try
-            res_newton = solve!(x0, solver_newton_asgs, op_newton_init)
-            cache_newton = res_newton isa Tuple ? res_newton[2] : res_newton
-            nls_cache = cache_newton isa Tuple ? cache_newton[2] : cache_newton
-            if any(!isfinite, get_free_dof_values(x0))
-                println("      -> ASGS Initializer: Exact Newton produced non-finite state. Restoring backup, falling through to Picard.")
-                get_free_dof_values(x0) .= x0_backup
-                newton_success = false
-            else
-                final_res = nls_cache.result.iterations > 0 ? nls_cache.result.residual_norm : 0.0
-                diag_cache["final_residual_norm"] = final_res
-                local_iters = nls_cache.result.iterations
-                if final_res <= ftol
-                    newton_success = true
-                    iter_count += local_iters
-                    println("      -> ASGS Initializer: Exact Newton converged vigorously to absolute continuous limits ($ftol)! Bypassing Picard.")
-                else
-                    # When initializing, if it hits noise floor but not ftol, we still allow Picard to attempt homotopy
-                    # to strictly guarantee we enter the quadratic basin, so we leave newton_success = false.
-                    iter_count += local_iters
-                end
-            end
-        catch e
-            println("      -> ASGS Initializer: Newton ConvergenceError. Exception: ", e)
+        res = safe_fe_solve!(x0, solver_newton_asgs, op_newton_init; backup=x0_backup)
+        if res.state == :nonfinite
+            println("      -> ASGS Initializer: Exact Newton produced non-finite state. Restoring backup, falling through to Picard.")
             newton_success = false
+        elseif res.state == :exception
+            println("      -> ASGS Initializer: Newton ConvergenceError. Exception: ", res.exc)
+            newton_success = false
+        elseif res.state == :max_iters_caught
+            # Preserve pre-refactor behavior: Stage I Newton 1's old `catch` block
+            # logged any exception (including the legacy "Reached max iterations"
+            # path) as "ConvergenceError" and set newton_success = false. Kept
+            # bit-identical here.
+            println("      -> ASGS Initializer: Newton ConvergenceError. Exception: Reached maximum iterations")
+            newton_success = false
+        else  # :ok
+            final_res = res.iterations > 0 ? res.residual_norm : 0.0
+            diag_cache["final_residual_norm"] = final_res
+            local_iters = res.iterations
+            if final_res <= ftol
+                newton_success = true
+                iter_count += local_iters
+                println("      -> ASGS Initializer: Exact Newton converged vigorously to absolute continuous limits ($ftol)! Bypassing Picard.")
+            else
+                # When initializing, if it hits noise floor but not ftol, we still allow Picard to attempt homotopy
+                # to strictly guarantee we enter the quadratic basin, so we leave newton_success = false.
+                iter_count += local_iters
+            end
         end
         
         if newton_success
@@ -201,72 +260,81 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
         else
             println("      -> ASGS Initializer: Exact Newton structurally aborted loop without geometric saturation. Orchestrating Picard Homotopy fallback...")
             get_free_dof_values(x0) .= x0_backup
-            
-            try
-                res_picard = solve!(x0, solver_picard, op_picard_init)
-                cache_picard = res_picard isa Tuple ? res_picard[2] : res_picard
-                nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
-                
-                final_res_picard = nls_cache_picard.result.residual_norm
+
+            # NOTE: helper's backup-restore-on-nonfinite is intentionally NOT used
+            # here. The pre-refactor code performed an *explicit* secondary `any(!isfinite, …)`
+            # check after the catch block to handle catastrophic Picard divergence
+            # (Picard can produce non-finite mid-iteration even without throwing).
+            # That secondary check is preserved verbatim below.
+            res_p = safe_fe_solve!(x0, solver_picard, op_picard_init)
+            if res_p.state == :ok
+                final_res_picard = res_p.residual_norm
                 diag_cache["final_residual_norm"] = final_res_picard
-                iter_count += nls_cache_picard.result.iterations
+                iter_count += res_p.iterations
                 if final_res_picard <= ftol
                     println("      -> ASGS Initializer: Picard fully converged! Escaping to evaluation.")
                     success = true
                 end
-            catch e
-                if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
-                    println("      -> ASGS Initializer: Picard concluded initial smoothing loops.")
-                else
-                    println("      -> ASGS Initializer: Picard threw unrecoverable error. Exception: ", e)
-                    get_free_dof_values(x0) .= x0_backup
-                end
+            elseif res_p.state == :max_iters_caught
+                println("      -> ASGS Initializer: Picard concluded initial smoothing loops.")
+            elseif res_p.state == :exception
+                println("      -> ASGS Initializer: Picard threw unrecoverable error. Exception: ", res_p.exc)
+                get_free_dof_values(x0) .= x0_backup
             end
-            
+            # `:nonfinite` is handled by the secondary `any(!isfinite, …)` check
+            # below (preserved from pre-refactor); the helper does not restore
+            # backup automatically here because we did not pass `backup=`.
+
             if any(!isfinite, get_free_dof_values(x0))
                 println("      -> ASGS Initializer: Picard catastrophically diverged. Restoring backup, evaluation impossible.")
                 get_free_dof_values(x0) .= x0_backup
                 success = false
             elseif !success
                 println("      -> ASGS Initializer: Picard smoothing finalized. Re-engaging Exact Newton...")
-                try
-                    res_solve = solve!(x0, solver_newton_asgs, op_newton_init)
-                    cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
-                    nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                res2 = safe_fe_solve!(x0, solver_newton_asgs, op_newton_init; backup=x0_backup)
+                if res2.state == :nonfinite
+                    println("      -> ASGS Initializer: Newton Homotopy Pass produced non-finite state. Restoring backup, marking failure.")
+                    success = false
+                elseif res2.state == :exception
+                    println("      -> ASGS Initializer: Newton ConvergenceError on Homotopy Pass. Exception: ", res2.exc)
+                    success = false
+                elseif res2.state == :max_iters_caught
+                    # Preserve pre-refactor behavior: lumped with generic ConvergenceError.
+                    println("      -> ASGS Initializer: Newton ConvergenceError on Homotopy Pass. Exception: Reached maximum iterations")
+                    success = false
+                else  # :ok
+                    iter_count += res2.iterations
+                    final_res = res2.residual_norm
+                    diag_cache["final_residual_norm"] = final_res
 
-                    if any(!isfinite, get_free_dof_values(x0))
-                        println("      -> ASGS Initializer: Newton Homotopy Pass produced non-finite state. Restoring backup, marking failure.")
-                        get_free_dof_values(x0) .= x0_backup
-                        success = false
+                    stop_reason = res2.stop_reason
+                    if stop_reason == "ftol_reached" || stop_reason == "initial_ftol"
+                        println("      -> ASGS Initializer: Newton Homotopy Pass achieved exact theoretical tolerance ($ftol).")
+                        success = true
+                    elseif stop_reason == "stagnation_noise_floor_reached"
+                        println("      -> ASGS Initializer: Newton Homotopy Pass cleanly saturated at numerical noise floor ($final_res). Approving.")
+                        success = true
                     else
-                        iter_count += nls_cache.result.iterations
-                        final_res = nls_cache.result.residual_norm
-                        diag_cache["final_residual_norm"] = final_res
-
-                        stop_reason = nls_cache.result.stop_reason
-                        if stop_reason == "ftol_reached" || stop_reason == "initial_ftol"
-                            println("      -> ASGS Initializer: Newton Homotopy Pass achieved exact theoretical tolerance ($ftol).")
-                            success = true
-                        elseif stop_reason == "stagnation_noise_floor_reached"
-                            println("      -> ASGS Initializer: Newton Homotopy Pass cleanly saturated at numerical noise floor ($final_res). Approving.")
-                            success = true
-                        else
-                            println("      -> ASGS Initializer: Newton Homotopy Pass structurally failed (Reason: $stop_reason). Bounding collapse.")
-                            success = false
-                        end
+                        println("      -> ASGS Initializer: Newton Homotopy Pass structurally failed (Reason: $stop_reason). Bounding collapse.")
+                        success = false
                     end
-                catch e
-                     println("      -> ASGS Initializer: Newton ConvergenceError on Homotopy Pass. Exception: ", e)
-                     success = false
                 end
             end
         end
     end
     
+    # `mms_plateau_success::Union{Bool,Nothing}` is `nothing` when MMS verification is
+    # disabled; otherwise it reports whether the MMS plateau was formally established
+    # (independent of the inner-solver `success` flag). Splitting these allows callers
+    # to detect the "solver converged but MMS budget exhausted" regression case
+    # explicitly. See plan Fix 6 / P-007.
+    mms_enabled = !isnothing(mms_cfg) && mms_cfg.enabled
+    _mms_plateau() = mms_enabled ? get(diag_cache, "mms_plateau_reached", false) : nothing
+
     if !success
         diag_cache["pi_u"] = pi_u
         diag_cache["pi_p"] = pi_p
-        return false, x0, iter_count, eval_time
+        return false, _mms_plateau(), x0, iter_count, eval_time
     end
 
     final_x0 = x0
@@ -364,14 +432,14 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
             diag_cache["mms_relative_change_history"] = mms_rc_hist
             diag_cache["pi_u"] = pi_u
             diag_cache["pi_p"] = pi_p
-            return success, final_x0, iter_count, eval_time
+            return success, _mms_plateau(), final_x0, iter_count, eval_time
         else
             println("\n      [+] ASGS Formulation exclusively resolved. Exiting solver module.")
             diag_cache["base_convergence_reached"] = true
             diag_cache["mms_stop_reason"] = "base_convergence_only"
             diag_cache["pi_u"] = pi_u
             diag_cache["pi_p"] = pi_p
-            return success, final_x0, iter_count, eval_time
+            return success, _mms_plateau(), final_x0, iter_count, eval_time
         end
     end
 
@@ -408,9 +476,14 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
         println("\n      [+] Initiating pre-assembly & structural factorization for static OSGS L2 Mass Matrices...")
         M_u = assemble_matrix((u,v) -> ∫(v ⋅ u)dΩ, U_proj, V_proj)
         M_p = assemble_matrix((p,q) -> ∫(q * p)dΩ, P_proj, Q_proj)
-        
-        ls_u = LUSolver()
-        ls_p = LUSolver()
+
+        # The L² mass matrices are symmetric positive-definite by construction. Cholesky
+        # via CHOLMOD is the mathematically honest factorization here: it's faster than
+        # the previous `LUSolver()` (no partial pivoting overhead), uses less memory,
+        # and preserves the symmetry of operations downstream. The factor is reused
+        # across every OSGS outer iteration and every MMS-plateau re-projection.
+        ls_u = CholeskySolver()
+        ls_p = CholeskySolver()
         num_u_fac = numerical_setup(symbolic_setup(ls_u, M_u), M_u)
         num_p_fac = numerical_setup(symbolic_setup(ls_p, M_p), M_p)
         
@@ -418,9 +491,11 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
         # per sub-scale projection (e.g., 3 inner steps) rather than unconditionally clamping to 1.
         base_nls = solver_newton.nls
         # Inner tolerancing is determined dynamically in loop
-        
-        # Expand maximum bounds to absorb the monolithic 1-step iteration workflow
-        eff_osgs_iters = max(max_osgs_iters, sol_cfg.newton_iterations + 5)
+
+        # OSGS outer-iteration budget is exactly the configured `stab_cfg.osgs_iterations`.
+        # When MMS plateau verification is active, the explicit `mms_cfg.max_extra_cycles`
+        # extension is added on top so the verifier has its own clearly-named budget.
+        eff_osgs_iters = max_osgs_iters
         if !isnothing(mms_cfg) && mms_cfg.enabled
             eff_osgs_iters += mms_cfg.max_extra_cycles
         end
@@ -472,37 +547,35 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
 
                 # --- Attempt 1: OSGS Inner Newton ---
                 newton_failed = false
-                try
-                    res_solve = solve!(final_x0, local_fesolver, op_newton_osgs)
-                    cache_solve = res_solve isa Tuple ? res_solve[2] : res_solve
-                    nls_cache = cache_solve isa Tuple ? cache_solve[2] : cache_solve
+                res_n1 = safe_fe_solve!(final_x0, local_fesolver, op_newton_osgs; backup=x_prev)
+                if res_n1.state == :nonfinite
+                    println("        -> OSGS Inner Newton produced non-finite state. Restoring previous iterate, engaging Picard fallback.")
+                    newton_failed = true
+                elseif res_n1.state == :max_iters_caught
+                    println("        -> OSGS Newton 1-step interior pass dynamically executed.")
+                    iter_count += 1
+                elseif res_n1.state == :exception
+                    println("        -> OSGS Newton threw unrecoverable exception: ", res_n1.exc, ". Attempting Picard fallback.")
+                    newton_failed = true
+                else  # :ok
+                    iter_count += res_n1.iterations
 
-                    if any(!isfinite, get_free_dof_values(final_x0))
-                        println("        -> OSGS Inner Newton produced non-finite state. Restoring previous iterate, engaging Picard fallback.")
-                        get_free_dof_values(final_x0) .= x_prev
-                        newton_failed = true
-                    else
-                        iter_count += nls_cache.result.iterations
+                    push!(diag_cache["inner_osgs_diagnostics"], (
+                        iterations = res_n1.iterations,
+                        initial_res = res_n1.initial_residual_norm,
+                        final_res = res_n1.residual_norm,
+                        step_norm = res_n1.step_norm,
+                        stop_reason = res_n1.stop_reason
+                    ))
+                    diag_cache["final_residual_norm"] = res_n1.residual_norm
 
-                        push!(diag_cache["inner_osgs_diagnostics"], (
-                            iterations = nls_cache.result.iterations,
-                            initial_res = nls_cache.result.initial_residual_norm,
-                            final_res = nls_cache.result.residual_norm,
-                            step_norm = nls_cache.result.step_norm,
-                            stop_reason = nls_cache.result.stop_reason
-                        ))
-                        diag_cache["final_residual_norm"] = nls_cache.result.residual_norm
-
-                        if nls_cache.result.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
-                            newton_failed = true
-                        end
-                    end
-                catch e
-                    if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
-                        println("        -> OSGS Newton 1-step interior pass dynamically executed.")
-                        iter_count += 1
-                    else
-                        println("        -> OSGS Newton threw unrecoverable exception: ", e, ". Attempting Picard fallback.")
+                    # P-003 back-pointer: only the three structural-failure stop reasons below
+                    # mark the inner Newton as failed. `xtol_stagnation` and `max_iters_stagnation`
+                    # (IterationCap) are accepted as outer-loop progress by design — see
+                    # `theory/osgs_algorithm.tex` §1.2.4 L1118. Do not add IterationCap to this
+                    # set without first revising the algorithm document; tightening here would
+                    # cause OSGS to reject converged-but-not-tight inner iterates.
+                    if res_n1.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
                         newton_failed = true
                     end
                 end
@@ -512,30 +585,31 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
                     println("        -> OSGS Inner Newton failed. Restoring previous iterate and engaging Picard smoother...")
                     get_free_dof_values(final_x0) .= x_prev
                     picard_completed = false
-                    try
-                        res_picard = solve!(final_x0, local_fesolver_picard, op_picard_osgs)
-                        cache_picard = res_picard isa Tuple ? res_picard[2] : res_picard
-                        nls_cache_picard = cache_picard isa Tuple ? cache_picard[2] : cache_picard
-                        iter_count += nls_cache_picard.result.iterations
-
+                    # Helper's backup is NOT passed: pre-refactor behavior performed a
+                    # secondary explicit `any(!isfinite, …)` check below to catch
+                    # catastrophic divergence in either the OK or the exception path.
+                    # Preserve verbatim.
+                    res_p = safe_fe_solve!(final_x0, local_fesolver_picard, op_picard_osgs)
+                    if res_p.state == :ok
+                        iter_count += res_p.iterations
                         push!(diag_cache["inner_osgs_diagnostics"], (
-                            iterations = nls_cache_picard.result.iterations,
-                            initial_res = nls_cache_picard.result.initial_residual_norm,
-                            final_res = nls_cache_picard.result.residual_norm,
-                            step_norm = nls_cache_picard.result.step_norm,
-                            stop_reason = "picard:" * nls_cache_picard.result.stop_reason
+                            iterations = res_p.iterations,
+                            initial_res = res_p.initial_residual_norm,
+                            final_res = res_p.residual_norm,
+                            step_norm = res_p.step_norm,
+                            stop_reason = "picard:" * res_p.stop_reason
                         ))
-                        diag_cache["final_residual_norm"] = nls_cache_picard.result.residual_norm
+                        diag_cache["final_residual_norm"] = res_p.residual_norm
                         picard_completed = true
-                    catch e
-                        if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
-                            println("        -> OSGS Picard concluded smoothing loops.")
-                            picard_completed = true
-                        else
-                            println("        -> OSGS Picard threw unrecoverable exception: ", e, ". Restoring backup and aborting OSGS.")
-                            get_free_dof_values(final_x0) .= x_prev
-                        end
+                    elseif res_p.state == :max_iters_caught
+                        println("        -> OSGS Picard concluded smoothing loops.")
+                        picard_completed = true
+                    elseif res_p.state == :exception
+                        println("        -> OSGS Picard threw unrecoverable exception: ", res_p.exc, ". Restoring backup and aborting OSGS.")
+                        get_free_dof_values(final_x0) .= x_prev
                     end
+                    # `:nonfinite` falls through to the explicit check below (helper did
+                    # not auto-restore because `backup=` was not passed).
 
                     if any(!isfinite, get_free_dof_values(final_x0))
                         println("        -> OSGS Picard catastrophically diverged. Restoring and aborting OSGS.")
@@ -551,39 +625,30 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
 
                     # --- Attempt 3: re-engage Newton on the Picard-smoothed iterate ---
                     println("        -> OSGS Picard smoothing finalized. Re-engaging Newton...")
-                    try
-                        res_solve2 = solve!(final_x0, local_fesolver, op_newton_osgs)
-                        cache_solve2 = res_solve2 isa Tuple ? res_solve2[2] : res_solve2
-                        nls_cache2 = cache_solve2 isa Tuple ? cache_solve2[2] : cache_solve2
-
-                        if any(!isfinite, get_free_dof_values(final_x0))
-                            println("        -> OSGS Inner Newton retry produced non-finite state. Restoring previous iterate, aborting OSGS nested sequence.")
-                            get_free_dof_values(final_x0) .= x_prev
-                            success = false
-                            break
-                        end
-
-                        iter_count += nls_cache2.result.iterations
-
+                    res_n2 = safe_fe_solve!(final_x0, local_fesolver, op_newton_osgs; backup=x_prev)
+                    if res_n2.state == :nonfinite
+                        println("        -> OSGS Inner Newton retry produced non-finite state. Restoring previous iterate, aborting OSGS nested sequence.")
+                        success = false
+                        break
+                    elseif res_n2.state == :max_iters_caught
+                        iter_count += 1
+                    elseif res_n2.state == :exception
+                        println("        -> OSGS Newton retry threw unrecoverable exception: ", res_n2.exc, ". Aborting OSGS loop.")
+                        success = false
+                        break
+                    else  # :ok
+                        iter_count += res_n2.iterations
                         push!(diag_cache["inner_osgs_diagnostics"], (
-                            iterations = nls_cache2.result.iterations,
-                            initial_res = nls_cache2.result.initial_residual_norm,
-                            final_res = nls_cache2.result.residual_norm,
-                            step_norm = nls_cache2.result.step_norm,
-                            stop_reason = "retry:" * nls_cache2.result.stop_reason
+                            iterations = res_n2.iterations,
+                            initial_res = res_n2.initial_residual_norm,
+                            final_res = res_n2.residual_norm,
+                            step_norm = res_n2.step_norm,
+                            stop_reason = "retry:" * res_n2.stop_reason
                         ))
-                        diag_cache["final_residual_norm"] = nls_cache2.result.residual_norm
+                        diag_cache["final_residual_norm"] = res_n2.residual_norm
 
-                        if nls_cache2.result.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
-                            println("        -> OSGS Inner Newton retry also failed (Reason: $(nls_cache2.result.stop_reason)). Aborting OSGS nested sequence.")
-                            success = false
-                            break
-                        end
-                    catch e
-                        if occursin("Reached maximum iterations", string(e)) || occursin("Reached max iterations", string(e))
-                            iter_count += 1
-                        else
-                            println("        -> OSGS Newton retry threw unrecoverable exception: ", e, ". Aborting OSGS loop.")
+                        if res_n2.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
+                            println("        -> OSGS Inner Newton retry also failed (Reason: $(res_n2.stop_reason)). Aborting OSGS nested sequence.")
                             success = false
                             break
                         end
@@ -758,6 +823,6 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
         
         diag_cache["pi_u"] = pi_u
         diag_cache["pi_p"] = pi_p
-        return success, final_x0, iter_count, eval_time
+        return success, _mms_plateau(), final_x0, iter_count, eval_time
     end
 end

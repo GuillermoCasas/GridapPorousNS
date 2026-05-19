@@ -46,7 +46,10 @@ using JSON3
     # the overarching solver handles execution logic parameters to avoid any hardcoded thresholds.
     # -----------------------------------------------------------------------------------------
     config_path = joinpath(@__DIR__, "osgs_orthogonality_config.json")
-    cfg = PorousNSSolver.load_config(config_path)
+    # This test config is intentionally partial; it relies on inheritance from
+    # `base_config.json`. Use the template loader explicitly (the production
+    # `load_config` shim is now the strict `load_frozen_config` after Fix 7).
+    cfg = PorousNSSolver.load_config_with_base_template(config_path)
 
     # 2. Setup a simplistic diagnostic domain specifically for testing subgrid mechanics
     domain = Tuple(cfg.domain.bounding_box)
@@ -66,7 +69,7 @@ using JSON3
     rxn = PorousNSSolver.ConstantSigmaLaw(cfg.physical_properties.sigma_constant)
     proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
     reg = PorousNSSolver.SmoothVelocityFloor(cfg.physical_properties.u_base_floor_ref, cfg.physical_properties.h_floor_weight, cfg.physical_properties.epsilon_floor)
-    form = PorousNSSolver.PaperGeneralFormulation(visc, rxn, proj, reg, cfg.physical_properties.nu, cfg.physical_properties.eps_val, cfg.physical_properties.eps_floor)
+    form = PorousNSSolver.PaperGeneralFormulation(visc, rxn, proj, reg, cfg.physical_properties.nu, cfg.physical_properties.eps_val)
     alpha_field = PorousNSSolver.SmoothRadialPorosity(cfg.domain.alpha_0, 1.0, cfg.domain.r_1, cfg.domain.r_2)
     mms = PorousNSSolver.Paper2DMMS(form, 1.0, alpha_field; L=1.0, alpha_infty=1.0)
     
@@ -140,8 +143,8 @@ using JSON3
         cfg_dict = JSON3.read(read(config_path, String), Dict{String, Any})
         
         cfg_dict["numerical_method"]["stabilization"] = Dict{String, Any}(
-            "method" => method, 
-            "osgs_iterations" => 5, 
+            "method" => method,
+            "osgs_iterations" => 25,
             "osgs_inner_newton_iters" => cfg.numerical_method.stabilization.osgs_inner_newton_iters,
             "osgs_tolerance" => 1e-7,
             "osgs_stopping_mode" => cfg.numerical_method.stabilization.osgs_stopping_mode,
@@ -155,8 +158,8 @@ using JSON3
         formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
         iter_solvers = PorousNSSolver.IterativeSolvers(fe_picard, fe_newton)
 
-        success, final_x0, iters, eval_time = PorousNSSolver.solve_system(
-            setup, formulation, iter_solvers, local_cfg, FEFunction(X, copy(get_free_dof_values(x0))); 
+        success, _mms_plateau_unused, final_x0, iters, eval_time = PorousNSSolver.solve_system(
+            setup, formulation, iter_solvers, local_cfg, FEFunction(X, copy(get_free_dof_values(x0)));
             diagnostics_cache=diag_cache
         )
 

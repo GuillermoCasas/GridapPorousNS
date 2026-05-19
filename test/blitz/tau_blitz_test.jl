@@ -102,4 +102,49 @@ using LinearAlgebra
         @test PorousNSSolver.compute_dtau_1_du(kin, med, du, 1e-2, 4.0, 2.0, 1e-8, true, law) == 0.0 * (kin.u ⋅ du)
         @test PorousNSSolver.compute_dtau_2_du(kin, med, du, 1e-2, 4.0, 2.0, 1e-8, true) == 0.0 * (kin.u ⋅ du)
     end
+
+    @testset "Tau1/Tau2 simplified paper form is intentional [P-001, P-008]" begin
+        # Locks in the simplifications that drop:
+        #   - the `ε·h²` term from τ₂ (paper eq:Tau2 → eq:Tau2Final, article.tex L755/L778)
+        #   - the porosity-gradient `(h/|k_0|)|∇α|` contribution to C_α in τ₁
+        #     (paper eq:Tau1 → eq:Tau1Final, article.tex L754/L777)
+        # These are intentional per article.tex L762 and L764–768; the assumptions
+        # are documented in `theory/paper-code-divergences.md`. The two assertions
+        # below are the regression anchor — a future audit that re-raises P-001 or
+        # P-008 should fail this test rather than mis-identifying a bug.
+        u = VectorValue(0.2, -0.1)
+        grad_u = TensorValue(0.1, 0.2, -0.3, 0.4)
+        mag_u = sqrt(u ⋅ u + 1e-8)
+        kin = PorousNSSolver.KinematicState(u, grad_u, mag_u)
+        law = PorousNSSolver.ConstantSigmaLaw(2.0)
+        h = 0.25
+        alpha = 0.7
+
+        # P-001: compute_tau_2 must NOT take eps_val. Varying the surrounding ε value
+        # (passed at call sites unrelated to τ₂) cannot affect τ₂ because it's not a
+        # parameter of the function — this is a structural lock.
+        med = PorousNSSolver.MediumState(alpha, VectorValue(0.05, -0.02), h)
+        τ2 = PorousNSSolver.compute_tau_2(kin, med, 1e-2, 4.0, 2.0, 1e-8)
+        @test isfinite(τ2) && τ2 > 0
+        # The full eq:Tau2 would yield h²/(c₁·α·τ_NS + ε·h² + reg); the simplified
+        # eq:Tau2Final yields h²/(c₁·α·τ_NS + reg). Numerically reconstruct the
+        # simplified denominator and confirm code matches.
+        c1, c2 = 4.0, 2.0
+        tau_reg = 1e-8
+        nu = 1e-2
+        tau_ns_inv = c1 * nu / h^2 + c2 * mag_u / h + tau_reg
+        tau_ns = 1.0 / tau_ns_inv
+        expected_tau2_final = h^2 / (c1 * alpha * tau_ns + tau_reg)
+        @test isapprox(τ2, expected_tau2_final; rtol=1e-12)
+
+        # P-008: compute_tau_1 must not depend on med.grad_alpha when the local α is
+        # held fixed. Vary grad_alpha by an order of magnitude and confirm τ₁ is bit-
+        # identical. (The full eq:Tau1 would add (h/|k_0|)|∇α| inside C_α; the
+        # simplified eq:Tau1Final drops it.)
+        med_small_grad = PorousNSSolver.MediumState(alpha, VectorValue(1e-6, 1e-6), h)
+        med_large_grad = PorousNSSolver.MediumState(alpha, VectorValue(10.0, 10.0), h)
+        τ1_small = PorousNSSolver.compute_tau_1(kin, med_small_grad, nu, c1, c2, tau_reg, law)
+        τ1_large = PorousNSSolver.compute_tau_1(kin, med_large_grad, nu, c1, c2, tau_reg, law)
+        @test τ1_small == τ1_large
+    end
 end

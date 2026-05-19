@@ -44,7 +44,7 @@ function execute_outer_homotopy_perturbation_loop!(
             )
         end
         
-        sys_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
+        sys_success, sys_mms_plateau_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
             setup, formulation, iter_solvers,
             config, x0;
             diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg

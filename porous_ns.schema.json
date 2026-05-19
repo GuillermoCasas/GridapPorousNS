@@ -38,13 +38,6 @@
             1e-08
           ]
         },
-        "eps_floor": {
-          "type": "number",
-          "description": "Minimum limit applied to the pressure stabilization parameter (eps_val). This acts as a safeguard against zero values.",
-          "examples": [
-            1e-08
-          ]
-        },
         "reaction_model": {
           "type": "string",
           "enum": [
@@ -217,11 +210,48 @@
                 3
               ]
             },
+            "osgs_inner_newton_iters": {
+              "type": "integer",
+              "description": "Inner Newton iterations performed per OSGS outer fixed-point step.",
+              "examples": [
+                3
+              ]
+            },
             "osgs_tolerance": {
               "type": "number",
               "description": "Tolerance for terminating OSGS iterations before reaching the maximum.",
               "examples": [
                 1e-05
+              ]
+            },
+            "osgs_projection_tolerance": {
+              "type": "number",
+              "description": "Tolerance for the iterative L2 projection drift inside OSGS.",
+              "examples": [
+                1e-05
+              ]
+            },
+            "osgs_stopping_mode": {
+              "type": "string",
+              "enum": [
+                "state_drift",
+                "projection_drift",
+                "both"
+              ],
+              "description": "Which drift metric gates OSGS convergence: state, projection, or both.",
+              "examples": [
+                "state_drift"
+              ]
+            },
+            "osgs_state_drift_scale": {
+              "type": "string",
+              "enum": [
+                "Linf",
+                "L2_mass"
+              ],
+              "description": "Norm used for the OSGS state-drift metric.",
+              "examples": [
+                "L2_mass"
               ]
             },
             "osgs_warmup_iterations": {
@@ -253,11 +283,53 @@
                 5
               ]
             },
+            "dynamic_picard_re_threshold": {
+              "type": "number",
+              "description": "Re threshold above which Picard's iteration budget is widened to dynamic_picard_re_iterations.",
+              "examples": [
+                10000.0
+              ]
+            },
+            "dynamic_picard_re_iterations": {
+              "type": "integer",
+              "description": "Picard iteration budget used at high Re (>= dynamic_picard_re_threshold).",
+              "examples": [
+                10
+              ]
+            },
+            "dynamic_picard_da_threshold": {
+              "type": "number",
+              "description": "Da threshold above which Picard's iteration budget is widened to dynamic_picard_da_iterations.",
+              "examples": [
+                10000.0
+              ]
+            },
+            "dynamic_picard_da_iterations": {
+              "type": "integer",
+              "description": "Picard iteration budget used at high Da (>= dynamic_picard_da_threshold).",
+              "examples": [
+                10
+              ]
+            },
             "newton_iterations": {
               "type": "integer",
               "description": "Maximum allowed exact Newton iterations.",
               "examples": [
                 20
+              ]
+            },
+            "dynamic_newton_re_threshold": {
+              "type": "number",
+              "description": "Re threshold above which Newton's iteration budget is widened to dynamic_newton_re_iterations (Phase 6 §2.1 stiff-cell fix).",
+              "examples": [
+                10000.0
+              ]
+            },
+            "dynamic_newton_re_iterations": {
+              "type": "integer",
+              "description": "Newton iteration budget used at high Re (>= dynamic_newton_re_threshold). Defaults to 60 to cover both the smoothing-out phase and the quadratic tail.",
+              "examples": [
+                60
               ]
             },
             "xtol": {
@@ -279,6 +351,20 @@
               "description": "Residual tolerance for the Picard smoother to declare 'good enough' and hand off to Newton. Should be looser than ftol since Picard is a globalization aid, not a precise solver. Must be >= ftol.",
               "examples": [
                 1e-3
+              ]
+            },
+            "dynamic_ftol_ceiling": {
+              "type": "number",
+              "description": "Upper bound on the dynamically-tightened ftol that couples residual tolerance to mesh resolution (O(h^(kv+1))). Prevents oversolving relative to discretization error.",
+              "examples": [
+                1e-4
+              ]
+            },
+            "dynamic_ftol_spatial_safety_factor": {
+              "type": "number",
+              "description": "Safety factor in (0, 1] applied to the spatially-scaled ftol. Lower values demand tighter convergence relative to discretization error.",
+              "examples": [
+                0.5
               ]
             },
             "max_increases": {
@@ -321,6 +407,27 @@
               "description": "The threshold for the residual inf-norm below which continuous divergence stops safely rather than crashing the solver.",
               "examples": [
                 0.01
+              ]
+            },
+            "condition_noise_floor_baseline": {
+              "type": "number",
+              "description": "Baseline coefficient for the condition-aware noise floor (multiplies a system-conditioning estimate to produce the effective floor).",
+              "examples": [
+                1e-12
+              ]
+            },
+            "condition_noise_floor_absolute_min": {
+              "type": "number",
+              "description": "Hard lower bound for the condition-aware noise floor (prevents it from collapsing to numerical zero).",
+              "examples": [
+                1e-14
+              ]
+            },
+            "condition_noise_floor_safety_factor": {
+              "type": "number",
+              "description": "Safety factor (>= 1) applied to the condition-aware noise floor before use.",
+              "examples": [
+                10.0
               ]
             },
             "max_linesearch_iterations": {

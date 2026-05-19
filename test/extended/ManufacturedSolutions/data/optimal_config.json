@@ -19,7 +19,7 @@
     "numerical_method": {
         "stabilization": {
             "method": ["ASGS"],
-            "osgs_iterations": 5,
+            "osgs_iterations": 25,
             "osgs_tolerance": 1e-10
         },
         "element_spaces": {

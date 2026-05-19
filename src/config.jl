@@ -8,7 +8,6 @@ Base.@kwdef struct PhysicalProperties
     f_x::Float64
     f_y::Float64
     eps_val::Float64
-    eps_floor::Float64
     reaction_model::String
     sigma_constant::Float64
     sigma_linear::Float64
@@ -214,17 +213,25 @@ function deep_merge!(base::AbstractDict, override::AbstractDict)
     return base
 end
 
-function load_config_with_defaults(override_path::String="")
+"""
+    load_config_with_base_template(override_path::String="")
+
+Test-harness convenience loader: deep-merges the user's JSON file with
+`base_config.json` so partial configs inherit missing fields. **Not** the
+production entry point — use `load_frozen_config` for self-contained configs
+where every numerical field is intentionally supplied. See plan Fix 7 / P-011.
+"""
+function load_config_with_base_template(override_path::String="")
     base_config_path = joinpath(@__DIR__, "..", "base_config.json")
     base_raw = read(base_config_path, String)
     base_dict = copy(JSON3.read(base_raw, Dict{String, Any}))
-    
+
     if !isempty(override_path) && isfile(override_path)
         test_raw = read(override_path, String)
         test_dict = JSON3.read(test_raw, Dict{String, Any})
         deep_merge!(base_dict, test_dict)
     end
-    
+
     _check_unknown_keys_hierarchical(base_dict)
     cfg = JSON3.read(JSON3.write(base_dict), PorousNSConfig)
     return validate!(cfg)
@@ -252,7 +259,10 @@ function load_config_from_dict(override::AbstractDict)
     return validate!(cfg)
 end
 
-# Backward compatibility shim
+# Production single-file entry point: strict loader, no silent inheritance from
+# `base_config.json`. Callers that need template inheritance (e.g. the MMS sweep
+# harness) should use `load_config_with_base_template` or `load_config_from_dict`
+# explicitly. See plan Fix 7 / P-011.
 function load_config(path::String="")
-    return load_config_with_defaults(path)
+    return load_frozen_config(path)
 end

@@ -86,7 +86,7 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
         visc_op = PorousNSSolver.LaplacianPseudoTractionViscosity()
     end
     
-    PorousNSSolver.PaperGeneralFormulation(visc_op, rxn, proj, reg, nu_calculated, eps_calculated, 0.0)
+    PorousNSSolver.PaperGeneralFormulation(visc_op, rxn, proj, reg, nu_calculated, eps_calculated)
 end
 
 # Error evaluator operating exclusively upon dimensionless algebraic norms corresponding to characteristic scaling
@@ -150,6 +150,7 @@ function execute_outer_homotopy_perturbation_loop!(
                       # for h-scaled plateau floors.
 )
     success = false
+    mms_plateau_success = nothing   # set per attempt; mirrors solver-side flag
     successful_eps = -1.0
     eval_time = 0.0
     iter_count_attempt = 0
@@ -193,7 +194,7 @@ function execute_outer_homotopy_perturbation_loop!(
             )
         end
         
-        sys_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
+        sys_success, sys_mms_plateau_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
             setup, formulation, iter_solvers,
             config, x0;
             diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
@@ -208,6 +209,14 @@ function execute_outer_homotopy_perturbation_loop!(
         if sys_success
             println("\n      [✅] Full non-linear algebraic system converged gracefully mathematically! Escaping constraint loop.")
             success = true
+            mms_plateau_success = sys_mms_plateau_success
+            # Fix 6: report MMS-verification status separately from solver convergence.
+            # `sys_success` reflects only the inner solver; `sys_mms_plateau_success`
+            # reflects whether the MMS plateau check was formally established. Both must
+            # be true (or plateau-check disabled) for the cell to count as fully verified.
+            if mms_plateau_success === false
+                println("      [⚠] Solver converged but MMS plateau was NOT formally verified (budget exhausted).")
+            end
             successful_eps = eps_p
             final_x0 = sys_final_x0
             eval_time = sys_eval_time
@@ -219,12 +228,12 @@ function execute_outer_homotopy_perturbation_loop!(
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
         end
     end
-    
+
     if !success
          println("    [WARNING] Completely failed to find root basin. Returning NaN.")
     end
-    
-    return success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt
+
+    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt
 end
 
 function run_mms(config_file="test_config.json")
@@ -329,7 +338,9 @@ function run_mms(config_file="test_config.json")
                         "eval_times" => Float64[],
                         "eval_iters" => Int[],
                         "eval_eps" => Float64[],
-                        "eval_residuals" => Float64[]
+                        "eval_residuals" => Float64[],
+                        "mms_plateau_success" => Union{Bool,Nothing}[],
+                        "overall_verification_success" => Bool[]
                     )
                 end
                 
@@ -525,7 +536,7 @@ function run_mms(config_file="test_config.json")
                                     # NONLINEAR CONVERGENCE LOOP
                                     # Incrementally shrink initial numerical perturbation forcing iterative validation
                                     # ==============================================================================
-                                    success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt = execute_outer_homotopy_perturbation_loop!(
+                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt = execute_outer_homotopy_perturbation_loop!(
                                         setup, formulation, iter_solvers, config, method, dynamic_ftol,
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
@@ -533,7 +544,15 @@ function run_mms(config_file="test_config.json")
                                         mms_rate_check_factor,
                                         n, kv
                                     )
-                                    
+
+                                    # Fix 6: overall verification combines solver convergence and (when MMS
+                                    # is enabled) the MMS plateau status. `nothing` plateau means MMS was
+                                    # disabled, which counts as verified by default.
+                                    overall_verification_success = success && (isnothing(mms_plateau_success) || mms_plateau_success)
+                                    if success && mms_plateau_success === false
+                                        println("  [⚠] Cell flagged: solver_success=true but mms_plateau_success=false (budget exhausted).")
+                                    end
+
                                     if success && final_x0 !== nothing
                                         u_h, p_h = final_x0
                                         el2_u, el2_p, eh1_u, eh1_p = calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L, dΩ)
@@ -560,6 +579,8 @@ function run_mms(config_file="test_config.json")
                                     push!(results_cache[k_id]["eval_iters"], iter_count_attempt)
                                     push!(results_cache[k_id]["eval_eps"], successful_eps)
                                     push!(results_cache[k_id]["eval_residuals"], final_residual_attempt)
+                                    push!(results_cache[k_id]["mms_plateau_success"], mms_plateau_success)
+                                    push!(results_cache[k_id]["overall_verification_success"], overall_verification_success)
                                     
                                     println("  -> L2 u/p: ", round(el2_u, sigdigits=4), " / ", round(el2_p, sigdigits=4), " | H1 u/p: ", round(eh1_u, sigdigits=4), " / ", round(eh1_p, sigdigits=4))
                                     # =========================================================================================

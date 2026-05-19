@@ -1,5 +1,5 @@
 {
-    "erase_past_results": false,
+    "erase_past_results": true,
     "epsilon_pert": [1.0],
     "max_n_pert": 5,
     "physical_properties": {
@@ -49,7 +49,7 @@
         },
         "stabilization": {
             "method": ["ASGS"],
-            "osgs_iterations": 5,
+            "osgs_iterations": 15,
             "osgs_inner_newton_iters": 1,
             "osgs_tolerance": 1e-10
         }
