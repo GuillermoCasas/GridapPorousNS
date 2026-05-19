@@ -12,12 +12,12 @@ Reviewers should re-check this table whenever `porous_solver.jl` is touched.
 
 | Algorithm / section | TeX location | Code helper | Code location |
 |---|---|---|---|
-| Algorithm O — `SimulationOrchestration` | [osgs_algorithm.tex:460](osgs_algorithm.tex#L460) | `solve_system` (orchestration body) | [porous_solver.jl:929-1085](../src/solvers/porous_solver.jl#L929-L1085) |
+| Algorithm O — `SimulationOrchestration` | [osgs_algorithm.tex:460](osgs_algorithm.tex#L460) | `solve_system` (orchestration body) | [porous_solver.jl:923-1082](../src/solvers/porous_solver.jl#L923-L1082) |
 | Algorithm B — `RobustNonlinearCascade` (Stage I) | [osgs_algorithm.tex:565](osgs_algorithm.tex#L565) | `_initialize_asgs_state!` (H1) | [porous_solver.jl:450-553](../src/solvers/porous_solver.jl#L450-L553) |
 | Algorithm B — `RobustNonlinearCascade` (OSGS inner) | [osgs_algorithm.tex:565](osgs_algorithm.tex#L565) | `_run_osgs_inner_cascade!` (H3) | [porous_solver.jl:318-427](../src/solvers/porous_solver.jl#L318-L427) |
-| Algorithm C — `OSGSFractionalRelaxation` | [osgs_algorithm.tex:907](osgs_algorithm.tex#L907) | `_run_osgs_relaxation!` (H7) | [porous_solver.jl:708-916](../src/solvers/porous_solver.jl#L708-L916) |
+| Algorithm C — `OSGSFractionalRelaxation` | [osgs_algorithm.tex:907](osgs_algorithm.tex#L907) | `_run_osgs_relaxation!` (H7) | [porous_solver.jl:708-910](../src/solvers/porous_solver.jl#L708-L910) |
 | Algorithm D — `VerifyMMSPlateau` (ASGS branch) | [osgs_algorithm.tex:1334](osgs_algorithm.tex#L1334) | `_run_asgs_mms_extension!` (H2) | [porous_solver.jl:571-664](../src/solvers/porous_solver.jl#L571-L664) |
-| Algorithm D — `VerifyMMSPlateau` (OSGS branch) | [osgs_algorithm.tex:1334](osgs_algorithm.tex#L1334) | inlined inside H7 (OSGS-MMS hook) | [porous_solver.jl:~828-895](../src/solvers/porous_solver.jl#L828-L895) |
+| Algorithm D — `VerifyMMSPlateau` (OSGS branch) | [osgs_algorithm.tex:1334](osgs_algorithm.tex#L1334) | inlined inside H7 (OSGS-MMS hook) | [porous_solver.jl:817-884](../src/solvers/porous_solver.jl#L817-L884) |
 | §3.6.1 `StateDrift` (`ℓ∞` vs continuous `L²`) | [osgs_algorithm.tex:959](osgs_algorithm.tex#L959) | `_compute_state_drift` (H4) | [porous_solver.jl:187-204](../src/solvers/porous_solver.jl#L187-L204) |
 | §3.6.2 `Mode_stop` (stopping-mode decision + ℓ∞ short-circuit) | [osgs_algorithm.tex:1005](osgs_algorithm.tex#L1005) | `_decide_osgs_convergence` (H6) | [porous_solver.jl:270-295](../src/solvers/porous_solver.jl#L270-L295) |
 | (no paper label) projection + Anderson mixing per outer iter | — | `_update_and_project!` (H5) | [porous_solver.jl:222-252](../src/solvers/porous_solver.jl#L222-L252) |
@@ -55,6 +55,6 @@ exists for code-side modularity (it is a pure function — no `diag_cache` write
   [src/solvers/nonlinear.jl](../src/solvers/nonlinear.jl), not to anything in
   `porous_solver.jl`. See the paper-side correspondence table at
   [osgs_algorithm.tex line 310](osgs_algorithm.tex#L310).
-- The four `SafeNewtonSolver` constructor sites (currently verbose, planned for
-  consolidation under a `_with_overrides` helper in Phase 2b of the refactor work)
+- The four `SafeNewtonSolver` constructor sites (now consolidated via the
+  `_with_overrides` helper in [src/solvers/nonlinear.jl:49](../src/solvers/nonlinear.jl#L49))
   are pure plumbing and have no paper anchor.
