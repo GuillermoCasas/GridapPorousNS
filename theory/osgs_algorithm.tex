@@ -620,6 +620,54 @@ $\boldsymbol{x}_{\mathrm{restore}}$ and returns failure. Without this
 guard the subsequent Newton call would crash on its first residual
 evaluation.
 
+\paragraph{Stage I addendum: Newton-1 noise-floor rejection.}  Stage~I
+(the ASGS algebraic initialisation invoked from Algorithm~\ref{alg:O})
+applies one extra rule on top of the bare Algorithm~\ref{alg:B} success
+predicate: when the first Newton call exits with
+$\mathsf{stagnation\_noise\_floor\_reached}$---i.e.\ the residual has
+fallen below $\textstag$ but not below $\textftol$---Stage~I
+\emph{rejects} that as a success and falls through to Picard. This
+is intentional asymmetry: Stage~I is the only place where the iterate
+must enter the exact-Newton quadratic basin before the OSGS staggered
+loop can fragment the state via projections, and an extra Picard pass
+on top of a noise-floor exit is a cheap empirical safeguard against
+starting OSGS from a non-quadratic-basin iterate. By contrast, the
+Stage~II inner cascade (called from Algorithm~\ref{alg:C}) accepts any
+non-structural Newton exit (including $\mathsf{stagnation\_noise\_floor\_reached}$,
+$\mathsf{xtol\_stagnation}$, $\mathsf{max\_iters\_stagnation}$): the
+OSGS outer loop re-evaluates convergence after every staggered
+iteration, so a non-tight inner exit is just outer-loop progress
+rather than a structural failure. The asymmetry exists in code
+because of this difference in what "good enough" means at each site;
+the Algorithm~\ref{alg:B} pseudocode above is the common subset.
+
+\paragraph{Legacy \texttt{max\_iters\_caught} exception path.}  Earlier
+Gridap solvers raised a \texttt{"Reached maximum iterations"}
+\emph{exception} when the iteration cap was exhausted, rather than
+exiting cleanly with $\mathsf{stop\_reason} = \mathsf{max\_iters\_stagnation}$.
+The current \code{SafeNewtonSolver} exits cleanly, so this exception
+path is purely defensive against legacy or non-\code{SafeNewtonSolver}
+solver instances. The three call sites that wrap a Newton solve in
+\code{safe\_fe\_solve!} handle the \code{:max\_iters\_caught} return
+state with three distinct policies:
+\begin{itemize}\itemsep0pt
+\item \textbf{Stage I (ASGS init)} treats it as a structural failure
+  and falls through to the Picard branch---consistent with the noise-floor
+  rejection above: any failure to reach the quadratic basin forces
+  Picard.
+\item \textbf{Stage II (OSGS inner cascade)} treats it as a
+  single-iteration partial success: $\mathrm{iter\_count}$ is
+  incremented but no fallback fires. The outer staggered loop will
+  re-evaluate convergence on the next iteration.
+\item \textbf{ASGS-MMS extension loop} treats it as a single-iteration
+  partial success too (matching Stage II), but emits no log line---the
+  cycle counter advances silently.
+\end{itemize}
+These three policies are an honest reflection of what each site
+actually wants from an iteration cap. The exception path is normally
+never taken with the modern solver stack; documenting it here prevents
+future auditors from re-flagging the asymmetry.
+
 % ============================================================
 \section{The Newton Kernel: Algorithm A and Its Leaves}
 \label{sec:newton}
@@ -1386,6 +1434,38 @@ and is followed by a \texttt{continue}, so the outer loop runs one
 more iteration to collect a sample; on subsequent $S_{\mathrm{conv}}$
 events, Algorithm~\ref{alg:D} is called and the loop either exits
 (plateau satisfied) or continues (still extending).}
+
+\extline{\paragraph{What one $\mathcal{H}$-entry costs.}
+Algorithm~\ref{alg:D} is mode-agnostic; it compares the last two
+entries of the running error history $\mathcal{H}$ regardless of how
+those entries were produced. However, the semantic content of one
+$\mathcal{H}$-entry differs between the two paths:
+in the ASGS extension loop, one entry corresponds to one extra
+\emph{single-Newton-step} on top of the already-converged
+$U_h^{\mathrm{ASGS}}$, whereas in the OSGS path one entry
+corresponds to one full \emph{outer staggered iteration} (inner
+cascade + residual reprojection + Anderson mixing). The plateau
+tolerance $\tau_{\mathrm{err}}$ is calibrated against the relative
+change between consecutive entries; users tuning $\tau_{\mathrm{err}}$
+should keep in mind that the per-entry cost---and therefore the
+expected per-entry relative-change scale---is different in the two
+paths. The current default is conservative enough that either path
+satisfies it.}
+
+\extline{\paragraph{Budget exhaustion is not a verification failure
+of the solver.} When the OSGS branch reaches its inflated outer-loop
+budget $N_{\mathrm{OSGS}}^{\mathrm{eff}}$ without the plateau test
+firing, the solver returns
+$(S_{\mathrm{solver}}, S_{\mathrm{plat}}) = (\mathrm{True}, \mathrm{False})$
+with \code{diag\_cache["mms\_stop\_reason"] = "mms\_budget\_exhausted"}.
+The base OSGS fixed point converged (this is what $S_{\mathrm{conv}}$
+firing at least once established); the plateau verifier ran out of
+samples. Callers that care about FE-error verification must read
+$S_{\mathrm{plat}}$ explicitly: a $\mathrm{True}/\mathrm{False}$
+return means "solver converged at the algebraic level, but the FE
+error did not plateau within the budget." Treating $S_{\mathrm{solver}}$
+alone as "overall verification success" is a misuse of the return
+contract.}
 
 \subsection{Parameters of this extension}
 

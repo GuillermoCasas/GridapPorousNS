@@ -193,3 +193,58 @@ Three independent concerns, all flagged during the planning discussion that prec
 ### What is in scope for the current Phase 5 batch (without §3.6)
 
 §3.1, §3.5, §5.1, §5.2 only. §3.6 is excluded by user direction in the planning session and is captured here for the next iteration. The expected effect of *not* landing §3.6 in this batch: pressure rates may not improve as much as theoretically possible; they are not expected to *regress*. The post-Phase-5 baseline becomes the reference against which a future §3.6 commit is judged for actual numerical improvement.
+
+---
+
+## 7. Three-Way Asymmetry in the Legacy `max_iters_caught` Exception Path — `[code-actual]`
+
+**Location**: [src/solvers/porous_solver.jl](../src/solvers/porous_solver.jl) — `_initialize_asgs_state!` (Stage I), `_run_osgs_inner_cascade!` (Stage II inner), `_run_asgs_mms_extension!` (MMS extension).
+
+**Paper Theory**: Algorithm B (`theory/osgs_algorithm.tex` §"The shared cascade") describes a Newton→Picard→Newton cascade that is reused at three call sites. The pseudocode is mode-agnostic with respect to *how* a non-converged Newton exit is detected — only the success/failure binary matters.
+
+**Apparent Divergence**: The legacy Gridap exception path (`"Reached maximum iterations"`, caught as `:max_iters_caught` by `safe_fe_solve!`) is treated *differently* at the three sites:
+- Stage I: structural failure → Picard fallback fires (matches the "Stage I quadratic-basin guarantee" addendum).
+- Stage II inner: single-iteration partial success, `iter_count` increments, no fallback, log line emitted.
+- ASGS-MMS extension: single-iteration partial success, `iter_count` increments, no fallback, **no** log line emitted.
+
+**Paper Alignment**: `[code-actual]` — These three policies are documented additions to Algorithm B, not divergences from it. The modern `SafeNewtonSolver` exits cleanly with `stop_reason = "max_iters_stagnation"` on the `:ok` path; the exception path is purely defensive against legacy or non-`SafeNewtonSolver` solver instances and is normally never taken. The paper now explicitly enumerates the three policies in `theory/osgs_algorithm.tex` §"The shared cascade" (paragraph "Legacy `max_iters_caught` exception path").
+
+**Re-evaluation trigger**: If a custom non-`SafeNewtonSolver` is plugged into the solver stack, or if Gridap's exception contract changes, re-audit which policy each site should apply.
+
+---
+
+## 8. `eval_time` Reporting Convention — `[code-actual]`
+
+**Location**: [src/solvers/porous_solver.jl](../src/solvers/porous_solver.jl), the `eval_time` return-tuple slot of `solve_system`.
+
+**Paper Theory**: Algorithm O describes the orchestration without committing to a particular wall-clock reporting boundary.
+
+**Implementation Reality**: `eval_time` measures the cumulative wall time of three regions:
+1. Stage I cascade (`@elapsed` around `_initialize_asgs_state!`).
+2. ASGS-MMS extension cycle loop (`@elapsed` *inside* `_run_asgs_mms_extension!`, around the cycle loop only).
+3. OSGS outer staggered loop (`@elapsed` *inside* `_run_osgs_relaxation!`, around the for-loop only).
+
+Crucially, `eval_time` **excludes**:
+- OSGS mass-matrix assembly and Cholesky factorisation (run-once setup; lives outside the `@elapsed` block in `solve_system`).
+- The ASGS-MMS extension's setup (oracle call, local-solver construction).
+- The OSGS post-loop `mms_budget_exhausted` check.
+- All `diag_cache` writes after the timed regions.
+
+**Paper Alignment**: `[code-actual]` — `eval_time` is the *iterative* wall time, not the *total* per-call wall time. Use a wall-clock `@elapsed` wrapper around the whole `solve_system` call if total cost is needed; that figure will be larger than `eval_time` by the OSGS setup cost (which can be a non-trivial chunk on large meshes).
+
+**Re-evaluation trigger**: If a `setup_eval_time` field is ever added to the return tuple (or a wider diagnostics-cache refactor lands), this entry should be updated to reflect the new split.
+
+---
+
+## 9. `mms_budget_exhausted` Reports Solver Success, Not Verification Success — `[paper-faithful]` (post P-007/Fix-6)
+
+**Location**: [src/solvers/porous_solver.jl](../src/solvers/porous_solver.jl), end of `_run_osgs_relaxation!`.
+
+**Paper Theory**: `theory/osgs_algorithm.tex` Algorithm C (OSGS branch with MMS hook) and Algorithm D (plateau verifier). The new paragraph "Budget exhaustion is not a verification failure of the solver" in §"How Algorithm D hooks into the core" now states the contract explicitly.
+
+**Implementation Reality**: When the OSGS outer-loop budget exhausts without the plateau test firing, the solver returns
+`(S_solver, S_plat, …) = (True, False, …)` with `diag_cache["mms_stop_reason"] = "mms_budget_exhausted"`. The base OSGS fixed point converged (necessary for the post-loop check to even fire); the plateau verifier ran out of samples.
+
+**Paper Alignment**: `[paper-faithful]` — the documented two-flag split (`solver_success, mms_plateau_success`) is the resolution of audit finding P-007 / Fix 6 ("solver success conflated with verification success"). Callers must read both flags. The P-007 follow-up in the audit-findings triage plan migrates *callers* to use the second flag explicitly; the solver-side contract is already in this final form.
+
+**Re-evaluation trigger**: If the audit plan's Fix 6 caller migration changes the return-tuple shape or adds an `overall_verification_success` convenience flag, update this entry.
