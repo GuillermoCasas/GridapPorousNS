@@ -29,3 +29,13 @@ Manifest.toml
 # Ignore repomix outputs
 repomix-output.*
 *.repomix-output.*
+
+# LaTeX compilation intermediates for theory/osgs_algorithm.tex
+theory/osgs_algorithm.aux
+theory/osgs_algorithm.fdb_latexmk
+theory/osgs_algorithm.fls
+theory/osgs_algorithm.log
+theory/osgs_algorithm.out
+theory/osgs_algorithm.pdf
+theory/osgs_algorithm.synctex.gz
+theory/osgs_algorithm.toc
