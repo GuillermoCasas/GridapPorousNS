@@ -40,3 +40,13 @@ theory/osgs_algorithm.out
 theory/osgs_algorithm.pdf
 theory/osgs_algorithm.synctex.gz
 theory/osgs_algorithm.toc
+
+# Defensive: same artifacts at repo root if latexmk is ever run from there
+/osgs_algorithm.aux
+/osgs_algorithm.fdb_latexmk
+/osgs_algorithm.fls
+/osgs_algorithm.log
+/osgs_algorithm.out
+/osgs_algorithm.pdf
+/osgs_algorithm.synctex.gz
+/osgs_algorithm.toc
