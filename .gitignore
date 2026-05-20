@@ -5,6 +5,7 @@
 FETCH_HEAD
 .idea/
 .vscode/
+.claude/
 
 # Ignore compiled artifacts and test result output directories entirely
 results/
