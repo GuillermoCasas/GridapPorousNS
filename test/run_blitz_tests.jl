@@ -14,6 +14,7 @@ files = [
 
     "formulation_consistency_blitz_test.jl",
     "tau_blitz_test.jl",
+    "porosity_hessian_blitz_test.jl",
     "projection_blitz_test.jl",
     "nonlinear_blitz_test.jl",
     "mms_exactness_blitz_test.jl",

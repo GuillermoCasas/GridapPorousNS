@@ -101,6 +101,34 @@ function lap_u_ex(f::UExFunc, x)
 end
 Δ(f::UExFunc) = x -> lap_u_ex(f, x)
 
+# Exact ∇(∇·u_ex), needed by the symmetric-gradient viscous strong operator. The base shape
+# S = (sin πx₁ sin πx₂, cos πx₁ cos πx₂) is divergence-free (∇·S ≡ 0), so for u = U α₀ α⁻¹ S
+#   ∇·u = -U α₀ (S·∇α)/α² ,  and  ∇(∇·u) follows by the quotient/product rule using the
+# exact porosity gradient ∇α and Hessian ∇²α. This replaces the previous finite-difference
+# evaluation with a closed form (machine-exact, no step-size error).
+function grad_div_u_ex(f::UExFunc, x)
+    c = f.U * f.alpha_0
+    A = f.alpha_field(x)
+    gA = PorousNSSolver.grad_alpha(f.alpha_field, x)
+    H  = PorousNSSolver.hess_alpha(f.alpha_field, x)
+    Ax = gA[1]; Ay = gA[2]
+    Axx = H[1,1]; Axy = H[1,2]; Ayy = H[2,2]
+
+    s1 = sin(pi*x[1]); s2 = sin(pi*x[2])
+    c1 = cos(pi*x[1]); c2 = cos(pi*x[2])
+    S1 = s1*s2;  S2 = c1*c2
+    S1x =  pi*c1*s2;  S1y =  pi*s1*c2
+    S2x = -pi*s1*c2;  S2y = -pi*c1*s2
+
+    φ  = S1*Ax + S2*Ay                       # = S·∇α
+    φx = S1x*Ax + S1*Axx + S2x*Ay + S2*Axy   # = ∂₁(S·∇α)
+    φy = S1y*Ax + S1*Axy + S2y*Ay + S2*Ayy   # = ∂₂(S·∇α)
+
+    gx = -c*φx/A^2 + 2.0*c*φ*Ax/A^3
+    gy = -c*φy/A^2 + 2.0*c*φ*Ay/A^3
+    return VectorValue(gx, gy)
+end
+
 function get_u_ex(mms::Paper2DMMS)
     return UExFunc(mms.U, mms.alpha_field.alpha_0, mms.alpha_field)
 end
@@ -167,7 +195,16 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
     
     # We must properly evaluate the reaction operator exactly.
     reaction_law = mms.formulation.reaction_law
-    
+
+    # The reaction term is evaluated through the SAME `reaction_speed` routine the assembly uses
+    # (src/models/regularization.jl) so the manufactured forcing is exact for the nonlinear
+    # Forchheimer law as well as the constant-σ law. `reaction_speed` carries only a constant
+    # velocity floor (no mesh-dependent ν/h term), so it is mesh-independent by construction —
+    # this pointwise oracle (which has no element `h`) is therefore exact regardless of
+    # `h_floor_weight`. The `h` argument below is accepted for signature parity and unused.
+    reg_oracle = mms.formulation.regularization
+    h_unused = 1.0
+
     f_ex_oracle = function(x)
         u = u_f(x)
         grad_u = grad_u_ex(u_f, x)
@@ -182,10 +219,23 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
         # So u ⋅ grad_u evaluates identical to (u ⋅ ∇)u. 
         conv = A * (u ⋅ grad_u)
         
-        # The reaction law may depend on U_mag or exactly be ConstantSigma
-        # For our MMS, it's evaluated safely. Using a placeholder for KinematicState if necessary, but ConstantSigma is independent.
-        # ConstantSigmaLaw internally returns sigma_val.
-        sig_val = reaction_law.sigma_val
+        # Reaction term σ(α,u)·u. This is the one place the two formulations differ in the
+        # reaction: ConstantSigmaLaw returns its constant, while the Forchheimer-Ergun law
+        # σ = a(α) + b(α)|u| is porosity-dependent and nonlinear in u. Both are evaluated through
+        # the same `sigma`/`effective_speed` routines used by the assembly, so the forcing is exact.
+        if reaction_law isa PorousNSSolver.ConstantSigmaLaw
+            sig_val = reaction_law.sigma_val
+        elseif reaction_law isa PorousNSSolver.ForchheimerErgunLaw
+            mag = PorousNSSolver.reaction_speed(reg_oracle, u, nu, h_unused, c_1, c_2)
+            sig_val = PorousNSSolver.sigma(
+                reaction_law,
+                PorousNSSolver.KinematicState(u, grad_u, mag),
+                PorousNSSolver.MediumState(A, grad_A, h_unused),
+                mag,
+            )
+        else
+            error("MMS Oracle missing native analytical derivation for reaction law $(typeof(reaction_law)).")
+        end
         rxn = sig_val * u
         
         pres = A * grad_p
@@ -200,19 +250,10 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
             # ∇⋅(2Aν \SPi\nabla \boldsymbol{u}) = 2ν(\SPi\nabla \boldsymbol{u} ⋅ \nabla A) + AνΔu + Aν∇(∇⋅u)
             SPi_u = 0.5 * (grad_u + transpose(grad_u))
             SPi_u_dot_grad_A = SPi_u ⋅ grad_A
-            
-            # The dilatancy gradient ∇(∇⋅u) is crucial for solving $F(u_h) = 0$ at extremely high Re, 
-            # where unscaled geometric residuals dictate the limit bounds precisely.
-            # Gridap currently prevents AD on tr(grad_u), so we evaluate the exact mathematical
-            # gradient of the analytical divergence natively via symmetric double-precision finite differences
-            function get_grad_div_u(pt::VectorValue{2, Float64}; h_fd=1e-5)
-                div_u_local(p) = tr(grad_u_ex(u_f, p))
-                dx = (div_u_local(VectorValue(pt[1]+h_fd, pt[2])) - div_u_local(VectorValue(pt[1]-h_fd, pt[2]))) / (2.0*h_fd)
-                dy = (div_u_local(VectorValue(pt[1], pt[2]+h_fd)) - div_u_local(VectorValue(pt[1], pt[2]-h_fd))) / (2.0*h_fd)
-                return VectorValue(dx, dy)
-            end
-            
-            grad_div_u = get_grad_div_u(VectorValue(x[1], x[2]))
+
+            # ∇(∇⋅u): evaluated in closed form from the exact porosity gradient and Hessian
+            # (grad_div_u_ex), replacing the previous finite-difference approximation.
+            grad_div_u = grad_div_u_ex(u_f, x)
             visc = 2.0 * nu * SPi_u_dot_grad_A + nu * A * lap_u + nu * A * grad_div_u
         elseif viscous_op isa PorousNSSolver.DeviatoricSymmetricViscosity
             # Weak form: 2*nu*(α * \ViscProj \nabla \boldsymbol{u} ⊙ \SPi\nabla \boldsymbol{v})
@@ -231,11 +272,6 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
             visc = nu * (grad_u ⋅ grad_A) + A * nu * lap_u
         else
             error("MMS Oracle missing native analytical derivation for $(typeof(viscous_op)).")
-        end
-        
-        # STRICT REACTION EVALUATOR DISPATCH
-        if !(reaction_law isa PorousNSSolver.ConstantSigmaLaw)
-            error("MMS Oracle missing native analytical derivation for non-linear $(typeof(reaction_law)). If evaluating MagnitudeErgunLaw, the native Jacobian norms must correspond locally here. To ensure convergence, revert to ConstantSigmaLaw.")
         end
         
         return conv + pres + rxn - visc

@@ -1,9 +1,9 @@
 {
+    "_comment": "Cocquet convergence study for comparison with Cocquet et al. (2020), Figs 2-3: same physical case (Re=500, c_in=0.5, transverse porosity). STABILIZED equal-order pairs P1/P1 and P2/P2 only (the VMS method's purpose). Reference raised to N=320 (vs the paper's 200) so the coarse N in {10,20,40,80} are >=4x coarser than the reference, removing the reference-resolution contamination that otherwise depresses the superconverged velocity-L2 slope. h_floor_weight=0 (reaction-speed fix). Run: julia --project=../../.. run_convergence.jl paper_comparison.json",
     "Re": 500.0,
     "c_in": 0.5,
-    "k_convergence_list": [
-        1
-    ],
+    "k_convergence_list": [1],
+    "element_pairs": [[1, 1], [2, 2]],
     "physical_properties": {
         "nu": 0.002,
         "sigma_linear": 0.30,
@@ -16,21 +16,14 @@
         "alpha_0": 1.0,
         "r_1": 0.2,
         "r_2": 0.5,
-        "bounding_box": [
-            0.0,
-            2.0,
-            0.0,
-            1.0
-        ]
+        "bounding_box": [0.0, 2.0, 0.0, 1.0]
     },
     "outlet_truncation_delta": 0.5,
     "interpolate_solution_to_coarser_meshes": false,
     "numerical_method": {
         "viscous_operator_type": "SymmetricGradient",
         "stabilization": {
-            "method": [
-                "ASGS"
-            ],
+            "method": ["ASGS"],
             "osgs_iterations": 15,
             "osgs_tolerance": 1e-10
         },
@@ -39,15 +32,8 @@
             "k_pressure": 1
         },
         "mesh": {
-            "partition": [
-                160,
-                80
-            ],
-            "convergence_partitions": [
-                10,
-                20,
-                40
-            ],
+            "partition": [640, 320],
+            "convergence_partitions": [10, 20, 40, 80],
             "element_type": "TRI"
         },
         "solver": {
@@ -73,6 +59,6 @@
     },
     "output": {
         "directory": "results",
-        "basename": "cocquet_flow"
+        "basename": "cocquet_paper_cmp"
     }
 }

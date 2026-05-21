@@ -31,6 +31,14 @@ Manifest.toml
 repomix-output.*
 *.repomix-output.*
 
+# LaTeX compilation intermediates (generic — covers any theory/*.tex build)
+theory/*.aux
+theory/*.fdb_latexmk
+theory/*.fls
+theory/*.out
+theory/*.synctex.gz
+theory/*.toc
+
 # LaTeX compilation intermediates for theory/osgs_algorithm.tex
 theory/osgs_algorithm.aux
 theory/osgs_algorithm.fdb_latexmk

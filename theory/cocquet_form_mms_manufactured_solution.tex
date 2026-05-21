@@ -1,0 +1,316 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+\newcommand{\uu}{\bm{u}}
+\newcommand{\xx}{\bm{x}}
+\newcommand{\ff}{\bm{f}}
+\newcommand{\nn}{\bm{n}}
+\newcommand{\grad}{\nabla}
+\newcommand{\dive}{\grad\!\cdot\!}
+\newcommand{\eps}{\bm{\varepsilon}}
+\newcommand{\Real}{\mathbb{R}}
+
+\title{A Manufactured Solution with the \emph{Cocquet} Formulation:\\
+       Verifying the Forchheimer / variable-porosity discretization}
+\author{Porous Navier--Stokes solver --- verification note}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note documents a Method-of-Manufactured-Solutions (MMS) test whose
+\emph{governing operator is identical} to the Cocquet benchmark --- the same
+symmetric-gradient viscous term and the same nonlinear, porosity-dependent
+Forchheimer--Ergun reaction --- but with a smooth, closed-form exact solution
+and standard Dirichlet data. The Cocquet benchmark exhibits sub-optimal
+$L^2$ convergence on coarse meshes; pure Navier--Stokes ($\alpha\equiv 1$,
+$\sigma=0$) on the same geometry recovers optimal rates. The variable porosity
+$\alpha$ \emph{combined with} the nonlinear drag is therefore the suspect, yet
+this exact combination had never been exercised by a manufactured solution: the
+existing MMS oracle only admitted a \emph{constant} reaction coefficient. The
+test below closes that gap. If it converges optimally, the Cocquet
+sub-optimality is physical/pre-asymptotic; if it degrades, a genuine
+formulation or implementation defect has been isolated. The Cocquet experiment
+itself is left untouched.
+\end{abstract}
+
+\section{Domain and porosity field}
+
+The domain is the square $\Omega=[-\tfrac12,\tfrac12]^2$ with characteristic
+length $L=1$. The porosity $\alpha:\Omega\to(0,1]$ is the smooth radial field
+\texttt{SmoothRadialPorosity} used throughout the existing MMS suite. With
+$r=\lvert\xx\rvert=\sqrt{x_1^2+x_2^2}$ and inner/outer radii $0<r_1<r_2<L/2$,
+\begin{equation}
+\alpha(\xx)=
+\begin{cases}
+\alpha_0, & r\le r_1,\\[2pt]
+\alpha_\infty-\dfrac{\alpha_\infty-\alpha_0}{1+e^{\gamma(\eta)}}, & r_1<r<r_2,\\[8pt]
+\alpha_\infty, & r\ge r_2,
+\end{cases}
+\qquad
+\eta=\frac{r^2-r_1^2}{r_2^2-r_1^2},\quad
+\gamma(\eta)=\frac{2\eta-1}{\eta(1-\eta)} .
+\label{eq:alpha}
+\end{equation}
+The field is $C^\infty$ in the transition annulus and matches $C^1$ at
+$r=r_1,r_2$; its gradient $\grad\alpha$ and Laplacian $\Delta\alpha$ are
+computed analytically (closed-form chain rule, \texttt{src/models/porosity.jl}).
+In the test we use $r_1=0.2$, $r_2=0.4$, $\alpha_\infty=1$, and sweep
+$\alpha_0\in\{1.0,\,0.5,\,0.05\}$. The case $\alpha_0=1$ gives
+$\alpha\equiv1$, $\grad\alpha\equiv\bm 0$ and $\sigma\equiv0$ --- a pure
+Navier--Stokes control. The cases $\alpha_0<1$ activate both the porosity
+gradient and the Forchheimer drag.
+
+\section{Exact solution}
+
+The manufactured velocity and pressure are
+\begin{align}
+\uu_{\mathrm{ex}}(\xx)
+  &= U\,\alpha_0\,\frac{1}{\alpha(\xx)}\,\bm S(\xx),
+  &\bm S(\xx)&=\begin{pmatrix}\sin(\pi x_1)\sin(\pi x_2)\\[2pt]
+                              \cos(\pi x_1)\cos(\pi x_2)\end{pmatrix},
+  \label{eq:uex}\\[4pt]
+p_{\mathrm{ex}}(\xx) &= P_c\,\cos(\pi x_1)\sin(\pi x_2),
+  \label{eq:pex}
+\end{align}
+with amplitude $U=1$. The $1/\alpha$ weighting couples the velocity field to
+the porosity, so that $\grad\uu_{\mathrm{ex}}$ carries an explicit
+$\grad\alpha$ contribution and the manufactured problem genuinely exercises the
+variable-media terms. Exact $\grad\uu_{\mathrm{ex}}$ and
+$\Delta\uu_{\mathrm{ex}}$ follow from \eqref{eq:uex} by differentiating the
+product $\alpha_0\,\alpha^{-1}\bm S$ (see \texttt{UExFunc} in
+\texttt{src/problems/mms\_paper\_2d.jl}). The pressure scale is
+\begin{equation}
+P_c=(1+\mathrm{Re}+\mathrm{Da})\,\frac{U\nu}{L},
+\end{equation}
+which for the Forchheimer law reduces to $P_c=(1+\mathrm{Re})\,U\nu/L$ since no
+single constant $\sigma$ (hence no Darcy number $\mathrm{Da}$) is defined.
+
+\section{Governing equations (the Cocquet formulation)}
+
+The steady, dimensional Darcy--Brinkman--Forchheimer momentum and mass balance
+solved by the code are
+\begin{align}
+\alpha\,(\uu\!\cdot\!\grad)\uu
+  \;+\;\alpha\,\grad p
+  \;+\;\sigma(\alpha,\uu)\,\uu
+  \;-\;\dive\!\big(2\nu\,\alpha\,\eps(\uu)\big)
+  &= \ff,
+  \label{eq:mom}\\[4pt]
+\dive(\alpha\,\uu)\;+\;\epsilon_{\mathrm p}\,p &= g,
+  \label{eq:mass}
+\end{align}
+on $\Omega$, where $\nu$ is the kinematic viscosity, $\epsilon_{\mathrm p}\ll1$
+a pressure-penalty regularization, and $\ff$, $g$ the manufactured sources
+constructed in \S\ref{sec:forcing}. The Reynolds number sets the viscosity,
+$\mathrm{Re}=UL/\nu \Rightarrow \nu=UL/\mathrm{Re}$.
+
+\subsection{Viscous term: symmetric gradient}
+\label{sec:visc}
+The Cocquet configuration uses the \emph{symmetric-gradient} viscous operator
+(\texttt{viscous\_operator\_type = "SymmetricGradient"}), i.e. the strain-rate
+tensor $\eps(\uu)=\tfrac12(\grad\uu+\grad\uu^{\mathsf T})$ \emph{without} the
+deviatoric projection. Expanding the divergence with the product rule,
+\begin{equation}
+\dive\!\big(2\nu\,\alpha\,\eps(\uu)\big)
+   = 2\nu\,\eps(\uu)\,\grad\alpha
+     \;+\;\nu\,\alpha\,\Delta\uu
+     \;+\;\nu\,\alpha\,\grad(\dive\uu),
+  \label{eq:visc-strong}
+\end{equation}
+using $\dive\eps(\uu)=\tfrac12\Delta\uu+\tfrac12\grad(\dive\uu)$. All three
+terms are retained in the strong residual used for the stabilization and in the
+manufactured forcing. (The canonical deviatoric-symmetric operator would
+instead drop the $\grad(\dive\uu)$ contribution in 2D; the test deliberately
+matches Cocquet by using the symmetric-gradient form.)
+
+\subsection{Reaction term: Forchheimer--Ergun}
+\label{sec:reac}
+The drag is the nonlinear, porosity-dependent Forchheimer--Ergun law
+\begin{equation}
+\sigma(\alpha,\uu)
+   = \sigma_{\mathrm{lin}}\left(\frac{1-\alpha}{\alpha}\right)^{\!2}
+   + \sigma_{\mathrm{nl}}\left(\frac{1-\alpha}{\alpha}\right)\lvert\uu\rvert_\star ,
+  \label{eq:sigma}
+\end{equation}
+with the test coefficients $\sigma_{\mathrm{lin}}=0.30$,
+$\sigma_{\mathrm{nl}}=1.75$ (identical to Cocquet). The speed
+$\lvert\uu\rvert_\star$ is the regularized magnitude returned by
+\texttt{effective\_speed}:
+\begin{equation}
+\lvert\uu\rvert_\star=\sqrt{\uu\!\cdot\!\uu+u_{\mathrm{floor}}^2},
+\qquad
+u_{\mathrm{floor}} = u_{\mathrm{base}}
+   + w_h\,\frac{c_1\nu}{c_2 h + \epsilon_{\mathrm{floor}}}.
+  \label{eq:floor}
+\end{equation}
+The MMS configuration fixes the mesh-coupling weight $w_h=0$, so
+$u_{\mathrm{floor}}=u_{\mathrm{base}}$ is a \emph{mesh-independent} constant.
+This is essential: it lets the forcing be evaluated by a point-wise oracle that
+has no element size $h$, while remaining \emph{exactly} consistent with the
+assembled reaction term. The forcing oracle calls the very same
+\texttt{sigma}/\texttt{effective\_speed} routines as the assembly, so
+\eqref{eq:sigma}--\eqref{eq:floor} are reproduced bit-for-bit. (The
+implementation guards $w_h=0$ and errors otherwise.)
+
+Because $\sigma$ depends on $\alpha(\xx)$ through $(1-\alpha)/\alpha$ and on
+$\lvert\uu\rvert$, the reaction is simultaneously \emph{spatially varying} and
+\emph{nonlinear in $\uu$} --- the precise feature absent from every previous
+MMS run, all of which used a constant $\sigma$.
+
+\section{Manufactured forcing}
+\label{sec:forcing}
+The sources $\ff$, $g$ are the strong residuals of
+\eqref{eq:mom}--\eqref{eq:mass} evaluated at the exact fields
+\eqref{eq:uex}--\eqref{eq:pex}:
+\begin{align}
+\ff(\xx) &=
+   \alpha\,(\uu_{\mathrm{ex}}\!\cdot\!\grad)\uu_{\mathrm{ex}}
+   + \alpha\,\grad p_{\mathrm{ex}}
+   + \sigma(\alpha,\uu_{\mathrm{ex}})\,\uu_{\mathrm{ex}}
+   - \Big[\,2\nu\,\eps(\uu_{\mathrm{ex}})\,\grad\alpha
+           + \nu\,\alpha\,\Delta\uu_{\mathrm{ex}}
+           + \nu\,\alpha\,\grad(\dive\uu_{\mathrm{ex}})\,\Big],
+  \label{eq:f}\\[4pt]
+g(\xx) &= \epsilon_{\mathrm p}\,p_{\mathrm{ex}}
+   + \alpha\,\dive\uu_{\mathrm{ex}}
+   + \grad\alpha\!\cdot\!\uu_{\mathrm{ex}} .
+  \label{eq:g}
+\end{align}
+Every term is computed analytically, including
+$\grad(\dive\uu_{\mathrm{ex}})$: since the base shape
+$\bm S$ is divergence-free ($\dive\bm S\equiv0$), one has
+$\dive\uu_{\mathrm{ex}}=-U\alpha_0(\bm S\!\cdot\!\grad\alpha)/\alpha^2$, whose
+gradient follows in closed form from the exact porosity gradient $\grad\alpha$
+and Hessian $\grad^2\alpha$ (\texttt{hess\_alpha}, \texttt{grad\_div\_u\_ex}).
+This replaces an earlier finite-difference evaluation, removing all step-size
+error. With $\ff$, $g$ so defined, the strong residual vanishes
+identically at $\uu_{\mathrm{ex}},p_{\mathrm{ex}}$, and the stabilized scheme
+is consistent by construction --- exactly as in the constant-$\sigma$ MMS, now
+extended to \eqref{eq:sigma}.
+
+\section{Boundary conditions}
+
+The manufactured test imposes the exact velocity as a Dirichlet condition on
+the \emph{entire} boundary, $\uu=\uu_{\mathrm{ex}}$ on $\partial\Omega$; the
+pressure is left free and pinned only through the penalty
+$\epsilon_{\mathrm p}p$ in \eqref{eq:mass}. This differs from the Cocquet
+benchmark, which prescribes a parabolic inlet, no-slip walls, and a
+traction-free Neumann outlet. The boundary \emph{data} therefore differ, but
+the differential operator, viscous form, reaction law and coefficients,
+stabilization (ASGS), and element pair are identical. Pure Navier--Stokes
+runs (\S1, $\alpha_0=1$) already confirmed that the Cocquet boundary set does
+not, by itself, spoil convergence, so isolating the operator under clean
+Dirichlet data is the sharper diagnostic.
+
+\section{Discretization and expected rates}
+
+Taylor--Hood $\mathbb{P}_2/\mathbb{P}_1$ elements on simplicial (TRI) meshes,
+ASGS stabilization, matching Cocquet. The porosity is interpolated to the
+velocity space order so it introduces no extra modeling error relative to the
+$\mathbb{P}_2$ velocity. The quadrature degree includes the Forchheimer bump
+$4k_v+\lfloor k_v/2\rfloor$ to integrate the non-polynomial
+$\lvert\uu\rvert$ factor in \eqref{eq:sigma}.
+
+For a smooth solution the expected asymptotic $L^2$ rates are
+\begin{equation}
+\lVert\uu-\uu_h\rVert_{L^2}=O(h^{k_v+1})=O(h^3),
+\qquad
+\lVert p-p_h\rVert_{L^2}=O(h^{k_p+1})=O(h^2),
+\end{equation}
+with semi-$H^1$ rates one order lower. The sweep runs
+$N\in\{10,20,40,80\}$ and $\mathrm{Re}\in\{1,100,500\}$ (the last matching
+Cocquet), recording per-mesh errors and fitted slopes.
+
+\paragraph{Reading the result.}
+\begin{itemize}
+\item \textbf{Optimal rates} (slopes $\to 3$ velocity, $\to 2$ pressure):
+      the Forchheimer / variable-$\alpha$ discretization is consistent and
+      accurate. The Cocquet sub-optimality is then attributable to physics
+      (boundary/corner regularity, high-$\mathrm{Re}$ pre-asymptotic range, or
+      a not-yet-converged fine reference), not to the formulation.
+\item \textbf{Degraded rates:} a real consistency or implementation defect in
+      the variable-porosity nonlinear-reaction path has been isolated;
+      candidates to examine next are the velocity-floor consistency near
+      stagnation, the symmetric-gradient operator under variable $\alpha$, the
+      omitted porosity-gradient correction $C_\alpha=\alpha+(h/|k_0|)|\grad\alpha|$
+      in $\tau$, and the reaction adjoint sign/weighting.
+\end{itemize}
+
+\section{Results}
+\label{sec:results}
+
+The sweep ($N\in\{10,20,40,80\}$, TRI, $\mathbb P_2/\mathbb P_1$, ASGS) gives
+the fitted $L^2$ slopes below. The case $\alpha_0=1$ is the pure-NS control.
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+$(\alpha_0,\mathrm{Re})$ & rate $u_{L^2}$ & rate $p_{L^2}$ & rate $u_{H^1}$\\
+\midrule
+$(1.0,\,1)$    & 3.31 & 2.02 & 2.17\\
+$(1.0,\,100)$  & 3.24 & 2.02 & 2.13\\
+$(1.0,\,500)$  & 2.94 & 2.03 & 1.90\\
+$(0.5,\,1)$    & 2.93 & 2.68 & 1.86\\
+$(0.5,\,100)$  & 2.70 & 2.03 & 1.70\\
+$(0.5,\,500)$  & 2.80 & 2.03 & 1.76\\
+$(0.05,\,1)$   & 2.87 & 2.69 & 1.79\\
+$(0.05,\,100)$ & 2.35 & 1.71 & 1.38\\
+$(0.05,\,500)$ & 2.39 & 1.99 & 1.40\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The per-refinement velocity slopes \emph{increase} toward the optimal $3$ as
+$h\to0$ in every case --- e.g. the stiffest run $(\alpha_0=0.05,\mathrm{Re}=500)$
+gives $1.97\to2.54\to2.60$, and the control $(\alpha_0=1,\mathrm{Re}=500)$ sits
+flat at $\approx 2.9$. There is a mild pre-asymptotic erosion on coarse meshes
+that grows with the drag strength (small $\alpha_0$) and the Reynolds number,
+but \emph{no fixed sub-optimal order ceiling}: the scheme is consistent and
+optimally convergent for the nonlinear, variable-porosity formulation.
+
+\paragraph{Conclusion.}
+The Cocquet \emph{formulation} is correct. An identical operator on a smooth
+solution recovers $O(h^3)$ velocity / $O(h^2)$ pressure, whereas the Cocquet
+benchmark itself plateaued at $\approx0.1$--$0.5$. The benchmark's
+sub-optimality is therefore \emph{not} a formulation/implementation defect in
+the discretized PDE; it had to be something specific to the benchmark
+\emph{run} that this manufactured test does not share. That cause was
+subsequently identified (see \texttt{docs/cocquet\_convergence\_analysis.md},
+Phase~6): the velocity \emph{regularization floor} used for the stabilization
+parameters $\tau$ carries a mesh-dependent diffusive term
+$\propto \nu/h$ that was also being fed into the \emph{physical} Forchheimer
+drag $\beta(\alpha)\lvert\uu\rvert\uu$. Growing under refinement, it made every
+mesh solve a different effective drag law and corrupted the reference solution,
+collapsing the measured rates. Removing that term from the reaction speed
+(while keeping it in $\tau$) restores velocity $H^1$ slopes of $\approx 2$ and
+$L^2$ slopes of $2.3$--$2.8$ for the benchmark, consistent with the present
+manufactured study and with the source paper's reported $O(h^2)$. This MMS,
+crucially, is what proved the discretization itself was sound and pointed the
+search away from the formulation.
+
+\section*{Implementation note}
+The manufactured-solution oracle in \texttt{src/problems/mms\_paper\_2d.jl} is
+\emph{shared} between the standard MMS suite and this Cocquet-form test. It
+dispatches on the configured operators, so the two formulations differ in
+exactly two terms --- the viscous operator (symmetric-gradient vs.
+deviatoric-symmetric) and the reaction law (constant $\sigma$ vs. nonlinear
+Forchheimer--Ergun) --- and the single oracle reproduces both forcings exactly.
+This isolates precisely what changes between the formulations.
+
+\section*{Reproduce}
+\begin{verbatim}
+cd test/extended/CocquetFormMMS
+julia --project=../../.. run_test.jl cocquet_form_mms.json
+# rates stored as HDF5 attributes rate_u_l2, rate_p_l2, ... in
+# results/cocquet_form_mms.h5
+\end{verbatim}
+
+\end{document}

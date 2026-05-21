@@ -1,141 +1,122 @@
-# test/long/CocquetExperiment/plot_convergence.py
+# test/extended/CocquetExperiment/plot_convergence.py
+#
+# Usage:
+#   python plot_convergence.py                                  # plots results/convergence_cocquet.h5
+#   python plot_convergence.py convergence_paper_comparison.h5  # any file under results/ (or an absolute path)
+#
+# Plots every (method / P<kv>P<kp>) group present in the file — equal-order P1/P1, P2/P2 and
+# mixed Taylor-Hood P2/P1 alike — so it never silently produces an empty figure when the group
+# names don't match a hard-coded list.
+import sys
+import os
+import re
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 
-def plot_cocquet():
+
+def _resolve_h5(arg):
     results_dir = os.path.join(os.path.dirname(__file__), 'results')
-    h5_file = os.path.join(results_dir, 'convergence_cocquet.h5')
-    
+    if arg is None:
+        return os.path.join(results_dir, 'convergence_cocquet.h5')
+    if os.path.isabs(arg) or os.path.exists(arg):
+        return arg
+    # bare name (with or without .h5) resolved under results/
+    if not arg.endswith('.h5'):
+        arg += '.h5'
+    return os.path.join(results_dir, arg)
+
+
+def _discover_groups(file):
+    """Yield (method, pair_name, kv, kp, group) for every P<kv>P<kp> leaf group."""
+    pat = re.compile(r'^P(\d+)P(\d+)$')
+    for method in file.keys():
+        node = file[method]
+        if not isinstance(node, h5py.Group):
+            continue
+        for pair_name in node.keys():
+            m = pat.match(pair_name)
+            if m and isinstance(node[pair_name], h5py.Group):
+                yield method, pair_name, int(m.group(1)), int(m.group(2)), node[pair_name]
+
+
+def plot_cocquet(h5_arg=None):
+    h5_file = _resolve_h5(h5_arg)
     if not os.path.exists(h5_file):
         print(f"HDF5 file not found: {h5_file}")
         return
 
-    # Create a 1x2 subplot layout to cleanly separate L2 and H1 metrics
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
-    
+    markers = ['^', 's', 'o', 'D', 'v', '*']
+    plotted = 0
+
     with h5py.File(h5_file, 'r') as file:
-        N_list = np.array(file["N_list"])
+        if "N_list" not in file:
+            print(f"'N_list' missing from {h5_file}; nothing to plot.")
+            return
+        N_list = np.array(file["N_list"], dtype=float)
         h = 1.0 / N_list
-        
+
+        groups = list(_discover_groups(file))
+        if not groups:
+            print(f"No P<kv>P<kp> groups found in {h5_file}. Top-level keys: {list(file.keys())}")
+            return
+
         delta = None
-        for k in [1, 2]:
-            for method in ["ASGS", "OSGS"]:
-                group_name = f"{method}/P{k}P{k}"
-                if group_name in file:
-                    if "outlet_truncation_delta" in file[group_name].attrs:
-                        delta = file[group_name].attrs["outlet_truncation_delta"]
-                        break
-            if delta is not None:
-                break
-        
-        for k in [1, 2]:
-            for method in ["ASGS", "OSGS"]:
-                group_name = f"{method}/P{k}P{k}"
-                if group_name not in file:
-                    continue
-                
-                group = file[group_name]
-                err_u = np.array(group["errors_l2_u"])
-                err_p = np.array(group["errors_l2_p"])
-                
-                err_u_h1 = np.array(group["errors_h1_u"])
-                err_p_h1 = np.array(group["errors_h1_p"])
-                
-                marker = '^' if k == 1 else 's'
-                ls = '-' if method == "ASGS" else '--'
-                
-                # Theoretical Rates
-                opt_u_l2 = k + 1
-                opt_p_l2 = k
-                opt_u_h1 = k
-                opt_p_h1 = k
-                
-                # Plot L2 Data
-                ax1.loglog(N_list, err_u, color='blue', marker=marker, linestyle=ls, linewidth=2, markersize=8, 
-                           label=fr'{method} P{k}/P{k} $L_2$ Velocity ({opt_u_l2})')
-                ax1.loglog(N_list, err_p, color='red', marker=marker, linestyle=ls, linewidth=2, markersize=8, 
-                           markerfacecolor='white', label=fr'{method} P{k}/P{k} $L_2$ Pressure ({opt_p_l2})')
+        midx = 0
+        for method, pair_name, kv, kp, group in sorted(groups, key=lambda t: (t[1], t[0])):
+            if delta is None and "outlet_truncation_delta" in group.attrs:
+                delta = group.attrs["outlet_truncation_delta"]
 
-                # Plot H1 Data
-                ax2.loglog(N_list, err_u_h1, color='blue', marker=marker, linestyle=ls, linewidth=2, markersize=8, 
-                           label=fr'{method} P{k}/P{k} $H_1$ Velocity ({opt_u_h1})')
-                ax2.loglog(N_list, err_p_h1, color='red', marker=marker, linestyle=ls, linewidth=2, markersize=8, 
-                           markerfacecolor='white', label=fr'{method} P{k}/P{k} $H_1$ Pressure ({opt_p_h1})')
-                
-                # Annotate local slopes for each segment dynamically handling collisions
+            err_u = np.array(group["errors_l2_u"]); err_p = np.array(group["errors_l2_p"])
+            err_u_h1 = np.array(group["errors_h1_u"]); err_p_h1 = np.array(group["errors_h1_p"])
+
+            marker = markers[midx % len(markers)]; midx += 1
+            ls = '-' if method == "ASGS" else '--'
+
+            # Optimal rates: velocity ~ (kv+1) in L2, kv in H1; pressure ~ (kp+1) in L2, kp in H1.
+            opt_u_l2, opt_u_h1 = kv + 1, kv
+            opt_p_l2, opt_p_h1 = kp + 1, kp
+            tag = f"{method} P{kv}/P{kp}"
+
+            ax1.loglog(N_list, err_u, color='blue', marker=marker, linestyle=ls, lw=2, ms=8,
+                       label=fr'{tag} $L_2$ Vel (opt {opt_u_l2})')
+            ax1.loglog(N_list, err_p, color='red', marker=marker, linestyle=ls, lw=2, ms=8,
+                       markerfacecolor='white', label=fr'{tag} $L_2$ Pre (opt {opt_p_l2})')
+            ax2.loglog(N_list, err_u_h1, color='blue', marker=marker, linestyle=ls, lw=2, ms=8,
+                       label=fr'{tag} $H_1$ Vel (opt {opt_u_h1})')
+            ax2.loglog(N_list, err_p_h1, color='red', marker=marker, linestyle=ls, lw=2, ms=8,
+                       markerfacecolor='white', label=fr'{tag} $H_1$ Pre (opt {opt_p_h1})')
+
+            # Raw local slopes (d log err / d log h), annotated at every segment midpoint,
+            # on every curve. Velocity labels sit above the line (blue), pressure below (red).
+            def annotate(ax, err, color, dy):
                 for i in range(len(N_list) - 1):
-                    slope_u = ((np.log(err_u[i+1]) - np.log(err_u[i])) / (np.log(h[i+1]) - np.log(h[i]))) / opt_u_l2
-                    slope_p = ((np.log(err_p[i+1]) - np.log(err_p[i])) / (np.log(h[i+1]) - np.log(h[i]))) / opt_p_l2
-                    
-                    slope_u_h1 = ((np.log(err_u_h1[i+1]) - np.log(err_u_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))) / opt_u_h1
-                    slope_p_h1 = ((np.log(err_p_h1[i+1]) - np.log(err_p_h1[i])) / (np.log(h[i+1]) - np.log(h[i]))) / opt_p_h1
-                    
-                    # Split ASGS and OSGS anchors precisely on the interpolating log segment to prevent crashes
-                    alpha_point = 0.50 if method == "ASGS" else 0.75
-                    log_N_mid = np.log(N_list[i]) * (1-alpha_point) + np.log(N_list[i+1]) * alpha_point
-                    N_mid = np.exp(log_N_mid)
+                    raw = (np.log(err[i+1]) - np.log(err[i])) / (np.log(h[i+1]) - np.log(h[i]))
+                    Nm = np.exp(0.5 * (np.log(N_list[i]) + np.log(N_list[i+1])))
+                    em = np.exp(0.5 * (np.log(err[i]) + np.log(err[i+1])))
+                    ax.annotate(f'{raw:.2f}', xy=(Nm, em), xytext=(0, dy), textcoords='offset points',
+                                color=color, fontsize=8, fontweight='bold', ha='center',
+                                bbox=dict(boxstyle='round,pad=0.1', fc='white', ec='none', alpha=0.6))
+            annotate(ax1, err_u, 'blue', 7)
+            annotate(ax1, err_p, 'red', -11)
+            annotate(ax2, err_u_h1, 'blue', 7)
+            annotate(ax2, err_p_h1, 'red', -11)
+            plotted += 1
 
-                    # --- L2 Midpoints ---
-                    log_u_mid = np.log(err_u[i]) * (1-alpha_point) + np.log(err_u[i+1]) * alpha_point
-                    log_p_mid = np.log(err_p[i]) * (1-alpha_point) + np.log(err_p[i+1]) * alpha_point
-                    err_u_mid = np.exp(log_u_mid)
-                    err_p_mid = np.exp(log_p_mid)
-                    
-                    # --- H1 Midpoints ---
-                    log_u_mid_h1 = np.log(err_u_h1[i]) * (1-alpha_point) + np.log(err_u_h1[i+1]) * alpha_point
-                    log_p_mid_h1 = np.log(err_p_h1[i]) * (1-alpha_point) + np.log(err_p_h1[i+1]) * alpha_point
-                    err_u_mid_h1 = np.exp(log_u_mid_h1)
-                    err_p_mid_h1 = np.exp(log_p_mid_h1)
-                    
-                    # Compute constant pixel offsets mathematically using tangential vector rotation
-                    d_log_N = np.log(N_list[i+1]) - np.log(N_list[i])
-                    offset_pts = 15.0 # Set perfectly distinct layout natively tracking log-log screens spacing
-                    
-                    # L2 Text Rotation
-                    d_log_u = np.log(err_u[i+1]) - np.log(err_u[i])
-                    len_u = np.sqrt(d_log_N**2 + d_log_u**2)
-                    nu_x, nu_y = -d_log_u / len_u, d_log_N / len_u
-                    
-                    d_log_p = np.log(err_p[i+1]) - np.log(err_p[i])
-                    len_p = np.sqrt(d_log_N**2 + d_log_p**2)
-                    np_x, np_y = d_log_p / len_p, -d_log_N / len_p
-                    
-                    ax1.annotate(f'{slope_u:.2f}', xy=(N_mid, err_u_mid), xycoords='data', xytext=(nu_x*offset_pts, nu_y*offset_pts), textcoords='offset points', color='blue', fontweight='bold', ha='center', va='center')
-                    ax1.annotate(f'{slope_p:.2f}', xy=(N_mid, err_p_mid), xycoords='data', xytext=(np_x*offset_pts, np_y*offset_pts), textcoords='offset points', color='red', fontweight='bold', ha='center', va='center')
-                    
-                    # H1 Text Rotation
-                    d_log_u_h1 = np.log(err_u_h1[i+1]) - np.log(err_u_h1[i])
-                    len_u_h1 = np.sqrt(d_log_N**2 + d_log_u_h1**2)
-                    nu_x_h1, nu_y_h1 = -d_log_u_h1 / len_u_h1, d_log_N / len_u_h1
-                    
-                    d_log_p_h1 = np.log(err_p_h1[i+1]) - np.log(err_p_h1[i])
-                    len_p_h1 = np.sqrt(d_log_N**2 + d_log_p_h1**2)
-                    np_x_h1, np_y_h1 = d_log_p_h1 / len_p_h1, -d_log_N / len_p_h1
+    for ax, ttl, yl in ((ax1, r'$L_2$-norms', r'$L_2$-norm error'),
+                        (ax2, r'$H_1$-seminorms', r'$H_1$-seminorm error')):
+        ax.set_xlabel(r'$N$'); ax.set_ylabel(yl); ax.set_title(f'Spatial convergence: {ttl}')
+        ax.grid(True, which="both", ls="--"); ax.legend(handlelength=3.0, fontsize=8)
 
-                    ax2.annotate(f'{slope_u_h1:.2f}', xy=(N_mid, err_u_mid_h1), xycoords='data', xytext=(nu_x_h1*offset_pts, nu_y_h1*offset_pts), textcoords='offset points', color='blue', fontweight='bold', ha='center', va='center')
-                    ax2.annotate(f'{slope_p_h1:.2f}', xy=(N_mid, err_p_mid_h1), xycoords='data', xytext=(np_x_h1*offset_pts, np_y_h1*offset_pts), textcoords='offset points', color='red', fontweight='bold', ha='center', va='center')
-            
-    ax1.set_xlabel(r'$N$')
-    ax1.set_ylabel(r'$L_2$-norm error')
-    ax1.set_title(r'Spatial convergence: $L_2$-norms')
-    ax1.grid(True, which="both", ls="--")
-    ax1.legend(handlelength=4.0)
-
-    ax2.set_xlabel(r'$N$')
-    ax2.set_ylabel(r'$H_1$-seminorm error')
-    ax2.set_title(r'Spatial convergence: $H_1$-seminorms')
-    ax2.grid(True, which="both", ls="--")
-    ax2.legend(handlelength=4.0)
-    
-    delta_str = f", $\delta=${delta}" if delta is not None else ""
-    plt.suptitle(rf'Cocquet Experiment Convergence Analysis: P1 and P2 (Re=500, c_in=0.5{delta_str})', fontsize=16)
+    delta_str = rf", $\delta=${delta}" if delta is not None else ""
+    plt.suptitle(rf'Cocquet Convergence ({os.path.basename(h5_file)}, Re=500, c_in=0.5{delta_str})', fontsize=15)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    
-    plot_file = os.path.join(results_dir, 'convergence_cocquet.png')
-    plt.savefig(plot_file, dpi=300)
-    print(f"Convergence plotted and saved to {plot_file}")
+
+    plot_file = os.path.splitext(h5_file)[0] + '.png'
+    plt.savefig(plot_file, dpi=200)
+    print(f"Plotted {plotted} group(s); saved to {plot_file}")
+
 
 if __name__ == "__main__":
-    plot_cocquet()
+    plot_cocquet(sys.argv[1] if len(sys.argv) > 1 else None)

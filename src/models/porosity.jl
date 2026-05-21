@@ -57,14 +57,14 @@ function _analyze_alpha(field::SmoothRadialPorosity, x)
     r = sqrt(r_sq)
     
     if r <= r1 || r >= r2
-        return alpha(field, x), VectorValue(0.0, 0.0), 0.0
+        return alpha(field, x), VectorValue(0.0, 0.0), 0.0, TensorValue(0.0, 0.0, 0.0, 0.0)
     end
-    
+
     eta = (r_sq - r1^2) / (r2^2 - r1^2)
     gamma_val = (2.0*eta - 1.0) / (eta * (1.0 - eta))
-    
+
     if gamma_val > 100.0 || gamma_val < -100.0
-        return alpha(field, x), VectorValue(0.0, 0.0), 0.0
+        return alpha(field, x), VectorValue(0.0, 0.0), 0.0, TensorValue(0.0, 0.0, 0.0, 0.0)
     end
     
     exp_g = exp(gamma_val)
@@ -84,7 +84,17 @@ function _analyze_alpha(field::SmoothRadialPorosity, x)
     
     lap_alpha_val = d2a_dr2 + (1.0/r) * da_dr
     grad_alpha_val = VectorValue(da_dr * (x[1]/r), da_dr * (x[2]/r))
-    return alpha_val, grad_alpha_val, lap_alpha_val
+
+    # Exact Hessian of the radial field α(r): for f(r), ∂_i∂_j f =
+    #   f''(r) x_i x_j / r² + f'(r) (δ_ij / r − x_i x_j / r³).
+    # Its trace equals f'' + f'/r = lap_alpha_val (checked), and it is symmetric.
+    x1 = x[1]; x2 = x[2]
+    r3 = r_sq * r
+    H11 = d2a_dr2 * (x1*x1) / r_sq + da_dr * (1.0/r - (x1*x1)/r3)
+    H22 = d2a_dr2 * (x2*x2) / r_sq + da_dr * (1.0/r - (x2*x2)/r3)
+    H12 = d2a_dr2 * (x1*x2) / r_sq - da_dr * (x1*x2)/r3
+    hess_alpha_val = TensorValue(H11, H12, H12, H22)
+    return alpha_val, grad_alpha_val, lap_alpha_val, hess_alpha_val
 end
 
 function grad_alpha(field::SmoothRadialPorosity, x)
@@ -93,4 +103,10 @@ end
 
 function lap_alpha(field::SmoothRadialPorosity, x)
     return _analyze_alpha(field, x)[3]
+end
+
+# Exact Hessian ∇²α (symmetric 2×2 TensorValue). Used by the manufactured-solution
+# forcing to evaluate ∇(∇·u_ex) analytically (no finite differences).
+function hess_alpha(field::SmoothRadialPorosity, x)
+    return _analyze_alpha(field, x)[4]
 end

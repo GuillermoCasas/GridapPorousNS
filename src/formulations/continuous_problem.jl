@@ -19,7 +19,10 @@ struct SigOp{R<:AbstractReactionLaw, Reg<:AbstractVelocityRegularization} <: Fun
     c_2::Float64
 end
 @inline function (op::SigOp)(u_v, grad_v, a_v, grad_a_v, h_v)
-    mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
+    # Physical reaction speed: constant floor only, NOT the mesh-dependent diffusive floor
+    # (which belongs to τ). Using effective_speed here injected an O(ν/h) drag that broke
+    # h-convergence for varying-porosity Forchheimer flows (Cocquet). See reaction_speed.
+    mag = reaction_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
     return sigma(op.law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag)
 end
 
@@ -31,7 +34,9 @@ struct DSigOp{R<:AbstractReactionLaw, Reg<:AbstractVelocityRegularization} <: Fu
     c_2::Float64
 end
 @inline function (op::DSigOp)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
-    mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
+    # Derivative of the physical reaction term: must differentiate σ evaluated at the SAME
+    # speed used in SigOp (reaction_speed), keeping ExactNewton exact for the residual.
+    mag = reaction_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
     return dsigma_du(op.law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag, du_v)
 end
 
@@ -147,19 +152,19 @@ end
 # law declares `min_quadrature_degree` (defaults to 0); the formulation
 # combines that with the formulation's base rule via `max`. Callers should
 # prefer this 3-arg form.
-get_quadrature_degree(::Type{PaperGeneralFormulation}, k_velocity::Int, rxn_law::AbstractReactionLaw) =
+get_quadrature_degree(::Type{<:PaperGeneralFormulation}, k_velocity::Int, rxn_law::AbstractReactionLaw) =
     max(compute_consistent_quadrature_degree(k_velocity), min_quadrature_degree(rxn_law, k_velocity))
-get_quadrature_degree(::Type{Legacy90d5749Mode}, k_velocity::Int, rxn_law::AbstractReactionLaw) =
+get_quadrature_degree(::Type{<:Legacy90d5749Mode}, k_velocity::Int, rxn_law::AbstractReactionLaw) =
     max(compute_consistent_quadrature_degree(k_velocity), min_quadrature_degree(rxn_law, k_velocity))
 
 # Legacy reaction-law-agnostic API. Returns the base rule only; misses any
 # reaction-specific bump (e.g. Forchheimer's ⌊k_v/2⌋). Retained for callers
 # that cannot supply a reaction law at the quadrature decision point.
-get_quadrature_degree(::Type{PaperGeneralFormulation}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
-get_quadrature_degree(::Type{Legacy90d5749Mode}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
+get_quadrature_degree(::Type{<:PaperGeneralFormulation}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
+get_quadrature_degree(::Type{<:Legacy90d5749Mode}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
 
-get_c1_c2(::Type{PaperGeneralFormulation}, k_velocity::Int) = compute_stabilization_constants(k_velocity)
-get_c1_c2(::Type{Legacy90d5749Mode}, k_velocity::Int) = compute_stabilization_constants(k_velocity)
+get_c1_c2(::Type{<:PaperGeneralFormulation}, k_velocity::Int) = compute_stabilization_constants(k_velocity)
+get_c1_c2(::Type{<:Legacy90d5749Mode}, k_velocity::Int) = compute_stabilization_constants(k_velocity)
 
 # Reusable Operators for Type Stability
 _get_dsigma_du_val(::ExactNewtonMode, law, u, α, h, du, reg, ν, c_1, c_2) = Operation(DSigOp(law, reg, ν, c_1, c_2))(u, ∇(u), α, ∇(α), h, du)

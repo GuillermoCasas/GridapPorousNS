@@ -141,18 +141,26 @@ end
 function run_convergence()
     println("--- Cocquet Convergence Analysis (N=200 Reference) ---")
     
-    base_config_path = joinpath(@__DIR__, "data", "test_config.json")
+    # Config filename may be passed as the first CLI argument (default: test_config.json),
+    # e.g. `julia run_convergence.jl paper_comparison.json` for the equal-order paper study.
+    config_file = length(ARGS) > 0 ? ARGS[1] : "test_config.json"
+    base_config_path = joinpath(@__DIR__, "data", config_file)
     base_config_dict = JSON3.read(read(base_config_path, String), Dict{String, Any})
-    
+
     # Store dynamic script parameters before strict schema parsing drops them or warns
     Re = Float64(base_config_dict["Re"])
     c_in = Float64(base_config_dict["c_in"])
     delta = Float64(get(base_config_dict, "outlet_truncation_delta", 0.0))
-    
+
     # Support mixed-order native schemas (e.g. Taylor-Hood P2/P1) directly from the JSON without equal-order script clamping
     k_v = base_config_dict["numerical_method"]["element_spaces"]["k_velocity"]
     k_p = base_config_dict["numerical_method"]["element_spaces"]["k_pressure"]
-    
+
+    # Optional list of (k_velocity, k_pressure) element pairs to sweep — e.g. the
+    # stabilized equal-order pairs [[1,1],[2,2]] plus Taylor-Hood [2,1]. Defaults to the
+    # single pair from element_spaces above. Results are stored per pair as P<kv>P<kp>.
+    element_pairs = get(base_config_dict, "element_pairs", [[k_v, k_p]])
+
     # Remove script variables to prevent strict-schema enforcement warnings during formal validation API loading
     delete!(base_config_dict, "Re")
     delete!(base_config_dict, "c_in")
@@ -160,6 +168,7 @@ function run_convergence()
         delete!(base_config_dict, "k_convergence_list")
     end
     delete!(base_config_dict, "outlet_truncation_delta")
+    delete!(base_config_dict, "element_pairs")
     
     # All physical schemas and geometrical limits are universally driven by the native test JSON payload
     # Temporary override to prevent strict parser crashing on dynamic iteration array
@@ -183,7 +192,11 @@ function run_convergence()
         mkdir(results_dir)
     end
     
-    h5_path = joinpath(results_dir, "convergence_cocquet.h5")
+    # Default output preserves the canonical name for test_config.json; other configs get
+    # their own file (e.g. paper_comparison.json -> convergence_paper_comparison.h5).
+    h5_name = config_file == "test_config.json" ? "convergence_cocquet.h5" :
+              "convergence_$(splitext(config_file)[1]).h5"
+    h5_path = joinpath(results_dir, h5_name)
     
     # Initialize the file struct once and close it immediately to free lock
     h5open(h5_path, "w") do file
@@ -194,8 +207,16 @@ function run_convergence()
     nm_dict = get(base_config_dict, "numerical_method", Dict())
     stab_dict = get(nm_dict, "stabilization", Dict())
     methods = as_list(get(stab_dict, "method", ["ASGS", "OSGS"]))
-    
-    for method in methods
+
+    for ep in element_pairs
+      k_v, k_p = Int(ep[1]), Int(ep[2])
+      # Drive the element order for this sweep entry; build_solver reads it back from the dict.
+      base_config_dict["numerical_method"]["element_spaces"]["k_velocity"] = k_v
+      base_config_dict["numerical_method"]["element_spaces"]["k_pressure"] = k_p
+      println("\n##########################################################################################")
+      println("[#] ELEMENT PAIR P$(k_v)/P$(k_p)")
+      println("##########################################################################################")
+      for method in methods
             println("\n\n==========================================================================================")
             println("[!] INITIATING BENCHMARK SEQUENCE | INTERPOLATION: P$(k_v)/P$(k_p) | STABILIZATION: $method")
             println("==========================================================================================")
@@ -292,7 +313,8 @@ function run_convergence()
                 attributes(g)["total_iters"] = sum(eval_iters)
                 attributes(g)["outlet_truncation_delta"] = delta
             end
-    end
+      end # end method
+    end # end element_pairs
     println("\nConvergence Data Generated and Exported to convergence_cocquet.h5")
 end
 
