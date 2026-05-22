@@ -1,0 +1,11 @@
+{
+    "fold_base_candidates": [320, 512, 768, 1024],
+    "fold_fine_ladder": [512, 768, 1024, 1536],
+    "fold_maxit": 60,
+    "slow_base_candidates": [80],
+    "slow_fine_ladder": [160, 320],
+    "slow_maxit": 400,
+    "mesh_maxit": 150,
+    "cont_nsteps": 30,
+    "cont_minr": 0.03
+}

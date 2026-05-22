@@ -1,0 +1,13 @@
+{
+    "target": { "Re": 1000000.0, "Da": 1.0, "alpha_0": 0.05 },
+    "continuation": {
+        "axis": "alpha",
+        "start": 1.0,
+        "nsteps": 30,
+        "adaptive": true,
+        "min_step_ratio": 3e-2,
+        "max_iters_per_step": 60
+    },
+    "element_spaces": { "k_velocity": 1, "k_pressure": 1 },
+    "mesh": { "convergence_partitions": [80, 160, 320], "element_type": "QUAD" }
+}

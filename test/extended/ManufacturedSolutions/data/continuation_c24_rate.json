@@ -1,0 +1,7 @@
+{
+    "target": { "Re": 1000000.0, "Da": 1.0, "alpha_0": 0.05 },
+    "continuation": { "nsteps": 32, "min_step_ratio": 3e-2, "max_iters_per_step": 80 },
+    "mesh_continuation": { "base_N": 512, "fine_Ns": [768, 1024], "mesh_max_iters": 120 },
+    "element_spaces": { "k_velocity": 1, "k_pressure": 1 },
+    "mesh": { "element_type": "QUAD" }
+}

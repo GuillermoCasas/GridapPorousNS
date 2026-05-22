@@ -19,25 +19,33 @@ struct SafeNewtonSolver <: NonlinearSolver
     max_linesearch_iterations::Int
     linesearch_contraction_factor::Float64
     mode::Symbol  # :newton (Armijo on Jacobian-scaled merit) or :picard (monotone residual)
+    # [honest-exit] A noise-floor stop (‖R‖∞ ≤ stagnation_noise_floor) is reported as CONVERGED
+    # only if ‖R‖∞ ≤ noise_floor_success_max_ftol_multiple · ftol. Default Inf ⇒ gate DISABLED
+    # (legacy: any noise-floor stop is "success"). A finite value (e.g. 10.0) rejects high-Re
+    # fold stalls — where ‖R‖≈1e-5 sits ~10²–10³× above ftol — from masquerading as a true root.
+    noise_floor_success_max_ftol_multiple::Float64
 end
 
-# Convenience constructor: keeps existing positional Newton call sites untouched,
-# while letting Picard call sites opt in with `mode = :picard`.
+# Convenience constructor: keeps existing positional call sites untouched (the honest-exit gate
+# defaults to Inf = disabled, so legacy behaviour is bit-identical unless a caller opts in).
 function SafeNewtonSolver(ls::LinearSolver, max_iters::Int, max_increases::Int,
                           xtol::Float64, ftol::Float64, linesearch_alpha_min::Float64,
                           c1::Float64, divergence_merit_factor::Float64,
                           stagnation_noise_floor::Float64, max_linesearch_iterations::Int,
-                          linesearch_contraction_factor::Float64; mode::Symbol = :newton)
+                          linesearch_contraction_factor::Float64; mode::Symbol = :newton,
+                          noise_floor_success_max_ftol_multiple::Float64 = Inf)
     return SafeNewtonSolver(ls, max_iters, max_increases, xtol, ftol, linesearch_alpha_min,
                             c1, divergence_merit_factor, stagnation_noise_floor,
-                            max_linesearch_iterations, linesearch_contraction_factor, mode)
+                            max_linesearch_iterations, linesearch_contraction_factor, mode,
+                            noise_floor_success_max_ftol_multiple)
 end
 
 function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig; mode::Symbol = :newton)
     return SafeNewtonSolver(
         ls, cfg.newton_iterations, cfg.max_increases, cfg.xtol, cfg.ftol,
         cfg.linesearch_alpha_min, cfg.armijo_c1, cfg.divergence_merit_factor, cfg.stagnation_noise_floor,
-        cfg.max_linesearch_iterations, cfg.linesearch_contraction_factor; mode=mode
+        cfg.max_linesearch_iterations, cfg.linesearch_contraction_factor; mode=mode,
+        noise_floor_success_max_ftol_multiple=cfg.noise_floor_success_max_ftol_multiple
     )
 end
 
@@ -60,6 +68,7 @@ function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing,
         nls.max_linesearch_iterations,
         nls.linesearch_contraction_factor,
         isnothing(mode) ? nls.mode : mode,
+        nls.noise_floor_success_max_ftol_multiple,
     )
 end
 
@@ -69,6 +78,7 @@ function check_solver_parameters(s::SafeNewtonSolver)
     if s.xtol <= 0.0 || s.ftol <= 0.0 || s.stagnation_noise_floor <= 0.0 throw(ArgumentError("Tolerances must be > 0.")) end
     if s.linesearch_alpha_min <= 0.0 || s.linesearch_alpha_min > 1.0 throw(ArgumentError("alpha_min must be in (0, 1].")) end
     if !(s.mode in (:newton, :picard)) throw(ArgumentError("SafeNewtonSolver mode must be :newton or :picard, got $(s.mode).")) end
+    if s.noise_floor_success_max_ftol_multiple < 1.0 throw(ArgumentError("noise_floor_success_max_ftol_multiple must be >= 1.0 (Inf disables the honest-exit gate).")) end
 end
 
 struct SafeSolverResult
@@ -178,7 +188,8 @@ function eval_safeguard_termination_bounds!(solver::SafeNewtonSolver, state::Saf
     end
 
     if !state.ls_success
-        if state.norm_b_new_inf <= solver.stagnation_noise_floor
+        if state.norm_b_new_inf <= solver.stagnation_noise_floor &&
+           state.norm_b_new_inf <= solver.noise_floor_success_max_ftol_multiple * solver.ftol
             return "stagnation_noise_floor_reached", true, true
         end
         println("  [Linesearch Depleted] Geometric step fraction alpha vanished below minimum limits without sufficient mathematical descent. Aborting local sequence.")
@@ -210,7 +221,8 @@ function eval_safeguard_termination_bounds!(solver::SafeNewtonSolver, state::Saf
     end
     
     if state.step_norm <= solver.xtol
-        if state.norm_b_new_inf <= solver.stagnation_noise_floor
+        if state.norm_b_new_inf <= solver.stagnation_noise_floor &&
+           state.norm_b_new_inf <= solver.noise_floor_success_max_ftol_multiple * solver.ftol
             return "stagnation_noise_floor_reached", true, true
         end
         println("  [Coordinate Stagnation] Step update magnitude collapsed below relative machine tracking limits (xtol = $(solver.xtol)). Algebraic progress saturated.")
@@ -218,7 +230,8 @@ function eval_safeguard_termination_bounds!(solver::SafeNewtonSolver, state::Saf
     end
     
     if state.i == solver.max_iters
-        if state.norm_b_new_inf <= solver.stagnation_noise_floor
+        if state.norm_b_new_inf <= solver.stagnation_noise_floor &&
+           state.norm_b_new_inf <= solver.noise_floor_success_max_ftol_multiple * solver.ftol
             return "stagnation_noise_floor_reached", true, true
         end
         println("  [Iteration Cap] Sequence hit maximum bounded loops ($(state.i)) without geometrically saturating non-linear constraints.")

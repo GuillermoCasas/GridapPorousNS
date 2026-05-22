@@ -77,6 +77,7 @@ Base.@kwdef struct SolverConfig
     condition_noise_floor_baseline::Float64
     condition_noise_floor_absolute_min::Float64
     condition_noise_floor_safety_factor::Float64
+    noise_floor_success_max_ftol_multiple::Float64
     linesearch_alpha_min::Float64
     max_linesearch_iterations::Int
     linesearch_contraction_factor::Float64
@@ -132,6 +133,7 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.xtol > 0 "Solver xtol must be > 0"
     @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"
     @assert sol.divergence_merit_factor >= 1.0 "Divergence merit factor must be >= 1.0"
+    @assert sol.noise_floor_success_max_ftol_multiple >= 1.0 "noise_floor_success_max_ftol_multiple must be >= 1.0 (use a large value / Inf to disable the honest-exit gate)"
     @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"
     @assert sol.dynamic_newton_re_threshold >= 1.0 "dynamic_newton_re_threshold must be >= 1"
     @assert sol.dynamic_newton_re_iterations >= 1 "dynamic_newton_re_iterations must be >= 1"

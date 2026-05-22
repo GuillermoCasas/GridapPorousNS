@@ -507,8 +507,12 @@ function run_mms(config_file="test_config.json")
                                     local_newton_it = max(local_newton_it, config.numerical_method.solver.dynamic_newton_re_iterations)
                                 end
 
-                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard)
-                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_newton_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract)
+                                # [honest-exit] gate: a noise-floor stop counts as converged only if
+                                # ‖R‖∞ ≤ k_nf · dynamic_ftol. Read from config (base default 1e30 = disabled;
+                                # the Phase-1 sweep configs set 10.0 to reject high-Re fold stalls).
+                                k_nf = config.numerical_method.solver.noise_floor_success_max_ftol_multiple
+                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard, noise_floor_success_max_ftol_multiple=k_nf)
+                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_newton_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; noise_floor_success_max_ftol_multiple=k_nf)
                                 
                                 solver_picard = FESolver(nls_picard)
                                 solver_newton = FESolver(nls_newton)
@@ -613,7 +617,11 @@ function run_mms(config_file="test_config.json")
                                         g["eval_iters"] = res["eval_iters"]
                                         g["eval_eps"] = res["eval_eps"]
                                         g["eval_residuals"] = res["eval_residuals"]
-                                        
+                                        # Per-mesh convergence status for the detection step (HDF5 can't store
+                                        # Union{Bool,Nothing}, so encode: -1=nothing/MMS-disabled, 0=false, 1=true).
+                                        g["overall_verification_success"] = Int8.(res["overall_verification_success"])
+                                        g["mms_plateau_success"] = Int8[x === nothing ? Int8(-1) : (x ? Int8(1) : Int8(0)) for x in res["mms_plateau_success"]]
+
                                         attributes(g)["total_time_s"] = sum(res["eval_times"])
                                         attributes(g)["total_iters"] = sum(res["eval_iters"])
                                         attributes(g)["Re"] = Float64(Re)

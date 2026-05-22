@@ -430,6 +430,14 @@
                 10.0
               ]
             },
+            "noise_floor_success_max_ftol_multiple": {
+              "type": "number",
+              "description": "[honest-exit] A noise-floor solver stop is reported as CONVERGED only if the final residual inf-norm is <= this multiple of the (dynamic) ftol. Must be >= 1. Use a very large value (e.g. 1e30) to disable the gate (legacy behaviour: any noise-floor stop counts as success); use a finite value (e.g. 10.0) to reject high-Re fold stalls where the residual sits ~10^2-10^3x above ftol from masquerading as a true root.",
+              "examples": [
+                10.0,
+                1e30
+              ]
+            },
             "max_linesearch_iterations": {
               "type": "integer",
               "description": "The strict upper limit mapped structurally dynamically onto exact armijo linesearch cycles avoiding topological float exhaustion.",

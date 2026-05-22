@@ -65,6 +65,7 @@
             "condition_noise_floor_baseline": 1e-16,
             "condition_noise_floor_absolute_min": 1e-8,
             "condition_noise_floor_safety_factor": 10.0,
+            "noise_floor_success_max_ftol_multiple": 1e30,
             "max_linesearch_iterations": 15,
             "linesearch_contraction_factor": 0.5,
             "run_diagnostics": false,
