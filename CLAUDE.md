@@ -35,10 +35,17 @@ The runners emit a warning when a file's runtime crosses the next tier's bound â
 cd test/extended/ManufacturedSolutions
 julia --project=../../.. run_test.jl test_config.json
 
-# Cocquet reference experiment.
+# Cocquet reference experiment (convergence study; compares VMS P1/P1 & P2/P2 against the
+# unstabilized Galerkin Taylor-Hood P2/P1 "Cocquet" method via the comparison_runs config).
 cd test/extended/CocquetExperiment
-julia --project=../../.. run_test.jl
+julia --project=../../.. run_convergence.jl paper_comparison.json
+python plot_convergence.py
 ```
+
+The sibling directories `test/extended/Cocquet{Alpha1,Deviatoric,LinearReaction,AllDirichlet}` are
+single-variable diagnostic flips off this benchmark (see `docs/cocquet_convergence_analysis.md`);
+`test/extended/CocquetFormMMS` is the manufactured-solution sibling. The exact Cocquet (unstabilized
+Galerkin) formulation is documented in `theory/cocquet_formulation.tex`.
 
 ### Single simulation from a JSON config
 

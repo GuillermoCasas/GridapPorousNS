@@ -1,14 +1,9 @@
 {
-    "_comment": "Cocquet convergence study for comparison with Cocquet et al. (2020), Figs 2-3: same physical case (Re=500, c_in=0.5, transverse porosity). THREE-WAY comparison in one plot via comparison_runs: our VMS-stabilized equal-order P1/P1 and P2/P2 (method ASGS), and the EXACT Cocquet method — unstabilized Galerkin Taylor-Hood P2/P1 with P1 porosity (method Galerkin, run via galerkin_driver.jl). Reference N=200 (matching the paper) over coarse N in {10,20,40,80}. outlet_truncation_delta=0 (whole domain). h_floor_weight=0 (reaction-speed fix). Run: julia --project=../../.. run_convergence.jl paper_comparison.json",
+    "_comment": "alpha=1 CONTROL — IDENTICAL to CocquetExperiment/paper_comparison.json (Re=500, c_in=0.5, mixed BC with traction outlet, equal-order P1/P1 and P2/P2, N=200 reference over coarse N in {10,20,40,80}, h_floor_weight=0) EXCEPT the porosity is overridden in run_convergence.jl to alpha=1 everywhere. At alpha=1 the generalized formulation reduces to plain Navier-Stokes (reaction sigma=0, no porosity weighting, porosity interpolation exact). Optimal convergence here proves the mixed-BC/corner and core solver are sound and localizes the benchmark's underperformance to the generalized formulation. Run: julia --project=../../.. run_convergence.jl alpha1.json",
     "Re": 500.0,
     "c_in": 0.5,
     "k_convergence_list": [
         1
-    ],
-    "comparison_runs": [
-        { "k_velocity": 1, "k_pressure": 1, "method": "ASGS" },
-        { "k_velocity": 2, "k_pressure": 2, "method": "ASGS" },
-        { "k_velocity": 2, "k_pressure": 1, "method": "Galerkin", "porosity_order": 1 }
     ],
     "element_pairs": [
         [
@@ -90,6 +85,6 @@
     },
     "output": {
         "directory": "results",
-        "basename": "cocquet_paper_cmp"
+        "basename": "cocquet_alpha1"
     }
 }

@@ -1,14 +1,9 @@
 {
-    "_comment": "Cocquet convergence study for comparison with Cocquet et al. (2020), Figs 2-3: same physical case (Re=500, c_in=0.5, transverse porosity). THREE-WAY comparison in one plot via comparison_runs: our VMS-stabilized equal-order P1/P1 and P2/P2 (method ASGS), and the EXACT Cocquet method — unstabilized Galerkin Taylor-Hood P2/P1 with P1 porosity (method Galerkin, run via galerkin_driver.jl). Reference N=200 (matching the paper) over coarse N in {10,20,40,80}. outlet_truncation_delta=0 (whole domain). h_floor_weight=0 (reaction-speed fix). Run: julia --project=../../.. run_convergence.jl paper_comparison.json",
+    "_comment": "VISCOUS-OPERATOR FLIP — IDENTICAL to CocquetExperiment/paper_comparison.json (Re=500, c_in=0.5, varying transverse porosity, Forchheimer reaction, mixed BC with traction outlet, equal-order P1/P1 and P2/P2, N=200 reference over coarse N in {10,20,40,80}, h_floor_weight=0) EXCEPT viscous_operator_type is DeviatoricSymmetric (the manufactured-solutions/canonical operator) instead of Cocquet's SymmetricGradient. This is the ONLY change vs the benchmark. If P2/P2 recovers, the SymmetricGradient operator's natural outlet traction is implicated; if still capped, the mixed-BC corner is operator-independent. Run: julia --project=../../.. run_convergence.jl deviatoric.json",
     "Re": 500.0,
     "c_in": 0.5,
     "k_convergence_list": [
         1
-    ],
-    "comparison_runs": [
-        { "k_velocity": 1, "k_pressure": 1, "method": "ASGS" },
-        { "k_velocity": 2, "k_pressure": 2, "method": "ASGS" },
-        { "k_velocity": 2, "k_pressure": 1, "method": "Galerkin", "porosity_order": 1 }
     ],
     "element_pairs": [
         [
@@ -42,7 +37,7 @@
     "outlet_truncation_delta": 0.0,
     "interpolate_solution_to_coarser_meshes": false,
     "numerical_method": {
-        "viscous_operator_type": "SymmetricGradient",
+        "viscous_operator_type": "DeviatoricSymmetric",
         "stabilization": {
             "method": [
                 "ASGS"
@@ -90,6 +85,6 @@
     },
     "output": {
         "directory": "results",
-        "basename": "cocquet_paper_cmp"
+        "basename": "cocquet_deviatoric"
     }
 }

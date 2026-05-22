@@ -1,7 +1,7 @@
-# test/extended/CocquetExperiment/plot_convergence.py
+# test/extended/CocquetAlpha1/plot_convergence.py
 #
 # Usage:
-#   python plot_convergence.py                          # plots results/convergence_paper_comparison.h5
+#   python plot_convergence.py                          # plots results/convergence_alpha1.h5
 #   python plot_convergence.py some_other.h5            # any file under results/ (or an absolute path)
 #
 # Plots every (method / P<kv>P<kp>) group present in the file — equal-order P1/P1, P2/P2 and
@@ -18,7 +18,7 @@ import numpy as np
 def _resolve_h5(arg):
     results_dir = os.path.join(os.path.dirname(__file__), 'results')
     if arg is None:
-        return os.path.join(results_dir, 'convergence_paper_comparison.h5')
+        return os.path.join(results_dir, 'convergence_alpha1.h5')
     if os.path.isabs(arg) or os.path.exists(arg):
         return arg
     # bare name (with or without .h5) resolved under results/
@@ -76,14 +76,12 @@ def plot_cocquet(h5_arg=None):
             err_u_h1 = np.array(group["errors_h1_u"]); err_p_h1 = np.array(group["errors_h1_p"])
 
             marker = markers[midx % len(markers)]; midx += 1
-            # Distinct line style per method: ASGS solid, OSGS dashed, Galerkin (Cocquet) dotted.
-            ls = '-' if method == "ASGS" else (':' if method == "Galerkin" else '--')
+            ls = '-' if method == "ASGS" else '--'
 
             # Optimal rates: velocity ~ (kv+1) in L2, kv in H1; pressure ~ (kp+1) in L2, kp in H1.
             opt_u_l2, opt_u_h1 = kv + 1, kv
             opt_p_l2, opt_p_h1 = kp + 1, kp
-            # Label the unstabilized Galerkin Taylor-Hood run as the Cocquet reference method.
-            tag = f"Cocquet(Galerkin) P{kv}/P{kp}" if method == "Galerkin" else f"{method} P{kv}/P{kp}"
+            tag = f"{method} P{kv}/P{kp}"
 
             ax1.loglog(N_list, err_u, color='blue', marker=marker, linestyle=ls, lw=2, ms=8,
                        label=fr'{tag} $L_2$ Vel (opt {opt_u_l2})')

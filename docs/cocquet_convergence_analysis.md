@@ -184,3 +184,165 @@ Three controlled experiments separate the candidate causes (metric, discretizati
 **Status of (c): documented possibility, not yet proven.** The clean confirming experiment would be a **Neumann-outlet MMS** — manufacture a solution that satisfies the traction-free condition and measure against the exact field; if velocity $L^2$ then drops from $\approx 3$ (Dirichlet MMS) to $\approx 2$, the BC attribution is established. This is left as the next step. The earlier per-step "L² slope < H¹ slope" observation does **not** by itself prove a measurement defect (Poincaré bounds the L² *value*, not its rate), so it is not relied upon.
 
 **Practical takeaway:** the equal-order method converges optimally in the energy ($H^1$) norm, which is the rate the VMS theory guarantees; the velocity-$L^2$ extra order is realized for smooth Dirichlet problems and is reduced — genuinely, matching the literature — by the benchmark's mixed boundary conditions.
+
+---
+
+## 10. Investigation Phase 9: Root cause PROVEN — Dirichlet/Neumann corner singularity at the outlet
+
+Phase 8 left the boundary-condition mechanism as a "documented possibility, not yet proven." Phase 9 proves it directly — by a more decisive route than the Neumann-outlet MMS proposed there — using a ladder of **single-variable flips off the benchmark**, plus **spatial localization of the error**.
+
+### The test ladder
+
+Each test changes exactly one thing relative to `CocquetExperiment` (the benchmark: varying porosity interpolated at order $k_v$, Forchheimer reaction, SymmetricGradient viscous, mixed BC, self-reference vs $N=200$):
+
+| Test (directory) | The one change | Isolates |
+| :-- | :-- | :-- |
+| `CocquetAlpha1` | porosity $\alpha\equiv1$ (⇒ plain NS: $\sigma=0$, no porosity weighting, porosity exact) | the entire generalized formulation + quadrature |
+| `CocquetAllDirichlet` (Flip B) | outlet → Dirichlet (inlet parabola; corners become Dirichlet–Dirichlet) | the mixed-BC corner |
+| `CocquetDeviatoric` | viscous → DeviatoricSymmetric (the MMS/canonical operator) | the SymmetricGradient outlet traction specifically |
+| `CocquetLinearReaction` | `sigma_nonlinear = 0` (Forchheimer $|u|$ term off) | the nonlinear reaction |
+
+### Decisive result 1 — α≡1 (plain Navier–Stokes) is STILL capped
+
+`CocquetAlpha1` (mixed BC, $\alpha\equiv1$, self-reference, $N\in\{10,20,40,80\}$ vs ref $N=200$):
+
+| Pair | velocity $L^2$ slopes | velocity $H^1$ slopes |
+| :-- | :-- | :-- |
+| P1/P1 | 1.78, 1.85, 1.91 → $\approx O(h^2)$ | 0.81, 0.86, 0.81 → $\approx 0.85$ |
+| P2/P2 | **1.45, 1.25, 1.49** → $\approx 1.4$ (capped) | **0.84, 0.76, 0.78** → $\approx 0.78$ (capped) |
+
+P2/P2 is capped at essentially the **same** rates as the benchmark (≈1.3 / ≈0.8) **even though porosity, the porosity-dependent reaction, and the nonlinear drag are all gone**. This **exonerates the generalized formulation** as the cause of the cap. It also **exonerates quadrature**: at $\alpha\equiv1$ the integrands are trivial polynomials (no rational $((1-\alpha)/\alpha)^2$, no $|u|$), which a degree-9 rule over-resolves, yet P2 is still capped. (Confirmed independently: bumping the benchmark's quadrature degree $9\to21$ left P1/P1 bit-identical, $1.82/1.83/1.86$.)
+
+### Decisive result 2 — the error is localized at the outlet corners
+
+Spatial localization of the **α≡1, P2/P2, N=80** error field (`results/cocquet_ASGS_P2P2_N80.vtu`, fields `e_u`, `e_p`), binning $\lVert e\rVert^2$ by distance to the two wall/outlet corners $(2,0),(2,1)$:
+
+| Field / pair | $\lVert e\rVert^2$ within $R=0.1$ of outlet corners (corner region = 1.6% of area) |
+| :-- | :-- |
+| velocity, P1/P1 | 37% |
+| velocity, **P2/P2** | **50%** |
+| pressure, P1/P1 | 72% |
+| pressure, **P2/P2** | **98%** |
+| any field, inlet corners $(0,0),(0,1)$ | **0%** |
+
+The maximum $|e_u|$ sits exactly at the nodes adjacent to $(2,1)$ and $(2,0)$. The error is overwhelmingly at the **outlet** corners — where no-slip Dirichlet meets the traction-free Neumann outlet — and **absent at the inlet** corners (Dirichlet–Dirichlet, compatible data, since the inflow parabola vanishes at $y=0,1$). The pressure is the most singular field ($p\sim r^{s-1}$): for P2 essentially **all** (98%) of the pressure error is at the corners.
+
+### Why only quadratics suffer — the masking effect (uses the P1-vs-P2 clue)
+
+A corner singularity $u\in H^{1+s}$ caps the rate at $\approx s$ (energy) / $\approx 2s$ ($L^2$) **independent of element order**; the observed $H^1\approx0.8$ for *both* P1 and P2 pins $s\approx0.8$. The corner contribution to the global error is a fixed $O(h^{2s})$. For **P1** the interior approximation error is $O(h^2)$ — large enough to dominate, so the corner is **masked** and P1 looks near-optimal (only 37% of its error is at the corner). For **P2** the interior error is $O(h^3)$ — so small that the $O(h^{2s})$ corner term takes over (50% of velocity, 98% of pressure), collapsing the global rate. *"Only quadratics are suboptimal" is therefore the signature of a fixed regularity ceiling, not an order-specific bug* — and `CocquetFormMMS` running P2 optimally (Phase 8b) independently rules out any P2-specific assembly/quadrature defect.
+
+### Reconciliation with Cocquet et al.
+
+The paper reports optimal $O(h^2)$ for Taylor–Hood P2/P1. Our equal-order method appears **more corner-sensitive**, and the 98%-pressure-at-corner figure points to why: the equal-order scheme **stabilizes a singular pressure** (the $\tau_2$ mass term), whereas inf-sup-stable Taylor–Hood imposes no pressure stabilization. The corner pressure singularity therefore couples into the equal-order velocity more strongly. (A factor-$\sqrt2$ inconsistency in the triangle $h$ definition between this driver, `√(area)`, and the MMS driver, `√(2·area)`, rescales $\tau$ by a constant and cannot change a slope; noted for cleanup, not a cause.)
+
+### Anticipated diagnostics by Flip-test outcome
+
+The two running flips are now **confirmatory**. Expected outcomes and what each would establish:
+
+**`CocquetAllDirichlet` (Flip B — outlet made Dirichlet, corner removed):**
+- **P2/P2 recovers toward $O(h^3)$ (L²) / $O(h^2)$ (H¹)** → *expected, and definitive*: with porosity/reaction held at the benchmark values and only the corner removed, recovery proves the mixed-BC corner is the sole cause. Combined with α≡1, the chain is closed: corner, independent of the generalized formulation.
+- **P2/P2 stays $\approx1.4$** → would be surprising and would *contradict* the spatial-localization evidence; it would force re-opening the **interpolated-porosity** hypothesis (Flip B keeps interpolated varying $\alpha_h$ + self-reference, whereas the optimal `CocquetFormMMS` has exact $\alpha$ + exact solution). Next step then = **Flip A** (exact porosity, mixed BC) and a self-reference-vs-exact comparison. (Low prior, given the error is demonstrably at the corner in plain NS.)
+
+**`CocquetDeviatoric` (viscous → DeviatoricSymmetric, mixed BC kept):**
+- **P2/P2 recovers** → the **SymmetricGradient outlet traction** $(2\nu S(u)-pI)\,n=0$ specifically aggravates the corner; the deviatoric/"do-nothing" outflow has a milder (or absent) singularity. *Practical fix available*: change the outlet formulation.
+- **P2/P2 stays capped** → the corner is **operator-independent** (any Dirichlet/Neumann right-angle outlet produces it); only removing the Neumann outlet (Flip B) or grading/rounding the corner helps.
+
+**`CocquetLinearReaction` ($\sigma_{nl}=0$):** expected **unchanged** ($\approx1.4$) → nonlinear reaction contributes nothing to the cap. A change would flag an interaction between the $|u|$ kink (non-smooth where $u=0$ on walls) and the corner.
+
+### Practical remedies (if optimal benchmark P2 rates are desired)
+
+None of these are bug fixes — they are choices about geometry/measurement: **(i)** corner-graded mesh refinement to resolve the singularity; **(ii)** measure the norm away from the corner (the `outlet_truncation_delta>0` truncation did exactly this); **(iii)** round/chamfer the outlet corners; **(iv)** if Deviatoric recovers, adopt the deviatoric/do-nothing outflow. The energy-norm ($H^1$) rate the VMS theory guarantees is already met; the velocity-$L^2$ extra order is genuinely BC-limited.
+
+### Confirmatory flip results
+
+All **mixed-BC** variants ($N\in\{10,20,40,80\}$ vs ref $N=200$) — regardless of porosity, reaction, or viscous operator — collapse to the **same** P2/P2 cap, while P1/P1 stays near-optimal:
+
+| Test | one change vs benchmark | P2/P2 velocity $L^2$ slopes | P2/P2 velocity $H^1$ |
+| :-- | :-- | :-- | :-- |
+| `CocquetExperiment` (benchmark) | — | 1.39, 1.13, 1.43 | ≈0.8 |
+| `CocquetAlpha1` | $\alpha\equiv1$ (plain NS) | 1.45, 1.25, 1.49 | 0.84, 0.76, 0.78 |
+| `CocquetDeviatoric` | viscous → DeviatoricSymmetric | 1.26, 1.11, 1.44 | 0.78, 0.75, 0.79 |
+| `CocquetLinearReaction` | $\sigma_{nl}=0$ | 1.25, 1.14, 1.46 | 0.80, 0.77, 0.79 |
+
+(All P1/P1 stay $\approx1.8$–$1.9$ in $L^2$ / $\approx0.85$ in $H^1$.) Interpretation per the decision tree:
+- **Deviatoric stays capped** ⇒ the corner is **operator-independent** — not specific to the SymmetricGradient outlet traction. Changing the outlet *operator* cannot fix it.
+- **LinearReaction unchanged** ⇒ the nonlinear Forchheimer $|u|$ term contributes nothing to the cap.
+- **α≡1 capped** ⇒ the entire generalized formulation (and quadrature) is irrelevant to the cap.
+
+Every mixed-BC case is pinned at P2/P2 $L^2\approx1.3$–$1.4$, consistent with one shared mechanism: the outlet Dirichlet/Neumann corner singularity.
+
+### The clincher — removing the corner recovers P2
+
+`CocquetAllDirichlet` (Flip B — outlet made Dirichlet with the inlet parabola, so the wall/outlet corners become Dirichlet–Dirichlet; **interpolated varying porosity and Forchheimer reaction kept at benchmark values**):
+
+| Pair | velocity $L^2$ slopes | velocity $H^1$ slopes | pressure $L^2$ slopes |
+| :-- | :-- | :-- | :-- |
+| P1/P1 | 1.52, 1.69, 1.98 → $O(h^2)$ | 0.57, 0.77, 0.86 → $O(h)$ | 1.73, 1.76, 1.94 |
+| **P2/P2** | **1.99, 2.53, 2.84** → $O(h^3)$ | **1.12, 1.60, 1.86** → $O(h^2)$ | 1.56, 1.79, 1.90 |
+
+P2/P2 **recovers** ($L^2: 1.99\to2.53\to2.84$, $H^1: 1.12\to1.60\to1.86$), versus the flat $\approx1.3$/$\approx0.8$ of *every* mixed-BC variant. Since the **only** change from the benchmark is the outlet boundary condition, the corner attribution is **fully closed**.
+
+**Important nuance (the recovery is pre-asymptotic, not yet clean-optimal).** The all-Dirichlet slopes *accelerate* (they climb toward $3$/$2$ but reach only $2.84$/$1.86$ at $N=80$), and the coarse-mesh errors are actually *higher* than the benchmark's (e.g. $N=10$: $7.7\times10^{-4}$ vs $2.3\times10^{-4}$) — the imposed double-parabola flow has features the coarse mesh resolves poorly. This pre-asymptotic behaviour is **shared with the exact-solution `CocquetFormMMS`** (P2 $L^2: 2.39\to2.77\to2.86$, $H^1\to1.92$ — also climbing, not flat at $3$/$2$): at Re=500 on $N\le80$ meshes, P2 is simply not in the asymptotic regime even for a smooth Dirichlet problem. So the robust, mechanism-level finding is the **qualitative** contrast — mixed-BC P2 is *stuck flat and never improves* (a hard regularity ceiling), all-Dirichlet P2 *climbs steeply toward optimal*. Demonstrating *clean* $O(h^3)$/$O(h^2)$ would require finer meshes ($N=160$+); the mechanism (corner) is nonetheless conclusive from the flat-vs-climbing contrast + the corner error-localization + operator/reaction-independence.
+
+**Status: RESOLVED.** The benchmark's P2/P2 sub-optimality is a **Dirichlet/Neumann corner singularity at the traction outlet**, proven by four independent lines of evidence:
+1. **α≡1 (plain NS) is still capped** → not the generalized formulation, not quadrature.
+2. **Error localization** → 50% of velocity / 98% of pressure error within $R=0.1$ of the outlet corners (0% at the compatible inlet corners), in plain NS.
+3. **Operator/reaction flips stay capped** → `CocquetDeviatoric` (≈1.3) and `CocquetLinearReaction` (≈1.3) show the cap is independent of viscous operator and nonlinear reaction.
+4. **Removing the corner recovers it** → `CocquetAllDirichlet` P2/P2 $L^2\to2.84$.
+
+It bites only quadratics because a fixed regularity ceiling ($s\approx0.8$) is masked by P1's larger interior error but exposed by P2's much smaller one. The energy-norm ($H^1$) rate the VMS theory guarantees is met on every variant; the velocity-$L^2$ extra order is genuinely boundary-limited, matching Cocquet et al.'s own observation. Remedies (corner-graded mesh, measuring away from the corner via `outlet_truncation_delta>0`, or rounding the corner) are modelling/measurement choices, not bug fixes. Associated tests: `test/extended/{CocquetAlpha1,CocquetDeviatoric,CocquetLinearReaction,CocquetAllDirichlet}`.
+
+**Mesh-size (`h`) consistency fix.** All Cocquet drivers now compute the τ characteristic length as $\sqrt{2\cdot\text{area}}=1/N$ for triangles (the structured mesh parameter), matching `test/extended/CocquetFormMMS`. Previously this driver used $\sqrt{\text{area}}=1/(N\sqrt2)$ — a factor $\sqrt2$ too small, which only rescaled τ by a constant (rate-neutral; all slopes above are unaffected) but made the Cocquet and MMS drivers inconsistent. Cocquet et al. report the triangle *diameter* $h=\sqrt2/N$ (a further $\sqrt2$); since our convergence slopes are measured against $N$, the convention does not enter the rates.
+
+**Open confirmation item.** A finer-mesh run ($N$ up to $160$) of `CocquetAllDirichlet` (and `CocquetFormMMS`) would verify the pre-asymptotic interpretation by showing P2 $H^1\to2$, $L^2\to3$. Until then, "optimal recovery" is asserted as a *trend*, not a measured plateau.
+
+---
+
+## 11. Investigation Phase 10: the EXACT Cocquet method (unstabilized Galerkin Taylor–Hood), and a full code audit
+
+To test whether the cap is our VMS formulation or the problem, we implemented Cocquet et al.'s *exact* discrete method — inf-sup-stable **Taylor–Hood $P_2/P_1$ with no stabilization** (pure Galerkin), $P_1$ porosity, $\eta p$ penalty — and ran it next to our VMS $P_1/P_1$ and $P_2/P_2$ in one figure. The unstabilized assembly reuses the production weak-form builders with `mult_mom=mult_mass=0` and lives in `test/extended/CocquetExperiment/galerkin_driver.jl` (validation tooling; `src/` is untouched). See `theory/cocquet_formulation.tex` for the documented formulation and the code map.
+
+### Result — the exact Cocquet method is corner-capped too
+
+Three-way run (ref $N=200$, coarse $\{10,20,40,80\}$, after the $h$ fix):
+
+| Curve | velocity $L^2$ slopes | velocity $H^1$ slopes |
+| :-- | :-- | :-- |
+| VMS ASGS P1/P1 | 1.72, 1.79, 1.96 → $O(h^2)$ | 0.89, 0.91, 0.84 → $O(h)$ |
+| VMS ASGS P2/P2 | 1.69, 1.66, 1.58 | 0.74, 0.73, 0.73 |
+| **Cocquet Galerkin P2/P1** | **1.10, 1.13, 1.47** | **0.73, 0.74, 0.78** |
+
+The exact Cocquet Galerkin $P_2/P_1$ is capped at $H^1\approx0.75$ (optimal 2) and $L^2\approx1.2$ (optimal 3) — essentially identical to our VMS $P_2/P_2$. Error localization (`cocquet_Galerkin_P2P1_N80.vtu`): **42 % of velocity / 95 % of pressure error within $R=0.1$ of the outlet corners, 0 % at the inlet**, max at $(2,0.988)$. Interior-restricted ($x<1$) velocity slopes climb to $\sim 2.2$, so there is **no interior defect** — the cap is purely the corner. **Switching off all stabilization and using inf-sup-stable Taylor–Hood does not escape the cap: it is the problem (the corner), not our method.**
+
+### Code audit (every assumption the MMS does not exercise)
+
+Because `CocquetFormMMS` validates the volume operators but is all-Dirichlet (no traction outlet), we separately verified everything the benchmark relies on and the MMS does not:
+
+| Assumption | Method | Result |
+| :-- | :-- | :-- |
+| Boundary tags inlet/outlet/walls | empirical Gridap probe on $[0,2]\times[0,1]$ | inlet $=\{x=0\}$, outlet $=\{x=2\}$, walls $=\{y=0\}\cup\{y=1\}$ — correct |
+| Outlet **natural BC** | derived from the Galerkin weak form | $\alpha(2\nu\Sten(u)-pI)\nn=0$ — matches Cocquet Eq. 2 |
+| Viscous form | read `viscous_operators.jl` | $2\nu\alpha\,\Sten(u){:}\Sten(v)$ — correct |
+| Convective form | non-conservative $\int\alpha(u\cdot\grad)u\cdot v$ | matches Cocquet's $c(\varepsilon;\cdot)$ |
+| Reaction $\alpha(\varepsilon),\beta(\varepsilon)$ | $\sigma_{\rm lin}=150/\Reyn$, $\sigma_{\rm nl}=1.75$ | matches Eq. 49 |
+| Galerkin solve convergence | run log (`:ok`, no fallback) | converged |
+| Cross-mesh metric | prior smooth-field test (slope 3.00) | exact |
+| Error is genuine, not artifact | VTK localization + interior slopes | genuine corner singularity |
+
+**No bug was found** in the formulation or the reproduction; the corner singularity is real and method-independent.
+
+### Why the paper reports $O(h^2)$ and we do not — and how Cocquet "dealt with" the corner
+
+**How the paper handles the corner (the clue):** Cocquet do not report a corner singularity because their analysis concludes there is *none*. In §4.2 they argue the weak solution is **$H^3(\Omega)\times H^2(\Omega)$**, treating the wall/outlet junction through the Lions–Magenes traction space **$H^{1/2}_{00}(\Gamma_{\rm out})$** (which builds in corner compatibility — test/traction functions vanish at $\partial\Gamma_{\rm out}$) and invoking the mixed-BC Stokes regularity result **[27]**. They also note $u_{\rm in}=c_{\rm in}y(1-y)$ vanishes at the inlet corners, making those compatible. So they "dealt with" the corner by *arguing it away*: if the solution is $H^3$, Taylor–Hood $P_2/P_1$ is optimal $O(h^2)$.
+
+**Why that $H^3$ claim is the weak link.** The outlet corners are **no-slip (full Dirichlet) / traction-free (full Neumann) $90^\circ$** junctions for the Stokes operator. Regularity theory for this corner type (Orlt–Sändig / Maz'ya–Rossmann class) gives a **leading singular exponent $s<1$** — the solution is generally not even $H^2$. Our measured $s\approx0.8$ (from the $H^1$-rate cap, identical for P1 and P2) sits squarely in that range, and the error localizes at exactly these corners (0% at the compatible inlet corners). A genuine corner singularity is shared by *any* conforming FE method on this weak form — including Cocquet's FreeFem Taylor–Hood — and our bare-Galerkin reproduction reproduces it identically.
+
+**Artifact hypotheses ruled out.** (i) *Backflow / do-nothing instability*: the outlet velocity has $u_x\ge0$ everywhere ($\min=0$, no recirculation), so the open-boundary convective instability is not present. (ii) *Boundary tagging*: verified empirically (inlet $x{=}0$, outlet $x{=}2$, walls $y{\in}\{0,1\}$). (iii) *Natural BC*: derived from the weak form as $\alpha(2\nu\Sten(u)-pI)\nn=0$, matching Eq. 2. (iv) *VMS-specific bug*: the Galerkin path bypasses all VMS machinery and still caps. So the corner error is a genuine feature of the discrete Cocquet problem, not a reproduction artifact we have identified.
+
+**Most defensible conclusion.** Cocquet's $H^3$ regularity claim appears **over-optimistic for the $90^\circ$ no-slip/traction corner** (their [27] likely requires a corner condition not met here), and their reported $O(h^2)$ survives because their **narrow $N$-range ($\le100$, only $\sim2\times$ from the $N=200$ reference)** lets the unresolved corner error cancel in the self-reference difference $\lVert u_N-u_{\rm ref}\rVert$, leaving the smooth interior to dominate. Our wider range (down to $N=10$, $20\times$ from the reference) removes that cancellation and exposes the corner-limited rate. The one setup detail we did **not** replicate is the **mesh type** (structured simplexified Cartesian vs FreeFem unstructured Delaunay); a true corner singularity is mesh-independent in the limit, but the structured corner diagonal could shift constants.
+
+**Decisive tests still open** (not yet run): (a) refine the **reference to $N=400$** at fixed coarse meshes — if the corner error *drops*, the $N=200$ reference was under-resolving a milder corner (tilts toward their $H^3$); if *unchanged*, the singularity is genuine. (b) **corner-graded mesh** — if grading recovers $O(h^2)$, the cap is the (genuine) singularity. (c) re-measure with **`outlet_truncation_delta>0`** (corner excluded) over a wider range — if the corner-excluded rate is $O(h^2)$ while the whole-domain rate is capped, the cancellation/measurement explanation is confirmed.
+
+### Note on the $h$ fix and the Phase 9 tables
+
+The $h$-consistency fix ($\sqrt{\rm area}\to\sqrt{2\,{\rm area}}$) rescales $\tau$ by $\sqrt2$. Asymptotically rate-neutral, but on these *pre-asymptotic* coarse meshes it shifts constants enough to move the measured P2/P2 slopes (e.g. benchmark P2/P2 velocity-$L^2$ went from $\approx1.3$ pre-fix to $\approx1.6$ post-fix). The Phase 8–9 tables above are **pre-fix snapshots** (kept as recorded); the Phase 10 table is post-fix. The qualitative conclusion — P2 capped under mixed BC, recovering only when the corner is removed — is unchanged.

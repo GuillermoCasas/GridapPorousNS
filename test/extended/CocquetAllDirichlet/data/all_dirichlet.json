@@ -1,14 +1,9 @@
 {
-    "_comment": "Cocquet convergence study for comparison with Cocquet et al. (2020), Figs 2-3: same physical case (Re=500, c_in=0.5, transverse porosity). THREE-WAY comparison in one plot via comparison_runs: our VMS-stabilized equal-order P1/P1 and P2/P2 (method ASGS), and the EXACT Cocquet method — unstabilized Galerkin Taylor-Hood P2/P1 with P1 porosity (method Galerkin, run via galerkin_driver.jl). Reference N=200 (matching the paper) over coarse N in {10,20,40,80}. outlet_truncation_delta=0 (whole domain). h_floor_weight=0 (reaction-speed fix). Run: julia --project=../../.. run_convergence.jl paper_comparison.json",
+    "_comment": "FLIP B (all-Dirichlet) diagnostic — IDENTICAL to CocquetExperiment/paper_comparison.json (Re=500, c_in=0.5, transverse porosity, equal-order P1/P1 and P2/P2, interpolated porosity at order k_v, N=200 reference over coarse N in {10,20,40,80}, h_floor_weight=0) EXCEPT the outlet is imposed as a Dirichlet boundary (same parabolic profile as the inlet) instead of the traction-free Neumann outlet. This makes the wall/outlet corners Dirichlet-Dirichlet (compatible) to test whether the benchmark's mixed-BC corner singularity caps P2/P2 velocity-L2 convergence. outlet_truncation_delta=0 (no traction outlet to truncate; errors over whole domain). Run: julia --project=../../.. run_convergence.jl all_dirichlet.json",
     "Re": 500.0,
     "c_in": 0.5,
     "k_convergence_list": [
         1
-    ],
-    "comparison_runs": [
-        { "k_velocity": 1, "k_pressure": 1, "method": "ASGS" },
-        { "k_velocity": 2, "k_pressure": 2, "method": "ASGS" },
-        { "k_velocity": 2, "k_pressure": 1, "method": "Galerkin", "porosity_order": 1 }
     ],
     "element_pairs": [
         [
@@ -90,6 +85,6 @@
     },
     "output": {
         "directory": "results",
-        "basename": "cocquet_paper_cmp"
+        "basename": "cocquet_alldirichlet"
     }
 }

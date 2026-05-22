@@ -1,0 +1,161 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage[margin=1in]{geometry}
+\usepackage{bm}
+\usepackage{hyperref}
+
+\newcommand{\uu}{\bm{u}}
+\newcommand{\vv}{\bm{v}}
+\newcommand{\ww}{\bm{w}}
+\newcommand{\ff}{\bm{f}}
+\newcommand{\nn}{\bm{n}}
+\newcommand{\xx}{\bm{x}}
+\newcommand{\grad}{\nabla}
+\newcommand{\dive}{\operatorname{div}}
+\newcommand{\Reyn}{\mathrm{Re}}
+\newcommand{\Sten}{\bm{S}}
+\newcommand{\dx}{\,d\xx}
+
+\title{The Cocquet et al.\ Darcy--Brinkman--Forchheimer formulation\\[2pt]
+\large (reference note for the \texttt{CocquetExperiment} validation)}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\noindent
+This note records, for future reference, the \emph{exact} continuous and discrete formulation of
+\begin{quote}
+P.-H.\ Cocquet, M.\ Rakotobe, D.\ Ramalingom, A.\ Bastide,
+\emph{Error analysis for the finite element approximation of the Brinkman--Darcy--Forchheimer model
+for porous media with mixed boundary conditions}, J.\ Comput.\ Appl.\ Math.\ (2020),
+\href{https://hal.univ-reunion.fr/hal-02561058}{hal-02561058}.
+\end{quote}
+The PDF is in \texttt{theory/Cocquet et al.\ - 2021 - Error analysis\ldots pdf}; equation numbers below
+are the paper's. The last section maps every term onto our code so the
+\texttt{CocquetExperiment} ``Galerkin'' comparison run reproduces the paper's method exactly.
+
+\section{Continuous problem}
+
+On a bounded Lipschitz domain $\Omega\subset\mathbb{R}^d$ with spatially varying porosity
+$\varepsilon:\Omega\to(0,1]$, the dimensionless steady Darcy--Brinkman--Forchheimer (DBF) model
+reads (Eq.~1):
+\begin{equation}
+\left\{
+\begin{aligned}
+-\dive\!\big(2\Reyn^{-1}\varepsilon\,\Sten(\uu) - \varepsilon\,\uu\otimes\uu\big)
+   + \varepsilon\grad p + \alpha(\varepsilon)\uu + \beta(\varepsilon)|\uu|\,\uu
+   &= \varepsilon\ff, && \text{in }\Omega,\\
+\dive(\varepsilon\uu) &= 0, && \text{in }\Omega,
+\end{aligned}
+\right.
+\end{equation}
+where $\Sten(\uu)=\tfrac12(\grad\uu+\grad\uu^{\top})$ is the symmetric velocity gradient, $\Reyn$ the
+Reynolds number, and $\ff$ an external force. One always has $\alpha(1)=\beta(1)=0$, so the standard
+Navier--Stokes equations are recovered when $\varepsilon\equiv1$. Using
+$\dive(\varepsilon\uu\otimes\uu)=\dive(\varepsilon\uu)\uu+\varepsilon(\uu\cdot\grad)\uu$ and
+$\dive(\varepsilon\uu)=0$, the convective term is $\varepsilon(\uu\cdot\grad)\uu$.
+
+\paragraph{Mixed boundary conditions (Eq.~2).} With $\partial\Omega=\Gamma_w\cup\Gamma_{\mathrm{in}}\cup\Gamma_{\mathrm{out}}$,
+\begin{equation}
+\uu = \bm{0}\ \text{on }\Gamma_w,\qquad
+\uu = \uu_{\mathrm{in}}\ \text{on }\Gamma_{\mathrm{in}},\qquad
+\varepsilon\big(2\Reyn^{-1}\Sten(\uu)-p\big)\nn = \bm{0}\ \text{on }\Gamma_{\mathrm{out}},
+\end{equation}
+i.e.\ no-slip walls, an inflow Dirichlet datum, and a traction-free (pseudo-traction) Neumann outlet.
+The wall/outlet corners are Dirichlet--Neumann junctions; their corner singularity is the subject of
+the convergence study (see \texttt{docs/cocquet\_convergence\_analysis.md}).
+
+\paragraph{Darcy and Forchheimer closure (Eq.~49).} For packed beds,
+\begin{equation}
+\alpha(\varepsilon)=\frac{150}{\Reyn}\Big(\frac{1-\varepsilon}{\varepsilon}\Big)^{2},
+\qquad
+\beta(\varepsilon)=1.75\,\frac{1-\varepsilon}{\varepsilon}.
+\end{equation}
+
+\section{Weak (Galerkin) formulation}
+
+With $\bm{X}=\{\vv\in H^1(\Omega)^d:\vv|_{\Gamma_w\cup\Gamma_{\mathrm{in}}}=\bm 0\}$ and
+$\bm{F}=\varepsilon\ff$, the variational problem is (Eq.~4): find
+$(\uu,p)\in \bm{X}_1\times L^2(\Omega)$ with $\uu|_{\Gamma_{\mathrm{in}}}=\uu_{\mathrm{in}}$ such that
+\begin{equation}
+\left\{
+\begin{aligned}
+a(\varepsilon;\uu,\vv) + c(\varepsilon;\uu,\uu,\vv) + b(\varepsilon;\vv,p) &= \langle\bm F,\vv\rangle,
+  && \forall\,\vv\in\bm X,\\
+b(\varepsilon;\uu,q) &= 0, && \forall\,q\in L^2(\Omega),
+\end{aligned}
+\right.
+\end{equation}
+\begin{align}
+a(\varepsilon;\uu,\vv) &= 2\Reyn^{-1}\!\int_\Omega \varepsilon\,\Sten(\uu){:}\Sten(\vv)\dx
+   + \int_\Omega \alpha(\varepsilon)\,\uu\cdot\vv\dx,\\
+c(\varepsilon;\uu,\vv,\ww) &= \int_\Omega \varepsilon\,(\uu\cdot\grad)\vv\cdot\ww\dx
+   + \int_\Omega \beta(\varepsilon)\,|\uu|\,\vv\cdot\ww\dx,\\
+b(\varepsilon;\vv,q) &= -\int_\Omega q\,\dive(\varepsilon\vv)\dx .
+\end{align}
+The porosity weights \emph{every} operator (viscous, convective, pressure, divergence, source); the
+reaction coefficients $\alpha,\beta$ depend on $\varepsilon$ pointwise.
+
+\section{Discretization (the method we reproduce)}
+
+\begin{itemize}
+\item \textbf{Taylor--Hood $P_2/P_1$}, inf-sup stable, so \textbf{no stabilization} is used --- the
+discrete problem is the pure Galerkin restriction of Eq.~4 to $\bm X_h\times M_h$ (Eq.~29/40).
+\item A small pressure penalty $\eta\,p$ ($\eta=10^{-7}$) is added to the incompressibility equation so
+every sub-matrix is invertible for the direct solver.
+\item The porosity is a \textbf{$P_1$ finite-element interpolant} $\varepsilon_h$ of $\varepsilon$,
+regardless of the velocity order.
+\item The nonlinear discrete system is solved by a \textbf{Picard fixed-point iteration} (Eq.~41):
+freeze the convecting velocity and the Forchheimer factor $|\uu_{h,n-1}|$, solve the resulting linear
+saddle-point problem for $(\uu_{h,n},p_{h,n})$, repeat. (The discrete solution is independent of the
+nonlinear solver; our driver uses an exact-Newton/Picard cascade and reaches the same root.)
+\end{itemize}
+
+\paragraph{Numerical test case (\S4.2).} Smooth porosity
+$\varepsilon(x,y)=0.45\big(1+\tfrac{1-0.45}{0.45}\exp(-(1-y))\big)=0.45+0.55\,e^{\,y-1}$,
+domain $\Omega=(0,2)\times(0,1)$, $\Gamma_{\mathrm{in}}=\{0\}\times[0,1]$,
+$\Gamma_{\mathrm{out}}=\{2\}\times[0,1]$, $\Gamma_w=[0,2]\times(\{0\}\cup\{1\})$, parabolic inflow
+$\uu_{\mathrm{in}}(y)=c_{\mathrm{in}}\,y(1-y)\,\bm e_x$. The convergence figures (Figs.~2--3) use a
+reference solution at $N=200$ and coarse meshes $N\le100$, with $h=\sqrt2/N$ (triangle diameter).
+The paper observes optimal $\mathrm{Err}_{tot}=O(h^2)$ in the energy norm; the velocity $L^2$ error does
+\emph{not} gain the extra order (it stays $O(h^2)$), which the paper attributes to the discrete
+porosity and we attribute (for our equal-order method) to the outlet corner singularity.
+
+\section{Mapping to the code}
+
+The production solver already implements Eq.~4 term-for-term; the only thing the Cocquet comparison
+needs beyond our VMS runs is to switch the stabilization off. No \texttt{src/} change is required.
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\hline
+Cocquet term & Code (\texttt{src/}) \\
+\hline
+$2\Reyn^{-1}\varepsilon\,\Sten(\uu){:}\Sten(\vv)$ & \texttt{SymmetricGradientViscosity}, $\nu=\Reyn^{-1}$ \\
+$\alpha(\varepsilon)\uu+\beta(\varepsilon)|\uu|\uu$, Eq.~49 & \texttt{ForchheimerErgunLaw(sigma\_linear,\,sigma\_nonlinear)}; \\
+ & \texttt{sigma\_linear}$=150/\Reyn$, \texttt{sigma\_nonlinear}$=1.75$ \\
+$\varepsilon(\uu\cdot\grad)\uu$, $\varepsilon\grad p$, $\dive(\varepsilon\uu)$ & porosity-weighted base terms in \\
+ & \texttt{build\_stabilized\_weak\_form\_residual} (\texttt{continuous\_problem.jl}) \\
+$\eta\,p$ penalty & \texttt{eps\_val} ($=\eta$) in the mass equation \\
+$P_1$ porosity $\varepsilon_h$ & \texttt{porosity\_order=1} in \texttt{run\_convergence.jl::build\_solver} \\
+Taylor--Hood $P_2/P_1$ & element pair \texttt{(k\_velocity,k\_pressure)=(2,1)} \\
+\textbf{no stabilization} (pure Galerkin) & weak-form builders called with
+   \texttt{mult\_mom=mult\_mass=0} \\
+\hline
+\end{tabular}
+\end{center}
+
+\paragraph{Where the Galerkin run lives.} The unstabilized assembly is driven by
+\texttt{test/extended/CocquetExperiment/galerkin\_driver.jl} (\emph{not} \texttt{src/}: it is validation
+tooling). It reuses the production builders
+\texttt{build\_stabilized\_weak\_form\_residual} / \texttt{build\_picard\_jacobian} /
+\texttt{build\_stabilized\_weak\_form\_jacobian} with \texttt{mult\_mom=mult\_mass=0}, which zero the VMS
+stabilization terms ($\bm L^\ast\!\cdot\tau\,\mathcal R$) and leave exactly the bare Galerkin DBF system
+of Eq.~4 (with the $\eta p$ penalty). The \texttt{comparison\_runs} list in
+\texttt{data/paper\_comparison.json} runs our VMS $P_1/P_1$ and $P_2/P_2$ (method \texttt{ASGS}) alongside
+this Cocquet $P_2/P_1$ Galerkin run (method \texttt{Galerkin}, $P_1$ porosity), and
+\texttt{plot\_convergence.py} draws all three in one figure.
+
+\end{document}

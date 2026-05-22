@@ -129,12 +129,25 @@ end
 # finer meshes if a coarser base still folds), then mesh-continue up the fine ladder. RETURNS the
 # rate curve + status (used by both the single-cell driver and the Phase-2 batch).
 function mesh_continuation_rate(Re, Da, αt, base_candidates, fine_ladder, kv, etype;
-                                cont_nsteps=30, cont_minr=3e-2, cont_maxit=60, mesh_maxit=100, verbose=true)
+                                cont_nsteps=30, cont_minr=3e-2, cont_maxit=60, mesh_maxit=100,
+                                direct_base=false, verbose=true)
     base = nothing; base_N = 0
     for cand in base_candidates
-        verbose && println(@sprintf(" [mesh-cont] base attempt N=%d (α=%.3f, Re=%.0e, Da=%.0e)", cand, αt, Re, Da))
-        r = alpha_continuation(Re, Da, αt, cand, kv, etype;
-            alpha_start=1.0, nsteps=cont_nsteps, adaptive=true, min_step_ratio=cont_minr, max_iters=cont_maxit)
+        if direct_base
+            # suboptimal-rate cell: a true root ALREADY exists at this mesh (detection requires a
+            # true root at both finest meshes for this category), so solve DIRECTLY from the
+            # exact-solution guess — the α-ramp would only re-derive a known root (the "wasteful"
+            # path). Escalate base_candidates only if a direct solve unexpectedly stalls.
+            verbose && println(@sprintf(" [mesh-cont] DIRECT base solve N=%d (α=%.3f, root known to exist)", cand, αt))
+            r0 = solve_cell(Re, Da, αt, cand, kv, etype, nothing; max_iters=cont_maxit)
+            verbose && println(@sprintf("   base ‖R‖=%.2e L2u=%.3e H1u=%.3e iters=%d%s",
+                r0.rnorm, r0.l2u, r0.h1u, r0.niters, r0.reached ? "" : "  [stall]"))
+            r = r0.reached ? r0 : nothing
+        else
+            verbose && println(@sprintf(" [mesh-cont] base attempt N=%d (α=%.3f, Re=%.0e, Da=%.0e)", cand, αt, Re, Da))
+            r = alpha_continuation(Re, Da, αt, cand, kv, etype;
+                alpha_start=1.0, nsteps=cont_nsteps, adaptive=true, min_step_ratio=cont_minr, max_iters=cont_maxit)
+        end
         if r !== nothing
             base = r; base_N = cand; break
         end
@@ -182,15 +195,16 @@ _json_safe(x::AbstractVector) = Any[_json_safe(v) for v in x]
 
 # Phase-2 batch: read flagged_cells.json, dedup by physics cell (continuation is method-agnostic),
 # rescue each via mesh-continuation, and write phase2_results.json (the merged report joins these
-# back to BOTH ASGS & OSGS groups). Fold cells (α<1) escalate the base mesh; slow cells (α≥1)
-# solve a coarse base with a large budget then mesh-continue up to the default-sweep meshes.
+# back to BOTH ASGS & OSGS groups). Routing is by the detected `category` (hardest across methods):
+#   suboptimal_rate (root exists) -> DIRECT base solve + mesh ladder (no wasteful α-ramp);
+#   fold / total_failure at α<1    -> α-continuation escalating the base mesh past the fold;
+#   α≥1 (pure NS, no fold)         -> coarse base, large budget, then mesh-continue.
 function run_phase2_from_flagged(flagged_json::String, out_json::String; defaults_path=nothing)
-    # Tunable ladders (override via a phase2_defaults.json). Fold cells (α<1) escalate the base
-    # mesh past the fold; slow cells (α≥1, no fold) solve a coarse base with a large budget then
-    # mesh-continue up to the default-sweep meshes.
+    # Tunable ladders (override via a phase2_defaults.json).
     D = Dict{String, Any}(
         "fold_base_candidates" => [320, 512, 768, 1024], "fold_fine_ladder" => [512, 768, 1024, 1536], "fold_maxit" => 60,
         "slow_base_candidates" => [80], "slow_fine_ladder" => [160, 320], "slow_maxit" => 400,
+        "subopt_base_candidates" => [320, 512], "subopt_fine_ladder" => [512, 768, 1024], "subopt_maxit" => 100,
         "mesh_maxit" => 150, "cont_nsteps" => 30, "cont_minr" => 3e-2)
     if defaults_path !== nothing && isfile(defaults_path)
         for (k, v) in JSON3.read(read(defaults_path, String), Dict{String, Any})
@@ -199,29 +213,40 @@ function run_phase2_from_flagged(flagged_json::String, out_json::String; default
         println("[phase2] loaded ladder defaults from $defaults_path")
     end
     flagged = JSON3.read(read(flagged_json, String))
-    seen = Set{Tuple}(); cells = []
+    # Dedup by physics cell, but track the categories seen across methods so we route by the
+    # HARDEST one (a fold/total_failure for EITHER method means the cell needs the root-search path;
+    # only an all-suboptimal_rate cell takes the cheap direct base solve).
+    bykey = Dict{Tuple, Any}(); cats = Dict{Tuple, Set{String}}(); order = Tuple[]
     for fc in flagged
         key = (Float64(fc.Re), Float64(fc.Da), Float64(fc.alpha_0), Int(fc.k_velocity), String(fc.element_type))
-        if !(key in seen)
-            push!(seen, key); push!(cells, fc)
-        end
+        haskey(bykey, key) || (bykey[key] = fc; cats[key] = Set{String}(); push!(order, key))
+        push!(cats[key], haskey(fc, :category) ? String(fc.category) : "")
     end
+    cells = [bykey[k] for k in order]
     println(@sprintf("[phase2] %d flagged groups -> %d unique physics cells", length(flagged), length(cells)))
     results = Any[]
     for fc in cells
         Re = Float64(fc.Re); Da = Float64(fc.Da); αt = Float64(fc.alpha_0)
         kv = Int(fc.k_velocity); etype = String(fc.element_type)
+        cset = cats[(Re, Da, αt, kv, etype)]
+        # "suboptimal_rate" only (no fold/total_failure for any method) => root exists => direct base.
+        subopt_only = ("suboptimal_rate" in cset) && !("fold" in cset) && !("total_failure" in cset)
         println("\n", "="^78)
-        println(@sprintf("[phase2] cell Re=%.0e Da=%.0e α=%.3f k=%d %s", Re, Da, αt, kv, etype))
-        if αt < 1.0           # fold
+        println(@sprintf("[phase2] cell Re=%.0e Da=%.0e α=%.3f k=%d %s  cats=%s", Re, Da, αt, kv, etype, string(collect(cset))))
+        direct = false
+        if subopt_only
+            base_candidates = Int.(D["subopt_base_candidates"]); fine_ladder = Int.(D["subopt_fine_ladder"]); maxit = Int(D["subopt_maxit"]); direct = true
+        elseif αt < 1.0       # fold / total_failure at a porous cell
             base_candidates = Int.(D["fold_base_candidates"]); fine_ladder = Int.(D["fold_fine_ladder"]); maxit = Int(D["fold_maxit"])
-        else                  # slow (no fold)
+        else                  # slow (α≥1, pure NS, no fold)
             base_candidates = Int.(D["slow_base_candidates"]); fine_ladder = Int.(D["slow_fine_ladder"]); maxit = Int(D["slow_maxit"])
         end
+        route = direct ? "suboptimal_direct" : (αt < 1.0 ? "fold" : "slow")
         r = mesh_continuation_rate(Re, Da, αt, base_candidates, fine_ladder, kv, etype;
-            cont_nsteps=Int(D["cont_nsteps"]), cont_minr=Float64(D["cont_minr"]), cont_maxit=maxit, mesh_maxit=Int(D["mesh_maxit"]))
+            cont_nsteps=Int(D["cont_nsteps"]), cont_minr=Float64(D["cont_minr"]), cont_maxit=maxit,
+            mesh_maxit=Int(D["mesh_maxit"]), direct_base=direct)
         push!(results, merge(Dict("Re" => Re, "Da" => Da, "alpha_0" => αt, "k_velocity" => kv,
-                                  "element_type" => etype), r))
+                                  "element_type" => etype, "phase2_route" => route), r))
     end
     open(out_json, "w") do io
         JSON3.write(io, [_json_safe(r) for r in results])   # NaN/Inf -> null (JSON spec disallows NaN)

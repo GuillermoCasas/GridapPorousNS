@@ -1,13 +1,24 @@
 {
+    "_comment": "NONLINEAR-REACTION ISOLATION — IDENTICAL to CocquetExperiment/paper_comparison.json (Re=500, c_in=0.5, varying porosity, mixed BC with traction outlet, SymmetricGradient viscous, equal-order P1/P1 and P2/P2, N=200 reference over coarse N in {10,20,40,80}, h_floor_weight=0) EXCEPT sigma_nonlinear=0, which turns OFF the Forchheimer |u| nonlinear drag while keeping the linear porosity-dependent Darcy term sigma_linear*((1-a)/a)^2. This is the ONLY change vs the benchmark. If P2/P2 is unchanged, the nonlinear reaction contributes nothing to the cap (corner-dominated). Run: julia --project=../../.. run_convergence.jl linear_reaction.json",
     "Re": 500.0,
     "c_in": 0.5,
     "k_convergence_list": [
         1
     ],
+    "element_pairs": [
+        [
+            1,
+            1
+        ],
+        [
+            2,
+            2
+        ]
+    ],
     "physical_properties": {
         "nu": 0.002,
         "sigma_linear": 0.30,
-        "sigma_nonlinear": 1.75,
+        "sigma_nonlinear": 0.0,
         "h_floor_weight": 0.0,
         "f_x": 0.0,
         "f_y": 0.0
@@ -23,7 +34,7 @@
             1.0
         ]
     },
-    "outlet_truncation_delta": 0.5,
+    "outlet_truncation_delta": 0.0,
     "interpolate_solution_to_coarser_meshes": false,
     "numerical_method": {
         "viscous_operator_type": "SymmetricGradient",
@@ -40,13 +51,14 @@
         },
         "mesh": {
             "partition": [
-                160,
-                80
+                400,
+                200
             ],
             "convergence_partitions": [
                 10,
                 20,
-                40
+                40,
+                80
             ],
             "element_type": "TRI"
         },
@@ -73,6 +85,6 @@
     },
     "output": {
         "directory": "results",
-        "basename": "cocquet_flow"
+        "basename": "cocquet_linreaction"
     }
 }
