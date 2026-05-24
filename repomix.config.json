@@ -13,7 +13,9 @@
     "customPatterns": [
       "repomix-output.*",
       "*.repomix-output.*",
-      ".repomixignore"
+      ".repomixignore",
+      "**/*.pdf",
+      "scratch/**/*"
     ]
   }
 }

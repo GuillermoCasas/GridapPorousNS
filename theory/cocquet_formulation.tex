@@ -158,4 +158,82 @@ of Eq.~4 (with the $\eta p$ penalty). The \texttt{comparison\_runs} list in
 this Cocquet $P_2/P_1$ Galerkin run (method \texttt{Galerkin}, $P_1$ porosity), and
 \texttt{plot\_convergence.py} draws all three in one figure.
 
+\section{Mesh generation and the paper's $h=\sqrt2/N$ inconsistency}
+\label{sec:mesh-generation}
+
+Reproducing Cocquet's Figure~2 quantitatively requires reproducing their meshes. The paper specifies
+the meshes verbatim in \S4.2 (p.~30):
+\begin{quote}\itshape
+``the mesh is obtained thanks to the Freefem command \texttt{buildmesh(a(N)+b(N)+c(N)+d(N))} with $N$
+being the number of vertices on each part of the boundary denoted by $a,b,c,d$. As a result, the mesh-size
+$h$ is $h=\sqrt2/N$, and we can consider only $N$.''
+\end{quote}
+
+\paragraph{What FreeFem actually does with that command.} In FreeFem++, the integer argument of a border
+specifies the number of \emph{segments} along that border. Concretely, with the four borders
+\begin{align*}
+a(t\in[0,2])\!: &\quad x=t,\ y=0\quad(\text{bottom wall, length }2)\\
+b(t\in[0,1])\!: &\quad x=2,\ y=t\quad(\text{outlet, length }1)\\
+c(t\in[2,0])\!: &\quad x=t,\ y=1\quad(\text{top wall, length }2)\\
+d(t\in[1,0])\!: &\quad x=0,\ y=t\quad(\text{inlet, length }1),
+\end{align*}
+the call \texttt{buildmesh(a(N)+b(N)+c(N)+d(N))} discretises each border into exactly $N$ equal segments
+\emph{regardless of its physical length}. Wall edges (length $2$) therefore have length $2/N$, and
+inlet/outlet edges have length $1/N$ --- the boundary, and hence the interior, is \textbf{anisotropic}.
+
+\paragraph{Why the paper's $h=\sqrt2/N$ is inconsistent with the literal recipe.} The value $h=\sqrt2/N$
+is the diameter (hypotenuse) of an \emph{isotropic} right triangle whose two legs are both $1/N$. With
+the literal $a(N)+b(N)+c(N)+d(N)$ recipe the triangles have legs $\sim1/N$ and $\sim2/N$, so the diameter
+is $\sqrt{(1/N)^2+(2/N)^2}=\sqrt5/N\approx2.24/N$, \emph{not} $\sqrt2/N$. The two statements
+``$N$ vertices on each border'' and ``$h=\sqrt2/N$'' cannot both be true. Empirically the literal recipe
+produces $\sim N\!\times\!N\!\times2$ cells (e.g.\ $170$ at $N=10$, $63\,872$ at $N=200$); a mesh truly
+with $h=\sqrt2/N$ would have $\sim2N\!\times\!N\!\times2\approx 4N^2$ cells (e.g.\ $400$ at $N=10$,
+$\sim160\,000$ at $N=200$) --- a factor of $\sim 2.5\!\times$ in cell count and a corresponding factor
+of $\sim 2$--$3\times$ in absolute discretisation error.
+
+\paragraph{Resolution: uniform-edge correction.} We resolve the inconsistency in favour of the
+\textbf{stated mesh size} $h=\sqrt2/N$, on the grounds that (i)~$h$ is the quantity the paper plots
+against and reports convergence rates in, and (ii)~uniform edges $1/N$ everywhere are the natural way to
+``consider only $N$'' (the paper's phrase) without separately tracking the two different boundary
+spacings. The corresponding FreeFem command is
+\[
+  \boxed{\ \texttt{buildmesh(a(2*N) + b(N) + c(2*N) + d(N))}\ }
+\]
+i.e.\ \textbf{$2N$ segments on the length-$2$ walls} and $N$ on the length-$1$ inlet/outlet, so every
+boundary edge has length $1/N$ and the interior --- still meshed by FreeFem's Delaunay/BAMG generator
+without any transfinite surface constraint --- inherits roughly the same density. The triangle diameter
+is then genuinely $\sqrt2/N$, matching the paper's $h$.
+
+\paragraph{Cell counts and code wiring.} The corrected meshes are produced by
+\texttt{test/extended/CocquetExperimentIrregularMesh/data/meshes/freefem/create\_paper\_meshes.edp}
+(FreeFem run separately --- not built into
+our Julia toolchain because no macOS-arm64 FreeFem binary exists) and saved as the FreeFem-native
+\texttt{.msh} format. \texttt{src/run\_simulation.jl::load\_freefem\_mesh} translates a FreeFem mesh into
+a Gridap \texttt{DiscreteModel} via an in-line conversion to Gmsh 2.2 format, mapping the FreeFem
+boundary labels $1,2,3,4$ onto named physical groups \texttt{"inlet"}, \texttt{"outlet"}, \texttt{"walls"}
+(both walls share one named group) and a 2D \texttt{"domain"} group; these names then resolve directly in
+\texttt{build\_fe\_spaces(\ldots,\ ["inlet","walls"],\ \ldots)}. The
+\texttt{CocquetExperimentIrregularMesh} driver opts into the FreeFem path via the
+\texttt{freefem\_mesh\_dir} key in its config; the file naming convention is
+\texttt{mesh\_fig2\_N<N>.msh} for coarse meshes and \texttt{mesh\_fig2\_N<N>\_reference.msh} for the
+$N=200$ reference. Indicative cell counts:
+\begin{center}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\hline
+$N$ & \emph{literal} $a(N){+}b(N){+}c(N){+}d(N)$ & \textbf{uniform} $a(2N){+}b(N){+}c(2N){+}d(N)$ & structured Cartesian \\
+\hline
+$10$  & $170$    & $448$    & $400$   \\
+$40$  & $2\,852$ & $7\,236$ & $6\,400$ \\
+$100$ & $\sim17\,800$ & $45\,964$ & $40\,000$ \\
+$200$ & $63\,872$ & $178\,460$ & $160\,000$ \\
+\hline
+\end{tabular}
+\end{center}
+
+The uniform recipe brings the FreeFem mesh's cell count into line with both the paper's stated
+$h=\sqrt2/N$ resolution and our structured Cartesian benchmark, so the comparison of Galerkin
+$P_2/P_1$, VMS $P_1/P_1$ and VMS $P_2/P_2$ on these meshes is now an apples-to-apples reproduction of
+Figure~2.
+
 \end{document}

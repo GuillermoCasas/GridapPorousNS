@@ -1,6 +1,7 @@
 module PorousNSSolver
 
 using Gridap
+using GridapGmsh
 using JSON3
 using StructTypes
 using WriteVTK

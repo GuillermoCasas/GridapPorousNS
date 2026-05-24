@@ -1,0 +1,104 @@
+/*
+  Mesh generation for Figure 2 of:
+  Cocquet et al. (2021), Error analysis for the FEM approximation
+  of the Brinkmann-Darcy-Forchheimer model.
+
+  Geometry:
+    Omega = (0,2) x (0,1)
+
+  Boundaries:
+    label 1: Gamma_in  = {0} x [0,1]
+    label 2: Gamma_out = {2} x [0,1]
+    label 3: Gamma_w   = bottom wall
+    label 4: Gamma_w   = top wall
+
+  Mesh size relation reported in the paper:
+    h = sqrt(2)/N
+
+  Figure 2:
+    Re = 500, c_in = 0.5
+    numerical solution compared to reference mesh N = 200
+    convergence meshes: N <= 100
+*/
+
+load "msh3"
+
+// ---------- Output folder ----------
+string outdir = "meshes_fig2";
+
+// FreeFem does not always create folders portably.
+// Create the folder before running, e.g.:
+//   mkdir -p meshes_fig2
+//
+// or uncomment this if your FreeFem build allows system calls:
+// exec("mkdir -p " + outdir);
+
+// ---------- Boundary labels ----------
+int labIn  = 1;
+int labOut = 2;
+int labBot = 3;
+int labTop = 4;
+
+// ---------- Mesh generator ----------
+func mesh makeMesh(int N)
+{
+    /*
+      Counter-clockwise orientation of the rectangle:
+
+        bottom: (0,0) -> (2,0)
+        outlet: (2,0) -> (2,1)
+        top:    (2,1) -> (0,1)
+        inlet:  (0,1) -> (0,0)
+
+      The paper denotes these four borders by a,b,c,d.
+    */
+
+    border a(t=0,2) { x = t; y = 0; label = labBot; }
+    border b(t=0,1) { x = 2; y = t; label = labOut; }
+    border c(t=2,0) { x = t; y = 1; label = labTop; }
+    border d(t=1,0) { x = 0; y = t; label = labIn; }
+
+    mesh Th = buildmesh(a(N) + b(N) + c(N) + d(N));
+    return Th;
+}
+
+// ---------- N values used for the convergence meshes ----------
+// The paper states N <= 100 and reference N = 200.
+// It does not explicitly list every N used in the plot,
+// so this set gives the standard sequence needed to reproduce it.
+int[int] Nvals = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+// ---------- Generate convergence meshes ----------
+for (int i = 0; i < Nvals.n; i++)
+{
+    int N = Nvals[i];
+    mesh Th = makeMesh(N);
+
+    real h = sqrt(2.0) / N;
+
+    cout << "Generated mesh for N = " << N
+         << ", h = " << h
+         << ", nt = " << Th.nt
+         << ", nv = " << Th.nv
+         << endl;
+
+    string filename = outdir + "/mesh_fig2_N" + N + ".msh";
+    savemesh(Th, filename);
+}
+
+// ---------- Generate reference mesh N = 200 ----------
+int Nref = 200;
+mesh ThRef = makeMesh(Nref);
+
+real href = sqrt(2.0) / Nref;
+
+cout << "Generated reference mesh for N = " << Nref
+     << ", h = " << href
+     << ", nt = " << ThRef.nt
+     << ", nv = " << ThRef.nv
+     << endl;
+
+savemesh(ThRef, outdir + "/mesh_fig2_N200_reference.msh");
+
+// ---------- Optional visual check ----------
+plot(ThRef, wait = true, cmm = "Reference mesh for Figure 2, N = 200");

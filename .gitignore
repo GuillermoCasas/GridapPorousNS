@@ -31,10 +31,14 @@ Manifest.toml
 repomix-output.*
 *.repomix-output.*
 
-# LaTeX compilation intermediates (generic — covers any theory/*.tex build)
+# LaTeX compilation intermediates (generic — covers any theory/*.tex build).
+# .pdf is NOT in the generic list because the bibliography/source PDFs (e.g. article.pdf,
+# the Cocquet reference) live alongside the .tex sources; per-file rules below ignore the
+# specific build outputs we don't want tracked.
 theory/*.aux
 theory/*.fdb_latexmk
 theory/*.fls
+theory/*.log
 theory/*.out
 theory/*.synctex.gz
 theory/*.toc
@@ -48,6 +52,16 @@ theory/osgs_algorithm.out
 theory/osgs_algorithm.pdf
 theory/osgs_algorithm.synctex.gz
 theory/osgs_algorithm.toc
+
+# LaTeX compilation intermediates for theory/cocquet_formulation.tex
+theory/cocquet_formulation.aux
+theory/cocquet_formulation.fdb_latexmk
+theory/cocquet_formulation.fls
+theory/cocquet_formulation.log
+theory/cocquet_formulation.out
+theory/cocquet_formulation.pdf
+theory/cocquet_formulation.synctex.gz
+theory/cocquet_formulation.toc
 
 # Defensive: same artifacts at repo root if latexmk is ever run from there
 /osgs_algorithm.aux
