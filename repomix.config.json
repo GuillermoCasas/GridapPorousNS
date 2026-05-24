@@ -15,7 +15,13 @@
       "*.repomix-output.*",
       ".repomixignore",
       "**/*.pdf",
-      "scratch/**/*"
+      "scratch/**/*",
+      "results/**/*",
+      "**/*.msh",
+      "**/*.vtu",
+      "**/*.vtk",
+      "**/*.pvd",
+      "**/*.h5"
     ]
   }
 }
