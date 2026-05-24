@@ -1,0 +1,95 @@
+{
+    "_comment": "Cocquet convergence study with OUTLET-CORNER TOPOLOGY MODIFICATION. Identical to CocquetExperiment/data/paper_comparison.json in every physical, numerical and discretization parameter — same Re=500, c_in=0.5, transverse Forchheimer porosity, partition [400,200], TRI elements, three-way comparison VMS P1/P1 + VMS P2/P2 + Cocquet Galerkin P2/P1. ONE difference: the two outlet-side corner vertices (entities 2,4 = (2,0),(2,1)) are stripped from the 'walls' Dirichlet tag and become free DOFs. See theory/CornerSingularity.md for the hypothesis (replicates the accidental free-corner behavior of FreeFem++ unstructured tagging that lets the Cocquet et al. results escape the mixed-BC corner singularity that caps Gridap's P2/P2 convergence). If P2/P2 L²/H¹ slopes recover toward 3/2 the corner is proven to be the singular factor; if they remain capped the hypothesis is falsified. Run: julia --project=../../.. run_convergence.jl paper_comparison_modified_corner.json",
+    "Re": 500.0,
+    "c_in": 0.5,
+    "k_convergence_list": [
+        1
+    ],
+    "comparison_runs": [
+        { "k_velocity": 1, "k_pressure": 1, "method": "ASGS" },
+        { "k_velocity": 2, "k_pressure": 2, "method": "ASGS" },
+        { "k_velocity": 2, "k_pressure": 1, "method": "Galerkin", "porosity_order": 1 }
+    ],
+    "element_pairs": [
+        [
+            1,
+            1
+        ],
+        [
+            2,
+            2
+        ]
+    ],
+    "physical_properties": {
+        "nu": 0.002,
+        "sigma_linear": 0.30,
+        "sigma_nonlinear": 1.75,
+        "h_floor_weight": 0.0,
+        "f_x": 0.0,
+        "f_y": 0.0
+    },
+    "domain": {
+        "alpha_0": 1.0,
+        "r_1": 0.2,
+        "r_2": 0.5,
+        "bounding_box": [
+            0.0,
+            2.0,
+            0.0,
+            1.0
+        ]
+    },
+    "outlet_truncation_delta": 0.0,
+    "interpolate_solution_to_coarser_meshes": false,
+    "numerical_method": {
+        "viscous_operator_type": "SymmetricGradient",
+        "stabilization": {
+            "method": [
+                "ASGS"
+            ],
+            "osgs_iterations": 15,
+            "osgs_tolerance": 1e-10
+        },
+        "element_spaces": {
+            "k_velocity": 2,
+            "k_pressure": 1
+        },
+        "mesh": {
+            "partition": [
+                400,
+                200
+            ],
+            "convergence_partitions": [
+                10,
+                20,
+                40,
+                80
+            ],
+            "element_type": "TRI"
+        },
+        "solver": {
+            "picard_iterations": 2,
+            "newton_iterations": 10,
+            "xtol": 1e-11,
+            "ftol": 1e-11,
+            "dynamic_ftol_ceiling": 1e-4,
+            "dynamic_ftol_spatial_safety_factor": 1e-2,
+            "stagnation_noise_floor": 1e-5,
+            "max_increases": 3,
+            "linesearch_alpha_min": 1e-10,
+            "armijo_c1": 1e-4,
+            "divergence_merit_factor": 1.05,
+            "max_linesearch_iterations": 25,
+            "linesearch_contraction_factor": 0.5,
+            "accelerator": {
+                "type": "Anderson",
+                "m": 5,
+                "relaxation_factor": 1.0
+            }
+        }
+    },
+    "output": {
+        "directory": "results",
+        "basename": "cocquet_modified_corner"
+    }
+}

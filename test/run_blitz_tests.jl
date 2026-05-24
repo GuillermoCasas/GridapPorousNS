@@ -18,7 +18,8 @@ files = [
     "projection_blitz_test.jl",
     "nonlinear_blitz_test.jl",
     "mms_exactness_blitz_test.jl",
-    "config_strict_loader_blitz_test.jl"
+    "config_strict_loader_blitz_test.jl",
+    "cocquet_modified_corner_topology_blitz_test.jl"
 ]
 
 @testset "Blitz Tests (< 5s)" begin
