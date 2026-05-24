@@ -48,3 +48,30 @@ function compute_reference_errors(f_h, f_ref, if_ref, V_free, dΩ_h, dΩ_ref; fi
 
     return (l2_nested, h1_nested, l2_cons, h1_cons, e_nested, e_cons)
 end
+
+
+"""
+    compute_trial_projection_errors(f_h, if_ref, U_trial, dΩ_h; filter_func=x->true)
+
+H-C diagnostic metric: project the reference field onto the coarse-mesh **trial** space
+`U_trial` (with Dirichlet conditions baked in) rather than the free-DOF test space used by
+`compute_reference_errors`'s `l2_nested`. Returns `(l2_trial, h1_trial)`.
+
+For a problem with P2-exact Dirichlet data (Cocquet's inlet `c_in y(1-y)` is exactly P2) this
+metric should agree with `l2_nested` to floating-point noise — any meaningful gap signals that
+the boundary-trace evaluation of the cross-mesh interpolant is contributing measurable error
+on unstructured meshes, which is the H-C hypothesis. See:
+  - `theory/Replicating Cocquet et al. convergence results.md` (H-C)
+  - `/Users/guillermocasasgonzalez/.claude/plans/i-have-added-replicating-tidy-stonebraker.md`
+
+Standalone (does not change `compute_reference_errors`'s signature or behaviour).
+"""
+function compute_trial_projection_errors(f_h, if_ref, U_trial, dΩ_h; filter_func=(x)->true)
+    f_ref_in_trial = interpolate(if_ref, U_trial)
+    e_trial = f_ref_in_trial - f_h
+    grad_e_trial = ∇(f_ref_in_trial) - ∇(f_h)
+    mask_h = CellField(x -> filter_func(x) ? 1.0 : 0.0, Gridap.FESpaces.get_triangulation(f_h))
+    l2_trial = sqrt(sum(∫( mask_h * (e_trial ⊙ e_trial) ) * dΩ_h))
+    h1_trial = sqrt(sum(∫( mask_h * (grad_e_trial ⊙ grad_e_trial) ) * dΩ_h))
+    return (l2_trial, h1_trial)
+end

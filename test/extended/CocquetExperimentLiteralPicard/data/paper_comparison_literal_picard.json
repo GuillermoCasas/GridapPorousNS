@@ -1,0 +1,93 @@
+{
+    "_comment": "[H-B] LITERAL-Cocquet-Picard flip of CocquetExperimentIrregularMeshFreefemDivs. Identical setup (FreeFem-divisions unstructured mesh, Re=500, c_in=0.5, Galerkin P2/P1) but the solver is replaced by a custom driver (literal_picard_driver.jl) that runs ONLY Picard iteration (no Newton at all, no Newton polish), capped at picard_iterations=10, with stopping rule max(L2(Du), L2(Dp)) < tol — i.e. the exact protocol of Cocquet et al. (2020) page 30. Tests H-B: the paper's published convergence numbers are not the true discretization error, but the Picard-iterate-after-10-steps error. The 'Galerkin_LiteralPicard' method label triggers the new driver. Both the N=200 reference and the N<=100 coarse runs use the same Picard stopping rule, so any iteration-truncation bias is shared and the differences are apples-to-apples. picard_iterations=10 is the cap; newton_iterations=1 is unused but required by schema validation.",
+    "Re": 500.0,
+    "c_in": 0.5,
+    "mesh_generator": "UNSTRUCTURED",
+    "wall_divisions": "freefem",
+    "k_convergence_list": [
+        1
+    ],
+    "comparison_runs": [
+        { "k_velocity": 2, "k_pressure": 1, "method": "Galerkin_LiteralPicard", "porosity_order": 1 }
+    ],
+    "element_pairs": [
+        [
+            2,
+            1
+        ]
+    ],
+    "physical_properties": {
+        "nu": 0.002,
+        "sigma_linear": 0.30,
+        "sigma_nonlinear": 1.75,
+        "h_floor_weight": 0.0,
+        "eps_val": 1e-7,
+        "f_x": 0.0,
+        "f_y": 0.0
+    },
+    "domain": {
+        "alpha_0": 1.0,
+        "r_1": 0.2,
+        "r_2": 0.5,
+        "bounding_box": [
+            0.0,
+            2.0,
+            0.0,
+            1.0
+        ]
+    },
+    "outlet_truncation_delta": 0.0,
+    "interpolate_solution_to_coarser_meshes": false,
+    "numerical_method": {
+        "viscous_operator_type": "SymmetricGradient",
+        "stabilization": {
+            "method": [
+                "ASGS"
+            ],
+            "osgs_iterations": 15,
+            "osgs_tolerance": 1e-10
+        },
+        "element_spaces": {
+            "k_velocity": 2,
+            "k_pressure": 1
+        },
+        "mesh": {
+            "partition": [
+                400,
+                200
+            ],
+            "convergence_partitions": [
+                10,
+                20,
+                40,
+                80,
+                100
+            ],
+            "element_type": "TRI"
+        },
+        "solver": {
+            "picard_iterations": 10,
+            "newton_iterations": 1,
+            "xtol": 1e-11,
+            "ftol": 1e-11,
+            "dynamic_ftol_ceiling": 1e-4,
+            "dynamic_ftol_spatial_safety_factor": 1e-2,
+            "stagnation_noise_floor": 1e-5,
+            "max_increases": 3,
+            "linesearch_alpha_min": 1e-10,
+            "armijo_c1": 1e-4,
+            "divergence_merit_factor": 1.05,
+            "max_linesearch_iterations": 25,
+            "linesearch_contraction_factor": 0.5,
+            "accelerator": {
+                "type": "Anderson",
+                "m": 5,
+                "relaxation_factor": 1.0
+            }
+        }
+    },
+    "output": {
+        "directory": "results",
+        "basename": "cocquet_literal_picard"
+    }
+}

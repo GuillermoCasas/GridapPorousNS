@@ -294,6 +294,8 @@ function run_convergence()
 
         errors_l2_u = Float64[]; errors_h1_u = Float64[]
         errors_l2_p = Float64[]; errors_h1_p = Float64[]
+        errors_l2_u_trial = Float64[]; errors_h1_u_trial = Float64[]
+        errors_l2_p_trial = Float64[]; errors_h1_p_trial = Float64[]
         eval_times = Float64[]; eval_iters = Int[]
 
         for N in N_list
@@ -315,6 +317,19 @@ function run_convergence()
             l2_eu_nested, h1_eu_nested, l2_eu, h1_eu, eu_nested, eu_cons = res_u
             l2_ep_nested, h1_ep_nested, l2_ep, h1_ep, ep_nested, ep_cons = res_p
 
+            # [H-C diagnostic] Project u_ref onto the Dirichlet-constrained TRIAL space U_h
+            # (not the free-DOF test space V_h_free used above). Hypothesis: paper plots
+            # ‖I_{U_h} u_ref − u_h‖, which differs from l2_nested only by how boundary nodes
+            # are populated (V_h_free interpolates u_ref's boundary trace; U_h uses analytic
+            # Dirichlet values). For P2-exact inlet `c_in y(1-y)` the algebraic difference is
+            # zero at boundary nodes; any measurable gap signals cross-mesh interpolation
+            # noise at coarse boundary nodes on unstructured meshes.
+            U_h, P_h = X_h
+            res_u_trial = PorousNSSolver.compute_trial_projection_errors(u_h, iu_ref, U_h, dΩ_h; filter_func=bounding_rule)
+            res_p_trial = PorousNSSolver.compute_trial_projection_errors(p_h, ip_ref, P_h, dΩ_h; filter_func=bounding_rule)
+            l2_eu_trial, h1_eu_trial = res_u_trial
+            l2_ep_trial, h1_ep_trial = res_p_trial
+
             PorousNSSolver.export_results(cfg_h, mod_h, u_h, p_h, "alpha" => alpha_h, "e_u" => eu_nested, "e_p" => ep_nested)
 
             # Reported metric is the CONSISTENT one (integrated on the fine reference mesh). On
@@ -324,13 +339,18 @@ function run_convergence()
             l2_uref = sqrt(sum(∫(u_ref ⊙ u_ref) * dΩ_ref))
             l2_uh   = sqrt(sum(∫(u_h ⊙ u_h) * dΩ_h))
             println("   [+] L2(u) consistent: ", l2_eu, "  | L2(u) NESTED: ", l2_eu_nested,
+                    "  | L2(u) TRIAL: ", l2_eu_trial,
                     "  | rel(consistent)=", l2_eu / l2_uref)
-            println("   [+] H1(u) consistent: ", h1_eu, "  | H1(u) NESTED: ", h1_eu_nested)
-            println("   [+] L2(p) consistent: ", l2_ep, "  | L2(p) NESTED: ", l2_ep_nested)
+            println("   [+] H1(u) consistent: ", h1_eu, "  | H1(u) NESTED: ", h1_eu_nested,
+                    "  | H1(u) TRIAL: ", h1_eu_trial)
+            println("   [+] L2(p) consistent: ", l2_ep, "  | L2(p) NESTED: ", l2_ep_nested,
+                    "  | L2(p) TRIAL: ", l2_ep_trial)
             println("   [+] ||u_ref||=", l2_uref, "  ||u_h||=", l2_uh)
 
             push!(errors_l2_u, l2_eu); push!(errors_h1_u, h1_eu)
             push!(errors_l2_p, l2_ep); push!(errors_h1_p, h1_ep)
+            push!(errors_l2_u_trial, l2_eu_trial); push!(errors_h1_u_trial, h1_eu_trial)
+            push!(errors_l2_p_trial, l2_ep_trial); push!(errors_h1_p_trial, h1_ep_trial)
             push!(eval_times, time_h); push!(eval_iters, iters_h)
 
             GC.gc()
@@ -347,6 +367,10 @@ function run_convergence()
             g["errors_h1_u"] = errors_h1_u
             g["errors_l2_p"] = errors_l2_p
             g["errors_h1_p"] = errors_h1_p
+            g["errors_l2_u_trial"] = errors_l2_u_trial
+            g["errors_h1_u_trial"] = errors_h1_u_trial
+            g["errors_l2_p_trial"] = errors_l2_p_trial
+            g["errors_h1_p_trial"] = errors_h1_p_trial
             g["eval_times"] = eval_times
             g["eval_iters"] = eval_iters
             attributes(g)["total_time_s"] = sum(eval_times)
