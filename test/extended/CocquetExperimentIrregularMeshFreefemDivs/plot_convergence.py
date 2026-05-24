@@ -1,13 +1,13 @@
-# test/extended/CocquetExperimentIrregularMesh/plot_convergence.py
+# test/extended/CocquetExperimentIrregularMeshFreefemDivs/plot_convergence.py
 #
-# Plotter for the IRREGULAR (unstructured-mesh) Cocquet study. Same 3-way comparison as the
+# Plotter for the freefem-divs UNSTRUCTURED-MESH Cocquet study. Same 3-way comparison as the
 # benchmark CocquetExperiment plotter (VMS P1/P1, VMS P2/P2, Cocquet Galerkin P2/P1), plotting
 # L2 and H1 norms. Shows ONLY this run's measurements — no reference-slope guide lines and no
 # overlaid paper-formula curves — so the figure depicts exactly the data in the HDF5.
 #
 # Usage:
-#   python plot_convergence.py                                       # convergence_paper_comparison_irregular.h5
-#   python plot_convergence.py convergence_paper_comparison_irregular.h5
+#   python plot_convergence.py                                                  # convergence_paper_comparison_irregular_freefem_divs.h5
+#   python plot_convergence.py convergence_paper_comparison_irregular_freefem_divs.h5
 import sys
 import os
 import re
@@ -19,7 +19,7 @@ import numpy as np
 def _resolve_h5(arg):
     results_dir = os.path.join(os.path.dirname(__file__), 'results')
     if arg is None:
-        return os.path.join(results_dir, 'convergence_paper_comparison_irregular.h5')
+        return os.path.join(results_dir, 'convergence_paper_comparison_irregular_freefem_divs.h5')
     if os.path.isabs(arg) or os.path.exists(arg):
         return arg
     if not arg.endswith('.h5'):

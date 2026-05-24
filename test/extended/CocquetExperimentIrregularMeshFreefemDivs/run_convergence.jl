@@ -1,25 +1,30 @@
-# test/extended/CocquetExperimentIrregularMesh/run_convergence.jl
+# test/extended/CocquetExperimentIrregularMeshFreefemDivs/run_convergence.jl
 # ==============================================================================================
 # Nature & Intent:
-# A single-variable FLIP off `test/extended/CocquetExperiment`: the ONLY change is the mesh —
-# this driver uses an UNSTRUCTURED (Delaunay) triangular mesh (`PorousNSSolver.build_unstructured_model`,
-# gmsh) instead of the structured Cartesian-simplexified mesh. The paper (Cocquet et al., 2020) used
-# FreeFem `buildmesh` (unstructured); the entire prior "outlet-corner singularity / paper-is-wrong"
-# conclusion in docs/cocquet_convergence_analysis.md was reached only on the structured mesh, so this
-# test isolates whether a corner-aligned structured mesh + structured self-reference was depressing the
-# measured slope below the paper's ~2.
+# A single-variable FLIP off `test/extended/CocquetExperimentIrregularMesh`: same gmsh Delaunay
+# unstructured mesh, same 3-way comparison (VMS P1/P1, VMS P2/P2, Cocquet Galerkin P2/P1), same
+# self-reference convergence methodology. ONE difference: the boundary-divisions policy is
+# `wall_divisions = :freefem`, which gives N segments per boundary part regardless of length —
+# the LITERAL `buildmesh(a(N)+b(N)+c(N)+d(N))` behaviour of FreeFem++. On our [0,2]×[0,1] domain
+# this leaves the walls (length 2) 2× coarser per edge than the inlet/outlet (length 1), an
+# anisotropy that the standard `:uniform` IrregularMesh sibling deliberately avoided by giving
+# walls 2N divisions.
 #
-# It reuses everything from the benchmark verbatim: the same Galerkin path (`galerkin_driver.jl` from the
-# sibling CocquetExperiment dir — single source of truth, NOT duplicated), the same weak form, the same
-# 3-way comparison (VMS P1/P1, VMS P2/P2, Cocquet Galerkin P2/P1), the same cross-mesh error metric.
+# Purpose: complete the FreeFem-parity experiment chain. CocquetExperimentIrregularMesh proved
+# the unstructured Delaunay topology recovers Cocquet's reported ~O(h²) slope on P2/P2. This
+# sibling asks: does adopting FreeFem's literal (anisotropic) boundary-divisions recipe push the
+# slope further toward Cocquet's reported values, or does the anisotropy at the walls actually
+# hurt? Already-existing diagnostic `freefem_recipe_diag.jl` exercises the mode at a single
+# (N_coarse, N_ref) pair; this driver runs the full convergence sweep in the same config-driven
+# pipeline so the result can be plotted side-by-side with the `:uniform` benchmark.
 #
-# The mesh choice is read from the config's top-level "mesh_generator" key ("UNSTRUCTURED" here),
-# stripped before strict schema parsing (exactly how Re/c_in/comparison_runs are handled), so no shared
-# `src/config.jl` schema change is needed.
+# The wall_divisions choice is read from the config's top-level "wall_divisions" key
+# ("freefem" here), stripped before strict schema parsing (exactly how mesh_generator/Re/c_in
+# are handled), so no shared `src/config.jl` schema change is needed.
 #
-# Run: cd test/extended/CocquetExperimentIrregularMesh && \
-#      julia --project=../../.. run_convergence.jl paper_comparison_irregular.json && \
-#      python plot_convergence.py convergence_paper_comparison_irregular.h5
+# Run: cd test/extended/CocquetExperimentIrregularMeshFreefemDivs && \
+#      julia --project=../../.. run_convergence.jl paper_comparison_irregular_freefem_divs.json && \
+#      python plot_convergence.py convergence_paper_comparison_irregular_freefem_divs.h5
 # ==============================================================================================
 
 using Pkg
@@ -175,7 +180,7 @@ end
 function run_convergence()
     println("--- Cocquet Convergence Analysis (IRREGULAR/UNSTRUCTURED mesh, N=200 Reference) ---")
 
-    config_file = length(ARGS) > 0 ? ARGS[1] : "paper_comparison_irregular.json"
+    config_file = length(ARGS) > 0 ? ARGS[1] : "paper_comparison_irregular_freefem_divs.json"
     base_config_path = joinpath(@__DIR__, "data", config_file)
     base_config_dict = JSON3.read(read(base_config_path, String), Dict{String, Any})
 
@@ -273,7 +278,7 @@ function run_convergence()
         println("##########################################################################################")
 
         println("\n   [+] Assembling High-Fidelity Reference Mesh Solution (N = $N_ref) natively...")
-        base_config_dict["output"]["basename"] = "cocquet_irr_ref_$(method)_P$(k_v)P$(k_p)_N$(N_ref)"
+        base_config_dict["output"]["basename"] = "cocquet_irr_ffd_ref_$(method)_P$(k_v)P$(k_p)_N$(N_ref)"
         mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref = build_solver(N_ref, base_config_dict, Re, c_in; porosity_order=porosity_order, mesh_generator=mesh_generator, wall_divisions=wall_divisions, mesh_file=freefem_path_for(N_ref))
         xh_ref, time_ref, iters_ref = exec_fn(mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref)
         u_ref, p_ref = xh_ref
@@ -295,7 +300,7 @@ function run_convergence()
             println("\n   ==============================================================")
             println("   [+] Launching Coarse Grid Algebraic Evaluation Space for N = $N")
             println("   ==============================================================")
-            base_config_dict["output"]["basename"] = "cocquet_irr_$(method)_P$(k_v)P$(k_p)_N$(N)"
+            base_config_dict["output"]["basename"] = "cocquet_irr_ffd_$(method)_P$(k_v)P$(k_p)_N$(N)"
             mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h = build_solver(N, base_config_dict, Re, c_in; porosity_order=porosity_order, mesh_generator=mesh_generator, wall_divisions=wall_divisions, mesh_file=freefem_path_for(N))
 
             xh_h, time_h, iters_h = exec_fn(mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h)
