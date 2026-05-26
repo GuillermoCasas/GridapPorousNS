@@ -227,6 +227,10 @@ function execute_outer_homotopy_perturbation_loop!(
     final_residual_attempt = NaN
     
     for attempt in 0:(pert_cfg.max_n_pert + 1)
+        # [design-intent] Same hard → easy ordering as `ManufacturedSolutions/run_test.jl`:
+        # default to the largest perturbation; only fall back to milder ones if Newton fails.
+        # `eval_eps[n]` records the largest eps_pert that worked, giving a robustness fingerprint
+        # per cell. See that file (around line 161) for the full rationale.
         eps_p = attempt <= pert_cfg.max_n_pert ? pert_cfg.eps_pert_base / (10.0^attempt) : 0.0
         
         u_0_func = PerturbationFunc(mms_setup.u_final, mms_setup.h_raw_func, eps_p * (mms_setup.u_ex_L2 / mms_setup.norm_h))

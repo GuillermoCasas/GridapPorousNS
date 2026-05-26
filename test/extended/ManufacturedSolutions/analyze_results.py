@@ -314,10 +314,16 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
                 etype = decode(g.attrs['element_type'])
                 Re = float(g.attrs['Re']); Da = float(g.attrs['Da']); a0 = float(g.attrs['alpha_0'])
                 res = g['eval_residuals'][:] if 'eval_residuals' in g else np.full(len(h), np.nan)
+                # `eval_eps` (per-mesh) = the largest eps_pert in {1.0, 0.1, ..., 0} that
+                # Newton actually absorbed at this N under the homotopy outer loop's
+                # break-at-first-success cascade. It is the per-cell robustness fingerprint;
+                # 1.0 = solver handled a full perturbation; 0 = only the eps=0 (u_ex) fallback
+                # converged (pre-asymptotic / noise-floor limited regime).
+                eps = g['eval_eps'][:] if 'eval_eps' in g else np.full(len(h), np.nan)
                 eu, ep, euh = g['err_u_l2'][:], g['err_p_l2'][:], g['err_u_h1'][:]
                 N = np.round(1.0 / h).astype(int)
                 o = np.argsort(N)
-                N, h, res, eu, ep, euh = N[o], h[o], res[o], eu[o], ep[o], euh[o]
+                N, h, res, eu, ep, euh, eps = N[o], h[o], res[o], eu[o], ep[o], euh[o], eps[o]
                 tr = np.array([is_true_root(res[i], N[i], kv, c) for i in range(len(N))])
 
                 ridx = int(np.where(N == report_N)[0][0]) if report_N in N else len(N) - 1
@@ -344,8 +350,13 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
                 cat = fl.get("category") if fl else None
                 p2 = phase2.get(_key(Re, Da, a0, kv, etype))
                 tol = slope_tol
+                # eps_used per the homotopy cascade: the eval_eps at the finest mesh (the
+                # hardest case in the convergence ladder) is the most diagnostic single number.
+                eps_finest = float(eps[-1]) if len(eps) and np.isfinite(eps[-1]) else float('nan')
+                eps_min = float(np.nanmin(eps)) if len(eps) and np.any(np.isfinite(eps)) else float('nan')
                 row = dict(cidx=int(parts[1]), Re=Re, Da=Da, a0=a0, k=kv, etype=etype, method=method,
-                           lsL2=lsL2, lsH1=lsH1, rate_mark="")
+                           lsL2=lsL2, lsH1=lsH1, rate_mark="",
+                           eps_finest=eps_finest, eps_min=eps_min)
 
                 if verified:
                     row.update(status="verified", mark="", N_rep=rep_N,
@@ -383,6 +394,9 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
 
     def rfmt(s):
         return "---" if (s is None or not np.isfinite(s)) else f"{s:.2f}"
+    def epsfmt(s):
+        # eps_pert values are exact decimals from {1.0, 0.1, 0.01, ..., 0.0}; format compactly.
+        return "---" if (s is None or not np.isfinite(s)) else (f"{s:.0e}" if 0 < s < 0.01 else f"{s:g}")
     with open(out_path, 'w') as io:
         io.write("# Merged MMS convergence table (Phase-1 sweep + Phase-2 continuation)\n\n")
         io.write("Marks: *(none)*=verified (true root + optimal slope, k+1 / k); ")
@@ -393,14 +407,20 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
         io.write("Rate caveat: a velocity-L² rate marked `ˢ` is ABOVE the nominal k+1 (super-convergent). ")
         io.write("This is not a failure (acceptance is one-sided, slope ≥ target − tol), but a rate well above nominal ")
         io.write("can signal the asymptotic regime is not yet established — confirm with one further refinement.\n\n")
-        io.write("| Config | Re | Da | α₀ | k | Elem | Method | Status | N_rep | L2_u | L2_p | H1_u | rate_L2u | rate_H1u | lsq_L2u | lsq_H1u |\n")
-        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+        io.write("**eps_finest / eps_min** columns report the per-cell robustness fingerprint: the largest "
+                 "eps_pert in {1.0, 0.1, ..., 0} that the homotopy outer loop accepted at the FINEST mesh "
+                 "(eps_finest) and the SMALLEST such value across the mesh ladder (eps_min). 1 means the "
+                 "solver absorbed a full ‖u_ex‖-scale perturbation of the initial guess; 0 means only the "
+                 "interpolated-u_ex fallback converged (pre-asymptotic / noise-floor limited).\n\n")
+        io.write("| Config | Re | Da | α₀ | k | Elem | Method | Status | N_rep | L2_u | L2_p | H1_u | rate_L2u | rate_H1u | lsq_L2u | lsq_H1u | eps_finest | eps_min |\n")
+        io.write("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
         for r in rows:
             l2u = (_fmt(r['l2u']) + r['mark']) if r['l2u'] is not None else "N/A"
-            io.write("| C{} | {:.0e} | {:.0e} | {:.2f} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n".format(
+            io.write("| C{} | {:.0e} | {:.0e} | {:.2f} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n".format(
                 r['cidx'], r['Re'], r['Da'], r['a0'], r['k'], r['etype'], r['method'], r['status'],
                 r['N_rep'], l2u, _fmt(r['l2p']), _fmt(r['h1u']),
-                rfmt(r['sL2']) + r.get('rate_mark', ''), rfmt(r['sH1']), rfmt(r.get('lsL2')), rfmt(r.get('lsH1'))))
+                rfmt(r['sL2']) + r.get('rate_mark', ''), rfmt(r['sH1']), rfmt(r.get('lsL2')), rfmt(r.get('lsH1')),
+                epsfmt(r.get('eps_finest')), epsfmt(r.get('eps_min'))))
     n_ver = sum(1 for r in rows if r['status'] == 'verified')
     n_star = sum(1 for r in rows if r['mark'] == '*')
     n_subopt = sum(1 for r in rows if r['mark'] == '‡')
@@ -463,6 +483,9 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
                     h = g['h'][:]; eu = g['err_u_l2'][:]; ep = g['err_p_l2'][:]
                     euh = g['err_u_h1'][:]; eph = g['err_p_h1'][:]
                     res = g['eval_residuals'][:] if 'eval_residuals' in g else np.full(len(h), np.nan)
+                    # eval_eps: per-mesh, largest eps_pert in {1.0, 0.1, ..., 0} that the homotopy
+                    # outer loop accepted at this N. The per-cell robustness fingerprint.
+                    eps_arr = g['eval_eps'][:] if 'eval_eps' in g else np.full(len(h), np.nan)
                     Ns = np.round(1.0 / h).astype(int)
                     # Diagnosis from the FULL per-mesh arrays (sorted by N, NO eu>0 filter) so the
                     # Status column matches detection / the merged table.
@@ -471,9 +494,9 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
                                                      kv, c, report_N, slope_tol)
                     # Masked + sorted arrays for plotting / rate / FME (drop non-positive errors).
                     m = (eu > 0) & (ep > 0)
-                    h, eu, ep, euh, eph, res, Ns = h[m], eu[m], ep[m], euh[m], eph[m], res[m], Ns[m]
+                    h, eu, ep, euh, eph, res, Ns, eps_arr = h[m], eu[m], ep[m], euh[m], eph[m], res[m], Ns[m], eps_arr[m]
                     order = np.argsort(Ns)
-                    h, eu, ep, euh, eph, res, Ns = (a[order] for a in (h, eu, ep, euh, eph, res, Ns))
+                    h, eu, ep, euh, eph, res, Ns, eps_arr = (a[order] for a in (h, eu, ep, euh, eph, res, Ns, eps_arr))
 
                     cf = g.attrs.get('config_file', b'unknown.json')
                     config_file_to_cidx[decode(cf)].add(c_idx)
@@ -496,6 +519,8 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
                     total_iters = int(g.attrs.get('total_iters', 0))
                     total_time = float(g.attrs.get('total_time_s', 0.0))
                     fres = res[-1] if len(res) and np.isfinite(res[-1]) else float('nan')
+                    eps_finest_det = float(eps_arr[-1]) if len(eps_arr) and np.isfinite(eps_arr[-1]) else float('nan')
+                    eps_min_det = float(np.nanmin(eps_arr)) if len(eps_arr) and np.any(np.isfinite(eps_arr)) else float('nan')
                     detailed_rows.append(dict(
                         cidx=int(c_idx), method=method, cf=decode(cf), Re=Re, Da=Da, a0=a0, kv=kv,
                         etype=etype, time=total_time, iters=total_iters, converged=honest_root,
@@ -504,7 +529,8 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
                         ru2=ru2, rp2=rp2, ru1=ru1, rp1=rp1,
                         opt=(opt_u_l2, opt_p_l2, opt_u_h1, opt_p_h1),
                         fme=(eu[-1] if len(eu) else np.nan, ep[-1] if len(ep) else np.nan,
-                             euh[-1] if len(euh) else np.nan, eph[-1] if len(eph) else np.nan)))
+                             euh[-1] if len(euh) else np.nan, eph[-1] if len(eph) else np.nan),
+                        eps_finest=eps_finest_det, eps_min=eps_min_det))
 
                     if do_plots and _HAVE_MPL and len(h):
                         ls = '-' if method == 'ASGS' else '--'
@@ -582,20 +608,27 @@ def _write_detailed_md(rows, config_file_to_cidx, out_file):
         io.write("- `no-root (N/A)` — no true root at any mesh. `incomplete` — only one mesh.\n\n")
         io.write("'Converged' is the HONEST true-root test (‖R‖ ≤ k_nf·dynamic_ftol) at the finest "
                  "mesh, not the solver's noise-floor-foolable flag. Final Res. shows (‖R‖ vs "
-                 "dynamic_ftol at that mesh). Rates/FME are the Phase-1 finest-mesh values.\n\n")
+                 "dynamic_ftol at that mesh). Rates/FME are the Phase-1 finest-mesh values.\n\n"
+                 "'eps_finest' / 'eps_min' is the homotopy outer loop's per-cell robustness fingerprint: "
+                 "the largest eps_pert ∈ {1.0, 0.1, ..., 0} that Newton absorbed at the finest mesh "
+                 "(eps_finest) and the smallest such value across all meshes (eps_min). 1 = solver "
+                 "handled a full perturbation; 0 = only the interpolated-u_ex fallback worked.\n\n")
+        def epsfmt_det(v):
+            return "---" if (v is None or not np.isfinite(v)) else (f"{v:.0e}" if 0 < v < 0.01 else f"{v:g}")
         io.write("| Config | Method | Source JSON | Re | Da | α_0 | k | Elem | Time (s) | Iters | "
                  "Converged | Status | Final Res. | rate_u_L2 | rate_p_L2 | rate_u_H1 | rate_p_H1 | "
-                 "FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 |\n")
-        io.write("|" + "---|" * 21 + "\n")
+                 "FME u_L2 | FME p_L2 | FME u_H1 | FME p_H1 | eps_finest | eps_min |\n")
+        io.write("|" + "---|" * 23 + "\n")
         for r in rows:
             ou2, op2, ou1, op1 = r['opt']
             conv = "Yes" if r['converged'] else "<b style='color:red'>No</b>"
-            io.write("| C{} | {} | {} | {} | {} | {:.2f} | {} | {} | {:.1f} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n".format(
+            io.write("| C{} | {} | {} | {} | {} | {:.2f} | {} | {} | {:.1f} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n".format(
                 r['cidx'], r['method'], r['cf'], jl(r['Re']), jl(r['Da']), r['a0'], r['kv'], r['etype'],
                 r['time'], r['iters'], conv, fstatus(r['status'], r.get('flag', '')),
                 f"{fsci(r['fres'])} ({fsci(r['ftol'])})",
                 frate(r['ru2'], ou2), frate(r['rp2'], op2), frate(r['ru1'], ou1), frate(r['rp1'], op1),
-                fsci(r['fme'][0]), fsci(r['fme'][1]), fsci(r['fme'][2]), fsci(r['fme'][3])))
+                fsci(r['fme'][0]), fsci(r['fme'][1]), fsci(r['fme'][2]), fsci(r['fme'][3]),
+                epsfmt_det(r.get('eps_finest')), epsfmt_det(r.get('eps_min'))))
         # config reference map
         io.write("\n## Simulation Configuration Reference Map\n")
         data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(out_file))), 'data')

@@ -158,15 +158,20 @@ function execute_outer_homotopy_perturbation_loop!(
     final_residual_attempt = NaN
     
     for attempt in 0:(pert_cfg.max_n_pert + 1)
-        # [eps-order-fix 2026-05-26] Try eps_pert=0 (start at u_ex) FIRST and escalate only if
-        # Newton fails. The previous order — eps=eps_pert_base → ... → 0 with first-success
-        # break — accepted a noise-floor "near-root" in extreme-parameter cells (e.g. config_18
-        # Re=Da=1e6) instead of the true minimum the eps=0 path would have reached. The diagnostic
-        # probe at diagnostics/velocity_centering_probe.jl proved a clean direct solve achieves
-        # ~2× lower L²(u) and 30× tighter residual at N=160. See plan "Diagnose & attack MMS
-        # convergence failures" Category B.
-        eps_p = attempt == 0 ? 0.0 :
-                pert_cfg.eps_pert_base / (10.0^(pert_cfg.max_n_pert + 1 - attempt))
+        # [design-intent] Iteration order is **hard → easy**: start with the largest perturbation
+        # (eps_pert_base, default 1.0) and only fall back to milder perturbations / eps=0 (clean
+        # u_ex initial guess) if Newton fails. Break-at-first-success means the harness records
+        # in `eval_eps[n]` the LARGEST perturbation the solver could absorb at this mesh; that
+        # column is an explicit map of where each cell needed help. A solver that only works when
+        # primed with u_ex is not practical — this test exposes that.
+        #
+        # NOTE: at extreme-parameter cells (e.g. config_18 Re=Da=1e6) the eps=1.0 attempt may
+        # land Newton in the basin's noise-floor region rather than at the true discrete minimum
+        # (probe `diagnostics/velocity_centering_probe.jl` measured a ~2× tighter L²(u) reachable
+        # via eps=0). That noise-floor convergence is the SOLVER'S honest behaviour from a generic
+        # initial guess — it shows up as sub-optimal slope and is the diagnostic signal we want,
+        # not noise to be optimised away.
+        eps_p = attempt <= pert_cfg.max_n_pert ? pert_cfg.eps_pert_base / (10.0^attempt) : 0.0
         
         u_0_func = PerturbationFunc(mms_setup.u_final, mms_setup.h_raw_func, eps_p * (mms_setup.u_ex_L2 / mms_setup.norm_h))
         x0 = interpolate_everywhere([u_0_func, mms_setup.p_final], setup.X)
