@@ -11,6 +11,11 @@
     "mms_max_extra_cycles": 5,
     "mms_require_consecutive_passes": 2,
     "mms_rate_check_factor": 100.0,
+    "skip_cells": [
+        [1e6, 1e-6, 0.05],
+        [1e6, 1.0,  0.05],
+        [1e6, 1e6,  0.05]
+    ],
     "physical_properties": {
         "Re": [1e-6, 1.0, 1e6],
         "Da": [1e-6, 1.0, 1e6],

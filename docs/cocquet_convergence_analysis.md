@@ -300,6 +300,8 @@ It bites only quadratics because a fixed regularity ceiling ($s\approx0.8$) is m
 
 ## 11. Investigation Phase 10: the EXACT Cocquet method (unstabilized Galerkin Taylor–Hood), and a full code audit
 
+> **⚠ Note (2026-05-26):** Phase 10 below concludes that the convergence cap is the mixed-BC outlet corner singularity and is method-independent. This conclusion was drawn entirely on a **structured Cartesian-simplexified** mesh. **Phase 11 (further down) revises it:** on an unstructured FreeFem-style mesh the velocity-L² cap relaxes substantially and slopes recover toward Cocquet's reported O(h²). The "method-independent corner singularity" reading of Phase 10 is therefore a **structured-mesh artefact**; the corner DOES dominate the cap, but on a mesh whose triangulation is not corner-aligned the dominance weakens. Read Phase 11 before relying on Phase 10's conclusions. See also [cocquet_investigation_synthesis.md](cocquet_investigation_synthesis.md) §5.3 / §5.7 for the post-S5-audit picture.
+
 To test whether the cap is our VMS formulation or the problem, we implemented Cocquet et al.'s *exact* discrete method — inf-sup-stable **Taylor–Hood $P_2/P_1$ with no stabilization** (pure Galerkin), $P_1$ porosity, $\eta p$ penalty — and ran it next to our VMS $P_1/P_1$ and $P_2/P_2$ in one figure. The unstabilized assembly reuses the production weak-form builders with `mult_mom=mult_mass=0` and lives in `test/extended/CocquetExperiment/galerkin_driver.jl` (validation tooling; `src/` is untouched). See `theory/cocquet_formulation.tex` for the documented formulation and the code map.
 
 ### Result — the exact Cocquet method is corner-capped too

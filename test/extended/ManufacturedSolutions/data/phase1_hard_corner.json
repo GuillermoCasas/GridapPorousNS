@@ -1,6 +1,6 @@
 {
     "erase_past_results": false,
-    "h5_filename": "phase1_tri_k2.h5",
+    "h5_filename": "phase1_hard_corner.h5",
     "epsilon_pert": [1.0],
     "max_n_pert": 1,
     "mms_verification_enabled": true,
@@ -11,13 +11,8 @@
     "mms_max_extra_cycles": 5,
     "mms_require_consecutive_passes": 2,
     "mms_rate_check_factor": 100.0,
-    "skip_cells": [
-        [1e6, 1e-6, 0.05],
-        [1e6, 1.0,  0.05],
-        [1e6, 1e6,  0.05]
-    ],
     "physical_properties": {
-        "Re": [1e-6, 1.0, 1e6],
+        "Re": [1e6],
         "Da": [1e-6, 1.0, 1e6],
         "physical_epsilon": [0.0],
         "numerical_epsilon_coefficient": [0.0001],
@@ -25,21 +20,21 @@
         "f_y": 0.0
     },
     "domain": {
-        "alpha_0": [1.0, 0.5, 0.05],
+        "alpha_0": [0.05],
         "r_1": 0.2,
         "r_2": 0.4,
         "bounding_box": [-0.5, 0.5, -0.5, 0.5]
     },
     "numerical_method": {
         "element_spaces": {
-            "k_velocity": [2],
-            "k_pressure": [2],
+            "k_velocity": [1, 2],
+            "k_pressure": [1, 2],
             "equal_order_only": true
         },
         "mesh": {
             "partition": [10, 10],
             "convergence_partitions": [10, 20, 40, 80, 160, 320],
-            "element_type": ["TRI"]
+            "element_type": ["QUAD", "TRI"]
         },
         "solver": {
             "picard_iterations": 2,
@@ -68,6 +63,6 @@
     },
     "output": {
         "directory": "test/extended/ManufacturedSolutions/results",
-        "basename": "phase1_tri_k2"
+        "basename": "phase1_hard_corner"
     }
 }

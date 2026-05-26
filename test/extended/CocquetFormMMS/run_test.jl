@@ -151,6 +151,61 @@ struct PerturbationConfig
     max_n_pert::Int
 end
 
+# [paper-faithful] Pure-Galerkin solve (mult_mom = mult_mass = 0) — the literal Cocquet
+# paper discrete formulation for inf-sup-stable Taylor-Hood. Mirrors the design of
+# test/extended/CocquetExperiment/galerkin_driver.jl: reuses the same weak-form builders
+# the VMS path uses, with the stabilization multipliers zeroed. No τ-stabilization, no
+# orthogonal-projection stage. Returns the same tuple shape solve_system does for
+# `(success, final_x0, iter_count, eval_time)` so the caller does not branch downstream.
+function execute_solver_galerkin_inline!(
+    setup::PorousNSSolver.FETopology, formulation::PorousNSSolver.VMSFormulation,
+    iter_solvers::PorousNSSolver.IterativeSolvers, config::PorousNSConfig, x0
+)
+    phys = config.physical_properties
+    freeze_cusp = config.numerical_method.solver.freeze_jacobian_cusp
+
+    res_fn(x, y)        = PorousNSSolver.build_stabilized_weak_form_residual(x, y, setup, formulation, phys;
+                                pi_u=nothing, pi_p=nothing, mult_mom=0.0, mult_mass=0.0)
+    jac_picard(x, dx, y) = PorousNSSolver.build_picard_jacobian(x, dx, y, setup, formulation, phys;
+                                pi_u=nothing, pi_p=nothing, mult_mom=0.0, mult_mass=0.0)
+    jac_newton(x, dx, y) = PorousNSSolver.build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys,
+                                freeze_cusp, PorousNSSolver.ExactNewtonMode();
+                                pi_u=nothing, pi_p=nothing, mult_mom=0.0, mult_mass=0.0)
+
+    op_picard = FEOperator(res_fn, jac_picard, setup.X, setup.Y)
+    op_newton = FEOperator(res_fn, jac_newton, setup.X, setup.Y)
+
+    iter_count = 0
+    success = false
+    final_residual_norm = NaN
+    x0_backup = copy(get_free_dof_values(x0))
+
+    eval_time = @elapsed begin
+        # Exact-Newton attempt first; Picard globalization fallback; final Newton polish.
+        res_n = PorousNSSolver.safe_fe_solve!(x0, iter_solvers.newton, op_newton; backup=x0_backup)
+        final_residual_norm = res_n.residual_norm
+        if res_n.state == :ok
+            iter_count = res_n.iterations
+            success = true
+        else
+            println("      [Galerkin] Newton state $(res_n.state); falling back to Picard...")
+            get_free_dof_values(x0) .= x0_backup
+            res_p = PorousNSSolver.safe_fe_solve!(x0, iter_solvers.picard, op_picard; backup=x0_backup)
+            iter_count += res_p.iterations
+            final_residual_norm = res_p.residual_norm
+            if res_p.state == :ok
+                res_n2 = PorousNSSolver.safe_fe_solve!(x0, iter_solvers.newton, op_newton; backup=x0_backup)
+                final_residual_norm = res_n2.residual_norm
+                if res_n2.state == :ok
+                    iter_count += res_n2.iterations
+                    success = true
+                end
+            end
+        end
+    end
+    return success, x0, iter_count, eval_time, final_residual_norm
+end
+
 # Algorithm E: Outer Homotopy Parameter Scaling
 function execute_outer_homotopy_perturbation_loop!(
     setup::PorousNSSolver.FETopology, formulation::PorousNSSolver.VMSFormulation,
@@ -208,11 +263,24 @@ function execute_outer_homotopy_perturbation_loop!(
             )
         end
         
-        sys_success, sys_mms_plateau_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
-            setup, formulation, iter_solvers,
-            config, x0;
-            diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
-        )
+        if uppercase(method) == "GALERKIN"
+            # [paper-faithful] Cocquet-paper pure-Galerkin path (mult_mom = mult_mass = 0).
+            # Bypasses solve_system's ASGS/OSGS machinery entirely. No plateau loop —
+            # Galerkin doesn't have τ-stabilization noise to track, and the error vs.
+            # the exact MMS solution is computed once-and-for-all after convergence.
+            sys_success, sys_final_x0, sys_iter_count, sys_eval_time, gal_final_residual =
+                execute_solver_galerkin_inline!(setup, formulation, iter_solvers, config, x0)
+            sys_mms_plateau_success = nothing
+            # Populate the diagnostics cache the same way solve_system does, so the analyzer's
+            # true-root gate (`is_true_root` reads `eval_residuals`) sees a finite residual.
+            local_diagnostics_cache["final_residual_norm"] = gal_final_residual
+        else
+            sys_success, sys_mms_plateau_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
+                setup, formulation, iter_solvers,
+                config, x0;
+                diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
+            )
+        end
         
         if haskey(local_diagnostics_cache, "mms_stop_reason")
             println("    -> MMS Plateau Reason: ", local_diagnostics_cache["mms_stop_reason"])

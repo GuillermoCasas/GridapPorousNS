@@ -19,6 +19,10 @@ jl_*.log
 *.sqlite
 Manifest.toml
 
+# Ignore per-test log folders and ad-hoc probe logs (run output, not source)
+**/logs/
+**/diagnostics/*.log
+
 # Ignore generic compilation temporary files
 *.tmp
 *.bak

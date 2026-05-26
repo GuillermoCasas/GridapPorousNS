@@ -11,6 +11,12 @@ other way around. Where a Cocquet/CocquetFormMMS result is used below it is clea
 
 Last updated: 2026-05-22.
 
+> **⚠ Caveats (added 2026-05-26):**
+> 1. **OSGS rows in this document's measurements are mislabelled ASGS.** The test harness `test/extended/ManufacturedSolutions/run_test.jl` hardcoded `"method" => "ASGS"` in the `config_dict` passed to `solve_system`, so every "ASGS vs OSGS" pair in `phase1_quad_k1.h5` / siblings is actually two ASGS solves. Any claim below that compares OSGS-specific behaviour to ASGS (e.g. §6 point 3 on "OSGS-specific pressure rate") is provisional pending the OSGS-dispatch fix and re-run. See [lessons_learned.md](lessons_learned.md) 2026-05-26 entry.
+> 2. **Sub-optimal rates at config_18 (Re=Da=10⁶, α=0.5) and config_23 (Re=10⁻⁶ Da=10⁶, α=0.05) were caused by a homotopy-ordering bug**, not by the formulation. The harness tried eps_pert ∈ {1.0, 0.1, 0.0} with break-at-first-success; the eps=1.0 perturbation landed Newton in the basin's noise-floor pseudo-root. Fixed 2026-05-26 by reversing the iteration order (eps=0 first). A direct probe at eps=0 recovered optimal slope (2.09) at config_18 N=80→N=160 versus production's 1.34. See [lessons_learned.md](lessons_learned.md) 2026-05-26 entry.
+> 3. The "fold at the extreme corner" diagnosis (§2 region B, §3) — that the discrete branch literally has no FE root at coarse mesh — may be partially or wholly an artefact of the eps_pert ordering bug at high (Re, Da, α-stress) regimes. C24 (Re=10⁶, Da=1, α=0.05) is the canonical example; re-evaluation needed under the corrected harness. The Phase-2 continuation results (super-convergent recovery to L²(u) rate ≈ 3) are not invalidated, but the FRAMING of "fold" should be revisited.
+
+
 ---
 
 ## TL;DR

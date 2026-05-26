@@ -158,7 +158,15 @@ function execute_outer_homotopy_perturbation_loop!(
     final_residual_attempt = NaN
     
     for attempt in 0:(pert_cfg.max_n_pert + 1)
-        eps_p = attempt <= pert_cfg.max_n_pert ? pert_cfg.eps_pert_base / (10.0^attempt) : 0.0
+        # [eps-order-fix 2026-05-26] Try eps_pert=0 (start at u_ex) FIRST and escalate only if
+        # Newton fails. The previous order — eps=eps_pert_base → ... → 0 with first-success
+        # break — accepted a noise-floor "near-root" in extreme-parameter cells (e.g. config_18
+        # Re=Da=1e6) instead of the true minimum the eps=0 path would have reached. The diagnostic
+        # probe at diagnostics/velocity_centering_probe.jl proved a clean direct solve achieves
+        # ~2× lower L²(u) and 30× tighter residual at N=160. See plan "Diagnose & attack MMS
+        # convergence failures" Category B.
+        eps_p = attempt == 0 ? 0.0 :
+                pert_cfg.eps_pert_base / (10.0^(pert_cfg.max_n_pert + 1 - attempt))
         
         u_0_func = PerturbationFunc(mms_setup.u_final, mms_setup.h_raw_func, eps_p * (mms_setup.u_ex_L2 / mms_setup.norm_h))
         x0 = interpolate_everywhere([u_0_func, mms_setup.p_final], setup.X)
@@ -245,8 +253,17 @@ function run_mms(config_file="test_config.json")
     Re_list = as_list(test_dict["physical_properties"]["Re"])
     Da_list = as_list(test_dict["physical_properties"]["Da"])
     alpha_list = as_list(test_dict["domain"]["alpha_0"])
-    
-    
+
+    # [paper-grid orchestration] Optional opt-in skip list for individual physics cells
+    # within the (Re × Da × α₀) cross-product. Format: a list of [Re, Da, alpha_0] triples.
+    # Used by the paper-grid Round-1 configs to defer the (Re=1e6, α₀=0.05) fold corner to a
+    # dedicated Round-2 batch. Default empty → no cells skipped, existing behavior unchanged.
+    skip_cells_set = Set{Tuple{Float64,Float64,Float64}}()
+    for triple in get(test_dict, "skip_cells", Any[])
+        @assert length(triple) == 3 "skip_cells entries must be [Re, Da, alpha_0]; got $(triple)"
+        push!(skip_cells_set, (Float64(triple[1]), Float64(triple[2]), Float64(triple[3])))
+    end
+
     nm_dict = test_dict["numerical_method"]
     elem_dict = nm_dict["element_spaces"]
     mesh_dict = nm_dict["mesh"]
@@ -313,7 +330,7 @@ function run_mms(config_file="test_config.json")
     
     conv_parts = mesh_dict["convergence_partitions"]
     
-    total_runs = sum(1 for etype in etype_list, kv in kv_list, kp in kp_list, alpha_0 in alpha_list, Da in Da_list, Re in Re_list if !(equal_order_only && kv != kp)) * length(methods)
+    total_runs = sum(1 for etype in etype_list, kv in kv_list, kp in kp_list, alpha_0 in alpha_list, Da in Da_list, Re in Re_list if !(equal_order_only && kv != kp) && !((Float64(Re), Float64(Da), Float64(alpha_0)) in skip_cells_set)) * length(methods)
     run_idx = 0
     
     # Pre-allocate cache for collecting metrics over partitions dynamically
@@ -343,7 +360,57 @@ function run_mms(config_file="test_config.json")
                         "overall_verification_success" => Bool[]
                     )
                 end
-                
+
+                # [resume-aware] Preload completed cells from existing HDF5 so the inner
+                # solve loop can skip cells whose (Re, Da, α, method) at the current N is
+                # already on disk. Only loads groups matching the current (etype, kv, kp).
+                if !erase_past && isfile(h5_path)
+                    h5open(h5_path, "r") do h5f_in
+                        for gname in keys(h5f_in)
+                            parts = split(gname, "_")
+                            if length(parts) >= 3 && parts[1] == "config"
+                                grp = h5f_in[gname]
+                                att = attributes(grp)
+                                try
+                                    r = Float64(read(att["Re"]))
+                                    d = Float64(read(att["Da"]))
+                                    a = Float64(read(att["alpha_0"]))
+                                    kv_v = Int(read(att["k_velocity"]))
+                                    kp_v = Int(read(att["k_pressure"]))
+                                    et = String(read(att["element_type"]))
+                                    m = String(read(att["method"]))
+                                    if et == etype && kv_v == kv && kp_v == kp
+                                        k_id_load = (etype, kv, kp, a, d, r, m)
+                                        if haskey(results_cache, k_id_load)
+                                            results_cache[k_id_load]["hs"]              = Vector{Float64}(read(grp["h"]))
+                                            results_cache[k_id_load]["err_u_l2"]        = Vector{Float64}(read(grp["err_u_l2"]))
+                                            results_cache[k_id_load]["err_p_l2"]        = Vector{Float64}(read(grp["err_p_l2"]))
+                                            results_cache[k_id_load]["err_u_h1"]        = Vector{Float64}(read(grp["err_u_h1"]))
+                                            results_cache[k_id_load]["err_p_h1"]        = Vector{Float64}(read(grp["err_p_h1"]))
+                                            results_cache[k_id_load]["eval_times"]      = Vector{Float64}(read(grp["eval_times"]))
+                                            results_cache[k_id_load]["eval_iters"]      = Vector{Int}(read(grp["eval_iters"]))
+                                            results_cache[k_id_load]["eval_eps"]        = Vector{Float64}(read(grp["eval_eps"]))
+                                            results_cache[k_id_load]["eval_residuals"]  = Vector{Float64}(read(grp["eval_residuals"]))
+                                            if haskey(grp, "overall_verification_success")
+                                                ovs = read(grp["overall_verification_success"])
+                                                results_cache[k_id_load]["overall_verification_success"] = Bool.(ovs .== 1)
+                                            end
+                                            if haskey(grp, "mms_plateau_success")
+                                                mps = read(grp["mms_plateau_success"])
+                                                results_cache[k_id_load]["mms_plateau_success"] = Union{Bool,Nothing}[x == -1 ? nothing : (x == 1) for x in mps]
+                                            end
+                                        end
+                                    end
+                                catch
+                                    # unreadable group; skip
+                                end
+                            end
+                        end
+                    end
+                    n_preloaded = sum(length(results_cache[k]["hs"]) for k in keys(results_cache) if k[1] == etype && k[2] == kv && k[3] == kp; init=0)
+                    println("[resume] Preloaded $(n_preloaded) (cell, N) data points from $(h5_path) for etype=$(etype), k_v=$(kv), k_p=$(kp).")
+                end
+
                 for n in conv_parts
                     println("\n========================================")
                     println("BUILDING MESH N = $n for etype = $etype, k_v = $kv, k_p = $kp")
@@ -444,6 +511,10 @@ function run_mms(config_file="test_config.json")
                         alpha_cf = CellField(x -> PorousNSSolver.alpha(alpha_field, x), Ω)
                         for Da in Da_list
                             for Re in Re_list
+                                if (Float64(Re), Float64(Da), Float64(alpha_0)) in skip_cells_set
+                                    println("[skip_cells] Re=$(Re), Da=$(Da), α=$(alpha_0) — skipped by config")
+                                    continue
+                                end
                                 U_amp = 1.0
                                 L = 1.0
                                 form = build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
@@ -523,7 +594,34 @@ function run_mms(config_file="test_config.json")
                                 for method in methods
                                     run_idx += 1
                                     println("\n--- Progress $(run_idx) / $(total_runs * length(conv_parts)) | Re=$(Re), Da=$(Da), α=$(alpha_0), method=$(method), N=$(n) ---")
-                                    
+
+                                    # [resume-aware] If this (cell, N) is already in HDF5 AS A VALID RESULT,
+                                    # skip the solve. If the existing entry is NaN (= prior solve failed),
+                                    # remove the stale entry and re-solve.
+                                    let k_id_skip = (etype, kv, kp, alpha_0, Da, Re, method),
+                                        target_h = 1.0 / n
+                                        rc = results_cache[k_id_skip]
+                                        hs_done = rc["hs"]
+                                        idx = findfirst(h -> abs(h - target_h) < 1e-12, hs_done)
+                                        if idx !== nothing
+                                            eu_existing = rc["err_u_l2"][idx]
+                                            if !isnan(eu_existing)
+                                                println("    [resume-skip] Already in HDF5 (target h=$(target_h)); skipping solve.")
+                                                continue
+                                            else
+                                                println("    [resume-retry] Prior result at h=$(target_h) was NaN; dropping stale entry and re-solving.")
+                                                # Drop the stale entry so the appended new result lands in the right slot.
+                                                for key in ("hs", "err_u_l2", "err_p_l2", "err_u_h1", "err_p_h1",
+                                                            "eval_times", "eval_iters", "eval_eps", "eval_residuals",
+                                                            "overall_verification_success", "mms_plateau_success")
+                                                    if length(rc[key]) >= idx
+                                                        deleteat!(rc[key], idx)
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+
                                     eps_pert_base = Float64(get(test_dict, "epsilon_pert", [0.1])[1])
                                     max_n_pert = Int(get(test_dict, "max_n_pert", 5))
                                     
