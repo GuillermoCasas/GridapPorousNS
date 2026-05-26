@@ -629,10 +629,33 @@ function run_mms(config_file="test_config.json")
 
                                     eps_pert_base = Float64(get(test_dict, "epsilon_pert", [0.1])[1])
                                     max_n_pert = Int(get(test_dict, "max_n_pert", 5))
-                                    
+
+                                    # [osgs-dispatch-fix 2026-05-26] The outer `config_dict` hardcodes
+                                    # "method" => "ASGS" (see line ~370). That makes solve_system always
+                                    # run the ASGS path regardless of the outer `method` loop variable —
+                                    # so OSGS rows in earlier HDF5s are mislabelled ASGS solves.
+                                    # Fix: rebuild a per-method PorousNSConfig with the right stabilization
+                                    # method AND propagate the test JSON's OSGS-specific overrides
+                                    # (osgs_iterations / osgs_tolerance / etc., which would otherwise be
+                                    # silently inherited from base_config.json defaults).
+                                    method_stab_dict = Dict{String,Any}(
+                                        "method" => String(method),
+                                        "osgs_iterations"          => get(stab_dict, "osgs_iterations", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_iterations", 3)),
+                                        "osgs_inner_newton_iters"  => get(stab_dict, "osgs_inner_newton_iters", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3)),
+                                        "osgs_tolerance"           => get(stab_dict, "osgs_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_tolerance", 1e-5)),
+                                        "osgs_projection_tolerance" => get(stab_dict, "osgs_projection_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_projection_tolerance", 1e-5)),
+                                        "osgs_stopping_mode"       => get(stab_dict, "osgs_stopping_mode", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_stopping_mode", "state_drift")),
+                                        "osgs_state_drift_scale"   => get(stab_dict, "osgs_state_drift_scale", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_state_drift_scale", "Linf")),
+                                        "osgs_warmup_iterations"   => get(stab_dict, "osgs_warmup_iterations", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_warmup_iterations", 2)),
+                                        "osgs_warmup_tolerance"    => get(stab_dict, "osgs_warmup_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_warmup_tolerance", 1e-3)),
+                                    )
+                                    method_config_dict = deepcopy(config_dict)
+                                    method_config_dict["numerical_method"]["stabilization"] = method_stab_dict
+                                    method_config = PorousNSSolver.load_config_from_dict(method_config_dict)
+
                                     u_h_exact, p_h_exact = x0_exact
                                     u_ex_L2 =  sqrt(abs(sum(∫(u_h_exact ⋅ u_h_exact)dΩ)))
-                                    
+
                                     setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
                                     formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
                                     iter_solvers = PorousNSSolver.IterativeSolvers(solver_picard, solver_newton)
@@ -644,7 +667,7 @@ function run_mms(config_file="test_config.json")
                                     # Incrementally shrink initial numerical perturbation forcing iterative validation
                                     # ==============================================================================
                                     success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt = execute_outer_homotopy_perturbation_loop!(
-                                        setup, formulation, iter_solvers, config, method, dynamic_ftol,
+                                        setup, formulation, iter_solvers, method_config, method, dynamic_ftol,
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
                                         mms_max_extra_cycles, mms_require_consecutive_passes,
