@@ -1,0 +1,329 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\geometry{margin=2.5cm}
+
+\title{Centered-encoding parametrization for the MMS sweep}
+\author{Working note (not yet merged into \texttt{article.tex})}
+\date{2026-05-28}
+
+% Match the notation conventions of article.tex (lines 140-141):
+\newcommand{\Reyn}{\operatorname{\mathit{Re}}}
+\newcommand{\Damk}{\operatorname{\mathit{Da}}}
+
+\begin{document}
+\maketitle
+
+\section{Motivation}
+
+The stabilized FE solver in this codebase is dimensional. Its inputs are
+$(\rho, \mu, \sigma, U, L, \boldsymbol{f})$ in a chosen system of units.
+The Method of Manufactured Solutions (MMS) test harness, however, organises
+runs by the \emph{dimensionless} regime $(\Reyn, \Damk, \alpha_0)$, and is
+free to choose any consistent dimensional encoding of each dimensionless
+cell. Here $\alpha_0$ is the infimum of the porosity field $\alpha(x)$, and
+$\alpha_\infty = 1$ is its supremum (a convention shared with
+\texttt{article.tex}).
+
+Until recently, the harness fixed
+\begin{equation}
+  U = 1, \qquad L = 1,
+\end{equation}
+and derived $\nu, \sigma$ from the dimensionless definitions used in
+\texttt{article.tex}:
+\begin{equation}
+  \nu \;=\; \frac{U\,L}{\Reyn} \;=\; \frac{1}{\Reyn},
+  \qquad
+  \sigma \;=\; \frac{\Damk\,\alpha_\infty\,\nu}{L^2}
+                          \;=\; \frac{\Damk\,\alpha_\infty}{\Reyn}.
+\end{equation}
+For the sweep grid $\Reyn \in \{10^{-6}, 1, 10^{6}\}$,
+$\Damk \in \{10^{-6}, 1, 10^{6}\}$, $\alpha_0 \in \{1, 0.5, 0.05\}$
+(with $\alpha_\infty = 1$), this encoding produces values such as
+$\nu = 10^{6}$ and $\sigma = 10^{12}$ for the cell
+$(\Reyn=10^{-6}, \Damk=10^{6}, \alpha_0=1)$. Twelve orders of magnitude
+separate the smallest from the largest dimensional coefficient that the
+solver sees, \emph{all on the same side of unity}.
+
+While the dimensionless physics is unchanged, this one-sided spread breaks
+numerical components of the stabilized solver that are not scale-invariant
+once round-off enters:
+\begin{itemize}
+  \item the OSGS staggered fixed-point's $L^2$ projection
+        $\pi_h$ of the strong residual evaluates
+        $\sigma\,\boldsymbol{u}_h$ and $\nu \Delta \boldsymbol{u}_h$ at
+        near-precision-floor $\boldsymbol{u}_h$ when
+        $\boldsymbol{u}_h \sim 1/\sigma$, amplifying floating-point noise
+        into a non-contractive $\pi_h$ update sequence;
+  \item the assembled Jacobian's row magnitudes span 12 orders, which the
+        direct factorisation absorbs but the Newton merit function and
+        line-search tolerances do not;
+  \item the MMS forcing oracle, computed by symbolic differentiation of the
+        analytic exact solution, mixes $\sigma\,\boldsymbol{u}_{\mathrm{ex}}$
+        at magnitude $10^{12}$ with sub-dominant terms at $10^{6}$, losing
+        six digits of relative precision in the sub-dominant contributions.
+\end{itemize}
+
+\section{The centered encoding}
+
+For a fixed dimensionless cell $(\Reyn, \Damk, \alpha_\infty)$, the
+harness has \emph{two} free dimensional parameters $(U, L)$. The freedom
+follows from the constraint pair (matching \texttt{article.tex} eq.~3.4):
+\begin{align}
+  \Reyn  &= \frac{U\,L}{\nu}, &
+  \Damk  &= \frac{\sigma\,L^2}{\alpha_\infty\,\nu}.
+\end{align}
+Eliminating $\nu, \sigma$:
+\begin{equation}
+  \nu\,\sigma
+   \;=\; \frac{\alpha_\infty\,\Damk\,U^{2}}{\Reyn^{2}},
+  \qquad
+  \frac{\nu}{\sigma}
+   \;=\; \frac{L^{2}}{\alpha_\infty\,\Damk}.
+\end{equation}
+So $U$ controls the geometric mean and $L$ controls the spread.
+
+\paragraph{Choice.}
+The \emph{centered encoding} chooses $U$ so that
+$\sqrt{\nu\,\sigma} = 1$, leaving $L = 1$ because the manufactured solution
+shape $\sin(\pi x)$ is hard-coded for a unit domain (see
+\texttt{Paper2DMMS} in \texttt{src/problems/mms\_paper\_2d.jl}):
+\begin{equation}
+  \boxed{\;\;
+    U \;=\; \frac{\Reyn}{\sqrt{\alpha_\infty\,\Damk}},
+    \qquad
+    L \;=\; 1.
+  \;\;}
+\end{equation}
+The resulting dimensional coefficients are
+\begin{equation}
+  \nu \;=\; \frac{1}{\sqrt{\alpha_\infty\,\Damk}},
+  \qquad
+  \sigma \;=\; \sqrt{\alpha_\infty\,\Damk}.
+\end{equation}
+One checks immediately that
+$\nu\,\sigma = 1$ (centering condition) and
+$\nu/\sigma = 1/(\alpha_\infty\,\Damk)$ (intrinsic spread).
+Note that $\nu$ and $\sigma$ no longer depend on $\Reyn$ — only $U$ absorbs
+the $\Reyn$ variation. The spread
+$\sigma / \nu = \alpha_\infty\,\Damk$ is \emph{intrinsic} to the cell and
+cannot be compressed by any choice of $(U, L)$; centering only shifts it
+to be symmetric about unity.
+
+\paragraph{What this does \emph{not} change.}
+The dimensionless equation (and therefore the dimensionless solution
+$\boldsymbol{u}^*, p^*$) is identical between the default and centered
+encodings; this is a strict reparametrization. The discrete velocity
+\emph{degrees of freedom} are
+$\boldsymbol{u}_h^{\mathrm{node}} \approx U\,\boldsymbol{u}^{*,\mathrm{node}}$,
+so they take on different absolute magnitudes between encodings, but their
+dimensionless counterparts $\boldsymbol{u}^{*,\mathrm{node}}$ are unchanged.
+The $H^1$-seminorm error
+$|\boldsymbol{u}_h - \boldsymbol{u}_{\mathrm{ex}}|_{H^1(\Omega)}\,/\,(U/L)$
+is regime-invariant (verified empirically: agreement to $<\!1\%$ across
+encodings on the easy regime C2).
+
+\section{Per-cell parameter table}
+
+The harness sweeps $\Reyn \in \{10^{-6}, 1, 10^{6}\}$,
+$\Damk \in \{10^{-6}, 1, 10^{6}\}$,
+$\alpha_0 \in \{1, 0.5, 0.05\}$, with $\alpha_\infty = 1$ in all cells.
+Three cells are skipped by config
+($(\Reyn, \Damk, \alpha_0) = (10^{6}, \star, 0.05)$, three triples),
+leaving 24 that are exercised by the sweep. Table~\ref{tab:per-cell}
+reports the dimensional values for both encodings. Because the dimensional
+$\sigma$ in the code path
+(\texttt{sigma\_c = Da * alpha\_infty * nu\_calc / L\^{}2}) uses
+$\alpha_\infty = 1$ throughout, the $\sigma$ columns are independent of
+$\alpha_0$ — they are determined purely by $(\Reyn, \Damk)$.
+
+\begin{table}[!htbp]
+  \centering
+  \footnotesize
+  \begin{tabular}{l rrr rrr rrr}
+    \toprule
+    & \multicolumn{3}{c}{Dimensionless inputs} &
+      \multicolumn{3}{c}{Default ($U=L=1$)} &
+      \multicolumn{3}{c}{Centered} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
+    \# & $\Reyn$ & $\Damk$ & $\alpha_0$ & $U$ & $\nu$ & $\sigma$ & $U$ & $\nu$ & $\sigma$ \\
+    \midrule
+    C1  & $10^{-6}$ & $10^{-6}$ & 1.00 & 1 & $10^{6}$    & $1$         & $10^{-3}$ & $10^{3}$    & $10^{-3}$ \\
+    C2  & 1         & $10^{-6}$ & 1.00 & 1 & 1           & $10^{-6}$   & $10^{3}$  & $10^{3}$    & $10^{-3}$ \\
+    C3  & $10^{6}$  & $10^{-6}$ & 1.00 & 1 & $10^{-6}$   & $10^{-12}$  & $10^{9}$  & $10^{3}$    & $10^{-3}$ \\
+    C4  & $10^{-6}$ & 1         & 1.00 & 1 & $10^{6}$    & $10^{6}$    & $10^{-6}$ & 1           & 1         \\
+    C5  & 1         & 1         & 1.00 & 1 & 1           & 1           & 1         & 1           & 1         \\
+    C6  & $10^{6}$  & 1         & 1.00 & 1 & $10^{-6}$   & $10^{-6}$   & $10^{6}$  & 1           & 1         \\
+    C7  & $10^{-6}$ & $10^{6}$  & 1.00 & 1 & $10^{6}$    & $10^{12}$   & $10^{-9}$ & $10^{-3}$   & $10^{3}$  \\
+    C8  & 1         & $10^{6}$  & 1.00 & 1 & 1           & $10^{6}$    & $10^{-3}$ & $10^{-3}$   & $10^{3}$  \\
+    C9  & $10^{6}$  & $10^{6}$  & 1.00 & 1 & $10^{-6}$   & 1           & $10^{3}$  & $10^{-3}$   & $10^{3}$  \\
+    \midrule
+    C10 & $10^{-6}$ & $10^{-6}$ & 0.50 & 1 & $10^{6}$    & $1$         & $10^{-3}$ & $10^{3}$    & $10^{-3}$ \\
+    C11 & 1         & $10^{-6}$ & 0.50 & 1 & 1           & $10^{-6}$   & $10^{3}$  & $10^{3}$    & $10^{-3}$ \\
+    C12 & $10^{6}$  & $10^{-6}$ & 0.50 & 1 & $10^{-6}$   & $10^{-12}$  & $10^{9}$  & $10^{3}$    & $10^{-3}$ \\
+    C13 & $10^{-6}$ & 1         & 0.50 & 1 & $10^{6}$    & $10^{6}$    & $10^{-6}$ & 1           & 1         \\
+    C14 & 1         & 1         & 0.50 & 1 & 1           & 1           & 1         & 1           & 1         \\
+    C15 & $10^{6}$  & 1         & 0.50 & 1 & $10^{-6}$   & $10^{-6}$   & $10^{6}$  & 1           & 1         \\
+    C16 & $10^{-6}$ & $10^{6}$  & 0.50 & 1 & $10^{6}$    & $10^{12}$   & $10^{-9}$ & $10^{-3}$   & $10^{3}$  \\
+    C17 & 1         & $10^{6}$  & 0.50 & 1 & 1           & $10^{6}$    & $10^{-3}$ & $10^{-3}$   & $10^{3}$  \\
+    C18 & $10^{6}$  & $10^{6}$  & 0.50 & 1 & $10^{-6}$   & 1           & $10^{3}$  & $10^{-3}$   & $10^{3}$  \\
+    \midrule
+    C19 & $10^{-6}$ & $10^{-6}$ & 0.05 & 1 & $10^{6}$    & $1$         & $10^{-3}$ & $10^{3}$    & $10^{-3}$ \\
+    C20 & 1         & $10^{-6}$ & 0.05 & 1 & 1           & $10^{-6}$   & $10^{3}$  & $10^{3}$    & $10^{-3}$ \\
+    \multicolumn{10}{l}{\emph{(skipped: $\Reyn = 10^{6}, \Damk = 10^{-6}, \alpha_0 = 0.05$)}} \\
+    C21 & $10^{-6}$ & 1         & 0.05 & 1 & $10^{6}$    & $10^{6}$    & $10^{-6}$ & 1           & 1         \\
+    C22 & 1         & 1         & 0.05 & 1 & 1           & 1           & 1         & 1           & 1         \\
+    \multicolumn{10}{l}{\emph{(skipped: $\Reyn = 10^{6}, \Damk = 1, \alpha_0 = 0.05$)}} \\
+    C23 & $10^{-6}$ & $10^{6}$  & 0.05 & 1 & $10^{6}$    & $10^{12}$   & $10^{-9}$ & $10^{-3}$   & $10^{3}$  \\
+    C24 & 1         & $10^{6}$  & 0.05 & 1 & 1           & $10^{6}$    & $10^{-3}$ & $10^{-3}$   & $10^{3}$  \\
+    \multicolumn{10}{l}{\emph{(skipped: $\Reyn = 10^{6}, \Damk = 10^{6}, \alpha_0 = 0.05$)}} \\
+    \bottomrule
+  \end{tabular}
+  \caption{Dimensional parameter values for each dimensionless cell in the
+    \texttt{phase1\_quad\_k1} sweep, under the default encoding
+    ($U=L=1$) and the centered encoding
+    ($U = \Reyn/\sqrt{\alpha_\infty \Damk}$, $L=1$), with
+    $\alpha_\infty = 1$ as run by the test harness
+    (\texttt{run\_test.jl:76}). The dimensionless physics is identical
+    between the two columns; only the dimensional representation differs.
+    Under the centered encoding, $\nu$ and $\sigma$ depend only on
+    $\Damk$, never on $\Reyn$ or $\alpha_0$.}
+  \label{tab:per-cell}
+\end{table}
+
+\paragraph{Maximum dimensional coefficient.}
+The worst cells under the default encoding (C7, C16, C23) hit
+$\sigma = 10^{12}$. Under the centered encoding the worst is
+$\sigma = 10^{3}$ (any cell with $\Damk = 10^{6}$). The maximum dimensional
+coefficient drops by nine orders of magnitude across the sweep.
+
+\section{Verification evidence}
+
+Two single-cell probes
+(\texttt{test/extended/ManufacturedSolutions/diagnostics/jacobian\_equilibration\_osgs\_probe.jl})
+validated the reparametrization before the full rerun. Note that the
+probe used a slightly different centering formula
+$U = \Reyn/\sqrt{\alpha_0 \Damk}$ (with $\alpha_0 = 0.5$ for C16), so
+$U = 1.41\cdot10^{-9}$ and $\sigma = 1.41\cdot10^{3}$ in the probe;
+the harness rerun uses $U = \Reyn/\sqrt{\alpha_\infty \Damk}$ with
+$\alpha_\infty = 1$, giving $U = 10^{-9}$ and $\sigma = 10^{3}$ exactly.
+
+\paragraph{C16 OSGS (high-$\sigma$, the canonical fold case).}
+\begin{center}
+\begin{tabular}{lrr}
+  \toprule
+  & Default & Centered (probe) \\
+  \midrule
+  $\nu$                           & $10^{6}$            & $1.41\cdot10^{-3}$ \\
+  $\sigma$                        & $10^{12}$           & $1.41\cdot10^{3}$ \\
+  OSGS staggered iters            & 25 (budget)         & 0 (immediate) \\
+  $\pi_u$-drift                   & $7.6\cdot10^{8}$    & $1.03\cdot10^{-6}$ \\
+  \texttt{overall\_converged}     & \texttt{false}      & \texttt{true} \\
+  Initial residual                & $1.27\cdot10^{-3}$  & $3.08\cdot10^{-10}$ \\
+  $L^{2}(\boldsymbol{u})$         & $1.07\cdot10^{-3}$  & $4.72\cdot10^{-4}$ \\
+  $H^{1}(\boldsymbol{u})$         & $2.45\cdot10^{-1}$  & $1.04\cdot10^{-1}$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\noindent The OSGS staggered fixed-point's projection drift drops by
+\emph{fourteen orders of magnitude}. Same physics; the difference is the
+floating-point conditioning of the strong-residual projection.
+
+\paragraph{C2 (easy regime; consistency check).}
+With $\Reyn=1$, $\Damk=10^{-6}$, $\alpha_0=1$, both encodings should give
+the same answer up to round-off.
+\begin{center}
+\begin{tabular}{lrr}
+  \toprule
+  & Default ($U=1$) & Centered ($U=10^{3}$) \\
+  \midrule
+  $H^{1}(\boldsymbol{u})$ & $3.612\cdot10^{-2}$ & $3.564\cdot10^{-2}$ \quad ($0.7\%$ diff) \\
+  $L^{2}(\boldsymbol{u})$ & $5.92\cdot10^{-4}$  & $1.18\cdot10^{-4}$  \quad (different noise floor) \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\noindent The $H^{1}$ semi-norm error agrees to under $1\%$ between
+encodings, confirming that the centered encoding represents the same
+discrete physics. The $L^{2}$ values differ by a constant noise-floor
+factor: in both runs the absolute residual at convergence is $O(10^{-9})$,
+and that absolute noise is divided by $U_c = U$ when forming the
+normalized error — a $1000\times$ different denominator produces the
+apparent $5\times$ discrepancy without any discretisation disagreement.
+
+\section{Implementation}
+
+The implementation is a single-line change to the MMS harness; no
+modification to the dimensional solver code:
+
+\begin{center}
+\begin{minipage}{0.9\linewidth}
+\begin{lstlisting}[basicstyle=\ttfamily\small, frame=single]
+# test/extended/ManufacturedSolutions/run_test.jl, ~line 523
+
+# Before (default encoding):
+U_amp = 1.0
+L     = 1.0
+
+# After (centered encoding):
+U_amp = Re / sqrt(alpha_infty * Da)
+L     = 1.0
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+The remainder of the harness pipeline (\texttt{build\_mms\_formulation},
+\texttt{Paper2DMMS}, \texttt{evaluate\_exactness\_diagnostics},
+\texttt{get\_characteristic\_scales}) already threads $U$ and $L$ through
+correctly: the MMS exact velocity is multiplied by $U$, the manufactured
+forcing is computed analytically from that scaled solution, and error
+norms divide out $U_c = U$ to report dimensionless quantities. No tooling
+surgery is required.
+
+\section{What is deliberately \emph{not} addressed here}
+
+\begin{itemize}
+  \item \textbf{The $L$ degree of freedom.}
+        \texttt{Paper2DMMS} hard-codes the spatial shape
+        $\sin(\pi x_1)\sin(\pi x_2)$ etc., which is one half-period on the
+        unit square but high-frequency garbage on $L \neq 1$. Allowing $L$
+        to vary would require generalising the shape to $\sin(\pi x/L)$
+        and re-deriving the analytic gradient/Laplacian/forcing terms. The
+        present reparametrization keeps $L=1$ and uses only the $U$ degree
+        of freedom; the achievable spread reduction is still $\sim 9$
+        orders of magnitude on the worst cell.
+  \item \textbf{The pressure penalty $\eta = \mathrm{eps\_val}$.}
+        The dimensional pressure amplitude $P_c$ varies with the encoding,
+        which means $\eta \cdot p^2$ has a different effective weight per
+        cell. Empirically the discrete LBB stabilization is the primary
+        gauge fix and $\eta$ acts only as a safety net; the rerun will
+        validate this in practice. If the sweep reveals an $\eta$-related
+        regression, a regime-aware scaling
+        $\eta_{\mathrm{cell}} \propto P_c^{-2}$ is a focused follow-up.
+  \item \textbf{Solver tolerances.}
+        \texttt{ftol}, \texttt{xtol}, \texttt{stagnation\_noise\_floor}
+        are absolute. Under the centered encoding the residual magnitudes
+        shrink for low-$\Reyn$ cells; the existing
+        \texttt{dynamic\_ftol\_spatial\_safety\_factor} machinery scales
+        \texttt{ftol} with $h^{k+1}$, which empirically reaches sensible
+        values in both encodings (the probes converged to high precision).
+        If a regression appears, the dynamic-tolerance formula is the
+        first place to look.
+\end{itemize}
+
+\section*{Status}
+
+This document accompanies a single-line code change at
+\texttt{test/extended/ManufacturedSolutions/run\_test.jl:523}. It is kept
+in \texttt{theory/} as a standalone working note pending the full
+24-cell sweep rerun on this encoding; once the encoding is shown to be
+\emph{uniformly} desirable (no regression on the easy cells, demonstrable
+gains on the high-$\sigma$ cells), the content here should be folded into
+\texttt{article.tex} as a remark in the verification section.
+
+\end{document}

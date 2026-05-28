@@ -24,6 +24,27 @@ struct SafeNewtonSolver <: NonlinearSolver
     # (legacy: any noise-floor stop is "success"). A finite value (e.g. 10.0) rejects high-Re
     # fold stalls — where ‖R‖≈1e-5 sits ~10²–10³× above ftol — from masquerading as a true root.
     noise_floor_success_max_ftol_multiple::Float64
+    # Per-field RELATIVE convergence tolerances. When set, the solver derives absolute
+    # per-field thresholds at iter 0 from the SOLUTION-FIELD SCALE — the inf-norm of
+    # the initial guess restricted to each field block:
+    #     effective_ftol_per_field[k] = max(ftol, relative_ftol_per_field[k] * ‖x₀[block_k]‖_∞)
+    # All termination checks then use those per-field absolute thresholds. The scalar
+    # `ftol` is the per-field absolute FLOOR; `relative_ftol_per_field[k]` is the
+    # dimensionless target (e.g., c_sf·h^(k+1) ≈ 1e-4 — "1% of the FE discretization
+    # error level relative to the solution field's magnitude"). When `nothing` (default),
+    # the solver uses the scalar `ftol` and `stagnation_noise_floor` globally —
+    # bit-identical to legacy.
+    #
+    # Why "intrinsic": `‖x₀[block_k]‖_∞` is the magnitude of the solution field we are
+    # converging TOWARDS (modulo perturbations the harness/orchestrator may have
+    # introduced; for MMS this is ≈ ‖u_ex‖, for production it reflects the user's
+    # initial guess or Dirichlet BC). It does NOT depend on knowing the analytic exact
+    # solution or any other problem-specific external scale. When ‖x₀[block_k]‖ is zero
+    # (e.g., a production solve starting from a true-zero IC with all-Dirichlet
+    # boundary conditions also at zero), the scale collapses and effective_ftol_per_field[k]
+    # falls back to the scalar `ftol` floor — legacy behavior.
+    relative_ftol_per_field::Union{Nothing, Vector{Float64}}
+    relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}}
 end
 
 # Convenience constructor: keeps existing positional call sites untouched (the honest-exit gate
@@ -33,11 +54,14 @@ function SafeNewtonSolver(ls::LinearSolver, max_iters::Int, max_increases::Int,
                           c1::Float64, divergence_merit_factor::Float64,
                           stagnation_noise_floor::Float64, max_linesearch_iterations::Int,
                           linesearch_contraction_factor::Float64; mode::Symbol = :newton,
-                          noise_floor_success_max_ftol_multiple::Float64 = Inf)
+                          noise_floor_success_max_ftol_multiple::Float64 = Inf,
+                          relative_ftol_per_field::Union{Nothing, Vector{Float64}} = nothing,
+                          relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}} = nothing)
     return SafeNewtonSolver(ls, max_iters, max_increases, xtol, ftol, linesearch_alpha_min,
                             c1, divergence_merit_factor, stagnation_noise_floor,
                             max_linesearch_iterations, linesearch_contraction_factor, mode,
-                            noise_floor_success_max_ftol_multiple)
+                            noise_floor_success_max_ftol_multiple,
+                            relative_ftol_per_field, relative_stagnation_noise_floor_per_field)
 end
 
 function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig; mode::Symbol = :newton)
@@ -69,6 +93,8 @@ function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing,
         nls.linesearch_contraction_factor,
         isnothing(mode) ? nls.mode : mode,
         nls.noise_floor_success_max_ftol_multiple,
+        nls.relative_ftol_per_field,
+        nls.relative_stagnation_noise_floor_per_field,
     )
 end
 
@@ -79,6 +105,31 @@ function check_solver_parameters(s::SafeNewtonSolver)
     if s.linesearch_alpha_min <= 0.0 || s.linesearch_alpha_min > 1.0 throw(ArgumentError("alpha_min must be in (0, 1].")) end
     if !(s.mode in (:newton, :picard)) throw(ArgumentError("SafeNewtonSolver mode must be :newton or :picard, got $(s.mode).")) end
     if s.noise_floor_success_max_ftol_multiple < 1.0 throw(ArgumentError("noise_floor_success_max_ftol_multiple must be >= 1.0 (Inf disables the honest-exit gate).")) end
+    if s.relative_ftol_per_field !== nothing
+        if isempty(s.relative_ftol_per_field)
+            throw(ArgumentError("relative_ftol_per_field must be a non-empty Vector or nothing."))
+        end
+        for (k, v) in enumerate(s.relative_ftol_per_field)
+            if !(v > 0.0) || !isfinite(v)
+                throw(ArgumentError("relative_ftol_per_field[$k] = $v must be finite and > 0."))
+            end
+        end
+    end
+    if s.relative_stagnation_noise_floor_per_field !== nothing
+        if isempty(s.relative_stagnation_noise_floor_per_field)
+            throw(ArgumentError("relative_stagnation_noise_floor_per_field must be a non-empty Vector or nothing."))
+        end
+        for (k, v) in enumerate(s.relative_stagnation_noise_floor_per_field)
+            if !(v > 0.0) || !isfinite(v)
+                throw(ArgumentError("relative_stagnation_noise_floor_per_field[$k] = $v must be finite and > 0."))
+            end
+        end
+    end
+    # If both per-field vectors are present, their lengths must agree (same field count).
+    if s.relative_ftol_per_field !== nothing && s.relative_stagnation_noise_floor_per_field !== nothing &&
+       length(s.relative_ftol_per_field) != length(s.relative_stagnation_noise_floor_per_field)
+        throw(ArgumentError("relative_ftol_per_field and relative_stagnation_noise_floor_per_field must have the same length (one entry per field)."))
+    end
 end
 
 struct SafeSolverResult
@@ -125,23 +176,212 @@ mutable struct SafeIterationState
     norm_b_new_inf::Float64
     phi_x::Float64
     phi_x_new::Float64
+    # Per-field inf-norms of the residual, computed in lock-step with the global
+    # `norm_b_*` scalars. `field_blocks === nothing` (single-field operator) leaves
+    # these as a 1-element vector matching the global value, so downstream code
+    # uniformly indexes `[k]` regardless.
+    norm_b_per_field::Vector{Float64}
+    norm_b_new_per_field::Vector{Float64}
+    # Per-field inf-norms of the current accepted iterate `x`, used as the
+    # natural-scale proxy for converting `solver.relative_*_per_field` into absolute
+    # per-field thresholds. RE-EVALUATED EVERY ITERATION (not running max / not
+    # fixed at iter 0) so the convergence target tracks the actual solution
+    # magnitude as Newton progresses. This handles three regimes uniformly:
+    #   • MMS where x₀ ≈ x_exact: scale stable, per-iter rebuild is a no-op;
+    #   • zero IC: scale starts at 0 (→ scalar fallback) and becomes meaningful
+    #     once Newton finds non-trivial iterates;
+    #   • bad/oversized IC: scale shrinks as Newton converges toward x_exact,
+    #     tolerance tightens accordingly.
+    # See _resolve_solution_scale_per_field for the cross-field fallback used
+    # when only one field's iterate has zero magnitude.
+    solution_scale_per_field::Vector{Float64}
+    # Effective per-field absolute thresholds, recomputed every iteration from
+    # `solution_scale_per_field` and the solver's `relative_*_per_field` (or
+    # falling back to the solver's scalar `ftol`/`stagnation_noise_floor` floors
+    # when the solver carries no relative tolerances — legacy bit-identical).
+    effective_ftol_per_field::Vector{Float64}
+    effective_noise_floor_per_field::Vector{Float64}
+end
+
+"""
+    _resolve_solution_scale_per_field(raw_scales) -> Vector{Float64}
+
+When one field's initial-guess inf-norm is zero (typical production case: zero
+pressure IC even when velocity has a Dirichlet-imposed magnitude), fall back to
+a dimensionally consistent proxy derived from the other field. For the standard
+(u, p) saddle-point case at ρ = 1:
+
+  • ‖u‖ has units of velocity [L/T]
+  • ‖p‖ has units of ρ·u² (Euler pressure scaling) so ‖p‖^(1/2) has units of u
+
+so if ‖u‖₀ = 0 we use `sqrt(‖p‖₀)` as the velocity-equivalent scale, and if
+‖p‖₀ = 0 we use `‖u‖₀²` as the pressure-equivalent scale. This is the
+"Bernoulli/total-head" combined scale heuristic and removes the per-field
+zero-fallback hole that would otherwise force the solver back to legacy.
+
+When ALL fields are zero (true-zero initial guess on every field), the resolved
+scales stay zero and the effective thresholds collapse to the scalar `solver.ftol`
+/ `solver.stagnation_noise_floor` floors — recovering legacy behavior.
+
+For other field-count configurations (single field, or n > 2 multi-physics), no
+saddle-point heuristic applies and the raw scales are returned unchanged.
+
+The ρ = 1 assumption matches this codebase's convention (`PaperGeneralFormulation`
+does not carry a ρ parameter; the dimensionless equation uses ρ = 1 throughout).
+"""
+function _resolve_solution_scale_per_field(raw_scales::Vector{Float64})
+    if length(raw_scales) == 2
+        u_scale, p_scale = raw_scales[1], raw_scales[2]
+        if u_scale == 0.0 && p_scale > 0.0
+            return [sqrt(p_scale), p_scale]
+        elseif p_scale == 0.0 && u_scale > 0.0
+            return [u_scale, u_scale^2]
+        end
+    end
+    return copy(raw_scales)
+end
+
+"""
+    _initialize_effective_thresholds(solver, solution_scale_per_field) -> (ftols, noise_floors)
+
+Derives the per-field absolute thresholds the solver uses throughout the run.
+
+`solution_scale_per_field[k]` is a proxy for the size of the solution field — the
+inf-norm of the initial guess restricted to field block k, with a Bernoulli-style
+cross-field fallback when one field's IC is zero (see
+`_resolve_solution_scale_per_field`).
+
+The user's `relative_*_per_field[k]` is the dimensionless target (e.g. `c_sf·h^(k+1)`).
+The effective absolute threshold is `max(scalar_floor, relative_target * scale)` so
+the scalar value remains a hard floor (the solver never tries to go tighter than
+the user's absolute ftol, regardless of what relative×scale produces).
+"""
+function _initialize_effective_thresholds(solver::SafeNewtonSolver,
+                                          solution_scale_per_field::Vector{Float64})
+    nfields = length(solution_scale_per_field)
+    ftols = Vector{Float64}(undef, nfields)
+    noise_floors = Vector{Float64}(undef, nfields)
+
+    if solver.relative_ftol_per_field !== nothing
+        @assert length(solver.relative_ftol_per_field) == nfields "relative_ftol_per_field length mismatch"
+        @inbounds for k in 1:nfields
+            ftols[k] = max(solver.ftol, solver.relative_ftol_per_field[k] * solution_scale_per_field[k])
+        end
+    else
+        @inbounds for k in 1:nfields
+            ftols[k] = solver.ftol
+        end
+    end
+
+    if solver.relative_stagnation_noise_floor_per_field !== nothing
+        @assert length(solver.relative_stagnation_noise_floor_per_field) == nfields "relative_stagnation_noise_floor_per_field length mismatch"
+        @inbounds for k in 1:nfields
+            noise_floors[k] = max(solver.stagnation_noise_floor,
+                                  solver.relative_stagnation_noise_floor_per_field[k] * solution_scale_per_field[k])
+        end
+    else
+        @inbounds for k in 1:nfields
+            noise_floors[k] = solver.stagnation_noise_floor
+        end
+    end
+
+    return ftols, noise_floors
+end
+
+"""
+    _per_field_inf_norms!(out, b, field_blocks)
+
+In-place fill of `out` with the per-field inf-norms of `b`. When
+`field_blocks === nothing`, `out` is a 1-element vector containing `norm(b, Inf)`
+(legacy/single-field path). Otherwise `out[k] = maximum(abs, view(b, field_blocks[k]))`.
+"""
+function _per_field_inf_norms!(out::Vector{Float64}, b::AbstractVector,
+                                field_blocks::Union{Nothing, Vector{UnitRange{Int}}})
+    if field_blocks === nothing
+        @assert length(out) == 1 "single-field fallback requires a 1-element output buffer"
+        out[1] = norm(b, Inf)
+    else
+        @assert length(out) == length(field_blocks) "out and field_blocks must match in length"
+        @inbounds for k in eachindex(field_blocks)
+            m = 0.0
+            for j in field_blocks[k]
+                a = abs(b[j])
+                if a > m
+                    m = a
+                end
+            end
+            out[k] = m
+        end
+    end
+    return out
+end
+
+"""
+    _residual_meets_per_field_ftol(per_field_norms, effective_ftols)
+
+Returns true iff every field's inf-norm is below its effective absolute threshold.
+When `solver.relative_*_per_field === nothing`, `effective_ftols[k]` equals the
+solver's scalar `ftol` for every k, so this collapses to a global inf-norm check —
+bit-identical to legacy.
+"""
+function _residual_meets_per_field_ftol(per_field_norms::Vector{Float64},
+                                          effective_ftols::Vector{Float64})
+    @assert length(per_field_norms) == length(effective_ftols) "field count mismatch"
+    @inbounds for k in eachindex(effective_ftols)
+        per_field_norms[k] <= effective_ftols[k] || return false
+    end
+    return true
+end
+
+"""
+    _residual_meets_per_field_noise_floor(per_field_norms, effective_noise_floors)
+
+Same pattern as `_residual_meets_per_field_ftol` but for the stagnation noise floor.
+"""
+function _residual_meets_per_field_noise_floor(per_field_norms::Vector{Float64},
+                                                 effective_noise_floors::Vector{Float64})
+    @assert length(per_field_norms) == length(effective_noise_floors) "field count mismatch"
+    @inbounds for k in eachindex(effective_noise_floors)
+        per_field_norms[k] <= effective_noise_floors[k] || return false
+    end
+    return true
+end
+
+"""
+    _residual_meets_per_field_honest_exit_gate(per_field_norms, effective_ftols, k_nf)
+
+The "honest-exit" gate: a noise-floor stop counts as success only if every
+field's residual is also within `k_nf × effective_ftols[k]`. Legacy collapses
+to the global check when `effective_ftols` is uniform.
+"""
+function _residual_meets_per_field_honest_exit_gate(per_field_norms::Vector{Float64},
+                                                      effective_ftols::Vector{Float64},
+                                                      k_nf::Float64)
+    @assert length(per_field_norms) == length(effective_ftols) "field count mismatch"
+    @inbounds for k in eachindex(effective_ftols)
+        per_field_norms[k] <= k_nf * effective_ftols[k] || return false
+    end
+    return true
 end
 
 # Algorithm A.2: Armijo Linesearch Pass
-function eval_armijo_linesearch_pass!(x, x_old, b, dx, op, dir_deriv, solver::SafeNewtonSolver, w, state::SafeIterationState)
+function eval_armijo_linesearch_pass!(x, x_old, b, dx, op, dir_deriv, solver::SafeNewtonSolver, w, state::SafeIterationState,
+                                       field_blocks::Union{Nothing, Vector{UnitRange{Int}}})
     alpha = 1.0
     step_norm_base = norm(dx, Inf)
     state.ls_success = false
     state.norm_b_new_inf = norm(b, Inf)
+    _per_field_inf_norms!(state.norm_b_new_per_field, b, field_blocks)
     state.phi_x_new = state.phi_x
-    
+
     eval_merit_W(b_vec) = 0.5 * sum(idx -> (b_vec[idx] / w[idx])^2, eachindex(b_vec))
-    
+
     for ls_iter in 1:solver.max_linesearch_iterations
         x .= x_old .- alpha .* dx
         residual!(b, op, x)
         state.phi_x_new = eval_merit_W(b)
         state.norm_b_new_inf = norm(b, Inf)
+        _per_field_inf_norms!(state.norm_b_new_per_field, b, field_blocks)
 
         if isnan(state.phi_x_new) || isnan(state.norm_b_new_inf)
             alpha *= solver.linesearch_contraction_factor
@@ -182,14 +422,16 @@ function eval_safeguard_termination_bounds!(solver::SafeNewtonSolver, state::Saf
     stop_reason = ""
     converged = false
     should_break = false
-    
-    if state.norm_b_new_inf <= solver.ftol
+
+    k_nf = solver.noise_floor_success_max_ftol_multiple
+
+    if _residual_meets_per_field_ftol(state.norm_b_new_per_field, state.effective_ftol_per_field)
         return "ftol_reached", true, true
     end
 
     if !state.ls_success
-        if state.norm_b_new_inf <= solver.stagnation_noise_floor &&
-           state.norm_b_new_inf <= solver.noise_floor_success_max_ftol_multiple * solver.ftol
+        if _residual_meets_per_field_noise_floor(state.norm_b_new_per_field, state.effective_noise_floor_per_field) &&
+           _residual_meets_per_field_honest_exit_gate(state.norm_b_new_per_field, state.effective_ftol_per_field, k_nf)
             return "stagnation_noise_floor_reached", true, true
         end
         println("  [Linesearch Depleted] Geometric step fraction alpha vanished below minimum limits without sufficient mathematical descent. Aborting local sequence.")
@@ -221,17 +463,17 @@ function eval_safeguard_termination_bounds!(solver::SafeNewtonSolver, state::Saf
     end
     
     if state.step_norm <= solver.xtol
-        if state.norm_b_new_inf <= solver.stagnation_noise_floor &&
-           state.norm_b_new_inf <= solver.noise_floor_success_max_ftol_multiple * solver.ftol
+        if _residual_meets_per_field_noise_floor(state.norm_b_new_per_field, state.effective_noise_floor_per_field) &&
+           _residual_meets_per_field_honest_exit_gate(state.norm_b_new_per_field, state.effective_ftol_per_field, k_nf)
             return "stagnation_noise_floor_reached", true, true
         end
         println("  [Coordinate Stagnation] Step update magnitude collapsed below relative machine tracking limits (xtol = $(solver.xtol)). Algebraic progress saturated.")
         return "xtol_stagnation", false, true
     end
-    
+
     if state.i == solver.max_iters
-        if state.norm_b_new_inf <= solver.stagnation_noise_floor &&
-           state.norm_b_new_inf <= solver.noise_floor_success_max_ftol_multiple * solver.ftol
+        if _residual_meets_per_field_noise_floor(state.norm_b_new_per_field, state.effective_noise_floor_per_field) &&
+           _residual_meets_per_field_honest_exit_gate(state.norm_b_new_per_field, state.effective_ftol_per_field, k_nf)
             return "stagnation_noise_floor_reached", true, true
         end
         println("  [Iteration Cap] Sequence hit maximum bounded loops ($(state.i)) without geometrically saturating non-linear constraints.")
@@ -317,27 +559,52 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     # if the test space is single-field, in which case the legacy global
     # equilibration is used.
     field_blocks = _detect_field_blocks(op)
+    # If the solver carries per-field tolerances, the field count must match.
+    nfields = field_blocks === nothing ? 1 : length(field_blocks)
+    if solver.relative_ftol_per_field !== nothing && length(solver.relative_ftol_per_field) != nfields
+        throw(ArgumentError("relative_ftol_per_field has length $(length(solver.relative_ftol_per_field)) but the operator's test space has $nfields field(s)."))
+    end
+    if solver.relative_stagnation_noise_floor_per_field !== nothing && length(solver.relative_stagnation_noise_floor_per_field) != nfields
+        throw(ArgumentError("relative_stagnation_noise_floor_per_field has length $(length(solver.relative_stagnation_noise_floor_per_field)) but the operator's test space has $nfields field(s)."))
+    end
 
     println("    [+] Evaluating initial PDE residual...")
     residual!(b, op, x)
     norm_b_inf = norm(b, Inf)
+    norm_b_per_field = Vector{Float64}(undef, nfields)
+    norm_b_new_per_field = Vector{Float64}(undef, nfields)
+    _per_field_inf_norms!(norm_b_per_field, b, field_blocks)
+    copyto!(norm_b_new_per_field, norm_b_per_field)
+
+    # Solution-magnitude proxy per field: ‖x[block_k]‖_∞ with cross-field Bernoulli
+    # fallback when one is zero. Recomputed every accepted Newton iter so the
+    # tolerance scale tracks the current iterate, not a stale guess (see comment
+    # on `solution_scale_per_field` in SafeIterationState).
+    x_per_field_raw = Vector{Float64}(undef, nfields)
+    _per_field_inf_norms!(x_per_field_raw, x, field_blocks)
+    solution_scale_per_field = _resolve_solution_scale_per_field(x_per_field_raw)
+    effective_ftol_per_field, effective_noise_floor_per_field =
+        _initialize_effective_thresholds(solver, solution_scale_per_field)
 
     # Preallocate zero-allocation weights
     w = ones(length(b))
     eval_merit_W(b_vec) = 0.5 * sum(idx -> (b_vec[idx] / w[idx])^2, eachindex(b_vec))
-    
+
     phi_x = eval_merit_W(b)
     println("Iter 0: f(x) inf-norm = $norm_b_inf | Merit Φ = $phi_x")
-    
-    if norm_b_inf <= solver.ftol
+
+    # Initial-ftol short-circuit using the per-field thresholds derived from x₀'s scale.
+    if _residual_meets_per_field_ftol(norm_b_new_per_field, effective_ftol_per_field)
         res = SafeSolverResult(0, norm_b_inf, norm_b_inf, 0.0, "initial_ftol")
         return x, SafeSolverCache(b, A, dx, ls_cache, res)
     end
-    
+
     initial_b_inf = norm_b_inf
-    
+
     state = SafeIterationState(
-        0, 0, false, 1.0, 0.0, norm_b_inf, norm_b_inf, phi_x, phi_x
+        0, 0, false, 1.0, 0.0, norm_b_inf, norm_b_inf, phi_x, phi_x,
+        norm_b_per_field, norm_b_new_per_field,
+        solution_scale_per_field, effective_ftol_per_field, effective_noise_floor_per_field,
     )
     
     x_old = similar(x)
@@ -371,7 +638,7 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         dir_deriv = -2.0 * state.phi_x
         
         x_old .= x
-        eval_armijo_linesearch_pass!(x, x_old, b, dx, op, dir_deriv, solver, w, state)
+        eval_armijo_linesearch_pass!(x, x_old, b, dx, op, dir_deriv, solver, w, state, field_blocks)
         
         if state.ls_success
             println("Iter $i: f(x) inf-norm = $(state.norm_b_new_inf) | Merit Φ = $(state.phi_x_new) | Step inf-norm = $(state.step_norm) | alpha = $(state.alpha)")
@@ -381,7 +648,22 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
             best_x .= x
             best_b_inf = state.norm_b_new_inf
         end
-        
+
+        # Refresh the per-field solution-magnitude proxy and re-derive the absolute
+        # thresholds. Re-evaluating EVERY iter (not running max, not fixed at iter 0)
+        # so the tolerance tracks the actual current iterate:
+        #   • bad/oversized x₀ shrinks toward x_exact → thresholds tighten;
+        #   • zero IC grows from 0 → thresholds become meaningful after first step;
+        #   • MMS x₀ ≈ x_exact stays stable.
+        # Cost: O(n_dofs) inf-norm + O(nfields) arithmetic per iter — negligible vs
+        # Jacobian assembly / linear solve.
+        _per_field_inf_norms!(x_per_field_raw, x, field_blocks)
+        new_scale = _resolve_solution_scale_per_field(x_per_field_raw)
+        copyto!(state.solution_scale_per_field, new_scale)
+        new_ftols, new_noise_floors = _initialize_effective_thresholds(solver, state.solution_scale_per_field)
+        copyto!(state.effective_ftol_per_field, new_ftols)
+        copyto!(state.effective_noise_floor_per_field, new_noise_floors)
+
         reason, converged, should_break = eval_safeguard_termination_bounds!(solver, state)
         
         if should_break
@@ -397,6 +679,7 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
 
         state.phi_x = state.phi_x_new
         state.norm_b_inf = state.norm_b_new_inf
+        copyto!(state.norm_b_per_field, state.norm_b_new_per_field)
     end
     
     res = SafeSolverResult(state.i, state.norm_b_inf, initial_b_inf, state.step_norm, stop_reason)

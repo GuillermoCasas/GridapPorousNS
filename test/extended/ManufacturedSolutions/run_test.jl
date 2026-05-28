@@ -520,7 +520,12 @@ function run_mms(config_file="test_config.json")
                                     println("[skip_cells] Re=$(Re), Da=$(Da), α=$(alpha_0) — skipped by config")
                                     continue
                                 end
-                                U_amp = 1.0
+                                # Centered encoding: choose U_amp so that geom-mean(ν_dim, σ_dim) = 1.
+                                # Same (Re, Da, α_infty) — only U_amp varies. Brings the dimensional
+                                # coefficients into the FP safe zone for high-Br regimes; verified
+                                # to unbreak the OSGS staggered loop at σ ~ 10¹¹ (C16 probe). See
+                                # diagnostics/jacobian_equilibration_osgs_probe.jl for evidence.
+                                U_amp = Re / sqrt(alpha_infty * Da)
                                 L = 1.0
                                 form = build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
                                 
@@ -548,7 +553,7 @@ function run_mms(config_file="test_config.json")
                                 c_ceil = config.numerical_method.solver.dynamic_ftol_ceiling
                                 c_sf = config.numerical_method.solver.dynamic_ftol_spatial_safety_factor
                                 dynamic_ftol = max(config.numerical_method.solver.ftol, min(c_ceil, c_sf * spatial_err_est))
-                                
+
                                 # Extrapolate dynamic noise scaling bounded against topological condition limits
                                 condition_scaling = Float64(n)^2 * max(1.0, Float64(Re))
                                 n_base = config.numerical_method.solver.condition_noise_floor_baseline
@@ -559,6 +564,23 @@ function run_mms(config_file="test_config.json")
                                 dynamic_noise_floor = max(dynamic_noise_floor, dynamic_ftol * n_sf)
                                 max_ls_iters = config.numerical_method.solver.max_linesearch_iterations
                                 ls_contract = config.numerical_method.solver.linesearch_contraction_factor
+
+                                # Per-field RELATIVE tolerances (Option C, intrinsic-scale variant):
+                                # pass dimensionless targets per field. The solver derives the per-field
+                                # absolute thresholds at each iteration from ‖x_current[block_k]‖_∞ (with
+                                # cross-field Bernoulli fallback when zero). No problem-specific external
+                                # scale (U_c, P_c) is plumbed through — the proxy comes from the iterate
+                                # itself. The shared target `c_sf · h^(k+1)` is the dimensionless "1% of
+                                # FE discretization error" goal; each field gets its own absolute threshold
+                                # via solver-side `relative_target * ‖x[block]‖` (floored at the scalar
+                                # ftol so the solver never tries below the user's absolute floor).
+                                rel_target_per_field = [c_sf * spatial_err_est, c_sf * spatial_err_est]
+                                # The noise-floor relative target mirrors `dynamic_noise_floor / dynamic_ftol`
+                                # in the legacy formula. With the per-iter intrinsic-scale machinery, the
+                                # solver applies the same `‖x[block]‖` scaling — so what we pass here is the
+                                # *relative* ratio between noise-floor and ftol, multiplied by c_sf·h^(k+1).
+                                # In the centered encoding this naturally scales with the solution magnitude.
+                                rel_noise_floor_per_field = [n_sf * c_sf * spatial_err_est, n_sf * c_sf * spatial_err_est]
                                 
                                 # Extract dynamic algebraic complexity scaling for Picard limits
                                 local_picard_it = solver_picard_it
@@ -584,11 +606,23 @@ function run_mms(config_file="test_config.json")
                                 end
 
                                 # [honest-exit] gate: a noise-floor stop counts as converged only if
-                                # ‖R‖∞ ≤ k_nf · dynamic_ftol. Read from config (base default 1e30 = disabled;
+                                # ‖R‖∞ ≤ k_nf · effective_ftol. Read from config (base default 1e30 = disabled;
                                 # the Phase-1 sweep configs set 10.0 to reject high-Re fold stalls).
                                 k_nf = config.numerical_method.solver.noise_floor_success_max_ftol_multiple
-                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard, noise_floor_success_max_ftol_multiple=k_nf)
-                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_newton_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; noise_floor_success_max_ftol_multiple=k_nf)
+                                # Pass a true machine-precision floor as the SafeNewtonSolver scalar ftol —
+                                # NOT `dynamic_ftol`, and NOT the user's `config.solver.ftol`. The dynamic
+                                # spatial scaling (c_sf · h^{k+1}) is already encoded in `rel_target_per_field`,
+                                # and the per-field rule recovers absolute tolerances through ε_k · ‖x[block_k]‖.
+                                # The scalar floor's only role is to prevent the per-field rule from descending
+                                # below floating-point round-off. Setting it at `10 · eps(Float64)` keeps it
+                                # effectively inert for any regime in which `ε_k · ‖x[block_k]‖` exceeds
+                                # machine precision (i.e., for all physically meaningful cells), while leaving
+                                # one order of safety against κ(A)-amplified assembly round-off.
+                                static_ftol_floor = 10 * eps(Float64)
+                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, static_ftol_floor, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard, noise_floor_success_max_ftol_multiple=k_nf,
+                                                                              relative_ftol_per_field=rel_target_per_field, relative_stagnation_noise_floor_per_field=rel_noise_floor_per_field)
+                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_newton_it, max_inc, xtol, static_ftol_floor, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; noise_floor_success_max_ftol_multiple=k_nf,
+                                                                              relative_ftol_per_field=rel_target_per_field, relative_stagnation_noise_floor_per_field=rel_noise_floor_per_field)
                                 
                                 solver_picard = FESolver(nls_picard)
                                 solver_newton = FESolver(nls_newton)

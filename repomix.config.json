@@ -16,12 +16,16 @@
       ".repomixignore",
       "**/*.pdf",
       "scratch/**/*",
-      "results/**/*",
+      "**/results/**/*",
       "**/*.msh",
       "**/*.vtu",
       "**/*.vtk",
       "**/*.pvd",
-      "**/*.h5"
+      "**/*.h5",
+      "**/*.json",
+      "theory/**/*",
+      "docs/**/*",
+      ".agents/**/*"
     ]
   }
 }

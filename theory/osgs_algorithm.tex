@@ -5,6 +5,7 @@
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage[most]{tcolorbox}
 \usepackage{tikz}
@@ -930,6 +931,21 @@ quadratic basin captures the iterate. Requiring $N_{\mathrm{inc}}$
 $F_{\mathrm{div}}$, separates transient overshooting from genuine
 repeated divergence.
 
+\paragraph{Scalar tolerance tests are dimensionally homogeneous.}
+The tests $\|\hat{\boldsymbol{b}}\|_{\infty}\le\textftol$ (line~5)
+and $\|\hat{\boldsymbol{b}}\|_{\infty}\le\textstag$ (lines~10, 19, 24)
+treat all components of $\hat{\boldsymbol{b}}$ as carrying a single
+common dimension. This is consistent with the core algorithm, which
+operates at a fixed parametric point. When this kernel is reused
+across a sweep that traverses many orders of magnitude in the
+velocity or pressure scales, the same numerical threshold cannot
+remain physically meaningful for all components simultaneously; the
+harness extension of Sec.~\ref{sec:harness-perfield} substitutes the
+block-wise rules~\eqref{eq:per-field-convergence}
+and~\eqref{eq:per-field-noise} for these scalar tests, with the
+honest-exit gate~\eqref{eq:per-field-honest} replacing the implicit
+single-scale gate that wraps each $\mathsf{NoiseFloor}$ exit.
+
 % ============================================================
 \section{Stage II: Algorithm C (OSGSFractionalRelaxation)}
 \label{sec:osgs}
@@ -1502,26 +1518,196 @@ Table~\ref{tab:params} verbatim. The harness changes parameter
 \emph{values} only; the algorithm boxes themselves are unchanged, so
 no $\mathrm{O}'$ or $\mathrm{B}'$ variants are needed.}
 
-\subsection{Adaptive \texorpdfstring{$\textftol$}{ftol}}
+\subsection{Discretisation-coupled outer-loop tolerance}
 \label{sec:harness-ftol}
 
 \extline{Two error scales matter in an FE method. The \emph{algebraic
-error} is the distance between the iterate and the discrete root,
-governed by $\textftol$. The \emph{discretisation error} is the
-distance between the discrete root and the true PDE solution, which
-behaves as $O(h^{k_v+1})$. The harness therefore re-derives $\textftol$
-per case:}
+error} is the distance between the iterate and the discrete root.
+The \emph{discretisation error} is the distance between the discrete
+root and the true PDE solution, which behaves as $O(h^{k_v+1})$.
+The harness derives a discretisation-coupled scalar tolerance,}
 \begin{equation}
     \label{eq:dynamic-ftol}
     \textcolor{extcolor}{\textftol^{\,\mathrm{dyn}}
     = \max\!\Bigl(\textftol^{\,\mathrm{static}},\
-        \min(C_{\mathrm{ceil}},\ C_{\mathrm{sf}} \cdot h^{k_v+1}) \Bigr).}
+        \min(C_{\mathrm{ceil}},\ C_{\mathrm{sf}} \cdot h^{k_v+1}) \Bigr),}
 \end{equation}
-\extline{The right-most term ties the tolerance to the discretisation
-scale via a spatial safety factor $C_{\mathrm{sf}}$; the ceiling
-$C_{\mathrm{ceil}}$ prevents trivially loose tolerances on coarse
-meshes; the outer $\max$ prevents the formula from descending below
-the user-supplied $\textftol^{\,\mathrm{static}}$.}
+\extline{in which $C_{\mathrm{sf}}$ ties the algebraic target to the
+discretisation rate; the ceiling $C_{\mathrm{ceil}}$ guards against
+trivially loose targets on coarse meshes; and the outer $\max$ pins
+the tolerance above the user-supplied $\textftol^{\,\mathrm{static}}$.
+Quantity~\eqref{eq:dynamic-ftol} governs the staggered drift criteria
+of Algorithm~\ref{alg:C} (Sec.~\ref{sec:osgs}) and the plateau target
+of Algorithm~\ref{alg:D} (Sec.~\ref{sec:mms}); for the
+algebraic convergence of the inner Newton kernel,
+Sec.~\ref{sec:harness-perfield} replaces this scalar criterion with a
+per-field intrinsic-scale rule that remains physically meaningful when
+the regime varies by many orders of magnitude.}
+
+\subsection{Per-field intrinsic-scale convergence for the inner Newton}
+\label{sec:harness-perfield}
+
+\extline{The scalar test $\|\boldsymbol{b}\|_\infty \le \textftol$ used
+throughout Algorithms~\ref{alg:A} and~\ref{alg:A3} carries a hidden
+dimensional assumption: it presumes that all components of the
+residual share one common scale. For the saddle-point system
+considered here, this is incorrect. The assembled residual contains
+momentum rows whose dimensions are $[\mu\, U / L^{2}]$ alongside
+continuity rows whose dimensions are $[U/L]$, with the two natural
+scales $U$ and $\mu$ varying by many orders of magnitude across
+$(\mathrm{Re}, \mathrm{Da})$ space. A scalar threshold meaningful for
+one regime is either trivially satisfied or unattainable in another.
+The harness therefore declares the inner convergence target as a
+\emph{dimensionless rate per field}, $\varepsilon_{k}$, and resolves
+it to an absolute per-iteration tolerance via a scale proxy derived
+from the iterate itself.}
+
+\extline{Let $\mathcal{B}_{u}, \mathcal{B}_{p} \subseteq \{1,\dots,N\}$
+denote the free-DOF index sets of the velocity and pressure field
+blocks (the consecutive multi-field style of Gridap; the construction
+generalises verbatim to $K > 2$ fields). Define the per-block
+inf-norms of the residual and the iterate,}
+\begin{equation}
+    \label{eq:per-field-norms}
+    \textcolor{extcolor}{
+    R_{k}(\boldsymbol{b}) := \|\boldsymbol{b}[\mathcal{B}_{k}]\|_{\infty},
+    \qquad
+    \mathcal{U}_{k}^{\mathrm{raw}}(\boldsymbol{x}) := \|\boldsymbol{x}[\mathcal{B}_{k}]\|_{\infty},
+    \qquad k \in \{u, p\}.}
+\end{equation}
+
+\extline{The scale proxy $\mathcal{U}_{k}(\boldsymbol{x})$ used to
+non-dimensionalise the tolerance is recovered from the iterate
+itself; no externally supplied $U_{c}, P_{c}$ enter the solver
+interface. When both blocks of the iterate have acquired a
+non-trivial magnitude, the proxy is the block's own inf-norm. When
+one block remains at zero (the canonical case being a zero-pressure
+initial condition together with a moving velocity), the missing scale
+is recovered from the other block via the Bernoulli dimensional
+identity $[p] = [\rho U^{2}]$, which under the constitutive
+$\rho \equiv 1$ assumption of the present formulation reduces to a
+square or square root:}
+\begin{equation}
+    \label{eq:per-field-scale-resolve}
+    \textcolor{extcolor}{
+    \mathcal{U}_{k}(\boldsymbol{x}) :=
+    \begin{cases}
+        \mathcal{U}_{k}^{\mathrm{raw}}(\boldsymbol{x})
+            & \text{if } \mathcal{U}_{u}^{\mathrm{raw}}>0 \ \text{and}\ \mathcal{U}_{p}^{\mathrm{raw}}>0, \\[2pt]
+        \bigl(\mathcal{U}_{p}^{\mathrm{raw}}\bigr)^{1/2}
+            & \text{if } k = u,\ \mathcal{U}_{u}^{\mathrm{raw}} = 0,\ \mathcal{U}_{p}^{\mathrm{raw}} > 0, \\[2pt]
+        \bigl(\mathcal{U}_{u}^{\mathrm{raw}}\bigr)^{2}
+            & \text{if } k = p,\ \mathcal{U}_{p}^{\mathrm{raw}} = 0,\ \mathcal{U}_{u}^{\mathrm{raw}} > 0, \\[2pt]
+        0
+            & \text{if } \mathcal{U}_{u}^{\mathrm{raw}} = \mathcal{U}_{p}^{\mathrm{raw}} = 0.
+    \end{cases}}
+\end{equation}
+
+\extline{The Bernoulli surrogate is physically motivated: momentum
+balance for an incompressible flow fixes the dimensional ratio
+between dynamic pressure and the square of the velocity, so a
+pressure scale alone determines a consistent velocity scale (and
+\emph{vice versa}) even before either field has been fully resolved.
+The all-zero corner case is the unique state in which no scale
+information is available from the iterate; resolution of this corner
+defers to the absolute floor below.}
+
+\extline{The effective per-field tolerance, recomputed at every
+accepted Newton iterate $\boldsymbol{x}^{(i)}$, is}
+\begin{equation}
+    \label{eq:per-field-effective-ftol}
+    \textcolor{extcolor}{
+    \tau^{\mathrm{F}}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)
+    := \max\!\Bigl(\textftol^{\,\mathrm{static}},\
+        \varepsilon_{k} \cdot \mathcal{U}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr),}
+\end{equation}
+\extline{where $\textftol^{\,\mathrm{static}}$ is a static
+machine-precision floor (set in the harness at $10\,\mathrm{eps}$,
+i.e.\ approximately $2.2\times 10^{-15}$ for double precision) whose
+only role is to prevent the formula from demanding tolerances below
+floating-point round-off when the per-field product
+$\varepsilon_{k}\cdot \mathcal{U}_{k}$ vanishes or becomes
+sub-precision. The dimensionless rate $\varepsilon_{k}$ is chosen to track
+the FE discretisation rate,}
+\begin{equation}
+    \label{eq:per-field-rate}
+    \textcolor{extcolor}{
+    \varepsilon_{u} = \varepsilon_{p} = C_{\mathrm{sf}} \cdot h^{k_{v}+1},}
+\end{equation}
+\extline{so that the algebraic error tolerated at termination is, in
+\emph{dimensionless} units, a fixed fraction $C_{\mathrm{sf}}$ of the
+expected $O(h^{k_{v}+1})$ FE discretisation error---independently of
+the regime. The dimensional tolerance recovered through
+\eqref{eq:per-field-effective-ftol} thereby scales linearly with the
+intrinsic magnitude of the field, while the convergence criterion
+itself remains a single regime-independent number.}
+
+\extline{The convergence and noise-floor predicates referenced by
+Algorithms~\ref{alg:A} and~\ref{alg:A3} are the block-wise rules}
+\begin{equation}
+    \label{eq:per-field-convergence}
+    \textcolor{extcolor}{
+    \rho_{\mathrm{F}}\!\bigl(\hat{\boldsymbol{b}}, \boldsymbol{x}^{(i)}\bigr)
+        := \bigwedge_{k \in \{u,p\}}
+            \Bigl[\,R_{k}(\hat{\boldsymbol{b}})
+                \le \tau^{\mathrm{F}}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr],
+    }
+\end{equation}
+\begin{equation}
+    \label{eq:per-field-noise}
+    \textcolor{extcolor}{
+    \rho_{\mathrm{N}}\!\bigl(\hat{\boldsymbol{b}}, \boldsymbol{x}^{(i)}\bigr)
+        := \bigwedge_{k \in \{u,p\}}
+            \Bigl[\,R_{k}(\hat{\boldsymbol{b}})
+                \le \tau^{\mathrm{N}}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr],
+        \qquad \tau^{\mathrm{N}}_{k} := \max\!\Bigl(\textstag^{\,\mathrm{dyn}},
+        \varepsilon_{k}^{\mathrm{N}} \cdot \mathcal{U}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr),}
+\end{equation}
+\extline{with the noise-floor scalar floor $\textstag^{\,\mathrm{dyn}}$
+taken from~\eqref{eq:dynamic-noise} below and the noise-floor rate
+$\varepsilon_{k}^{\mathrm{N}} = n^{\mathrm{sf}}\,\varepsilon_{k}$
+preserving the fixed safety margin $n^{\mathrm{sf}} > 1$ above the
+convergence rate (Sec.~\ref{sec:harness-noise}). The honest-exit
+gate that wraps every $\mathsf{NoiseFloor}$ exit
+(Sec.~\ref{sec:falseEquiv}) is likewise block-wise:}
+\begin{equation}
+    \label{eq:per-field-honest}
+    \textcolor{extcolor}{
+    \rho_{\mathrm{HE}}\!\bigl(\hat{\boldsymbol{b}}, \boldsymbol{x}^{(i)}\bigr)
+        := \bigwedge_{k \in \{u,p\}}
+            \Bigl[\,R_{k}(\hat{\boldsymbol{b}})
+                \le K_{\mathrm{nf}}\, \tau^{\mathrm{F}}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr].}
+\end{equation}
+
+\extline{In the algorithm boxes of Part~\ref{part:core}, the scalar
+tests $\|\boldsymbol{b}\|_{\infty}\le \textftol$ and
+$\|\boldsymbol{b}\|_{\infty}\le \textstag$ are read, under this
+extension, as the corresponding predicates~\eqref{eq:per-field-convergence}
+and~\eqref{eq:per-field-noise}; with $\varepsilon_{k} = 0$ the
+predicates collapse exactly to the scalar form, preserving the core
+algorithm verbatim when the extension is inactive.}
+
+\paragraph{Per-iteration refresh.}
+\label{sec:harness-perfield-refresh}
+\extline{The proxy $\mathcal{U}_{k}$ in~\eqref{eq:per-field-effective-ftol}
+is re-evaluated from the current iterate at every accepted
+line-search step, not from the initial guess and not from any running
+maximum. The reason is symmetric:}
+\begin{itemize}[topsep=0pt, itemsep=0pt]
+\item \extline{An initial guess that overshoots the true field
+magnitude would, if left frozen, hold the tolerance at a permanently
+loose value as the iterate shrinks toward the solution.}
+\item \extline{An initial guess that undershoots (in particular, a
+zero IC for which the Bernoulli fallback resolves the proxy from a
+partial scale) would, if left frozen, hold the tolerance at a
+permanently tight and unreachable value as the iterate grows.}
+\end{itemize}
+\extline{Both pathologies are avoided by tracking
+$\mathcal{U}_{k}(\boldsymbol{x}^{(i)})$ adaptively. The cost is one
+$O(\dim\mathcal{B}_{k})$ inf-norm per field per accepted iterate---negligible against the Jacobian assembly and linear solve that
+dominate each iteration. Because the scale proxy depends only on the
+iterate, the algorithm requires no external $(U_{c}, P_{c})$
+declaration and therefore makes no problem-specific assumption.}
 
 \subsection{Adaptive noise floor}
 \label{sec:harness-noise}
@@ -1531,6 +1717,7 @@ elliptic operators and is amplified by convective and reactive terms.
 A static $\textstag$ appropriate on a coarse mesh becomes far above
 the genuine round-off floor on a fine mesh. The harness scales}
 \begin{equation}
+    \label{eq:dynamic-noise}
     \textcolor{extcolor}{\textstag^{\,\mathrm{dyn}}
     = \min\!\Bigl(\textstag,\ \max(n^{\min},\ n^{\mathrm{base}} \cdot N^2 \cdot \max(1, \mathrm{Re}))\Bigr),}
 \end{equation}
@@ -1566,7 +1753,9 @@ the Picard iteration budget when a stiffness threshold is exceeded:}
 \toprule
 \textbf{Symbol} & \textbf{Field in code} & \textbf{Role / effect} \\
 \midrule
-$C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{sol.dynamic\_ftol\_ceiling}, \code{\_spatial\_safety\_factor} & Clamps for the adaptive $\textftol$ rule, \S\ref{sec:harness-ftol}. \\
+$C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{sol.dynamic\_ftol\_ceiling}, \code{\_spatial\_safety\_factor} & Clamps for the discretisation-coupled outer-loop tolerance \eqref{eq:dynamic-ftol}, \S\ref{sec:harness-ftol}; $C_{\mathrm{sf}}$ also sets the per-field dimensionless rate \eqref{eq:per-field-rate}. \\
+$\varepsilon_{k}$, $\varepsilon^{\mathrm{N}}_{k}$ & (built from $C_{\mathrm{sf}}$, $n^{\mathrm{sf}}$, $h$, $k_{v}$) & Dimensionless per-field convergence and noise-floor rates supplied to the inner Newton kernel as \code{relative\_ftol\_per\_field} and \code{relative\_stagnation\_noise\_floor\_per\_field}, \S\ref{sec:harness-perfield}. \\
+$\textftol^{\,\mathrm{static}}$ & (harness-set: $10\,\mathrm{eps}$) & Static machine-precision floor of~\eqref{eq:per-field-effective-ftol}; prevents per-field tolerances from descending below floating-point round-off. The corresponding noise-floor floor used in~\eqref{eq:per-field-noise} is $\textstag^{\,\mathrm{dyn}}$ from~\eqref{eq:dynamic-noise}. \\
 $n^{\mathrm{base}}, n^{\min}, n^{\mathrm{sf}}$ & \code{sol.condition\_noise\_floor\_*} & Adaptive noise-floor controls, \S\ref{sec:harness-noise}. \\
 $\mathrm{Re}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Re}}$ & \code{sol.dynamic\_picard\_re\_*} & Per-case Picard widening trigger and budget for high Reynolds. \\
 $\mathrm{Da}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Da}}$ & \code{sol.dynamic\_picard\_da\_*} & Per-case Picard widening trigger and budget for high Damk\"ohler. \\
