@@ -61,8 +61,20 @@ def robust_open_h5(filepath, mode='r', retries=10, delay=2.0):
 
 # base_config.json fallbacks (used only if a phase-1 config omits a field; the phase-1 configs
 # set ftol/ceiling/safety/k_nf explicitly, so these rarely apply).
+# `relative_residual_tol` and `initial_residual_floor` parameterise the pure-relative gate
+# `‖R_final‖ / ‖R_initial‖ ≤ τ_rel` that replaces the unscaled-residual gate when iter-0
+# residuals are recorded (sweeps from 2026-05-31 onward). The relative form is the
+# canonical Newton-convergence test from Dennis–Schnabel / Kelley — it discriminates between
+# "scale-correct deep convergence" (which any Re=10⁶ cell achieves trivially with a
+# 15-order relative reduction) and "stall at the algebraic noise floor" (where Newton drops
+# the residual by only a few orders before saturating, as in the C7 N=320 case).
+# The floor handles the degenerate `‖R₀‖ → 0` case (perfect IC, trivial problem, or re-solve
+# from a converged state): below the floor we fall back to the absolute gate so the relative
+# test does not divide-by-noise.
 _BASE = dict(ftol=1e-8, dynamic_ftol_ceiling=1e-4, dynamic_ftol_spatial_safety_factor=1e-2,
-             noise_floor_success_max_ftol_multiple=1e30)
+             noise_floor_success_max_ftol_multiple=1e30,
+             relative_residual_tol=1e-6,
+             initial_residual_floor=1e-13)
 
 
 def load_solver_constants(config_path):
@@ -80,10 +92,32 @@ def dynamic_ftol(N, kv, c):
                               c["dynamic_ftol_spatial_safety_factor"] * h ** (kv + 1)))
 
 
-def is_true_root(residual, N, kv, c):
-    """A mesh reached a TRUE root iff its residual is finite and within k_nf*dynamic_ftol(N)."""
-    return bool(np.isfinite(residual) and
-                residual <= c["noise_floor_success_max_ftol_multiple"] * dynamic_ftol(N, kv, c))
+def is_true_root(residual, N, kv, c, initial_residual=float('nan')):
+    """A mesh reached a TRUE root iff Newton drove ‖R‖ sufficiently small.
+
+    Preferred test (pure relative, scale-invariant): ‖R_final‖/‖R_initial‖ ≤ relative_residual_tol.
+    This is the canonical Newton-convergence test from Dennis–Schnabel / Kelley. It correctly
+    handles both:
+      - Re=10⁶ cells where ‖R_initial‖ ~ 10¹⁵ and ‖R_final‖ ~ 1 (relative ratio ~10⁻¹⁵ → pass,
+        even though raw ‖R_final‖ is huge by the absolute gate's standard);
+      - Noise-floor stalls (C7 N=320, ‖R_initial‖ = 5.74e-12, ‖R_final‖ = 9.16e-15 → relative
+        ratio 1.6e-3 → fail, correctly diagnosed as Newton not achieving deep convergence even
+        though the absolute residual is at machine precision).
+
+    Floor on ‖R_initial‖ (`initial_residual_floor`): when the iter-0 residual is itself at
+    machine precision (perfect IC, trivial problem, re-solve from a converged state), the
+    relative form would divide-by-noise. In that regime there is nothing meaningful for Newton
+    to converge; fall back to the absolute gate.
+
+    Legacy fallback: when `initial_residual` is missing entirely (NaN — HDF5s written before
+    2026-05-31 do not carry `eval_initial_residuals`), use the absolute gate so existing
+    sweeps remain readable. Known to false-flag Re=10⁶ cells; re-run those cells with the
+    new harness to get the relative gate behavior."""
+    if not np.isfinite(residual):
+        return False
+    if not np.isfinite(initial_residual) or initial_residual <= c["initial_residual_floor"]:
+        return bool(residual <= c["noise_floor_success_max_ftol_multiple"] * dynamic_ftol(N, kv, c))
+    return bool(residual <= c["relative_residual_tol"] * initial_residual)
 
 
 def consecutive_slope(h_coarse, e_coarse, h_fine, e_fine):
@@ -110,16 +144,20 @@ def _is_superconv(s, target, tol):
     return s is not None and np.isfinite(s) and s > target + tol
 
 
-def phase1_status(N, h, res, eu, euh, kv, c, report_N, slope_tol):
+def phase1_status(N, h, res, eu, euh, kv, c, report_N, slope_tol, res0=None):
     """Phase-1-only diagnosis of ONE (config, method), from its per-mesh residuals + errors.
     Returns (status, flag) where status ∈ {optimal, sub-optimal-rate, fold, no-root, incomplete}
     and flag ∈ {'', 'ˢ'} (super-convergent velocity-L²). This is the SAME true-root + one-sided
     slope logic the detection and merged table use, so the detailed table agrees with them. It does
-    NOT include the Phase-2 rescue verdict (that is in merged_convergence_report.md)."""
+    NOT include the Phase-2 rescue verdict (that is in merged_convergence_report.md).
+
+    `res0` (optional): per-mesh iter-0 residuals for the relative-residual gate. Pass `None` or
+    NaN-filled when reading legacy HDF5s that lack `eval_initial_residuals`."""
     n = len(N)
     if n == 0:
         return ("no-data", "")
-    tr = np.array([is_true_root(res[i], N[i], kv, c) for i in range(n)])
+    r0 = res0 if res0 is not None else np.full(n, np.nan)
+    tr = np.array([is_true_root(res[i], N[i], kv, c, r0[i]) for i in range(n)])
     if n >= 2:
         sL2 = consecutive_slope(h[-2], eu[-2], h[-1], eu[-1])
         sH1 = consecutive_slope(h[-2], euh[-2], h[-1], euh[-1])
@@ -150,13 +188,17 @@ def _analyze_group(g):
         return None
     kv = int(g.attrs['k_velocity'])
     res = g['eval_residuals'][:] if 'eval_residuals' in g else np.full(len(h), np.nan)
+    # `eval_initial_residuals` was added 2026-05-31 to enable the relative-residual gate
+    # ‖R_final‖/‖R_initial‖. Missing on legacy HDF5s — fall back to NaN so the gate falls
+    # back to the unscaled (legacy) absolute test for those rows.
+    res0 = g['eval_initial_residuals'][:] if 'eval_initial_residuals' in g else np.full(len(h), np.nan)
     eu = g['err_u_l2'][:]
     euh = g['err_u_h1'][:]
     eps = g['eval_eps'][:] if 'eval_eps' in g else np.full(len(h), np.nan)
     ovs = g['overall_verification_success'][:] if 'overall_verification_success' in g else None
     Ns = np.round(1.0 / h).astype(int)
     o = np.argsort(Ns)
-    return dict(kv=kv, N=Ns[o], h=h[o], res=res[o], eu=eu[o], euh=euh[o], eps=eps[o],
+    return dict(kv=kv, N=Ns[o], h=h[o], res=res[o], res0=res0[o], eu=eu[o], euh=euh[o], eps=eps[o],
                 ovs=(ovs[o] if ovs is not None else None))
 
 
@@ -181,7 +223,8 @@ def detect(h5_glob, config_path, slope_tol, out_json):
                 method = parts[-1]
                 kv = a['kv']
                 N, h, res, eu, euh, eps = a['N'], a['h'], a['res'], a['eu'], a['euh'], a['eps']
-                tr = np.array([is_true_root(res[i], N[i], kv, c) for i in range(len(N))])
+                res0 = a['res0']
+                tr = np.array([is_true_root(res[i], N[i], kv, c, res0[i]) for i in range(len(N))])
                 summary['total'] += 1
 
                 why = []
@@ -314,6 +357,7 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
                 etype = decode(g.attrs['element_type'])
                 Re = float(g.attrs['Re']); Da = float(g.attrs['Da']); a0 = float(g.attrs['alpha_0'])
                 res = g['eval_residuals'][:] if 'eval_residuals' in g else np.full(len(h), np.nan)
+                res0 = g['eval_initial_residuals'][:] if 'eval_initial_residuals' in g else np.full(len(h), np.nan)
                 # `eval_eps` (per-mesh) = the largest eps_pert in {1.0, 0.1, ..., 0} that
                 # Newton actually absorbed at this N under the homotopy outer loop's
                 # break-at-first-success cascade. It is the per-cell robustness fingerprint;
@@ -323,8 +367,8 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
                 eu, ep, euh = g['err_u_l2'][:], g['err_p_l2'][:], g['err_u_h1'][:]
                 N = np.round(1.0 / h).astype(int)
                 o = np.argsort(N)
-                N, h, res, eu, ep, euh, eps = N[o], h[o], res[o], eu[o], ep[o], euh[o], eps[o]
-                tr = np.array([is_true_root(res[i], N[i], kv, c) for i in range(len(N))])
+                N, h, res, res0, eu, ep, euh, eps = N[o], h[o], res[o], res0[o], eu[o], ep[o], euh[o], eps[o]
+                tr = np.array([is_true_root(res[i], N[i], kv, c, res0[i]) for i in range(len(N))])
 
                 ridx = int(np.where(N == report_N)[0][0]) if report_N in N else len(N) - 1
                 rep_N = int(N[ridx])
@@ -483,6 +527,7 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
                     h = g['h'][:]; eu = g['err_u_l2'][:]; ep = g['err_p_l2'][:]
                     euh = g['err_u_h1'][:]; eph = g['err_p_h1'][:]
                     res = g['eval_residuals'][:] if 'eval_residuals' in g else np.full(len(h), np.nan)
+                    res0 = g['eval_initial_residuals'][:] if 'eval_initial_residuals' in g else np.full(len(h), np.nan)
                     # eval_eps: per-mesh, largest eps_pert in {1.0, 0.1, ..., 0} that the homotopy
                     # outer loop accepted at this N. The per-cell robustness fingerprint.
                     eps_arr = g['eval_eps'][:] if 'eval_eps' in g else np.full(len(h), np.nan)
@@ -491,12 +536,12 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
                     # Status column matches detection / the merged table.
                     so = np.argsort(Ns)
                     p1status, p1flag = phase1_status(Ns[so], h[so], res[so], eu[so], euh[so],
-                                                     kv, c, report_N, slope_tol)
+                                                     kv, c, report_N, slope_tol, res0=res0[so])
                     # Masked + sorted arrays for plotting / rate / FME (drop non-positive errors).
                     m = (eu > 0) & (ep > 0)
-                    h, eu, ep, euh, eph, res, Ns, eps_arr = h[m], eu[m], ep[m], euh[m], eph[m], res[m], Ns[m], eps_arr[m]
+                    h, eu, ep, euh, eph, res, res0, Ns, eps_arr = h[m], eu[m], ep[m], euh[m], eph[m], res[m], res0[m], Ns[m], eps_arr[m]
                     order = np.argsort(Ns)
-                    h, eu, ep, euh, eph, res, Ns, eps_arr = (a[order] for a in (h, eu, ep, euh, eph, res, Ns, eps_arr))
+                    h, eu, ep, euh, eph, res, res0, Ns, eps_arr = (a[order] for a in (h, eu, ep, euh, eph, res, res0, Ns, eps_arr))
 
                     cf = g.attrs.get('config_file', b'unknown.json')
                     config_file_to_cidx[decode(cf)].add(c_idx)
@@ -515,7 +560,7 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
 
                     # HONEST converged: finest mesh is a true root (‖R‖ ≤ k_nf·dynamic_ftol), NOT
                     # the solver's homotopy-sentinel heuristic.
-                    honest_root = bool(len(Ns) and is_true_root(res[-1], int(Ns[-1]), kv, c))
+                    honest_root = bool(len(Ns) and is_true_root(res[-1], int(Ns[-1]), kv, c, res0[-1] if len(res0) else float('nan')))
                     total_iters = int(g.attrs.get('total_iters', 0))
                     total_time = float(g.attrs.get('total_time_s', 0.0))
                     fres = res[-1] if len(res) and np.isfinite(res[-1]) else float('nan')
@@ -560,13 +605,15 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
                     if plt.gca().get_legend_handles_labels()[0]:    # skip empty legend (failed cells)
                         plt.legend(handlelength=4.0)
                     plt.grid(True, which="both", ls="--")
-                    png = os.path.join(outdir, f'convergence_config{c_idx}_Re{Re:g}_Da{Da:g}_a{a0}_{etype}.png')
+                    plot_subdir = os.path.join(outdir, f'k{kv}', etype)
+                    os.makedirs(plot_subdir, exist_ok=True)
+                    png = os.path.join(plot_subdir, f'convergence_config{c_idx}_Re{Re:g}_Da{Da:g}_a{a0}_k{kv}{kp}.png')
                     plt.savefig(png); plt.close()
 
     _write_detailed_md(detailed_rows, config_file_to_cidx, os.path.join(outdir, 'convergence_report.md'))
     _write_summary_tables(table_data, os.path.join(outdir, 'summary_tables.txt'))
     if do_plots and _HAVE_MPL:
-        print(f"[plots] per-config PNGs written under {outdir}/")
+        print(f"[plots] per-config PNGs written under {outdir}/k{{kv}}/{{etype}}/")
 
 
 def _write_detailed_md(rows, config_file_to_cidx, out_file):

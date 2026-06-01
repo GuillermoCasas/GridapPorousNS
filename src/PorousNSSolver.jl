@@ -40,7 +40,10 @@ export run_simulation
 export load_config
 export PorousNSConfig
 export compute_reference_errors
+export compute_reference_errors_multimask
 export compute_trial_projection_errors
+export compute_mode_decomposition
+export compute_corner_excluded_norm
 export ILUGMRESSolver
 
 end # module

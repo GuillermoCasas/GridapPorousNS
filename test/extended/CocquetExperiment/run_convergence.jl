@@ -206,6 +206,14 @@ function run_convergence()
     
     L_max = base_config.domain.bounding_box[2]
     bounding_rule = x -> x[1] <= (L_max - delta)
+
+    # Magnitude-gap diagnostic probes (S3 / corner-localised norm). The outlet-wall
+    # corners are at (L_max, y_min) and (L_max, y_max) of the bounding box; derived,
+    # not hard-coded. R_list = {0.05, 0.1, 0.2} per the diagnostic plan; R=0.1 is
+    # the primary plotted value. See docs/cocquet_magnitude_investigation.md (S3a / S3b).
+    bbox = base_config.domain.bounding_box
+    outlet_corners = ((bbox[2], bbox[3]), (bbox[2], bbox[4]))
+    corner_excl_radii = [0.05, 0.1, 0.2]
     
     # Extract the target refinement nodes mathematically from the parsed structs.
     # partition limits are defined as [2*N, N], so N = partition[2] (the vertical subdivision)
@@ -269,7 +277,29 @@ function run_convergence()
         errors_l2_p = Float64[]; errors_h1_p = Float64[]
         eval_times = Float64[]; eval_iters = Int[]
 
-        for N in N_list
+        # Diagnostic probes for the magnitude-gap investigation
+        # (docs/cocquet_magnitude_investigation.md, S3).
+        #   fraction_cellavg = ‖P₀ e_h‖² / ‖e_h‖² — share captured by piecewise constants
+        #                      on the coarse mesh. Tends to 1 generically as h → 0 for any
+        #                      smooth converging error; useful for within-cell-oscillation
+        #                      diagnostics (P₁ vs P₂) but NOT a discriminator for a globally-
+        #                      applied gauge/BC bias (self-reference cancels such modes).
+        #   chi_Omega        = |Ω|·‖ē_Ω‖² / ‖e_h‖² — share carried by the single domain-wide
+        #                      mean ē_Ω = (∫_Ω e)/|Ω|. Self-reference-invariant: χ_Ω → 0 for
+        #                      any zero-mean error; only a true rigid offset of e_h produces
+        #                      χ_Ω → 1. This is the actual S3 discriminator.
+        cellavg_frac_u = Float64[]; cellavg_frac_p = Float64[]
+        chi_Omega_u    = Float64[]; chi_Omega_p    = Float64[]
+        l2_cellavg_u   = Float64[]; l2_cellavg_p   = Float64[]
+        l2_domainmean_u = Float64[]; l2_domainmean_p = Float64[]
+        # Corner-excluded norms (one row per N, one column per R in corner_excl_radii).
+        n_radii = length(corner_excl_radii)
+        l2_eu_corner_excl = Matrix{Float64}(undef, length(N_list), n_radii)
+        h1_eu_corner_excl = Matrix{Float64}(undef, length(N_list), n_radii)
+        l2_ep_corner_excl = Matrix{Float64}(undef, length(N_list), n_radii)
+        h1_ep_corner_excl = Matrix{Float64}(undef, length(N_list), n_radii)
+
+        for (n_idx, N) in enumerate(N_list)
             println("\n   ==============================================================")
             println("   [+] Launching Coarse Grid Algebraic Evaluation Space for N = $N")
             println("   ==============================================================")
@@ -282,20 +312,68 @@ function run_convergence()
             V_h_free = TestFESpace(mod_h, ru_h, conformity=:H1)
             Q_h_free = TestFESpace(mod_h, rp_h, conformity=:H1)
 
-            res_u = PorousNSSolver.compute_reference_errors(u_h, u_ref, iu_ref, V_h_free, dΩ_h, dΩ_ref; filter_func=bounding_rule)
-            res_p = PorousNSSolver.compute_reference_errors(p_h, p_ref, ip_ref, Q_h_free, dΩ_h, dΩ_ref; filter_func=bounding_rule)
+            # Multi-mask call: cross-mesh interpolation built once per field, applied under
+            # the full bounding rule and the three corner-exclusion radii in one pass. The
+            # first mask is the full bounding rule (matches the legacy `compute_reference_errors`
+            # output); the next |corner_excl_radii| are the radius-sweep variants.
+            corner_masks = [let R2 = R*R, base = bounding_rule
+                                x -> begin
+                                    base(x) || return false
+                                    @inbounds for c in outlet_corners
+                                        d2 = (x[1] - c[1])^2 + (x[2] - c[2])^2
+                                        d2 ≤ R2 && return false
+                                    end
+                                    return true
+                                end
+                            end for R in corner_excl_radii]
+            mask_set = vcat([bounding_rule], corner_masks)
 
-            l2_eu_nested, h1_eu_nested, l2_eu, h1_eu, eu_nested, eu_cons = res_u
-            l2_ep_nested, h1_ep_nested, l2_ep, h1_ep, ep_nested, ep_cons = res_p
+            res_u_mm = PorousNSSolver.compute_reference_errors_multimask(u_h, u_ref, iu_ref, V_h_free, dΩ_h, dΩ_ref; masks=mask_set)
+            res_p_mm = PorousNSSolver.compute_reference_errors_multimask(p_h, p_ref, ip_ref, Q_h_free, dΩ_h, dΩ_ref; masks=mask_set)
+
+            # Index 1 is the bounding-rule (full) variant — same as the legacy call would have produced.
+            full_u = res_u_mm.per_mask[1]; full_p = res_p_mm.per_mask[1]
+            l2_eu_nested, h1_eu_nested = full_u.l2_nested, full_u.h1_nested
+            l2_eu,        h1_eu        = full_u.l2_cons,   full_u.h1_cons
+            l2_ep_nested, h1_ep_nested = full_p.l2_nested, full_p.h1_nested
+            l2_ep,        h1_ep        = full_p.l2_cons,   full_p.h1_cons
+            eu_nested, eu_cons = res_u_mm.e_nested, res_u_mm.e_cons
+            ep_nested, ep_cons = res_p_mm.e_nested, res_p_mm.e_cons
+
+            for (r_idx, _) in enumerate(corner_excl_radii)
+                excl_u = res_u_mm.per_mask[r_idx + 1]
+                excl_p = res_p_mm.per_mask[r_idx + 1]
+                l2_eu_corner_excl[n_idx, r_idx] = excl_u.l2_cons; h1_eu_corner_excl[n_idx, r_idx] = excl_u.h1_cons
+                l2_ep_corner_excl[n_idx, r_idx] = excl_p.l2_cons; h1_ep_corner_excl[n_idx, r_idx] = excl_p.h1_cons
+            end
+
+            # S3 probes: cell-average mode fraction AND domain-mean fraction χ_Ω.
+            # The second is the actual discriminator for a globally-applied gauge/BC
+            # bias surviving self-reference; the first is informative about cell-scale
+            # smoothness only.
+            md_u = PorousNSSolver.compute_mode_decomposition(u_h, iu_ref, V_h_free, dΩ_h)
+            md_p = PorousNSSolver.compute_mode_decomposition(p_h, ip_ref, Q_h_free, dΩ_h)
 
             PorousNSSolver.export_results(cfg_h, mod_h, u_h, p_h, "alpha" => alpha_h, "e_u" => eu_nested, "e_p" => ep_nested)
 
             println("   [+] L2-norms | L2(u): ", l2_eu, " | L2(p): ", l2_ep)
             println("   [+] H1-seminorms | semiH1(u): ", h1_eu, " | semiH1(p): ", h1_ep)
+            println("   [+] S3 χ_Ω (domain-mean share) | u: ", round(md_u.chi_Omega, sigdigits=4),
+                    " | p: ", round(md_p.chi_Omega, sigdigits=4),
+                    "   [cell-avg share | u: ", round(md_u.fraction_cellavg, sigdigits=4),
+                    " p: ", round(md_p.fraction_cellavg, sigdigits=4), "]")
+            r_show = corner_excl_radii[min(2, end)]  # R=0.1 by default
+            r_idx_show = min(2, n_radii)
+            println("   [+] Corner-excluded L²(u) (R=$(r_show)): ", l2_eu_corner_excl[n_idx, r_idx_show],
+                    " | L²(p): ", l2_ep_corner_excl[n_idx, r_idx_show])
 
             push!(errors_l2_u, l2_eu); push!(errors_h1_u, h1_eu)
             push!(errors_l2_p, l2_ep); push!(errors_h1_p, h1_ep)
             push!(eval_times, time_h); push!(eval_iters, iters_h)
+            push!(cellavg_frac_u, md_u.fraction_cellavg); push!(cellavg_frac_p, md_p.fraction_cellavg)
+            push!(chi_Omega_u, md_u.chi_Omega);   push!(chi_Omega_p, md_p.chi_Omega)
+            push!(l2_cellavg_u, md_u.l2_cellavg); push!(l2_cellavg_p, md_p.l2_cellavg)
+            push!(l2_domainmean_u, md_u.l2_domainmean); push!(l2_domainmean_p, md_p.l2_domainmean)
 
             GC.gc()  # free UMFPACK C-pointer memory between solves
         end
@@ -313,6 +391,24 @@ function run_convergence()
             g["errors_h1_p"] = errors_h1_p
             g["eval_times"] = eval_times
             g["eval_iters"] = eval_iters
+            # S3 / corner-excluded probes for the magnitude-gap investigation.
+            # `chi_Omega_*` is the self-reference-invariant domain-mean fraction;
+            # `cellavg_frac_*` is retained for the within-cell-oscillation diagnostic.
+            g["cellavg_frac_u"]    = cellavg_frac_u
+            g["cellavg_frac_p"]    = cellavg_frac_p
+            g["chi_Omega_u"]       = chi_Omega_u
+            g["chi_Omega_p"]       = chi_Omega_p
+            g["l2_cellavg_u"]      = l2_cellavg_u
+            g["l2_cellavg_p"]      = l2_cellavg_p
+            g["l2_domainmean_u"]   = l2_domainmean_u
+            g["l2_domainmean_p"]   = l2_domainmean_p
+            g["l2_eu_corner_excl"] = l2_eu_corner_excl
+            g["h1_eu_corner_excl"] = h1_eu_corner_excl
+            g["l2_ep_corner_excl"] = l2_ep_corner_excl
+            g["h1_ep_corner_excl"] = h1_ep_corner_excl
+            attributes(g)["corner_excl_radii"] = corner_excl_radii
+            attributes(g)["outlet_corners_x"]  = collect(c[1] for c in outlet_corners)
+            attributes(g)["outlet_corners_y"]  = collect(c[2] for c in outlet_corners)
             attributes(g)["total_time_s"] = sum(eval_times)
             attributes(g)["total_iters"] = sum(eval_iters)
             attributes(g)["outlet_truncation_delta"] = delta

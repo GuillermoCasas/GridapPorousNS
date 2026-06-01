@@ -206,6 +206,111 @@ bend in the right direction.
 - **Test:** Confirm in solver logs that all Galerkin runs use Newton (mode), not
   Picard.
 
+### S3a: Domain-mean share χ_Ω — RULED OUT for the load-bearing Galerkin P2/P1 case (2026-05-29)
+- **Outcome:** For the Galerkin P2/P1 row (the actual paper-comparison case),
+  `χ_Ω(u)` is **0.017, 0.034, 0.046, 0.049** across `N = 10, 20, 40, 80`
+  (`results/convergence_paper_comparison.h5`, group `Galerkin/P2P1`). The L²(u)
+  cross-mesh error is essentially zero-mean (≲ 5 %); the 845 × magnitude gap to
+  the paper is *not* explained by a rigid domain-wide offset surviving
+  self-reference. The ASGS P2/P2 row is the same picture: `χ_Ω(u) ≤ 0.028`
+  for every N. Both are P2 velocity spaces, which represent the parabolic
+  inlet Dirichlet `c_in · y · (1 − y)` exactly, so there is no
+  Dirichlet-interpolation surplus to leak into the mean.
+- **Where χ_Ω did fire — ASGS P1/P1 inlet-interpolation error:** the same
+  probe reports `χ_Ω(u) = 0.752, 0.797, 0.772, 0.605` for ASGS P1/P1. The
+  P1 velocity space cannot represent the parabolic inlet exactly; the
+  Dirichlet-interpolation error scales with `h²` per cell, so the coarse and
+  reference meshes inject *different* mean fluxes through `Γ_in` and the
+  difference carries a non-trivial domain mean. χ_Ω drops at `N = 80`
+  because the residual interpolation error is small enough there that it no
+  longer dominates the (already small) total error.
+- **Methodological takeaway, and a correction:** the cell-average share
+  `‖P₀ e_h‖² / ‖e_h‖²` is *not* a rigid-offset diagnostic on its own — it
+  tends to 1 generically for any smooth converging FE error because piecewise
+  constants approximate smooth fields well on small cells. The right
+  discriminator is the domain-mean share `χ_Ω`, which is zero for any
+  zero-mean error and only saturates when the error is a true rigid offset.
+  A prior reading of the cell-average signal as "global mode confirmed" was
+  overconfident; χ_Ω disagrees on the load-bearing case.
+- **Status:** open hypothesis closed for Galerkin P2/P1 and ASGS P2/P2.
+  Re-route the magnitude-gap investigation to non-rigid bulk-distributed
+  modes — the corner-excluded L²(u) (S3b) accounts for ~44 % of the squared
+  error at N=80 for Galerkin P2/P1, leaving roughly half the gap in a
+  zero-mean, non-corner-localised "bulk" component that neither S3a nor
+  S3b explain.
+
+### S3a (legacy header for context — superseded by the result above)
+- **Why suspect:** The cross-norm comparison above noted that L²(u) is
+  disproportionately off relative to H¹(u) for the same solution pair —
+  consistent with something specific to L²(u). A *globally-applied* BC,
+  gauge, or boundary-flux bias is invisible to self-reference (it appears
+  identically in u_h and u_ref, so cancels in their difference); but a
+  finite-h dependent rigid offset that scales differently between the
+  coarse and reference mesh can survive. The probe is whether e_h carries
+  a non-trivial domain-wide constant component.
+- **Probe (self-reference-invariant):**
+  `χ_Ω := |Ω| · ‖ē_Ω‖² / ‖e_h‖²` with `ē_Ω = (∫_Ω e)/|Ω|`.
+  χ_Ω → 1 only when e_h is a rigid domain-wide offset, χ_Ω → 0 for any
+  zero-mean error. Computed by
+  `compute_mode_decomposition(f_h, if_ref, V_free, dΩ_h)` in
+  [src/metrics.jl](../src/metrics.jl); persisted to HDF5 as
+  `chi_Omega_u`, `chi_Omega_p` by
+  [run_convergence.jl](../test/extended/CocquetExperiment/run_convergence.jl).
+- **Companion diagnostic (does NOT discriminate S3 on its own):**
+  the cell-average share
+  `fraction_cellavg := ‖P₀ e_h‖² / ‖e_h‖²` is computed and stored in the
+  same call (`cellavg_frac_u`, `cellavg_frac_p`). It tends to 1 generically
+  as `h → 0` for any C¹ error because piecewise constants approximate
+  smooth functions on small cells, so a high value is the expected
+  signature of a converging FE difference, not of a pathological global
+  mode. The within-cell-share signal (1 − fraction_cellavg) is useful for
+  contrasting P₁ and P₂ velocity spaces but should not be read as evidence
+  for a gauge/BC bias.
+- **Interpretation:**
+  - χ_Ω ≳ 0.5, stable across N: a finite-h rigid offset survives
+    self-reference → pivot to **O6** (pressure-gauge probe) and to whatever
+    couples gauge to velocity in this discretisation.
+  - χ_Ω ≲ 0.05 across N: error has effectively zero mean → S3 ruled out
+    as the dominant source of the magnitude gap; weight shifts to
+    discretisation-level mechanisms that don't average down (corner-localised
+    content in S3b, or non-constant low-frequency modes not captured by χ_Ω).
+  - Intermediate (0.05–0.5): partial contribution; report and pair with the
+    corner-excluded decomposition in S3b.
+
+### S3b: Corner-localised error decomposition (corner-excluded L² norm)
+- **Why suspect:** The earlier localised analysis (item 3 in the queue, line 240)
+  found that on the structured Cartesian-simplexified mesh **71 %** of the
+  squared error is concentrated within 0.1 of the two outlet–wall corners
+  `(L_max, 0)` and `(L_max, y_max)`. On unstructured Delaunay the same
+  fraction drops to ~1 %, but the total ‖e‖ grows. A systematic R-sweep on
+  the structured mesh quantifies *how much* of the magnitude gap is corner-
+  bound and at what radius it saturates.
+- **Probe:** `compute_corner_excluded_norm(...; corners, R)` (added to
+  [src/metrics.jl](../src/metrics.jl)). Thin wrapper around
+  `compute_reference_errors` that AND's the existing `bounding_rule` with an
+  exclusion mask `x ↦ ⋂_c ‖x−c‖ > R`. Run for R ∈ {0.05, 0.1, 0.2}, with
+  outlet corners derived from the bounding box (not hard-coded), and persist
+  as `l2_eu_corner_excl[N_idx, R_idx]` and the same for H¹ / p. R=0.1 is
+  plotted by default; the other radii are stored for analysis.
+- **Interpretation:**
+  - If excluding R=0.1 collapses the magnitude gap to ≲ 10×: corner pollution
+    confirmed at the discrete level → pivot to **S2** (BAMG / adaptmesh near
+    the corner) or to a corner-graded mesh experiment.
+  - If the gap persists at R=0.2: error is diffuse — not corner-localised —
+    weakening the corner-pollution reading and pointing back at S3a's
+    global-mode result.
+
+Both probes operate on the existing solver outputs (no new sweeps); the
+reference solution at N=200 is already computed in-memory per run
+([run_convergence.jl:257–266](../test/extended/CocquetExperiment/run_convergence.jl#L257-L266)).
+Output is appended to the existing HDF5 file per group; the plotter
+[plot_convergence.py](../test/extended/CocquetExperiment/plot_convergence.py)
+emits a third subplot showing the cell-average fraction (linear, 0..1) on
+the primary axis and the R=0.1 corner-excluded L²(u) (log) on a twin axis,
+for each (method × element pair). Older HDF5 files without these keys are
+detected at plot time and the diagnostic subplot is hidden — the existing
+L²/H¹ subplots are unchanged.
+
 ## Cross-norm comparison reveals the L²(u) ratio is anomalously large
 
 At N=100 Galerkin P2/P1 freefem-divs:

@@ -46,9 +46,11 @@ def plot_cocquet(h5_arg=None):
         print(f"HDF5 file not found: {h5_file}")
         return
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 14))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 20))
     markers = ['^', 's', 'o', 'D', 'v', '*']
     plotted = 0
+    # Whether any group carries the S3 / corner-excluded probes (controls the third axis).
+    diag_present = False
 
     with h5py.File(h5_file, 'r') as file:
         if "N_list" not in file:
@@ -110,10 +112,52 @@ def plot_cocquet(h5_arg=None):
             annotate(ax2, err_p_h1, 'red', -11)
             plotted += 1
 
+            # S3 / corner-excluded probes — drawn on ax3. Only present when
+            # `run_convergence.jl` has been re-run with the diagnostic probes
+            # wired in; falls back gracefully on older HDF5 files.
+            if "chi_Omega_u" in group and "l2_eu_corner_excl" in group:
+                diag_present = True
+                # Primary signal: χ_Ω (domain-mean share, self-reference-invariant).
+                chi_u = np.array(group["chi_Omega_u"])
+                chi_p = np.array(group["chi_Omega_p"])
+                radii = np.array(group.attrs.get("corner_excl_radii", [0.05, 0.1, 0.2]))
+                # Primary plotted radius: R closest to 0.1, fallback to middle entry.
+                r_idx_plot = int(np.argmin(np.abs(radii - 0.1)))
+                R_plot = radii[r_idx_plot]
+                # HDF5 matrix shape from Julia (n_N, n_R) reads as (n_R, n_N) under NumPy's
+                # row-major convention; select the row for R_plot across all N.
+                l2_u_excl = np.array(group["l2_eu_corner_excl"])[r_idx_plot, :]
+                # Left y-axis: χ_Ω (linear, 0..1).
+                ax3.plot(N_list, chi_u, color='blue', marker=marker, linestyle=ls, lw=2, ms=8,
+                         label=fr'{tag} $\chi_\Omega$ (u)')
+                ax3.plot(N_list, chi_p, color='red',  marker=marker, linestyle=ls, lw=2, ms=8,
+                         markerfacecolor='white', label=fr'{tag} $\chi_\Omega$ (p)')
+                # Right twin (log): L²(u) excluding ball B_R around outlet corners.
+                if not hasattr(ax3, '_twin'):
+                    ax3._twin = ax3.twinx()
+                    ax3._twin.set_yscale('log')
+                    ax3._twin.set_ylabel(rf'$\|e_h\|_{{L^2(\Omega\setminus B_{{{R_plot:g}}})}}$ (log)')
+                ax3._twin.plot(N_list, l2_u_excl, color='green', marker=marker, linestyle=ls, lw=2, ms=8,
+                               markerfacecolor='white', label=fr'{tag} $L_2(u)\,/\,B_{{{R_plot:g}}}$ excl.')
+
     for ax, ttl, yl in ((ax1, r'$L_2$-norms', r'$L_2$-norm error'),
                         (ax2, r'$H_1$-seminorms', r'$H_1$-seminorm error')):
         ax.set_xlabel(r'$N$'); ax.set_ylabel(yl); ax.set_title(f'Spatial convergence: {ttl}')
         ax.grid(True, which="both", ls="--"); ax.legend(handlelength=3.0, fontsize=8)
+
+    if diag_present:
+        ax3.set_xscale('log')
+        ax3.set_xlabel(r'$N$')
+        ax3.set_ylabel(r'domain-mean share $\chi_\Omega = |\Omega|\,\|\bar e_\Omega\|^2/\|e_h\|^2$')
+        ax3.set_title('Magnitude-gap probes: $\chi_\Omega$ (left, linear) and corner-excluded $L^2(u)$ (right, log)')
+        ax3.set_ylim(0.0, 1.05)
+        ax3.grid(True, which='both', ls='--')
+        # Combine legends from the linear-scale axis and the log twin axis.
+        h1_h, h1_l = ax3.get_legend_handles_labels()
+        h2_h, h2_l = ax3._twin.get_legend_handles_labels() if hasattr(ax3, '_twin') else ([], [])
+        ax3.legend(h1_h + h2_h, h1_l + h2_l, handlelength=3.0, fontsize=8, loc='upper right')
+    else:
+        ax3.set_visible(False)
 
     parts = [os.path.basename(h5_file)]
     if Re is not None:
