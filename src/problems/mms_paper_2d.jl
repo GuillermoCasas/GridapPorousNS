@@ -54,24 +54,33 @@ struct UExFunc <: Function
     U::Float64
     alpha_0::Float64
     alpha_field::AbstractPorosityField
+    L::Float64              # characteristic length: polynomial frequency is π/L
 end
+
+# Backward-compatible 3-arg constructor: defaults L=1.0. Callers (e.g. legacy probes,
+# `test/blitz/porosity_hessian_blitz_test.jl`) that pre-date the 2026-06-01 L-rescaling
+# can continue to call `UExFunc(U, alpha_0, alpha_field)` without modification.
+UExFunc(U::Float64, alpha_0::Float64, alpha_field::AbstractPorosityField) =
+    UExFunc(U, alpha_0, alpha_field, 1.0)
 function (f::UExFunc)(x)
     A = f.alpha_field(x)
-    S = VectorValue(sin(pi*x[1])*sin(pi*x[2]), cos(pi*x[1])*cos(pi*x[2]))
+    k = pi / f.L            # spatial frequency under L-rescaling
+    S = VectorValue(sin(k*x[1])*sin(k*x[2]), cos(k*x[1])*cos(k*x[2]))
     return f.U * f.alpha_0 * (1.0 / A) * S
 end
 
 function grad_u_ex(f::UExFunc, x)
     A = f.alpha_field(x)
     grad_A = PorousNSSolver.grad_alpha(f.alpha_field, x)
-    S = VectorValue(sin(pi*x[1])*sin(pi*x[2]), cos(pi*x[1])*cos(pi*x[2]))
-    
-    # ∇S_ij = ∂_i S_j
+    k = pi / f.L
+    S = VectorValue(sin(k*x[1])*sin(k*x[2]), cos(k*x[1])*cos(k*x[2]))
+
+    # ∇S_ij = ∂_i S_j — each spatial derivative picks up factor k=π/L by the chain rule.
     grad_S = TensorValue(
-        pi*cos(pi*x[1])*sin(pi*x[2]), pi*sin(pi*x[1])*cos(pi*x[2]),
-        -pi*sin(pi*x[1])*cos(pi*x[2]), -pi*cos(pi*x[1])*sin(pi*x[2])
+        k*cos(k*x[1])*sin(k*x[2]), k*sin(k*x[1])*cos(k*x[2]),
+        -k*sin(k*x[1])*cos(k*x[2]), -k*cos(k*x[1])*sin(k*x[2])
     )
-    
+
     outer_A_S = outer(grad_A, S)
     return f.U * f.alpha_0 * ( (1.0 / A) * grad_S - (1.0 / A^2) * outer_A_S )
 end
@@ -81,31 +90,33 @@ function lap_u_ex(f::UExFunc, x)
     A = f.alpha_field(x)
     grad_A = PorousNSSolver.grad_alpha(f.alpha_field, x)
     lap_A = PorousNSSolver.lap_alpha(f.alpha_field, x)
-    
-    S = VectorValue(sin(pi*x[1])*sin(pi*x[2]), cos(pi*x[1])*cos(pi*x[2]))
+
+    k = pi / f.L
+    S = VectorValue(sin(k*x[1])*sin(k*x[2]), cos(k*x[1])*cos(k*x[2]))
     grad_S = TensorValue(
-        pi*cos(pi*x[1])*sin(pi*x[2]), pi*sin(pi*x[1])*cos(pi*x[2]),
-        -pi*sin(pi*x[1])*cos(pi*x[2]), -pi*cos(pi*x[1])*sin(pi*x[2])
+        k*cos(k*x[1])*sin(k*x[2]), k*sin(k*x[1])*cos(k*x[2]),
+        -k*sin(k*x[1])*cos(k*x[2]), -k*cos(k*x[1])*sin(k*x[2])
     )
-    lap_S = VectorValue(-2.0*pi^2 * sin(pi*x[1])*sin(pi*x[2]), -2.0*pi^2 * cos(pi*x[1])*cos(pi*x[2]))
-    
+    # ΔS picks up k² from two derivative orders.
+    lap_S = VectorValue(-2.0*k^2 * sin(k*x[1])*sin(k*x[2]), -2.0*k^2 * cos(k*x[1])*cos(k*x[2]))
+
     U_a0 = f.U * f.alpha_0
     P = U_a0 / A
     grad_P = - (U_a0 / A^2) * grad_A
     lap_P = - (U_a0 / A^2) * lap_A + 2.0 * (U_a0 / A^3) * (grad_A ⋅ grad_A)
-    
+
     # grad_P ⋅ grad_S applies directional derivative of S along grad_P
     term2 = 2.0 * (grad_P ⋅ grad_S)
-    
+
     return P * lap_S + term2 + lap_P * S
 end
 Δ(f::UExFunc) = x -> lap_u_ex(f, x)
 
 # Exact ∇(∇·u_ex), needed by the symmetric-gradient viscous strong operator. The base shape
-# S = (sin πx₁ sin πx₂, cos πx₁ cos πx₂) is divergence-free (∇·S ≡ 0), so for u = U α₀ α⁻¹ S
-#   ∇·u = -U α₀ (S·∇α)/α² ,  and  ∇(∇·u) follows by the quotient/product rule using the
-# exact porosity gradient ∇α and Hessian ∇²α. This replaces the previous finite-difference
-# evaluation with a closed form (machine-exact, no step-size error).
+# S = (sin(kx₁) sin(kx₂), cos(kx₁) cos(kx₂)) with k=π/L is divergence-free (∇·S ≡ 0), so
+# for u = U α₀ α⁻¹ S we have ∇·u = -U α₀ (S·∇α)/α², and ∇(∇·u) follows by the
+# quotient/product rule using the exact porosity gradient ∇α and Hessian ∇²α. Each spatial
+# derivative of S picks up factor k=π/L (chain rule on x ↦ x/L).
 function grad_div_u_ex(f::UExFunc, x)
     c = f.U * f.alpha_0
     A = f.alpha_field(x)
@@ -114,11 +125,12 @@ function grad_div_u_ex(f::UExFunc, x)
     Ax = gA[1]; Ay = gA[2]
     Axx = H[1,1]; Axy = H[1,2]; Ayy = H[2,2]
 
-    s1 = sin(pi*x[1]); s2 = sin(pi*x[2])
-    c1 = cos(pi*x[1]); c2 = cos(pi*x[2])
+    k = pi / f.L
+    s1 = sin(k*x[1]); s2 = sin(k*x[2])
+    c1 = cos(k*x[1]); c2 = cos(k*x[2])
     S1 = s1*s2;  S2 = c1*c2
-    S1x =  pi*c1*s2;  S1y =  pi*s1*c2
-    S2x = -pi*s1*c2;  S2y = -pi*c1*s2
+    S1x =  k*c1*s2;  S1y =  k*s1*c2
+    S2x = -k*s1*c2;  S2y = -k*c1*s2
 
     φ  = S1*Ax + S2*Ay                       # = S·∇α
     φx = S1x*Ax + S1*Axx + S2x*Ay + S2*Axy   # = ∂₁(S·∇α)
@@ -130,7 +142,7 @@ function grad_div_u_ex(f::UExFunc, x)
 end
 
 function get_u_ex(mms::Paper2DMMS)
-    return UExFunc(mms.U, mms.alpha_field.alpha_0, mms.alpha_field)
+    return UExFunc(mms.U, mms.alpha_field.alpha_0, mms.alpha_field, mms.L)
 end
 
 function get_characteristic_scales(mms::Paper2DMMS)
@@ -155,7 +167,9 @@ end
 
 function get_p_ex(mms::Paper2DMMS)
     U_amp, P_amp = get_characteristic_scales(mms)
-    return x -> P_amp * cos(pi*x[1])*sin(pi*x[2])
+    L = mms.L
+    k = pi / L
+    return x -> P_amp * cos(k*x[1])*sin(k*x[2])
 end
 
 # To evaluate exact forcing via AD or exactly:
@@ -191,8 +205,10 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
     P_c = get_characteristic_scales(mms)[2]
     
     u_f = get_u_ex(mms)
-    p_f(x) = P_c * cos(pi*x[1])*sin(pi*x[2])
-    
+    L_local = mms.L
+    k_local = pi / L_local
+    p_f(x) = P_c * cos(k_local*x[1])*sin(k_local*x[2])
+
     # We must properly evaluate the reaction operator exactly.
     reaction_law = mms.formulation.reaction_law
 
@@ -210,7 +226,7 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
         grad_u = grad_u_ex(u_f, x)
         lap_u = lap_u_ex(u_f, x)
         
-        grad_p = VectorValue(P_c * -pi*sin(pi*x[1])*sin(pi*x[2]), P_c * pi*cos(pi*x[1])*cos(pi*x[2]))
+        grad_p = VectorValue(P_c * -k_local*sin(k_local*x[1])*sin(k_local*x[2]), P_c * k_local*cos(k_local*x[1])*cos(k_local*x[2]))
         
         A = alpha_field(x)
         grad_A = PorousNSSolver.grad_alpha(alpha_field, x)

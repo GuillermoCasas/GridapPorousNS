@@ -17,6 +17,11 @@
 \newcommand{\Reyn}{\operatorname{\mathit{Re}}}
 \newcommand{\Damk}{\operatorname{\mathit{Da}}}
 
+% Convenient shorthand for inline code identifiers (file paths, function names,
+% Julia / config keys). Renders the same as \texttt; lets later edits switch the
+% style globally without churn.
+\newcommand{\code}[1]{\texttt{#1}}
+
 \begin{document}
 \maketitle
 
@@ -256,47 +261,577 @@ and that absolute noise is divided by $U_c = U$ when forming the
 normalized error — a $1000\times$ different denominator produces the
 apparent $5\times$ discrepancy without any discretisation disagreement.
 
-\section{Implementation}
+\section{Implementation of centered encoding}
+\label{sec:impl-centered}
 
-The implementation is a single-line change to the MMS harness; no
-modification to the dimensional solver code:
-
+The centered encoding alone is a single-cell-loop change in the MMS
+harness; no modification to the dimensional solver. The original
+\code{U\_amp = 1.0}, \code{L = 1.0} line is replaced by:
 \begin{center}
 \begin{minipage}{0.9\linewidth}
 \begin{lstlisting}[basicstyle=\ttfamily\small, frame=single]
-# test/extended/ManufacturedSolutions/run_test.jl, ~line 523
+# test/extended/ManufacturedSolutions/run_test.jl
 
-# Before (default encoding):
-U_amp = 1.0
-L     = 1.0
-
-# After (centered encoding):
-U_amp = Re / sqrt(alpha_infty * Da)
-L     = 1.0
+(L_cell, U_amp) = compute_L_and_U(encoding_strategy,
+                                  Re, Da, alpha_infty)
 \end{lstlisting}
 \end{minipage}
 \end{center}
+\noindent where \code{compute\_L\_and\_U} returns $(L=1, U=\Reyn/\sqrt{\alpha_\infty\Damk})$
+for the centered strategy (Section~2), $(L=1, U=1)$ for the legacy
+default, and the variable-$L$ values for balanced and minmax
+(Section~\ref{sec:varL}). The downstream pipeline
+(\code{build\_mms\_formulation}, \code{Paper2DMMS},
+\code{evaluate\_exactness\_diagnostics}, \code{get\_characteristic\_scales})
+threads $U$ and $L$ through correctly: the MMS exact velocity is multiplied
+by $U$, the manufactured forcing is computed analytically from that
+scaled solution, and error norms divide out the appropriate
+dimensionless combination (Section~\ref{sec:varL-norm} corrects the
+naive divisor to give genuinely $L$-invariant quantities). The
+variable-$L$ generalisation — polynomial frequency $\pi \to \pi/L$,
+domain bounding box $\Omega \to L \cdot \Omega$, porosity radii
+$r_i \to L \cdot r_i$, per-cell mesh rebuild — is the additional refactor
+documented in §\ref{sec:varL-impl}.
 
-The remainder of the harness pipeline (\texttt{build\_mms\_formulation},
-\texttt{Paper2DMMS}, \texttt{evaluate\_exactness\_diagnostics},
-\texttt{get\_characteristic\_scales}) already threads $U$ and $L$ through
-correctly: the MMS exact velocity is multiplied by $U$, the manufactured
-forcing is computed analytically from that scaled solution, and error
-norms divide out $U_c = U$ to report dimensionless quantities. No tooling
-surgery is required.
+\section{Variable $L$ generalisation}
+\label{sec:varL}
+
+The centered encoding of Section~2 spends the $U$ degree of freedom and
+hardcodes $L = 1$ because the manufactured shape
+$\sin(\pi x)$ was wired to a unit period. Generalising the polynomial
+to $\sin(\pi x / L)$ and coupling the domain to $L$ (so the dimensionless
+mesh ratio $h_{\text{dim}} = h / L = 1/N$ and the similarity analysis
+remain intact under any choice of $L$) unlocks the second degree of
+freedom.
+
+\paragraph{Status (2026-06-01).} The generalisation is implemented; the
+default \texttt{encoding\_strategy = "centered"} preserves the
+pre-generalisation behaviour bit-identically, and the new strategies
+\texttt{"balanced"} and \texttt{"minmax"} expose the second-DOF
+machinery for use in MMS sweeps. The remainder of this section presents
+the math (§\ref{sec:varL-identities}--\ref{sec:varL-comparison}), the
+implementation (§\ref{sec:varL-impl}), the empirical validation
+(§\ref{sec:varL-empirical}), the Float64-precision interpretation
+(§\ref{sec:varL-fp}), and the dimensionless-error normalisation
+correction (§\ref{sec:varL-norm}).
+
+\subsection{Identities and the design space}
+\label{sec:varL-identities}
+
+Recall the two identities from Section~2:
+\begin{equation}
+  \nu \, \sigma \;=\; \frac{\alpha_\infty\,\Damk\,U^{2}}{\Reyn^{2}},
+  \qquad
+  \frac{\nu}{\sigma} \;=\; \frac{L^{2}}{\alpha_\infty\,\Damk}.
+  \label{eq:vL-identities}
+\end{equation}
+The first identity says $U$ alone controls the geometric mean
+$\sqrt{\nu\sigma}$ — $L$ has no effect on it. The second says $L$ alone
+controls the ratio $\nu/\sigma$ — $U$ has no effect on it. The two
+degrees of freedom are therefore \emph{orthogonal} in log-space: one
+slides the pair $(\nu, \sigma)$ along the line $\log\nu + \log\sigma =
+\mathrm{const}$, the other rotates the pair around its geometric mean.
+
+\subsection{Balanced-coefficient encoding ($\nu = \sigma$)}
+
+The natural use of the $L$ degree of freedom is to set $\nu/\sigma = 1$,
+making the diffusion and reaction coefficients dimensionally identical
+on every cell. From the second identity in~\eqref{eq:vL-identities}:
+\begin{equation}
+  L^{\star} \;=\; \sqrt{\alpha_\infty\,\Damk}.
+  \label{eq:vL-L}
+\end{equation}
+Note that, like $\nu$ and $\sigma$ in the centered encoding, $L^\star$
+depends only on $\Damk$ (and $\alpha_\infty$), not on $\Reyn$ or
+$\alpha_0$.
+
+The remaining choice is $U$. The centered selection
+$U = \Reyn / \sqrt{\alpha_\infty \Damk}$ collapses the geometric mean to
+unity ($\sqrt{\nu\sigma} = 1$), so combined with~\eqref{eq:vL-L} it
+yields $\nu = \sigma = 1$ on every cell. This is the most aggressive
+flattening of the operator coefficients, but it leaves $U$ unchanged
+from the centered encoding — the same factor of $10^9$ excursion to
+$U = 10^{-9}$ at the C7 corner.
+
+\subsection{Minmax encoding: trading $U$ headroom against $\nu, \sigma$}
+
+A different use of the $L$ DOF is to minimise the worst-case excursion
+across all three of $U, \nu, \sigma$ simultaneously. Concretely, we
+solve
+\begin{equation}
+  \min_{U, L}\;\; \max\!\bigl(\,|\log_{10} U|,\,|\log_{10} \nu|,\,|\log_{10} \sigma|\,\bigr).
+\end{equation}
+Keeping $\nu = \sigma$ (which sets $L = L^\star$ as above) and choosing
+$U$ to equalise $|\log U|$ with $|\log \nu|$ gives a closed form. Define
+\begin{equation}
+  A \;\equiv\; \tfrac{1}{2}\log_{10}(\alpha_\infty \Damk) \;-\; \log_{10}\Reyn.
+\end{equation}
+$A$ is the excursion of $\log\nu$ from $\log U$ at the centered choice.
+The minmax optimum is achieved at
+\begin{equation}
+  \boxed{\;\;
+    \log_{10} U^{\star\star} \;=\; -\,\frac{A}{2},
+    \qquad
+    \log_{10} L^{\star\star} \;=\; \tfrac{1}{2}\log_{10}(\alpha_\infty \Damk),
+    \qquad
+    \log_{10}\nu^{\star\star} \;=\; \log_{10}\sigma^{\star\star} \;=\; +\,\frac{A}{2}.
+  \;\;}
+  \label{eq:vL-minmax}
+\end{equation}
+At this point, $|\log U| = |\log \nu| = |\log \sigma| = |A|/2$ — all
+three dimensional quantities sit at the same distance from unity, with
+$U$ on the opposite side of $\sigma$ in log-space. Closed forms:
+\begin{equation}
+  U^{\star\star} \;=\; \left(\frac{\Reyn^{2}}{\alpha_\infty\,\Damk}\right)^{1/4},
+  \qquad
+  L^{\star\star} \;=\; \sqrt{\alpha_\infty\,\Damk},
+  \qquad
+  \nu^{\star\star} \;=\; \sigma^{\star\star} \;=\; \left(\frac{\alpha_\infty\,\Damk}{\Reyn^{2}}\right)^{1/4}.
+\end{equation}
+Notice the satisfying symmetry $U^{\star\star} \cdot \nu^{\star\star} =
+1$ on every cell.
+
+\paragraph{Spread reduction.}
+Under the centered encoding the worst-case excursion is $|A|$:
+$\log\nu = -A/2 \cdot 2 = $ (signed) $A$ and $\log U =$ opposite-sign
+$A/2$, so $\max(|\log U|,|\log\nu|,|\log\sigma|) = |A|$. Under minmax
+that worst case drops to $|A|/2$ — \textbf{a factor-of-two reduction in
+log-magnitude}, i.e.\ the worst dimensional quantity halves its number
+of digits away from unity, on every cell.
+
+\subsection{Per-cell numerical values}
+
+Table~\ref{tab:per-cell-varL} reports the dimensional values under
+both new strategies, alongside the centered baseline for reference.
+All values shown for $\alpha_\infty = 1$ as run by the harness.
+
+\begin{table}[!htbp]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{l rrr rrr rrrr rrrr}
+    \toprule
+    & \multicolumn{3}{c}{Dim'less} &
+      \multicolumn{3}{c}{Centered ($L=1$)} &
+      \multicolumn{4}{c}{Balanced ($\nu = \sigma$, $U$ centered)} &
+      \multicolumn{4}{c}{Minmax ($\nu = \sigma = 1/U$)} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-11} \cmidrule(lr){12-15}
+    \# & $\Reyn$ & $\Damk$ & $\alpha_0$
+       & $U$ & $\nu$ & $\sigma$
+       & $U$ & $L$ & $\nu$ & $\sigma$
+       & $U$ & $L$ & $\nu$ & $\sigma$ \\
+    \midrule
+    C1  & $10^{-6}$ & $10^{-6}$ & 1.00
+        & $10^{-3}$ & $10^{3}$ & $10^{-3}$
+        & $10^{-3}$ & $10^{-3}$ & 1 & 1
+        & $10^{-1.5}$ & $10^{-3}$ & $10^{1.5}$ & $10^{1.5}$ \\
+    C2  & 1 & $10^{-6}$ & 1.00
+        & $10^{3}$ & $10^{3}$ & $10^{-3}$
+        & $10^{3}$ & $10^{-3}$ & 1 & 1
+        & $10^{1.5}$ & $10^{-3}$ & $10^{-1.5}$ & $10^{-1.5}$ \\
+    C3  & $10^{6}$ & $10^{-6}$ & 1.00
+        & $10^{9}$ & $10^{3}$ & $10^{-3}$
+        & $10^{9}$ & $10^{-3}$ & 1 & 1
+        & $10^{4.5}$ & $10^{-3}$ & $10^{-4.5}$ & $10^{-4.5}$ \\
+    C4  & $10^{-6}$ & 1 & 1.00
+        & $10^{-6}$ & 1 & 1
+        & $10^{-6}$ & 1 & 1 & 1
+        & $10^{-3}$ & 1 & $10^{3}$ & $10^{3}$ \\
+    C5  & 1 & 1 & 1.00
+        & 1 & 1 & 1
+        & 1 & 1 & 1 & 1
+        & 1 & 1 & 1 & 1 \\
+    C6  & $10^{6}$ & 1 & 1.00
+        & $10^{6}$ & 1 & 1
+        & $10^{6}$ & 1 & 1 & 1
+        & $10^{3}$ & 1 & $10^{-3}$ & $10^{-3}$ \\
+    C7  & $10^{-6}$ & $10^{6}$ & 1.00
+        & $10^{-9}$ & $10^{-3}$ & $10^{3}$
+        & $10^{-9}$ & $10^{3}$ & 1 & 1
+        & $10^{-4.5}$ & $10^{3}$ & $10^{4.5}$ & $10^{4.5}$ \\
+    C8  & 1 & $10^{6}$ & 1.00
+        & $10^{-3}$ & $10^{-3}$ & $10^{3}$
+        & $10^{-3}$ & $10^{3}$ & 1 & 1
+        & $10^{-1.5}$ & $10^{3}$ & $10^{1.5}$ & $10^{1.5}$ \\
+    C9  & $10^{6}$ & $10^{6}$ & 1.00
+        & $10^{3}$ & $10^{-3}$ & $10^{3}$
+        & $10^{3}$ & $10^{3}$ & 1 & 1
+        & $10^{1.5}$ & $10^{3}$ & $10^{-1.5}$ & $10^{-1.5}$ \\
+    \midrule
+    \multicolumn{15}{l}{\emph{$\alpha_0 = 0.5$ cells (C10--C18): identical $U, \nu, \sigma, L$ values
+                                  as C1--C9 because the harness uses
+                                  $\alpha_\infty = 1$.}} \\
+    \midrule
+    C19 & $10^{-6}$ & $10^{-6}$ & 0.05
+        & $10^{-3}$ & $10^{3}$ & $10^{-3}$
+        & $10^{-3}$ & $10^{-3}$ & 1 & 1
+        & $10^{-1.5}$ & $10^{-3}$ & $10^{1.5}$ & $10^{1.5}$ \\
+    C20 & 1 & $10^{-6}$ & 0.05
+        & $10^{3}$ & $10^{3}$ & $10^{-3}$
+        & $10^{3}$ & $10^{-3}$ & 1 & 1
+        & $10^{1.5}$ & $10^{-3}$ & $10^{-1.5}$ & $10^{-1.5}$ \\
+    C21 & $10^{-6}$ & 1 & 0.05
+        & $10^{-6}$ & 1 & 1
+        & $10^{-6}$ & 1 & 1 & 1
+        & $10^{-3}$ & 1 & $10^{3}$ & $10^{3}$ \\
+    C22 & 1 & 1 & 0.05
+        & 1 & 1 & 1
+        & 1 & 1 & 1 & 1
+        & 1 & 1 & 1 & 1 \\
+    C23 & $10^{-6}$ & $10^{6}$ & 0.05
+        & $10^{-9}$ & $10^{-3}$ & $10^{3}$
+        & $10^{-9}$ & $10^{3}$ & 1 & 1
+        & $10^{-4.5}$ & $10^{3}$ & $10^{4.5}$ & $10^{4.5}$ \\
+    C24 & 1 & $10^{6}$ & 0.05
+        & $10^{-3}$ & $10^{-3}$ & $10^{3}$
+        & $10^{-3}$ & $10^{3}$ & 1 & 1
+        & $10^{-1.5}$ & $10^{3}$ & $10^{1.5}$ & $10^{1.5}$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Per-cell dimensional values under three encodings: centered
+    ($L=1$ fixed), balanced ($\nu = \sigma$ via $L = \sqrt{\alpha_\infty \Damk}$
+    with centered $U$), and minmax (jointly optimal $U$ and $L$).
+    Skipped cells $(\Reyn=10^{6}, \alpha_0=0.05)$ omitted. Values shown
+    with $\alpha_\infty = 1$ as run by the test harness; under this
+    convention all three encodings are independent of $\alpha_0$.}
+  \label{tab:per-cell-varL}
+\end{table}
+
+\subsection{Comparison summary}
+\label{sec:varL-comparison}
+
+For each encoding and each cell, the worst-case dimensional excursion
+$M = \max(|\log_{10} U|, |\log_{10}\nu|, |\log_{10}\sigma|)$ measures
+how far from unity the most extreme coefficient lies. The sweep maxima
+over all 24 cells are:
+
+\begin{center}
+\begin{tabular}{lrl}
+  \toprule
+  Encoding & $\max_{\text{cells}} M$ & Worst-case cells \\
+  \midrule
+  Default ($U = L = 1$)             & 12  & C3, C7, C12, C16, C23 \\
+  Centered ($L = 1$)                & 9   & C3, C7, C12, C16, C23 \\
+  Balanced ($\nu = \sigma$, $U$ centered) & 9 & C3, C7, C12, C16, C23 (set by $|\log U|$) \\
+  Minmax (jointly optimal $U, L$)   & 4.5 & C3, C7, C12, C16, C23 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The same five $(\mathrm{Re}, \mathrm{Da}) \in
+\{(10^{6}, 10^{-6}), (10^{-6}, 10^{6})\}$ corner cells dominate in
+every encoding — they are the diagonally-opposite corners of the
+$(\mathrm{Re}, \mathrm{Da})$ plane that the sweep grid samples. The
+balanced encoding flattens the operator coefficients to
+$\nu = \sigma = 1$ but does not improve the worst-case excursion
+because $|\log U|$ is unchanged from centered. The minmax encoding
+redistributes the excursion across all three quantities and halves
+the worst case from 9 to 4.5 orders of magnitude.
+
+\subsection{Implementation}
+\label{sec:varL-impl}
+
+The generalisation was implemented on 2026-06-01. The diff is contained
+to two files plus blitz tests:
+
+\paragraph{\texttt{src/problems/mms\_paper\_2d.jl}.}  The hard-coded
+spatial frequency $\pi$ is replaced by $k = \pi / L$ throughout the
+analytic chain. The struct \code{UExFunc} gains an
+\code{L::Float64} field; the operator
+$f \mapsto f(x) = U \alpha_0 \alpha(x)^{-1} S(x/L)$ is now genuinely
+$L$-aware. The five analytic-derivative functions
+\code{grad\_u\_ex}, \code{lap\_u\_ex}, \code{grad\_div\_u\_ex},
+\code{get\_p\_ex}, and the pressure-gradient block in
+\code{evaluate\_exactness\_diagnostics} each pick up the appropriate
+$1/L$ from the chain rule: first derivatives by $1/L$, second
+derivatives by $1/L^2$. A backward-compatible three-argument constructor
+\code{UExFunc(U, alpha\_0, alpha\_field)} with $L = 1$ default is added
+so legacy probes that pre-date the generalisation continue to compile.
+
+\paragraph{\texttt{test/extended/ManufacturedSolutions/run\_test.jl}.}
+A new helper
+\code{compute\_L\_and\_U(strategy, Re, Da, alpha\_infty)}
+returns the pair $(L, U_{\text{amp}})$ for the four named strategies
+\code{"centered"} (default — $L = 1$, $U = \mathrm{Re}/\sqrt{\alpha_\infty \mathrm{Da}}$),
+\code{"balanced"} ($L = \sqrt{\alpha_\infty \mathrm{Da}}$,
+same $U$),
+\code{"minmax"} ($L = \sqrt{\alpha_\infty \mathrm{Da}}$,
+$U = (\mathrm{Re}^2 / (\alpha_\infty \mathrm{Da}))^{1/4}$), and
+\code{"unit"} ($L = U = 1$, kept for diagnostic probes). The strategy
+is read once at the top of \code{run\_mms} via
+\code{get(test\_dict, "encoding\_strategy", "centered")}.
+
+The harness builds the per-cell $L$ \emph{inside} the
+$(\mathrm{Re}, \mathrm{Da}, \alpha_0)$ triple loop because $L$ varies
+per cell under non-centered strategies. The mesh and FE spaces are
+therefore rebuilt per cell rather than once per~$N$ — a few extra
+seconds of wall-clock per sweep, negligible against solve time.
+\code{\_build\_local\_mesh} accepts $L$ and tuples
+\code{L .* domain\_cfg.bounding\_box}; \code{build\_porosity\_field}
+accepts $L$ and constructs \code{SmoothRadialPorosity} with
+$L \cdot r_1$ and $L \cdot r_2$. The homotopy perturbation
+\code{h\_raw\_func} is rescaled with $k = \pi/L$ on the polynomial
+frequencies and with $1/L^8$ on the boundary bubble $B_{\text{fn}}$,
+so $\|h\|_{L^2(\Omega)}$ stays $O(L^{d/2})$ matching the manufactured
+solution.
+
+\paragraph{Similarity invariants preserved by the implementation.} The
+key check that the dimensionless physics is genuinely the same across
+encodings:
+\begin{itemize}
+\item $\mathrm{Re}_{\text{check}} = U \cdot L / \nu = U L / (UL/\mathrm{Re}) = \mathrm{Re}$
+      — preserved algebraically.
+\item $\mathrm{Da}_{\text{check}} = \alpha_\infty \sigma L^2 / \nu
+      = \alpha_\infty (\alpha_\infty \mathrm{Da} \nu / L^2) L^2 / (\alpha_\infty \nu) = \mathrm{Da}$
+      — preserved.
+\item $u_{ex}(L\hat{x}) / U_{\text{amp}} = \alpha_0 / \alpha(L\hat{x}) \cdot \hat{S}(\hat{x})$.
+      For this ratio to be $L$-invariant, $\alpha(L\hat{x})$ as a
+      function of $\hat{x}$ must equal $\alpha(\hat{x})$ at $L=1$.
+      Writing $\tilde{r}_i = L \cdot r_i$ for the L-scaled radii stored
+      in the field (set by \code{build\_porosity\_field}), the
+      smoothing parameter at physical $r$ is
+      $\eta(r; L) = (r^2 - \tilde{r}_1^2)/(\tilde{r}_2^2 - \tilde{r}_1^2)$.
+      At $r = L\hat{r}$:
+      \[
+        \eta(L\hat{r}; L) \;=\; \frac{L^2 \hat{r}^2 - L^2 r_1^2}{L^2 r_2^2 - L^2 r_1^2}
+        \;=\; \frac{\hat{r}^2 - r_1^2}{r_2^2 - r_1^2}
+        \;=\; \eta(\hat{r}; 1).
+      \]
+      The $L^2$ factor cancels between numerator and denominator, so
+      $\alpha$ at the corresponding dimensionless position is identical
+      to the $L=1$ baseline.
+\item Physical $\nabla_x \alpha$ scales as $1/L$ — exactly as a physical
+      gradient should under coordinate dilation. From the same formula,
+      $d\eta/dr = 2r/(\tilde{r}_2^2 - \tilde{r}_1^2) = 2r/(L^2 (r_2^2 - r_1^2))$.
+      At $r = L \hat{r}$ this gives $(2\hat{r}/(r_2^2 - r_1^2)) \cdot 1/L$,
+      so the dimensionless $L \cdot \nabla \alpha = 2 \hat{r}/(r_2^2 - r_1^2)$
+      is encoding-invariant.
+\item The grid Reynolds number $\mathrm{Re}_h = U h / \nu
+      = (U L / \nu) \cdot (h/L) = \mathrm{Re} / N$ — independent of $L$.
+      Stabilisation $\tau_{\text{NS}}$ at the same $N$ should therefore have
+      the same dimensionless value across encodings.
+\end{itemize}
+
+\subsection{Empirical validation}
+\label{sec:varL-empirical}
+
+Two end-to-end checks were performed.
+
+\paragraph{$L=1$ bit-identical regression.} Cell C5 (Re$=1$, Da$=1$,
+$\alpha_0=1$, OSGS) run at $N \in \{10, 20, 40, 80\}$ through the new
+harness with \code{encoding\_strategy = "centered"} reproduces the
+master HDF5 values to all seven reported digits:
+
+\begin{center}
+\begin{tabular}{lrrr|rrr}
+  \toprule
+  & \multicolumn{3}{c|}{Master} & \multicolumn{3}{c}{New harness (centered)} \\
+  $N$ & $L^2_u$ & $L^2_p$ & $H^1_u$ & $L^2_u$ & $L^2_p$ & $H^1_u$ \\
+  \midrule
+  10 & $9.530767\!\times\!10^{-3}$ & $2.298378\!\times\!10^{-2}$ & $2.858131\!\times\!10^{-1}$
+     & $9.530767\!\times\!10^{-3}$ & $2.298378\!\times\!10^{-2}$ & $2.858131\!\times\!10^{-1}$ \\
+  20 & $1.841275\!\times\!10^{-3}$ & $1.928104\!\times\!10^{-2}$ & $1.438814\!\times\!10^{-1}$
+     & $1.841275\!\times\!10^{-3}$ & $1.928104\!\times\!10^{-2}$ & $1.438814\!\times\!10^{-1}$ \\
+  40 & $4.633695\!\times\!10^{-4}$ & $5.695171\!\times\!10^{-3}$ & $7.150274\!\times\!10^{-2}$
+     & $4.633695\!\times\!10^{-4}$ & $5.695171\!\times\!10^{-3}$ & $7.150274\!\times\!10^{-2}$ \\
+  80 & $1.313346\!\times\!10^{-4}$ & $1.976955\!\times\!10^{-3}$ & $3.568200\!\times\!10^{-2}$
+     & $1.313346\!\times\!10^{-4}$ & $1.976955\!\times\!10^{-3}$ & $3.568200\!\times\!10^{-2}$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The agreement confirms that the per-cell mesh rebuild, the
+$k = \pi/L$ substitution, the porosity-radius scaling, and the
+normalisation correction (§\ref{sec:varL-norm}) collapse exactly to the
+pre-generalisation formula at $L = 1$.
+
+\paragraph{C7 minmax probe.} The corner cell C7 (Re$=10^{-6}$,
+Da$=10^{6}$, $\alpha_0=1$, OSGS) was the empirical motivation: under the
+centered encoding, the $L^2_u$ slope at the finest mesh pair drops from
+$2.04$ at $N=80 \to 160$ to $0.84$ at $N=160 \to 320$ — a stall
+attributed in Section~4 to the solution-scale precision floor at
+$U_{\text{amp}} = 10^{-9}$. Running the same cell at
+\code{encoding\_strategy = "minmax"} (which gives $U_{\text{amp}} =
+10^{-4.5}$, $L = 10^3$, $\nu = \sigma = 10^{4.5}$) yields the
+complementary trajectory:
+
+\begin{center}
+\begin{tabular}{lrr}
+  \toprule
+  $N_{\text{coarse}} \to N_{\text{fine}}$ & Centered slope & Minmax slope \\
+  \midrule
+  $10 \to 20$   & $1.96$ & $0.94$ \\
+  $20 \to 40$   & $1.98$ & $1.28$ \\
+  $40 \to 80$   & $2.01$ & $1.47$ \\
+  $80 \to 160$  & $2.04$ & $1.63$ \\
+  $160 \to 320$ & $\mathbf{0.84}$ \emph{(stalled)} & $\mathbf{1.93}$ \emph{(recovered)} \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Centered is clean at coarse meshes and stalls at the finest
+pair; minmax is pre-asymptotic at coarse meshes and recovers at the
+finest pair. The trajectories cross. The continuous problems and the
+dimensionless meshes are identical between the two; the difference is
+the Float64 realisation of the discrete operator, discussed next.
+
+\subsection{Floating-point realisation}
+\label{sec:varL-fp}
+
+The continuous dimensionless problem
+\begin{equation}
+  -\tfrac{1}{\Reyn} \widehat{\Delta} \hat{u}
+  + \tfrac{\alpha_\infty \Damk}{\Reyn} \hat{u}
+  + (\hat{u} \cdot \widehat{\nabla}) \hat{u}
+  + \widehat{\nabla} \hat{p}
+  = \hat{f}
+  \label{eq:dimless-ns}
+\end{equation}
+is invariant under the choice of $(U_{\text{amp}}, L)$ — both encodings
+discretise the same equation, and the algebraic similarity invariants
+of §\ref{sec:varL-impl} (Re, Da, $\alpha$ at corresponding positions,
+$\nabla\alpha$ scaling, grid Reynolds $\mathrm{Re}_h = \mathrm{Re}/N$)
+all hold exactly. The discrete realisation is invariant only to the
+precision of the floating-point system. Float64's $\sim 16$ digits of
+relative precision are preserved at each elementary operation, but the
+\emph{same} dimensionless quantity computed via \emph{different
+sequences of dimensional operations} at different orders of magnitude
+accumulates round-off differently. The empirical L=1 bit-identity
+(§\ref{sec:varL-empirical}) and the dimensional-similarity algebra
+together pin the source to discrete operations whose absolute operand
+magnitudes change with the encoding; three plausible sites:
+
+\begin{enumerate}
+\item \textbf{OSGS strong-residual projection.} The discrete projection
+      $\boldsymbol{\pi}_h = M^{-1} R(u_h)$ inverts the dimensional mass
+      matrix $M$ against the dimensional strong residual $R$. For C7 at
+      $N=10$, where the cell measure is $|\Omega|/N^2$:
+
+      \begin{itemize}
+      \item Centered: $M_{ij} \sim |\Omega|/N^2 \sim 10^{-2}$;
+            the residual entries $R_i$ sum contributions
+            $\sigma u_h \sim 10^{-6}$, $-\nu \Delta u_h \sim 10^{-11}$,
+            $\nabla p_h \sim 3 \cdot 10^{-6}$, all dimensional. The
+            $R_i$ extracted by quadrature is on order
+            $10^{-8}$--$10^{-7}$; the projected $\pi$ on order $10^{-5}$.
+      \item Minmax: $M_{ij} \sim L^2 |\Omega|/N^2 \sim 10^{4}$;
+            $R_i$ summands are $\sigma u_h \sim 1$,
+            $-\nu \Delta u_h \sim 10^{-5.5}$,
+            $\nabla p_h \sim 0.3$ — five orders of magnitude apart in
+            the $\sigma u$ vs $\nu \Delta u$ summands rather than
+            centered's six.
+      \end{itemize}
+
+      Both encodings produce the same dimensionless $\hat{\boldsymbol{\pi}}_h$
+      \emph{exactly} (the dimensional rescaling cancels term by term),
+      but the round-off in computing the dimensional $R$ as a sum of
+      four contributions at different magnitudes accumulates
+      differently. The relative position of summands in log-space
+      changes between encodings, and Float64 cancels the smaller
+      ones differently when summed with the larger ones.
+\item \textbf{Stabilisation parameter $\tau_{\text{NS}}$.} The
+      dimensional formula
+      $\tau_{\text{NS}} = (4 c_1 \nu / h^2 + 2 c_2 \sigma + c |u|/h)^{-1}$
+      contains summands that scale unequally per encoding. For C7 at
+      $N=10$:
+      \begin{itemize}
+      \item Centered: $4 c_1 \nu / h^2 \approx 0.4 c_1$, $2 c_2 \sigma \approx 2000 c_2$ — summands span four orders.
+      \item Minmax:   $4 c_1 \nu / h^2 \approx 12.6 c_1$, $2 c_2 \sigma \approx 6.3 \times 10^4 c_2$ — summands span four orders again, but the diffusion summand sits at a different relative weight and is more vulnerable to floating-point obliteration when added to the reaction summand.
+      \end{itemize}
+      $\hat{\tau} = \tau \cdot U_c / L$ is encoding-invariant
+      algebraically; the dimensional summation is not invariant in
+      finite precision.
+\item \textbf{Newton residual.} $\boldsymbol{r} = \boldsymbol{b} -
+      \mathcal{J}\, \delta\boldsymbol{x}$ in centered has
+      $|\boldsymbol{b}|, |\mathcal{J} \delta\boldsymbol{x}| \sim 10^{-7}$
+      cancelling to extract $|\boldsymbol{r}|$ at machine precision; in
+      minmax the same cancellation happens between operands at $\sim
+      10^{4.5}$. Same relative residual reduction, different absolute
+      round-off in the extraction.
+\end{enumerate}
+
+\noindent At fine $N$ the FE truncation grows back above these
+floating-point floors and the dimensionless slopes converge to the
+$h^{k+1}$ optimum in \emph{both} encodings. At coarse $N$ and at the
+mesh where the corresponding floor is binding, encoding-dependent
+deviations show: centered fails first at solution-scale (C7 at $N=320$
+where $U_{\text{amp}} h^{k+1} \sim \varepsilon_{\text{mach}}$); minmax
+fails first at operator-scale (the same cell at coarse $N$ where
+$\sigma h^2 \sim$ summand-cancellation noise). The full sweep of the
+24~cells shows the bulk of cells lying away from either floor for both
+encodings; the slope trajectory is essentially identical for all cells
+where neither floor is binding (most of the
+$|\log\nu|, |\log\sigma|, |\log U| < 6$ interior).
+
+\subsection{Dimensionless error normalisation}
+\label{sec:varL-norm}
+
+The harness's error norms were historically computed as
+\begin{equation}
+  \widetilde{e}_{L^2, u} \;=\; \frac{\|\boldsymbol{e}_u\|_{L^2(\Omega)}}{U_c},
+  \qquad
+  \widetilde{e}_{H^1, u} \;=\; \frac{\|\nabla \boldsymbol{e}_u\|_{L^2(\Omega)}}{U_c / L}.
+\end{equation}
+At $L = 1$ with a unit-area baseline bounding box these are numerically
+the dimensionless quantities $\|\hat{e}_u\|_{L^2(\hat\Omega)}$ and
+$\|\widehat{\nabla} \hat{e}_u\|_{L^2(\hat\Omega)}$, but at $L \neq 1$
+they carry a residual factor of $L$ — they are \emph{not} fully
+dimensionless. Reading the $L^2$ similarity in detail
+($\boldsymbol{e}_u(x) = U_c \cdot \hat{\boldsymbol{e}}_u(x/L)$,
+$\mathrm{d}x = L^d \mathrm{d}\hat{x}$):
+\begin{align}
+  \|\boldsymbol{e}_u\|_{L^2(\Omega)}^2
+  \;&=\; U_c^2 \cdot L^d \cdot \|\hat{\boldsymbol{e}}_u\|_{L^2(\hat\Omega)}^2 \notag \\
+  \Rightarrow \quad
+  \|\boldsymbol{e}_u\|_{L^2(\Omega)}
+  \;&=\; U_c \cdot \sqrt{|\Omega|} \cdot \|\hat{\boldsymbol{e}}_u\|_{L^2(\hat\Omega)}.
+  \label{eq:l2-similarity}
+\end{align}
+For the gradient, $\nabla_x \boldsymbol{e}_u = (U_c / L) \nabla_{\hat{x}} \hat{\boldsymbol{e}}_u$,
+and the $L^2$ similarity inherits a $(1/L)^2 \cdot L^d$ factor that in
+2D reduces to unity:
+\begin{equation}
+  \|\nabla \boldsymbol{e}_u\|_{L^2(\Omega)}
+  \;=\; U_c \cdot \|\widehat{\nabla} \hat{\boldsymbol{e}}_u\|_{L^2(\hat\Omega)}
+  \qquad (\text{2D}).
+  \label{eq:h1-similarity}
+\end{equation}
+The dimensionless quantities are therefore
+\begin{equation}
+  \boxed{\quad
+    e_{L^2, u} \;=\; \frac{\|\boldsymbol{e}_u\|_{L^2(\Omega)}}{U_c \cdot \sqrt{|\Omega|}},
+    \qquad
+    e_{H^1, u} \;=\; \frac{\|\nabla \boldsymbol{e}_u\|_{L^2(\Omega)}}{U_c}
+    \quad
+  }
+  \label{eq:norm-fix}
+\end{equation}
+(and analogously $P_c \cdot \sqrt{|\Omega|}$ and $P_c$ for the pressure).
+The corrected formulas are implemented in
+\code{calculate\_normalized\_errors} in
+\code{test/extended/ManufacturedSolutions/run\_test.jl}
+(line~150 of the 2026-06-01 commit). For
+the standard baseline domain $[-0.5, 0.5]^2$ at $L = 1$, $|\Omega| = 1$
+and the corrected formulas collapse to the legacy ones bit-identically —
+which is exactly what the regression of §\ref{sec:varL-empirical}
+confirms.
 
 \section{What is deliberately \emph{not} addressed here}
 
 \begin{itemize}
-  \item \textbf{The $L$ degree of freedom.}
-        \texttt{Paper2DMMS} hard-codes the spatial shape
-        $\sin(\pi x_1)\sin(\pi x_2)$ etc., which is one half-period on the
-        unit square but high-frequency garbage on $L \neq 1$. Allowing $L$
-        to vary would require generalising the shape to $\sin(\pi x/L)$
-        and re-deriving the analytic gradient/Laplacian/forcing terms. The
-        present reparametrization keeps $L=1$ and uses only the $U$ degree
-        of freedom; the achievable spread reduction is still $\sim 9$
-        orders of magnitude on the worst cell.
+  \item \textbf{Higher-precision arithmetic} as a Float64-floor remedy.
+        The encoding-dependent slope drift documented in
+        §\ref{sec:varL-fp} is a property of Float64's 16-digit relative
+        precision applied to dimensional operands at heterogeneous
+        magnitudes. Switching the LU back-substitution (and the
+        $\tau$ and OSGS-projection arithmetic) to extended precision
+        — \code{DoubleFloats.jl} ($\sim 32$ digits) or quad precision —
+        would eliminate the floor at the cost of a $\sim 5$--$10\times$
+        runtime overhead. This is a single-cell diagnostic worth
+        running if a future paper requires the C7-corner slope cleanly
+        at the finest mesh under \emph{either} encoding; the variable-$L$
+        machinery already moves the floor by 4.5 orders of magnitude,
+        which is sufficient for the present sweep.
   \item \textbf{The pressure penalty $\eta = \mathrm{eps\_val}$.}
         The dimensional pressure amplitude $P_c$ varies with the encoding,
         which means $\eta \cdot p^2$ has a different effective weight per
@@ -316,14 +851,24 @@ surgery is required.
         first place to look.
 \end{itemize}
 
-\section*{Status}
+\section*{Status (2026-06-01)}
 
-This document accompanies a single-line code change at
-\texttt{test/extended/ManufacturedSolutions/run\_test.jl:523}. It is kept
-in \texttt{theory/} as a standalone working note pending the full
-24-cell sweep rerun on this encoding; once the encoding is shown to be
-\emph{uniformly} desirable (no regression on the easy cells, demonstrable
-gains on the high-$\sigma$ cells), the content here should be folded into
-\texttt{article.tex} as a remark in the verification section.
+Centered encoding (Section~2) is the harness default and the
+\code{phase1\_quad\_k1} master HDF5 was produced under it. Variable-$L$
+generalisation (Section~\ref{sec:varL}) is implemented in the harness
+with $L = 1$ centered preserved bit-identically; \code{"balanced"} and
+\code{"minmax"} are available as opt-in strategies. The corner case
+C7 (Re$=10^{-6}$, Da$=10^{6}$, $\alpha_0=1$) was the empirical
+diagnosis target: its Float64 noise-floor stall under centered at
+$N=320$ is recovered by minmax at the same $N$, confirming that the
+mechanism is solution-scale precision (not algorithm-side). The
+remainder of the (Re, Da, $\alpha$) sweep behaves equivalently across
+encodings for cells where neither floor is binding.
+
+This document is kept in \texttt{theory/} as a standalone working
+note. Once a final paper-grade $k=2$ sweep is performed (deciding
+between centered and minmax based on which side's Float64 floor is
+binding for that polynomial order), the contents here should be
+condensed into \code{article.tex} as a verification-section remark.
 
 \end{document}

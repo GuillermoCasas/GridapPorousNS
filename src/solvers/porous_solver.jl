@@ -470,6 +470,7 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
     else  # :ok
         final_res = res.iterations > 0 ? res.residual_norm : 0.0
         diag_cache["final_residual_norm"] = final_res
+        get!(diag_cache, "initial_residual_norm", res.initial_residual_norm)
         local_iters = res.iterations
         if final_res <= ftol
             newton_success = true
@@ -497,6 +498,7 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
         if res_p.state == :ok
             final_res_picard = res_p.residual_norm
             diag_cache["final_residual_norm"] = final_res_picard
+            get!(diag_cache, "initial_residual_norm", res_p.initial_residual_norm)
             iter_count_ref[] += res_p.iterations
             if final_res_picard <= ftol
                 println("      -> ASGS Initializer: Picard fully converged! Escaping to evaluation.")
@@ -533,6 +535,7 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
                 iter_count_ref[] += res2.iterations
                 final_res = res2.residual_norm
                 diag_cache["final_residual_norm"] = final_res
+                get!(diag_cache, "initial_residual_norm", res2.initial_residual_norm)
 
                 stop_reason = res2.stop_reason
                 if stop_reason == "ftol_reached" || stop_reason == "initial_ftol"

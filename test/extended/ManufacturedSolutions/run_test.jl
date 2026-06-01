@@ -35,8 +35,13 @@ using LinearAlgebra
 # Helper Constructors
 # ==============================================================================
 
-function _build_local_mesh(domain_cfg, mesh_cfg)
-    domain = Tuple(domain_cfg.bounding_box)
+function _build_local_mesh(domain_cfg, mesh_cfg, L::Float64=1.0)
+    # The JSON `bounding_box` is interpreted as the L=1 baseline; the actual physical
+    # domain extends as `L .* bounding_box`. This keeps `Re = U·L/ν` and `Da = α·σ·L²/ν`
+    # as TRUE dimensionless numbers (the manufactured shape `sin(πx/L)` and the physical
+    # domain scale together, preserving the dimensionless analysis under L-rescaling).
+    bbox = collect(L .* domain_cfg.bounding_box)
+    domain = Tuple(bbox)
     partition = Tuple(mesh_cfg.partition)
     if mesh_cfg.element_type == "TRI"
         model = CartesianDiscreteModel(domain, partition; isperiodic=Tuple(fill(false, length(partition))), map=identity)
@@ -51,9 +56,41 @@ function _build_local_mesh(domain_cfg, mesh_cfg)
     return model
 end
 
-# Creates the domain porosity field structure parameterized by alpha bounds and geometry
-function build_porosity_field(config, alpha_0, alpha_infty)
-    PorousNSSolver.SmoothRadialPorosity(Float64(alpha_0), Float64(alpha_infty), config.domain.r_1, config.domain.r_2)
+# Creates the domain porosity field structure parameterized by alpha bounds and geometry.
+# The radii `r_1, r_2` are L=1 baselines that scale with the characteristic length: the
+# actual porosity-bump transition lives at `L*r_1 < r < L*r_2`, keeping the bump's
+# *relative* footprint on the L-scaled domain unchanged.
+function build_porosity_field(config, alpha_0, alpha_infty, L::Float64=1.0)
+    PorousNSSolver.SmoothRadialPorosity(
+        Float64(alpha_0), Float64(alpha_infty),
+        L * config.domain.r_1, L * config.domain.r_2
+    )
+end
+
+# [encoding] Compute the characteristic-length `L` and velocity scale `U_amp` for one
+# (Re, Da, α_∞) cell, per the chosen encoding strategy. See theory/centered_encoding.tex
+# Section 6 for the derivation of the four formulas.
+#
+#   "centered"  — historical default: `L=1`, `U=Re/√(α_∞·Da)`. Centers ν·σ=1.
+#   "balanced"  — `L=√(α_∞·Da)`, `U=Re/√(α_∞·Da)`. Forces ν=σ; U unchanged from centered.
+#   "minmax"    — `L=√(α_∞·Da)`, `U=(Re²/(α_∞·Da))^(1/4)`. Minimises max(|log U|,|log ν|,|log σ|);
+#                 at the C7 corner reduces the worst dimensional excursion from 9 to 4.5 orders.
+#   "unit"      — `L=1`, `U=1`. The dimensional-default baseline; kept for diagnostic probes.
+function compute_L_and_U(strategy::String, Re::Float64, Da::Float64, alpha_infty::Float64)
+    if strategy == "centered"
+        return (1.0, Float64(Re) / sqrt(alpha_infty * Float64(Da)))
+    elseif strategy == "balanced"
+        L = sqrt(alpha_infty * Float64(Da))
+        return (L, Float64(Re) / sqrt(alpha_infty * Float64(Da)))
+    elseif strategy == "minmax"
+        L = sqrt(alpha_infty * Float64(Da))
+        U_amp = (Float64(Re)^2 / (alpha_infty * Float64(Da)))^(1.0/4.0)
+        return (L, U_amp)
+    elseif strategy == "unit"
+        return (1.0, 1.0)
+    else
+        error("Unknown encoding_strategy: \"$strategy\". Valid: \"centered\", \"balanced\", \"minmax\", \"unit\".")
+    end
 end
 
 # Sets up the specific continuous VMS mathematical behavior for the Manufactured Solution
@@ -89,27 +126,50 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     PorousNSSolver.PaperGeneralFormulation(visc_op, rxn, proj, reg, nu_calculated, eps_calculated)
 end
 
-# Error evaluator operating exclusively upon dimensionless algebraic norms corresponding to characteristic scaling
+# Error evaluator returning genuinely DIMENSIONLESS norms (encoding-invariant under L-rescaling).
+#
+# Derivation (writing the dimensional error as e(x) = U_c · ê(x/L), with x̂ = x/L the
+# dimensionless coordinate and Ω the L-scaled physical domain):
+#
+#   ‖e‖²_{L²(Ω)}     = ∫_Ω |e|² dx = U_c² · ∫_Ω |ê(x/L)|² dx
+#                    = U_c² · L^d · ‖ê‖²_{L²(Ω̂)}
+#   ⇒  ‖e‖_{L²(Ω)}   = U_c · √(|Ω|) · ‖ê‖_{L²(Ω̂)}
+#
+#   ‖∇e‖²_{L²(Ω)}    = ∫_Ω (U_c/L)² |∇_x̂ ê|² dx = (U_c/L)² · L^d · ‖∇ê‖²_{L²(Ω̂)}
+#   ⇒  ‖∇e‖_{L²(Ω)}  = U_c · L^{d/2 - 1} · ‖∇ê‖_{L²(Ω̂)}   (independent of L in 2D where d=2)
+#
+# So the dimensionless quantities are:
+#
+#     el2_u_dimless   = ‖e_u‖_{L²(Ω)}  / (U_c · √(|Ω|))   = ‖ê_u‖_{L²(Ω̂)}
+#     eh1_u_dimless   = ‖∇e_u‖_{L²(Ω)} / U_c              = ‖∇ê_u‖_{L²(Ω̂)}        (2D)
+#
+# For L=1 with a unit-area baseline bounding box `[-0.5, 0.5]²` this collapses to the
+# legacy form `el2_u = ‖e‖/U_c`, `eh1_u = ‖∇e‖/(U_c/L)` — so existing centered-encoding
+# K=1 sweeps reproduce bit-identically. For L≠1 (balanced / minmax encodings) the new form
+# removes the L-inflation that the legacy normalisation introduced.
 function calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L, dΩ)
-    # Native error vectors
     e_u = u_final - u_h
     e_p = p_final - p_h
-    
-    # 1. Absolute Velocity L2 norm rigorously divided by Characteristic Velocity `U_c`
-    el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ)) / U_c
-    
-    # Align pressure exactly (cancelling null space integration variations) 
+
+    # Domain measure |Ω| (this is the *physical* area of the L-scaled domain).
     area = sum(∫(1.0)dΩ)
+    sqrt_area = sqrt(abs(area))     # √(|Ω|) = L · √(|Ω̂|); for L=1 with [-0.5, 0.5]² this is 1.0
+
+    # 1. Velocity L² error, dimensionless via ‖e_u‖/(U_c · √(|Ω|)).
+    el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ)) / (U_c * sqrt_area)
+
+    # Pressure null-space alignment (centre the error so the gauge-mode is not penalised).
     mean_e_p = sum(∫(e_p)dΩ) / area
     e_p_centered = e_p - mean_e_p
-    
-    # 2. Absolute Pressure L2 norm strictly divided by Characteristic Pressure `P_c`
-    el2_p = sqrt(sum(∫(e_p_centered * e_p_centered)dΩ)) / P_c
-    
-    # 3. Absolute Semi-H1 gradient errors normalized by exact corresponding characteristic scales taking into account geometric `L` characteristic derivation factors.
-    eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ)) / (U_c / L)
-    eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ)) / (P_c / L)
-    
+
+    # 2. Pressure L² error, dimensionless via ‖e_p‖/(P_c · √(|Ω|)).
+    el2_p = sqrt(sum(∫(e_p_centered * e_p_centered)dΩ)) / (P_c * sqrt_area)
+
+    # 3. Semi-H¹ errors. In 2D the L from integration cancels the 1/L from the gradient, so
+    # the dimensionless H¹ semi-norm is simply ‖∇e‖/U_c (no L factor in the divisor).
+    eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ)) / U_c
+    eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ)) / P_c
+
     return el2_u, el2_p, eh1_semi_u, eh1_semi_p
 end
 
@@ -156,6 +216,11 @@ function execute_outer_homotopy_perturbation_loop!(
     iter_count_attempt = 0
     final_x0 = nothing
     final_residual_attempt = NaN
+    # [relative-residual gate] Iter-0 residual ‖R(x₀)‖ of the converged attempt,
+    # populated by solve_system into `diagnostics_cache["initial_residual_norm"]`.
+    # Provides the natural scale ‖f‖ for the gate `‖R_final‖/‖R_initial‖ < tol`
+    # so Re=10⁶ cells stop being false-flagged on raw residual magnitude.
+    initial_residual_attempt = NaN
     
     for attempt in 0:(pert_cfg.max_n_pert + 1)
         # [design-intent] Iteration order is **hard → easy**: start with the largest perturbation
@@ -235,10 +300,12 @@ function execute_outer_homotopy_perturbation_loop!(
             eval_time = sys_eval_time
             iter_count_attempt = sys_iter_count
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
+            initial_residual_attempt = get(local_diagnostics_cache, "initial_residual_norm", NaN)
             break
         else
             println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(local_stab_cfg.osgs_tolerance)`) or system fully diverged.")
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
+            initial_residual_attempt = get(local_diagnostics_cache, "initial_residual_norm", NaN)
         end
     end
 
@@ -246,7 +313,7 @@ function execute_outer_homotopy_perturbation_loop!(
          println("    [WARNING] Completely failed to find root basin. Returning NaN.")
     end
 
-    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt
+    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt
 end
 
 function run_mms(config_file="test_config.json")
@@ -297,7 +364,12 @@ function run_mms(config_file="test_config.json")
     # flagging — anything larger is the iteration plateauing at a non-FE-optimal
     # state rather than a genuine MMS convergence.
     mms_rate_check_factor = Float64(get(test_dict, "mms_rate_check_factor", 100.0))
-    
+
+    # [encoding] Strategy for choosing the dimensional `(L, U_amp)` per cell. See
+    # theory/centered_encoding.tex Section 6 for the four formulas. Default `"centered"`
+    # preserves the pre-2026-06 behaviour (L=1, centered U_amp) bit-identically.
+    encoding_strategy = String(get(test_dict, "encoding_strategy", "centered"))
+
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
     h5_filename = get(test_dict, "h5_filename", "convergence_data.h5")
@@ -361,6 +433,7 @@ function run_mms(config_file="test_config.json")
                         "eval_iters" => Int[],
                         "eval_eps" => Float64[],
                         "eval_residuals" => Float64[],
+                        "eval_initial_residuals" => Float64[],
                         "mms_plateau_success" => Union{Bool,Nothing}[],
                         "overall_verification_success" => Bool[]
                     )
@@ -396,6 +469,15 @@ function run_mms(config_file="test_config.json")
                                             results_cache[k_id_load]["eval_iters"]      = Vector{Int}(read(grp["eval_iters"]))
                                             results_cache[k_id_load]["eval_eps"]        = Vector{Float64}(read(grp["eval_eps"]))
                                             results_cache[k_id_load]["eval_residuals"]  = Vector{Float64}(read(grp["eval_residuals"]))
+                                            # Backward-compatible: pre-existing HDF5s lack `eval_initial_residuals`.
+                                            # Fill with NaN of matching length so the column remains valid in
+                                            # the cache and the analyzer's relative gate gracefully falls back
+                                            # to the absolute gate for legacy rows.
+                                            if haskey(grp, "eval_initial_residuals")
+                                                results_cache[k_id_load]["eval_initial_residuals"] = Vector{Float64}(read(grp["eval_initial_residuals"]))
+                                            else
+                                                results_cache[k_id_load]["eval_initial_residuals"] = fill(NaN, length(results_cache[k_id_load]["hs"]))
+                                            end
                                             if haskey(grp, "overall_verification_success")
                                                 ovs = read(grp["overall_verification_success"])
                                                 results_cache[k_id_load]["overall_verification_success"] = Bool.(ovs .== 1)
@@ -418,128 +500,146 @@ function run_mms(config_file="test_config.json")
 
                 for n in conv_parts
                     println("\n========================================")
-                    println("BUILDING MESH N = $n for etype = $etype, k_v = $kv, k_p = $kp")
+                    println("BEGIN N = $n for etype = $etype, k_v = $kv, k_p = $kp (encoding=$encoding_strategy)")
                     println("========================================")
-                    
+
                     # ==============================================================================
-                    # MESH & SPATIAL DISCRETIZATION
-                    # Evaluated EXACTLY ONCE per resolution (n) to bypass intensive julia compilations
+                    # PER-N CONSTANTS
+                    # The L-independent setup: reference FE (depends on kv/kp), quadrature degree
+                    # (depends on formulation type + kv), stabilization constants c_1, c_2.
+                    # Everything that depends on L (mesh, FE spaces over the mesh, perturbation
+                    # polynomial, porosity radii) is rebuilt inside the per-cell loop below because
+                    # L is now per-cell via the encoding strategy.
                     # ==============================================================================
-                    config_dict = Dict(
-                        "physical_properties" => Dict("nu" => 1.0, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
-                        "domain" => Dict(
-                            "alpha_0" => 0.4, 
-                            "bounding_box" => test_dict["domain"]["bounding_box"],
-                            "r_1" => test_dict["domain"]["r_1"],
-                            "r_2" => test_dict["domain"]["r_2"]
-                        ),
-                        "numerical_method" => Dict(
-                            "element_spaces" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
-                            "mesh" => Dict("element_type" => String(etype), "partition" => [n, n]),
-                            "stabilization" => Dict(
-                                "method" => "ASGS", 
-                                "osgs_inner_newton_iters" => get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3)
-                            ),
-                            "solver" => get(get(test_dict, "numerical_method", Dict()), "solver", Dict())
-                        )
-                    )
-                    
-                    # Dynamically instantiate hierarchy overrides ensuring JSON parser rigor
-                    config = PorousNSSolver.load_config_from_dict(config_dict)
-                    
-                    # Generate logical cell models natively spanning bounded domain
-                    model = _build_local_mesh(config.domain, config.numerical_method.mesh)
-                    labels = get_face_labeling(model)
-                    add_tag_from_tags!(labels, "all_boundaries", [1,2,3,4,5,6,7,8])
-                    
-                    # Pre-compile the structural geometric perturbation offset mapping purely algebraically outside evaluations!
-                    xmin, xmax, ymin, ymax = config.domain.bounding_box[1], config.domain.bounding_box[2], config.domain.bounding_box[3], config.domain.bounding_box[4]
-                    B_fn(x) = (x[1] - xmin)^2 * (xmax - x[1])^2 * (x[2] - ymin)^2 * (ymax - x[2])^2
-                    h_raw_func(x) = B_fn(x) * VectorValue(sin(3π*x[1])*cos(2π*x[2]), -cos(3π*x[1])*sin(2π*x[2]))
-                    
-                    # Compile Taylor-Hood Finite Element Spaces relying heavily on ReferenceFE definitions
                     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
                     refe_p = ReferenceFE(lagrangian, Float64, kp)
-                    V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["all_boundaries"])
-                    Q = TestFESpace(model, refe_p, conformity=:H1)
-                    
-                    # Structurally generate topologically unbound sub-grid reference domains 
-                    # stripped of physical inlet/wall definitions for mathematically pure exact L2 bounds mapping
-                    V_free = TestFESpace(model, refe_u, conformity=:H1)
-                    Q_free = TestFESpace(model, refe_p, conformity=:H1)
-                    
                     # Coordinate quadrature degree evaluation recursively mapped back to formulation definitions.
-                    # The MMS runner always uses ConstantSigmaLaw (see build_mms_formulation above), whose
+                    # The MMS runner always uses ConstantSigmaLaw (see build_mms_formulation), whose
                     # min_quadrature_degree default is 0, so the result matches the legacy base rule.
-                    # Passing the law explicitly per §3.5 future-proofs against a future MMS variant that
-                    # uses Forchheimer (which would otherwise silently under-integrate the inertial term).
                     degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, kv, PorousNSSolver.ConstantSigmaLaw(0.0))
-                    Ω = Triangulation(model)
-                    dΩ = Measure(Ω, degree + 4) # Extra numeric points exactly resolving high order source integration
-                    
-                    # Compute element-wise characteristic length variable 'h' structurally defined for stabilizations
-                    if etype == "TRI"
-                        h_array = lazy_map(v -> sqrt(2.0 * abs(v)), get_cell_measure(Ω))
-                    else
-                        h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
-                    end
-                    h_cf = CellField(collect(h_array), Ω)
-                    
-                    # Strictly define physical topology and scaling fields statically to prevent Gridap AST leaks
-                    h_pert_cf = CellField(h_raw_func, Ω)
-                    norm_h = sqrt(abs(sum(∫( h_pert_cf ⋅ h_pert_cf )dΩ)))
-                    if norm_h <= 0.0
-                        error("Perturbation field norm must be strictly positive (when perturbing).")
-                    end
-                    
-                    Y = MultiFieldFESpace([V, Q])
-                    
                     c_1, c_2 = PorousNSSolver.get_c1_c2(PorousNSSolver.PaperGeneralFormulation, kv)
-                    tau_reg_lim = config.physical_properties.tau_regularization_limit
-                    solver_newton_it = config.numerical_method.solver.newton_iterations
-                    solver_picard_it = config.numerical_method.solver.picard_iterations
-                    max_inc = config.numerical_method.solver.max_increases
-                    xtol = config.numerical_method.solver.xtol
-                    stagnation_tol = config.numerical_method.solver.stagnation_noise_floor
-                    ftol = config.numerical_method.solver.ftol
-                    ls_alpha_min = config.numerical_method.solver.linesearch_alpha_min
-                    freeze_cusp = config.numerical_method.solver.freeze_jacobian_cusp
-                    
+
                     # ==============================================================================
                     # PHYSICS PARAMETER SWEEP
-                    # Iterate fluid configurations using precompiled outer topological operators
+                    # Per-cell: pick L and U_amp from the encoding strategy, then build the L-coupled
+                    # mesh / FE spaces / quadrature / perturbation / porosity / formulation / solver.
                     # ==============================================================================
                     for alpha_0 in alpha_list
-                        # Outer extraction of dynamic CellFields evaluating purely geometric domains
                         alpha_infty = 1.0
-                        alpha_field = build_porosity_field(config, alpha_0, alpha_infty)
-                        alpha_cf = CellField(x -> PorousNSSolver.alpha(alpha_field, x), Ω)
                         for Da in Da_list
                             for Re in Re_list
                                 if (Float64(Re), Float64(Da), Float64(alpha_0)) in skip_cells_set
                                     println("[skip_cells] Re=$(Re), Da=$(Da), α=$(alpha_0) — skipped by config")
                                     continue
                                 end
-                                # Centered encoding: choose U_amp so that geom-mean(ν_dim, σ_dim) = 1.
-                                # Same (Re, Da, α_infty) — only U_amp varies. Brings the dimensional
-                                # coefficients into the FP safe zone for high-Br regimes; verified
-                                # to unbreak the OSGS staggered loop at σ ~ 10¹¹ (C16 probe). See
-                                # diagnostics/jacobian_equilibration_osgs_probe.jl for evidence.
-                                U_amp = Re / sqrt(alpha_infty * Da)
-                                L = 1.0
-                                form = build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
-                                
+
+                                # [encoding] Pick the per-cell characteristic length and velocity scale
+                                # from the configured strategy. Default "centered" reproduces the
+                                # pre-2026-06 behaviour (L=1, U=Re/√(α_∞·Da)) bit-identically.
+                                # See theory/centered_encoding.tex Section 6 for the four formulas.
+                                (L_cell, U_amp) = compute_L_and_U(encoding_strategy, Float64(Re), Float64(Da), alpha_infty)
+                                println("  [cell setup] Re=$(Re), Da=$(Da), α=$(alpha_0), strategy=$encoding_strategy → L=$(L_cell), U_amp=$(U_amp)")
+
+                                # Build per-cell config. The bounding_box and r_1, r_2 carried here are
+                                # the L=1 BASELINE values from JSON; _build_local_mesh and
+                                # build_porosity_field apply the L_cell scaling internally.
+                                config_dict = Dict(
+                                    "physical_properties" => Dict("nu" => 1.0, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
+                                    "domain" => Dict(
+                                        "alpha_0" => 0.4,
+                                        "bounding_box" => test_dict["domain"]["bounding_box"],
+                                        "r_1" => test_dict["domain"]["r_1"],
+                                        "r_2" => test_dict["domain"]["r_2"]
+                                    ),
+                                    "numerical_method" => Dict(
+                                        "element_spaces" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
+                                        "mesh" => Dict("element_type" => String(etype), "partition" => [n, n]),
+                                        "stabilization" => Dict(
+                                            "method" => "ASGS",
+                                            "osgs_inner_newton_iters" => get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3)
+                                        ),
+                                        "solver" => get(get(test_dict, "numerical_method", Dict()), "solver", Dict())
+                                    )
+                                )
+                                config = PorousNSSolver.load_config_from_dict(config_dict)
+
+                                # Build L-scaled mesh (bounding_box · L_cell) and FE spaces over it.
+                                model = _build_local_mesh(config.domain, config.numerical_method.mesh, L_cell)
+                                labels = get_face_labeling(model)
+                                add_tag_from_tags!(labels, "all_boundaries", [1,2,3,4,5,6,7,8])
+
+                                V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["all_boundaries"])
+                                Q = TestFESpace(model, refe_p, conformity=:H1)
+                                V_free = TestFESpace(model, refe_u, conformity=:H1)
+                                Q_free = TestFESpace(model, refe_p, conformity=:H1)
+                                Ω = Triangulation(model)
+                                dΩ = Measure(Ω, degree + 4)
+
+                                # Element-wise h field (scales as L_cell·area_baseline because the
+                                # cell measure already inherits the L_cell-scaled domain).
+                                # Note: Re_h = U_amp·h/ν = (U_amp·L_cell/ν)·(h/L_cell) = Re/N — L_cell
+                                # cancels, so τ_NS stabilisation stays at the same dimensionless scale
+                                # across encodings.
+                                if etype == "TRI"
+                                    h_array = lazy_map(v -> sqrt(2.0 * abs(v)), get_cell_measure(Ω))
+                                else
+                                    h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
+                                end
+                                h_cf = CellField(collect(h_array), Ω)
+
+                                # Homotopy perturbation field, L-rescaled. B_fn is normalised by L^8
+                                # so its magnitude stays O(1) on the L-scaled domain (raw
+                                # (x-xmin)²·(xmax-x)²·… would grow as L^8); h_raw_func's polynomial
+                                # frequencies pick up the same 1/L_cell factor as u_ex so the
+                                # perturbation oscillates the same number of periods regardless of
+                                # L_cell.
+                                xmin_phys = L_cell * config.domain.bounding_box[1]
+                                xmax_phys = L_cell * config.domain.bounding_box[2]
+                                ymin_phys = L_cell * config.domain.bounding_box[3]
+                                ymax_phys = L_cell * config.domain.bounding_box[4]
+                                L_for_pert = L_cell
+                                B_fn(x) = (x[1] - xmin_phys)^2 * (xmax_phys - x[1])^2 * (x[2] - ymin_phys)^2 * (ymax_phys - x[2])^2 / L_for_pert^8
+                                k_pert = pi / L_for_pert
+                                h_raw_func(x) = B_fn(x) * VectorValue(sin(3*k_pert*x[1])*cos(2*k_pert*x[2]), -cos(3*k_pert*x[1])*sin(2*k_pert*x[2]))
+
+                                h_pert_cf = CellField(h_raw_func, Ω)
+                                norm_h = sqrt(abs(sum(∫( h_pert_cf ⋅ h_pert_cf )dΩ)))
+                                if norm_h <= 0.0
+                                    error("Perturbation field norm must be strictly positive (when perturbing).")
+                                end
+
+                                Y = MultiFieldFESpace([V, Q])
+
+                                # Solver constants from per-cell config (independent of L_cell; read
+                                # here to keep the cell loop self-contained after the restructure).
+                                tau_reg_lim = config.physical_properties.tau_regularization_limit
+                                solver_newton_it = config.numerical_method.solver.newton_iterations
+                                solver_picard_it = config.numerical_method.solver.picard_iterations
+                                max_inc = config.numerical_method.solver.max_increases
+                                xtol = config.numerical_method.solver.xtol
+                                stagnation_tol = config.numerical_method.solver.stagnation_noise_floor
+                                ftol = config.numerical_method.solver.ftol
+                                ls_alpha_min = config.numerical_method.solver.linesearch_alpha_min
+                                freeze_cusp = config.numerical_method.solver.freeze_jacobian_cusp
+
+                                # Porosity field with L-scaled radii (JSON r_1, r_2 are L=1 baselines).
+                                alpha_field = build_porosity_field(config, alpha_0, alpha_infty, L_cell)
+                                alpha_cf = CellField(x -> PorousNSSolver.alpha(alpha_field, x), Ω)
+
+                                # Build formulation and MMS using the encoding-chosen (L_cell, U_amp).
+                                form = build_mms_formulation(config, Da, Re, U_amp, L_cell, alpha_infty)
+
                                 # Exact execution of full manufactured solutions analytical expressions
-                                mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
+                                mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L_cell, alpha_infty=alpha_infty)
                                 U_c, P_c = PorousNSSolver.get_characteristic_scales(mms)
-                                
+
                                 u_final = PorousNSSolver.get_u_ex(mms)
                                 p_final = PorousNSSolver.get_p_ex(mms)
-                                
-                                U = TrialFESpace(V, u_final)  
+
+                                U = TrialFESpace(V, u_final)
                                 P = TrialFESpace(Q, p_final)
                                 X = MultiFieldFESpace([U, P])
-                                
+
                                 # Evaluate symbolic PDE operators mapping directly onto the exact physical boundary source terms
                                 f_cf, g_cf = PorousNSSolver.evaluate_exactness_diagnostics(mms, model, Ω, dΩ, h_cf, X, Y, c_1, c_2, tau_reg_lim)
                                 
@@ -652,6 +752,7 @@ function run_mms(config_file="test_config.json")
                                                 # Drop the stale entry so the appended new result lands in the right slot.
                                                 for key in ("hs", "err_u_l2", "err_p_l2", "err_u_h1", "err_p_h1",
                                                             "eval_times", "eval_iters", "eval_eps", "eval_residuals",
+                                                            "eval_initial_residuals",
                                                             "overall_verification_success", "mms_plateau_success")
                                                     if length(rc[key]) >= idx
                                                         deleteat!(rc[key], idx)
@@ -693,14 +794,14 @@ function run_mms(config_file="test_config.json")
                                     setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
                                     formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
                                     iter_solvers = PorousNSSolver.IterativeSolvers(solver_picard, solver_newton)
-                                    mms_setup = MMSSetup(u_final, p_final, h_raw_func, u_ex_L2, norm_h, U_c, P_c, L)
+                                    mms_setup = MMSSetup(u_final, p_final, h_raw_func, u_ex_L2, norm_h, U_c, P_c, L_cell)
                                     pert_cfg = PerturbationConfig(eps_pert_base, max_n_pert)
                                     
                                     # ==============================================================================
                                     # NONLINEAR CONVERGENCE LOOP
                                     # Incrementally shrink initial numerical perturbation forcing iterative validation
                                     # ==============================================================================
-                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt = execute_outer_homotopy_perturbation_loop!(
+                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt = execute_outer_homotopy_perturbation_loop!(
                                         setup, formulation, iter_solvers, method_config, method, dynamic_ftol,
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
@@ -719,7 +820,7 @@ function run_mms(config_file="test_config.json")
 
                                     if success && final_x0 !== nothing
                                         u_h, p_h = final_x0
-                                        el2_u, el2_p, eh1_u, eh1_p = calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L, dΩ)
+                                        el2_u, el2_p, eh1_u, eh1_p = calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L_cell, dΩ)
                                         
                                         vtk_dir = joinpath("results", "vtk")
                                         if !isdir(vtk_dir)
@@ -743,6 +844,7 @@ function run_mms(config_file="test_config.json")
                                     push!(results_cache[k_id]["eval_iters"], iter_count_attempt)
                                     push!(results_cache[k_id]["eval_eps"], successful_eps)
                                     push!(results_cache[k_id]["eval_residuals"], final_residual_attempt)
+                                    push!(results_cache[k_id]["eval_initial_residuals"], initial_residual_attempt)
                                     push!(results_cache[k_id]["mms_plateau_success"], mms_plateau_success)
                                     push!(results_cache[k_id]["overall_verification_success"], overall_verification_success)
                                     
@@ -777,6 +879,7 @@ function run_mms(config_file="test_config.json")
                                         g["eval_iters"] = res["eval_iters"]
                                         g["eval_eps"] = res["eval_eps"]
                                         g["eval_residuals"] = res["eval_residuals"]
+                                        g["eval_initial_residuals"] = res["eval_initial_residuals"]
                                         # Per-mesh convergence status for the detection step (HDF5 can't store
                                         # Union{Bool,Nothing}, so encode: -1=nothing/MMS-disabled, 0=false, 1=true).
                                         g["overall_verification_success"] = Int8.(res["overall_verification_success"])
