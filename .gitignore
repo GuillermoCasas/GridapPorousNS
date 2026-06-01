@@ -46,6 +46,8 @@ theory/*.log
 theory/*.out
 theory/*.synctex.gz
 theory/*.toc
+theory/compilation/
+
 
 # LaTeX compilation intermediates for theory/osgs_algorithm.tex
 theory/osgs_algorithm.aux

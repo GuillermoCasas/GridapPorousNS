@@ -1,0 +1,36 @@
+# latexmk configuration file for porous_NS_with_Gridap theory folder
+
+# 1. Parse command line arguments to detect the target TeX filename
+my $target = "";
+foreach my $arg (@ARGV) {
+    # Skip option flags starting with '-'
+    next if $arg =~ /^-/;
+    
+    # If the argument ends with .tex, extract the base name
+    if ($arg =~ /^(.*)\.tex$/) {
+        $target = $1;
+        last;
+    }
+    
+    # If the argument is just the base name and the .tex file exists
+    if (-e "$arg.tex") {
+        $target = $arg;
+        last;
+    }
+}
+
+# 2. Configure output and auxiliary directories
+if ($target ne "") {
+    # Strip path prefixes if target is specified with path (e.g. theory/article -> article)
+    $target =~ s/.*\///;
+    $aux_dir = "compilation/$target";
+} else {
+    # Fallback if latexmk is run without specifying a file
+    $aux_dir = "compilation/default";
+}
+
+# The PDF output should always be placed in the current directory (theory/)
+$out_dir = ".";
+
+# Print configuration info for transparency
+print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to '$out_dir/'\n";
