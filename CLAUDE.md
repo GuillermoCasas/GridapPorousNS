@@ -34,6 +34,12 @@ The runners emit a warning when a file's runtime crosses the next tier's bound â
 # Method of Manufactured Solutions sweep over (Re, Da, h).
 cd test/extended/ManufacturedSolutions
 julia --project=../../.. run_test.jl test_config.json
+# Run any sub-combination of factors without authoring a new config:
+julia --project=../../.. run_test.jl test_config.json --filter Re=1e6,etype=QUAD,kv=1
+# Multiple concurrent launches share ONE results DB (content-addressed keys + file lock):
+for k in 1 2 3 4; do julia --project=../../.. run_test.jl test_config.json --shard $k/4 & done; wait
+python analyze_results.py --h5 results/<db>.h5 --config data/test_config.json   # post-sweep analysis
+# (See test/extended/ManufacturedSolutions/README.md for the full harness guide.)
 
 # Cocquet reference experiment (convergence study; compares VMS P1/P1 & P2/P2 against the
 # unstabilized Galerkin Taylor-Hood P2/P1 "Cocquet" method via the comparison_runs config).

@@ -822,8 +822,8 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 # search has to backtrack many times near the iso-spikes the SmoothVelocityFloor /
                                 # τ-regularisation introduce along the search line, so the iteration budget needs
                                 # to span both the smoothing-out phase and the quadratic-convergence tail. See
-                                # test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md for the
-                                # Re=1e6, Da=1, α=0.05 case that motivates this. The schema default leaves
+                                # docs/mms_fold_recovery.md for the Re=1e6, Da=1, α=0.05 corner that
+                                # motivates this. The schema default leaves
                                 # well-resolved (low-Re) regimes bit-identical.
                                 local_newton_it = solver_newton_it
                                 if Re >= config.numerical_method.solver.dynamic_newton_re_threshold

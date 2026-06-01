@@ -4,7 +4,7 @@
 #
 # WHY: at the high-Re / low-porosity corner (e.g. Re=1e6, Da=1, α₀=0.05) the discrete VMS
 # solution branch FOLDS — there is no root reachable from the exact-solution initial guess at
-# coarse mesh (diagnosed in probe_stiff_diagnose.jl / diagnostics/probe_diag_v2.md). But the
+# coarse mesh (diagnosed in probe_stiff_diagnose.jl; see docs/mms_fold_recovery.md). But the
 # branch is reachable by α-continuation from α=1 (smooth, easy), and the fold recedes with mesh
 # refinement, so at fine enough N the branch reaches the target α and we recover the true FE
 # solution. This driver automates that: warm-started α-continuation per mesh, then MMS
