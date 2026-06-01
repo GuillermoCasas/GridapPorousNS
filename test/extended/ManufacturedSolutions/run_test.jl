@@ -136,6 +136,8 @@ end
 function _parse_cli_args(args)
     filt = Dict{Symbol,Vector{String}}()
     shard = nothing
+    h5_name = nothing
+    max_n = nothing
     valid_keys = (:Re, :Da, :alpha0, :kv, :kp, :etype, :method)
     i = 1
     while i <= length(args)
@@ -159,12 +161,22 @@ function _parse_cli_args(args)
             k = parse(Int, m.captures[1]); Nsh = parse(Int, m.captures[2])
             (Nsh >= 1 && 1 <= k <= Nsh) || error("--shard k/N requires 1 ≤ k ≤ N; got $(k)/$(Nsh).")
             shard = (k, Nsh)
+        elseif a == "--h5"
+            i += 1
+            i <= length(args) || error("--h5 requires a filename, e.g. --h5 quad_k2.h5")
+            h5_name = String(strip(args[i]))
+        elseif a == "--max-N"
+            i += 1
+            i <= length(args) || error("--max-N requires a positive integer, e.g. --max-N 40")
+            mn = tryparse(Int, strip(args[i]))
+            (mn !== nothing && mn > 0) || error("--max-N must be a positive integer; got \"$(args[i])\".")
+            max_n = mn
         else
-            error("Unrecognized argument \"$(a)\". Expected --filter or --shard.")
+            error("Unrecognized argument \"$(a)\". Expected --filter, --shard, --h5, or --max-N.")
         end
         i += 1
     end
-    return (filter=filt, shard=shard)
+    return (filter=filt, shard=shard, h5=h5_name, max_n=max_n)
 end
 
 # Sets up the specific continuous VMS mathematical behavior for the Manufactured Solution
@@ -390,7 +402,8 @@ function execute_outer_homotopy_perturbation_loop!(
     return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt
 end
 
-function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{String}}(), cli_shard=nothing)
+function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{String}}(), cli_shard=nothing,
+                 cli_h5=nothing, cli_max_n=nothing)
     config_path = joinpath(@__DIR__, "data", config_file)
     test_dict = JSON3.read(read(config_path, String), Dict{String, Any})
 
@@ -457,6 +470,9 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
     h5_filename = get(test_dict, "h5_filename", "convergence_data.h5")
+    if cli_h5 !== nothing
+        h5_filename = cli_h5   # CLI override: route this run's results to a chosen DB (per-study isolation)
+    end
     h5_path = joinpath(results_dir, h5_filename)
 
     erase_past = get(test_dict, "erase_past_results", false)
@@ -478,6 +494,10 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     end
 
     conv_parts = mesh_dict["convergence_partitions"]
+    if cli_max_n !== nothing
+        conv_parts = filter(n -> n <= cli_max_n, conv_parts)   # CLI override: cap the N-ladder for quick gates
+        isempty(conv_parts) && error("--max-N $(cli_max_n) excludes every mesh in convergence_partitions=$(mesh_dict["convergence_partitions"]).")
+    end
 
     # [cell-select] Materialise the full Cartesian cell list ONCE, in the SAME nesting order the
     # solve loops below visit cells, then apply (a) the config's equal_order_only + skip_cells
@@ -1065,5 +1085,5 @@ if abspath(PROGRAM_FILE) == @__FILE__
         flag_args = ARGS[2:end]
     end
     cli = _parse_cli_args(flag_args)
-    run_mms(config_file; cli_filter=cli.filter, cli_shard=cli.shard)
+    run_mms(config_file; cli_filter=cli.filter, cli_shard=cli.shard, cli_h5=cli.h5, cli_max_n=cli.max_n)
 end

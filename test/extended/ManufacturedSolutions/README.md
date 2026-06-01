@@ -20,25 +20,40 @@ research harness** — it is *not* part of the automated `runtests.jl` tiers.
 
 ## Running a sweep
 
+There is **one** sweep config — [`data/test_config.json`](data/test_config.json) — the full reference
+grid (Re/Da/α₀ ∈ {1e-6, 1, 1e6}; QUAD+TRI; k=1,2; ASGS+OSGS; N=10–320; strict honest-exit gate
+`k_nf=10`; MMS plateau verification; the Re=1e6/α₀=0.05 fold corner deferred via `skip_cells`). Every
+*study* (a particular k / element-type / sub-grid) is a CLI selection on this one config, routed to its
+own DB — no per-study config files.
+
 ```bash
 cd test/extended/ManufacturedSolutions
-julia --project=../../.. run_test.jl test_config.json
-python analyze_results.py --h5 results/<db>.h5 --config data/test_config.json
+julia --project=../../.. run_test.jl test_config.json --h5 mms_sweep.h5
+python analyze_results.py --h5 results/mms_sweep.h5 --config data/test_config.json
 ```
 
-The output HDF5 group key is **content-addressed**: `config_<idx>_<tag>_<method>`, where `<tag>` is a
-hash of the physics cell `(Re, Da, α₀, kv, kp, etype)` that is identical across runs. `<idx>` is a
-human-readable label only. VTK field export is **opt-in** — set `"write_vtk": true` in the config
-(default off, so a re-run does not regenerate GBs of `.vtu`).
+The output HDF5 group key is **content-addressed**: `config_<idx>_<tag>_<method>`, where `<tag>` hashes
+the physics cell `(Re, Da, α₀, kv, kp, etype)` identically across runs and `<idx>` is a deterministic,
+shard-independent label. VTK export is **opt-in** (`"write_vtk": true`; default off so re-runs don't
+regenerate GBs of `.vtu`).
 
-### Selecting a sub-combination of factors (no new config needed)
+### CLI overrides — run any sub-combination without authoring a config
+
+| Flag | Effect |
+|---|---|
+| `--filter Re=…,Da=…,alpha0=…,kv=…,kp=…,etype=…,method=…` | Select a sub-grid. AND across keys, OR within a key's repeated values. `1e6` matches `1000000.0`. |
+| `--h5 <name>` | Route this run's results to a chosen DB — keeps studies isolated (e.g. k1 vs k2 in separate files). |
+| `--max-N <int>` | Cap the N-ladder (quick gates, without editing `convergence_partitions`). |
+| `--shard k/N` | Run shard k of N; concurrent launches share one DB (below). |
 
 ```bash
-# AND across keys, OR within repeated keys. Keys: Re, Da, alpha0, kv, kp, etype, method.
-julia --project=../../.. run_test.jl test_config.json --filter Re=1e6,etype=QUAD,kv=1
+# k=2 QUAD study into its own DB (≡ the retired phase1_quad_k2.json):
+julia --project=../../.. run_test.jl test_config.json --filter etype=QUAD,kv=2 --h5 quad_k2.h5
+# quick smoke (1 cell, short ladder):
+julia --project=../../.. run_test.jl test_config.json --filter Re=1.0,Da=1.0,etype=QUAD,kv=1 --max-N 40 --h5 smoke.h5
 ```
-`--filter` narrows the config's grid; the full N-ladder always runs so convergence slopes stay
-computable. `1e6` matches a config value of `1000000.0` (both canonicalised identically).
+The **fold corner** (Re=1e6, α₀=0.05) is excluded from the sweep by `skip_cells` and handled by
+`run_continuation.jl` — see [`docs/mms_fold_recovery.md`](../../../docs/mms_fold_recovery.md).
 
 ### Concurrent launches into ONE shared database
 
@@ -49,50 +64,51 @@ files, no post-hoc merge step.
 
 ```bash
 for k in 1 2 3 4; do
-  julia --project=../../.. run_test.jl test_config.json --shard $k/4 > logs/shard_${k}.log 2>&1 &
+  julia --project=../../.. run_test.jl test_config.json --filter etype=QUAD,kv=2 --h5 quad_k2.h5 \
+        --shard $k/4 > logs/shard_${k}.log 2>&1 &
 done
 wait
-python analyze_results.py --h5 results/<db>.h5 --config data/test_config.json
+python analyze_results.py --h5 results/quad_k2.h5 --config data/test_config.json
 ```
 
 Notes / limits:
-- `erase_past_results=true` is rejected with `--shard` (a shard would wipe another's work).
+- `erase_past_results=true` is rejected with `--shard` (a shard would wipe another's work). The config
+  ships `erase_past_results=false`; to start fresh, `rm` the target DB (or pick a new `--h5` name).
 - Sharding is round-robin by count (not cost-balanced); if load balance ever matters, sort the
   selected cells by a cost proxy before sharding — there is no auxiliary-file machinery to add.
 - Resume is automatic: completed `(cell, N)` entries are skipped, so re-running or adding shards only
-  fills gaps. Mixing a legacy-format DB (`config_<idx>_<method>`) with new content-addressed writes is
-  not recommended — start fresh, or keep legacy DBs read-only.
+  fills gaps. Don't mix a legacy-format DB (`config_<idx>_<method>`) with new content-addressed writes —
+  start fresh, or keep legacy DBs read-only.
 
 ## Configs (`data/`)
 
-| Config | Purpose |
-|---|---|
-| `test_config.json` | Canonical full reference sweep (Re/Da/α₀ ∈ {1e-6, 1, 1e6}; QUAD+TRI; k=1,2; N=10–320; ASGS). |
-| `phase1_{quad,tri}_{k1,k2}.json` | The 2 element-type × 2 order convergence matrix (back the documented results). |
-| `phase1_hard_corner.json` | Systematic Da sweep at the extreme Re=1e6, α₀=0.05 corner. |
-| `scout_centered.json` | Minimal quick-validation gate (easy corner). |
-| `continuation_{c24,c24_rate,c21}.json` | Fold-recovery evidence for `run_continuation.jl` (see `docs/mms_fold_recovery.md`). |
+Consolidated to the minimum — *which* cells to run is a CLI concern (`--filter`/`--h5`/`--max-N`), not a
+config-file one, so the per-(k, element-type) variants are gone:
 
-For a quick smoke run, `--filter` down to a single cell rather than authoring a throwaway config:
-`run_test.jl test_config.json --filter Re=1.0,Da=1.0,etype=QUAD,kv=1`.
+| Config | Harness | Purpose |
+|---|---|---|
+| `test_config.json` | `run_test.jl` | **The** full reference sweep. Every k / element-type / sub-grid study is a `--filter` selection on this one config, routed to its own DB via `--h5`. |
+| `continuation_c24.json` | `run_continuation.jl` | α-continuation fold recovery at the Re=1e6/α₀=0.05 corner. |
+| `continuation_c24_rate.json` | `run_continuation.jl` | `mesh_ladder` regime — convergence rate at the corner via interpolate-up. |
+
+To recreate a retired sibling (e.g. the old `continuation_c21` = `c24` with `Da=1e-6`, or any
+`phase1_*` = a `--filter` slice), copy the nearest config and change the one field, or use the CLI.
 
 ## Quick robustness assessment
 
 A fast multi-regime gate to confirm the harness runs cleanly and to spot convergence regressions —
-e.g. before merging a change. Use an **ephemeral** subset config (do **not** commit it; it is trivially
-recreated). A representative spread that finishes in a few minutes:
+e.g. before merging a change. No throwaway config needed: `--filter` a representative spread, `--max-N`
+a short ladder, into a scratch `--h5` DB. (The α₀=0.05 fold corner is already excluded by the config's
+`skip_cells`; it is covered by `run_continuation.jl`.)
 
-- `Re ∈ {1e-6, 1.0, 1e6}` (Darcy/Stokes → unit → convection-dominated) × `Da=1` × `α₀ ∈ {1.0, 0.5}`
-- `ASGS + OSGS`, `k=1`, `QUAD`, `convergence_partitions: [10, 20, 40]`, `max_n_pert: 2`,
-  `erase_past_results: false` (so it can be sharded), a unique `h5_filename`.
-- Deliberately **omit** the `α₀=0.05` fold corner — it is *expected* to fold and is slow; it is
-  covered by `run_continuation.jl` (see [`docs/mms_fold_recovery.md`](../../../docs/mms_fold_recovery.md)).
-
-Copy the solver block from `data/test_config.json`. Run it sharded (this also exercises the shared-DB
-concurrency), then analyze:
 ```bash
-for k in 1 2; do julia --project=../../.. run_test.jl <subset>.json --shard $k/2 > logs/rob_$k.log 2>&1 & done; wait
-python analyze_results.py --h5 results/<subset>.h5 --config data/<subset>.json --no-plots --outdir /tmp/rob
+# Da=1 column × all Re × all α, QUAD k=1, ASGS+OSGS, N≤40, 2 shards into one scratch DB:
+for k in 1 2; do
+  julia --project=../../.. run_test.jl test_config.json \
+        --filter Da=1.0,etype=QUAD,kv=1 --max-N 40 --shard $k/2 --h5 _robustness.h5 \
+        > logs/rob_$k.log 2>&1 &
+done; wait
+python analyze_results.py --h5 results/_robustness.h5 --config data/test_config.json --no-plots --outdir /tmp/rob
 ```
 
 ### How to read it — two independent signals
@@ -110,16 +126,15 @@ python analyze_results.py --h5 results/<subset>.h5 --config data/<subset>.json -
      low/unit Re — the known coarse-mesh *pre-asymptotic porosity-layer* effect (the layer is resolved
      by only 2–8 cells at N≤40; it recovers to optimal at fine N). See
      [`docs/mms_convergence_status.md`](../../../docs/mms_convergence_status.md).
-   - **OSGS is flagged on coarse meshes, and this is pre-existing** — the frozen baseline
-     `results/phase1_quad_k1.h5` (generated before the harness rework) shows the same class of
-     total-failures / disagreements / folds. Low/unit-Re OSGS actually converges to ‖R‖~1e-12 (true
-     roots) but trips the strict honest-root gate; high-Re OSGS genuinely diverges on coarse N.
+   - **OSGS is flagged on coarse meshes, and this is pre-existing** (independent of harness I/O; it was
+     present in pre-rework baselines too — see [`docs/mms_convergence_status.md`](../../../docs/mms_convergence_status.md)).
+     Low/unit-Re OSGS converges to ‖R‖~1e-12 (true roots) but trips the strict honest-root gate; high-Re
+     OSGS genuinely diverges on coarse N.
    - **Solver-success vs analyzer "no-root" disagreements** are surfaced by the honest-exit gate:
      `is_true_root` accepts a finest-mesh stop only if `‖R‖ ≤ k_nf · dynamic_ftol`, where `k_nf =
-     solver.noise_floor_success_max_ftol_multiple`. A throwaway subset that omits this key leaves the
-     solver's gate disabled (base default), so it reports cells as converged that the analyzer flags.
-     The real `phase1_*` configs set `noise_floor_success_max_ftol_multiple: 10.0`; **carry the same
-     key + finer meshes for a clean pass**, or read the flags as "coarse-mesh, gate-disabled" noise.
+     solver.noise_floor_success_max_ftol_multiple`. `test_config.json` ships
+     `noise_floor_success_max_ftol_multiple: 10.0`, so the gate is active by default; finer meshes
+     reduce the coarse-mesh disagreements.
 
 Rule of thumb: a *harness/IO/cleanup* change is robust if signal 1 is clean and signal 2 is **unchanged
-from the frozen baseline** — convergence quality is a `src/`-level concern, not a harness one.
+from prior runs** — convergence quality is a `src/`-level concern, not a harness one.

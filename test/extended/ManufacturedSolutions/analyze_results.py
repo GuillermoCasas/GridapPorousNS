@@ -777,10 +777,10 @@ def _write_summary_tables(table_data, out_file):
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description="One-stop MMS sweep analysis: detect + merged table + plots + detailed table.")
-    ap.add_argument('--h5', default=os.path.join(here, 'results', 'phase1_*.h5'),
-                    help="glob of Phase-1 HDF5 files (default results/phase1_*.h5)")
-    ap.add_argument('--config', default=os.path.join(here, 'data', 'phase1_quad_k1.json'),
-                    help="a Phase-1 JSON config (for the dynamic_ftol / k_nf constants)")
+    ap.add_argument('--h5', default=os.path.join(here, 'results', '*.h5'),
+                    help="glob of result HDF5 DBs (default results/*.h5; pass one DB to analyze a single study)")
+    ap.add_argument('--config', default=os.path.join(here, 'data', 'test_config.json'),
+                    help="a sweep JSON config (for the dynamic_ftol / k_nf constants)")
     ap.add_argument('--flagged', default=os.path.join(here, 'results', 'flagged_cells.json'),
                     help="output path for the detected flagged_cells.json (Phase-2 input)")
     ap.add_argument('--phase2', default=os.path.join(here, 'results', 'phase2_results.json'),
