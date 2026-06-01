@@ -1,5 +1,9 @@
 # test/extended/ManufacturedSolutions/probe_stiff_diagnose.jl
 # ==============================================================================================
+# [diagnostic-tool] Manually-run investigation driver — NOT part of the automated sweep
+# (run_test.jl) or the test tiers. Also provides the low-level primitives (`build_cell`,
+# `probe_a2_heavy_solve`) that run_continuation.jl reuses via `include`.
+#
 # Nature & Intent:
 # Standalone diagnostic for the stiff MMS corner cell C24 (Re=1e6, Da=1, α=0.05, k=1, n=10,
 # QUAD, ASGS) — re-diagnosing, with TRUSTWORTHY probes, why it converges to a wrong solution.

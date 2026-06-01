@@ -1,5 +1,8 @@
-# test/long/ManufacturedSolutions/run_diagnostics.jl
+# test/extended/ManufacturedSolutions/run_diagnostics.jl
 # ==============================================================================================
+# [diagnostic-tool] Manually-run, single-cell VMS-ablation investigation — NOT part of the
+# automated sweep (run_test.jl) or the test tiers. Hardcodes one extreme cell on purpose.
+#
 # Nature & Intent:
 # Deep inspection tool for resolving the high-reaction stall limits of the VMS formulation. Evaluates
 # residual operator components natively. Tests exactly how the strong continuous continuum representations
