@@ -202,7 +202,7 @@ def _analyze_group(g):
                 ovs=(ovs[o] if ovs is not None else None))
 
 
-def detect(h5_glob, config_path, slope_tol, out_json):
+def detect(h5_glob, config_path, slope_tol, out_json, numbering):
     c = load_solver_constants(config_path)
     files = sorted(glob.glob(h5_glob))
     if not files:
@@ -288,7 +288,7 @@ def detect(h5_glob, config_path, slope_tol, out_json):
                     category = "other"
                 summary[category] = summary.get(category, 0) + 1
                 flagged.append(dict(
-                    h5=os.path.basename(fpath), group=gname, config_idx=int(parts[1]),
+                    h5=os.path.basename(fpath), group=gname, config_idx=numbering.get(_cell_id(g), 0),
                     Re=float(g.attrs['Re']), Da=float(g.attrs['Da']), alpha_0=float(g.attrs['alpha_0']),
                     k_velocity=kv, k_pressure=int(g.attrs['k_pressure']),
                     element_type=decode(g.attrs['element_type']), method=method,
@@ -326,6 +326,39 @@ def _cell_key(parts):
     return parts[2] if len(parts) >= 4 else parts[1]
 
 
+def _cell_id(g):
+    """Canonical, method-agnostic physics-cell identity (Re, Da, α, kv, kp, etype). Uses the harness's
+    `cell_signature` attribute when present (new-format groups), else rebuilds it from attributes
+    (legacy). Matches run_test.jl's _cell_signature format."""
+    cs = g.attrs.get('cell_signature')
+    if cs is not None:
+        return decode(cs)
+    return "Re=%.12e|Da=%.12e|a0=%.12e|kv=%d|kp=%d|et=%s" % (
+        float(g.attrs['Re']), float(g.attrs['Da']), float(g.attrs['alpha_0']),
+        int(g.attrs['k_velocity']), int(g.attrs['k_pressure']), decode(g.attrs['element_type']))
+
+
+def build_cell_numbering(h5_glob):
+    """Deterministic, globally-unique display index per physics cell across all matched HDF5 files —
+    independent of the stored config_<idx> (a per-process counter that repeats under sharded runs).
+    Sorted by (kv, kp, etype, Re, Da, alpha_0) so the numbering is stable and reproducible.
+    Returns {cell_id -> 1-based int}."""
+    keys = {}
+    for fpath in sorted(glob.glob(h5_glob)):
+        with robust_open_h5(fpath, 'r') as f:
+            for gname in f.keys():
+                parts = gname.split('_')
+                if len(parts) < 3 or parts[0] != 'config':
+                    continue
+                g = f[gname]
+                cid = _cell_id(g)
+                if cid not in keys:
+                    keys[cid] = (int(g.attrs['k_velocity']), int(g.attrs['k_pressure']),
+                                 decode(g.attrs['element_type']), float(g.attrs['Re']),
+                                 float(g.attrs['Da']), float(g.attrs['alpha_0']))
+    return {cid: i + 1 for i, cid in enumerate(sorted(keys, key=lambda c: keys[c]))}
+
+
 def _load_phase2(path):
     if not path or not os.path.exists(path):
         return {}
@@ -348,7 +381,7 @@ def _fmt(x):
     return "---" if (x is None or not np.isfinite(x)) else f"{x:.3e}"
 
 
-def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, report_N, slope_tol):
+def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, report_N, slope_tol, numbering):
     c = load_solver_constants(config_path)
     phase2 = _load_phase2(phase2_path)
     flagged_map = _load_flagged(flagged_path)
@@ -409,7 +442,7 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
                 # hardest case in the convergence ladder) is the most diagnostic single number.
                 eps_finest = float(eps[-1]) if len(eps) and np.isfinite(eps[-1]) else float('nan')
                 eps_min = float(np.nanmin(eps)) if len(eps) and np.any(np.isfinite(eps)) else float('nan')
-                row = dict(cidx=int(parts[1]), Re=Re, Da=Da, a0=a0, k=kv, etype=etype, method=method,
+                row = dict(cidx=numbering.get(_cell_id(g), 0), Re=Re, Da=Da, a0=a0, k=kv, etype=etype, method=method,
                            lsL2=lsL2, lsH1=lsH1, rate_mark="",
                            eps_finest=eps_finest, eps_min=eps_min)
 
@@ -499,7 +532,7 @@ def _format_scientific(val):
     return f"10^{exp}" if base == "1" else s
 
 
-def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, do_plots=True):
+def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, numbering, do_plots=True):
     """Per-config log-log plots (PNG) + a detailed markdown table (honest true-root 'Converged')
     + fixed-width summary_tables.txt. Reads all h5 files matching the glob."""
     c = load_solver_constants(config_path)
@@ -527,7 +560,7 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
                 # Grouping above is by the stable cell_key (content tag for new-format groups), so
                 # ASGS/OSGS pair correctly even when concurrent shards assigned different positional
                 # <idx> values. c_idx here is just a human-readable display label from the group name.
-                c_idx = int(first_gname.split('_')[1])
+                c_idx = numbering.get(_cell_id(first_g), 0)
                 Re = float(first_g.attrs['Re']); Da = float(first_g.attrs['Da'])
                 a0 = float(first_g.attrs['alpha_0'])
                 kv = int(first_g.attrs['k_velocity']); kp = int(first_g.attrs['k_pressure'])
@@ -765,12 +798,13 @@ def main():
     args = ap.parse_args()
 
     do = args.only
+    numbering = build_cell_numbering(args.h5)   # deterministic, shard-independent config numbers
     if do in (None, 'detect'):
-        detect(args.h5, args.config, args.slope_tol, args.flagged)
+        detect(args.h5, args.config, args.slope_tol, args.flagged, numbering)
     if do in (None, 'merged'):
-        merged_table(args.h5, args.config, args.flagged, args.phase2, args.out, args.report_N, args.slope_tol)
+        merged_table(args.h5, args.config, args.flagged, args.phase2, args.out, args.report_N, args.slope_tol, numbering)
     if do in ('detailed', 'plots') or (do is None and not args.no_detailed):
-        make_plots_and_detailed(args.h5, args.config, args.outdir, args.report_N, args.slope_tol,
+        make_plots_and_detailed(args.h5, args.config, args.outdir, args.report_N, args.slope_tol, numbering,
                                 do_plots=(do != 'detailed' and not args.no_plots))
 
 

@@ -470,33 +470,11 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
         error("erase_past_results=true is incompatible with --shard (a shard would wipe another shard's results). Set erase_past_results=false for sharded runs.")
     end
 
-    max_idx = 0
-    existing_signatures = Dict()
+    # Ensure the shared DB exists before the per-cell "r+" writes (create under the lock; truncate
+    # if erase_past). The per-cell group index is assigned deterministically from the full grid
+    # (global_cell_index, below), so no idx seeding from existing groups is needed here.
     mkpidlock(h5_lock_path; wait=true) do
-        h5open(h5_path, h5_mode) do h5f
-            if !erase_past
-                for gname in keys(h5f)
-                    parts = split(gname, "_")
-                    if length(parts) >= 3 && parts[1] == "config"
-                        idx = parse(Int, parts[2])
-                        max_idx = max(max_idx, idx)
-                        g = h5f[gname]
-                        att = attributes(g)
-                        try
-                            r = Float64(read(att["Re"]))
-                            d = Float64(read(att["Da"]))
-                            a = Float64(read(att["alpha_0"]))
-                            kv_v = Int(read(att["k_velocity"]))
-                            kp_v = Int(read(att["k_pressure"]))
-                            et = String(read(att["element_type"]))
-                            sig_base = (r, d, a, kv_v, kp_v, et)
-                            existing_signatures[sig_base] = idx
-                        catch
-                        end
-                    end
-                end
-            end
-        end
+        h5open(h5_path, h5_mode) do _io end
     end
 
     conv_parts = mesh_dict["convergence_partitions"]
@@ -514,6 +492,22 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
         ((Float64(Re), Float64(Da), Float64(alpha_0)) in skip_cells_set) && continue
         push!(all_cells, (etype, kv, kp, alpha_0, Da, Re, method))
     end
+
+    # [display-index] Deterministic, globally-unique config index per physics cell, from the cell's
+    # position in the FULL grid — identical across all shards, so config_<idx> never repeats or drifts
+    # between concurrent launches (replaces the old per-process counter). Method is excluded so a
+    # cell's ASGS and OSGS groups share one index.
+    global_cell_index = Dict{Tuple,Int}()
+    let next_idx = 0
+        for (etype, kv, kp, alpha_0, Da, Re, method) in all_cells
+            sb = (Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp), String(etype))
+            if !haskey(global_cell_index, sb)
+                next_idx += 1
+                global_cell_index[sb] = next_idx
+            end
+        end
+    end
+
     selected = filter(c -> _cell_passes_filter(cli_filter, c...), all_cells)
     if cli_shard !== nothing
         kshard, nshard = cli_shard
@@ -984,13 +978,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     # EXPORT CURRENT CURVE TO HDF5 DYNAMICALLY
                                     # =========================================================================================
                                     sig_base = (Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp), String(etype))
-                                    if haskey(existing_signatures, sig_base)
-                                        c_idx = existing_signatures[sig_base]
-                                    else
-                                        max_idx += 1
-                                        c_idx = max_idx
-                                        existing_signatures[sig_base] = c_idx
-                                    end
+                                    c_idx = global_cell_index[sig_base]   # deterministic, shard-independent
                                     
                                     cell_sig = _cell_signature(Re, Da, alpha_0, kv, kp, etype)
                                     cell_tag = _content_tag(cell_sig)
