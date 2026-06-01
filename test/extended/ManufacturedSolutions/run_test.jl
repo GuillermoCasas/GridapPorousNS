@@ -30,6 +30,10 @@ using LineSearches
 using Printf
 using Random
 using LinearAlgebra
+using SHA                              # content-addressed HDF5 group keys (sha1)
+using FileWatching.Pidfile: mkpidlock  # cross-process write lock for one shared results DB
+# NOTE: SHA / FileWatching are stdlibs loaded via the default LOAD_PATH fallback, matching how
+# this harness already uses Printf / Random / DelimitedFiles (none are listed in Project.toml).
 
 # ==============================================================================
 # Helper Constructors
@@ -91,6 +95,76 @@ function compute_L_and_U(strategy::String, Re::Float64, Da::Float64, alpha_infty
     else
         error("Unknown encoding_strategy: \"$strategy\". Valid: \"centered\", \"balanced\", \"minmax\", \"unit\".")
     end
+end
+
+# ==============================================================================
+# Content-addressed keys + CLI cell selection (shared-DB / concurrent-launch support)
+# ==============================================================================
+
+# [content-address] Launch-independent signature string for one PHYSICS+DISCRETIZATION cell
+# (Re, Da, α₀, k_v, k_p, element_type) — deliberately NOT the stabilization method, which is
+# carried in the group-name suffix instead, so a cell's ASGS and OSGS groups share one tag.
+# The `%.12e` float formatting is load-bearing: it canonicalises every representation of the same
+# IEEE double (1e6, 1.0e6, 1000000.0) to one string, so two concurrent launches compute
+# byte-identical signatures — and therefore identical content tags — for the same cell.
+function _cell_signature(Re, Da, alpha_0, kv, kp, etype)
+    return @sprintf("Re=%.12e|Da=%.12e|a0=%.12e|kv=%d|kp=%d|et=%s",
+                    Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp), String(etype))
+end
+
+# Short, filesystem/HDF5-safe content tag. 12 hex chars of SHA1 — collision probability is
+# negligible for the O(10²)-cell grids this harness sweeps.
+_content_tag(sig::AbstractString) = bytes2hex(sha1(sig))[1:12]
+
+# Canonical numeric string, reused for both the content tag and `--filter` matching, so that
+# e.g. `--filter Re=1e6` matches a config value written as `1000000.0`.
+_canon_num(x) = @sprintf("%.12e", Float64(x))
+
+# [cli] Does one cell (etype,kv,kp,alpha_0,Da,Re,method) pass the `--filter` selection?
+# AND across distinct keys, OR within a key's repeated values; an absent key is unconstrained.
+function _cell_passes_filter(filt::Dict{Symbol,Vector{String}}, etype, kv, kp, alpha_0, Da, Re, method)
+    num_ok(key, have) = !haskey(filt, key) || any(w -> _canon_num(parse(Float64, w)) == _canon_num(have), filt[key])
+    str_ok(key, have) = !haskey(filt, key) || any(w -> w == String(have), filt[key])
+    return num_ok(:Re, Re) && num_ok(:Da, Da) && num_ok(:alpha0, alpha_0) &&
+           num_ok(:kv, kv) && num_ok(:kp, kp) &&
+           str_ok(:etype, etype) && str_ok(:method, method)
+end
+
+# [cli] Parse `--filter key=val,key=val …` and `--shard k/N` from the flag args (the config-path
+# positional has already been consumed). Fails loud on any malformed / unknown input — no silent
+# defaults, per the repo's hard rules.
+function _parse_cli_args(args)
+    filt = Dict{Symbol,Vector{String}}()
+    shard = nothing
+    valid_keys = (:Re, :Da, :alpha0, :kv, :kp, :etype, :method)
+    i = 1
+    while i <= length(args)
+        a = args[i]
+        if a == "--filter"
+            i += 1
+            i <= length(args) || error("--filter requires an argument, e.g. --filter Re=1e6,etype=QUAD")
+            for kvpair in split(args[i], ",")
+                isempty(strip(kvpair)) && continue
+                kvparts = split(kvpair, "="; limit=2)
+                length(kvparts) == 2 || error("--filter entry \"$(kvpair)\" must be key=value.")
+                key = Symbol(strip(kvparts[1]))
+                key in valid_keys || error("Unknown --filter key \"$(strip(kvparts[1]))\". Valid: Re, Da, alpha0, kv, kp, etype, method.")
+                push!(get!(filt, key, String[]), String(strip(kvparts[2])))
+            end
+        elseif a == "--shard"
+            i += 1
+            i <= length(args) || error("--shard requires k/N, e.g. --shard 2/4")
+            m = match(r"^(\d+)/(\d+)$", strip(args[i]))
+            m === nothing && error("--shard must be k/N (e.g. 2/4); got \"$(args[i])\".")
+            k = parse(Int, m.captures[1]); Nsh = parse(Int, m.captures[2])
+            (Nsh >= 1 && 1 <= k <= Nsh) || error("--shard k/N requires 1 ≤ k ≤ N; got $(k)/$(Nsh).")
+            shard = (k, Nsh)
+        else
+            error("Unrecognized argument \"$(a)\". Expected --filter or --shard.")
+        end
+        i += 1
+    end
+    return (filter=filt, shard=shard)
 end
 
 # Sets up the specific continuous VMS mathematical behavior for the Manufactured Solution
@@ -316,10 +390,15 @@ function execute_outer_homotopy_perturbation_loop!(
     return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt
 end
 
-function run_mms(config_file="test_config.json")
+function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{String}}(), cli_shard=nothing)
     config_path = joinpath(@__DIR__, "data", config_file)
     test_dict = JSON3.read(read(config_path, String), Dict{String, Any})
-    
+
+    # [concurrency] Our cross-process write safety is the mkpidlock sidecar (single-writer critical
+    # sections, below). Disable libhdf5's OWN file lock so it neither rejects concurrent opens of
+    # the shared DB nor deadlocks against our flock. Mirrors analyze_results.py:robust_open_h5.
+    ENV["HDF5_USE_FILE_LOCKING"] = "FALSE"
+
     as_list(x) = x isa Vector ? x : [x]
     
     Re_list = as_list(test_dict["physical_properties"]["Re"])
@@ -370,44 +449,82 @@ function run_mms(config_file="test_config.json")
     # preserves the pre-2026-06 behaviour (L=1, centered U_amp) bit-identically.
     encoding_strategy = String(get(test_dict, "encoding_strategy", "centered"))
 
+    # [output] VTK field export is OFF by default — the convergence study only needs the HDF5
+    # database + reports, and a full sweep otherwise regenerates GBs of .vtu. Set "write_vtk": true
+    # in the config to re-enable per-cell VTK snapshots (written to results/vtk/).
+    write_vtk = Bool(get(test_dict, "write_vtk", false))
+
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
     h5_filename = get(test_dict, "h5_filename", "convergence_data.h5")
     h5_path = joinpath(results_dir, h5_filename)
-    
+
     erase_past = get(test_dict, "erase_past_results", false)
     h5_mode = erase_past ? "w" : "cw"
-    
-    h5f = h5open(h5_path, h5_mode)
+
+    h5_lock_path = h5_path * ".lock"   # single sidecar shared by all concurrent launches
+
+    # [concurrency] "erase then run concurrently" is contradictory: one shard would truncate the
+    # file another shard is filling. Refuse it loudly.
+    if erase_past && cli_shard !== nothing
+        error("erase_past_results=true is incompatible with --shard (a shard would wipe another shard's results). Set erase_past_results=false for sharded runs.")
+    end
+
     max_idx = 0
     existing_signatures = Dict()
-    if !erase_past
-        for gname in keys(h5f)
-            parts = split(gname, "_")
-            if length(parts) >= 3 && parts[1] == "config"
-                idx = parse(Int, parts[2])
-                max_idx = max(max_idx, idx)
-                g = h5f[gname]
-                att = attributes(g)
-                try
-                    r = Float64(read(att["Re"]))
-                    d = Float64(read(att["Da"]))
-                    a = Float64(read(att["alpha_0"]))
-                    kv_v = Int(read(att["k_velocity"]))
-                    kp_v = Int(read(att["k_pressure"]))
-                    et = String(read(att["element_type"]))
-                    sig_base = (r, d, a, kv_v, kp_v, et)
-                    existing_signatures[sig_base] = idx
-                catch
+    mkpidlock(h5_lock_path; wait=true) do
+        h5open(h5_path, h5_mode) do h5f
+            if !erase_past
+                for gname in keys(h5f)
+                    parts = split(gname, "_")
+                    if length(parts) >= 3 && parts[1] == "config"
+                        idx = parse(Int, parts[2])
+                        max_idx = max(max_idx, idx)
+                        g = h5f[gname]
+                        att = attributes(g)
+                        try
+                            r = Float64(read(att["Re"]))
+                            d = Float64(read(att["Da"]))
+                            a = Float64(read(att["alpha_0"]))
+                            kv_v = Int(read(att["k_velocity"]))
+                            kp_v = Int(read(att["k_pressure"]))
+                            et = String(read(att["element_type"]))
+                            sig_base = (r, d, a, kv_v, kp_v, et)
+                            existing_signatures[sig_base] = idx
+                        catch
+                        end
+                    end
                 end
             end
         end
     end
-    close(h5f)
-    
+
     conv_parts = mesh_dict["convergence_partitions"]
-    
-    total_runs = sum(1 for etype in etype_list, kv in kv_list, kp in kp_list, alpha_0 in alpha_list, Da in Da_list, Re in Re_list if !(equal_order_only && kv != kp) && !((Float64(Re), Float64(Da), Float64(alpha_0)) in skip_cells_set)) * length(methods)
+
+    # [cell-select] Materialise the full Cartesian cell list ONCE, in the SAME nesting order the
+    # solve loops below visit cells, then apply (a) the config's equal_order_only + skip_cells
+    # filters, (b) the CLI --filter, (c) deterministic --shard partitioning. This single chokepoint
+    # is what lets a user run any sub-combination of factors into one shared DB, and keeps shards
+    # disjoint. IMPORTANT: keep this enumeration order in lockstep with the loops below — a reorder
+    # there must be mirrored here, or two shards would disagree on the partition.
+    all_cells = Tuple[]
+    for etype in etype_list, kv in kv_list, kp in kp_list,
+        alpha_0 in alpha_list, Da in Da_list, Re in Re_list, method in methods
+        (equal_order_only && kv != kp) && continue
+        ((Float64(Re), Float64(Da), Float64(alpha_0)) in skip_cells_set) && continue
+        push!(all_cells, (etype, kv, kp, alpha_0, Da, Re, method))
+    end
+    selected = filter(c -> _cell_passes_filter(cli_filter, c...), all_cells)
+    if cli_shard !== nothing
+        kshard, nshard = cli_shard
+        selected = selected[kshard:nshard:end]   # round-robin: disjoint, exhaustive, order-stable
+    end
+    isempty(selected) && error("No cells selected after --filter/--shard — check the filter keys/values against the config grid.")
+    selected_set = Set(selected)
+    total_runs = length(selected)
+    println("[cell-select] $(length(selected)) of $(length(all_cells)) cells selected" *
+            (cli_shard === nothing ? "" : " (shard $(cli_shard[1])/$(cli_shard[2]))") *
+            (isempty(cli_filter) ? "" : " (filter $(cli_filter))") * ".")
     run_idx = 0
     
     # Pre-allocate cache for collecting metrics over partitions dynamically
@@ -443,6 +560,7 @@ function run_mms(config_file="test_config.json")
                 # solve loop can skip cells whose (Re, Da, α, method) at the current N is
                 # already on disk. Only loads groups matching the current (etype, kv, kp).
                 if !erase_past && isfile(h5_path)
+                    mkpidlock(h5_lock_path; wait=true) do
                     h5open(h5_path, "r") do h5f_in
                         for gname in keys(h5f_in)
                             parts = split(gname, "_")
@@ -494,6 +612,7 @@ function run_mms(config_file="test_config.json")
                             end
                         end
                     end
+                    end  # mkpidlock (resume-preload read)
                     n_preloaded = sum(length(results_cache[k]["hs"]) for k in keys(results_cache) if k[1] == etype && k[2] == kv && k[3] == kp; init=0)
                     println("[resume] Preloaded $(n_preloaded) (cell, N) data points from $(h5_path) for etype=$(etype), k_v=$(kv), k_p=$(kp).")
                 end
@@ -530,6 +649,12 @@ function run_mms(config_file="test_config.json")
                             for Re in Re_list
                                 if (Float64(Re), Float64(Da), Float64(alpha_0)) in skip_cells_set
                                     println("[skip_cells] Re=$(Re), Da=$(Da), α=$(alpha_0) — skipped by config")
+                                    continue
+                                end
+
+                                # [cell-select] Skip the entire per-cell setup if no stabilization
+                                # method for this physics cell survives the --filter/--shard selection.
+                                if !any(m -> (etype, kv, kp, alpha_0, Da, Re, m) in selected_set, methods)
                                     continue
                                 end
 
@@ -697,8 +822,8 @@ function run_mms(config_file="test_config.json")
                                 # search has to backtrack many times near the iso-spikes the SmoothVelocityFloor /
                                 # τ-regularisation introduce along the search line, so the iteration budget needs
                                 # to span both the smoothing-out phase and the quadratic-convergence tail. See
-                                # test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md for the
-                                # Re=1e6, Da=1, α=0.05 case that motivates this. The schema default leaves
+                                # docs/mms_fold_recovery.md for the Re=1e6, Da=1, α=0.05 corner that
+                                # motivates this. The schema default leaves
                                 # well-resolved (low-Re) regimes bit-identical.
                                 local_newton_it = solver_newton_it
                                 if Re >= config.numerical_method.solver.dynamic_newton_re_threshold
@@ -731,6 +856,10 @@ function run_mms(config_file="test_config.json")
                                 x0_exact = interpolate_everywhere([u_final, p_final], X)
                                 
                                 for method in methods
+                                    # [cell-select] Honour --filter/--shard at the single per-method chokepoint.
+                                    if !((etype, kv, kp, alpha_0, Da, Re, method) in selected_set)
+                                        continue
+                                    end
                                     run_idx += 1
                                     println("\n--- Progress $(run_idx) / $(total_runs * length(conv_parts)) | Re=$(Re), Da=$(Da), α=$(alpha_0), method=$(method), N=$(n) ---")
 
@@ -821,15 +950,17 @@ function run_mms(config_file="test_config.json")
                                     if success && final_x0 !== nothing
                                         u_h, p_h = final_x0
                                         el2_u, el2_p, eh1_u, eh1_p = calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L_cell, dΩ)
-                                        
-                                        vtk_dir = joinpath("results", "vtk")
-                                        if !isdir(vtk_dir)
-                                            mkpath(vtk_dir)
+
+                                        if write_vtk
+                                            vtk_dir = joinpath(results_dir, "vtk")
+                                            if !isdir(vtk_dir)
+                                                mkpath(vtk_dir)
+                                            end
+                                            u_ex_cf = interpolate_everywhere(u_final, U)
+                                            p_ex_cf = interpolate_everywhere(p_final, P)
+                                            filename = joinpath(vtk_dir, "mms_$(method)_Re$(Float64(Re))_Da$(Float64(Da))_N$(n).vtu")
+                                            writevtk(Ω, filename, cellfields=["uh"=>u_h, "ph"=>p_h, "uex"=>u_ex_cf, "pex"=>p_ex_cf, "alpha"=>alpha_cf, "err_u"=>u_h - u_ex_cf, "err_p"=>p_h - p_ex_cf])
                                         end
-                                        u_ex_cf = interpolate_everywhere(u_final, U)
-                                        p_ex_cf = interpolate_everywhere(p_final, P)
-                                        filename = joinpath(vtk_dir, "mms_$(method)_Re$(Float64(Re))_Da$(Float64(Da))_N$(n).vtu")
-                                        writevtk(Ω, filename, cellfields=["uh"=>u_h, "ph"=>p_h, "uex"=>u_ex_cf, "pex"=>p_ex_cf, "alpha"=>alpha_cf, "err_u"=>u_h - u_ex_cf, "err_p"=>p_h - p_ex_cf])
                                     else
                                         el2_u, el2_p, eh1_u, eh1_p = NaN, NaN, NaN, NaN
                                     end
@@ -861,10 +992,18 @@ function run_mms(config_file="test_config.json")
                                         existing_signatures[sig_base] = c_idx
                                     end
                                     
+                                    cell_sig = _cell_signature(Re, Da, alpha_0, kv, kp, etype)
+                                    cell_tag = _content_tag(cell_sig)
+
+                                    mkpidlock(h5_lock_path; wait=true) do
                                     h5open(h5_path, "r+") do h5f_out
                                         res = results_cache[k_id]
-                                        grp_name = "config_$(c_idx)_$(method)"
-                                        
+                                        # [content-address] config_<idx>_<tag>_<method>: <tag> hashes the physics
+                                        # cell (Re,Da,α,kv,kp,etype) identically across concurrent launches, so two
+                                        # processes never clobber distinct cells, and a cell's ASGS/OSGS groups share
+                                        # <tag>. <idx> stays human-readable but is no longer the uniqueness guarantee.
+                                        grp_name = "config_$(c_idx)_$(cell_tag)_$(method)"
+
                                         if haskey(h5f_out, grp_name)
                                             delete_object(h5f_out, grp_name)
                                         end
@@ -896,6 +1035,7 @@ function run_mms(config_file="test_config.json")
                                         attributes(g)["k_pressure"] = Int(kp)
                                         attributes(g)["element_type"] = String(etype)
                                         attributes(g)["method"] = String(method)
+                                        attributes(g)["cell_signature"] = String(cell_sig)
                                         attributes(g)["config_file"] = String(config_file)
                                         attributes(g)["target_ftol"] = Float64(dynamic_ftol)
                                         attributes(g)["osgs_tolerance"] = Float64(dynamic_ftol)
@@ -909,7 +1049,8 @@ function run_mms(config_file="test_config.json")
                                         
                                         println("\n    [💾] Appended $(grp_name) accurately to HDF5 file layout. Available for plotting!")
                                     end
-                                    
+                                    end  # mkpidlock (per-cell write critical section)
+
                                     # Force garbage collection to prevent C-pointer memory leaks from UMFPACK LU factorizations across the N sweeps
                                     GC.gc()
                                     
@@ -924,6 +1065,17 @@ function run_mms(config_file="test_config.json")
 end # end function
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    config_file = length(ARGS) > 0 ? ARGS[1] : "test_config.json"
-    run_mms(config_file)
+    # ARGS[1] is the config filename (optional; defaults to test_config.json). Anything starting
+    # with -- is a flag parsed by _parse_cli_args. Examples:
+    #   julia run_test.jl phase1_quad_k1.json
+    #   julia run_test.jl phase1_quad_k1.json --filter Re=1e6,etype=QUAD,kv=1
+    #   julia run_test.jl phase1_quad_k1.json --shard 2/4         # one shard of a concurrent sweep
+    flag_args = ARGS
+    config_file = "test_config.json"
+    if length(ARGS) > 0 && !startswith(ARGS[1], "--")
+        config_file = ARGS[1]
+        flag_args = ARGS[2:end]
+    end
+    cli = _parse_cli_args(flag_args)
+    run_mms(config_file; cli_filter=cli.filter, cli_shard=cli.shard)
 end

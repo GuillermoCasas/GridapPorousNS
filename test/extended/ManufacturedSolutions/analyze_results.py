@@ -317,6 +317,15 @@ def _key(Re, Da, alpha_0, kv, etype):
     return (f"{float(Re):.3e}", f"{float(Da):.3e}", f"{float(alpha_0):.4f}", int(kv), str(etype))
 
 
+def _cell_key(parts):
+    """Stable per-physics-cell identity, used to group a cell's ASGS/OSGS halves and to join the
+    flagged map. New-format groups are config_<idx>_<tag>_<method> (len>=4): the <tag> content-
+    addresses the physics cell and is identical across concurrent shards, so it is the robust key.
+    Legacy groups are config_<idx>_<method> (len==3): fall back to <idx>. This makes pairing correct
+    even when concurrent shards assign different positional <idx> values to the same cell."""
+    return parts[2] if len(parts) >= 4 else parts[1]
+
+
 def _load_phase2(path):
     if not path or not os.path.exists(path):
         return {}
@@ -330,7 +339,9 @@ def _load_flagged(path):
         return {}
     with open(path) as fh:
         rows = json.load(fh)
-    return {(int(r["config_idx"]), r["method"]): r for r in rows}
+    # Key by the stable cell identity (content tag for new-format groups, idx for legacy) so the
+    # merged-table join below is robust to per-process idx drift under concurrent sharded writes.
+    return {(_cell_key(r["group"].split('_')), r["method"]): r for r in rows}
 
 
 def _fmt(x):
@@ -390,7 +401,7 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
                     return float(np.polyfit(np.log(h[idx]), np.log(errs[idx]), 1)[0])
                 lsL2, lsH1 = ls_rate(eu), ls_rate(euh)
 
-                fl = flagged_map.get((int(parts[1]), method))
+                fl = flagged_map.get((_cell_key(parts), method))
                 cat = fl.get("category") if fl else None
                 p2 = phase2.get(_key(Re, Da, a0, kv, etype))
                 tol = slope_tol
@@ -509,9 +520,14 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, d
             for gname in f.keys():
                 parts = gname.split('_')
                 if len(parts) >= 3 and parts[0] == 'config':
-                    config_dict[parts[1]][parts[-1]] = gname
-            for c_idx, methods in config_dict.items():
-                first_g = f[next(iter(methods.values()))]
+                    config_dict[_cell_key(parts)][parts[-1]] = gname
+            for cell_key, methods in config_dict.items():
+                first_gname = next(iter(methods.values()))
+                first_g = f[first_gname]
+                # Grouping above is by the stable cell_key (content tag for new-format groups), so
+                # ASGS/OSGS pair correctly even when concurrent shards assigned different positional
+                # <idx> values. c_idx here is just a human-readable display label from the group name.
+                c_idx = int(first_gname.split('_')[1])
                 Re = float(first_g.attrs['Re']); Da = float(first_g.attrs['Da'])
                 a0 = float(first_g.attrs['alpha_0'])
                 kv = int(first_g.attrs['k_velocity']); kp = int(first_g.attrs['k_pressure'])

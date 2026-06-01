@@ -4,7 +4,7 @@
 #
 # WHY: at the high-Re / low-porosity corner (e.g. Re=1e6, Da=1, α₀=0.05) the discrete VMS
 # solution branch FOLDS — there is no root reachable from the exact-solution initial guess at
-# coarse mesh (diagnosed in probe_stiff_diagnose.jl / diagnostics/probe_diag_v2.md). But the
+# coarse mesh (diagnosed in probe_stiff_diagnose.jl; see docs/mms_fold_recovery.md). But the
 # branch is reachable by α-continuation from α=1 (smooth, easy), and the fold recedes with mesh
 # refinement, so at fine enough N the branch reaches the target α and we recover the true FE
 # solution. This driver automates that: warm-started α-continuation per mesh, then MMS
@@ -17,7 +17,21 @@
 # exactly as run_test.jl reads epsilon_pert / max_n_pert / mms_* — no magic numbers, no
 # silent defaults beyond what is documented here.
 #
+# REGIMES (config "regime" field; defaults from key-presence for backward compatibility):
+#   "alpha"       — per-mesh α-continuation: ramp α from `continuation.start` (default 1.0) to
+#                   `target.alpha_0` at each mesh in `mesh.convergence_partitions`. Default when no
+#                   "mesh_continuation" block is present.
+#   "mesh_ladder" — α-continuation ONCE at `mesh_continuation.base_N`, then interpolate the converged
+#                   state up `mesh_continuation.fine_Ns` (one solve per finer mesh). Yields the
+#                   defensible L²/H¹-vs-h rate at the corner. Default when a "mesh_continuation" block
+#                   is present.
+#   EXTENSION POINT: a "da" regime (ramp Da at fixed α) is not wired here, but the underlying
+#                   primitive already exists as `probe_continuation` in probe_stiff_diagnose.jl.
+# BATCH:  `run_continuation.jl phase2 [flagged.json] [out.json] [defaults.json]` rescues every cell in
+#         flagged_cells.json via mesh-continuation, routed by detected category.
+#
 # RUN:  cd test/extended/ManufacturedSolutions && julia --project=../../.. run_continuation.jl [config.json]
+#       (the regime is auto-selected from the config; see REGIMES above.)
 # ==============================================================================================
 
 using Pkg
@@ -259,8 +273,15 @@ function run_continuation(config_file="continuation_c24.json")
     cfg = JSON3.read(read(joinpath(@__DIR__, "data", config_file), String))
     Re = Float64(cfg["target"]["Re"]); Da = Float64(cfg["target"]["Da"]); αt = Float64(cfg["target"]["alpha_0"])
 
-    # Mesh-continuation rate study (base α-continuation + interpolate-up) if requested.
-    if haskey(cfg, "mesh_continuation")
+    # [regime] First-class, validated continuation regime. For backward compatibility an absent
+    # "regime" defaults from the legacy key-presence convention (a "mesh_continuation" block ⇒
+    # "mesh_ladder", otherwise ⇒ "alpha"), so every pre-existing continuation_*.json runs unchanged.
+    default_regime = haskey(cfg, "mesh_continuation") ? "mesh_ladder" : "alpha"
+    regime = String(get(cfg, "regime", default_regime))
+
+    if regime == "mesh_ladder"
+        # Mesh-continuation rate study: α-continuation ONCE at a base mesh, then interpolate-up.
+        haskey(cfg, "mesh_continuation") || error("regime=\"mesh_ladder\" requires a \"mesh_continuation\" block (base_N, fine_Ns).")
         mc = cfg["mesh_continuation"]
         cc = get(cfg, "continuation", Dict())
         mesh_continuation_rate(Re, Da, αt, [Int(mc["base_N"])], Int.(collect(mc["fine_Ns"])),
@@ -269,8 +290,13 @@ function run_continuation(config_file="continuation_c24.json")
             cont_nsteps=Int(get(cc, "nsteps", 30)), cont_minr=Float64(get(cc, "min_step_ratio", 3e-2)),
             cont_maxit=Int(get(cc, "max_iters_per_step", 60)), mesh_maxit=Int(get(mc, "mesh_max_iters", 100)))
         return
+    elseif regime != "alpha"
+        error("Unknown continuation regime \"$regime\". Supported: \"alpha\" (per-mesh α-ramp to the " *
+              "target) and \"mesh_ladder\" (α-ramp at a base mesh + interpolate-up the fine ladder). " *
+              "A \"da\" regime is a documented extension point — see the file header.")
     end
 
+    # regime == "alpha": per-mesh α-continuation to the target corner.
     c = cfg["continuation"]
     αstart = Float64(get(c, "start", 1.0))
     nsteps = Int(get(c, "nsteps", 48))

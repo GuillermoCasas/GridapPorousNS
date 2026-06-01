@@ -75,7 +75,7 @@ degrade convergence. That is what makes it the clean case.
 - The trouble axis is **`Re × α₀`**, not `Re × Da`. `Da` only scales the *constant* reaction
   `σ_c`; a large `σ_c` (high `Da`) *helps* (coercive). The fold is driven by **convection + the
   steep porosity layer**, confirmed independent of `Da` (C24 at `Da=1` and C21 at `Da=1e-6` give
-  **bit-identical** corner roots — `src/.../diagnostics/c24_resolution_and_continuation.md`).
+  **bit-identical** corner roots — see [`docs/mms_fold_recovery.md`](mms_fold_recovery.md)).
 - **Buckets 2 (fold) and 3 (sub-optimal rate) are the same physics at two severities**, not two
   disjoint sets. At the extreme corner the branch folds (no coarse root); short of/just past the
   fold the root exists but the rate is pre-asymptotically eroded. Both resolve by **refining past the
@@ -97,7 +97,7 @@ recovers optimal/superconvergent rates. The numbers and the observed recovery ag
 
 ## 3. The fold (region B) — established
 
-Full diagnosis: [`diagnostics/c24_resolution_and_continuation.md`](../test/extended/ManufacturedSolutions/diagnostics/c24_resolution_and_continuation.md). Key points:
+Full diagnosis: [`docs/mms_fold_recovery.md`](mms_fold_recovery.md). Key points:
 
 - **It is a true turning point, not a solver/Jacobian bug.** The Exact-Newton Jacobian was verified
   against finite differences to `4.8e-12`; heavy Newton *and* Picard from the exact solution both
