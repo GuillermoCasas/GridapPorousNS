@@ -75,3 +75,51 @@ Notes / limits:
 
 For a quick smoke run, `--filter` down to a single cell rather than authoring a throwaway config:
 `run_test.jl test_config.json --filter Re=1.0,Da=1.0,etype=QUAD,kv=1`.
+
+## Quick robustness assessment
+
+A fast multi-regime gate to confirm the harness runs cleanly and to spot convergence regressions —
+e.g. before merging a change. Use an **ephemeral** subset config (do **not** commit it; it is trivially
+recreated). A representative spread that finishes in a few minutes:
+
+- `Re ∈ {1e-6, 1.0, 1e6}` (Darcy/Stokes → unit → convection-dominated) × `Da=1` × `α₀ ∈ {1.0, 0.5}`
+- `ASGS + OSGS`, `k=1`, `QUAD`, `convergence_partitions: [10, 20, 40]`, `max_n_pert: 2`,
+  `erase_past_results: false` (so it can be sharded), a unique `h5_filename`.
+- Deliberately **omit** the `α₀=0.05` fold corner — it is *expected* to fold and is slow; it is
+  covered by `run_continuation.jl` (see [`docs/mms_fold_recovery.md`](../../../docs/mms_fold_recovery.md)).
+
+Copy the solver block from `data/test_config.json`. Run it sharded (this also exercises the shared-DB
+concurrency), then analyze:
+```bash
+for k in 1 2; do julia --project=../../.. run_test.jl <subset>.json --shard $k/2 > logs/rob_$k.log 2>&1 & done; wait
+python analyze_results.py --h5 results/<subset>.h5 --config data/<subset>.json --no-plots --outdir /tmp/rob
+```
+
+### How to read it — two independent signals
+
+1. **Harness robustness** (what an I/O / concurrency / CLI change can affect): every shard exits 0,
+   all solves complete, **no** `unable to lock` / truncation / corruption in the logs, and the DB has
+   exactly `#cells × #methods` content-addressed groups (`config_<idx>_<tag>_<method>`). Cross-check
+   that a sharded run is content-identical to a single-process run of the same cells. This is the
+   signal that validates the cleanup/generalization itself.
+
+2. **Solver convergence** (affected only by `src/` changes, *not* by harness I/O): read
+   `analyze_results.py`'s summary. Expected, non-regression behavior on these intentionally **coarse**
+   meshes (N≤40):
+   - **ASGS velocity L² rate ≈ 2** (optimal) at `α₀=1.0` and at `Re=1e6`; **≈ 1.6 at `α₀=0.5`** for
+     low/unit Re — the known coarse-mesh *pre-asymptotic porosity-layer* effect (the layer is resolved
+     by only 2–8 cells at N≤40; it recovers to optimal at fine N). See
+     [`docs/mms_convergence_status.md`](../../../docs/mms_convergence_status.md).
+   - **OSGS is flagged on coarse meshes, and this is pre-existing** — the frozen baseline
+     `results/phase1_quad_k1.h5` (generated before the harness rework) shows the same class of
+     total-failures / disagreements / folds. Low/unit-Re OSGS actually converges to ‖R‖~1e-12 (true
+     roots) but trips the strict honest-root gate; high-Re OSGS genuinely diverges on coarse N.
+   - **Solver-success vs analyzer "no-root" disagreements** are surfaced by the honest-exit gate:
+     `is_true_root` accepts a finest-mesh stop only if `‖R‖ ≤ k_nf · dynamic_ftol`, where `k_nf =
+     solver.noise_floor_success_max_ftol_multiple`. A throwaway subset that omits this key leaves the
+     solver's gate disabled (base default), so it reports cells as converged that the analyzer flags.
+     The real `phase1_*` configs set `noise_floor_success_max_ftol_multiple: 10.0`; **carry the same
+     key + finer meshes for a clean pass**, or read the flags as "coarse-mesh, gate-disabled" noise.
+
+Rule of thumb: a *harness/IO/cleanup* change is robust if signal 1 is clean and signal 2 is **unchanged
+from the frozen baseline** — convergence quality is a `src/`-level concern, not a harness one.
