@@ -17,7 +17,7 @@ Depending on the chosen space ``\widetilde{\mathcal{X}}`` for the sub-grid scale
 - `src/solvers/nonlinear.jl`: Defines the exact solver execution schemes (`solver_picard`, `solver_newton`) required to converge the coupled nonlinear ASGS/OSGS algebraic problems.
 
 # Algorithm-to-code mapping
-See `theory/algorithm-code-mapping.md` for the full table. In short, `solve_system` mirrors
+See `docs/solver/algorithm-code-mapping.md` for the full table. In short, `solve_system` mirrors
 Algorithm O (SimulationOrchestration) of `theory/osgs_algorithm.tex`; it delegates to seven
 file-local helpers (`_initialize_asgs_state!`, `_run_asgs_mms_extension!`,
 `_run_osgs_inner_cascade!`, `_compute_state_drift`, `_update_and_project!`,
@@ -161,7 +161,10 @@ function safe_fe_solve!(x, fesolver, op; backup=nothing)
                 residual_norm = r.residual_norm,
                 initial_residual_norm = r.initial_residual_norm,
                 step_norm = r.step_norm,
-                stop_reason = r.stop_reason)
+                stop_reason = r.stop_reason,
+                iteration_history = r.iteration_history,
+                initial_residual_normalized = r.initial_residual_normalized,
+                residual_normalized = r.residual_normalized)
     catch e
         msg = string(e)
         if occursin("Reached maximum iterations", msg) || occursin("Reached max iterations", msg)
@@ -170,6 +173,27 @@ function safe_fe_solve!(x, fesolver, op; backup=nothing)
             return (state = :exception, exc = e)
         end
     end
+end
+
+# [trajectory] Append one algorithm-stage record to diag_cache["trajectory"], capturing a case's exact
+# path through the nonlinear orchestration (Algorithm O → B/C → A) for later analysis. `stage` is a
+# documentation-aligned code (e.g. "B:StageI:N1", "C:OSGS[3]:Picard"). `res` is a `safe_fe_solve!`
+# NamedTuple; non-:ok early-return states carry only `state`, so the numeric fields fall back to defaults.
+function _record_stage!(diag_cache, stage::String, res)
+    haskey(diag_cache, "trajectory") || (diag_cache["trajectory"] = Any[])
+    push!(diag_cache["trajectory"], (
+        stage       = stage,
+        state       = String(res.state),
+        stop_reason = get(res, :stop_reason, ""),
+        iters       = get(res, :iterations, 0),
+        res_in      = get(res, :initial_residual_norm, NaN),
+        res_out     = get(res, :residual_norm, NaN),
+        # [trajectory] normalized residuals (per-field convergence quantity, ≤1 ⟺ converged); the
+        # plotter prefers these and falls back to the inf-norms above when they are absent.
+        res_in_norm  = get(res, :initial_residual_normalized, NaN),
+        res_out_norm = get(res, :residual_normalized, NaN),
+        history     = get(res, :iteration_history, NamedTuple[]),
+    ))
 end
 
 # ==============================================================================
@@ -262,10 +286,9 @@ end
 Implements §3.6.2 `Mode_stop` logic from `theory/osgs_algorithm.tex`, plus the
 absolute ℓ∞ noise-floor short-circuit. Pure function.
 
-Note (per `theory/Code Audit Findings.md` P-005): the ℓ∞ short-circuit is gated to
-`state_drift` mode only. In `projection_drift` and `both` modes the projection may
-legitimately still be moving while the primary state appears stagnant, so a raw
-ℓ∞ short-circuit could return a non-fixed-point on `(U_h, π_h)`.
+The ℓ∞ short-circuit is gated to `state_drift` mode only: in `projection_drift` and `both`
+modes the projection may legitimately still be moving while the primary state appears stagnant,
+so a raw ℓ∞ short-circuit could accept a non-fixed-point on `(U_h, π_h)`.
 """
 function _decide_osgs_convergence(x_diff, x_diff_inf, pi_u_drift, pi_p_drift,
                                    osgs_iter, stab_cfg, osgs_tol, stagnation_tol)
@@ -310,17 +333,19 @@ loop.
 
 Internal policy: any non-structural Newton finish is accepted; only
 `linesearch_failed`, `merit_divergence_escaped`, `linear_solve_nan` mark inner
-failure. See the P-003 back-pointer attached to the classification site below.
+failure (stagnation / max-iters finishes are progress — the outer OSGS loop
+re-evaluates anyway). The classification site is below.
 
 Returns `(success, structurally_failed)`. `structurally_failed=true` signals the
 caller to `break` the outer OSGS loop.
 """
 function _run_osgs_inner_cascade!(final_x0, x_prev, op_newton_osgs, op_picard_osgs,
                                    local_fesolver, local_fesolver_picard,
-                                   diag_cache, iter_count_ref)
+                                   diag_cache, iter_count_ref; outer_iter::Int=0)
     # --- Attempt 1: OSGS Inner Newton ---
     newton_failed = false
     res_n1 = safe_fe_solve!(final_x0, local_fesolver, op_newton_osgs; backup=x_prev)
+    _record_stage!(diag_cache, "C:OSGS[$outer_iter]:N1", res_n1)
     if res_n1.state == :nonfinite
         println("        -> OSGS Inner Newton produced non-finite state. Restoring previous iterate, engaging Picard fallback.")
         newton_failed = true
@@ -342,12 +367,10 @@ function _run_osgs_inner_cascade!(final_x0, x_prev, op_newton_osgs, op_picard_os
         ))
         diag_cache["final_residual_norm"] = res_n1.residual_norm
 
-        # P-003 back-pointer: only the three structural-failure stop reasons below
-        # mark the inner Newton as failed. `xtol_stagnation` and `max_iters_stagnation`
-        # (IterationCap) are accepted as outer-loop progress by design — see
-        # `theory/osgs_algorithm.tex` §1.2.4 L1118. Do not add IterationCap to this
-        # set without first revising the algorithm document; tightening here would
-        # cause OSGS to reject converged-but-not-tight inner iterates.
+        # Only the three structural-failure stop reasons below mark the inner Newton as failed.
+        # `xtol_stagnation` and `max_iters_stagnation` (IterationCap) are accepted as outer-loop
+        # progress by design (see `theory/osgs_algorithm.tex` §1.2.4). Adding IterationCap here would
+        # make OSGS reject converged-but-not-tight inner iterates — revise the algorithm doc first.
         if res_n1.stop_reason in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
             newton_failed = true
         end
@@ -358,11 +381,10 @@ function _run_osgs_inner_cascade!(final_x0, x_prev, op_newton_osgs, op_picard_os
         println("        -> OSGS Inner Newton failed. Restoring previous iterate and engaging Picard smoother...")
         get_free_dof_values(final_x0) .= x_prev
         picard_completed = false
-        # Helper's backup is NOT passed: pre-refactor behavior performed a
-        # secondary explicit `any(!isfinite, …)` check below to catch
-        # catastrophic divergence in either the OK or the exception path.
-        # Preserve verbatim.
+        # No backup passed to the helper: the explicit `any(!isfinite, …)` check below catches
+        # catastrophic divergence in both the OK and the exception path.
         res_p = safe_fe_solve!(final_x0, local_fesolver_picard, op_picard_osgs)
+        _record_stage!(diag_cache, "C:OSGS[$outer_iter]:Picard", res_p)
         if res_p.state == :ok
             iter_count_ref[] += res_p.iterations
             push!(diag_cache["inner_osgs_diagnostics"], (
@@ -374,6 +396,15 @@ function _run_osgs_inner_cascade!(final_x0, x_prev, op_newton_osgs, op_picard_os
             ))
             diag_cache["final_residual_norm"] = res_p.residual_norm
             picard_completed = true
+            # [picard-divergence early-exit] If Picard itself diverges (merit escaped — FINITE
+            # but exploding, so the `any(!isfinite)` guard below misses it), the iterate / eps_pert
+            # is hopeless; abort the OSGS nested sequence now rather than burning a Newton-2 retry
+            # on a diverging state. Mirrors the ASGS-init early-exit.
+            if res_p.stop_reason == "merit_divergence_escaped"
+                println("        -> OSGS Picard diverged (merit escaped). Restoring previous iterate and aborting OSGS nested sequence.")
+                get_free_dof_values(final_x0) .= x_prev
+                return (false, true)
+            end
         elseif res_p.state == :max_iters_caught
             println("        -> OSGS Picard concluded smoothing loops.")
             picard_completed = true
@@ -397,6 +428,7 @@ function _run_osgs_inner_cascade!(final_x0, x_prev, op_newton_osgs, op_picard_os
         # --- Attempt 3: re-engage Newton on the Picard-smoothed iterate ---
         println("        -> OSGS Picard smoothing finalized. Re-engaging Newton...")
         res_n2 = safe_fe_solve!(final_x0, local_fesolver, op_newton_osgs; backup=x_prev)
+        _record_stage!(diag_cache, "C:OSGS[$outer_iter]:N2", res_n2)
         if res_n2.state == :nonfinite
             println("        -> OSGS Inner Newton retry produced non-finite state. Restoring previous iterate, aborting OSGS nested sequence.")
             return (false, true)
@@ -454,6 +486,7 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
     println("      -> ASGS Initializer: Attempting Exact Newton solver initially...")
     newton_success = false
     res = safe_fe_solve!(x0, solver_newton_asgs, op_newton_init; backup=x0_backup)
+    _record_stage!(diag_cache, "B:StageI:N1", res)
     if res.state == :nonfinite
         println("      -> ASGS Initializer: Exact Newton produced non-finite state. Restoring backup, falling through to Picard.")
         newton_success = false
@@ -461,25 +494,27 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
         println("      -> ASGS Initializer: Newton ConvergenceError. Exception: ", res.exc)
         newton_success = false
     elseif res.state == :max_iters_caught
-        # Preserve pre-refactor behavior: Stage I Newton 1's old `catch` block
-        # logged any exception (including the legacy "Reached max iterations"
-        # path) as "ConvergenceError" and set newton_success = false. Kept
-        # bit-identical here.
+        # "Reached max iterations" at the initializer counts as a non-success (logged as a
+        # ConvergenceError); Stage I demands genuine convergence before it may bypass Picard.
         println("      -> ASGS Initializer: Newton ConvergenceError. Exception: Reached maximum iterations")
         newton_success = false
     else  # :ok
         final_res = res.iterations > 0 ? res.residual_norm : 0.0
         diag_cache["final_residual_norm"] = final_res
         get!(diag_cache, "initial_residual_norm", res.initial_residual_norm)
-        local_iters = res.iterations
-        if final_res <= ftol
+        iter_count_ref[] += res.iterations
+        # [stage-I success = the solver's OWN per-field convergence verdict, not an absolute floor]
+        # Bypass Picard whenever Newton reached its (per-field, dynamic) ftol target — stop_reason
+        # "ftol_reached"/"initial_ftol" — i.e. it is already in the exact-Newton quadratic basin.
+        # Keying on `final_res <= ftol` would be wrong: that scalar `ftol` is a machine-precision FLOOR
+        # (10·eps in the MMS harness), not the convergence target, so a per-field-converging solve almost
+        # never meets it and Picard would fire on every cell. A stagnation / xtol / max-iters / divergence
+        # exit still falls through to Picard to secure the quadratic basin before OSGS (B6).
+        if res.stop_reason == "ftol_reached" || res.stop_reason == "initial_ftol"
             newton_success = true
-            iter_count_ref[] += local_iters
-            println("      -> ASGS Initializer: Exact Newton converged vigorously to absolute continuous limits ($ftol)! Bypassing Picard.")
+            println("      -> ASGS Initializer: Exact Newton reached its ftol target (stop=$(res.stop_reason), ‖R‖=$(final_res)) — already in the quadratic basin. Bypassing Picard.")
         else
-            # When initializing, if it hits noise floor but not ftol, we still allow Picard to attempt homotopy
-            # to strictly guarantee we enter the quadratic basin, so we leave newton_success = false.
-            iter_count_ref[] += local_iters
+            println("      -> ASGS Initializer: Exact Newton exited without reaching ftol (stop=$(res.stop_reason), ‖R‖=$(final_res)). Engaging Picard to secure the quadratic basin (B6).")
         end
     end
 
@@ -489,17 +524,22 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
         println("      -> ASGS Initializer: Exact Newton structurally aborted loop without geometric saturation. Orchestrating Picard Homotopy fallback...")
         get_free_dof_values(x0) .= x0_backup
 
-        # NOTE: helper's backup-restore-on-nonfinite is intentionally NOT used
-        # here. The pre-refactor code performed an *explicit* secondary `any(!isfinite, …)`
-        # check after the catch block to handle catastrophic Picard divergence
-        # (Picard can produce non-finite mid-iteration even without throwing).
-        # That secondary check is preserved verbatim below.
+        # Backup is intentionally NOT passed to the helper here: Picard can go non-finite mid-iteration
+        # without throwing, so the explicit `any(!isfinite, …)` check below handles that divergence.
+        picard_diverged = false
         res_p = safe_fe_solve!(x0, solver_picard, op_picard_init)
+        _record_stage!(diag_cache, "B:StageI:Picard", res_p)
         if res_p.state == :ok
             final_res_picard = res_p.residual_norm
             diag_cache["final_residual_norm"] = final_res_picard
             get!(diag_cache, "initial_residual_norm", res_p.initial_residual_norm)
             iter_count_ref[] += res_p.iterations
+            # [picard-divergence early-exit] Picard's role here is to globalise a Newton
+            # failure; if Picard *itself* diverges (merit escaped — FINITE but exploding,
+            # so the `any(!isfinite)` guard below misses it) the current eps_pert is hopeless.
+            # Bail now instead of burning an expensive Newton-2 retry on a diverging iterate,
+            # so the caller falls back to a milder eps_pert.
+            picard_diverged = (res_p.stop_reason == "merit_divergence_escaped")
             if final_res_picard <= ftol
                 println("      -> ASGS Initializer: Picard fully converged! Escaping to evaluation.")
                 success = true
@@ -510,17 +550,17 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
             println("      -> ASGS Initializer: Picard threw unrecoverable error. Exception: ", res_p.exc)
             get_free_dof_values(x0) .= x0_backup
         end
-        # `:nonfinite` is handled by the secondary `any(!isfinite, …)` check
-        # below (preserved from pre-refactor); the helper does not restore
-        # backup automatically here because we did not pass `backup=`.
+        # `:nonfinite` is caught by the `any(!isfinite, …)` check below; the helper does not
+        # auto-restore the backup here because no `backup=` was passed.
 
-        if any(!isfinite, get_free_dof_values(x0))
-            println("      -> ASGS Initializer: Picard catastrophically diverged. Restoring backup, evaluation impossible.")
+        if any(!isfinite, get_free_dof_values(x0)) || picard_diverged
+            println("      -> ASGS Initializer: Picard diverged (merit escaped / non-finite). Restoring backup; skipping Newton retry to fall back to a milder eps_pert.")
             get_free_dof_values(x0) .= x0_backup
             success = false
         elseif !success
             println("      -> ASGS Initializer: Picard smoothing finalized. Re-engaging Exact Newton...")
             res2 = safe_fe_solve!(x0, solver_newton_asgs, op_newton_init; backup=x0_backup)
+            _record_stage!(diag_cache, "B:StageI:N2", res2)
             if res2.state == :nonfinite
                 println("      -> ASGS Initializer: Newton Homotopy Pass produced non-finite state. Restoring backup, marking failure.")
                 success = false
@@ -528,7 +568,7 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
                 println("      -> ASGS Initializer: Newton ConvergenceError on Homotopy Pass. Exception: ", res2.exc)
                 success = false
             elseif res2.state == :max_iters_caught
-                # Preserve pre-refactor behavior: lumped with generic ConvergenceError.
+                # "Reached max iterations" on the homotopy pass is treated as a ConvergenceError (failure).
                 println("      -> ASGS Initializer: Newton ConvergenceError on Homotopy Pass. Exception: Reached maximum iterations")
                 success = false
             else  # :ok
@@ -683,14 +723,12 @@ in its entirety, including the terminal `mms_budget_exhausted` branch (M9
 deviation: the post-loop MMS budget check lives inside this helper, not in
 `solve_system`, so Algorithm C's terminal logic stays in one place).
 
-`initial_success` carries Stage I's success flag through to this helper's
-function-level `success` variable, matching pre-refactor behaviour: in the
-original monolith, `success` was a `solve_system`-level local set to `true` by
-a successful Stage I and only flipped inside the OSGS loop by an explicit
-structural failure / overall_converged / mms_budget_exhausted branch. If the
-OSGS outer loop exhausts its iteration budget without convergence *and* MMS is
-disabled, the carried `true` is preserved. Reinitialising to `false` here
-would silently change the semantics of `(success, ...)` for that case.
+`initial_success` carries Stage I's success flag into this helper's function-level `success`.
+The contract: `success` is `true` after a successful Stage I and is flipped only by an explicit
+structural-failure / overall_converged / mms_budget_exhausted branch inside the OSGS loop. So if the
+outer loop exhausts its budget without convergence *and* MMS is disabled, the carried `true` is
+preserved. Reinitialising to `false` here would silently change the `(success, …)` semantics for that
+case.
 
 Calls per outer iteration: `_run_osgs_inner_cascade!` (H3, Algorithm B),
 `_compute_state_drift` (H4, §3.6.1), `_update_and_project!` (H5), and
@@ -701,12 +739,12 @@ boundary.
 
 The factorized mass-matrix handles (`M_u`, `M_p`, `num_u_fac`, `num_p_fac`) and
 projection spaces (`U_proj`, `V_proj`, `P_proj`, `Q_proj`) are constructed by
-the caller — they live outside the timed region to preserve pre-refactor
-`eval_time` semantics.
+the caller and live outside the timed region, so `eval_time` measures only the
+outer loop.
 
 Returns the elapsed wall time of the timed outer loop only; the post-loop
 budget-check and final `diag_cache["pi_u"]/["pi_p"]` writes execute *after* the
-`@elapsed` block, matching original behaviour.
+`@elapsed` block.
 """
 function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
                                 setup, formulation, phys_cfg, stab_cfg, sol_cfg,
@@ -734,7 +772,7 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
         eff_osgs_iters += mms_cfg.max_extra_cycles
     end
 
-    # Carry Stage I's success forward — pre-refactor semantics. See docstring.
+    # Carry Stage I's success forward (see docstring: it must survive a budget-exhausted, MMS-disabled exit).
     success = initial_success
     pi_u = nothing
     pi_p = nothing
@@ -764,12 +802,19 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
         for osgs_iter in 1:eff_osgs_iters
             println("        [OSGS Iter $osgs_iter]")
 
-            tau_inner_m = osgs_iter <= stab_cfg.osgs_warmup_iterations ? max(ftol, stab_cfg.osgs_warmup_tolerance) : ftol
+            # [code-actual] Scale-covariant OSGS warmup. During the first `osgs_warmup_iterations` outer
+            # iters the inner solve is loosened via the per-field RELATIVE target: `osgs_warmup_tolerance`
+            # is a DIMENSIONLESS relative-reduction target `‖R_k‖ ≤ osgs_warmup_tolerance·‖R₀_k‖`, looser
+            # than the normal per-field target and encoding-invariant. (An absolute warmup ftol would be
+            # dimensional against a residual ∝U/∝P_c and break OSGS covariance — guarded by
+            # encoding_invariance_test.jl.) Outside warmup the normal per-field target applies.
+            warmup_rel = (osgs_iter <= stab_cfg.osgs_warmup_iterations && base_nls.relative_ftol_per_field !== nothing) ?
+                fill(stab_cfg.osgs_warmup_tolerance, length(base_nls.relative_ftol_per_field)) : nothing
 
-            local_osgs_nls = _with_overrides(base_nls; max_iters=stab_cfg.osgs_inner_newton_iters, ftol=tau_inner_m)
+            local_osgs_nls = _with_overrides(base_nls; max_iters=stab_cfg.osgs_inner_newton_iters, relative_ftol_per_field=warmup_rel)
             local_fesolver = FESolver(local_osgs_nls)
 
-            local_osgs_nls_picard = _with_overrides(base_nls; max_iters=stab_cfg.osgs_inner_newton_iters, ftol=sol_cfg.picard_handoff_ftol, mode=:picard)
+            local_osgs_nls_picard = _with_overrides(base_nls; max_iters=stab_cfg.osgs_inner_newton_iters, ftol=sol_cfg.picard_handoff_ftol, mode=:picard, relative_ftol_per_field=warmup_rel)
             local_fesolver_picard = FESolver(local_osgs_nls_picard)
 
             res_fn_osgs(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p)
@@ -784,7 +829,7 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
             (inner_success, structurally_failed) = _run_osgs_inner_cascade!(
                 final_x0, x_prev, op_newton_osgs, op_picard_osgs,
                 local_fesolver, local_fesolver_picard,
-                diag_cache, iter_count_ref)
+                diag_cache, iter_count_ref; outer_iter=osgs_iter)
 
             if structurally_failed
                 success = false
@@ -820,6 +865,9 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
                 if !get(diag_cache, "base_convergence_reached", false)
                     println("        [+] OSGS Base Staggered Fixed-Point nominally mathematically converged natively!")
                     diag_cache["base_convergence_reached"] = true
+                    # [trajectory] outer-iteration index at which the OSGS staggered loop first
+                    # base-converged; outer iters AFTER this are MMS plateau-verification re-solves.
+                    diag_cache["base_convergence_outer_iter"] = osgs_iter
 
                     if !isnothing(mms_cfg) && mms_cfg.enabled
                         diag_cache["mms_error_history"] = []
@@ -895,9 +943,9 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
         end
     end
 
-    # Post-loop MMS budget exhaustion check (M9 deviation: moved inside H7
-    # from solve_system, so Algorithm C's terminal logic stays in one place).
-    # NOT inside @elapsed — matches pre-refactor behaviour.
+    # Post-loop MMS budget exhaustion check (M9 deviation: kept inside H7 rather than in
+    # solve_system, so Algorithm C's terminal logic stays in one place).
+    # Runs outside @elapsed, so it is excluded from `eval_time`.
     if !isnothing(mms_cfg) && mms_cfg.enabled
         if get(diag_cache, "base_convergence_reached", false) && !get(diag_cache, "mms_plateau_reached", false)
             println("        [!] OSGS hit maximum extended cycle boundaries without formal plateau verification. Assuming base convergence.")
@@ -921,7 +969,7 @@ Stage I ASGS algebraic initialisation → method dispatch (ASGS w/ optional MMS
 plateau extension, or OSGS staggered relaxation).
 
 Delegates to seven file-local helpers — see the module-level "Algorithm-to-code
-mapping" docstring at the top of this file, and `theory/algorithm-code-mapping.md`.
+mapping" docstring at the top of this file, and `docs/solver/algorithm-code-mapping.md`.
 """
 function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solvers::IterativeSolvers,
                       config::PorousNSConfig, x0;

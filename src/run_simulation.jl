@@ -8,7 +8,7 @@ This file is the high-level orchestration layer and primary entry point for the 
 Its purpose is to convert structured, human-readable JSON configurations seamlessly into fully solved physical simulations.
 
 # Pipeline Overview
-1. **Configuration**: Parses hierarchical JSON parameters into strongly-typed physical and numerical schemas (`load_frozen_config`, the strict single-file loader — see plan Fix 7 / P-011).
+1. **Configuration**: Parses hierarchical JSON parameters into strongly-typed physical and numerical schemas (`load_frozen_config`, the strict single-file loader that fails on any missing field).
 2. **Topology & Spaces**: Generates the geometric mesh and constructs the finite element Trial and Test function spaces, natively applying required boundary conditions (`build_fe_spaces`).
 3. **Formulation Binding**: Dynamically constructs the mathematical `AbstractFormulation` (encapsulating exact viscous stress operators, drag laws, and projection policies) based on the inputs (`build_formulation`).
 4. **Assembly**: Computes fundamental geometric scales (like element characteristic sizes `h`) and safely translates the theoretical continuous operators into discrete, evaluatable `FEOperator` closures.
@@ -56,7 +56,8 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
         visc_op = LaplacianPseudoTractionViscosity()
     end
 
-    # 4. Bind the canonical PaperGeneralFormulation embodying the authoritative rigorous mathematical baseline.
+    # 4. Assemble the chosen viscous operator, reaction law, projection policy and regularization
+    #    into the PaperGeneralFormulation (the VMS weak form transcribed from article.tex).
     form = PaperGeneralFormulation(visc_op, reaction_law, proj, reg, nu, eps_val)
     return form
 end
@@ -307,22 +308,21 @@ function run_simulation(config_path::String;
                         dirichlet_masks=[(true,true)],
                         dirichlet_values=[VectorValue(0.0,0.0)])
     
-    # Enforce pure mathematical parameter hierarchy (Zero internal hardcoding allowed).
+    # Strict load: every field must be present in the JSON; no silent defaults.
     cfg = load_frozen_config(config_path)
     model = _build_default_mesh(cfg.domain, cfg.numerical_method.mesh)
     
     X, Y, kv, kp = build_fe_spaces(model, cfg.numerical_method.element_spaces, dirichlet_tags, dirichlet_masks, dirichlet_values)
     
-    # Bugfix preservation: Formulate before probing underlying type signatures 
+    # Build the formulation first: the quadrature degree below depends on its type and reaction law.
     form = build_formulation(cfg.physical_properties, cfg.numerical_method)
-    
-    # Quadrature logic strictly bound to mathematical formulation identity, velocity
-    # polynomial degree, and the reaction law's own minimum requirement (§3.5).
+
+    # Quadrature degree from the formulation type, velocity order kv, and the reaction law's minimum.
     degree = get_quadrature_degree(typeof(form), kv, form.reaction_law)
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     
-    # Evaluate characteristic mapping scale `h`. The underlying scaling impacts inverse estimate constants implicitly.
+    # Element characteristic size h: √(2·area) for TRI, √area for QUAD (feeds the τ inverse estimates).
     is_tri_val = (cfg.numerical_method.mesh.element_type == "TRI")
     cell_measures = get_cell_measure(Ω)
     h_array = lazy_map(v -> is_tri_val ? sqrt(2.0 * abs(v)) : sqrt(abs(v)), cell_measures)
@@ -341,7 +341,8 @@ function run_simulation(config_path::String;
     # Establish specific stabilization weights for momentum convective and viscous tau evaluations
     c_1, c_2 = get_c1_c2(typeof(form), kv)
     
-    # Construct unconstrained test spaces natively required as base topological maps for OSGS L2 Subgrid tracking
+    # Unconstrained (no-Dirichlet) test spaces V_free/Q_free — required for the OSGS L² projection of
+    # the strong residual; projecting on the Dirichlet-constrained space breaks O(h^{k+1}) convergence.
     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
     refe_p = ReferenceFE(lagrangian, Float64, kp)
     V_free = TestFESpace(model, refe_u, conformity=:H1)
@@ -363,11 +364,11 @@ function run_simulation(config_path::String;
     
     x0 = interpolate_everywhere([VectorValue(0.0,0.0), 0.0], X)
     
-    println("\n[!] Bridging simulation logic into robust VMS algorithm architecture...")
+    println("\n[*] Solving stabilized VMS system...")
     success, mms_plateau_success, final_x0, iters, eval_time = solve_system(setup, formulation, iter_solvers, cfg, x0)
-    
+
     if !success
-        @warn "Simulation orchestration structurally failed to map physical nonlinear bounds."
+        @warn "Nonlinear solver did not converge; check the configuration and mesh resolution."
     end
     
     x_h = final_x0

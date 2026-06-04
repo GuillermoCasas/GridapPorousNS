@@ -210,7 +210,7 @@ function run_convergence()
     # Magnitude-gap diagnostic probes (S3 / corner-localised norm). The outlet-wall
     # corners are at (L_max, y_min) and (L_max, y_max) of the bounding box; derived,
     # not hard-coded. R_list = {0.05, 0.1, 0.2} per the diagnostic plan; R=0.1 is
-    # the primary plotted value. See docs/cocquet_magnitude_investigation.md (S3a / S3b).
+    # the primary plotted value. See docs/cocquet/investigation-synthesis.md (S3a / S3b).
     bbox = base_config.domain.bounding_box
     outlet_corners = ((bbox[2], bbox[3]), (bbox[2], bbox[4]))
     corner_excl_radii = [0.05, 0.1, 0.2]
@@ -278,7 +278,7 @@ function run_convergence()
         eval_times = Float64[]; eval_iters = Int[]
 
         # Diagnostic probes for the magnitude-gap investigation
-        # (docs/cocquet_magnitude_investigation.md, S3).
+        # (docs/cocquet/investigation-synthesis.md, S3).
         #   fraction_cellavg = ‖P₀ e_h‖² / ‖e_h‖² — share captured by piecewise constants
         #                      on the coarse mesh. Tends to 1 generically as h → 0 for any
         #                      smooth converging error; useful for within-cell-oscillation

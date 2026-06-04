@@ -45,6 +45,15 @@ struct SafeNewtonSolver <: NonlinearSolver
     # falls back to the scalar `ftol` floor — legacy behavior.
     relative_ftol_per_field::Union{Nothing, Vector{Float64}}
     relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}}
+    # [no-progress stall guard] If `stall_window > 0`, the solve aborts with stop_reason
+    # "no_progress_stall" once the BEST residual inf-norm fails to improve by the relative
+    # factor `stall_min_rel_improvement` over `stall_window` consecutive iterations. This bails
+    # doomed attempts — e.g. a high-Re eps_pert=1.0 guess that grinds the full Newton budget with
+    # merit stuck ~1e19 then linesearch-depletes — in a handful of iterations, so the caller falls
+    # back to a milder eps_pert instead of exhausting max_iters. `stall_window = 0` ⇒ DISABLED
+    # (the default; the production single-run path constructs the solver without it and is unchanged).
+    stall_window::Int
+    stall_min_rel_improvement::Float64
 end
 
 # Convenience constructor: keeps existing positional call sites untouched (the honest-exit gate
@@ -56,12 +65,15 @@ function SafeNewtonSolver(ls::LinearSolver, max_iters::Int, max_increases::Int,
                           linesearch_contraction_factor::Float64; mode::Symbol = :newton,
                           noise_floor_success_max_ftol_multiple::Float64 = Inf,
                           relative_ftol_per_field::Union{Nothing, Vector{Float64}} = nothing,
-                          relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}} = nothing)
+                          relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}} = nothing,
+                          stall_window::Int = 0,
+                          stall_min_rel_improvement::Float64 = 0.0)
     return SafeNewtonSolver(ls, max_iters, max_increases, xtol, ftol, linesearch_alpha_min,
                             c1, divergence_merit_factor, stagnation_noise_floor,
                             max_linesearch_iterations, linesearch_contraction_factor, mode,
                             noise_floor_success_max_ftol_multiple,
-                            relative_ftol_per_field, relative_stagnation_noise_floor_per_field)
+                            relative_ftol_per_field, relative_stagnation_noise_floor_per_field,
+                            stall_window, stall_min_rel_improvement)
 end
 
 function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig; mode::Symbol = :newton)
@@ -78,7 +90,8 @@ end
 # inherited from `nls` verbatim. `nothing` for any kwarg means "keep `nls`'s
 # value". Replaces the previous verbose field-by-field SafeNewtonSolver()
 # rebuilds, which were vulnerable to silently dropping new struct fields.
-function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing, mode=nothing)
+function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing, mode=nothing,
+                         relative_ftol_per_field=nothing)
     return SafeNewtonSolver(
         nls.ls,
         isnothing(max_iters) ? nls.max_iters : max_iters,
@@ -93,8 +106,11 @@ function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing,
         nls.linesearch_contraction_factor,
         isnothing(mode) ? nls.mode : mode,
         nls.noise_floor_success_max_ftol_multiple,
-        nls.relative_ftol_per_field,
+        # `relative_ftol_per_field` override (covariant OSGS warmup relaxation): nothing ⇒ keep base.
+        isnothing(relative_ftol_per_field) ? nls.relative_ftol_per_field : relative_ftol_per_field,
         nls.relative_stagnation_noise_floor_per_field,
+        nls.stall_window,
+        nls.stall_min_rel_improvement,
     )
 end
 
@@ -130,6 +146,8 @@ function check_solver_parameters(s::SafeNewtonSolver)
        length(s.relative_ftol_per_field) != length(s.relative_stagnation_noise_floor_per_field)
         throw(ArgumentError("relative_ftol_per_field and relative_stagnation_noise_floor_per_field must have the same length (one entry per field)."))
     end
+    if s.stall_window < 0 throw(ArgumentError("stall_window must be >= 0 (0 disables the no-progress stall guard).")) end
+    if !(0.0 <= s.stall_min_rel_improvement < 1.0) throw(ArgumentError("stall_min_rel_improvement must be in [0, 1).")) end
 end
 
 struct SafeSolverResult
@@ -138,6 +156,16 @@ struct SafeSolverResult
     initial_residual_norm::Float64
     step_norm::Float64
     stop_reason::String
+    # [trajectory] Per-iteration record of this Algorithm-A (ExactNewtonPipeline) run: a Vector of
+    # NamedTuples (i, f_inf, f_norm, merit, step_inf, alpha, accepted). Empty for the initial-ftol
+    # short-circuit. The orchestrator (Algorithm O) tags each invocation with a stage code
+    # (e.g. "B:StageI:N1", "C:OSGS[k]:Picard") and assembles diag_cache["trajectory"] from these.
+    iteration_history::Vector
+    # [trajectory] Normalized residuals: the scalar actually compared to the convergence threshold,
+    # f_norm = maxₖ(‖R[block_k]‖_∞ / effective_ftol_per_field[k]) (≤ 1 ⟺ converged). `‖R‖_∞`
+    # above is field-blind and uses the machine ftol floor; these track the per-field gate instead.
+    initial_residual_normalized::Float64
+    residual_normalized::Float64
 end
 
 struct SafeSolverCache
@@ -182,23 +210,16 @@ mutable struct SafeIterationState
     # uniformly indexes `[k]` regardless.
     norm_b_per_field::Vector{Float64}
     norm_b_new_per_field::Vector{Float64}
-    # Per-field inf-norms of the current accepted iterate `x`, used as the
-    # natural-scale proxy for converting `solver.relative_*_per_field` into absolute
-    # per-field thresholds. RE-EVALUATED EVERY ITERATION (not running max / not
-    # fixed at iter 0) so the convergence target tracks the actual solution
-    # magnitude as Newton progresses. This handles three regimes uniformly:
-    #   • MMS where x₀ ≈ x_exact: scale stable, per-iter rebuild is a no-op;
-    #   • zero IC: scale starts at 0 (→ scalar fallback) and becomes meaningful
-    #     once Newton finds non-trivial iterates;
-    #   • bad/oversized IC: scale shrinks as Newton converges toward x_exact,
-    #     tolerance tightens accordingly.
-    # See _resolve_solution_scale_per_field for the cross-field fallback used
-    # when only one field's iterate has zero magnitude.
+    # Per-field initial-residual inf-norms ‖R₀_k‖, frozen at iteration 0. They convert the solver's
+    # dimensionless `relative_*_per_field` targets into absolute per-field thresholds, so the
+    # convergence gate is a dimensionless relative reduction `‖R_k‖ ≤ rel·‖R₀_k‖`. Scaling by the
+    # residual norm (same units as `R_k`), not the solution magnitude `‖x‖`, is what keeps the gate
+    # encoding-invariant. A true-zero initial residual on every field collapses the thresholds to the
+    # scalar `ftol`/`stagnation_noise_floor` floors. (Name kept for history; it now holds ‖R₀‖.)
     solution_scale_per_field::Vector{Float64}
-    # Effective per-field absolute thresholds, recomputed every iteration from
-    # `solution_scale_per_field` and the solver's `relative_*_per_field` (or
-    # falling back to the solver's scalar `ftol`/`stagnation_noise_floor` floors
-    # when the solver carries no relative tolerances — legacy bit-identical).
+    # Per-field absolute thresholds, derived once from `solution_scale_per_field` and the solver's
+    # `relative_*_per_field` (or the scalar `ftol`/`stagnation_noise_floor` floors when no relative
+    # tolerances are set).
     effective_ftol_per_field::Vector{Float64}
     effective_noise_floor_per_field::Vector{Float64}
 end
@@ -246,10 +267,8 @@ end
 
 Derives the per-field absolute thresholds the solver uses throughout the run.
 
-`solution_scale_per_field[k]` is a proxy for the size of the solution field — the
-inf-norm of the initial guess restricted to field block k, with a Bernoulli-style
-cross-field fallback when one field's IC is zero (see
-`_resolve_solution_scale_per_field`).
+`solution_scale_per_field[k]` is the per-field initial-residual norm ‖R₀_k‖, frozen at iteration 0
+(see `SafeIterationState`). Scaling the gate by the residual norm keeps it encoding-invariant.
 
 The user's `relative_*_per_field[k]` is the dimensionless target (e.g. `c_sf·h^(k+1)`).
 The effective absolute threshold is `max(scalar_floor, relative_target * scale)` so
@@ -576,13 +595,14 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     _per_field_inf_norms!(norm_b_per_field, b, field_blocks)
     copyto!(norm_b_new_per_field, norm_b_per_field)
 
-    # Solution-magnitude proxy per field: ‖x[block_k]‖_∞ with cross-field Bernoulli
-    # fallback when one is zero. Recomputed every accepted Newton iter so the
-    # tolerance scale tracks the current iterate, not a stale guess (see comment
-    # on `solution_scale_per_field` in SafeIterationState).
-    x_per_field_raw = Vector{Float64}(undef, nfields)
-    _per_field_inf_norms!(x_per_field_raw, x, field_blocks)
-    solution_scale_per_field = _resolve_solution_scale_per_field(x_per_field_raw)
+    # [code-actual] Per-field convergence gate: the DIMENSIONLESS relative reduction `‖R_k‖ ≤ rel·‖R₀_k‖`.
+    # The scale is the INITIAL per-field residual norm ‖R₀_k‖ (same units as `R_k`), frozen at iter 0.
+    # Scaling by the residual — not the solution magnitude ‖x‖ (∝U velocity, ∝U² pressure) — is what
+    # keeps the gate encoding-invariant: under OSGS's single-inner-step staggering a solution-scaled gate
+    # is dimensional and makes the converged result non-covariant (worst in pressure). Guarded by
+    # encoding_invariance_test.jl.
+    x_per_field_raw = Vector{Float64}(undef, nfields)   # retained for buffer parity; unused by the gate
+    solution_scale_per_field = copy(norm_b_per_field)   # ‖R₀_k‖ (the residual scale), frozen
     effective_ftol_per_field, effective_noise_floor_per_field =
         _initialize_effective_thresholds(solver, solution_scale_per_field)
 
@@ -593,9 +613,13 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     phi_x = eval_merit_W(b)
     println("Iter 0: f(x) inf-norm = $norm_b_inf | Merit Φ = $phi_x")
 
+    # [trajectory] Initial normalized residual: maxₖ(‖R₀[block_k]‖_∞ / effective_ftol_per_field[k]),
+    # the scalar the per-field convergence gate compares to 1.
+    f_norm0 = maximum(norm_b_new_per_field ./ effective_ftol_per_field)
+
     # Initial-ftol short-circuit using the per-field thresholds derived from x₀'s scale.
     if _residual_meets_per_field_ftol(norm_b_new_per_field, effective_ftol_per_field)
-        res = SafeSolverResult(0, norm_b_inf, norm_b_inf, 0.0, "initial_ftol")
+        res = SafeSolverResult(0, norm_b_inf, norm_b_inf, 0.0, "initial_ftol", NamedTuple[], f_norm0, f_norm0)
         return x, SafeSolverCache(b, A, dx, ls_cache, res)
     end
 
@@ -611,7 +635,13 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     best_x = copy(x)
     best_b_inf = norm_b_inf
     stop_reason = "max_iters"
-    
+    # [trajectory] per-iteration record of this Algorithm-A run; [stall guard] iter of last meaningful improvement.
+    iteration_history = NamedTuple[]
+    last_improve_iter = 0
+    # [trajectory] last recorded normalized residual (the per-field convergence quantity); seeds to the
+    # initial value so a 0-iteration exit still reports a sensible final normalized residual.
+    last_f_norm = f_norm0
+
     for i in 1:solver.max_iters
         state.i = i
         
@@ -643,26 +673,35 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         if state.ls_success
             println("Iter $i: f(x) inf-norm = $(state.norm_b_new_inf) | Merit Φ = $(state.phi_x_new) | Step inf-norm = $(state.step_norm) | alpha = $(state.alpha)")
         end
-        
+
+        # [trajectory] record this iteration's residual / normalized residual / merit / step / alpha
+        # (and whether the Armijo line search accepted) for later analysis of the exact nonlinear path.
+        # f_norm = maxₖ(‖R[block_k]‖_∞ / effective_ftol_per_field[k]) is the scalar compared to 1.
+        f_norm = maximum(state.norm_b_new_per_field ./ state.effective_ftol_per_field)
+        last_f_norm = f_norm
+        push!(iteration_history, (i = i, f_inf = state.norm_b_new_inf, f_norm = f_norm,
+                                  merit = state.phi_x_new, step_inf = state.step_norm,
+                                  alpha = state.alpha, accepted = state.ls_success))
+
         if state.norm_b_new_inf < best_b_inf
+            # [stall guard] only a MEANINGFUL improvement of the best residual resets the window.
+            if state.norm_b_new_inf < best_b_inf * (1.0 - solver.stall_min_rel_improvement)
+                last_improve_iter = i
+            end
             best_x .= x
             best_b_inf = state.norm_b_new_inf
         end
 
-        # Refresh the per-field solution-magnitude proxy and re-derive the absolute
-        # thresholds. Re-evaluating EVERY iter (not running max, not fixed at iter 0)
-        # so the tolerance tracks the actual current iterate:
-        #   • bad/oversized x₀ shrinks toward x_exact → thresholds tighten;
-        #   • zero IC grows from 0 → thresholds become meaningful after first step;
-        #   • MMS x₀ ≈ x_exact stays stable.
-        # Cost: O(n_dofs) inf-norm + O(nfields) arithmetic per iter — negligible vs
-        # Jacobian assembly / linear solve.
-        _per_field_inf_norms!(x_per_field_raw, x, field_blocks)
-        new_scale = _resolve_solution_scale_per_field(x_per_field_raw)
-        copyto!(state.solution_scale_per_field, new_scale)
-        new_ftols, new_noise_floors = _initialize_effective_thresholds(solver, state.solution_scale_per_field)
-        copyto!(state.effective_ftol_per_field, new_ftols)
-        copyto!(state.effective_noise_floor_per_field, new_noise_floors)
+        # [stall guard] bail a doomed attempt early (e.g. a high-Re eps_pert=1.0 guess grinding the
+        # full Newton budget with merit stuck) so the caller falls back to a milder eps_pert, rather
+        # than exhausting max_iters. Disabled when stall_window == 0 (production single-run default).
+        if solver.stall_window > 0 && (i - last_improve_iter) >= solver.stall_window
+            x .= best_x
+            state.norm_b_inf = best_b_inf
+            stop_reason = "no_progress_stall"
+            println("  [No-Progress Stall] best residual ($best_b_inf) failed to improve by ≥$(solver.stall_min_rel_improvement) over $(solver.stall_window) iterations — bailing for caller fallback.")
+            break
+        end
 
         reason, converged, should_break = eval_safeguard_termination_bounds!(solver, state)
         
@@ -682,7 +721,8 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         copyto!(state.norm_b_per_field, state.norm_b_new_per_field)
     end
     
-    res = SafeSolverResult(state.i, state.norm_b_inf, initial_b_inf, state.step_norm, stop_reason)
+    res = SafeSolverResult(state.i, state.norm_b_inf, initial_b_inf, state.step_norm, stop_reason,
+                           iteration_history, f_norm0, last_f_norm)
     return x, SafeSolverCache(b, A, dx, ls_cache, res)
 end
 

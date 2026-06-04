@@ -1,5 +1,8 @@
 {
     "erase_past_results": false,
+    "encoding_strategy": "minmax",
+    "solver_stall_window": 20,
+    "solver_stall_min_rel_improvement": 1e-2,
     "h5_filename": "mms_sweep.h5",
     "epsilon_pert": [1.0],
     "max_n_pert": 1,

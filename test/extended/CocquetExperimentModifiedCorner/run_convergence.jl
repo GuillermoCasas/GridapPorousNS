@@ -10,7 +10,7 @@
 # accidental corner-node release that FreeFem++'s unstructured mesh tagger produces and that
 # Cocquet et al.'s reported P2/P2 convergence depends on (theory/CornerSingularity.md).
 #
-# Purpose: complete the corner-singularity evidence chain (docs/cocquet_convergence_analysis.md)
+# Purpose: complete the corner-singularity evidence chain (docs/cocquet/convergence-analysis.md)
 # by testing the inverse of CocquetAllDirichlet. CocquetAllDirichlet ABOLISHED the mixed-BC corner
 # by promoting outlet to Dirichlet; this test ABOLISHES the corner DIRICHLET PIN while keeping the
 # outlet natural. If P2/P2 L²/H¹ slopes recover toward 3/2 here, the singular factor is proven to

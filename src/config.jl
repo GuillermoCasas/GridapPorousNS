@@ -224,7 +224,7 @@ production entry point — use `load_frozen_config` for self-contained configs
 where every numerical field is intentionally supplied. See plan Fix 7 / P-011.
 """
 function load_config_with_base_template(override_path::String="")
-    base_config_path = joinpath(@__DIR__, "..", "base_config.json")
+    base_config_path = joinpath(@__DIR__, "..", "config", "base_config.json")
     base_raw = read(base_config_path, String)
     base_dict = copy(JSON3.read(base_raw, Dict{String, Any}))
 
@@ -251,7 +251,7 @@ function load_frozen_config(exact_path::String)
 end
 
 function load_config_from_dict(override::AbstractDict)
-    base_config_path = joinpath(@__DIR__, "..", "base_config.json")
+    base_config_path = joinpath(@__DIR__, "..", "config", "base_config.json")
     base_raw = read(base_config_path, String)
     base_dict = copy(JSON3.read(base_raw, Dict{String, Any}))
     

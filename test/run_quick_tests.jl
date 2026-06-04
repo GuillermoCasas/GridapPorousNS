@@ -10,9 +10,11 @@ using LinearAlgebra
 include("test_utils.jl")
 
 files = [
+    "encoding_invariance_quick_test.jl",
     "formulation_smoke_quick_test.jl",
     "interpolation_projection_quick_test.jl",
-    "osgs_orthogonality_quick_test.jl"
+    "osgs_orthogonality_quick_test.jl",
+    "viscous_operators_quick_test.jl"
 ]
 
 @testset "Quick Tests (6s - 2m)" begin

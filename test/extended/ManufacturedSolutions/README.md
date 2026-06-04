@@ -11,7 +11,7 @@ research harness** — it is *not* part of the automated `runtests.jl` tiers.
 |---|---|
 | `run_test.jl` | **Canonical sweep driver.** Reads a `data/<config>.json`, sweeps the factor grid, writes one HDF5 results DB under `results/`. |
 | `analyze_results.py` | **Single analysis entry point.** Detects flagged cells, builds the merged + detailed convergence reports and summary tables, optional plots. |
-| `run_continuation.jl` | Fold-recovery driver for the stiff high-Re/low-α corner (α / mesh-ladder regimes; batch `phase2` mode). See [`docs/mms_fold_recovery.md`](../../../docs/mms_fold_recovery.md). |
+| `run_continuation.jl` | Fold-recovery driver for the stiff high-Re/low-α corner (α / mesh-ladder regimes; batch `phase2` mode). See [`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md). |
 | `plot_mesh.py` | Mesh visualizations (thin wrapper over `tools/mesh_viz/`). |
 | `probe_stiff_diagnose.jl`, `run_diagnostics.jl` | `[diagnostic-tool]` — manually-run, single-cell investigations (not the sweep). `probe_stiff_diagnose.jl` also supplies the cell primitives `run_continuation.jl` reuses. |
 | `diagnostics/{jacobian_equilibration_osgs,velocity_centering}_probe.jl` | Retained negative-result probes (see `docs/lessons_learned.md`). |
@@ -53,7 +53,7 @@ julia --project=../../.. run_test.jl test_config.json --filter etype=QUAD,kv=2 -
 julia --project=../../.. run_test.jl test_config.json --filter Re=1.0,Da=1.0,etype=QUAD,kv=1 --max-N 40 --h5 smoke.h5
 ```
 The **fold corner** (Re=1e6, α₀=0.05) is excluded from the sweep by `skip_cells` and handled by
-`run_continuation.jl` — see [`docs/mms_fold_recovery.md`](../../../docs/mms_fold_recovery.md).
+`run_continuation.jl` — see [`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md).
 
 ### Concurrent launches into ONE shared database
 
@@ -125,9 +125,9 @@ python analyze_results.py --h5 results/_robustness.h5 --config data/test_config.
    - **ASGS velocity L² rate ≈ 2** (optimal) at `α₀=1.0` and at `Re=1e6`; **≈ 1.6 at `α₀=0.5`** for
      low/unit Re — the known coarse-mesh *pre-asymptotic porosity-layer* effect (the layer is resolved
      by only 2–8 cells at N≤40; it recovers to optimal at fine N). See
-     [`docs/mms_convergence_status.md`](../../../docs/mms_convergence_status.md).
+     [`docs/mms/convergence-status.md`](../../../docs/mms/convergence-status.md).
    - **OSGS is flagged on coarse meshes, and this is pre-existing** (independent of harness I/O; it was
-     present in pre-rework baselines too — see [`docs/mms_convergence_status.md`](../../../docs/mms_convergence_status.md)).
+     present in pre-rework baselines too — see [`docs/mms/convergence-status.md`](../../../docs/mms/convergence-status.md)).
      Low/unit-Re OSGS converges to ‖R‖~1e-12 (true roots) but trips the strict honest-root gate; high-Re
      OSGS genuinely diverges on coarse N.
    - **Solver-success vs analyzer "no-root" disagreements** are surfaced by the honest-exit gate:

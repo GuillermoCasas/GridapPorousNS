@@ -57,9 +57,8 @@ struct UExFunc <: Function
     L::Float64              # characteristic length: polynomial frequency is π/L
 end
 
-# Backward-compatible 3-arg constructor: defaults L=1.0. Callers (e.g. legacy probes,
-# `test/blitz/porosity_hessian_blitz_test.jl`) that pre-date the 2026-06-01 L-rescaling
-# can continue to call `UExFunc(U, alpha_0, alpha_field)` without modification.
+# 3-arg constructor defaulting the domain length L=1.0, for callers that do not rescale the domain.
+# New code should pass L explicitly; the manufactured frequency is k = π/L.
 UExFunc(U::Float64, alpha_0::Float64, alpha_field::AbstractPorosityField) =
     UExFunc(U, alpha_0, alpha_field, 1.0)
 function (f::UExFunc)(x)

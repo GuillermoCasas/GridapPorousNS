@@ -109,7 +109,7 @@ using LinearAlgebra
         #   - the porosity-gradient `(h/|k_0|)|∇α|` contribution to C_α in τ₁
         #     (paper eq:Tau1 → eq:Tau1Final, article.tex L754/L777)
         # These are intentional per article.tex L762 and L764–768; the assumptions
-        # are documented in `theory/paper-code-divergences.md`. The two assertions
+        # are documented in `docs/solver/paper-code-divergences.md`. The two assertions
         # below are the regression anchor — a future audit that re-raises P-001 or
         # P-008 should fail this test rather than mis-identifying a bug.
         u = VectorValue(0.2, -0.1)

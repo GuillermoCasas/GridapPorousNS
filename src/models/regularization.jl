@@ -27,7 +27,7 @@ end
 # stabilization parameters), it must NOT carry the mesh-dependent diffusive floor
 # `h_floor_weight·c₁ν/(c₂h)`: that term scales like ν/h and grows under refinement, so
 # injecting it into the drag makes every mesh solve a different effective drag law and
-# destroys h-convergence (see docs/cocquet_convergence_analysis.md, Phase 6). Only a small
+# destroys h-convergence (see docs/cocquet/convergence-analysis.md, Phase 6). Only a small
 # constant floor `u_base_floor_ref` is kept, purely to keep |u| differentiable at u = 0
 # (stagnation); it is mesh-independent so it does not break consistency. The ν, h, c₁, c₂
 # arguments are accepted for signature parity with `effective_speed` but intentionally unused.

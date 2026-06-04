@@ -194,8 +194,15 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     # Derive kinematic viscosity and exact constant sigma for the reaction operator 
     # to perfectly represent Darcy-scale bounds parameterized by Reynolds / Darcy inputs.
     nu_calculated = U_amp * L / Float64(Re)
-    eps_calculated = config.physical_properties.eps_val
-    
+    # [covariance 2026-06-02] eps_val is DIMENSIONAL: in the continuity penalty `eps_val·p`,
+    # [eps_val] = (U/L)/P_c, so it MUST scale with the (L,U) encoding — exactly like ν=U·L/Re and
+    # σ=Da·α∞·ν/L². The config value is treated as the DIMENSIONLESS penalty ε̂; eps_val is derived
+    # per-cell so ε̂ = eps_val·P_c·L/U is encoding-invariant. P_c per get_characteristic_scales:
+    # P_c = (1+Re+Da)·U·ν/L. A FIXED eps_val (the previous 1e-8) makes ε̂ encoding-dependent and breaks
+    # scale-covariance (worst in the pressure / OSGS projection). See encoding_invariance_test.jl.
+    P_c_cell = (1.0 + Float64(Re) + Float64(Da)) * U_amp * nu_calculated / L
+    eps_calculated = config.physical_properties.eps_val * (U_amp / L) / P_c_cell
+
     sigma_c = Float64(Da) * alpha_infty * nu_calculated / (L^2)
     rxn = PorousNSSolver.ConstantSigmaLaw(sigma_c)
     
@@ -307,7 +314,9 @@ function execute_outer_homotopy_perturbation_loop!(
     # Provides the natural scale ‖f‖ for the gate `‖R_final‖/‖R_initial‖ < tol`
     # so Re=10⁶ cells stop being false-flagged on raw residual magnitude.
     initial_residual_attempt = NaN
-    
+    # [trajectory] per-attempt nonlinear trajectory (eps_pert → algorithm stages → per-iteration dots).
+    attempt_traces = Any[]
+
     for attempt in 0:(pert_cfg.max_n_pert + 1)
         # [design-intent] Iteration order is **hard → easy**: start with the largest perturbation
         # (eps_pert_base, default 1.0) and only fall back to milder perturbations / eps=0 (clean
@@ -331,6 +340,7 @@ function execute_outer_homotopy_perturbation_loop!(
         println("    [Attempt $(attempt+1)/$(pert_cfg.max_n_pert + 2)] Homotopy Perturbation Scale: eps_pert = $eps_p")
         println("    [!] Delegating orchestration to PDE assembly module via `src/solvers/porous_solver.jl` (Mode: $method)")
         println("    ==================================================")
+        flush(stdout)  # [observability] surface the current eps_pert attempt live (log is block-buffered)
         
         local_stab_cfg = PorousNSSolver.StabilizationConfig(
             method=method,
@@ -363,7 +373,19 @@ function execute_outer_homotopy_perturbation_loop!(
             config, x0;
             diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
         )
-        
+
+        # [trajectory] capture this attempt's stage-by-stage path (built by the orchestrator into
+        # diag_cache["trajectory"]) before the next attempt overwrites the local cache. For OSGS we
+        # ALSO capture the Algorithm-C outer-loop sequence: per-outer-iteration drift diagnostics,
+        # the base-convergence boundary (outer iters after it are MMS plateau-verification re-solves),
+        # the per-plateau-cycle MMS relative-change ratios, and the MMS stop reason.
+        push!(attempt_traces, (eps_pert = eps_p, success = sys_success,
+                               stages = get(local_diagnostics_cache, "trajectory", Any[]),
+                               osgs_outer = get(local_diagnostics_cache, "outer_osgs_diagnostics", Any[]),
+                               mms_relchange = get(local_diagnostics_cache, "mms_relative_change_history", Any[]),
+                               base_conv_outer_iter = get(local_diagnostics_cache, "base_convergence_outer_iter", -1),
+                               mms_stop_reason = get(local_diagnostics_cache, "mms_stop_reason", "")))
+
         if haskey(local_diagnostics_cache, "mms_stop_reason")
             println("    -> MMS Plateau Reason: ", local_diagnostics_cache["mms_stop_reason"])
             println("    -> Base Convergence Reached: ", get(local_diagnostics_cache, "base_convergence_reached", false))
@@ -399,7 +421,7 @@ function execute_outer_homotopy_perturbation_loop!(
          println("    [WARNING] Completely failed to find root basin. Returning NaN.")
     end
 
-    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt
+    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt, attempt_traces
 end
 
 function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{String}}(), cli_shard=nothing,
@@ -458,9 +480,20 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     mms_rate_check_factor = Float64(get(test_dict, "mms_rate_check_factor", 100.0))
 
     # [encoding] Strategy for choosing the dimensional `(L, U_amp)` per cell. See
-    # theory/centered_encoding.tex Section 6 for the four formulas. Default `"centered"`
-    # preserves the pre-2026-06 behaviour (L=1, centered U_amp) bit-identically.
-    encoding_strategy = String(get(test_dict, "encoding_strategy", "centered"))
+    # theory/centered_encoding.tex Section 6 for the formulas. Default `"minmax"` minimises
+    # max(|log U|, |log ν|, |log σ|), keeping the dimensional scale spread tame at extreme
+    # (Re, Da). The legacy "centered" encoding's U_amp blows up to ~1e9 at Re=1e6, which
+    # starves the nonlinear solves and produced the OSGS C20/C24 residual stall. The other
+    # strategies ("centered" / "balanced" / "unit") remain available for back-comparison.
+    encoding_strategy = String(get(test_dict, "encoding_strategy", "minmax"))
+
+    # [stall guard] No-progress bail for the nonlinear kernel (Algorithm A): abort an attempt once the
+    # best residual fails to improve by `solver_stall_min_rel_improvement` over `solver_stall_window`
+    # iterations, so a doomed eps_pert (e.g. a high-Re 1.0 guess that grinds the full Newton budget with
+    # merit stuck) falls back to a milder perturbation fast instead of exhausting max_iters.
+    # `solver_stall_window = 0` ⇒ DISABLED (default).
+    solver_stall_window = Int(get(test_dict, "solver_stall_window", 0))
+    solver_stall_min_rel_improvement = Float64(get(test_dict, "solver_stall_min_rel_improvement", 0.0))
 
     # [output] VTK field export is OFF by default — the convergence study only needs the HDF5
     # database + reports, and a full sweep otherwise regenerates GBs of .vtu. Set "write_vtk": true
@@ -836,7 +869,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 # search has to backtrack many times near the iso-spikes the SmoothVelocityFloor /
                                 # τ-regularisation introduce along the search line, so the iteration budget needs
                                 # to span both the smoothing-out phase and the quadratic-convergence tail. See
-                                # docs/mms_fold_recovery.md for the Re=1e6, Da=1, α=0.05 corner that
+                                # docs/mms/fold-recovery.md for the Re=1e6, Da=1, α=0.05 corner that
                                 # motivates this. The schema default leaves
                                 # well-resolved (low-Re) regimes bit-identical.
                                 local_newton_it = solver_newton_it
@@ -859,9 +892,11 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 # one order of safety against κ(A)-amplified assembly round-off.
                                 static_ftol_floor = 10 * eps(Float64)
                                 nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, static_ftol_floor, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard, noise_floor_success_max_ftol_multiple=k_nf,
-                                                                              relative_ftol_per_field=rel_target_per_field, relative_stagnation_noise_floor_per_field=rel_noise_floor_per_field)
+                                                                              relative_ftol_per_field=rel_target_per_field, relative_stagnation_noise_floor_per_field=rel_noise_floor_per_field,
+                                                                              stall_window=solver_stall_window, stall_min_rel_improvement=solver_stall_min_rel_improvement)
                                 nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_newton_it, max_inc, xtol, static_ftol_floor, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; noise_floor_success_max_ftol_multiple=k_nf,
-                                                                              relative_ftol_per_field=rel_target_per_field, relative_stagnation_noise_floor_per_field=rel_noise_floor_per_field)
+                                                                              relative_ftol_per_field=rel_target_per_field, relative_stagnation_noise_floor_per_field=rel_noise_floor_per_field,
+                                                                              stall_window=solver_stall_window, stall_min_rel_improvement=solver_stall_min_rel_improvement)
                                 
                                 solver_picard = FESolver(nls_picard)
                                 solver_newton = FESolver(nls_newton)
@@ -876,6 +911,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     end
                                     run_idx += 1
                                     println("\n--- Progress $(run_idx) / $(total_runs * length(conv_parts)) | Re=$(Re), Da=$(Da), α=$(alpha_0), method=$(method), N=$(n) ---")
+                                    flush(stdout)  # [observability] stdout is block-buffered to the log file; flush per cell so the log tracks real progress (not hours behind)
 
                                     # [resume-aware] If this (cell, N) is already in HDF5 AS A VALID RESULT,
                                     # skip the solve. If the existing entry is NaN (= prior solve failed),
@@ -916,10 +952,25 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     # method AND propagate the test JSON's OSGS-specific overrides
                                     # (osgs_iterations / osgs_tolerance / etc., which would otherwise be
                                     # silently inherited from base_config.json defaults).
+                                    # [osgs-dynamic-widening 2026-06-01] Extend the high-Re Newton
+                                    # iteration widening (applied to `local_newton_it` above) to the OSGS
+                                    # *inner* Newton solve as well — there is no principled reason the
+                                    # dynamic budget should privilege the ASGS/standalone-Newton path
+                                    # ("why make a difference between both methods?"). Without this the OSGS
+                                    # inner solve stays capped at the configured `osgs_inner_newton_iters`
+                                    # (e.g. 1) even at Re≫1, so it stalls far from the root — C20/C24 showed
+                                    # OSGS ‖R‖~1e6 vs ASGS ~1e0. Reuses the SAME dynamic_newton_re_threshold /
+                                    # dynamic_newton_re_iterations knobs (no new parameters).
+                                    osgs_inner_base = get(stab_dict, "osgs_inner_newton_iters",
+                                        get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3))
+                                    osgs_inner_eff = osgs_inner_base
+                                    if Re >= config.numerical_method.solver.dynamic_newton_re_threshold
+                                        osgs_inner_eff = max(osgs_inner_eff, config.numerical_method.solver.dynamic_newton_re_iterations)
+                                    end
                                     method_stab_dict = Dict{String,Any}(
                                         "method" => String(method),
                                         "osgs_iterations"          => get(stab_dict, "osgs_iterations", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_iterations", 3)),
-                                        "osgs_inner_newton_iters"  => get(stab_dict, "osgs_inner_newton_iters", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3)),
+                                        "osgs_inner_newton_iters"  => osgs_inner_eff,
                                         "osgs_tolerance"           => get(stab_dict, "osgs_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_tolerance", 1e-5)),
                                         "osgs_projection_tolerance" => get(stab_dict, "osgs_projection_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_projection_tolerance", 1e-5)),
                                         "osgs_stopping_mode"       => get(stab_dict, "osgs_stopping_mode", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_stopping_mode", "state_drift")),
@@ -944,7 +995,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     # NONLINEAR CONVERGENCE LOOP
                                     # Incrementally shrink initial numerical perturbation forcing iterative validation
                                     # ==============================================================================
-                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt = execute_outer_homotopy_perturbation_loop!(
+                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt, cell_attempt_traces = execute_outer_homotopy_perturbation_loop!(
                                         setup, formulation, iter_solvers, method_config, method, dynamic_ftol,
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
@@ -952,6 +1003,31 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                         mms_rate_check_factor,
                                         n, kv
                                     )
+
+                                    # [trajectory] Persist this run's full nonlinear trajectory (all eps_pert
+                                    # attempts → algorithm stages → per-iteration residual dots) as a JSON sidecar,
+                                    # one per (cell, method, N), for plot_trajectory.py / post-hoc analysis. Best
+                                    # effort — a trace-write failure must never abort the sweep.
+                                    try
+                                        traces_dir = joinpath(results_dir, "traces")
+                                        isdir(traces_dir) || mkpath(traces_dir)
+                                        trace_name = @sprintf("traj_Re%.0e_Da%.0e_a%.2f_kv%d_kp%d_%s_%s_N%d.json",
+                                            Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp),
+                                            String(etype), String(method), Int(n))
+                                        trace_obj = (
+                                            cell = (Re=Float64(Re), Da=Float64(Da), alpha_0=Float64(alpha_0),
+                                                    kv=Int(kv), kp=Int(kp), etype=String(etype),
+                                                    method=String(method), encoding=encoding_strategy),
+                                            N = Int(n), success = success, successful_eps = successful_eps,
+                                            final_residual = final_residual_attempt, initial_residual = initial_residual_attempt,
+                                            attempts = cell_attempt_traces,
+                                        )
+                                        open(joinpath(traces_dir, trace_name), "w") do io
+                                            JSON3.write(io, trace_obj)
+                                        end
+                                    catch e
+                                        @warn "Trajectory trace write failed (non-fatal)" exception=e
+                                    end
 
                                     # Fix 6: overall verification combines solver convergence and (when MMS
                                     # is enabled) the MMS plateau status. `nothing` plateau means MMS was

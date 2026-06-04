@@ -5,7 +5,7 @@
 # this driver uses an UNSTRUCTURED (Delaunay) triangular mesh (`PorousNSSolver.build_unstructured_model`,
 # gmsh) instead of the structured Cartesian-simplexified mesh. The paper (Cocquet et al., 2020) used
 # FreeFem `buildmesh` (unstructured); the entire prior "outlet-corner singularity / paper-is-wrong"
-# conclusion in docs/cocquet_convergence_analysis.md was reached only on the structured mesh, so this
+# conclusion in docs/cocquet/convergence-analysis.md was reached only on the structured mesh, so this
 # test isolates whether a corner-aligned structured mesh + structured self-reference was depressing the
 # measured slope below the paper's ~2.
 #

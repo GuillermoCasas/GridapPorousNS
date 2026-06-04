@@ -15,7 +15,7 @@ boundary can otherwise fall outside every coarse cell and the default search thr
 `if_ref` with the same tolerant search so the nested branch is robust too.
 
 Returns:
-`l2_nested, h1_nested, l2_cons, h1_cons, e_nested, e_consistent`
+`l2_nested, h1_nested, l2_cons, h1_cons, e_nested, e_cons`
 """
 function compute_reference_errors(f_h, f_ref, if_ref, V_free, dΩ_h, dΩ_ref; filter_func=(x)->true, search_method=nothing)
     # ---------------------------------------------------------------------
@@ -72,8 +72,7 @@ The output named tuple is
 * `chi_Omega = |Ω| · ‖ē_Ω‖² / ‖e‖² = (∫_Ω e)⋅(∫_Ω e) / (|Ω|·‖e‖²)` —
   share captured by the single domain-wide constant.
 
-What these numbers actually probe (relevant to
-`docs/cocquet_magnitude_investigation.md` S3):
+What these numbers actually probe:
 
 * `fraction_cellavg` measures how smooth `e_h` is on the coarse-cell scale.
   For any C¹ error it tends to 1 as `h → 0` because piecewise constants

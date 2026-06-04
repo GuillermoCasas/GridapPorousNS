@@ -49,18 +49,18 @@ python plot_convergence.py
 ```
 
 The sibling directories `test/extended/Cocquet{Alpha1,Deviatoric,LinearReaction,AllDirichlet}` are
-single-variable diagnostic flips off this benchmark (see `docs/cocquet_convergence_analysis.md`);
+single-variable diagnostic flips off this benchmark (see `docs/cocquet/convergence-analysis.md`);
 `test/extended/CocquetFormMMS` is the manufactured-solution sibling. The exact Cocquet (unstabilized
-Galerkin) formulation is documented in `theory/cocquet_formulation.tex`.
+Galerkin) formulation is documented in `theory/cocquet/cocquet_formulation.tex`.
 
 ### Single simulation from a JSON config
 
 ```julia
 using PorousNSSolver
-run_simulation("base_config.json")
+run_simulation("config/base_config.json")
 ```
 
-`base_config.json` is the canonical example; `porous_ns.schema.json` defines the full schema.
+`config/base_config.json` is the canonical example; `config/porous_ns.schema.json` defines the full schema.
 
 ## Architecture
 
@@ -68,7 +68,7 @@ run_simulation("base_config.json")
 
 ### Pipeline (`src/run_simulation.jl`)
 
-1. `load_config_with_defaults(path)` — parses JSON into strongly-typed configs (`PhysicalProperties`, `NumericalMethodConfig`, etc.). **No silent defaults**: missing numerical fields are configuration errors, not opportunities to backfill (see "Hard rules" below).
+1. `load_frozen_config(path)` — parses a self-contained JSON into strongly-typed configs (`PhysicalProperties`, `NumericalMethodConfig`, etc.). **No silent defaults**: missing numerical fields are configuration errors, not opportunities to backfill (see "Hard rules" below). (`load_config_with_base_template` is the test-harness variant that merges partial overrides onto `base_config.json`.)
 2. `_build_default_mesh` — `CartesianDiscreteModel` (QUAD or simplexified TRI) with conventional tag IDs: inlet=7, outlet=8, walls=1..6.
 3. `build_fe_spaces` — Lagrangian Taylor–Hood–style `(kv, kp)` pair, wrapped in a `MultiFieldFESpace` for the monolithic `(u, p)` system.
 4. `build_formulation` — assembles a `PaperGeneralFormulation` from a viscous operator (`DeviatoricSymmetric` | `SymmetricGradient` | `LaplacianPseudoTraction`), a reaction law (`ForchheimerErgunLaw` | `ConstantSigmaLaw`), a projection policy, and a `SmoothVelocityFloor` regularization.
@@ -85,15 +85,17 @@ run_simulation("base_config.json")
 
 See [docs/lessons_learned.md](docs/lessons_learned.md) for the append-only ledger of past regressions and the canonical fixes. Read it before touching `src/formulations/`, `src/stabilization/`, or `src/solvers/`.
 
+Documentation is indexed in two places: [docs/README.md](docs/README.md) (investigation & status docs — MMS and Cocquet clusters) and [theory/README.md](theory/README.md) (LaTeX sources plus the canonical paper↔code references). Each topic has one canonical doc; the rest carry status headers pointing to it.
+
 ### Theory anchors
 
-The implementation is a literal transcription of [theory/article.tex](theory/article.tex) — *"A stabilized finite element method for incompressible, inertial flows in inhomogeneous porous media"* (Casas, González-Usúa, Codina, de-Pouplana). When in doubt, the paper is authoritative.
+The implementation is a literal transcription of [theory/paper/article.tex](theory/paper/article.tex) — *"A stabilized finite element method for incompressible, inertial flows in inhomogeneous porous media"* (Casas, González-Usúa, Codina, de-Pouplana). When in doubt, the paper is authoritative.
 
 - **Continuous problem** — strong form, momentum + mass: `eq:StrongMomentumEquation`, `eq:StrongMassEquation`. The reaction tensor `σ(α, u)` is symmetric positive semi-definite; the Forchheimer form is `σ = a(α) + b(α)|u|` (`eq:DBFResistanceTerm`).
 - **Stabilized OSGS system** — `eq:OSGSProblem` (Eqs. 4.10a–d). ASGS is recovered by setting `π_h = 0`. The staggered linearized iteration is `eq:LinearizedOSGSProblem`; the pseudocode driving `porous_solver.jl` is `alg:StationarySystem`.
 - **Stabilization parameters** — `τ₁` (`eq:Tau1`), `τ₂` (`eq:Tau2`), with `τ_{1,NS}` from `eq:TauNavierStokes`. The numerical constants `c₁ = 4k⁴`, `c₂ = 2k²` (paper Remark after `eq:conditions_on_num_param`) are what `get_c1_c2` returns for equal-order interpolation.
 - **Reaction projection trim** — Section 4.4 mentions that for constant `σ` the reaction term is omitted from the orthogonal projection (its `L²` projection is exactly zero on the FE space). This is what `ProjectResidualWithoutReactionWhenConstantSigma` implements when `experimental_reaction_mode == "standard"` and `reaction_model == "Constant_Sigma"`.
-- **Documented divergences from the paper** — [theory/paper-code-divergences.md](theory/paper-code-divergences.md) catalogues each apparent code/paper mismatch and classifies it. Highlights worth knowing:
+- **Documented divergences from the paper** — [docs/solver/paper-code-divergences.md](docs/solver/paper-code-divergences.md) catalogues each apparent code/paper mismatch and classifies it. Highlights worth knowing:
   - The `(1/α)∇·(αa)v` term is intentionally absent from `convective_adjoint` (paper Sec. 5, line ~800 — kept out to preserve the `A² − B²` symmetry in the stability estimate).
   - `convective_adjoint` returns `+α a·∇v` (positive sign), because the stabilization bilinear form subtracts the adjoint (`B_S` definition under `eq:OSGSProblem`). Flipping the sign in code reproduces the "Anti-SUPG" failure.
   - OSGS projection is computed on **unconstrained** spaces `V_free/Q_free` (no Dirichlet) — projecting on the Dirichlet-constrained space introduces an `O(1)` boundary residual that breaks `O(h^{k+1})` MMS convergence.
@@ -121,9 +123,9 @@ The codebase tags design choices explicitly. Preserve the labels when editing:
 
 This is enforced at the cultural level (`.agents/rules/no-hard-coded-parameters.md`). Every tolerance, threshold, damping factor, floor, iteration cap, line-search constant, and noise floor must:
 
-1. Live in `porous_ns.schema.json` and the corresponding `Base.@kwdef struct` in `src/config.jl`.
+1. Live in `config/porous_ns.schema.json` and the corresponding `Base.@kwdef struct` in `src/config.jl`.
 2. Be threaded explicitly through the call chain (no closure-local fallbacks, no `tol = something(cfg.tol, 1e-8)`).
-3. Fail loudly on missing input — `load_config_with_defaults` must not invent values.
+3. Fail loudly on missing input — `load_frozen_config` must not invent values.
 
 If you need a new numerical control, add it to the schema, the config struct, the JSON, and the consuming function — in that order. Do not introduce inline literals like `1e-8`, `0.5`, `100` in solver/formulation code unless they are mathematically universal (e.g. `2` in `2μ∇^s u`).
 
@@ -139,5 +141,5 @@ Suffix test files with `_test.jl` (e.g. `tau_blitz_test.jl`), not prefix.
 
 - Julia project: `Project.toml` pinned to `Gridap 0.18.6`. `Manifest.toml` is gitignored; resolve locally with `Pkg.instantiate()`.
 - Outputs (VTK, HDF5, sweep results) go under `results/` directories that are gitignored.
-- `theory/` holds the LaTeX article, OSGS algorithm derivation, and a `paper-code-divergences.md` ledger. When implementation diverges from the paper, update that ledger.
+- `theory/` holds **only the LaTeX sources** now: `theory/paper/` (the SIAM article + its build dependencies, incl. `theory/paper/siam/` for the class/bst), `theory/cocquet/` (the Cocquet-et-al. formulation notes + reference PDF), plus `osgs_algorithm.tex` and `centered_encoding.tex`. All meta-documentation — observations, to-dos, process notes, and the paper↔code references — lives under `docs/` (organized by topic: `docs/solver/`, `docs/cocquet/`, `docs/mms/`, `docs/paper/`). See `docs/README.md` and `theory/README.md` for the indexes. When implementation diverges from the paper, update `docs/solver/paper-code-divergences.md`.
 - `.agents/skills/` contains per-domain skill prompts (regression guards, doc architect, config strictness). They formalize the review checks above.

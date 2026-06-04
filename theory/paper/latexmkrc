@@ -1,0 +1,44 @@
+# latexmk configuration file for porous_NS_with_Gridap theory folder
+
+# 1. Parse command line arguments to detect the target TeX filename
+my $target = "";
+foreach my $arg (@ARGV) {
+    # Skip option flags starting with '-'
+    next if $arg =~ /^-/;
+    
+    # If the argument ends with .tex, extract the base name
+    if ($arg =~ /^(.*)\.tex$/) {
+        $target = $1;
+        last;
+    }
+    
+    # If the argument is just the base name and the .tex file exists
+    if (-e "$arg.tex") {
+        $target = $arg;
+        last;
+    }
+}
+
+# 2. Configure output and auxiliary directories
+if ($target ne "") {
+    # Strip path prefixes if target is specified with path (e.g. theory/article -> article)
+    $target =~ s/.*\///;
+    $aux_dir = "compilation/$target";
+} else {
+    # Fallback if latexmk is run without specifying a file
+    $aux_dir = "compilation/default";
+}
+
+# The PDF output should always be placed in the current directory (theory/)
+$out_dir = ".";
+
+# 3. Make the local SIAM template files (in siam/) findable.
+#    siam/siamart190516.cls is loaded by \documentclass{siamart190516} (TEXINPUTS),
+#    siam/siamplain.bst by \bibliographystyle{siamplain} (BSTINPUTS). The trailing
+#    ':' (empty path element) preserves the system default search paths. Paths are
+#    relative to theory/, the directory latexmk compiles from.
+$ENV{'TEXINPUTS'} = './siam//:' . ($ENV{'TEXINPUTS'} // '');
+$ENV{'BSTINPUTS'} = './siam//:' . ($ENV{'BSTINPUTS'} // '');
+
+# Print configuration info for transparency
+print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to '$out_dir/'\n";

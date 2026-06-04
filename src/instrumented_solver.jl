@@ -47,10 +47,8 @@ function _instrumented_solve_inner!(x::AbstractVector, solver::InstrumentedNewto
     log_cb("Iter 0: f(x) inf-norm = $norm_b_inf | L2-norm = $norm_b_l2")
     last_norm_l2 = norm_b_l2
     
-    # [DIAGNOSTICS C1: Residual Decomposition at Init]
-    # To do this correctly, we need the `X` and `Y` spaces inside the operator, which we don't have direct access to here.
-    # Actually, the user script will call the residual decomposition itself at specific points. We just provide hooks if possible.
-    # However, for C4 (Merit-function descent test), we can do it here!
+    # [DIAGNOSTICS] The C1 residual decomposition needs the X/Y spaces (not available here), so the
+    # caller's script runs it at chosen points; only the C4 merit-function descent check happens here.
     
     if norm_b_inf <= solver.ftol
         log_cb("  [Convergence] Initial residual is below tolerance ($(solver.ftol)).")

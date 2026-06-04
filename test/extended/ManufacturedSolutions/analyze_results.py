@@ -202,9 +202,24 @@ def _analyze_group(g):
                 ovs=(ovs[o] if ovs is not None else None))
 
 
+def _sweep_h5_files(h5_glob):
+    """Result DBs matching `h5_glob`, EXCLUDING scratch/diagnostic DBs whose basename starts
+    with '_' (e.g. `_osgs_i1.h5` — OSGS-iteration sensitivity probes). Those are not part of the
+    canonical sweep: globbing them in injects one DUPLICATE per-cell row into the merged table
+    for every diagnostic DB that happens to contain the same cell (the C10/C13 N_rep=40 repeats).
+    Applied at every glob site so detect / numbering / merged / detailed stay mutually consistent."""
+    all_files = sorted(glob.glob(h5_glob))
+    files = [f for f in all_files if not os.path.basename(f).startswith('_')]
+    skipped = [f for f in all_files if os.path.basename(f).startswith('_')]
+    if skipped:
+        print("[h5] ignoring %d scratch/diagnostic DB(s) with leading '_': %s"
+              % (len(skipped), ", ".join(os.path.basename(s) for s in skipped)))
+    return files
+
+
 def detect(h5_glob, config_path, slope_tol, out_json, numbering):
     c = load_solver_constants(config_path)
-    files = sorted(glob.glob(h5_glob))
+    files = _sweep_h5_files(h5_glob)
     if not files:
         print(f"[detect] no h5 files match {h5_glob}")
         return []
@@ -344,7 +359,7 @@ def build_cell_numbering(h5_glob):
     Sorted by (kv, kp, etype, Re, Da, alpha_0) so the numbering is stable and reproducible.
     Returns {cell_id -> 1-based int}."""
     keys = {}
-    for fpath in sorted(glob.glob(h5_glob)):
+    for fpath in _sweep_h5_files(h5_glob):
         with robust_open_h5(fpath, 'r') as f:
             for gname in f.keys():
                 parts = gname.split('_')
@@ -386,7 +401,7 @@ def merged_table(h5_glob, config_path, flagged_path, phase2_path, out_path, repo
     phase2 = _load_phase2(phase2_path)
     flagged_map = _load_flagged(flagged_path)
     rows = []
-    for fpath in sorted(glob.glob(h5_glob)):
+    for fpath in _sweep_h5_files(h5_glob):
         with robust_open_h5(fpath, 'r') as f:
             for gname in sorted(f.keys()):
                 parts = gname.split('_')
@@ -536,7 +551,7 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, n
     """Per-config log-log plots (PNG) + a detailed markdown table (honest true-root 'Converged')
     + fixed-width summary_tables.txt. Reads all h5 files matching the glob."""
     c = load_solver_constants(config_path)
-    files = sorted(glob.glob(h5_glob))
+    files = _sweep_h5_files(h5_glob)
     if not files:
         print(f"[plots] no h5 files match {h5_glob}")
         return

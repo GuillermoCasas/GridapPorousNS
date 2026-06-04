@@ -28,9 +28,10 @@ This solver rigorously implements the **Variational Multiscale (VMS)** formulati
 > Reversing this forces *Anti-SUPG* negative streamline diffusion, destroying coercivity violently at parameter extrema!
 
 > [!NOTE]
-> **`[code-actual]` Adjoint Exactness Traces**
+> **`[code-actual]` Viscous Adjoint Expansion**
 >
-> The test-side adjoint mapping $\mathcal{L}^*(\mathbf{v}, q)$ utilizes the analytically justified simplification `0.5*Δ(v)`. This trace trace natively vanishes for exact divergence-free test spaces limits computationally efficiently preventing unstable continuous test-element Hessians.
+> The viscous part of the test-side adjoint $\mathcal{L}^*(\mathbf{v}, q)$ uses the **full dimension-aware** divergence of the (deviatoric) symmetric gradient,
+> $\nabla\cdot\boldsymbol{\varepsilon}^d(\mathbf{v}) = \tfrac{1}{2}\Delta\mathbf{v} + \left(\tfrac{1}{2}-\tfrac{1}{d}\right)\nabla(\nabla\cdot\mathbf{v})$ — the second coefficient is $0$ in 2D and $+\tfrac{1}{6}$ in 3D — together with the porosity-gradient coupling $2\nu\,\boldsymbol{\varepsilon}(\mathbf{v})\cdot\nabla\alpha$. For $k_v = 1$ the Hessian $\nabla\nabla\mathbf{v}$ vanishes, leaving only the porosity-gradient term. See `docs/solver/paper-code-divergences.md` §2 and `src/formulations/viscous_operators.jl`.
 
 ---
 
