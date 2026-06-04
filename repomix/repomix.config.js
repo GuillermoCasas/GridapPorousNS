@@ -30,8 +30,8 @@ module.exports = isRunFromRepomixFolder ? {
       "../**/*.pvd",
       "../**/*.h5",
       "../**/*.json",
-      "../theory/**/*",
-      "../.agents/**/*"
+      "../.agents/**/*",
+      "../**/siam/**/*"
     ]
   }
 } : {
@@ -62,8 +62,8 @@ module.exports = isRunFromRepomixFolder ? {
       "**/*.pvd",
       "**/*.h5",
       "**/*.json",
-      "theory/**/*",
-      ".agents/**/*"
+      ".agents/**/*",
+      "**/siam/**/*"
     ]
   }
 };
