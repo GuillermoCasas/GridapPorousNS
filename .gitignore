@@ -10,6 +10,8 @@ FETCH_HEAD
 # Ignore compiled artifacts and test result output directories entirely
 results/
 **/results/
+# Per-cell solver trajectory dumps are run output, not source (e.g. archived sweep baselines)
+**/traces/
 
 # Ignore specific Gridap and Julia files
 *.jl.cov

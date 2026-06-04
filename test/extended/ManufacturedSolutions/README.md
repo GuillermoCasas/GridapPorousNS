@@ -16,7 +16,8 @@ research harness** — it is *not* part of the automated `runtests.jl` tiers.
 | `probe_stiff_diagnose.jl`, `run_diagnostics.jl` | `[diagnostic-tool]` — manually-run, single-cell investigations (not the sweep). `probe_stiff_diagnose.jl` also supplies the cell primitives `run_continuation.jl` reuses. |
 | `diagnostics/{jacobian_equilibration_osgs,velocity_centering}_probe.jl` | Retained negative-result probes (see `docs/lessons_learned.md`). |
 | `data/*.json` | Sweep configs (see below). | 
-| `results/` | Output DB + reports (**gitignored**). |
+| `results/` | All output (**gitignored**). HDF5 DB + merged reports at the root; per-cell artifacts under `results/k<kv>/<etype>/` (convergence `.png` from `analyze_results.py`, plus `vtk/` and `traces/`). Ad-hoc/debug runs mirror under `results/debug_results/`. |
+| `previous_results/` | Deliberately-kept archived sweep snapshots (tracked; `traces/` within them are gitignored via `**/traces/`). |
 
 ## Running a sweep
 
@@ -34,8 +35,14 @@ python analyze_results.py --h5 results/mms_sweep.h5 --config data/test_config.js
 
 The output HDF5 group key is **content-addressed**: `config_<idx>_<tag>_<method>`, where `<tag>` hashes
 the physics cell `(Re, Da, α₀, kv, kp, etype)` identically across runs and `<idx>` is a deterministic,
-shard-independent label. VTK export is **opt-in** (`"write_vtk": true`; default off so re-runs don't
-regenerate GBs of `.vtu`).
+shard-independent label.
+
+**Per-cell outputs (ParaView + traces).** VTK field snapshots are written **by default** so each cell
+can be inspected visually, under `results/k<kv>/<etype>/vtk/mms_<method>_Re…_Da…_a…_N….vtu`, alongside
+the `traces/` JSON sidecars and the convergence `.png` plots. Ad-hoc/debug runs (whose `h5_filename`
+lives under `debug_results/`, the convention for scratch output) mirror this under
+`results/debug_results/k<kv>/<etype>/…`. A full sweep can write many GBs of `.vtu`; set
+`"write_vtk": false` in the config to skip it for large production sweeps.
 
 ### CLI overrides — run any sub-combination without authoring a config
 

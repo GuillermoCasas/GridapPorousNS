@@ -495,10 +495,12 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     solver_stall_window = Int(get(test_dict, "solver_stall_window", 0))
     solver_stall_min_rel_improvement = Float64(get(test_dict, "solver_stall_min_rel_improvement", 0.0))
 
-    # [output] VTK field export is OFF by default — the convergence study only needs the HDF5
-    # database + reports, and a full sweep otherwise regenerates GBs of .vtu. Set "write_vtk": true
-    # in the config to re-enable per-cell VTK snapshots (written to results/vtk/).
-    write_vtk = Bool(get(test_dict, "write_vtk", false))
+    # [output] ParaView/VTK field export is ON by default so every cell can be inspected visually.
+    # Per-cell outputs are organized per (kv, etype) next to the convergence plots:
+    # results/k<kv>/<etype>/{vtk,traces}/ (and results/debug_results/... for ad-hoc/debug runs whose
+    # `h5_filename` lives under debug_results/). A full sweep can write many GBs of .vtu; set
+    # "write_vtk": false in the config to skip VTK for large sweeps.
+    write_vtk = Bool(get(test_dict, "write_vtk", true))
 
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
@@ -507,6 +509,11 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
         h5_filename = cli_h5   # CLI override: route this run's results to a chosen DB (per-study isolation)
     end
     h5_path = joinpath(results_dir, h5_filename)
+    # `h5_filename` may include a subdirectory (e.g. "debug_results/foo.h5" for ad-hoc/debug runs,
+    # to keep results/ clean); create its parent so any such path resolves.
+    mkpath(dirname(h5_path))
+    # Per-cell output base for VTK/traces: keep debug-run artifacts out of the main results/ tree.
+    _cell_out_base = startswith(h5_filename, "debug_results/") ? joinpath(results_dir, "debug_results") : results_dir
 
     erase_past = get(test_dict, "erase_past_results", false)
     h5_mode = erase_past ? "w" : "cw"
@@ -1009,7 +1016,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     # one per (cell, method, N), for plot_trajectory.py / post-hoc analysis. Best
                                     # effort — a trace-write failure must never abort the sweep.
                                     try
-                                        traces_dir = joinpath(results_dir, "traces")
+                                        traces_dir = joinpath(_cell_out_base, "k$(Int(kv))", String(etype), "traces")
                                         isdir(traces_dir) || mkpath(traces_dir)
                                         trace_name = @sprintf("traj_Re%.0e_Da%.0e_a%.2f_kv%d_kp%d_%s_%s_N%d.json",
                                             Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp),
@@ -1042,13 +1049,11 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                         el2_u, el2_p, eh1_u, eh1_p = calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L_cell, dΩ)
 
                                         if write_vtk
-                                            vtk_dir = joinpath(results_dir, "vtk")
-                                            if !isdir(vtk_dir)
-                                                mkpath(vtk_dir)
-                                            end
+                                            vtk_dir = joinpath(_cell_out_base, "k$(Int(kv))", String(etype), "vtk")
+                                            isdir(vtk_dir) || mkpath(vtk_dir)
                                             u_ex_cf = interpolate_everywhere(u_final, U)
                                             p_ex_cf = interpolate_everywhere(p_final, P)
-                                            filename = joinpath(vtk_dir, "mms_$(method)_Re$(Float64(Re))_Da$(Float64(Da))_N$(n).vtu")
+                                            filename = joinpath(vtk_dir, "mms_$(method)_Re$(Float64(Re))_Da$(Float64(Da))_a$(Float64(alpha_0))_N$(n).vtu")
                                             writevtk(Ω, filename, cellfields=["uh"=>u_h, "ph"=>p_h, "uex"=>u_ex_cf, "pex"=>p_ex_cf, "alpha"=>alpha_cf, "err_u"=>u_h - u_ex_cf, "err_p"=>p_h - p_ex_cf])
                                         end
                                     else

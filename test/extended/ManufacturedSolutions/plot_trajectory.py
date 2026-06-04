@@ -55,8 +55,8 @@ def _title(cell, N):
 
 def main():
     ap = argparse.ArgumentParser(description="MMS solver trajectory diagrams (one PNG per eps_pert attempt).")
-    ap.add_argument("--traces", default=os.path.join(HERE, "results", "traces"),
-                    help="dir of trajectory JSON sidecars (default results/traces)")
+    ap.add_argument("--traces", default=os.path.join(HERE, "results"),
+                    help="root to search for trajectory JSON sidecars (default results/; recurses into k<kv>/<etype>/traces/ and debug_results/)")
     ap.add_argument("--file", default=None, help="plot a single trace JSON file")
     ap.add_argument("--out", default=None, help="output dir (default <traces>/plots)")
     ap.add_argument("--cell", default=None, help="filter, e.g. Re=1e6,Da=1e-6,a0=0.5")
@@ -64,7 +64,7 @@ def main():
     ap.add_argument("--method", default=None, help="filter by method (ASGS/OSGS)")
     args = ap.parse_args()
 
-    files = [args.file] if args.file else sorted(glob.glob(os.path.join(args.traces, "*.json")))
+    files = [args.file] if args.file else sorted(glob.glob(os.path.join(args.traces, "**", "traj_*.json"), recursive=True))
     if not files:
         print(f"[traj] no trace files in {args.traces}")
         return

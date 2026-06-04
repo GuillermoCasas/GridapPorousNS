@@ -77,11 +77,12 @@ end
     @info "encodings" centered=(Lc, Uc) minmax=(Lm, Um)
     @test !(isapprox(Lc, Lm) && isapprox(Uc, Um))   # genuinely different scalings
 
-    run_mms(_write_inv_config("centered", "_inv_centered.h5"))
-    run_mms(_write_inv_config("minmax",   "_inv_minmax.h5"))
+    # Ad-hoc/debug scratch DBs go under results/debug_results/ to keep results/ clean (project convention).
+    run_mms(_write_inv_config("centered", "debug_results/_inv_centered.h5"))
+    run_mms(_write_inv_config("minmax",   "debug_results/_inv_minmax.h5"))
 
-    cpath = joinpath(_MMS_DIR, "results", "_inv_centered.h5")
-    mpath = joinpath(_MMS_DIR, "results", "_inv_minmax.h5")
+    cpath = joinpath(_MMS_DIR, "results", "debug_results", "_inv_centered.h5")
+    mpath = joinpath(_MMS_DIR, "results", "debug_results", "_inv_minmax.h5")
 
     for field in ("err_u_l2", "err_u_h1", "err_p_l2")
         ec = _read_method_errors(cpath, field)

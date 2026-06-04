@@ -14,7 +14,8 @@ cells, etc. — those are test-specific and belong in each test's small wrapper.
    `SafeSolverResult.iteration_history`; the orchestrator (`src/solvers/porous_solver.jl`,
    Algorithm O → B/C) tags each sub-algorithm invocation and assembles `diag_cache["trajectory"]`.
 2. The driver (e.g. `test/extended/ManufacturedSolutions/run_test.jl`) writes per-run JSON sidecars
-   under `results/traces/traj_*.json`.
+   under `results/k<kv>/<etype>/traces/traj_*.json` (and `results/debug_results/.../traces/` for
+   ad-hoc/debug runs). All of `results/` is gitignored.
 3. A per-test wrapper reads those, splits them however that test wants, and calls `plot_stages`.
 
 ## API
@@ -68,5 +69,5 @@ each run and writes **one independent PNG per attempt**:
 ```bash
 python plot_trajectory.py                                      # every attempt of every trace
 python plot_trajectory.py --cell Re=1e6,Da=1e-6,a0=0.5 --N 160 --method ASGS
-python plot_trajectory.py --file results/traces/traj_....json
+python plot_trajectory.py --file results/k1/QUAD/traces/traj_....json   # (default search recurses all of results/)
 ```
