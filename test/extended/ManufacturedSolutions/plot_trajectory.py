@@ -18,6 +18,7 @@ import glob
 import json
 import math
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -108,9 +109,16 @@ def main():
         base_out = args.out or _plot_dir_for(f)
         run = args.run or trace.get("run")
         out_dir = os.path.join(base_out, run) if run else base_out
+        # [per-config folder] each cell (Re,Da,α,kv,kp,etype,method) gets its OWN subfolder holding all of
+        # its trace plots — every mesh N and every homotopy attempt — so one config's convergence story sits
+        # in one place: plots/<run>/<cell_id>/. The cell id is the trace stem minus the leading "traj_" and
+        # the trailing "_N<mesh>".
+        base = os.path.splitext(os.path.basename(f))[0]
+        cell_stem = base[len("traj_"):] if base.startswith("traj_") else base
+        cell_id = re.sub(r"_N\d+$", "", cell_stem)
+        out_dir = os.path.join(out_dir, cell_id)
         os.makedirs(out_dir, exist_ok=True)
         out_dirs.add(out_dir)
-        base = os.path.splitext(os.path.basename(f))[0]
         title = _title(cell, N)
         attempts = trace.get("attempts", []) or []
         for ai, att in enumerate(attempts):

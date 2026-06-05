@@ -89,7 +89,8 @@
         40,
         80,
         160,
-        320
+        320,
+        640
       ],
       "element_type": [
         "QUAD"
@@ -111,6 +112,7 @@
       "max_increases": 3,
       "divergence_merit_factor": 1.05,
       "armijo_c1": 0.0001,
+      "newton_residual_divergence_patience": 2,
       "accelerator": {
         "type": "Anderson",
         "m": 10,
@@ -126,7 +128,9 @@
       "osgs_inner_newton_iters": 1,
       "osgs_tolerance": 1e-10,
       "osgs_warmup_iterations": 2,
-      "osgs_warmup_tolerance": 0.001
+      "osgs_warmup_tolerance": 0.001,
+      "osgs_projection_coupling": "freeze_after_k",
+      "osgs_freeze_after_k": 2
     }
   },
   "output": {
