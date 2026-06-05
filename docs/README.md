@@ -40,7 +40,9 @@ canonical doc**; the rest are kept for traceability and carry a status header po
 |---|---|---|
 | **Canonical ref** | [paper-code-divergences.md](solver/paper-code-divergences.md) | Ledger of every code/paper divergence, classified and justified. Update when implementation diverges from the paper. |
 | **Canonical ref** | [algorithm-code-mapping.md](solver/algorithm-code-mapping.md) | 1:1 map from `osgs_algorithm.tex` algorithm boxes to `src/solvers/porous_solver.jl`. |
+| **Canonical** | [osgs-reaction-dominated-rate.md](solver/osgs-reaction-dominated-rate.md) | The open OSGS high-Da velocity-rate loss: `staggered`-vs-`coupled` evidence (it is the fixed point), the coercivity-gap mechanism, options + the `freeze_after_k` recommendation. |
 | Backlog | [efficiency-ideas.md](solver/efficiency-ideas.md) | Newton/Picard scheduling & convergence-gate proposals (2026-06-04). |
+| Audit | [normalization-audit.md](solver/normalization-audit.md) | Dimensional/scaling audit of every solver convergence/drift/divergence gate (encoding-invariance, P5 2026-06-04). |
 | Historical | [algorithm-improvement.md](solver/algorithm-improvement.md) | Consolidated critique → plan → progress (formerly three files). |
 | Historical | [refactor-brief.md](solver/refactor-brief.md) | The `solve_system` refactor brief. |
 | Transcripts | [code-audit-findings.md](solver/code-audit-findings.md), [reply.md](solver/reply.md) | Raw audit/review conversations. |

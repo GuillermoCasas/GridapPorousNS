@@ -1,0 +1,406 @@
+%==============================================================================
+%  Standalone note: Loss of coercivity-norm control for the OSGS method
+%  in the reaction-dominated (large Da) regime.
+%
+%  Notation is kept compatible with the manuscript
+%  "A stabilized finite element method for incompressible, inertial flows
+%   in inhomogeneous porous media" (Casas, Gonzalez-Usua, Codina, de-Pouplana).
+%
+%  The macros below replicate the relevant ones defined inline in that paper
+%  (\ViscProj, \Reyn, \Damk, \triplenorm, \dualpairing, \innerprod, ...), so the
+%  equations can be lifted into the manuscript with no changes.  If you compile
+%  this inside the paper itself, simply delete the PREAMBLE-DUPLICATE block.
+%==============================================================================
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\usepackage{cleveref}
+
+%================= PREAMBLE-DUPLICATE (mirrors the manuscript) =================
+% Dimensionless numbers
+\newcommand{\Reyn}{\operatorname{\mathit{Re}}}
+\newcommand{\Damk}{\operatorname{\mathit{Da}}}
+
+% Projection operators used in the viscous term (deviatoric/symmetric split)
+\newcommand{\DPi}{\overset{\scriptscriptstyle{\text{D}}}{\Pi}}
+\newcommand{\SPi}{\overset{\scriptscriptstyle{\text{S}}}{\Pi}}
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\text{DS}}}{\Pi}}
+
+% Triple norm
+\newcommand{\triplenorm}[1]{{\left\vert\kern-0.25ex\left\vert\kern-0.25ex\left\vert #1
+\right\vert\kern-0.25ex\right\vert\kern-0.25ex\right\vert}}
+
+% Inner-product / duality pairings (simplified, comma-separated arguments)
+\newcommand{\innerprod}[1]{\left(#1\right)}
+\newcommand{\dualpairing}[1]{\left\langle #1\right\rangle}
+
+% Theorem environments
+\theoremstyle{plain}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+%============================ end PREAMBLE-DUPLICATE ===========================
+
+% Shorthands local to this note
+\newcommand{\uh}{\boldsymbol{u}_h}
+\newcommand{\ph}{p_h}
+\newcommand{\Uh}{U_h}
+\newcommand{\Vh}{V_h}
+\newcommand{\Wh}{W_h}
+\newcommand{\Th}{\mathcal{T}_h}
+\newcommand{\Xh}{\mathcal{X}_{h0}}
+\newcommand{\Pio}{\Pi_{\boldsymbol{\tau}h}}            % FE projection in the tau-inner product
+\newcommand{\Porth}{\widetilde{\Pi}}                  % subscale-space projection
+\newcommand{\siga}{\widetilde{\sigma}_\alpha}
+\newcommand{\tauNS}{\tau_{1,\text{NS}}}
+\newcommand{\normh}[1]{\left\Vert #1\right\Vert_h}
+\newcommand{\norm}[1]{\left\Vert #1\right\Vert}
+
+\title{Why the orthogonal subscales lose coercivity-norm control \\[2pt]
+in the reaction-dominated limit}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\noindent
+\textit{Scope.}\; This note isolates, in a setting and notation compatible with the
+manuscript, the mechanism by which the coercivity proof of the ASGS method fails
+to carry over to the OSGS method as the Damk\"ohler number grows. The conclusion
+is that the failure is structural for a constant reaction coefficient---it is not
+an artifact of the proof technique---but that it degrades the \emph{provable
+coercivity norm}, not the \emph{optimal convergence rate}, which both methods
+retain. We close by recording the precedents for this observation in the
+literature and the sense in which the present framing is new.
+
+%------------------------------------------------------------------------------
+\section{Setting and the common stabilized form}
+%------------------------------------------------------------------------------
+We work in the linearized, constant-coefficient setting of the stability analysis
+of the manuscript: uniform viscosity $\nu$, a uniform isotropic resistance
+$\boldsymbol{\sigma}=\sigma\boldsymbol{1}$, a given advection field $\boldsymbol{a}$
+with $\nabla\!\cdot(\alpha\boldsymbol{a})=0$, and a porosity field well resolved by
+the mesh. Writing $\Uh=[\uh;\ph]\in\Xh$ for the finite element unknowns, both
+methods of interest share the single stabilized bilinear form
+%
+\begin{equation}\label{eq:BS}
+  B_\text{S}(\boldsymbol{a},\Uh,\Vh)
+  = B(\boldsymbol{a},\Uh,\Vh)
+  - \sum_{K\in\Th}\dualpairing{\mathcal{L}^*\Vh,\ \boldsymbol{\tau}_K\,\Porth\!\left[\mathcal{L}\Uh\right]}_K ,
+\end{equation}
+%
+differing \emph{only} in the choice of the projection $\Porth$ onto the subscale
+space $\widetilde{\mathcal{X}}$~\cite{codina2018variational,hughes2007variational}:
+%
+\begin{equation}\label{eq:choices}
+  \text{ASGS:}\quad \Porth=\mathcal{I},
+  \qquad\qquad
+  \text{OSGS:}\quad \Porth=\mathcal{I}-\Pio ,
+\end{equation}
+%
+where $\Pio$ is the projection onto $\Xh$ associated with the (possibly
+$\boldsymbol{\tau}$-weighted) inner product, the simplest choice being the
+$L^2$-projection~\cite{codina2002stabilized}. Here $\mathcal{L}$ is the
+momentum--continuity operator of the linearized problem and $\mathcal{L}^*$ its
+formal adjoint; in the reaction-dominated regime the only piece of either operator
+that survives is the zeroth-order (reactive) one, so that
+%
+\begin{equation}\label{eq:reactive-part}
+  \mathcal{L}\Uh\big|_{\text{react}} = \sigma\uh,
+  \qquad
+  \mathcal{L}^*\Vh\big|_{\text{react}} = \sigma\boldsymbol{v}_h .
+\end{equation}
+%
+Recall the stabilization parameter and the reactive control quantity of the
+manuscript,
+%
+\begin{equation}\label{eq:tau1-siga}
+  \tau_1=\frac{1}{\alpha_K\tauNS^{-1}+\sigma},
+  \qquad
+  \siga\coloneqq\frac{\tauNS^{-1}\,\sigma}{\tauNS^{-1}+\sigma/\alpha_K},
+  \qquad
+  \tauNS=\Big(c_1\tfrac{\nu}{h^2}+c_2\tfrac{|\boldsymbol{w}|}{h}\Big)^{-1},
+\end{equation}
+%
+with the reaction-dominated asymptotics ($\Damk_h\to\infty$, $h\to0$)
+%
+\begin{equation}\label{eq:asymp}
+  \tau_1\sim\frac{\alpha_K}{\sigma},
+  \qquad
+  \siga\sim\alpha_K(1+\Reyn_h)\frac{\nu}{h^2}
+  \;\sim\;\frac{\alpha_K(1+\Reyn_h)}{\Damk_h}\,\frac{\sigma}{1},
+\end{equation}
+%
+where the last form makes explicit that $\siga/\sigma\sim(1+\Reyn_h)/\Damk_h\to0$.
+
+%------------------------------------------------------------------------------
+\section{The ASGS coercivity argument, reduced to its reactive content}
+%------------------------------------------------------------------------------
+Testing \cref{eq:BS} with $\Vh=\Uh$ and $\Porth=\mathcal{I}$ reproduces the
+manuscript's identity
+%
+\begin{align}\label{eq:ASGS-expand}
+  B_\text{S}(\boldsymbol{a},\Uh,\Uh)
+  &= 2\nu\big\|\alpha^{1/2}\ViscProj\nabla\uh\big\|^2
+   + \big\|\sigma^{1/2}\uh\big\|^2
+   + \varepsilon\big\|\ph\big\|^2 \notag\\
+  &\quad
+   + \big\|\tau_1^{1/2}\alpha X(\Uh)\big\|_h^2
+   - \big\|\tau_1^{1/2}\big(2\nabla\!\cdot(\alpha\nu\ViscProj\nabla\uh)-\sigma\uh\big)\big\|_h^2
+   + \big\|\tau_2^{1/2}\nabla\!\cdot(\alpha\uh)\big\|_h^2
+   - \varepsilon^2\big\|\tau_2^{1/2}\ph\big\|_h^2 ,
+\end{align}
+%
+with $X(\Uh)\coloneqq\boldsymbol{a}\cdot\nabla\uh+\nabla\ph$. The decisive feature
+is purely algebraic. Expanding the squared norm of the difference on the second
+line produces a \emph{cross term} and, crucially, a \emph{positive} reactive
+square:
+%
+\begin{equation}\label{eq:positive-square}
+  -\big\|\tau_1^{1/2}\big(2\nabla\!\cdot(\alpha\nu\ViscProj\nabla\uh)-\sigma\uh\big)\big\|_h^2
+  = -\big\|\tau_1^{1/2}\,2\nabla\!\cdot(\alpha\nu\ViscProj\nabla\uh)\big\|_h^2
+    \;\underbrace{-\;\big\|\tau_1^{1/2}\sigma\uh\big\|_h^2}_{\text{from }\mathcal{L}^*\text{ paired with }\mathcal{L}}
+    \;+\;2\dualpairing{2\tau_1\nabla\!\cdot(\nu\alpha\ViscProj\nabla\uh),\,\sigma\uh}_h .
+\end{equation}
+%
+After the cross term is absorbed with Young's inequality and the inverse estimate
+$\|\nabla\!\cdot(\alpha\ViscProj\nabla\uh)\|_K\le C_\text{inv}h^{-1}
+\|\alpha^{1/2}\ViscProj\nabla\uh\|_K$~\cite{brenner2008mathematical}, the surviving
+coefficient of $\|\uh\|_K^2$ is controlled from below by $C\,\siga$, giving the
+manuscript's bound
+%
+\begin{equation}\label{eq:ASGS-lemma}
+  B_\text{S}(\boldsymbol{a},\Uh,\Uh)\ \ge\ C\,\triplenorm{\Uh}^2,
+  \qquad
+  \triplenorm{\Uh}^2
+  = \nu\big\|\alpha^{1/2}\ViscProj\nabla\uh\big\|^2
+  + \big\|\siga^{1/2}\uh\big\|^2
+  + \varepsilon\big\|\ph\big\|^2
+  + \big\|\tau_1^{1/2}\alpha X(\Uh)\big\|_h^2
+  + \big\|\tau_2^{1/2}\nabla\!\cdot(\alpha\uh)\big\|_h^2 .
+\end{equation}
+%
+The point to retain: the $\siga$-control of $\uh$ comes from the term
+$-\|\tau_1^{1/2}\sigma\uh\|_h^2$ in \cref{eq:positive-square}, i.e.\ from the
+stabilization \emph{pairing the reactive part of $\mathcal{L}^*\Vh$ with the
+reactive part of $\mathcal{L}\Uh$}. This pairing is nonzero precisely because
+$\Porth=\mathcal{I}$ leaves $\sigma\uh$ untouched.
+
+%------------------------------------------------------------------------------
+\section{The analogous OSGS argument and where it breaks}
+%------------------------------------------------------------------------------
+Repeating the computation with $\Porth=\mathcal{I}-\Pio$ replaces the stabilizing
+term in \cref{eq:BS}, when tested with $\Uh$, by the seminorm of the
+\emph{fine-scale} residual only,
+%
+\begin{equation}\label{eq:OSGS-stab}
+  \sum_K\dualpairing{\mathcal{L}^*\Uh,\ \boldsymbol{\tau}_K(\mathcal{I}-\Pio)\mathcal{L}\Uh}_K
+  = \sum_K\big\|\boldsymbol{\tau}_K^{1/2}(\mathcal{I}-\Pio)\mathcal{L}\Uh\big\|_K^2 \ \ge\ 0 ,
+\end{equation}
+%
+which controls only the component of the residual orthogonal to $\Xh$. Now apply
+\cref{eq:reactive-part}. Since $\uh\in\mathcal{V}_{h0}\subset\Xh$ and $\sigma$ is
+constant, the reactive residual lies entirely in the finite element space, hence
+%
+\begin{equation}\label{eq:annihilation}
+  \boxed{\;(\mathcal{I}-\Pio)\big[\sigma\uh\big]=\boldsymbol{0}\quad(\sigma\text{ constant}).\;}
+\end{equation}
+%
+This is the same fact that, in the manuscript, justifies dropping the reactive
+terms from the computed projection (their projection ``is exactly zero for
+constant $\boldsymbol{\sigma}$''). Algorithmically convenient there, it is
+analytically obstructive here: the positive reactive square that ASGS extracted in
+\cref{eq:positive-square} is, for OSGS, \emph{identically zero in the
+reaction-dominated limit}. The only remaining source of $L^2$-control on $\uh$ is
+the bare Galerkin reactive term $\|\sigma^{1/2}\uh\|^2$ already present in
+\cref{eq:ASGS-expand}, which carries the coefficient $\sigma$ rather than the
+stabilization-enhanced $\siga$. Collecting this:
+
+\begin{proposition}[Reactive coercivity gap]\label{prop:gap}
+Under the constant-coefficient assumptions above, the largest coefficient
+$c_{\uh}$ for which an estimate of the form
+$B_\text{S}(\boldsymbol{a},\Uh,\Uh)\ge c_{\uh}\,\|\uh\|^2+(\text{other nonnegative terms})$
+is provable from \cref{eq:BS} satisfies, as $\Damk_h\to\infty$,
+\begin{equation}\label{eq:gap}
+  c_{\uh}^{\,\mathrm{ASGS}}\sim C\,\siga\sim\alpha_K(1+\Reyn_h)\frac{\nu}{h^2},
+  \qquad
+  c_{\uh}^{\,\mathrm{OSGS}}\sim \sigma,
+  \qquad\Longrightarrow\qquad
+  \frac{c_{\uh}^{\,\mathrm{OSGS}}}{c_{\uh}^{\,\mathrm{ASGS}}}\sim\frac{\Damk_h}{1+\Reyn_h}\to\infty,
+\end{equation}
+i.e.\ the OSGS coercivity argument controls $\uh$ in a norm weaker than
+$\triplenorm{\cdot}$ by a relative factor $\sim(1+\Reyn_h)/\Damk_h$ on the
+$\siga$-block. No reorganization of the proof recovers the $\siga$-control from
+\cref{eq:OSGS-stab} alone, because the relevant residual component is zero by
+construction \eqref{eq:annihilation}.
+\end{proposition}
+
+\begin{remark}[Why only the reactive term is affected]
+The annihilation \eqref{eq:annihilation} is special to the reaction operator,
+which acts as a (scaled) identity and therefore cannot map $\uh$ out of $\Xh$. By
+contrast, $\boldsymbol{a}\cdot\nabla\uh$ and $\nabla\ph$ generically possess
+nonzero components orthogonal to $\Xh$, so the convective and pressure-gradient
+stabilizations---the $\tau_1\|\alpha X(\Uh)\|_h^2$ and $\tau_2$-divergence blocks
+of $\triplenorm{\cdot}$---survive the orthogonal projection intact. The deficiency
+is thus confined to the zeroth-order term, exactly the term that
+LBB/convection-oriented OSGS analyses never needed to control.
+\end{remark}
+
+%------------------------------------------------------------------------------
+\section{Why optimal convergence rates are nevertheless retained}
+%------------------------------------------------------------------------------
+The gap of \cref{prop:gap} is a statement about the \emph{provable coercivity
+norm}, and must not be read as a loss of accuracy. Three observations, all
+consistent with the manuscript's numerical evidence, explain why the convergence
+\emph{rate} is unaffected.
+
+\smallskip
+\noindent\textbf{(i) Consistency is untouched.} The OSGS residual fed back through
+$\Porth$ is still the true finite element residual; orthogonality changes only
+which projection of it enters \cref{eq:BS}. The interpolation-error right-hand side
+of the convergence theorem is therefore identical for both methods, and the
+estimate
+$
+  \triplenorm{E_h}\lesssim\sum_K h_K^{-1}\big(\tau_{2,K}^{1/2}\mathrm{E}_{\text{int},K}(\boldsymbol{u})
+  +\tau_{1,K}^{1/2}\mathrm{E}_{\text{int},K}(p)\big)
+$
+holds in the (smaller) OSGS norm with the same order.
+
+\smallskip
+\noindent\textbf{(ii) The Galerkin reaction term covers the velocity.} In the
+reaction-dominated limit the velocity error is itself governed by the shared term
+$\|\sigma^{1/2}\boldsymbol{e}_u\|$. The very fact that kills the OSGS coercivity
+contribution---$\sigma\uh$ being well represented in $\Xh$---also means this
+Galerkin term represents the reaction accurately. This is the same mechanism the
+manuscript invokes when it notes that the apparently weaker $\siga$-control ``turns
+out not to be the case'' once the asymptotics are examined.
+
+\smallskip
+\noindent\textbf{(iii) Variable resistance escapes the cancellation.} For a
+spatially varying $\sigma(\boldsymbol{x})$---as in the Darcy--Forchheimer closure
+actually solved, where $\sigma$ depends on $\alpha(\boldsymbol{x})$ and on
+$|\boldsymbol{u}|$---one has $\sigma\uh\notin\mathcal{V}_{h0}$ in general, so
+$(\mathcal{I}-\Pio)[\sigma\uh]\neq\boldsymbol{0}$ and OSGS recovers a genuine,
+nonzero reactive contribution. The degeneracy of \cref{prop:gap} is therefore the
+\emph{worst case of an idealized constant-coefficient model problem}, not of the
+formulation as implemented.
+
+\smallskip
+This reconciles the theory with the reported experiments, in which ASGS and OSGS
+deliver essentially identical, optimal convergence rates across the
+reaction-dominated columns of the parameter sweep.
+
+%------------------------------------------------------------------------------
+\section{Relation to the literature}
+%------------------------------------------------------------------------------
+The \emph{general principle} behind \cref{eq:annihilation}---that orthogonal
+subscales provide no stabilization for residual components already representable in
+the finite element space---is established in the variational multiscale
+literature. It is stated explicitly by Gravenkamp and
+Codina~\cite{gravenkamp2023dispersed}, who note that the stabilization vanishes
+when the argument of the orthogonal projection lies in the finite element space,
+and who trace exactly that mechanism for the \emph{convective} term. The
+companion fact that the OSGS stabilized norm is constructed to control the
+\emph{convective} term (with the reaction coefficient entering only through the
+stabilization parameter, never as an independently controlled quantity) is visible
+throughout the orthogonal-subscale analyses of the convection--diffusion--reaction
+and Oseen problems~\cite{codina2002stabilized,codina-blasco2002cdr,codina2008analysis}.
+Within the present manuscript, the constant-$\sigma$ vanishing is already used at
+the algorithmic level (the reactive terms are excluded from the computed
+projection because their projection is exactly zero).
+
+What appears \emph{not} to have been stated in this form is the combination of:
+(a) the explicit side-by-side coercivity comparison of \cref{eq:positive-square}
+and \cref{eq:OSGS-stab}, identifying $-\|\tau_1^{1/2}\sigma\uh\|_h^2$ as precisely
+the term ASGS keeps and OSGS cannot, with the gap quantified as $\sim1/\Damk_h$ in
+\cref{eq:gap}; (b) the specialization to the reaction-dominated regime of the
+\emph{porous} (generalized Navier--Stokes) problem, with the porosity-weighted
+$\siga$; and (c) the reconciliation of items (i)--(iii) showing that the weaker
+provable bound coexists with optimal observed rates, the variable-$\sigma$ remark
+softening the result further. We therefore recommend presenting it not as a new
+phenomenon but as making explicit, for the reaction-dominated regime, a known
+limitation of orthogonal subscales.
+
+%------------------------------------------------------------------------------
+\section*{Suggested one-paragraph version for the manuscript}
+%------------------------------------------------------------------------------
+\noindent\textit{(Drop-in text, parallel to the existing remark on $\siga$.)}
+\begin{quote}\small
+It is worth noting that the coercivity argument above does not carry over verbatim
+to the OSGS method in the reaction-dominated regime. The stabilizing term then
+controls only the component of the residual orthogonal to $\Xh$, whereas for a
+constant resistance $\sigma$ the reactive residual $\sigma\uh$ lies entirely in
+$\mathcal{V}_{h0}$ and is annihilated by the orthogonal projection---the same
+property that lets us exclude these terms from the computed projection. The
+positive contribution $-\|\tau_1^{1/2}\sigma\uh\|_h^2$ that yields the
+$\siga$-control in \cref{eq:ASGS-lemma} is therefore unavailable for OSGS, and the
+velocity is controlled only through the bare Galerkin term $\|\sigma^{1/2}\uh\|^2$,
+weaker by a factor $\sim(1+\Reyn_h)/\Damk_h$. This is a known feature of orthogonal
+subscales~\cite{gravenkamp2023dispersed,codina2002stabilized}: no stabilization is
+added for residual components already representable on the mesh. By consistency the
+convergence \emph{rate} is unaffected---as our experiments confirm---and for the
+spatially varying $\sigma(\boldsymbol{x})$ of the closure actually solved the
+cancellation is no longer exact, so a nonzero reactive stabilization is in fact
+recovered.
+\end{quote}
+
+%------------------------------------------------------------------------------
+\begin{thebibliography}{99}
+\itemsep2pt
+
+\bibitem{codina2001stabilized}
+R.~Codina,
+\emph{A stabilized finite element method for generalized stationary
+incompressible flows},
+Comput. Methods Appl. Mech. Engrg. \textbf{190} (2001) 2681--2706.
+
+\bibitem{codina2002stabilized}
+R.~Codina,
+\emph{Stabilized finite element approximation of transient incompressible flows
+using orthogonal subscales},
+Comput. Methods Appl. Mech. Engrg. \textbf{191} (2002) 4295--4321.
+
+\bibitem{codina-blasco2002cdr}
+R.~Codina, J.~Blasco,
+\emph{Analysis of a stabilized finite element approximation of the transient
+convection--diffusion--reaction equation using orthogonal subscales},
+Comput. Vis. Sci. \textbf{4} (2002) 167--174.
+
+\bibitem{codina2008analysis}
+R.~Codina,
+\emph{Analysis of a stabilized finite element approximation of the Oseen equations
+using orthogonal subscales},
+Appl. Numer. Math. \textbf{58} (2008) 264--283.
+
+\bibitem{codina2018variational}
+R.~Codina, S.~Badia, J.~Baiges, J.~Principe,
+\emph{Variational multiscale methods in computational fluid dynamics},
+in: Encyclopedia of Computational Mechanics, 2nd ed., Wiley, 2018, pp.~1--28.
+
+\bibitem{hughes2007variational}
+T.~J.~R. Hughes, G.~Sangalli,
+\emph{Variational multiscale analysis: the fine-scale Green's function,
+projection, optimization, localization, and stabilized methods},
+SIAM J. Numer. Anal. \textbf{45} (2007) 539--557.
+
+\bibitem{gravenkamp2023dispersed}
+H.~Gravenkamp, R.~Codina, et al.,
+\emph{A stabilized finite element method for modeling dispersed multiphase flows
+using orthogonal subgrid scales},
+2023. (Replace with the exact journal/volume/pages used in your bibliography.)
+
+\bibitem{brenner2008mathematical}
+S.~C. Brenner, L.~R. Scott,
+\emph{The Mathematical Theory of Finite Element Methods},
+3rd ed., Springer, 2008.
+
+\end{thebibliography}
+
+\end{document}
