@@ -370,7 +370,7 @@ function cascade_step_outcome(res, policy::CascadePolicy)
             return :success
         elseif sr == "stagnation_noise_floor_reached"
             return policy.accept_noise_floor ? :success : :reject
-        elseif sr == "linesearch_failed" || sr == "merit_divergence_escaped" || sr == "linear_solve_nan"
+        elseif sr == "linesearch_failed" || sr == "merit_divergence_escaped" || sr == "residual_divergence_escaped" || sr == "linear_solve_nan"
             return :reject  # structural failures are never accepted
         else  # xtol_stagnation / max_iters_stagnation / no_progress_stall — a "soft stall"
             return policy.accept_soft_stall ? :success : :reject

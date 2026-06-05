@@ -61,6 +61,11 @@ struct SafeNewtonSolver <: NonlinearSolver
     # then hands back to Newton instead of running Picard to its full ftol/cap. `Inf` (default) ⇒ DISABLED:
     # every non-ping-pong Picard solve is bit-identical to legacy. Ignored in :newton mode.
     picard_gain_target::Float64
+    # [residual-divergence guard, :newton] The Φ-based divergence check below is masked by the Armijo
+    # line search (Φ strictly decreases every accepted step), so it never catches a Newton solve whose
+    # residual ‖R‖∞ is climbing. When `> 0`, abort (→ Picard via the cascade) after this many consecutive
+    # ‖R‖∞ increases beyond `divergence_merit_factor`. `0` ⇒ DISABLED (legacy: Newton runs its budget).
+    newton_residual_divergence_patience::Int
 end
 
 # Convenience constructor: keeps existing positional call sites untouched (the honest-exit gate
@@ -75,13 +80,15 @@ function SafeNewtonSolver(ls::LinearSolver, max_iters::Int, max_increases::Int,
                           relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}} = nothing,
                           stall_window::Int = 0,
                           stall_min_rel_improvement::Float64 = 0.0,
-                          picard_gain_target::Float64 = Inf)
+                          picard_gain_target::Float64 = Inf,
+                          newton_residual_divergence_patience::Int = 0)
     return SafeNewtonSolver(ls, max_iters, max_increases, xtol, ftol, linesearch_alpha_min,
                             c1, divergence_merit_factor, stagnation_noise_floor,
                             max_linesearch_iterations, linesearch_contraction_factor, mode,
                             noise_floor_success_max_ftol_multiple,
                             relative_ftol_per_field, relative_stagnation_noise_floor_per_field,
-                            stall_window, stall_min_rel_improvement, picard_gain_target)
+                            stall_window, stall_min_rel_improvement, picard_gain_target,
+                            newton_residual_divergence_patience)
 end
 
 function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig; mode::Symbol = :newton)
@@ -89,7 +96,8 @@ function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig; mode::Symbol = :n
         ls, cfg.newton_iterations, cfg.max_increases, cfg.xtol, cfg.ftol,
         cfg.linesearch_alpha_min, cfg.armijo_c1, cfg.divergence_merit_factor, cfg.stagnation_noise_floor,
         cfg.max_linesearch_iterations, cfg.linesearch_contraction_factor; mode=mode,
-        noise_floor_success_max_ftol_multiple=cfg.noise_floor_success_max_ftol_multiple
+        noise_floor_success_max_ftol_multiple=cfg.noise_floor_success_max_ftol_multiple,
+        newton_residual_divergence_patience=cfg.newton_residual_divergence_patience
     )
 end
 
@@ -123,6 +131,7 @@ function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing,
         # MUST be threaded — the OSGS-inner Picard is rebuilt via this helper, so dropping it would
         # silently disable ping-pong on the OSGS path.
         isnothing(picard_gain_target) ? nls.picard_gain_target : picard_gain_target,
+        nls.newton_residual_divergence_patience,
     )
 end
 
@@ -162,7 +171,8 @@ function build_iter_solvers(sol_cfg::SolverConfig, ls::LinearSolver;
         noise_floor_success_max_ftol_multiple = noise_floor_success_max_ftol_multiple,
         relative_ftol_per_field = relative_ftol_per_field,
         relative_stagnation_noise_floor_per_field = relative_stagnation_noise_floor_per_field,
-        stall_window = stall_window, stall_min_rel_improvement = stall_min_rel_improvement)
+        stall_window = stall_window, stall_min_rel_improvement = stall_min_rel_improvement,
+        newton_residual_divergence_patience = sol_cfg.newton_residual_divergence_patience)
     return (picard = FESolver(nls_picard), newton = FESolver(nls_newton))
 end
 
@@ -174,6 +184,7 @@ function check_solver_parameters(s::SafeNewtonSolver)
     if !(s.mode in (:newton, :picard)) throw(ArgumentError("SafeNewtonSolver mode must be :newton or :picard, got $(s.mode).")) end
     if s.noise_floor_success_max_ftol_multiple < 1.0 throw(ArgumentError("noise_floor_success_max_ftol_multiple must be >= 1.0 (Inf disables the honest-exit gate).")) end
     if !(s.picard_gain_target > 0.0) throw(ArgumentError("picard_gain_target must be > 0 (Inf disables the P4 Picard gain-then-return stop).")) end
+    if s.newton_residual_divergence_patience < 0 throw(ArgumentError("newton_residual_divergence_patience must be >= 0 (0 disables the residual-divergence → Picard handoff).")) end
     if s.relative_ftol_per_field !== nothing
         if isempty(s.relative_ftol_per_field)
             throw(ArgumentError("relative_ftol_per_field must be a non-empty Vector or nothing."))
@@ -250,6 +261,7 @@ end
 mutable struct SafeIterationState
     i::Int
     inc_count::Int
+    res_inc_count::Int   # consecutive ‖R‖∞ increases (Newton residual-divergence guard)
     ls_success::Bool
     alpha::Float64
     step_norm::Float64
@@ -500,7 +512,23 @@ function eval_safeguard_termination_bounds!(solver::SafeNewtonSolver, state::Saf
     else
         state.inc_count = 0
     end
-    
+
+    # [residual-divergence guard, :newton] The Φ check above is driven down by the Armijo line search,
+    # so it cannot detect a Newton solve whose residual ‖R‖∞ is climbing. Track consecutive ‖R‖∞
+    # increases (beyond `divergence_merit_factor`) and hand off to Picard (a structural reject in the
+    # cascade) after `newton_residual_divergence_patience` of them. `= 0` ⇒ disabled (legacy).
+    if solver.mode === :newton && solver.newton_residual_divergence_patience > 0
+        if state.norm_b_new_inf > state.norm_b_inf * solver.divergence_merit_factor
+            state.res_inc_count += 1
+            if state.res_inc_count >= solver.newton_residual_divergence_patience
+                println("  [Residual Divergence] ‖R‖∞ rose for $(state.res_inc_count) consecutive steps beyond the divergence factor; handing off to Picard.")
+                return "residual_divergence_escaped", false, true
+            end
+        else
+            state.res_inc_count = 0
+        end
+    end
+
     if state.step_norm <= solver.xtol
         if _residual_meets_per_field_noise_floor(state.norm_b_new_per_field, state.effective_noise_floor_per_field) &&
            _residual_meets_per_field_honest_exit_gate(state.norm_b_new_per_field, state.effective_ftol_per_field, k_nf)
@@ -645,7 +673,7 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     initial_b_inf = norm_b_inf
 
     state = SafeIterationState(
-        0, 0, false, 1.0, 0.0, norm_b_inf, norm_b_inf, phi_x, phi_x,
+        0, 0, 0, false, 1.0, 0.0, norm_b_inf, norm_b_inf, phi_x, phi_x,
         norm_b_per_field, norm_b_new_per_field,
         solution_scale_per_field, effective_ftol_per_field, effective_noise_floor_per_field,
     )

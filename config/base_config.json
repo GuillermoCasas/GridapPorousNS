@@ -78,6 +78,7 @@
             "pingpong_max_swaps": 0,
             "pingpong_picard_gain_orders": 1.5,
             "osgs_plateau_machine_floor_shortcut": false,
+            "newton_residual_divergence_patience": 0,
             "accelerator": {
                 "type": "None",
                 "m": 5,

@@ -117,6 +117,9 @@ Base.@kwdef struct SolverConfig
     pingpong_picard_gain_orders::Float64           # orders of magnitude ‖R‖∞ must drop in Picard before returning to Newton
     # P2 — OSGS plateau machine-floor short-circuit (porous_solver.jl `_run_osgs_relaxation!`):
     osgs_plateau_machine_floor_shortcut::Bool      # false ⇒ require_consecutive_passes (today)
+    # [residual-divergence guard] Consecutive ‖R‖∞ increases (beyond divergence_merit_factor) that abort a
+    # Newton solve → Picard. 0 ⇒ disabled (today's behaviour: Newton runs its full budget while diverging).
+    newton_residual_divergence_patience::Int
     accelerator::AcceleratorConfig
 end
 
@@ -170,6 +173,7 @@ function validate!(cfg::PorousNSConfig)
     # [iterator-scheduling] new knobs (default OFF/inert)
     @assert sol.newton_stall_window >= 0 "newton_stall_window must be >= 0 (0 disables the no-progress stall guard)"
     @assert 0.0 <= sol.newton_stall_min_rel_improvement < 1.0 "newton_stall_min_rel_improvement must be in [0, 1)"
+    @assert sol.newton_residual_divergence_patience >= 0 "newton_residual_divergence_patience must be >= 0 (0 disables the residual-divergence → Picard handoff)"
     @assert sol.pingpong_max_swaps >= 0 "pingpong_max_swaps must be >= 0 (0 disables Newton↔Picard ping-pong)"
     @assert sol.pingpong_picard_gain_orders > 0.0 "pingpong_picard_gain_orders must be > 0"
     @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"

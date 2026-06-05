@@ -591,6 +591,14 @@
               "examples": [
                 false
               ]
+            },
+            "newton_residual_divergence_patience": {
+              "type": "integer",
+              "description": "[divergence guard] Consecutive Newton iterations whose residual ||R||_inf rises beyond divergence_merit_factor before the Newton solve aborts and the cascade hands off to Picard. The :newton divergence safeguard otherwise watches the merit Phi, which the Armijo line search forces down, so a residual-divergent solve runs its full iteration budget. 0 (default) disables this guard (legacy). Validate >= 0.",
+              "examples": [
+                0,
+                2
+              ]
             }
           },
           "additionalProperties": false
