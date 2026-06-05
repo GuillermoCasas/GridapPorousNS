@@ -47,6 +47,28 @@ Base.@kwdef struct StabilizationConfig
     osgs_state_drift_scale::String
     osgs_warmup_iterations::Int
     osgs_warmup_tolerance::Float64
+    # [projection-coupling] How the OSGS orthogonal projection π is coupled to the nonlinear solve:
+    #   "staggered" (default, paper alg:StationarySystem) — outer fixed-point loop: freeze π, run the
+    #       inner Newton, then update π = Π(R(U)). The frozen-π lag makes the map contract only linearly
+    #       (~0.75/iter) and an aggressive accelerator can destabilise it into a limit cycle.
+    #   "coupled"  — a SINGLE Newton solve in which the residual recomputes π = Π(R(u)) at EVERY nonlinear
+    #       iteration (no staggering lag), while the Jacobian stays the LOCAL frozen-π form (sparse — NOT the
+    #       prohibitive monolithic ∂π/∂u). A Picard-type coupling whose per-eval projection is the cheap
+    #       Cholesky-cached mass solve; intended to make OSGS converge in ~ASGS iteration counts.
+    #   "freeze_after_k" — `osgs_freeze_after_k` (=k) single-step warm-up iterations that refresh the
+    #       projection π = Π(R(u)) at EVERY nonlinear iteration, then FREEZE π and run a full frozen-π Newton
+    #       solve to convergence. With π frozen the Jacobian is the exact tangent, so the finish converges
+    #       quadratically. Verified: U*(π_k) is optimal-RATE for any fixed k (orthogonality buys a smaller
+    #       error CONSTANT, not a rate — ASGS is already optimal-order), and k=2-3 captures ~all of the OSGS
+    #       constant-advantage in ~ASGS iteration counts. The projection is ALWAYS applied (no ASGS fallback);
+    #       in the reaction-dominated corner the OSGS fixed point is itself sub-optimal, so those cells show
+    #       OSGS's (poor) behaviour honestly — a formulation defect, not an iterator one. See
+    #       docs/solver/efficiency-ideas.md Idea 5.
+    osgs_projection_coupling::String
+    # [freeze_after_k] Number of projection-updating warm-up iterations before freezing π (k ≥ 1): π is
+    # refreshed at each of the first k nonlinear iterations, then frozen for the quadratic finish. Inert
+    # unless osgs_projection_coupling == "freeze_after_k". (Pure ASGS is obtained via method="ASGS".)
+    osgs_freeze_after_k::Int
 end
 
 Base.@kwdef struct MeshConfig
@@ -84,6 +106,17 @@ Base.@kwdef struct SolverConfig
     run_diagnostics::Bool
     ablation_mode::String
     experimental_reaction_mode::String
+    # [iterator-scheduling] All default OFF/inert (base_config.json values below) so the shipped
+    # default reproduces today's behaviour bit-identically until a user opts in.
+    # P1 — no-progress stall guard (engine already in nonlinear.jl `_safe_solve_inner!`):
+    newton_stall_window::Int                       # 0 ⇒ disabled (Newton runs its full budget, today's behaviour)
+    newton_stall_min_rel_improvement::Float64      # relative ‖R‖∞ drop counting as "progress" for the stall window
+    # P4 — adaptive Newton↔Picard ping-pong (orchestrator-level, porous_solver.jl):
+    pingpong_enabled::Bool                         # false ⇒ one-way Newton→Picard→Newton cascade (today)
+    pingpong_max_swaps::Int                        # hard cap on Newton↔Picard alternations
+    pingpong_picard_gain_orders::Float64           # orders of magnitude ‖R‖∞ must drop in Picard before returning to Newton
+    # P2 — OSGS plateau machine-floor short-circuit (porous_solver.jl `_run_osgs_relaxation!`):
+    osgs_plateau_machine_floor_shortcut::Bool      # false ⇒ require_consecutive_passes (today)
     accelerator::AcceleratorConfig
 end
 
@@ -134,6 +167,11 @@ function validate!(cfg::PorousNSConfig)
     @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"
     @assert sol.divergence_merit_factor >= 1.0 "Divergence merit factor must be >= 1.0"
     @assert sol.noise_floor_success_max_ftol_multiple >= 1.0 "noise_floor_success_max_ftol_multiple must be >= 1.0 (use a large value / Inf to disable the honest-exit gate)"
+    # [iterator-scheduling] new knobs (default OFF/inert)
+    @assert sol.newton_stall_window >= 0 "newton_stall_window must be >= 0 (0 disables the no-progress stall guard)"
+    @assert 0.0 <= sol.newton_stall_min_rel_improvement < 1.0 "newton_stall_min_rel_improvement must be in [0, 1)"
+    @assert sol.pingpong_max_swaps >= 0 "pingpong_max_swaps must be >= 0 (0 disables Newton↔Picard ping-pong)"
+    @assert sol.pingpong_picard_gain_orders > 0.0 "pingpong_picard_gain_orders must be > 0"
     @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"
     @assert sol.dynamic_newton_re_threshold >= 1.0 "dynamic_newton_re_threshold must be >= 1"
     @assert sol.dynamic_newton_re_iterations >= 1 "dynamic_newton_re_iterations must be >= 1"
@@ -151,7 +189,9 @@ function validate!(cfg::PorousNSConfig)
     @assert stab.osgs_projection_tolerance > 0
     @assert stab.osgs_stopping_mode in ("state_drift", "projection_drift", "both") "osgs_stopping_mode must be 'state_drift', 'projection_drift', or 'both'"
     @assert stab.osgs_state_drift_scale in ("Linf", "L2_mass") "osgs_state_drift_scale must be 'Linf' or 'L2_mass'"
-    
+    @assert stab.osgs_projection_coupling in ("staggered", "coupled", "freeze_after_k") "osgs_projection_coupling must be 'staggered', 'coupled', or 'freeze_after_k'"
+    @assert stab.osgs_freeze_after_k >= 1 "osgs_freeze_after_k must be >= 1 (number of projection-updating warm-up iterations before freezing π)"
+
     # Formulation Operator validation
     @assert cfg.numerical_method.viscous_operator_type in ("DeviatoricSymmetric", "SymmetricGradient", "Laplacian") "viscous_operator_type strictly expects DeviatoricSymmetric, SymmetricGradient, or Laplacian"
     

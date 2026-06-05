@@ -6,6 +6,7 @@ using Test
 # Include test entry points for extended suites
 files = [
     "utilities_extended_test.jl",
+    "pingpong_equivalence_extended_test.jl",
 ]
 
 @testset "Extended Tests (> 2m)" begin

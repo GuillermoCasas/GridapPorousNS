@@ -213,3 +213,43 @@ does not weaken; it skips re-confirming a provably-static quantity).
 3. **(a)** Idea 2 tier 1 — measured `stall_window` experiment for ASGS (cheap, reversible, config-only).
 4. **(b)** Idea 2 tier 2 — prototype the full Newton↔Picard ping-pong as a new orchestrator mode (real
    change; new schema controls; A/B on iterations + rates).
+
+---
+
+## Idea 5 — `freeze_after_k`: coupled warm-up, then freeze π (IMPLEMENTED, 2026-06-05)
+
+**Status: implemented.** New `osgs_projection_coupling = "freeze_after_k"` mode in `_run_osgs_relaxation!`
+(`porous_solver.jl`). It is the user's "project a few nonlinear iterations, then freeze" scheme:
+
+1. **Warm-up** — `osgs_freeze_after_k` (=k) *single-step* staggered iterations: each takes ONE Newton step
+   against the current frozen π, then re-projects `π = Π(R(u))`. So the projection is refreshed at EVERY
+   nonlinear iteration for the first k iterations (the lagged map; ~linearly contracting). Because π is
+   frozen *within* each single step, every warm-up step is a valid Newton step (the `D=−2Φ` line-search
+   certificate holds) — π only changes *between* steps, so no two-phase line-search hack is needed.
+2. **Freeze + finish** — freeze `π = π_k` and run a full Newton solve to convergence. With π constant the
+   Jacobian is the *exact* tangent of `R(·;π_k)` (no `∂π/∂u` term), so the finish converges **quadratically**.
+
+**Why it is correct (rate vs constant).** `U*(π_k)` is optimal-**rate** for *any* fixed k: the paper's
+stability/convergence theory rests on the π-independent bilinear form `B_S` (`article.tex` 553-557; the
+theorem is proved for π=0), so **ASGS is already optimal-order and orthogonality only shrinks the error
+*constant*.** k slides the constant from ASGS (k=0) toward OSGS (k→∞) without leaving the optimal-rate band.
+
+**The projection is ALWAYS applied — there is no ASGS fallback.** (An earlier draft added a velocity-H¹
+relative-drift gate that fell back to ASGS in the reaction-dominated corner; it was removed at the user's
+direction — "always do the projection in all cases.") Consequence: in that corner the OSGS *fixed point
+itself* is sub-optimal (the staggered-map defect, caveat #5 in
+[`../mms/convergence-status.md`](../mms/convergence-status.md)), so `freeze_after_k` there converges toward
+that sub-optimal point and those cells **honestly show OSGS's poor rate** — the mode does NOT mask the
+defect behind ASGS. Where the map is well-behaved (most of the parameter space), k=2-3 gives optimal rate +
+~all of the OSGS error-constant advantage in ~ASGS iteration counts.
+
+**A/B:** the full k=1 QUAD sweep (`data/k1_quad_freeze.json`, N=10→320) is the characterization run; numbers
+to be filled from `results/k1_quad_freeze.h5` + `merged_convergence_report.md`. Earlier staggered-warm-up
+probes (since superseded by the single-step warm-up) showed, on the *mild* cell, freeze k=3 ≈ optimal rate
+(2.1/1.0) at ~8-9 iters/mesh capturing ~99% of the OSGS L² gain vs full-OSGS's ~40; on the *defect* cell
+(Da=1e6) the partially-frozen result tracks OSGS's own sub-optimal/negative H¹ rate (error grows with
+refinement) — expected, and now shown rather than gated away.
+
+Knob: `osgs_freeze_after_k` (k≥1; k=2-3 default-good). Config-strictness pinned by
+`test/blitz/freeze_after_k_config_blitz_test.jl`; encoding-covariance of the mode pinned by the
+`freeze_after_k` case in `test/quick/encoding_invariance_quick_test.jl`.

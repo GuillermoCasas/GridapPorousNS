@@ -267,6 +267,29 @@
               "examples": [
                 0.001
               ]
+            },
+            "osgs_projection_coupling": {
+              "type": "string",
+              "enum": [
+                "staggered",
+                "coupled",
+                "freeze_after_k"
+              ],
+              "description": "How the OSGS orthogonal projection pi is coupled to the nonlinear solve. 'staggered' (default; paper alg:StationarySystem): outer fixed-point loop freezes pi, runs the inner Newton, then updates pi = Pi(R(U)); the frozen-pi lag makes the map contract only linearly. 'coupled': a single Newton solve whose residual recomputes pi = Pi(R(u)) at every nonlinear iteration (no staggering lag), with the Jacobian kept in the local frozen-pi form (sparse, NOT the prohibitive monolithic dPi/du) — a Picard-type coupling using the Cholesky-cached mass solve per evaluation, intended to make OSGS converge in ~ASGS iteration counts. 'freeze_after_k': osgs_freeze_after_k single-step warm-up iterations that refresh pi = Pi(R(u)) at every nonlinear iteration, then FREEZE pi and run a full frozen-pi Newton solve to convergence (quadratic, since pi is then constant). U*(pi_k) is optimal-rate for any fixed k and k=2-3 captures ~all of the OSGS error-constant advantage in ~ASGS iteration counts; the projection is ALWAYS applied (no ASGS fallback), so the reaction-dominated cells show OSGS's own (sub-optimal) fixed-point behaviour honestly.",
+              "examples": [
+                "staggered",
+                "coupled",
+                "freeze_after_k"
+              ]
+            },
+            "osgs_freeze_after_k": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "[freeze_after_k mode] Number of projection-updating warm-up iterations before freezing pi (k >= 1): pi is refreshed at each of the first k nonlinear iterations, then frozen for the quadratic finish. Inert unless osgs_projection_coupling == 'freeze_after_k'. k=2-3 captures ~all of the OSGS constant-advantage where the map is well-behaved.",
+              "examples": [
+                2,
+                3
+              ]
             }
           },
           "additionalProperties": false
@@ -523,6 +546,51 @@
                 }
               },
               "additionalProperties": false
+            },
+            "newton_stall_window": {
+              "type": "integer",
+              "description": "[iterator-scheduling P1] Consecutive non-improving Newton iterations before bailing to the cascade's Picard stage (stop_reason 'no_progress_stall'). 0 disables the guard (default; Newton runs its full budget = today's behaviour). Use >= 2 so a one-step plateau before quadratic descent is not bailed.",
+              "examples": [
+                0,
+                2
+              ]
+            },
+            "newton_stall_min_rel_improvement": {
+              "type": "number",
+              "description": "[iterator-scheduling P1] Relative ||R||_inf reduction that counts as 'progress' for the stall window. In [0, 1). Keep small (e.g. 1e-3) so genuine quadratic descent always resets the window.",
+              "examples": [
+                0.0,
+                1e-3
+              ]
+            },
+            "pingpong_enabled": {
+              "type": "boolean",
+              "description": "[iterator-scheduling P4] Master switch for the adaptive Newton<->Picard ping-pong cascade. false (default) keeps the one-way Newton->Picard->Newton cascade (today's behaviour).",
+              "examples": [
+                false
+              ]
+            },
+            "pingpong_max_swaps": {
+              "type": "integer",
+              "description": "[iterator-scheduling P4] Hard cap on Newton<->Picard alternations. 0 (with pingpong_enabled=false) is inert. Validate >= 0.",
+              "examples": [
+                0,
+                3
+              ]
+            },
+            "pingpong_picard_gain_orders": {
+              "type": "number",
+              "description": "[iterator-scheduling P4] Orders of magnitude ||R||_inf must drop during a Picard segment before handing back to Newton (||R||_inf <= ||R0||_inf * 10^-gain). Read only when pingpong_enabled=true. Validate > 0.",
+              "examples": [
+                1.5
+              ]
+            },
+            "osgs_plateau_machine_floor_shortcut": {
+              "type": "boolean",
+              "description": "[iterator-scheduling P2] When true, the OSGS outer loop accepts a single passing MMS-plateau check (instead of require_consecutive_passes) once the state drift has reached the tight machine floor (x_diff <= osgs_tolerance) in state_drift mode. false (default) preserves today's multi-pass verification.",
+              "examples": [
+                false
+              ]
             }
           },
           "additionalProperties": false

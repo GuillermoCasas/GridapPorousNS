@@ -333,8 +333,8 @@ function run_simulation(config_path::String;
     alpha_fn(x) = alpha_0_val
     alpha_cf = CellField(alpha_fn, Ω)
     
-    f_x_val = cfg.phys.f_x
-    f_y_val = cfg.phys.f_y
+    f_x_val = cfg.physical_properties.f_x
+    f_y_val = cfg.physical_properties.f_y
     f_fn(x) = VectorValue(f_x_val, f_y_val)
     f_cf = CellField(f_fn, Ω)
     
@@ -353,14 +353,25 @@ function run_simulation(config_path::String;
     
     sol_cfg = cfg.numerical_method.solver
     p_ls = LUSolver()
-    
-    nls_picard = SafeNewtonSolver(p_ls, sol_cfg.picard_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.picard_handoff_ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor; mode=:picard)
-    fe_picard = FESolver(nls_picard)
-    
-    nls_newton = SafeNewtonSolver(p_ls, sol_cfg.newton_iterations, sol_cfg.max_increases, sol_cfg.xtol, sol_cfg.ftol, sol_cfg.linesearch_alpha_min, sol_cfg.armijo_c1, sol_cfg.divergence_merit_factor, sol_cfg.stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor)
-    fe_newton = FESolver(nls_newton)
-    
-    iter_solvers = IterativeSolvers(fe_picard, fe_newton)
+
+    # [P0 shared builder + P6 parity] Production builds the (picard, newton) pair through the same builder
+    # as the MMS harness. It keeps the bare scalar-ftol path (distinct picard_handoff_ftol / ftol; no
+    # per-field relative tolerances; static iteration budgets — option (b): production has no manufactured
+    # solution or characteristic Re/Da to drive the dynamic budgets, so those stay harness-only) and passes
+    # `noise_floor_success_max_ftol_multiple = Inf` to reproduce the prior positional-ctor default byte-for-byte.
+    # P6 wires the no-progress STALL GUARD from the config (`newton_stall_*`, default 0 ⇒ off ⇒ bit-identical);
+    # the Newton↔Picard PING-PONG needs no plumbing here — `solve_system` reads `pingpong_*` from `sol_cfg`
+    # and builds the gain-targeted Picard itself, so a production user opts in purely via config.
+    solvers = build_iter_solvers(sol_cfg, p_ls;
+        newton_max_iters = sol_cfg.newton_iterations,
+        picard_max_iters = sol_cfg.picard_iterations,
+        newton_ftol = sol_cfg.ftol,
+        picard_ftol = sol_cfg.picard_handoff_ftol,
+        noise_floor_success_max_ftol_multiple = Inf,
+        stall_window = sol_cfg.newton_stall_window,
+        stall_min_rel_improvement = sol_cfg.newton_stall_min_rel_improvement)
+
+    iter_solvers = IterativeSolvers(solvers.picard, solvers.newton)
     
     x0 = interpolate_everywhere([VectorValue(0.0,0.0), 0.0], X)
     

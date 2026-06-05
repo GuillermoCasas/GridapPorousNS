@@ -39,7 +39,9 @@
             "osgs_projection_tolerance": 1e-5,
             "osgs_state_drift_scale": "Linf",
             "osgs_warmup_iterations": 2,
-            "osgs_warmup_tolerance": 1e-3
+            "osgs_warmup_tolerance": 1e-3,
+            "osgs_projection_coupling": "staggered",
+            "osgs_freeze_after_k": 2
         },
         "solver": {
             "picard_iterations": 5,
@@ -70,6 +72,12 @@
             "run_diagnostics": false,
             "ablation_mode": "full",
             "experimental_reaction_mode": "standard",
+            "newton_stall_window": 0,
+            "newton_stall_min_rel_improvement": 0.0,
+            "pingpong_enabled": false,
+            "pingpong_max_swaps": 0,
+            "pingpong_picard_gain_orders": 1.5,
+            "osgs_plateau_machine_floor_shortcut": false,
             "accelerator": {
                 "type": "None",
                 "m": 5,

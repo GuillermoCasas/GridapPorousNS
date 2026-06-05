@@ -1,0 +1,140 @@
+{
+  "erase_past_results": false,
+  "encoding_strategy": "minmax",
+  "solver_stall_window": 2,
+  "solver_stall_min_rel_improvement": 0.001,
+  "h5_filename": "phase1_quad_k2_pingpong.h5",
+  "epsilon_pert": [
+    1.0
+  ],
+  "max_n_pert": 1,
+  "mms_verification_enabled": true,
+  "mms_tau_err": 0.0001,
+  "mms_eps_u_l2": 1e-12,
+  "mms_eps_u_h1": 1e-12,
+  "mms_eps_p_l2": 1e-12,
+  "mms_max_extra_cycles": 5,
+  "mms_require_consecutive_passes": 2,
+  "mms_rate_check_factor": 100.0,
+  "skip_cells": [
+    [
+      1000000.0,
+      1e-06,
+      0.05
+    ],
+    [
+      1000000.0,
+      1.0,
+      0.05
+    ],
+    [
+      1000000.0,
+      1000000.0,
+      0.05
+    ]
+  ],
+  "physical_properties": {
+    "Re": [
+      1e-06,
+      1.0,
+      1000000.0
+    ],
+    "Da": [
+      1e-06,
+      1.0,
+      1000000.0
+    ],
+    "physical_epsilon": [
+      0.0
+    ],
+    "numerical_epsilon_coefficient": [
+      0.0001
+    ],
+    "f_x": 0.0,
+    "f_y": 0.0
+  },
+  "domain": {
+    "alpha_0": [
+      1.0,
+      0.5,
+      0.05
+    ],
+    "r_1": 0.2,
+    "r_2": 0.4,
+    "bounding_box": [
+      -0.5,
+      0.5,
+      -0.5,
+      0.5
+    ]
+  },
+  "numerical_method": {
+    "element_spaces": {
+      "k_velocity": [
+        2
+      ],
+      "k_pressure": [
+        2
+      ],
+      "equal_order_only": true
+    },
+    "mesh": {
+      "partition": [
+        10,
+        10
+      ],
+      "convergence_partitions": [
+        10,
+        20,
+        40,
+        80,
+        160,
+        320
+      ],
+      "element_type": [
+        "QUAD"
+      ]
+    },
+    "solver": {
+      "picard_iterations": 2,
+      "newton_iterations": 10,
+      "dynamic_newton_re_iterations": 150,
+      "noise_floor_success_max_ftol_multiple": 10.0,
+      "xtol": 1e-10,
+      "ftol": 1e-10,
+      "dynamic_ftol_ceiling": 0.0001,
+      "dynamic_ftol_spatial_safety_factor": 0.01,
+      "stagnation_noise_floor": 1e-05,
+      "linesearch_alpha_min": 0.0001,
+      "max_linesearch_iterations": 25,
+      "linesearch_contraction_factor": 0.5,
+      "max_increases": 3,
+      "divergence_merit_factor": 1.05,
+      "armijo_c1": 0.0001,
+      "accelerator": {
+        "type": "Anderson",
+        "m": 10,
+        "relaxation_factor": 0.8
+      },
+      "pingpong_enabled": true,
+      "pingpong_max_swaps": 3,
+      "pingpong_picard_gain_orders": 1.5,
+      "osgs_plateau_machine_floor_shortcut": true
+    },
+    "stabilization": {
+      "method": [
+        "ASGS",
+        "OSGS"
+      ],
+      "osgs_iterations": 5,
+      "osgs_inner_newton_iters": 1,
+      "osgs_tolerance": 1e-10,
+      "osgs_warmup_iterations": 2,
+      "osgs_warmup_tolerance": 0.001
+    }
+  },
+  "output": {
+    "directory": "test/extended/ManufacturedSolutions/results",
+    "basename": "phase1_quad_k2_pingpong"
+  }
+}

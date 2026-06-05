@@ -669,6 +669,29 @@ actually wants from an iteration cap. The exception path is normally
 never taken with the modern solver stack; documenting it here prevents
 future auditors from re-flagging the asymmetry.
 
+\paragraph{Implementation note (2026-06): explicit cascade policy and the opt-in ping-pong.}
+The Stage-I-vs-OSGS-inner success asymmetry above (noise-floor rejection; legacy
+\texttt{max\_iters\_caught}) is, in code, a single pure verdict
+$\mathrm{cascade\_step\_outcome}(\mathsf{res}, \mathsf{policy})$ parameterised by
+three boolean flags
+$(\mathsf{accept\_noise\_floor},\ \mathsf{accept\_soft\_stall},\ \mathsf{max\_iters\_caught\_is\_failure})$,
+rather than duplicated control flow. Three policy constants instantiate it:
+Stage-I~Newton-1 $=(\mathrm{false},\mathrm{false},\mathrm{true})$, Stage-I~Newton-2
+$=(\mathrm{true},\mathrm{false},\mathrm{true})$ (it accepts a noise-floor finish though
+Newton-1 does not, but still rejects a soft stall), and OSGS-inner
+$=(\mathrm{true},\mathrm{true},\mathrm{false})$. Two \emph{opt-in, default-off} efficiency
+variants reuse this machinery without altering the canonical algorithm above:
+(i) an adaptive Newton$\leftrightarrow$Picard \emph{ping-pong} that replaces the one-way
+Newton$\to$Picard$\to$Newton cascade in both instantiations when
+$\mathsf{pingpong\_enabled}$, running Picard only until $\|\mathcal{R}\|_\infty$ has dropped
+$\mathsf{pingpong\_picard\_gain\_orders}$ orders (just enough to re-enter Newton's basin)
+before returning to Newton, bounded by $\mathsf{pingpong\_max\_swaps}$; and (ii) an OSGS
+plateau short-circuit (Alg.~\ref{alg:C}) that accepts a single passing MMS-plateau check once
+the state drift has reached the \emph{tight} machine floor $x_{\mathrm{diff}}\le\mathsf{osgs\_tol}$
+in \code{state\_drift} mode, when $\mathsf{osgs\_plateau\_machine\_floor\_shortcut}$ is set.
+Both default off (canonical behaviour unchanged); see
+\code{docs/solver/efficiency-ideas.md} and \code{docs/solver/algorithm-code-mapping.md}.
+
 % ============================================================
 \section{The Newton Kernel: Algorithm A and Its Leaves}
 \label{sec:newton}

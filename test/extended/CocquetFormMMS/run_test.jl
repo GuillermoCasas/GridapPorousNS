@@ -250,7 +250,9 @@ function execute_outer_homotopy_perturbation_loop!(
             osgs_projection_tolerance=dynamic_ftol,
             osgs_state_drift_scale=config.numerical_method.stabilization.osgs_state_drift_scale,
             osgs_warmup_iterations=config.numerical_method.stabilization.osgs_warmup_iterations,
-            osgs_warmup_tolerance=config.numerical_method.stabilization.osgs_warmup_tolerance
+            osgs_warmup_tolerance=config.numerical_method.stabilization.osgs_warmup_tolerance,
+            osgs_projection_coupling=config.numerical_method.stabilization.osgs_projection_coupling,
+            osgs_freeze_after_k=config.numerical_method.stabilization.osgs_freeze_after_k
         )
         
         local_diagnostics_cache = Dict{String, Any}()
