@@ -351,7 +351,9 @@ function execute_outer_homotopy_perturbation_loop!(
             osgs_projection_tolerance=dynamic_ftol,
             osgs_state_drift_scale=config.numerical_method.stabilization.osgs_state_drift_scale,
             osgs_warmup_iterations=config.numerical_method.stabilization.osgs_warmup_iterations,
-            osgs_warmup_tolerance=config.numerical_method.stabilization.osgs_warmup_tolerance
+            osgs_warmup_tolerance=config.numerical_method.stabilization.osgs_warmup_tolerance,
+            osgs_projection_coupling=config.numerical_method.stabilization.osgs_projection_coupling,
+            osgs_freeze_after_k=config.numerical_method.stabilization.osgs_freeze_after_k
         )
         
         local_diagnostics_cache = Dict{String, Any}()
@@ -487,11 +489,16 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     # strategies ("centered" / "balanced" / "unit") remain available for back-comparison.
     encoding_strategy = String(get(test_dict, "encoding_strategy", "minmax"))
 
-    # [stall guard] No-progress bail for the nonlinear kernel (Algorithm A): abort an attempt once the
+    # [stall guard / P1] No-progress bail for the nonlinear kernel (Algorithm A): abort an attempt once the
     # best residual fails to improve by `solver_stall_min_rel_improvement` over `solver_stall_window`
     # iterations, so a doomed eps_pert (e.g. a high-Re 1.0 guess that grinds the full Newton budget with
     # merit stuck) falls back to a milder perturbation fast instead of exhausting max_iters.
-    # `solver_stall_window = 0` ⇒ DISABLED (default).
+    # The test-JSON keys are a harness convenience. Their default (0 / 0.0 = DISABLED) is exactly the
+    # canonical `SolverConfig.newton_stall_window` / `newton_stall_min_rel_improvement` value shipped in
+    # config/base_config.json — kept as an explicit literal here because base_config.json is not directly
+    # loadable into a full PorousNSConfig (it intentionally omits eps_val; see docs/known_issues.md). The
+    # PRODUCTION path sources these from SolverConfig directly through the shared builder (P6); this is the
+    # one harness-side place that mirrors that default.
     solver_stall_window = Int(get(test_dict, "solver_stall_window", 0))
     solver_stall_min_rel_improvement = Float64(get(test_dict, "solver_stall_min_rel_improvement", 0.0))
 
@@ -514,6 +521,11 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     mkpath(dirname(h5_path))
     # Per-cell output base for VTK/traces: keep debug-run artifacts out of the main results/ tree.
     _cell_out_base = startswith(h5_filename, "debug_results/") ? joinpath(results_dir, "debug_results") : results_dir
+    # Run identity = the results-DB basename (sans dir/extension), e.g. "k1_quad_freeze". Stamped into each
+    # trace so plot_trajectory.py can group a run's trajectory plots under plots/<run>/ automatically (no
+    # --run flag needed). Each (cell,method,N) trace is overwritten per run, so the stamp always reflects the
+    # run that last wrote it.
+    run_name = splitext(basename(h5_filename))[1]
 
     erase_past = get(test_dict, "erase_past_results", false)
     h5_mode = erase_past ? "w" : "cw"
@@ -579,6 +591,34 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     println("[cell-select] $(length(selected)) of $(length(all_cells)) cells selected" *
             (cli_shard === nothing ? "" : " (shard $(cli_shard[1])/$(cli_shard[2]))") *
             (isempty(cli_filter) ? "" : " (filter $(cli_filter))") * ".")
+
+    # [clean-slate] `erase_past_results=true` already truncates the H5 DB ("w" mode above). Extend it to a
+    # TRUE clean slate by also clearing the regenerated per-(kv,etype) artifacts — traces/, plots/, vtk/, and
+    # the convergence_*.png — for exactly the (kv,etype) combos this run will write. Without this, trajectory
+    # plots / convergence PNGs / traces from a PREVIOUS run linger and get mixed with the new ones (the
+    # provenance trap). Scoped to the run's own combos (never other studies); incompatible with --shard
+    # (erase_past already errors out for shards above). Best-effort — a clean failure must not abort the run.
+    if erase_past
+        cleared = Set{Tuple{Int,String}}()
+        for s in selected
+            et = String(s[1]); kvc = Int(s[2])
+            (kvc, et) in cleared && continue
+            push!(cleared, (kvc, et))
+            cell_dir = joinpath(_cell_out_base, "k$(kvc)", et)
+            isdir(cell_dir) || continue
+            try
+                for sub in ("traces", "plots", "vtk")
+                    rm(joinpath(cell_dir, sub); force=true, recursive=true)
+                end
+                for f in readdir(cell_dir; join=true)
+                    endswith(f, ".png") && rm(f; force=true)
+                end
+            catch e
+                @warn "erase_past_results artifact clean failed (non-fatal)" cell_dir exception=e
+            end
+        end
+        println("[erase_past_results] Clean slate: cleared traces/plots/vtk + convergence PNGs for $(length(cleared)) (kv,etype) combo(s).")
+    end
     run_idx = 0
     
     # Pre-allocate cache for collecting metrics over partitions dynamically
@@ -898,15 +938,27 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 # machine precision (i.e., for all physically meaningful cells), while leaving
                                 # one order of safety against κ(A)-amplified assembly round-off.
                                 static_ftol_floor = 10 * eps(Float64)
-                                nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, static_ftol_floor, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard, noise_floor_success_max_ftol_multiple=k_nf,
-                                                                              relative_ftol_per_field=rel_target_per_field, relative_stagnation_noise_floor_per_field=rel_noise_floor_per_field,
-                                                                              stall_window=solver_stall_window, stall_min_rel_improvement=solver_stall_min_rel_improvement)
-                                nls_newton = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_newton_it, max_inc, xtol, static_ftol_floor, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; noise_floor_success_max_ftol_multiple=k_nf,
-                                                                              relative_ftol_per_field=rel_target_per_field, relative_stagnation_noise_floor_per_field=rel_noise_floor_per_field,
-                                                                              stall_window=solver_stall_window, stall_min_rel_improvement=solver_stall_min_rel_improvement)
-                                
-                                solver_picard = FESolver(nls_picard)
-                                solver_newton = FESolver(nls_newton)
+                                # [P0 shared builder] Harness builds the rich (picard, newton) pair: one shared
+                                # machine-precision floor for both ftols, dynamic noise floor, per-field relative
+                                # tolerances, the honest-exit gate, dynamic-widened iteration budgets, and the stall
+                                # guard. All solver scalars (max_inc, xtol, linesearch params, armijo_c1, div_fac)
+                                # are read from `config.numerical_method.solver` inside the builder — identical to the
+                                # locals used here. The builder dispatches mode=:picard / :newton internally.
+                                _iter_solvers = PorousNSSolver.build_iter_solvers(
+                                    config.numerical_method.solver, LUSolver();
+                                    newton_max_iters = local_newton_it,
+                                    picard_max_iters = local_picard_it,
+                                    newton_ftol = static_ftol_floor,
+                                    picard_ftol = static_ftol_floor,
+                                    stagnation_noise_floor = dynamic_noise_floor,
+                                    noise_floor_success_max_ftol_multiple = k_nf,
+                                    relative_ftol_per_field = rel_target_per_field,
+                                    relative_stagnation_noise_floor_per_field = rel_noise_floor_per_field,
+                                    stall_window = solver_stall_window,
+                                    stall_min_rel_improvement = solver_stall_min_rel_improvement)
+
+                                solver_picard = _iter_solvers.picard
+                                solver_newton = _iter_solvers.newton
                                 
                                 # Interpolate initial mathematical guess state perfectly atop exact solution roots
                                 x0_exact = interpolate_everywhere([u_final, p_final], X)
@@ -984,6 +1036,11 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                         "osgs_state_drift_scale"   => get(stab_dict, "osgs_state_drift_scale", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_state_drift_scale", "Linf")),
                                         "osgs_warmup_iterations"   => get(stab_dict, "osgs_warmup_iterations", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_warmup_iterations", 2)),
                                         "osgs_warmup_tolerance"    => get(stab_dict, "osgs_warmup_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_warmup_tolerance", 1e-3)),
+                                        # Propagate the projection-coupling mode (else the per-method rebuild silently drops it
+                                        # and the base_config default "staggered" wins — the 2026-05-26 field-drop bug class).
+                                        "osgs_projection_coupling" => get(stab_dict, "osgs_projection_coupling", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_projection_coupling", "staggered")),
+                                        # [freeze_after_k] propagate the warm-up k-budget (same field-drop guard).
+                                        "osgs_freeze_after_k" => get(stab_dict, "osgs_freeze_after_k", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_freeze_after_k", 2)),
                                     )
                                     method_config_dict = deepcopy(config_dict)
                                     method_config_dict["numerical_method"]["stabilization"] = method_stab_dict
@@ -1022,6 +1079,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                             Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp),
                                             String(etype), String(method), Int(n))
                                         trace_obj = (
+                                            run = run_name,
                                             cell = (Re=Float64(Re), Da=Float64(Da), alpha_0=Float64(alpha_0),
                                                     kv=Int(kv), kp=Int(kp), etype=String(etype),
                                                     method=String(method), encoding=encoding_strategy),
