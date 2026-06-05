@@ -27,6 +27,14 @@ import trajectory_plot as tp  # noqa: E402
 GREEN, RED = "#2e7d32", "#c62828"
 
 
+def _plot_dir_for(trace_path):
+    """Output dir for a trace's plots: a 'plots/' subfolder INSIDE the trace's own 'traces/' dir
+    (results/k<kv>/<etype>/traces/plots/), so each trajectory's JSON sidecar and its rendered PNG live
+    together under traces/. (The per-(kv,etype) convergence PNGs stay at the k<kv>/<etype> top level.)
+    A run-name subfolder is appended by the caller, giving results/k<kv>/<etype>/traces/plots/<run>/."""
+    return os.path.join(os.path.dirname(os.path.abspath(trace_path)), "plots")
+
+
 def _match(cell, N, cell_sel, n_sel, method_sel):
     if method_sel and str(cell.get("method", "")).upper() != method_sel.upper():
         return False
@@ -58,7 +66,17 @@ def main():
     ap.add_argument("--traces", default=os.path.join(HERE, "results"),
                     help="root to search for trajectory JSON sidecars (default results/; recurses into k<kv>/<etype>/traces/ and debug_results/)")
     ap.add_argument("--file", default=None, help="plot a single trace JSON file")
-    ap.add_argument("--out", default=None, help="output dir (default <traces>/plots)")
+    ap.add_argument("--out", default=None,
+                    help="force a single flat output dir (override). Default: each plot mirrors its trace's "
+                         "location — written to the 'plots/' sibling of the trace's 'traces/' dir "
+                         "(e.g. results/k1/QUAD/traces/foo.json -> results/k1/QUAD/plots/foo_att1.png), "
+                         "so plots are organized per-(kv,etype) alongside vtk/ and traces/.")
+    ap.add_argument("--run", default=None,
+                    help="OVERRIDE the run-name subfolder. By default each plot is grouped under the trace's "
+                         "own `run` stamp (written by run_test.jl = the results-DB basename), e.g. "
+                         "results/k1/QUAD/plots/k1_quad_freeze/foo_att1.png — so you normally need NOTHING. "
+                         "Pass --run only to force a different grouping name (e.g. for pre-2026-06-05 traces "
+                         "that lack the stamp).")
     ap.add_argument("--cell", default=None, help="filter, e.g. Re=1e6,Da=1e-6,a0=0.5")
     ap.add_argument("--N", type=int, default=None, help="filter by mesh resolution N")
     ap.add_argument("--method", default=None, help="filter by method (ASGS/OSGS)")
@@ -68,10 +86,9 @@ def main():
     if not files:
         print(f"[traj] no trace files in {args.traces}")
         return
-    out_dir = args.out or os.path.join(args.traces, "plots")
-    os.makedirs(out_dir, exist_ok=True)
 
     n = 0
+    out_dirs = set()
     for f in files:
         try:
             with open(f) as fh:
@@ -82,6 +99,17 @@ def main():
         cell, N = trace["cell"], trace["N"]
         if not args.file and not _match(cell, N, args.cell, args.N, args.method):
             continue
+        # Per-trace output dir: mirror the trace's location so plots sit under k<kv>/<etype>/plots/
+        # alongside vtk/ and traces/ (consistent with run_test.jl's per-cell artifact layout). Each run's
+        # plots are then grouped under a run-name subfolder, taken AUTOMATICALLY from the trace's own `run`
+        # stamp (written by run_test.jl = the results-DB basename) — so you never have to pass a flag. `--run`
+        # overrides the stamp; `--out` forces a single flat dir (ad-hoc use). Traces with no `run` stamp
+        # (pre-2026-06-05) fall back to a flat plots/ dir.
+        base_out = args.out or _plot_dir_for(f)
+        run = args.run or trace.get("run")
+        out_dir = os.path.join(base_out, run) if run else base_out
+        os.makedirs(out_dir, exist_ok=True)
+        out_dirs.add(out_dir)
         base = os.path.splitext(os.path.basename(f))[0]
         title = _title(cell, N)
         attempts = trace.get("attempts", []) or []
@@ -98,9 +126,12 @@ def main():
                             osgs_outer=att.get("osgs_outer"),
                             base_conv_k=att.get("base_conv_outer_iter"),
                             mms_relchange=att.get("mms_relchange"))
-            print(f"[traj] {os.path.basename(out_path)}")
+            print(f"[traj] {os.path.relpath(out_path, args.traces)}")
             n += 1
-    print(f"[traj] wrote {n} PNG(s) to {out_dir}")
+    if len(out_dirs) == 1:
+        print(f"[traj] wrote {n} PNG(s) to {next(iter(out_dirs))}")
+    else:
+        print(f"[traj] wrote {n} PNG(s) across {len(out_dirs)} per-(kv,etype) plots/ dirs under {args.traces}")
 
 
 if __name__ == "__main__":

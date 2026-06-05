@@ -62,3 +62,6 @@ cocquet_form_mms_manufactured_solution.pdf
 article.pdf
 supplement.pdf
 centered_encoding.pdf
+
+# compiled standalone note (build artifact of osgs_reaction_note.tex)
+theory/osgs_reaction_note.pdf

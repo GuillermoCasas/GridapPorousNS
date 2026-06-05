@@ -89,6 +89,8 @@ def _parse_stage(code):
     step = parts[2] if len(parts) > 2 else mid
     if algo == "B" and mid == "StageI":
         context = "Alg. B - Stage I (ASGS init)"
+    elif algo == "C" and mid.startswith("OSGS") and step == "Coupled":
+        context = "Alg. C - OSGS coupled (single Newton; pi recomputed each iter)"
     elif algo == "C" and mid.startswith("OSGS"):
         idx = mid[mid.find("[") + 1:mid.find("]")] if "[" in mid else "?"
         context = "Alg. C - OSGS outer it. {} (-> Alg. B)".format(idx)
@@ -479,11 +481,15 @@ def _plot_osgs(stages, osgs_outer, base_conv_k, mms_relchange, out_path, title, 
 
 def plot_attempt(stages, out_path, title="", subtitle="", subtitle_color=None,
                  osgs_outer=None, base_conv_k=None, mms_relchange=None):
-    """Dispatch: OSGS (outer-loop ran) -> nested C->B->A diagram; else -> flat stage list."""
+    """Dispatch: a STAGGERED OSGS run (outer loop ran) -> nested C->B->A diagram; everything else
+    (ASGS, or coupled OSGS = Stage I + a single coupled Newton solve with no staggered outer loop)
+    -> flat stage list. Coupled mode is detected by the absence of any staggered structure: no
+    populated osgs_outer AND no indexed C:OSGS[k] stage. Its trajectory lives in the C:OSGS:Coupled
+    stage history and renders as an ordinary flat stage box."""
     stages = stages or []
     osgs_outer = osgs_outer or []
-    has_osgs = bool(osgs_outer) or any("C:OSGS" in s.get("stage", "") for s in stages)
-    if has_osgs:
+    has_staggered = bool(osgs_outer) or any(re.search(r"C:OSGS\[(\d+)\]", s.get("stage", "")) for s in stages)
+    if has_staggered:
         return _plot_osgs(stages, osgs_outer, base_conv_k, mms_relchange or [],
                           out_path, title, subtitle, subtitle_color)
     return plot_stages(stages, out_path, title=title, subtitle=subtitle, subtitle_color=subtitle_color)
