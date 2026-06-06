@@ -1088,7 +1088,12 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                             attempts = cell_attempt_traces,
                                         )
                                         open(joinpath(traces_dir, trace_name), "w") do io
-                                            JSON3.write(io, trace_obj)
+                                            # allow_inf: stage records default missing residual fields to NaN
+                                            # (e.g. the freeze_after_k path lacks normalized residuals). Without
+                                            # this, JSON3 throws "NaN not allowed", the best-effort catch swallows
+                                            # it, and the trace lands EMPTY (0 bytes) → the plotter skips it. NaN/Inf
+                                            # tokens are read fine by Python's json.load; the plotter skips NaN points.
+                                            JSON3.write(io, trace_obj; allow_inf=true)
                                         end
                                     catch e
                                         @warn "Trajectory trace write failed (non-fatal)" exception=e
