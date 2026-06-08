@@ -33,15 +33,7 @@
         "stabilization": {
             "method": "ASGS",
             "osgs_iterations": 3,
-            "osgs_inner_newton_iters": 3,
-            "osgs_tolerance": 1e-5,
-            "osgs_stopping_mode": "state_drift",
-            "osgs_projection_tolerance": 1e-5,
-            "osgs_state_drift_scale": "Linf",
-            "osgs_warmup_iterations": 2,
-            "osgs_warmup_tolerance": 1e-3,
-            "osgs_projection_coupling": "staggered",
-            "osgs_freeze_after_k": 2
+            "osgs_tolerance": 1e-5
         },
         "solver": {
             "picard_iterations": 5,

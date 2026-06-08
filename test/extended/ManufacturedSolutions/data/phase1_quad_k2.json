@@ -123,10 +123,7 @@
         "OSGS"
       ],
       "osgs_iterations": 5,
-      "osgs_inner_newton_iters": 1,
-      "osgs_tolerance": 1e-10,
-      "osgs_warmup_iterations": 2,
-      "osgs_warmup_tolerance": 0.001
+      "osgs_tolerance": 1e-10
     }
   },
   "output": {

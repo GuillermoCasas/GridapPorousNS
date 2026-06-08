@@ -20,7 +20,6 @@ files = [
     "mms_exactness_blitz_test.jl",
     "mms_unit_length_blitz_test.jl",
     "config_strict_loader_blitz_test.jl",
-    "freeze_after_k_config_blitz_test.jl",
     "cascade_policy_symmetry_blitz_test.jl",
     "stall_guard_blitz_test.jl",
     "pingpong_schedule_blitz_test.jl",

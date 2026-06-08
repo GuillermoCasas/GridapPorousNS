@@ -93,7 +93,6 @@
                 "Galerkin"
             ],
             "osgs_iterations": 15,
-            "osgs_inner_newton_iters": 1,
             "osgs_tolerance": 1e-10
         }
     },

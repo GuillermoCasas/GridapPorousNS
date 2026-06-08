@@ -18,11 +18,13 @@ Depending on the chosen space ``\widetilde{\mathcal{X}}`` for the sub-grid scale
 
 # Algorithm-to-code mapping
 See `docs/solver/algorithm-code-mapping.md` for the full table. In short, `solve_system` mirrors
-Algorithm O (SimulationOrchestration) of `theory/osgs_algorithm.tex`; it delegates to seven
-file-local helpers (`_initialize_asgs_state!`, `_run_asgs_mms_extension!`,
-`_run_osgs_inner_cascade!`, `_compute_state_drift`, `_update_and_project!`,
-`_decide_osgs_convergence`, `_run_osgs_relaxation!`) that map 1:1 to Algorithms B, C, D and
-the §3.6 helpers of the paper.
+Algorithm O (SimulationOrchestration) of `theory/osgs_algorithm.tex`; it delegates to three
+file-local helpers — `_initialize_asgs_state!` (Stage-I ASGS boot, Algorithm B),
+`_run_asgs_mms_extension!`, and `_run_osgs_relaxation!` (the coupled OSGS solve, Algorithm C) —
+plus the shared Newton↔Picard cascade (`_pingpong_cascade!` / `cascade_step_outcome`). The
+staggered OSGS satellite (`_run_osgs_inner_cascade!`, `_compute_state_drift`, `_update_and_project!`,
+`_decide_osgs_convergence`) was removed in the 2026-06-08 coupled-only leaning — see
+`docs/solver/coupled-only-leaning-and-jfnk-plan.md`.
 =#
 using Gridap
 using Gridap.Algebra
@@ -197,135 +199,14 @@ function _record_stage!(diag_cache, stage::String, res)
 end
 
 # ==============================================================================
-# H4 — _compute_state_drift  (pure, §3.6.1 StateDrift)
-# ==============================================================================
-"""
-    _compute_state_drift(final_x0, x_prev, X, dΩ, osgs_state_drift_scale)
-        → (x_diff::Float64, x_diff_inf::Float64)
-
-Implements `StateDrift` from §3.6.1 of `theory/osgs_algorithm.tex`. Pure function.
-Returns the mode-selected `x_diff` (L²-mass-weighted or ℓ∞ DOF norm, per
-`osgs_state_drift_scale`) and the always-computed `x_diff_inf` (needed by the
-absolute noise-floor short-circuit in `_decide_osgs_convergence`).
-"""
-function _compute_state_drift(final_x0, x_prev, X, dΩ, osgs_state_drift_scale)
-    x_diff_inf = norm(get_free_dof_values(final_x0) - x_prev, Inf)
-
-    # Split separation L2 mapping norms native evaluation
-    if osgs_state_drift_scale == "L2_mass"
-        u_prev, p_prev = FEFunction(X, x_prev)
-        u_h, p_h = final_x0
-        e_u = u_h - u_prev
-        e_p = p_h - p_prev
-        x_diff_u_l2 = sqrt(abs(sum(∫(e_u ⋅ e_u)dΩ)))
-        x_diff_p_l2 = sqrt(abs(sum(∫(e_p * e_p)dΩ)))
-        x_diff = max(x_diff_u_l2, x_diff_p_l2)
-    else
-        x_diff = x_diff_inf
-    end
-
-    return x_diff, x_diff_inf
-end
-
-# ==============================================================================
-# H5 — _update_and_project!  (pure-ish, residual projection + Anderson)
-# ==============================================================================
-"""
-    _update_and_project!(final_x0, pi_u, pi_p, accel_u, accel_p, form, dΩ,
-                         h_cf, f_cf, alpha_cf, g_cf, c_1, c_2,
-                         U_proj, V_proj, P_proj, Q_proj,
-                         M_u, M_p, num_u_fac, num_p_fac)
-        → (pi_u_next, pi_p_next, pi_u_drift, pi_p_drift, R_u_algebraic_norm)
-
-Owns the residual evaluation, L² projection, optional Anderson mixing, and
-projection-drift computation per OSGS outer iteration. No `diag_cache` writes,
-no `println` — the caller assembles diagnostics from the returned tuple.
-The Anderson accelerators are stateful (their internal history is mutated when
-non-`nothing`); otherwise the function has no side effects on its inputs.
-"""
-function _update_and_project!(final_x0, pi_u, pi_p, accel_u, accel_p, form, dΩ,
-                              h_cf, f_cf, alpha_cf, g_cf, c_1, c_2,
-                              U_proj, V_proj, P_proj, Q_proj,
-                              M_u, M_p, num_u_fac, num_p_fac)
-    # Pre-map the sub-grid scales natively before bounding loop state
-    u_h, p_h = final_x0
-    R_u = inner_projection_u(u_h, p_h, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
-    R_p = inner_projection_p(u_h, p_h, form, dΩ, h_cf, alpha_cf, g_cf)
-
-    pi_u_next = discrete_l2_projection(R_u, U_proj, V_proj, dΩ, M_u, num_u_fac)
-    pi_p_next = discrete_l2_projection(R_p, P_proj, Q_proj, dΩ, M_p, num_p_fac)
-
-    if !isnothing(accel_u) && !isnothing(accel_p)
-        pi_u_mixed = update!(accel_u, get_free_dof_values(pi_u), get_free_dof_values(pi_u_next))
-        pi_p_mixed = update!(accel_p, get_free_dof_values(pi_p), get_free_dof_values(pi_p_next))
-
-        get_free_dof_values(pi_u_next) .= pi_u_mixed
-        get_free_dof_values(pi_p_next) .= pi_p_mixed
-    end
-
-    dpi_u_vec = get_free_dof_values(pi_u_next) - get_free_dof_values(pi_u)
-    dpi_p_vec = get_free_dof_values(pi_p_next) - get_free_dof_values(pi_p)
-
-    pi_u_drift = sqrt(abs(dot(dpi_u_vec, M_u * dpi_u_vec)))
-    pi_p_drift = sqrt(abs(dot(dpi_p_vec, M_p * dpi_p_vec)))
-
-    b_u_R = assemble_vector(v -> ∫(v ⋅ R_u)dΩ, V_proj)
-    R_u_algebraic_norm = norm(b_u_R, 2)
-
-    return pi_u_next, pi_p_next, pi_u_drift, pi_p_drift, R_u_algebraic_norm
-end
-
-# ==============================================================================
-# H6 — _decide_osgs_convergence  (pure, §3.6.2 Mode_stop)
-# ==============================================================================
-"""
-    _decide_osgs_convergence(x_diff, x_diff_inf, pi_u_drift, pi_p_drift,
-                              osgs_iter, stab_cfg, osgs_tol, stagnation_tol)
-        → overall_converged::Bool
-
-Implements §3.6.2 `Mode_stop` logic from `theory/osgs_algorithm.tex`, plus the
-absolute ℓ∞ noise-floor short-circuit. Pure function.
-
-The ℓ∞ short-circuit is gated to `state_drift` mode only: in `projection_drift` and `both`
-modes the projection may legitimately still be moving while the primary state appears stagnant,
-so a raw ℓ∞ short-circuit could accept a non-fixed-point on `(U_h, π_h)`.
-"""
-function _decide_osgs_convergence(x_diff, x_diff_inf, pi_u_drift, pi_p_drift,
-                                   osgs_iter, stab_cfg, osgs_tol, stagnation_tol)
-    # Geometrically bind orthogonality tolerance to the exact numerical limitations
-    dynamic_osgs_tol = max(osgs_tol, stagnation_tol)
-    state_converged = x_diff <= dynamic_osgs_tol
-    proj_converged = max(pi_u_drift, pi_p_drift) <= max(stab_cfg.osgs_projection_tolerance, stagnation_tol)
-
-    if stab_cfg.osgs_stopping_mode == "state_drift"
-        overall_converged = state_converged
-    elseif stab_cfg.osgs_stopping_mode == "projection_drift"
-        overall_converged = proj_converged
-    else
-        overall_converged = state_converged && proj_converged
-    end
-
-    if x_diff_inf <= stagnation_tol && osgs_iter >= 2
-        if stab_cfg.osgs_stopping_mode == "state_drift"
-            # Stagnation noise floor on ℓ∞ acts as a safety net only when state drift
-            # is the binding criterion. In "projection_drift" and "both" modes, the
-            # projection may still be drifting legitimately — don't short-circuit.
-            overall_converged = true
-        end
-    end
-
-    return overall_converged
-end
-
-# ==============================================================================
 # Shared cascade success-policy (Algorithm B; refactor-brief B5/B6/B10)
 # ==============================================================================
-# The ASGS Stage-I cascade (`_initialize_asgs_state!`) and the OSGS inner cascade
-# (`_run_osgs_inner_cascade!`) are both Algorithm B. Historically they each inlined
-# their own stop-reason classification, which is the *only* place they legitimately
-# differ. `CascadePolicy` + `cascade_step_outcome` make that difference one explicit,
-# shared decision instead of duplicated control flow, and give P4's Newton↔Picard
-# ping-pong a single reusable verdict primitive.
+# The ASGS Stage-I cascade (`_initialize_asgs_state!`) and the coupled OSGS solve
+# (`_run_osgs_relaxation!`) both reuse this Algorithm-B cascade. Each classifies its own
+# stop-reason, which is the *only* place they legitimately differ. `CascadePolicy` +
+# `cascade_step_outcome` make that difference one explicit, shared decision instead of
+# duplicated control flow, and give the Newton↔Picard ping-pong a single reusable verdict
+# primitive. (The former staggered OSGS inner cascade was removed in the coupled-only leaning.)
 #
 # THREE policy flags are required (not two): Stage-I Newton-2 accepts a noise-floor
 # finish but rejects a soft stall (xtol/max-iters/no-progress), whereas the OSGS inner
@@ -394,7 +275,8 @@ Newton, bounded by `max_swaps`. Each segment is tagged honestly via `_record_sta
 (`<stage_prefix>:PP[swap]:N` / `:P`) — never relabel a Picard step as Newton.
 
 Returns `:success` (a Newton segment was accepted), `:structural_abort` (a non-finite/exception/merit-
-divergence segment — restore done), or `:reject` (swaps exhausted without success). Safeguards
+divergence segment, OR a Picard segment that fails to reduce ‖R‖ — neither solver can advance, so the
+caller fails and the homotopy drops eps_pert; restore done), or `:reject` (swaps exhausted). Safeguards
 (merit/line-search/divergence within each Newton segment, monotone-residual within each Picard segment)
 are unchanged — this only schedules *between* solves. Inert unless the caller opts in (pingpong_enabled).
 """
@@ -432,10 +314,17 @@ function _pingpong_cascade!(final_x0, restore_vec, op_newton, op_picard, solver_
         elseif res_p.state == :max_iters_caught
             iter_count_ref[] += 1
         end
-        # Picard structural failure (non-finite / exception / merit escaped / finite-but-exploding) → abort.
+        # [ping-pong] The Picard segment is the globalizer after Newton diverged. If it ALSO fails to make
+        # progress — a structural failure (non-finite / exception / merit-divergence), a depleted line
+        # search, or simply no reduction in ‖R‖ — then NEITHER solver can advance from this iterate. Deem
+        # the attempt failed (restore the entry iterate) so the caller fails and the OUTER homotopy loop
+        # drops eps_pert, instead of repeating the identical Newton↔Picard cycle to max_swaps.
+        picard_no_progress = res_p.state == :ok &&
+            (res_p.stop_reason == "merit_divergence_escaped" ||
+             res_p.stop_reason == "linesearch_failed" ||
+             res_p.residual_norm >= res_p.initial_residual_norm)
         if res_p.state == :nonfinite || res_p.state == :exception ||
-           (res_p.state == :ok && res_p.stop_reason == "merit_divergence_escaped") ||
-           any(!isfinite, get_free_dof_values(final_x0))
+           any(!isfinite, get_free_dof_values(final_x0)) || picard_no_progress
             get_free_dof_values(final_x0) .= restore_vec
             return :structural_abort
         end
@@ -451,166 +340,6 @@ function _pingpong_cascade!(final_x0, restore_vec, op_newton, op_picard, solver_
         swap += 1
     end
     return :reject  # swaps exhausted without success → caller falls through to terminal logic
-end
-
-# ==============================================================================
-# H3 — _run_osgs_inner_cascade!  (Algorithm B, OSGS operators)
-# ==============================================================================
-"""
-    _run_osgs_inner_cascade!(final_x0, x_prev, op_newton_osgs, op_picard_osgs,
-                              local_fesolver, local_fesolver_picard,
-                              diag_cache, iter_count_ref)
-        → (success::Bool, structurally_failed::Bool)
-
-Implements Algorithm B (RobustNonlinearCascade) of `theory/osgs_algorithm.tex`
-with OSGS operators (π_h frozen) and `restore = x_prev`. Owns the
-per-outer-iteration Newton→Picard→Newton cascade inside Algorithm C's outer
-loop.
-
-Internal policy: any non-structural Newton finish is accepted; only
-`linesearch_failed`, `merit_divergence_escaped`, `linear_solve_nan` mark inner
-failure (stagnation / max-iters finishes are progress — the outer OSGS loop
-re-evaluates anyway). The classification site is below.
-
-Returns `(success, structurally_failed)`. `structurally_failed=true` signals the
-caller to `break` the outer OSGS loop.
-"""
-function _run_osgs_inner_cascade!(final_x0, x_prev, op_newton_osgs, op_picard_osgs,
-                                   local_fesolver, local_fesolver_picard,
-                                   diag_cache, iter_count_ref; outer_iter::Int=0,
-                                   pingpong_enabled::Bool=false, pingpong_max_swaps::Int=0)
-    # [P4] Opt-in adaptive Newton↔Picard ping-pong replaces the one-way N1→Picard→N2 cascade. Default
-    # OFF ⇒ the existing body below runs unchanged (bit-identical). `local_fesolver_picard` carries the
-    # gain target (set in _run_osgs_relaxation! when pingpong_enabled). Note: ping-pong only does real
-    # work for OSGS when `osgs_inner_newton_iters > 1` — with a 1-step inner Newton the first segment
-    # already exits as an accepted soft-stall, so the loop returns immediately (same numerics, see plan).
-    if pingpong_enabled
-        v = _pingpong_cascade!(final_x0, x_prev, op_newton_osgs, op_picard_osgs,
-                               local_fesolver, local_fesolver_picard, OSGS_INNER_POLICY,
-                               diag_cache, iter_count_ref;
-                               stage_prefix="C:OSGS[$outer_iter]", max_swaps=pingpong_max_swaps)
-        return (v == :success, v != :success)
-    end
-
-    # --- Attempt 1: OSGS Inner Newton ---
-    newton_failed = false
-    res_n1 = safe_fe_solve!(final_x0, local_fesolver, op_newton_osgs; backup=x_prev)
-    _record_stage!(diag_cache, "C:OSGS[$outer_iter]:N1", res_n1)
-    # [P3a] OSGS_INNER_POLICY: accept noise-floor + soft-stall finishes; only the three structural
-    # reasons reject; legacy :max_iters_caught is a 1-iteration success. (See policy matrix above.)
-    outcome_n1 = cascade_step_outcome(res_n1, OSGS_INNER_POLICY)
-    if res_n1.state == :nonfinite
-        println("        -> OSGS Inner Newton produced non-finite state. Restoring previous iterate, engaging Picard fallback.")
-        newton_failed = true
-    elseif res_n1.state == :exception
-        println("        -> OSGS Newton threw unrecoverable exception: ", res_n1.exc, ". Attempting Picard fallback.")
-        newton_failed = true
-    elseif outcome_n1 == :one_iter_success   # legacy :max_iters_caught
-        println("        -> OSGS Newton 1-step interior pass dynamically executed.")
-        iter_count_ref[] += 1
-    else  # :ok — :success or :reject (the policy decides; only structural reasons → :reject)
-        iter_count_ref[] += res_n1.iterations
-
-        push!(diag_cache["inner_osgs_diagnostics"], (
-            iterations = res_n1.iterations,
-            initial_res = res_n1.initial_residual_norm,
-            final_res = res_n1.residual_norm,
-            step_norm = res_n1.step_norm,
-            stop_reason = res_n1.stop_reason
-        ))
-        diag_cache["final_residual_norm"] = res_n1.residual_norm
-
-        # Only structural-failure stop reasons mark the inner Newton as failed. xtol_stagnation /
-        # max_iters_stagnation (IterationCap) are accepted as outer-loop progress by design
-        # (OSGS_INNER_POLICY.accept_soft_stall=true) — see `theory/osgs_algorithm.tex` §1.2.4.
-        # Adding IterationCap to the reject set would make OSGS reject converged-but-not-tight
-        # inner iterates — revise the algorithm doc (and the policy) first.
-        if outcome_n1 == :reject
-            newton_failed = true
-        end
-    end
-
-    # --- Attempt 2 (only if Newton failed): Picard smoother, then Attempt 3: Newton retry ---
-    if newton_failed
-        println("        -> OSGS Inner Newton failed. Restoring previous iterate and engaging Picard smoother...")
-        get_free_dof_values(final_x0) .= x_prev
-        picard_completed = false
-        # No backup passed to the helper: the explicit `any(!isfinite, …)` check below catches
-        # catastrophic divergence in both the OK and the exception path.
-        res_p = safe_fe_solve!(final_x0, local_fesolver_picard, op_picard_osgs)
-        _record_stage!(diag_cache, "C:OSGS[$outer_iter]:Picard", res_p)
-        if res_p.state == :ok
-            iter_count_ref[] += res_p.iterations
-            push!(diag_cache["inner_osgs_diagnostics"], (
-                iterations = res_p.iterations,
-                initial_res = res_p.initial_residual_norm,
-                final_res = res_p.residual_norm,
-                step_norm = res_p.step_norm,
-                stop_reason = "picard:" * res_p.stop_reason
-            ))
-            diag_cache["final_residual_norm"] = res_p.residual_norm
-            picard_completed = true
-            # [picard-divergence early-exit] If Picard itself diverges (merit escaped — FINITE
-            # but exploding, so the `any(!isfinite)` guard below misses it), the iterate / eps_pert
-            # is hopeless; abort the OSGS nested sequence now rather than burning a Newton-2 retry
-            # on a diverging state. Mirrors the ASGS-init early-exit.
-            if res_p.stop_reason == "merit_divergence_escaped"
-                println("        -> OSGS Picard diverged (merit escaped). Restoring previous iterate and aborting OSGS nested sequence.")
-                get_free_dof_values(final_x0) .= x_prev
-                return (false, true)
-            end
-        elseif res_p.state == :max_iters_caught
-            println("        -> OSGS Picard concluded smoothing loops.")
-            picard_completed = true
-        elseif res_p.state == :exception
-            println("        -> OSGS Picard threw unrecoverable exception: ", res_p.exc, ". Restoring backup and aborting OSGS.")
-            get_free_dof_values(final_x0) .= x_prev
-        end
-        # `:nonfinite` falls through to the explicit check below (helper did
-        # not auto-restore because `backup=` was not passed).
-
-        if any(!isfinite, get_free_dof_values(final_x0))
-            println("        -> OSGS Picard catastrophically diverged. Restoring and aborting OSGS.")
-            get_free_dof_values(final_x0) .= x_prev
-            return (false, true)
-        end
-
-        if !picard_completed
-            return (false, true)
-        end
-
-        # --- Attempt 3: re-engage Newton on the Picard-smoothed iterate ---
-        println("        -> OSGS Picard smoothing finalized. Re-engaging Newton...")
-        res_n2 = safe_fe_solve!(final_x0, local_fesolver, op_newton_osgs; backup=x_prev)
-        _record_stage!(diag_cache, "C:OSGS[$outer_iter]:N2", res_n2)
-        outcome_n2 = cascade_step_outcome(res_n2, OSGS_INNER_POLICY)
-        if res_n2.state == :nonfinite
-            println("        -> OSGS Inner Newton retry produced non-finite state. Restoring previous iterate, aborting OSGS nested sequence.")
-            return (false, true)
-        elseif res_n2.state == :exception
-            println("        -> OSGS Newton retry threw unrecoverable exception: ", res_n2.exc, ". Aborting OSGS loop.")
-            return (false, true)
-        elseif outcome_n2 == :one_iter_success   # legacy :max_iters_caught
-            iter_count_ref[] += 1
-        else  # :ok — :success or :reject
-            iter_count_ref[] += res_n2.iterations
-            push!(diag_cache["inner_osgs_diagnostics"], (
-                iterations = res_n2.iterations,
-                initial_res = res_n2.initial_residual_norm,
-                final_res = res_n2.residual_norm,
-                step_norm = res_n2.step_norm,
-                stop_reason = "retry:" * res_n2.stop_reason
-            ))
-            diag_cache["final_residual_norm"] = res_n2.residual_norm
-
-            if outcome_n2 == :reject
-                println("        -> OSGS Inner Newton retry also failed (Reason: $(res_n2.stop_reason)). Aborting OSGS nested sequence.")
-                return (false, true)
-            end
-        end
-    end
-
-    return (true, false)
 end
 
 # ==============================================================================
@@ -631,8 +360,8 @@ accumulates `iter_count_ref`.
 
 Internal policy (Stage I addendum): Newton-1 that hits the noise floor but not
 `ftol` does **not** mark success — it falls through to Picard to guarantee
-entering the quadratic basin. This asymmetry vs `_run_osgs_inner_cascade!` is
-intentional (see B6 in `theory/refactor_solve_system_prompt.md`).
+entering the quadratic basin. (This asymmetry was historically contrasted with the now-removed
+OSGS inner cascade; the coupled OSGS solve reuses the same shared cascade policy.)
 """
 function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
                                   solver_newton_asgs, solver_picard, ftol,
@@ -910,12 +639,10 @@ outer loop exhausts its budget without convergence *and* MMS is disabled, the ca
 preserved. Reinitialising to `false` here would silently change the `(success, …)` semantics for that
 case.
 
-Calls per outer iteration: `_run_osgs_inner_cascade!` (H3, Algorithm B),
-`_compute_state_drift` (H4, §3.6.1), `_update_and_project!` (H5), and
-`_decide_osgs_convergence` (H6, §3.6.2). The OSGS-branch MMS plateau hook
-(Algorithm D for the OSGS path) is inlined inside the outer loop here, because
-extracting it would require returning a `break` signal through a function
-boundary.
+The coupled OSGS solve runs a single Newton solve whose residual recomputes `π = Π(R(u))` at
+every evaluation (frozen-π local Jacobian), with the shared Newton↔Picard cascade as fallback.
+The OSGS-branch MMS plateau hook (Algorithm D for the OSGS path) is inlined here, because
+extracting it would require returning a `break` signal through a function boundary.
 
 The factorized mass-matrix handles (`M_u`, `M_p`, `num_u_fac`, `num_p_fac`) and
 projection spaces (`U_proj`, `V_proj`, `P_proj`, `Q_proj`) are constructed by
@@ -926,14 +653,12 @@ Returns the elapsed wall time of the timed outer loop only; the post-loop
 budget-check and final `diag_cache["pi_u"]/["pi_p"]` writes execute *after* the
 `@elapsed` block.
 
-Before the staggered loop, this helper dispatches on `stab_cfg.osgs_projection_coupling` and may
-early-return from a dedicated branch (each with the same `(success, pi_u, pi_p, elapsed)` contract):
-  • `"coupled"` — one Newton solve whose residual recomputes `π = Π(R(u))` each evaluation (frozen-π
-    local Jacobian; Picard-type, linearly convergent to the same fixed point).
-  • `"freeze_after_k"` — exactly `osgs_freeze_after_k` fully-converged staggered updates then stop (the
-    last is the quadratic frozen finish); a velocity-H¹ relative-drift gate (`osgs_freeze_drift_gate`)
-    restores the Stage-I ASGS state where the subscale coupling is destabilising. See `efficiency-ideas.md` Idea 5.
-The default `"staggered"` mode falls through to the Algorithm-C outer loop documented above.
+OSGS is a single coupled solve (the 2026-06-08 leaning removed the `staggered`/`freeze_after_k`
+coupling dispatch): one Newton solve whose residual recomputes `π = Π(R(u))` at every evaluation
+(frozen-π local Jacobian; Picard-type, linearly convergent to the discrete OSGS fixed point), with
+a Newton↔Picard cascade fallback gated on `pingpong_enabled` and the stall sensor disabled
+(`stall_window=0`, since the coupled solve converges slowly-monotone). See
+`docs/solver/coupled-only-leaning-and-jfnk-plan.md`.
 """
 function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
                                 setup, formulation, phys_cfg, stab_cfg, sol_cfg,
@@ -978,30 +703,56 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
     # OSGS fixed point as the staggered scheme (R̃ = R − Π(R) orthogonal), so errors match; the aim is to
     # reach it in ~ASGS iteration counts. See docs/solver/efficiency-ideas.md.
     # ==============================================================================
-    if stab_cfg.osgs_projection_coupling == "coupled"
-        coupled_elapsed = @elapsed begin
-            println("      [+] OSGS COUPLED mode: single Newton solve; π = Π(R(u)) recomputed each nonlinear iteration (local frozen-π Jacobian; non-monolithic).")
-            diag_cache["inner_osgs_diagnostics"] = []
-            diag_cache["outer_osgs_diagnostics"] = []
+    # [solver-leaning 2026-06-07] OSGS has a SINGLE nonlinear route now: the coupled solve below —
+    # one Newton solve whose residual re-projects π = Π(R(u)) every evaluation (local frozen-π Jacobian,
+    # non-monolithic). The `staggered` and `freeze_after_k` branches + their drift/stopping/warm-up
+    # satellite were deleted (they reached the same fixed point via more machinery). See lessons_learned.
+    coupled_elapsed = @elapsed begin
+        println("      [+] OSGS COUPLED mode: single Newton solve; π = Π(R(u)) recomputed each nonlinear iteration (local frozen-π Jacobian; non-monolithic).")
+        diag_cache["inner_osgs_diagnostics"] = []
+        diag_cache["outer_osgs_diagnostics"] = []
 
-            # Residual: recompute π from the CURRENT iterate every evaluation (no staggering lag).
-            res_fn_coupled = (x, y) -> begin
-                u_x, p_x = x
-                R_u_cf = inner_projection_u(u_x, p_x, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
-                R_p_cf = inner_projection_p(u_x, p_x, form, dΩ, h_cf, alpha_cf, g_cf)
-                pi_u_x = discrete_l2_projection(R_u_cf, U_proj, V_proj, dΩ, M_u, num_u_fac)
-                pi_p_x = discrete_l2_projection(R_p_cf, P_proj, Q_proj, dΩ, M_p, num_p_fac)
-                build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u_x, pi_p=pi_p_x)
-            end
-            # Jacobian: local frozen-π form. The π VALUE is irrelevant to the Jacobian (ProjectFullResidual
-            # ignores it; the reaction-trim uses σ/∂σ); a zero π just selects the OSGS (is_osgs=true) branch.
-            _zu = allocate_in_domain(M_u); fill!(_zu, 0.0); _pi_u0 = FEFunction(U_proj, _zu)
-            _zp = allocate_in_domain(M_p); fill!(_zp, 0.0); _pi_p0 = FEFunction(P_proj, _zp)
-            jac_fn_coupled = (x, dx, y) -> build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=_pi_u0, pi_p=_pi_p0)
+        # Residual: recompute π from the CURRENT iterate every evaluation (no staggering lag).
+        res_fn_coupled = (x, y) -> begin
+            u_x, p_x = x
+            R_u_cf = inner_projection_u(u_x, p_x, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
+            R_p_cf = inner_projection_p(u_x, p_x, form, dΩ, h_cf, alpha_cf, g_cf)
+            pi_u_x = discrete_l2_projection(R_u_cf, U_proj, V_proj, dΩ, M_u, num_u_fac)
+            pi_p_x = discrete_l2_projection(R_p_cf, P_proj, Q_proj, dΩ, M_p, num_p_fac)
+            build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u_x, pi_p=pi_p_x)
+        end
+        # Jacobian: local frozen-π form. The π VALUE is irrelevant to the Jacobian (ProjectFullResidual
+        # ignores it; the reaction-trim uses σ/∂σ); a zero π just selects the OSGS (is_osgs=true) branch.
+        _zu = allocate_in_domain(M_u); fill!(_zu, 0.0); _pi_u0 = FEFunction(U_proj, _zu)
+        _zp = allocate_in_domain(M_p); fill!(_zp, 0.0); _pi_p0 = FEFunction(P_proj, _zp)
+        jac_fn_coupled = (x, dx, y) -> build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=_pi_u0, pi_p=_pi_p0)
 
-            op_coupled = FEOperator(res_fn_coupled, jac_fn_coupled, X, Y)
-            x_backup = copy(get_free_dof_values(final_x0))
-            res_c = safe_fe_solve!(final_x0, FESolver(base_nls), op_coupled; backup=x_backup)
+        op_coupled = FEOperator(res_fn_coupled, jac_fn_coupled, X, Y)
+        x_backup = copy(get_free_dof_values(final_x0))
+        # The coupled inexact-Newton converges SLOWLY-MONOTONE (the dropped ∂π/∂U gives a linear rate);
+        # DISABLE the stall sensor for it (a slow step is not a stall). With it on, the high-Da/fine-mesh
+        # coupled solve fails the "improve by stall_min_rel_improvement over stall_window steps" test and
+        # bails after ~2 steps, silently leaving U at the ASGS state — OSGS degenerates into ASGS and reports
+        # ASGS's (optimal) rate under the OSGS label. Its genuine failures (line-search failure, divergence,
+        # max-iters) are still caught. The Stage-I boot keeps the stall sensor (cold-start oscillation → Picard).
+        coupled_nls = _with_overrides(base_nls; stall_window=0)
+        if sol_cfg.pingpong_enabled
+            # [coupled cascade] Give the coupled solve the SAME Newton↔Picard fallback as the Stage-I boot:
+            # if Newton's line search fails or it diverges → hand to Picard (frozen-advection Oseen
+            # linearisation, wider basin) → back to Newton once Picard has cleared `picard_gain_orders`.
+            # Converging cells run Newton straight to ftol (Picard stays inert); the `linesearch_failed` cells
+            # (steep under-resolved porosity layers) now get a real fallback instead of quitting after one
+            # step. The Picard Jacobian uses the same zero-π placeholder (the π value is irrelevant to the
+            # local frozen-π tangent — only is_osgs is selected).
+            jac_picard_coupled = (x, dx, y) -> build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=_pi_u0, pi_p=_pi_p0, mult_mom=1.0, mult_mass=1.0)
+            op_picard_coupled  = FEOperator(res_fn_coupled, jac_picard_coupled, X, Y)
+            solver_picard_gain_c = FESolver(_with_overrides(coupled_nls; ftol=sol_cfg.picard_handoff_ftol, mode=:picard, picard_gain_target=sol_cfg.pingpong_picard_gain_orders))
+            v_c = _pingpong_cascade!(final_x0, x_backup, op_coupled, op_picard_coupled,
+                                     FESolver(coupled_nls), solver_picard_gain_c, OSGS_INNER_POLICY,
+                                     diag_cache, iter_count_ref; stage_prefix="C:OSGS", max_swaps=sol_cfg.pingpong_max_swaps)
+            success = initial_success && (v_c == :success)
+        else
+            res_c = safe_fe_solve!(final_x0, FESolver(coupled_nls), op_coupled; backup=x_backup)
             _record_stage!(diag_cache, "C:OSGS:Coupled", res_c)
             if res_c.state == :ok
                 iter_count_ref[] += res_c.iterations
@@ -1012,382 +763,29 @@ function _run_osgs_relaxation!(initial_success, final_x0, X, Y, V_free, Q_free,
             end
             outcome_c = cascade_step_outcome(res_c, OSGS_INNER_POLICY)
             success = initial_success && (outcome_c == :success || outcome_c == :one_iter_success)
-
-            # Final self-consistent projection (for π export / diagnostics).
-            u_h, p_h = final_x0
-            pi_u = discrete_l2_projection(inner_projection_u(u_h, p_h, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2), U_proj, V_proj, dΩ, M_u, num_u_fac)
-            pi_p = discrete_l2_projection(inner_projection_p(u_h, p_h, form, dΩ, h_cf, alpha_cf, g_cf), P_proj, Q_proj, dΩ, M_p, num_p_fac)
-
-            diag_cache["base_convergence_reached"] = true
-            diag_cache["base_convergence_outer_iter"] = 1
-            if !isnothing(mms_cfg) && mms_cfg.enabled
-                E_u2, E_p2, E_u1, E_p1 = mms_cfg.oracle(final_x0...)
-                diag_cache["mms_plateau_reached"] = true
-                diag_cache["mms_stop_reason"] = "coupled_single_solve"
-                budget = mms_cfg.h_local^(mms_cfg.kv + 1)
-                if E_u2 > mms_cfg.rate_check_factor * budget
-                    diag_cache["mms_stop_reason"] = "coupled_at_suboptimal_rate"
-                    println("        [!] Coupled OSGS at sub-optimal rate: E_u2=$E_u2 > $(mms_cfg.rate_check_factor)·h^(kv+1).")
-                end
-            end
         end
-        diag_cache["pi_u"] = pi_u
-        diag_cache["pi_p"] = pi_p
-        return success, pi_u, pi_p, coupled_elapsed
-    end
 
-    # ==============================================================================
-    # [projection-coupling == "freeze_after_k"]  Coupled warm-up, then freeze π and finish.
-    # ------------------------------------------------------------------------------
-    # WARM-UP — `osgs_freeze_after_k` (=k) single-step staggered iterations: each takes ONE Newton step
-    # against the current frozen π, then re-projects π = Π(R(u)). So the projection is refreshed at EVERY
-    # nonlinear iteration for the first k iterations (the lagged map; ~linearly contracting). Because π is
-    # frozen WITHIN each single step, every warm-up step is itself a valid Newton step — the `D=-2Φ`
-    # line-search certificate holds — so no special line-search handling is needed; π only changes BETWEEN
-    # steps.
-    # FREEZE + FINISH — freeze π = π_k (the projection after the k warm-up steps) and run a full Newton solve
-    # to convergence. With π constant the Jacobian is the EXACT tangent of R(·;π_k) (no ∂π/∂u term), so the
-    # finish converges QUADRATICALLY to U*(π_k).
-    # The result U*(π_k) is optimal-RATE for any fixed k — the paper's stability/convergence theory rests on
-    # the π-INDEPENDENT bilinear form B_S, so ASGS (π=0) is already optimal-order and orthogonality only
-    # shrinks the error CONSTANT. k slides the constant from ASGS (k=0) toward OSGS (k→∞); k=2-3 captures
-    # ~all of the OSGS constant gain in ~ASGS iteration counts.
-    # The projection is ALWAYS applied — there is NO ASGS fallback. In the reaction-dominated corner the OSGS
-    # *fixed point itself* is sub-optimal, so those cells honestly show OSGS's (poor) behaviour; that is a
-    # formulation defect (docs/mms/convergence-status.md caveat #5), NOT something this iterator masks.
-    # See docs/solver/efficiency-ideas.md Idea 5.
-    # ==============================================================================
-    if stab_cfg.osgs_projection_coupling == "freeze_after_k"
-        freeze_elapsed = @elapsed begin
-            k_freeze = stab_cfg.osgs_freeze_after_k
-            println("      [+] OSGS FREEZE-AFTER-K mode: $k_freeze projection-updating warm-up step(s) (π refreshed each nonlinear iteration), then freeze π and a quadratic frozen-π finish.")
-            diag_cache["inner_osgs_diagnostics"] = []
-            diag_cache["outer_osgs_diagnostics"] = []
+        # Final self-consistent projection (for π export / diagnostics).
+        u_h, p_h = final_x0
+        pi_u = discrete_l2_projection(inner_projection_u(u_h, p_h, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2), U_proj, V_proj, dΩ, M_u, num_u_fac)
+        pi_p = discrete_l2_projection(inner_projection_p(u_h, p_h, form, dΩ, h_cf, alpha_cf, g_cf), P_proj, Q_proj, dΩ, M_p, num_p_fac)
 
-            # π^0 = 0 (first warm-up step re-derives π from the ASGS state — same bootstrap as the staggered loop).
-            _z_u = allocate_in_domain(M_u); fill!(_z_u, 0.0); pi_u = FEFunction(U_proj, _z_u)
-            _z_p = allocate_in_domain(M_p); fill!(_z_p, 0.0); pi_p = FEFunction(P_proj, _z_p)
-
-            _pp_gain = sol_cfg.pingpong_enabled ? sol_cfg.pingpong_picard_gain_orders : Inf
-            # WARM-UP solver: ONE Newton step per iteration (max_iters=1) ⇒ one projection update per nonlinear
-            # iteration. FINISH solver: the full Newton budget (the quadratic frozen-π solve).
-            warm_solver        = FESolver(_with_overrides(base_nls; max_iters=1))
-            warm_solver_picard = FESolver(_with_overrides(base_nls; max_iters=1, ftol=sol_cfg.picard_handoff_ftol, mode=:picard, picard_gain_target=_pp_gain))
-            finish_solver        = FESolver(base_nls)
-            finish_solver_picard = FESolver(_with_overrides(base_nls; ftol=sol_cfg.picard_handoff_ftol, mode=:picard, picard_gain_target=_pp_gain))
-
-            warmup_cut_short = false
-            for m in 1:k_freeze
-                println("        [Freeze warm-up $m/$k_freeze]  (project π every nonlinear iteration)")
-                res_fn_fz = (x, y) -> build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p)
-                jac_newton_fz = (x, dx, y) -> build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u, pi_p=pi_p)
-                jac_picard_fz = (x, dx, y) -> build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p, mult_mom=1.0, mult_mass=1.0)
-                op_newton_fz = FEOperator(res_fn_fz, jac_newton_fz, X, Y)
-                op_picard_fz = FEOperator(res_fn_fz, jac_picard_fz, X, Y)
-
-                x_prev = copy(get_free_dof_values(final_x0))
-                (_, structurally_failed) = _run_osgs_inner_cascade!(
-                    final_x0, x_prev, op_newton_fz, op_picard_fz,
-                    warm_solver, warm_solver_picard,
-                    diag_cache, iter_count_ref; outer_iter=m,
-                    pingpong_enabled=sol_cfg.pingpong_enabled, pingpong_max_swaps=sol_cfg.pingpong_max_swaps)
-
-                if structurally_failed
-                    println("        [!] Freeze warm-up $m structurally failed — stopping warm-up early; finishing with the current frozen π.")
-                    warmup_cut_short = true
-                    break
-                end
-
-                (x_diff, x_diff_inf) = _compute_state_drift(final_x0, x_prev, X, dΩ, stab_cfg.osgs_state_drift_scale)
-                (pi_u_next, pi_p_next, pi_u_drift, pi_p_drift, R_u_algebraic_norm) = _update_and_project!(
-                    final_x0, pi_u, pi_p, nothing, nothing, form, dΩ,
-                    h_cf, f_cf, alpha_cf, g_cf, c_1, c_2,
-                    U_proj, V_proj, P_proj, Q_proj,
-                    M_u, M_p, num_u_fac, num_p_fac)
-
-                _fz_E = (!isnothing(mms_cfg) && mms_cfg.enabled) ? mms_cfg.oracle(final_x0...) : (NaN, NaN, NaN, NaN)
-                push!(diag_cache["outer_osgs_diagnostics"], (
-                    x_diff_inf = x_diff_inf, x_diff_resolved = x_diff,
-                    pi_u_drift = pi_u_drift, pi_p_drift = pi_p_drift, R_u_norm = R_u_algebraic_norm,
-                    err_u_l2 = _fz_E[1], err_p_l2 = _fz_E[2], err_u_h1 = _fz_E[3], err_p_h1 = _fz_E[4],
-                    pi_u_l2 = sqrt(abs(sum(∫(pi_u_next ⋅ pi_u_next)dΩ))),
-                    pi_p_l2 = sqrt(abs(sum(∫(pi_p_next * pi_p_next)dΩ))),
-                ))
-                println("        * warm-up drift ‖ΔU‖_$(stab_cfg.osgs_state_drift_scale)=$x_diff | π drift u=$pi_u_drift p=$pi_p_drift")
-
-                pi_u = pi_u_next
-                pi_p = pi_p_next
-            end
-
-            # FREEZE + FINISH: π is now frozen at π_k; run the full Newton solve to convergence (quadratic,
-            # since π is constant ⇒ exact tangent ⇒ :newton line-search valid).
-            println("        [Freeze finish] π frozen after warm-up; quadratic frozen-π Newton to convergence.")
-            res_fn_fin = (x, y) -> build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p)
-            jac_newton_fin = (x, dx, y) -> build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u, pi_p=pi_p)
-            jac_picard_fin = (x, dx, y) -> build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p, mult_mom=1.0, mult_mass=1.0)
-            op_newton_fin = FEOperator(res_fn_fin, jac_newton_fin, X, Y)
-            op_picard_fin = FEOperator(res_fn_fin, jac_picard_fin, X, Y)
-
-            x_prev_fin = copy(get_free_dof_values(final_x0))
-            (fin_success, _fin_sf) = _run_osgs_inner_cascade!(
-                final_x0, x_prev_fin, op_newton_fin, op_picard_fin,
-                finish_solver, finish_solver_picard,
-                diag_cache, iter_count_ref; outer_iter=k_freeze + 1,
-                pingpong_enabled=sol_cfg.pingpong_enabled, pingpong_max_swaps=sol_cfg.pingpong_max_swaps)
-
-            # Final self-consistent projection (for π export / diagnostics) + the finish's outer-trace entry.
-            u_h, p_h = final_x0
-            pi_u = discrete_l2_projection(inner_projection_u(u_h, p_h, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2), U_proj, V_proj, dΩ, M_u, num_u_fac)
-            pi_p = discrete_l2_projection(inner_projection_p(u_h, p_h, form, dΩ, h_cf, alpha_cf, g_cf), P_proj, Q_proj, dΩ, M_p, num_p_fac)
-            (x_diff_f, x_diff_inf_f) = _compute_state_drift(final_x0, x_prev_fin, X, dΩ, stab_cfg.osgs_state_drift_scale)
-            _fin_E = (!isnothing(mms_cfg) && mms_cfg.enabled) ? mms_cfg.oracle(final_x0...) : (NaN, NaN, NaN, NaN)
-            push!(diag_cache["outer_osgs_diagnostics"], (
-                x_diff_inf = x_diff_inf_f, x_diff_resolved = x_diff_f,
-                pi_u_drift = 0.0, pi_p_drift = 0.0, R_u_norm = NaN,
-                err_u_l2 = _fin_E[1], err_p_l2 = _fin_E[2], err_u_h1 = _fin_E[3], err_p_h1 = _fin_E[4],
-                pi_u_l2 = sqrt(abs(sum(∫(pi_u ⋅ pi_u)dΩ))),
-                pi_p_l2 = sqrt(abs(sum(∫(pi_p * pi_p)dΩ))),
-            ))
-
-            success = initial_success && fin_success
-            diag_cache["base_convergence_reached"] = true
-            diag_cache["base_convergence_outer_iter"] = k_freeze + 1
+        diag_cache["base_convergence_reached"] = true
+        diag_cache["base_convergence_outer_iter"] = 1
+        if !isnothing(mms_cfg) && mms_cfg.enabled
+            E_u2, E_p2, E_u1, E_p1 = mms_cfg.oracle(final_x0...)
             diag_cache["mms_plateau_reached"] = true
-            diag_cache["mms_stop_reason"] = warmup_cut_short ? "freeze_after_k_warmup_cut_short" : "freeze_after_k"
-            if !isnothing(mms_cfg) && mms_cfg.enabled
-                E_u2, E_p2, E_u1, E_p1 = mms_cfg.oracle(final_x0...)
-                budget = mms_cfg.h_local^(mms_cfg.kv + 1)
-                if E_u2 > mms_cfg.rate_check_factor * budget
-                    diag_cache["mms_stop_reason"] = "freeze_after_k_at_suboptimal_rate"
-                    println("        [!] Freeze-after-k at sub-optimal rate: E_u2=$E_u2 > $(mms_cfg.rate_check_factor)·h^(kv+1) — the reaction-dominated OSGS fixed-point defect (convergence-status.md caveat #5), shown honestly (no ASGS fallback).")
-                end
+            diag_cache["mms_stop_reason"] = "coupled_single_solve"
+            budget = mms_cfg.h_local^(mms_cfg.kv + 1)
+            if E_u2 > mms_cfg.rate_check_factor * budget
+                diag_cache["mms_stop_reason"] = "coupled_at_suboptimal_rate"
+                println("        [!] Coupled OSGS at sub-optimal rate: E_u2=$E_u2 > $(mms_cfg.rate_check_factor)·h^(kv+1).")
             end
         end
-        diag_cache["pi_u"] = pi_u
-        diag_cache["pi_p"] = pi_p
-        return success, pi_u, pi_p, freeze_elapsed
     end
-
-    elapsed = @elapsed begin
-        local accel_u = nothing
-        local accel_p = nothing
-        if sol_cfg.accelerator.type == "Anderson"
-            println("      [+] Initializing Blocked Anderson Acceleration (m = $(sol_cfg.accelerator.m), damping = $(sol_cfg.accelerator.relaxation_factor), safety = $(sol_cfg.accelerator.safety_factor))")
-            accel_u = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor, sol_cfg.accelerator.safety_factor, M_u)
-            accel_p = AndersonAccelerator(sol_cfg.accelerator.m, sol_cfg.accelerator.relaxation_factor, sol_cfg.accelerator.safety_factor, M_p)
-        end
-
-        # Initialize the orthogonal projection π_h^0 = 0. The first OSGS outer
-        # iteration then re-solves U_h against π_h = 0 — which IS the ASGS problem,
-        # already converged — and produces the first non-trivial projection naturally.
-        # Avoids the off-distribution bootstrap that the warmup phase had to unwind.
-        println("        * Initializing orthogonal projection π_h^0 = 0 (first iter re-derives from ASGS state)...")
-        x_u = allocate_in_domain(M_u); fill!(x_u, 0.0)
-        x_p = allocate_in_domain(M_p); fill!(x_p, 0.0)
-        pi_u = FEFunction(U_proj, x_u)
-        pi_p = FEFunction(P_proj, x_p)
-
-        diag_cache["inner_osgs_diagnostics"] = []
-        diag_cache["outer_osgs_diagnostics"] = []
-
-        for osgs_iter in 1:eff_osgs_iters
-            println("        [OSGS Iter $osgs_iter]")
-
-            # [code-actual] Scale-covariant OSGS warmup. During the first `osgs_warmup_iterations` outer
-            # iters the inner solve is loosened via the per-field RELATIVE target: `osgs_warmup_tolerance`
-            # is a DIMENSIONLESS relative-reduction target `‖R_k‖ ≤ osgs_warmup_tolerance·‖R₀_k‖`, looser
-            # than the normal per-field target and encoding-invariant. (An absolute warmup ftol would be
-            # dimensional against a residual ∝U/∝P_c and break OSGS covariance — guarded by
-            # encoding_invariance_test.jl.) Outside warmup the normal per-field target applies.
-            warmup_rel = (osgs_iter <= stab_cfg.osgs_warmup_iterations && base_nls.relative_ftol_per_field !== nothing) ?
-                fill(stab_cfg.osgs_warmup_tolerance, length(base_nls.relative_ftol_per_field)) : nothing
-
-            local_osgs_nls = _with_overrides(base_nls; max_iters=stab_cfg.osgs_inner_newton_iters, relative_ftol_per_field=warmup_rel)
-            local_fesolver = FESolver(local_osgs_nls)
-
-            # [P4] When ping-pong is enabled the inner Picard carries the gain-then-return target so it
-            # stops the moment it re-enters Newton's basin; Inf (default) ⇒ legacy Picard (run to handoff/cap).
-            _pp_gain = sol_cfg.pingpong_enabled ? sol_cfg.pingpong_picard_gain_orders : Inf
-            local_osgs_nls_picard = _with_overrides(base_nls; max_iters=stab_cfg.osgs_inner_newton_iters, ftol=sol_cfg.picard_handoff_ftol, mode=:picard, relative_ftol_per_field=warmup_rel, picard_gain_target=_pp_gain)
-            local_fesolver_picard = FESolver(local_osgs_nls_picard)
-
-            res_fn_osgs(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p)
-            jac_newton_osgs(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u, pi_p=pi_p)
-            jac_picard_osgs(x, dx, y) = build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=pi_u, pi_p=pi_p, mult_mom=1.0, mult_mass=1.0)
-
-            op_newton_osgs = FEOperator(res_fn_osgs, jac_newton_osgs, X, Y)
-            op_picard_osgs = FEOperator(res_fn_osgs, jac_picard_osgs, X, Y)
-
-            x_prev = copy(get_free_dof_values(final_x0))
-
-            (inner_success, structurally_failed) = _run_osgs_inner_cascade!(
-                final_x0, x_prev, op_newton_osgs, op_picard_osgs,
-                local_fesolver, local_fesolver_picard,
-                diag_cache, iter_count_ref; outer_iter=osgs_iter,
-                pingpong_enabled=sol_cfg.pingpong_enabled, pingpong_max_swaps=sol_cfg.pingpong_max_swaps)
-
-            if structurally_failed
-                success = false
-                break
-            end
-
-            (x_diff, x_diff_inf) = _compute_state_drift(final_x0, x_prev, X, dΩ, stab_cfg.osgs_state_drift_scale)
-
-            (pi_u_next, pi_p_next, pi_u_drift, pi_p_drift, R_u_algebraic_norm) = _update_and_project!(
-                final_x0, pi_u, pi_p, accel_u, accel_p, form, dΩ,
-                h_cf, f_cf, alpha_cf, g_cf, c_1, c_2,
-                U_proj, V_proj, P_proj, Q_proj,
-                M_u, M_p, num_u_fac, num_p_fac)
-
-            # [trace-enrichment] Capture, per outer iteration, the MMS error (the accuracy trajectory — shows
-            # where the error plateaus, independent of the drift gate that never fires) and the projection L2
-            # norms ‖π_u‖/‖π_p‖ (to see whether the projection itself limit-cycles or only U_h does). The MMS
-            # error is the quantity we ultimately verify; recording it every outer iter (not only after the
-            # never-reached drift-base-convergence) makes the OSGS staggered loop's convergence vs limit-cycle
-            # behaviour fully diagnosable from the structured trace alone — no log-scraping. Only when the
-            # oracle is available (MMS verification runs); a few extra integrals per outer iter.
-            _osgs_E = (!isnothing(mms_cfg) && mms_cfg.enabled) ? mms_cfg.oracle(final_x0...) : (NaN, NaN, NaN, NaN)
-            _pi_u_l2 = sqrt(abs(sum(∫(pi_u_next ⋅ pi_u_next)dΩ)))
-            _pi_p_l2 = sqrt(abs(sum(∫(pi_p_next * pi_p_next)dΩ)))
-            push!(diag_cache["outer_osgs_diagnostics"], (
-                x_diff_inf = x_diff_inf,
-                x_diff_resolved = x_diff,
-                pi_u_drift = pi_u_drift,
-                pi_p_drift = pi_p_drift,
-                R_u_norm = R_u_algebraic_norm,
-                err_u_l2 = _osgs_E[1],
-                err_p_l2 = _osgs_E[2],
-                err_u_h1 = _osgs_E[3],
-                err_p_h1 = _osgs_E[4],
-                pi_u_l2 = _pi_u_l2,
-                pi_p_l2 = _pi_p_l2,
-            ))
-
-            overall_converged = _decide_osgs_convergence(
-                x_diff, x_diff_inf, pi_u_drift, pi_p_drift,
-                osgs_iter, stab_cfg, osgs_tol, stagnation_tol)
-
-            println("        * Comparing limits against previous relaxation step: \n          x_diff_inf = $x_diff_inf | x_diff_mode_$(stab_cfg.osgs_state_drift_scale) = $x_diff \n          pi_u_drift = $pi_u_drift | pi_p_drift = $pi_p_drift \n          overall_converged = $overall_converged")
-
-            if overall_converged
-                pi_u = pi_u_next
-                pi_p = pi_p_next
-
-                if !get(diag_cache, "base_convergence_reached", false)
-                    println("        [+] OSGS Base Staggered Fixed-Point nominally mathematically converged natively!")
-                    diag_cache["base_convergence_reached"] = true
-                    # [trajectory] outer-iteration index at which the OSGS staggered loop first
-                    # base-converged; outer iters AFTER this are MMS plateau-verification re-solves.
-                    diag_cache["base_convergence_outer_iter"] = osgs_iter
-
-                    if !isnothing(mms_cfg) && mms_cfg.enabled
-                        diag_cache["mms_error_history"] = []
-                        diag_cache["mms_relative_change_history"] = []
-                        diag_cache["mms_consecutive_passes"] = 0
-
-                        E_u2_0, E_p2_0, E_u1_0, E_p1_0 = mms_cfg.oracle(final_x0...)
-                        push!(diag_cache["mms_error_history"], (E_u2_0, E_p2_0, E_u1_0, E_p1_0))
-                    end
-                else
-                    if !isnothing(mms_cfg) && mms_cfg.enabled
-                        E_u2_k, E_p2_k, E_u1_k, E_p1_k = mms_cfg.oracle(final_x0...)
-                        mms_err_hist = diag_cache["mms_error_history"]
-                        push!(mms_err_hist, (E_u2_k, E_p2_k, E_u1_k, E_p1_k))
-
-                        E_u2_prev, E_p2_prev, E_u1_prev, E_p1_prev = mms_err_hist[end-1]
-
-                        # §5.1: h-scaled plateau floors (see ASGS site for full comment).
-                        eps_u_l2_eff = mms_cfg.eps_u_l2 * mms_cfg.h_local^(mms_cfg.kv + 1)
-                        eps_u_h1_eff = mms_cfg.eps_u_h1 * mms_cfg.h_local^mms_cfg.kv
-                        eps_p_l2_eff = mms_cfg.eps_p_l2 * mms_cfg.h_local^(mms_cfg.kv + 1)
-
-                        r_u2 = abs(E_u2_k - E_u2_prev) / max(E_u2_k, E_u2_prev, eps_u_l2_eff)
-                        r_u1 = abs(E_u1_k - E_u1_prev) / max(E_u1_k, E_u1_prev, eps_u_h1_eff)
-                        r_p2 = abs(E_p2_k - E_p2_prev) / max(E_p2_k, E_p2_prev, eps_p_l2_eff)
-
-                        mms_rc_hist = diag_cache["mms_relative_change_history"]
-                        push!(mms_rc_hist, (r_u2, r_p2, r_u1))
-                        max_r = max(r_u2, r_u1, r_p2)
-
-                        println("        * [Verification Cycle] Plateau max ratio: $max_r (Target: $(mms_cfg.tau_err))")
-
-                        pass_count = diag_cache["mms_consecutive_passes"]
-                        if max_r < mms_cfg.tau_err
-                            pass_count += 1
-                        else
-                            pass_count = 0
-                        end
-                        diag_cache["mms_consecutive_passes"] = pass_count
-
-                        # [P2] Machine-floor plateau short-circuit. Once the state drift has reached the
-                        # TIGHT machine floor (x_diff ≤ osgs_tol, NOT the looser max(osgs_tol, stagnation_tol)),
-                        # U_h is at a fixed point, so the MMS error (a deterministic function of U_h) provably
-                        # cannot change on the next cycle — re-confirming the plateau `require_consecutive_passes`
-                        # times is wasted work. Accept a single passing check instead. This does NOT loosen any
-                        # tolerance (max_r < tau_err must still hold this cycle); it recognizes a provably-static
-                        # quantity. Guard rails: opt-in (default off); state_drift mode only (in
-                        # projection_drift/both the projection may still be moving); tight osgs_tol only (a
-                        # stagnation_tol-level x_diff may be stalled, not converged). Hard cells (e.g. Re=1,Da=1e6)
-                        # never reach x_diff ≤ osgs_tol, so they are untouched.
-                        eff_required_passes = mms_cfg.require_consecutive_passes
-                        if sol_cfg.osgs_plateau_machine_floor_shortcut &&
-                           stab_cfg.osgs_stopping_mode == "state_drift" && x_diff <= osgs_tol
-                            eff_required_passes = 1
-                            if pass_count >= 1 && pass_count < mms_cfg.require_consecutive_passes
-                                println("        [P2] Machine-floor plateau short-circuit: state frozen (x_diff=$x_diff ≤ osgs_tol=$osgs_tol); accepting plateau after $pass_count pass(es) instead of $(mms_cfg.require_consecutive_passes).")
-                            end
-                        end
-
-                        if pass_count >= eff_required_passes
-                            println("        [+] OSGS MMS Plateau formally established natively ($pass_count consecutive < $(mms_cfg.tau_err)).")
-                            diag_cache["mms_plateau_reached"] = true
-                            diag_cache["mms_stop_reason"] = "mms_plateau_satisfied"
-
-                            # §5.2: rate-aware sanity check (see ASGS site for full comment).
-                            budget = mms_cfg.h_local^(mms_cfg.kv + 1)
-                            if E_u2_k > mms_cfg.rate_check_factor * budget
-                                diag_cache["mms_stop_reason"] = "mms_plateau_at_suboptimal_rate"
-                                println("        [!] Plateau at sub-optimal rate: E_u2=$E_u2_k > $(mms_cfg.rate_check_factor) × h^(kv+1)=$(mms_cfg.rate_check_factor * budget). Flagged for inspection.")
-                            end
-
-                            success = true
-                            break
-                        end
-                    end
-                end
-
-                if isnothing(mms_cfg) || !mms_cfg.enabled
-                    println("        [+] OSGS Staggered Fixed-Point loop successfully converged structurally within mathematical boundaries!")
-                    diag_cache["mms_stop_reason"] = "base_convergence_only"
-                    success = true
-                    break
-                end
-            else
-                if !isnothing(mms_cfg) && mms_cfg.enabled
-                    diag_cache["mms_consecutive_passes"] = 0
-                end
-            end
-
-            pi_u = pi_u_next
-            pi_p = pi_p_next
-        end
-    end
-
-    # Post-loop MMS budget exhaustion check (M9 deviation: kept inside H7 rather than in
-    # solve_system, so Algorithm C's terminal logic stays in one place).
-    # Runs outside @elapsed, so it is excluded from `eval_time`.
-    if !isnothing(mms_cfg) && mms_cfg.enabled
-        if get(diag_cache, "base_convergence_reached", false) && !get(diag_cache, "mms_plateau_reached", false)
-            println("        [!] OSGS hit maximum extended cycle boundaries without formal plateau verification. Assuming base convergence.")
-            diag_cache["mms_stop_reason"] = "mms_budget_exhausted"
-            success = true
-        end
-    end
-
     diag_cache["pi_u"] = pi_u
     diag_cache["pi_p"] = pi_p
-
-    return success, pi_u, pi_p, elapsed
+    return success, pi_u, pi_p, coupled_elapsed
 end
 
 """
@@ -1444,7 +842,9 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     # ==============================================================================
     res_fn_init(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing)
     jac_picard_init(x, dx, y) = build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
-    jac_newton_init(x, dx, y) = build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=nothing, pi_p=nothing)
+    jac_newton_init(x, dx, y) = sol_cfg.ablation_mode == "picard_only" ?
+        build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0) :
+        build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=nothing, pi_p=nothing)
 
     op_picard_init = FEOperator(res_fn_init, jac_picard_init, X, Y)
     op_newton_init = FEOperator(res_fn_init, jac_newton_init, X, Y)

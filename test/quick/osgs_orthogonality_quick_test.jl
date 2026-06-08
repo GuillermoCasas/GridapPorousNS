@@ -145,11 +145,7 @@ using JSON3
         cfg_dict["numerical_method"]["stabilization"] = Dict{String, Any}(
             "method" => method,
             "osgs_iterations" => 25,
-            "osgs_inner_newton_iters" => cfg.numerical_method.stabilization.osgs_inner_newton_iters,
-            "osgs_tolerance" => 1e-7,
-            "osgs_stopping_mode" => cfg.numerical_method.stabilization.osgs_stopping_mode,
-            "osgs_projection_tolerance" => cfg.numerical_method.stabilization.osgs_projection_tolerance,
-            "osgs_state_drift_scale" => cfg.numerical_method.stabilization.osgs_state_drift_scale
+            "osgs_tolerance" => 1e-7
         )
         local_cfg = PorousNSSolver.load_config_from_dict(cfg_dict)
         diag_cache = Dict{String, Any}()

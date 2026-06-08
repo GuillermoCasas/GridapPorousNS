@@ -244,15 +244,7 @@ function execute_outer_homotopy_perturbation_loop!(
         local_stab_cfg = PorousNSSolver.StabilizationConfig(
             method=method,
             osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
-            osgs_inner_newton_iters=config.numerical_method.stabilization.osgs_inner_newton_iters,
-            osgs_tolerance=dynamic_ftol,
-            osgs_stopping_mode=config.numerical_method.stabilization.osgs_stopping_mode,
-            osgs_projection_tolerance=dynamic_ftol,
-            osgs_state_drift_scale=config.numerical_method.stabilization.osgs_state_drift_scale,
-            osgs_warmup_iterations=config.numerical_method.stabilization.osgs_warmup_iterations,
-            osgs_warmup_tolerance=config.numerical_method.stabilization.osgs_warmup_tolerance,
-            osgs_projection_coupling=config.numerical_method.stabilization.osgs_projection_coupling,
-            osgs_freeze_after_k=config.numerical_method.stabilization.osgs_freeze_after_k
+            osgs_tolerance=dynamic_ftol
         )
         
         local_diagnostics_cache = Dict{String, Any}()
@@ -465,8 +457,7 @@ function run_mms(config_file="test_config.json")
                             "element_spaces" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
                             "mesh" => Dict("element_type" => String(etype), "partition" => [n, n]),
                             "stabilization" => Dict(
-                                "method" => "ASGS", 
-                                "osgs_inner_newton_iters" => get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3)
+                                "method" => "ASGS"
                             ),
                             "solver" => get(get(test_dict, "numerical_method", Dict()), "solver", Dict())
                         )

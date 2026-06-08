@@ -7,10 +7,8 @@
 # encodings of one cell should agree to ~roundoff. (Literal bit-identity is only achievable for
 # power-of-two scalings; for the harness's √(Da)-style encodings we check a tight relative tolerance.)
 #
-# This guards scale-covariance. ASGS is expected to hold it. OSGS is under investigation
-# (docs/mms/next-actions.md, 2026-06-02): the OSGS staggered loop is encoding-dependent at extreme Da,
-# so its case here is marked `@test_broken` if it violates the invariant — turning the known defect
-# into a tracked, self-announcing regression marker rather than a silent failure.
+# This guards scale-covariance. Both ASGS and OSGS now hold it (after the eps_val + inner-gate
+# covariance fixes, docs/lessons_learned.md 2026-06-02), so both are checked with a tight @test below.
 #
 # Cell chosen non-extreme but nontrivial: Re=10 (mild inertia), Da=2 (≠1 so the encodings give
 # genuinely different L and U), α₀=0.5 (mid porosity). Small N for speed.
@@ -25,17 +23,16 @@ const _INV_NS = [4]
 # Threshold near roundoff. Two covariance bugs were found and fixed (docs/lessons_learned.md 2026-06-02):
 #   • ASGS: the DIMENSIONAL pressure penalty `eps_val` was injected as a fixed 1e-8 for every encoding;
 #     scaling it covariantly (eps_val = ε̂·(U/L)/P_c in build_mms_formulation) → ASGS covariant to ~1e-10.
-#   • OSGS: the inner-Newton stop was encoding-dependent — (a) the per-field gate normalised by ‖x_k‖
-#     (∝U, ∝P_c∝U² for pressure) and (b) the absolute warmup tolerance 1e-3. With OSGS's 1-step
-#     staggering this left the iterates non-covariant (worst in pressure, ≈2e-2). Fix: per-field gate
-#     normalised by the INITIAL residual ‖R₀_k‖ (nonlinear.jl) + osgs_warmup_iterations=0 (configs)
-#     → OSGS covariant to ~1e-10. BOTH methods must now hold to ≤_INV_RTOL — this guards both fixes.
+#   • OSGS: the inner-Newton stop was encoding-dependent — the per-field gate normalised by ‖x_k‖
+#     (∝U, ∝P_c∝U² for pressure) left the iterates non-covariant (worst in pressure, ≈2e-2). Fix:
+#     per-field gate normalised by the INITIAL residual ‖R₀_k‖ (nonlinear.jl) → OSGS covariant to
+#     ~1e-10. BOTH methods must now hold to ≤_INV_RTOL — this guards both fixes.
 const _INV_RTOL = 1e-8
 
 "Write a one-cell config that differs from the others ONLY in `encoding_strategy`, return its filename.
-`coupling`/`methods` default to the legacy staggered ASGS+OSGS run; the freeze_after_k case overrides them."
+`methods` defaults to an ASGS+OSGS run."
 function _write_inv_config(enc::String, h5name::String;
-                           coupling::String="staggered", methods::Vector{String}=["ASGS", "OSGS"], tag::String="")
+                           methods::Vector{String}=["ASGS", "OSGS"], tag::String="")
     cfg = JSON3.read(read(joinpath(_MMS_DIR, "data", "phase1_quad_k1.json"), String), Dict{String,Any})
     cfg["mms_verification_enabled"] = false
     cfg["physical_properties"]["Re"] = [_INV_RE]
@@ -46,7 +43,6 @@ function _write_inv_config(enc::String, h5name::String;
     cfg["numerical_method"]["mesh"]["convergence_partitions"] = _INV_NS
     cfg["numerical_method"]["mesh"]["element_type"] = ["QUAD"]
     cfg["numerical_method"]["stabilization"]["method"] = methods
-    cfg["numerical_method"]["stabilization"]["osgs_projection_coupling"] = coupling
     cfg["encoding_strategy"] = enc
     cfg["h5_filename"] = h5name
     cfg["skip_cells"] = Any[]
@@ -102,34 +98,5 @@ end
     # cleanup scratch configs (the results HDF5 / traces live under gitignored results/)
     for enc in ("centered", "minmax")
         rm(joinpath(_MMS_DIR, "data", "_inv_$(enc).json"); force=true)
-    end
-end
-
-@testset "encoding invariance: freeze_after_k gate + frozen solution (Re=$_INV_RE, Da=$_INV_DA, α=$_INV_A0)" begin
-    # [must-test] The freeze_after_k ASGS-fallback gate uses the RATIO ‖∇ΔU‖/‖∇U^0‖, which must be
-    # encoding-invariant (it is — both norms scale identically; the only non-covariant element, a dimensional
-    # floor on ‖∇U^0‖, was removed). If it were NOT, the SAME cell under two encodings could compute different
-    # relative drifts → flip the gate decision (fallback vs frozen) → diverge. This cell is mild, so the gate
-    # stays open under both encodings; the test confirms the frozen-k solution (and thus the in-between gate
-    # computation) is scale-covariant to the same tolerance as ASGS/OSGS.
-    run_mms(_write_inv_config("centered", "debug_results/_inv_frz_centered.h5";
-                              coupling="freeze_after_k", methods=["OSGS"], tag="_frz"))
-    run_mms(_write_inv_config("minmax",   "debug_results/_inv_frz_minmax.h5";
-                              coupling="freeze_after_k", methods=["OSGS"], tag="_frz"))
-
-    cpath = joinpath(_MMS_DIR, "results", "debug_results", "_inv_frz_centered.h5")
-    mpath = joinpath(_MMS_DIR, "results", "debug_results", "_inv_frz_minmax.h5")
-
-    for field in ("err_u_l2", "err_u_h1", "err_p_l2")
-        ec = _read_method_errors(cpath, field)
-        em = _read_method_errors(mpath, field)
-        @test haskey(ec, "OSGS") && haskey(em, "OSGS")
-        reldiff = maximum(abs.(ec["OSGS"] .- em["OSGS"]) ./ max.(abs.(em["OSGS"]), eps()))
-        @info "freeze_after_k scale-covariance check" field reldiff centered=ec["OSGS"] minmax=em["OSGS"]
-        @test reldiff <= _INV_RTOL
-    end
-
-    for enc in ("centered", "minmax")
-        rm(joinpath(_MMS_DIR, "data", "_inv_$(enc)_frz.json"); force=true)
     end
 end

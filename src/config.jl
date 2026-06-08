@@ -39,36 +39,13 @@ end
 
 Base.@kwdef struct StabilizationConfig
     method::String
+    # OSGS runs a single coupled solve: π = Π(R(u)) re-projected at every residual evaluation, with a
+    # frozen-π (sparse, local) Jacobian — see src/solvers/porous_solver.jl. `osgs_iterations` bounds
+    # that coupled Newton; `osgs_tolerance` is its convergence target. (The staggered/freeze_after_k
+    # coupling modes + their drift/warm-up/inner-cap satellite were removed in the 2026-06-08
+    # coupled-only leaning — see docs/solver/coupled-only-leaning-and-jfnk-plan.md.)
     osgs_iterations::Int
-    osgs_inner_newton_iters::Int
     osgs_tolerance::Float64
-    osgs_stopping_mode::String
-    osgs_projection_tolerance::Float64
-    osgs_state_drift_scale::String
-    osgs_warmup_iterations::Int
-    osgs_warmup_tolerance::Float64
-    # [projection-coupling] How the OSGS orthogonal projection π is coupled to the nonlinear solve:
-    #   "staggered" (default, paper alg:StationarySystem) — outer fixed-point loop: freeze π, run the
-    #       inner Newton, then update π = Π(R(U)). The frozen-π lag makes the map contract only linearly
-    #       (~0.75/iter) and an aggressive accelerator can destabilise it into a limit cycle.
-    #   "coupled"  — a SINGLE Newton solve in which the residual recomputes π = Π(R(u)) at EVERY nonlinear
-    #       iteration (no staggering lag), while the Jacobian stays the LOCAL frozen-π form (sparse — NOT the
-    #       prohibitive monolithic ∂π/∂u). A Picard-type coupling whose per-eval projection is the cheap
-    #       Cholesky-cached mass solve; intended to make OSGS converge in ~ASGS iteration counts.
-    #   "freeze_after_k" — `osgs_freeze_after_k` (=k) single-step warm-up iterations that refresh the
-    #       projection π = Π(R(u)) at EVERY nonlinear iteration, then FREEZE π and run a full frozen-π Newton
-    #       solve to convergence. With π frozen the Jacobian is the exact tangent, so the finish converges
-    #       quadratically. Verified: U*(π_k) is optimal-RATE for any fixed k (orthogonality buys a smaller
-    #       error CONSTANT, not a rate — ASGS is already optimal-order), and k=2-3 captures ~all of the OSGS
-    #       constant-advantage in ~ASGS iteration counts. The projection is ALWAYS applied (no ASGS fallback);
-    #       in the reaction-dominated corner the OSGS fixed point is itself sub-optimal, so those cells show
-    #       OSGS's (poor) behaviour honestly — a formulation defect, not an iterator one. See
-    #       docs/solver/efficiency-ideas.md Idea 5.
-    osgs_projection_coupling::String
-    # [freeze_after_k] Number of projection-updating warm-up iterations before freezing π (k ≥ 1): π is
-    # refreshed at each of the first k nonlinear iterations, then frozen for the quadratic finish. Inert
-    # unless osgs_projection_coupling == "freeze_after_k". (Pure ASGS is obtained via method="ASGS".)
-    osgs_freeze_after_k::Int
 end
 
 Base.@kwdef struct MeshConfig
@@ -190,11 +167,6 @@ function validate!(cfg::PorousNSConfig)
     @assert stab.method in ("ASGS", "OSGS") "Stabilization method must be ASGS or OSGS"
     @assert stab.osgs_iterations >= 1
     @assert stab.osgs_tolerance > 0
-    @assert stab.osgs_projection_tolerance > 0
-    @assert stab.osgs_stopping_mode in ("state_drift", "projection_drift", "both") "osgs_stopping_mode must be 'state_drift', 'projection_drift', or 'both'"
-    @assert stab.osgs_state_drift_scale in ("Linf", "L2_mass") "osgs_state_drift_scale must be 'Linf' or 'L2_mass'"
-    @assert stab.osgs_projection_coupling in ("staggered", "coupled", "freeze_after_k") "osgs_projection_coupling must be 'staggered', 'coupled', or 'freeze_after_k'"
-    @assert stab.osgs_freeze_after_k >= 1 "osgs_freeze_after_k must be >= 1 (number of projection-updating warm-up iterations before freezing π)"
 
     # Formulation Operator validation
     @assert cfg.numerical_method.viscous_operator_type in ("DeviatoricSymmetric", "SymmetricGradient", "Laplacian") "viscous_operator_type strictly expects DeviatoricSymmetric, SymmetricGradient, or Laplacian"

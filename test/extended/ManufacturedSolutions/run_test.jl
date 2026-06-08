@@ -181,8 +181,13 @@ end
 
 # Sets up the specific continuous VMS mathematical behavior for the Manufactured Solution
 function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
-    # Define exact residual projections enforcing strictly positive stabilization operators
-    proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
+    # [audit 2026-06] Projection policy is config-driven (mirrors src/run_simulation.jl:42-45): trim the
+    # reaction from the orthogonal projection ONLY when experimental_reaction_mode=="standard" (constant
+    # sigma); otherwise project the FULL residual. Lets the harness A/B trim vs full-residual OSGS — the
+    # decisive test of whether (I-Pi)(sigma*u_h)=0 actually holds for the implemented V_free projection.
+    proj = config.numerical_method.solver.experimental_reaction_mode == "standard" ?
+           PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma() :
+           PorousNSSolver.ProjectFullResidual()
     
     # Establish velocity regularization parameters strictly from configuration
     reg = PorousNSSolver.SmoothVelocityFloor(
@@ -345,15 +350,7 @@ function execute_outer_homotopy_perturbation_loop!(
         local_stab_cfg = PorousNSSolver.StabilizationConfig(
             method=method,
             osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
-            osgs_inner_newton_iters=config.numerical_method.stabilization.osgs_inner_newton_iters,
-            osgs_tolerance=dynamic_ftol,
-            osgs_stopping_mode=config.numerical_method.stabilization.osgs_stopping_mode,
-            osgs_projection_tolerance=dynamic_ftol,
-            osgs_state_drift_scale=config.numerical_method.stabilization.osgs_state_drift_scale,
-            osgs_warmup_iterations=config.numerical_method.stabilization.osgs_warmup_iterations,
-            osgs_warmup_tolerance=config.numerical_method.stabilization.osgs_warmup_tolerance,
-            osgs_projection_coupling=config.numerical_method.stabilization.osgs_projection_coupling,
-            osgs_freeze_after_k=config.numerical_method.stabilization.osgs_freeze_after_k
+            osgs_tolerance=dynamic_ftol
         )
         
         local_diagnostics_cache = Dict{String, Any}()
@@ -774,8 +771,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                         "element_spaces" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
                                         "mesh" => Dict("element_type" => String(etype), "partition" => [n, n]),
                                         "stabilization" => Dict(
-                                            "method" => "ASGS",
-                                            "osgs_inner_newton_iters" => get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3)
+                                            "method" => "ASGS"
                                         ),
                                         "solver" => get(get(test_dict, "numerical_method", Dict()), "solver", Dict())
                                     )
@@ -1011,36 +1007,10 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     # method AND propagate the test JSON's OSGS-specific overrides
                                     # (osgs_iterations / osgs_tolerance / etc., which would otherwise be
                                     # silently inherited from base_config.json defaults).
-                                    # [osgs-dynamic-widening 2026-06-01] Extend the high-Re Newton
-                                    # iteration widening (applied to `local_newton_it` above) to the OSGS
-                                    # *inner* Newton solve as well — there is no principled reason the
-                                    # dynamic budget should privilege the ASGS/standalone-Newton path
-                                    # ("why make a difference between both methods?"). Without this the OSGS
-                                    # inner solve stays capped at the configured `osgs_inner_newton_iters`
-                                    # (e.g. 1) even at Re≫1, so it stalls far from the root — C20/C24 showed
-                                    # OSGS ‖R‖~1e6 vs ASGS ~1e0. Reuses the SAME dynamic_newton_re_threshold /
-                                    # dynamic_newton_re_iterations knobs (no new parameters).
-                                    osgs_inner_base = get(stab_dict, "osgs_inner_newton_iters",
-                                        get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_inner_newton_iters", 3))
-                                    osgs_inner_eff = osgs_inner_base
-                                    if Re >= config.numerical_method.solver.dynamic_newton_re_threshold
-                                        osgs_inner_eff = max(osgs_inner_eff, config.numerical_method.solver.dynamic_newton_re_iterations)
-                                    end
                                     method_stab_dict = Dict{String,Any}(
                                         "method" => String(method),
                                         "osgs_iterations"          => get(stab_dict, "osgs_iterations", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_iterations", 3)),
-                                        "osgs_inner_newton_iters"  => osgs_inner_eff,
                                         "osgs_tolerance"           => get(stab_dict, "osgs_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_tolerance", 1e-5)),
-                                        "osgs_projection_tolerance" => get(stab_dict, "osgs_projection_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_projection_tolerance", 1e-5)),
-                                        "osgs_stopping_mode"       => get(stab_dict, "osgs_stopping_mode", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_stopping_mode", "state_drift")),
-                                        "osgs_state_drift_scale"   => get(stab_dict, "osgs_state_drift_scale", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_state_drift_scale", "Linf")),
-                                        "osgs_warmup_iterations"   => get(stab_dict, "osgs_warmup_iterations", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_warmup_iterations", 2)),
-                                        "osgs_warmup_tolerance"    => get(stab_dict, "osgs_warmup_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_warmup_tolerance", 1e-3)),
-                                        # Propagate the projection-coupling mode (else the per-method rebuild silently drops it
-                                        # and the base_config default "staggered" wins — the 2026-05-26 field-drop bug class).
-                                        "osgs_projection_coupling" => get(stab_dict, "osgs_projection_coupling", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_projection_coupling", "staggered")),
-                                        # [freeze_after_k] propagate the warm-up k-budget (same field-drop guard).
-                                        "osgs_freeze_after_k" => get(stab_dict, "osgs_freeze_after_k", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_freeze_after_k", 2)),
                                     )
                                     method_config_dict = deepcopy(config_dict)
                                     method_config_dict["numerical_method"]["stabilization"] = method_stab_dict

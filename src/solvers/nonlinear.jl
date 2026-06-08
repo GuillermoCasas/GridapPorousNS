@@ -107,7 +107,8 @@ end
 # value". Replaces the previous verbose field-by-field SafeNewtonSolver()
 # rebuilds, which were vulnerable to silently dropping new struct fields.
 function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing, mode=nothing,
-                         relative_ftol_per_field=nothing, picard_gain_target=nothing)
+                         relative_ftol_per_field=nothing, picard_gain_target=nothing,
+                         stall_window=nothing, stall_min_rel_improvement=nothing)
     return SafeNewtonSolver(
         nls.ls,
         isnothing(max_iters) ? nls.max_iters : max_iters,
@@ -125,8 +126,12 @@ function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing,
         # `relative_ftol_per_field` override (covariant OSGS warmup relaxation): nothing ⇒ keep base.
         isnothing(relative_ftol_per_field) ? nls.relative_ftol_per_field : relative_ftol_per_field,
         nls.relative_stagnation_noise_floor_per_field,
-        nls.stall_window,
-        nls.stall_min_rel_improvement,
+        # `stall_window` override: the Stage-I boot wants the early-bail stall sensor (cold-start
+        # oscillation/divergence → Picard), but the Stage-II coupled solve converges SLOWLY-MONOTONE
+        # (inexact-Newton linear rate); the stall sensor would mistake slow progress for a stall and bail,
+        # silently degenerating OSGS into ASGS. So the coupled solve passes stall_window=0 to disable it.
+        isnothing(stall_window) ? nls.stall_window : stall_window,
+        isnothing(stall_min_rel_improvement) ? nls.stall_min_rel_improvement : stall_min_rel_improvement,
         # `picard_gain_target` override (P4 ping-pong Picard segment): nothing ⇒ keep base (Inf = inert).
         # MUST be threaded — the OSGS-inner Picard is rebuilt via this helper, so dropping it would
         # silently disable ping-pong on the OSGS path.

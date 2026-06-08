@@ -210,85 +210,11 @@
                 3
               ]
             },
-            "osgs_inner_newton_iters": {
-              "type": "integer",
-              "description": "Inner Newton iterations performed per OSGS outer fixed-point step.",
-              "examples": [
-                3
-              ]
-            },
             "osgs_tolerance": {
               "type": "number",
               "description": "Tolerance for terminating OSGS iterations before reaching the maximum.",
               "examples": [
                 1e-05
-              ]
-            },
-            "osgs_projection_tolerance": {
-              "type": "number",
-              "description": "Tolerance for the iterative L2 projection drift inside OSGS.",
-              "examples": [
-                1e-05
-              ]
-            },
-            "osgs_stopping_mode": {
-              "type": "string",
-              "enum": [
-                "state_drift",
-                "projection_drift",
-                "both"
-              ],
-              "description": "Which drift metric gates OSGS convergence: state, projection, or both.",
-              "examples": [
-                "state_drift"
-              ]
-            },
-            "osgs_state_drift_scale": {
-              "type": "string",
-              "enum": [
-                "Linf",
-                "L2_mass"
-              ],
-              "description": "Norm used for the OSGS state-drift metric.",
-              "examples": [
-                "L2_mass"
-              ]
-            },
-            "osgs_warmup_iterations": {
-              "type": "integer",
-              "description": "Transition frame halting OSGS decoupled initialization.",
-              "examples": [
-                2
-              ]
-            },
-            "osgs_warmup_tolerance": {
-              "type": "number",
-              "description": "DIMENSIONLESS relative-reduction target for the OSGS inner solve during the first `osgs_warmup_iterations` outer iterations: the inner Newton converges to `‖R_k‖ ≤ osgs_warmup_tolerance·‖R₀_k‖` (looser than the normal per-field target), giving early-iteration relaxation while staying scale-covariant. (Was an absolute residual floor pre-2026-06-02, which broke OSGS encoding-invariance.)",
-              "examples": [
-                0.001
-              ]
-            },
-            "osgs_projection_coupling": {
-              "type": "string",
-              "enum": [
-                "staggered",
-                "coupled",
-                "freeze_after_k"
-              ],
-              "description": "How the OSGS orthogonal projection pi is coupled to the nonlinear solve. 'staggered' (default; paper alg:StationarySystem): outer fixed-point loop freezes pi, runs the inner Newton, then updates pi = Pi(R(U)); the frozen-pi lag makes the map contract only linearly. 'coupled': a single Newton solve whose residual recomputes pi = Pi(R(u)) at every nonlinear iteration (no staggering lag), with the Jacobian kept in the local frozen-pi form (sparse, NOT the prohibitive monolithic dPi/du) — a Picard-type coupling using the Cholesky-cached mass solve per evaluation, intended to make OSGS converge in ~ASGS iteration counts. 'freeze_after_k': osgs_freeze_after_k single-step warm-up iterations that refresh pi = Pi(R(u)) at every nonlinear iteration, then FREEZE pi and run a full frozen-pi Newton solve to convergence (quadratic, since pi is then constant). U*(pi_k) is optimal-rate for any fixed k and k=2-3 captures ~all of the OSGS error-constant advantage in ~ASGS iteration counts; the projection is ALWAYS applied (no ASGS fallback), so the reaction-dominated cells show OSGS's own (sub-optimal) fixed-point behaviour honestly.",
-              "examples": [
-                "staggered",
-                "coupled",
-                "freeze_after_k"
-              ]
-            },
-            "osgs_freeze_after_k": {
-              "type": "integer",
-              "minimum": 1,
-              "description": "[freeze_after_k mode] Number of projection-updating warm-up iterations before freezing pi (k >= 1): pi is refreshed at each of the first k nonlinear iterations, then frozen for the quadratic finish. Inert unless osgs_projection_coupling == 'freeze_after_k'. k=2-3 captures ~all of the OSGS constant-advantage where the map is well-behaved.",
-              "examples": [
-                2,
-                3
               ]
             }
           },
@@ -488,9 +414,10 @@
                 "full",
                 "galerkin",
                 "momentum_only",
-                "mass_only"
+                "mass_only",
+                "picard_only"
               ],
-              "description": "Switch behavior of specific solver terms for systematic testing.",
+              "description": "Switch behavior of specific solver terms for systematic testing. 'picard_only' forces the Picard/Oseen Jacobian for every nonlinear stage (diagnostic: tests whether a converged result is solver-independent).",
               "examples": [
                 "full"
               ]
