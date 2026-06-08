@@ -47,9 +47,7 @@
         "stabilization": {
             "method": [
                 "ASGS"
-            ],
-            "osgs_iterations": 15,
-            "osgs_tolerance": 1e-10
+            ]
         },
         "element_spaces": {
             "k_velocity": 2,
@@ -81,12 +79,7 @@
             "armijo_c1": 1e-4,
             "divergence_merit_factor": 1.05,
             "max_linesearch_iterations": 25,
-            "linesearch_contraction_factor": 0.5,
-            "accelerator": {
-                "type": "Anderson",
-                "m": 5,
-                "relaxation_factor": 1.0
-            }
+            "linesearch_contraction_factor": 0.5
         }
     },
     "output": {

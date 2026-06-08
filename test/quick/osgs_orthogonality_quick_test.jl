@@ -143,16 +143,14 @@ using JSON3
         cfg_dict = JSON3.read(read(config_path, String), Dict{String, Any})
         
         cfg_dict["numerical_method"]["stabilization"] = Dict{String, Any}(
-            "method" => method,
-            "osgs_iterations" => 25,
-            "osgs_tolerance" => 1e-7
+            "method" => method
         )
         local_cfg = PorousNSSolver.load_config_from_dict(cfg_dict)
         diag_cache = Dict{String, Any}()
 
         setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, fx, alpha_cf, gx)
         formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
-        iter_solvers = PorousNSSolver.IterativeSolvers(fe_picard, fe_newton)
+        iter_solvers = PorousNSSolver.StageSolvers(fe_picard, fe_newton)
 
         success, _mms_plateau_unused, final_x0, iters, eval_time = PorousNSSolver.solve_system(
             setup, formulation, iter_solvers, local_cfg, FEFunction(X, copy(get_free_dof_values(x0)));

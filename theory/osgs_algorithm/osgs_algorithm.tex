@@ -230,6 +230,15 @@ A.1--A.3 are pure procedures with no further dependencies.}
 \label{fig:hierarchy}
 \end{figure}
 
+\paragraph{Code map.}  The source mirrors this tree:
+Algorithm~\ref{alg:A} (the shared Newton kernel) is \code{src/solvers/nonlinear.jl};
+Algorithms~\ref{alg:B} and~\ref{alg:O} (the Stage-I ASGS boot and the orchestrator) are
+\code{src/solvers/asgs\_solver.jl}; Algorithm~\ref{alg:C} (the coupled OSGS solve,
+\code{solve\_osgs\_stage!}) is \code{src/solvers/osgs\_solver.jl}; and the optional Algorithm~\ref{alg:D}
+(\code{VerifyMMSPlateau}) is \code{src/solvers/mms\_verification.jl}, plugged in behind the
+\code{SolutionVerifier} seam (\code{on\_asgs\_converged!} / \code{on\_osgs\_converged!}) so the production
+path runs a no-op \code{NoVerification}.
+
 \paragraph{Reading order.}  This document presents the modules
 top-down: first the orchestrator (§\ref{sec:orchestration}), then the
 two stage solvers (§\ref{sec:picard}, §\ref{sec:osgs}), then the shared
@@ -1831,7 +1840,7 @@ does not advance the iterate.}
 \footnotesize
 \extline{%
 \begin{tabular}{@{}r@{\quad}p{0.82\textwidth}@{}}
-\textit{Called by:} & Inline blue hook in Algorithm~\ref{alg:O} (per extension cycle in the ASGS path); inline blue hook in Algorithm~\ref{alg:C} (once, after the single coupled OSGS solve). See §\ref{sec:mms-hooks}. \\
+\textit{Called by:} & The \code{SolutionVerifier} hooks the core invokes at each convergence point: \code{on\_asgs\_converged!} from Algorithm~\ref{alg:O} (per extension cycle in the ASGS path) and \code{on\_osgs\_converged!} from Algorithm~\ref{alg:C} (once, after the single coupled OSGS solve). The production path passes a no-op \code{NoVerification}; the MMS harness passes \code{MMSPlateauVerifier}. See §\ref{sec:mms-hooks}. \\
 \textit{Calls:}     & (none; pure procedure) \\
 \textit{Inputs:}    & Current iterate $U_h^m$; exact reference $U_{\mathrm{ex}}$; running error history $\mathcal{H}$; pass counter $I_{\mathrm{pass}}$ \\
 \textit{Outputs:}   & Plateau flag $S_{\mathrm{plat}}$; updated counter $I_{\mathrm{pass}}'$ \\

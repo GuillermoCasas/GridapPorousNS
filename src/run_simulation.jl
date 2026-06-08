@@ -371,7 +371,7 @@ function run_simulation(config_path::String;
         stall_window = sol_cfg.newton_stall_window,
         stall_min_rel_improvement = sol_cfg.newton_stall_min_rel_improvement)
 
-    iter_solvers = IterativeSolvers(solvers.picard, solvers.newton)
+    iter_solvers = StageSolvers(solvers.picard, solvers.newton)
     
     x0 = interpolate_everywhere([VectorValue(0.0,0.0), 0.0], X)
     

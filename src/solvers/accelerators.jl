@@ -1,4 +1,10 @@
 # src/solvers/accelerators.jl
+#
+# [available-option — not yet wired into the solver] Anderson acceleration (mixing) for fixed-point
+# iterations. Kept self-contained in this file as a future lever to speed up the OSGS coupled solve,
+# whose inexact-Newton (dropped dense ∂π/∂U) converges only *linearly* and can cost 30–104 inner
+# iterations per mesh. When wired in, the config surface (an OSGS-acceleration knob) should be added
+# AT THE POINT OF CONSUMPTION so it is never dead config. Exported as `AndersonAccelerator`.
 using LinearAlgebra
 
 """

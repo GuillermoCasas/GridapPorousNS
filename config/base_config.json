@@ -31,9 +31,7 @@
             "k_pressure": 1
         },
         "stabilization": {
-            "method": "ASGS",
-            "osgs_iterations": 3,
-            "osgs_tolerance": 1e-5
+            "method": "ASGS"
         },
         "solver": {
             "picard_iterations": 5,
@@ -69,14 +67,7 @@
             "pingpong_enabled": false,
             "pingpong_max_swaps": 0,
             "pingpong_picard_gain_orders": 1.5,
-            "osgs_plateau_machine_floor_shortcut": false,
-            "newton_residual_divergence_patience": 0,
-            "accelerator": {
-                "type": "None",
-                "m": 5,
-                "relaxation_factor": 1.0,
-                "safety_factor": 10.0
-            }
+            "newton_residual_divergence_patience": 0
         },
         "mesh": {
             "partition": [

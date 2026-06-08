@@ -25,12 +25,7 @@
             "xtol": 1e-8,
             "max_increases": 3,
             "stagnation_noise_floor": 1e-5,
-            "run_diagnostics": false,
-            "accelerator": {
-                "type": "None",
-                "m": 5,
-                "relaxation_factor": 1.0
-            }
+            "run_diagnostics": false
         }
     }
 }

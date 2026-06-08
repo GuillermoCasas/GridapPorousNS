@@ -30,22 +30,12 @@ Base.@kwdef struct ElementSpacesConfig
     k_pressure::Int
 end
 
-Base.@kwdef struct AcceleratorConfig
-    type::String
-    m::Int
-    relaxation_factor::Float64
-    safety_factor::Float64
-end
-
 Base.@kwdef struct StabilizationConfig
+    # ASGS (identity projection, π_h = 0) or OSGS (a single coupled solve: π = Π(R(u)) re-projected at
+    # every residual evaluation, with a frozen-π sparse-local Jacobian — see src/solvers/osgs_solver.jl).
+    # The coupled OSGS solve runs at the shared Newton budget/ftol; it has no separate iteration or
+    # tolerance knob.
     method::String
-    # OSGS runs a single coupled solve: π = Π(R(u)) re-projected at every residual evaluation, with a
-    # frozen-π (sparse, local) Jacobian — see src/solvers/porous_solver.jl. `osgs_iterations` bounds
-    # that coupled Newton; `osgs_tolerance` is its convergence target. (The staggered/freeze_after_k
-    # coupling modes + their drift/warm-up/inner-cap satellite were removed in the 2026-06-08
-    # coupled-only leaning — see docs/solver/coupled-only-leaning-and-jfnk-plan.md.)
-    osgs_iterations::Int
-    osgs_tolerance::Float64
 end
 
 Base.@kwdef struct MeshConfig
@@ -88,16 +78,13 @@ Base.@kwdef struct SolverConfig
     # P1 — no-progress stall guard (engine already in nonlinear.jl `_safe_solve_inner!`):
     newton_stall_window::Int                       # 0 ⇒ disabled (Newton runs its full budget, today's behaviour)
     newton_stall_min_rel_improvement::Float64      # relative ‖R‖∞ drop counting as "progress" for the stall window
-    # P4 — adaptive Newton↔Picard ping-pong (orchestrator-level, porous_solver.jl):
+    # P4 — adaptive Newton↔Picard ping-pong (orchestrator-level, asgs_solver.jl):
     pingpong_enabled::Bool                         # false ⇒ one-way Newton→Picard→Newton cascade (today)
     pingpong_max_swaps::Int                        # hard cap on Newton↔Picard alternations
     pingpong_picard_gain_orders::Float64           # orders of magnitude ‖R‖∞ must drop in Picard before returning to Newton
-    # P2 — OSGS plateau machine-floor short-circuit (porous_solver.jl `_run_osgs_relaxation!`):
-    osgs_plateau_machine_floor_shortcut::Bool      # false ⇒ require_consecutive_passes (today)
     # [residual-divergence guard] Consecutive ‖R‖∞ increases (beyond divergence_merit_factor) that abort a
     # Newton solve → Picard. 0 ⇒ disabled (today's behaviour: Newton runs its full budget while diverging).
     newton_residual_divergence_patience::Int
-    accelerator::AcceleratorConfig
 end
 
 Base.@kwdef struct NumericalMethodConfig
@@ -124,7 +111,6 @@ end
 StructTypes.StructType(::Type{PhysicalProperties}) = StructTypes.Struct()
 StructTypes.StructType(::Type{DomainConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ElementSpacesConfig}) = StructTypes.Struct()
-StructTypes.StructType(::Type{AcceleratorConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{StabilizationConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{MeshConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{SolverConfig}) = StructTypes.Struct()
@@ -158,15 +144,10 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.dynamic_newton_re_iterations >= 1 "dynamic_newton_re_iterations must be >= 1"
     @assert sol.max_linesearch_iterations >= 1 "Linesearch iterations must be strictly bounded >= 1"
     @assert 0.0 < sol.linesearch_contraction_factor < 1.0 "Linesearch contraction map alpha must strictly be in (0, 1)"
-    @assert sol.accelerator.m >= 1 "Accelerator history size m must be >= 1"
-    @assert 0.0 < sol.accelerator.relaxation_factor <= 1.0 "Accelerator relaxation_factor must be in (0, 1]"
-    @assert sol.accelerator.safety_factor >= 1.0 "Accelerator safety_factor must be >= 1.0 (Powell-style restart threshold; values < 1 would restart every step)"
-    
+
     # Stabilization
     stab = cfg.numerical_method.stabilization
     @assert stab.method in ("ASGS", "OSGS") "Stabilization method must be ASGS or OSGS"
-    @assert stab.osgs_iterations >= 1
-    @assert stab.osgs_tolerance > 0
 
     # Formulation Operator validation
     @assert cfg.numerical_method.viscous_operator_type in ("DeviatoricSymmetric", "SymmetricGradient", "Laplacian") "viscous_operator_type strictly expects DeviatoricSymmetric, SymmetricGradient, or Laplacian"
@@ -207,9 +188,6 @@ function _check_unknown_keys_hierarchical(dict::AbstractDict)
         end
         if haskey(nm, "solver") && nm["solver"] isa AbstractDict
             _check_unknown_keys(SolverConfig, nm["solver"], "numerical_method.solver")
-            if haskey(nm["solver"], "accelerator") && nm["solver"]["accelerator"] isa AbstractDict
-                _check_unknown_keys(AcceleratorConfig, nm["solver"]["accelerator"], "numerical_method.solver.accelerator")
-            end
         end
         if haskey(nm, "mesh") && nm["mesh"] isa AbstractDict
             _check_unknown_keys(MeshConfig, nm["mesh"], "numerical_method.mesh")

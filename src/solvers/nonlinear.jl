@@ -24,25 +24,20 @@ struct SafeNewtonSolver <: NonlinearSolver
     # (legacy: any noise-floor stop is "success"). A finite value (e.g. 10.0) rejects high-Re
     # fold stalls — where ‖R‖≈1e-5 sits ~10²–10³× above ftol — from masquerading as a true root.
     noise_floor_success_max_ftol_multiple::Float64
-    # Per-field RELATIVE convergence tolerances. When set, the solver derives absolute
-    # per-field thresholds at iter 0 from the SOLUTION-FIELD SCALE — the inf-norm of
-    # the initial guess restricted to each field block:
-    #     effective_ftol_per_field[k] = max(ftol, relative_ftol_per_field[k] * ‖x₀[block_k]‖_∞)
-    # All termination checks then use those per-field absolute thresholds. The scalar
-    # `ftol` is the per-field absolute FLOOR; `relative_ftol_per_field[k]` is the
-    # dimensionless target (e.g., c_sf·h^(k+1) ≈ 1e-4 — "1% of the FE discretization
-    # error level relative to the solution field's magnitude"). When `nothing` (default),
-    # the solver uses the scalar `ftol` and `stagnation_noise_floor` globally —
-    # bit-identical to legacy.
+    # Per-field RELATIVE convergence tolerances. When set, the solver derives absolute per-field
+    # thresholds at iter 0 by scaling each relative target by the INITIAL RESIDUAL norm of that field
+    # block, ‖R₀_k‖ (frozen at iteration 0):
+    #     effective_ftol_per_field[k] = max(ftol, relative_ftol_per_field[k] * ‖R₀_k‖)
+    # All termination checks then use those per-field absolute thresholds, so the gate is the
+    # DIMENSIONLESS relative reduction `‖R_k‖ ≤ rel·‖R₀_k‖`. The scalar `ftol` is the per-field
+    # absolute FLOOR; `relative_ftol_per_field[k]` is the dimensionless target (e.g. c_sf·h^(k+1)).
+    # When `nothing` (default), the solver uses the scalar `ftol`/`stagnation_noise_floor` globally.
     #
-    # Why "intrinsic": `‖x₀[block_k]‖_∞` is the magnitude of the solution field we are
-    # converging TOWARDS (modulo perturbations the harness/orchestrator may have
-    # introduced; for MMS this is ≈ ‖u_ex‖, for production it reflects the user's
-    # initial guess or Dirichlet BC). It does NOT depend on knowing the analytic exact
-    # solution or any other problem-specific external scale. When ‖x₀[block_k]‖ is zero
-    # (e.g., a production solve starting from a true-zero IC with all-Dirichlet
-    # boundary conditions also at zero), the scale collapses and effective_ftol_per_field[k]
-    # falls back to the scalar `ftol` floor — legacy behavior.
+    # Why the RESIDUAL norm and not the solution magnitude ‖x₀‖: the residual ‖R_k‖ and its scale
+    # ‖R₀_k‖ share units, so the ratio is dimensionless and encoding-invariant. Scaling by ‖x₀‖ would
+    # be dimensional (velocity ∝ U, pressure ∝ U²), making the converged result non-covariant across
+    # fields (worst in pressure) — the bug the 2026-06-02 encoding-covariance fix removed. A true-zero
+    # initial residual on a field collapses that field's threshold to the scalar `ftol` floor.
     relative_ftol_per_field::Union{Nothing, Vector{Float64}}
     relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}}
     # [no-progress stall guard] If `stall_window > 0`, the solve aborts with stop_reason
@@ -57,7 +52,7 @@ struct SafeNewtonSolver <: NonlinearSolver
     # [P4 ping-pong] Picard gain-then-return stop. In :picard mode with a FINITE value, the solve stops
     # with stop_reason "picard_gain_reached" as soon as ‖R‖∞ ≤ ‖R₀‖∞ · 10^(-picard_gain_target) — i.e.
     # once Picard has driven the residual `picard_gain_target` orders below its starting value, just enough
-    # to re-enter Newton's quadratic basin. The Newton↔Picard ping-pong orchestrator (porous_solver.jl)
+    # to re-enter Newton's quadratic basin. The Newton↔Picard ping-pong orchestrator (asgs_solver.jl)
     # then hands back to Newton instead of running Picard to its full ftol/cap. `Inf` (default) ⇒ DISABLED:
     # every non-ping-pong Picard solve is bit-identical to legacy. Ignored in :newton mode.
     picard_gain_target::Float64
@@ -101,14 +96,13 @@ function SafeNewtonSolver(ls::LinearSolver, cfg::SolverConfig; mode::Symbol = :n
     )
 end
 
-# Copy-with-overrides for the three fields ever overridden at call sites in
-# `porous_solver.jl` (`max_iters`, `ftol`, `mode`). All other fields are
-# inherited from `nls` verbatim. `nothing` for any kwarg means "keep `nls`'s
-# value". Replaces the previous verbose field-by-field SafeNewtonSolver()
+# Copy-with-overrides for the fields actually overridden at call sites
+# (`max_iters`, `ftol`, `mode`, `stall_window`, `picard_gain_target`). All other
+# fields are inherited from `nls` verbatim. `nothing` for any kwarg means "keep
+# `nls`'s value". Replaces the previous verbose field-by-field SafeNewtonSolver()
 # rebuilds, which were vulnerable to silently dropping new struct fields.
 function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing, mode=nothing,
-                         relative_ftol_per_field=nothing, picard_gain_target=nothing,
-                         stall_window=nothing, stall_min_rel_improvement=nothing)
+                         picard_gain_target=nothing, stall_window=nothing)
     return SafeNewtonSolver(
         nls.ls,
         isnothing(max_iters) ? nls.max_iters : max_iters,
@@ -123,15 +117,14 @@ function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing,
         nls.linesearch_contraction_factor,
         isnothing(mode) ? nls.mode : mode,
         nls.noise_floor_success_max_ftol_multiple,
-        # `relative_ftol_per_field` override (covariant OSGS warmup relaxation): nothing ⇒ keep base.
-        isnothing(relative_ftol_per_field) ? nls.relative_ftol_per_field : relative_ftol_per_field,
+        nls.relative_ftol_per_field,
         nls.relative_stagnation_noise_floor_per_field,
         # `stall_window` override: the Stage-I boot wants the early-bail stall sensor (cold-start
         # oscillation/divergence → Picard), but the Stage-II coupled solve converges SLOWLY-MONOTONE
         # (inexact-Newton linear rate); the stall sensor would mistake slow progress for a stall and bail,
         # silently degenerating OSGS into ASGS. So the coupled solve passes stall_window=0 to disable it.
         isnothing(stall_window) ? nls.stall_window : stall_window,
-        isnothing(stall_min_rel_improvement) ? nls.stall_min_rel_improvement : stall_min_rel_improvement,
+        nls.stall_min_rel_improvement,
         # `picard_gain_target` override (P4 ping-pong Picard segment): nothing ⇒ keep base (Inf = inert).
         # MUST be threaded — the OSGS-inner Picard is rebuilt via this helper, so dropping it would
         # silently disable ping-pong on the OSGS path.
@@ -285,26 +278,21 @@ mutable struct SafeIterationState
     # convergence gate is a dimensionless relative reduction `‖R_k‖ ≤ rel·‖R₀_k‖`. Scaling by the
     # residual norm (same units as `R_k`), not the solution magnitude `‖x‖`, is what keeps the gate
     # encoding-invariant. A true-zero initial residual on every field collapses the thresholds to the
-    # scalar `ftol`/`stagnation_noise_floor` floors. (Name kept for history; it now holds ‖R₀‖.)
-    solution_scale_per_field::Vector{Float64}
-    # Per-field absolute thresholds, derived once from `solution_scale_per_field` and the solver's
+    # scalar `ftol`/`stagnation_noise_floor` floors.
+    initial_residual_scale_per_field::Vector{Float64}
+    # Per-field absolute thresholds, derived once from `initial_residual_scale_per_field` and the solver's
     # `relative_*_per_field` (or the scalar `ftol`/`stagnation_noise_floor` floors when no relative
     # tolerances are set).
     effective_ftol_per_field::Vector{Float64}
     effective_noise_floor_per_field::Vector{Float64}
 end
 
-# [P5 cleanup] `_resolve_solution_scale_per_field` (a Bernoulli/total-head zero-fallback heuristic for
-# a SOLUTION-magnitude-scaled gate) was removed: the per-field gate now scales by the frozen initial
-# RESIDUAL ‖R₀_k‖ (the 2026-06-02 encoding-covariance fix), which is never the solution magnitude, so the
-# helper had no call sites. See docs/normalization-audit.md gate #1 and docs/known_issues.md.
-
 """
-    _initialize_effective_thresholds(solver, solution_scale_per_field) -> (ftols, noise_floors)
+    _initialize_effective_thresholds(solver, initial_residual_scale_per_field) -> (ftols, noise_floors)
 
 Derives the per-field absolute thresholds the solver uses throughout the run.
 
-`solution_scale_per_field[k]` is the per-field initial-residual norm ‖R₀_k‖, frozen at iteration 0
+`initial_residual_scale_per_field[k]` is the per-field initial-residual norm ‖R₀_k‖, frozen at iteration 0
 (see `SafeIterationState`). Scaling the gate by the residual norm keeps it encoding-invariant.
 
 The user's `relative_*_per_field[k]` is the dimensionless target (e.g. `c_sf·h^(k+1)`).
@@ -313,15 +301,15 @@ the scalar value remains a hard floor (the solver never tries to go tighter than
 the user's absolute ftol, regardless of what relative×scale produces).
 """
 function _initialize_effective_thresholds(solver::SafeNewtonSolver,
-                                          solution_scale_per_field::Vector{Float64})
-    nfields = length(solution_scale_per_field)
+                                          initial_residual_scale_per_field::Vector{Float64})
+    nfields = length(initial_residual_scale_per_field)
     ftols = Vector{Float64}(undef, nfields)
     noise_floors = Vector{Float64}(undef, nfields)
 
     if solver.relative_ftol_per_field !== nothing
         @assert length(solver.relative_ftol_per_field) == nfields "relative_ftol_per_field length mismatch"
         @inbounds for k in 1:nfields
-            ftols[k] = max(solver.ftol, solver.relative_ftol_per_field[k] * solution_scale_per_field[k])
+            ftols[k] = max(solver.ftol, solver.relative_ftol_per_field[k] * initial_residual_scale_per_field[k])
         end
     else
         @inbounds for k in 1:nfields
@@ -333,7 +321,7 @@ function _initialize_effective_thresholds(solver::SafeNewtonSolver,
         @assert length(solver.relative_stagnation_noise_floor_per_field) == nfields "relative_stagnation_noise_floor_per_field length mismatch"
         @inbounds for k in 1:nfields
             noise_floors[k] = max(solver.stagnation_noise_floor,
-                                  solver.relative_stagnation_noise_floor_per_field[k] * solution_scale_per_field[k])
+                                  solver.relative_stagnation_noise_floor_per_field[k] * initial_residual_scale_per_field[k])
         end
     else
         @inbounds for k in 1:nfields
@@ -420,6 +408,11 @@ function _residual_meets_per_field_honest_exit_gate(per_field_norms::Vector{Floa
     return true
 end
 
+# Block-equilibrated merit Φ(b) = ½ Σ (b_i / w_i)². The weights `w` equilibrate the per-field-block
+# row scales (so a saddle-point pressure block's near-zero diagonal can't dominate); they are set by
+# `_update_merit_weights!` from the Jacobian diagonal. Used by both the Armijo pass and the main loop.
+_merit_W(b, w) = 0.5 * sum(idx -> (b[idx] / w[idx])^2, eachindex(b))
+
 # Algorithm A.2: Armijo Linesearch Pass
 function eval_armijo_linesearch_pass!(x, x_old, b, dx, op, dir_deriv, solver::SafeNewtonSolver, w, state::SafeIterationState,
                                        field_blocks::Union{Nothing, Vector{UnitRange{Int}}})
@@ -430,12 +423,10 @@ function eval_armijo_linesearch_pass!(x, x_old, b, dx, op, dir_deriv, solver::Sa
     _per_field_inf_norms!(state.norm_b_new_per_field, b, field_blocks)
     state.phi_x_new = state.phi_x
 
-    eval_merit_W(b_vec) = 0.5 * sum(idx -> (b_vec[idx] / w[idx])^2, eachindex(b_vec))
-
     for ls_iter in 1:solver.max_linesearch_iterations
         x .= x_old .- alpha .* dx
         residual!(b, op, x)
-        state.phi_x_new = eval_merit_W(b)
+        state.phi_x_new = _merit_W(b, w)
         state.norm_b_new_inf = norm(b, Inf)
         _per_field_inf_norms!(state.norm_b_new_per_field, b, field_blocks)
 
@@ -654,15 +645,14 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     # keeps the gate encoding-invariant: under OSGS's single-inner-step staggering a solution-scaled gate
     # is dimensional and makes the converged result non-covariant (worst in pressure). Guarded by
     # encoding_invariance_test.jl.
-    solution_scale_per_field = copy(norm_b_per_field)   # ‖R₀_k‖ (the residual scale), frozen
+    initial_residual_scale_per_field = copy(norm_b_per_field)   # ‖R₀_k‖ (the residual scale), frozen
     effective_ftol_per_field, effective_noise_floor_per_field =
-        _initialize_effective_thresholds(solver, solution_scale_per_field)
+        _initialize_effective_thresholds(solver, initial_residual_scale_per_field)
 
     # Preallocate zero-allocation weights
     w = ones(length(b))
-    eval_merit_W(b_vec) = 0.5 * sum(idx -> (b_vec[idx] / w[idx])^2, eachindex(b_vec))
 
-    phi_x = eval_merit_W(b)
+    phi_x = _merit_W(b, w)
     println("Iter 0: f(x) inf-norm = $norm_b_inf | Merit Φ = $phi_x")
 
     # [trajectory] Initial normalized residual: maxₖ(‖R₀[block_k]‖_∞ / effective_ftol_per_field[k]),
@@ -680,7 +670,7 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     state = SafeIterationState(
         0, 0, 0, false, 1.0, 0.0, norm_b_inf, norm_b_inf, phi_x, phi_x,
         norm_b_per_field, norm_b_new_per_field,
-        solution_scale_per_field, effective_ftol_per_field, effective_noise_floor_per_field,
+        initial_residual_scale_per_field, effective_ftol_per_field, effective_noise_floor_per_field,
     )
     
     x_old = similar(x)
@@ -704,7 +694,7 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         # to the legacy global rule for single-field problems.
         d_A = diag(A)
         _update_merit_weights!(w, d_A, field_blocks)
-        state.phi_x = eval_merit_W(b)
+        state.phi_x = _merit_W(b, w)
         
         solve_failed, ls_cache = eval_linear_system_resolution!(dx, A, b, solver, ls_cache)
         
@@ -755,7 +745,7 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
             break
         end
 
-        # [P4] Picard gain-then-return stop. In :picard mode with a finite gain target, stop as soon as
+        # Picard gain-then-return stop. In :picard mode with a finite gain target, stop as soon as
         # ‖R‖∞ has dropped `picard_gain_target` orders below the initial residual ‖R₀‖∞ (initial_b_inf) —
         # just enough to re-enter Newton's basin, so the ping-pong orchestrator hands back to Newton
         # without running Picard to its full ftol/cap. Inert when picard_gain_target == Inf (default),

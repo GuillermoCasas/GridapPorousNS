@@ -59,17 +59,10 @@
             "linesearch_contraction_factor": 0.5,
             "max_increases": 3,
             "divergence_merit_factor": 1.05,
-            "armijo_c1": 1e-4,
-            "accelerator": {
-                "type": "Anderson",
-                "m": 10,
-                "relaxation_factor": 0.8
-            }
+            "armijo_c1": 1e-4
         },
         "stabilization": {
-            "method": ["ASGS", "OSGS"],
-            "osgs_iterations": 5,
-            "osgs_tolerance": 1e-10
+            "method": ["ASGS", "OSGS"]
         }
     },
     "output": {

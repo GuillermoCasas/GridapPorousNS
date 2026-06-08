@@ -39,9 +39,7 @@ function setup_cell(; Re::Float64, Da::Float64, alpha_0::Float64, n::Int,
         "numerical_method" => Dict(
             "element_spaces" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
             "mesh" => Dict("element_type" => element_type, "partition" => [n, n]),
-            "stabilization" => Dict("method" => "OSGS",
-                                    "osgs_iterations" => 5,
-                                    "osgs_tolerance" => 1e-10),
+            "stabilization" => Dict("method" => "OSGS"),
             "solver" => Dict("newton_iterations" => 150),
         ),
     )
@@ -133,7 +131,7 @@ function setup_cell(; Re::Float64, Da::Float64, alpha_0::Float64, n::Int,
     )
     fe_picard = FESolver(nls_picard)
     fe_newton = FESolver(nls_newton)
-    iter_solvers = PorousNSSolver.IterativeSolvers(fe_picard, fe_newton)
+    iter_solvers = PorousNSSolver.StageSolvers(fe_picard, fe_newton)
 
     setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
     formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)

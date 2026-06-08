@@ -202,20 +202,6 @@
               "examples": [
                 "ASGS"
               ]
-            },
-            "osgs_iterations": {
-              "type": "integer",
-              "description": "Iterations used for resolving Orthogonal Subgrid Scales.",
-              "examples": [
-                3
-              ]
-            },
-            "osgs_tolerance": {
-              "type": "number",
-              "description": "Tolerance for terminating OSGS iterations before reaching the maximum.",
-              "examples": [
-                1e-05
-              ]
             }
           },
           "additionalProperties": false
@@ -434,46 +420,6 @@
                 "standard"
               ]
             },
-            "accelerator": {
-              "type": "object",
-              "title": "Accelerator Configuration",
-              "description": "Smart nonlinear convergence accelerator properties (e.g. Anderson Mixing) to rapidly resolve Fixed-Point loops.",
-              "properties": {
-                "type": {
-                  "type": "string",
-                  "enum": [
-                    "None",
-                    "Anderson"
-                  ],
-                  "description": "Type of sequence extrapolation applied to fixed point iterations.",
-                  "examples": [
-                    "None"
-                  ]
-                },
-                "m": {
-                  "type": "integer",
-                  "description": "Maximum memory depth or historical tracking for the mixing subspace.",
-                  "examples": [
-                    5
-                  ]
-                },
-                "relaxation_factor": {
-                  "type": "number",
-                  "description": "Standard numerical damping or geometrical relaxation ratio applied to the proposed extrapolation.",
-                  "examples": [
-                    1.0
-                  ]
-                },
-                "safety_factor": {
-                  "type": "number",
-                  "description": "Powell-style restart threshold. If ||x_next - g_k||_inf exceeds safety_factor * ||f_k||_inf, the Anderson step is rejected, history is cleared, and we fall back to relaxed Picard. Must be >= 1.",
-                  "examples": [
-                    10.0
-                  ]
-                }
-              },
-              "additionalProperties": false
-            },
             "newton_stall_window": {
               "type": "integer",
               "description": "[iterator-scheduling P1] Consecutive non-improving Newton iterations before bailing to the cascade's Picard stage (stop_reason 'no_progress_stall'). 0 disables the guard (default; Newton runs its full budget = today's behaviour). Use >= 2 so a one-step plateau before quadratic descent is not bailed.",
@@ -510,13 +456,6 @@
               "description": "[iterator-scheduling P4] Orders of magnitude ||R||_inf must drop during a Picard segment before handing back to Newton (||R||_inf <= ||R0||_inf * 10^-gain). Read only when pingpong_enabled=true. Validate > 0.",
               "examples": [
                 1.5
-              ]
-            },
-            "osgs_plateau_machine_floor_shortcut": {
-              "type": "boolean",
-              "description": "[iterator-scheduling P2] When true, the OSGS outer loop accepts a single passing MMS-plateau check (instead of require_consecutive_passes) once the state drift has reached the tight machine floor (x_diff <= osgs_tolerance) in state_drift mode. false (default) preserves today's multi-pass verification.",
-              "examples": [
-                false
               ]
             },
             "newton_residual_divergence_patience": {

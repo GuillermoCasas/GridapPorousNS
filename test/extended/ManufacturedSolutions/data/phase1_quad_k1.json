@@ -113,11 +113,6 @@
       "divergence_merit_factor": 1.05,
       "armijo_c1": 0.0001,
       "newton_residual_divergence_patience": 2,
-      "accelerator": {
-        "type": "Anderson",
-        "m": 10,
-        "relaxation_factor": 0.8
-      },
       "pingpong_enabled": true,
       "pingpong_max_swaps": 4,
       "pingpong_picard_gain_orders": 1.5
@@ -126,9 +121,7 @@
       "method": [
         "ASGS",
         "OSGS"
-      ],
-      "osgs_iterations": 5,
-      "osgs_tolerance": 1e-10
+      ]
     }
   },
   "output": {

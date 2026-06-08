@@ -298,7 +298,7 @@ end
 # Algorithm E: Outer Homotopy Parameter Scaling
 function execute_outer_homotopy_perturbation_loop!(
     setup::PorousNSSolver.FETopology, formulation::PorousNSSolver.VMSFormulation,
-    iter_solvers::PorousNSSolver.IterativeSolvers, config::PorousNSConfig,
+    iter_solvers::PorousNSSolver.StageSolvers, config::PorousNSConfig,
     method::String, dynamic_ftol::Float64, mms_setup::MMSSetup, pert_cfg::PerturbationConfig,
     mms_verification_enabled::Bool, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
     mms_max_extra_cycles, mms_require_consecutive_passes,
@@ -347,30 +347,24 @@ function execute_outer_homotopy_perturbation_loop!(
         println("    ==================================================")
         flush(stdout)  # [observability] surface the current eps_pert attempt live (log is block-buffered)
         
-        local_stab_cfg = PorousNSSolver.StabilizationConfig(
-            method=method,
-            osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
-            osgs_tolerance=dynamic_ftol
-        )
-        
         local_diagnostics_cache = Dict{String, Any}()
-        mms_cfg = nothing
-        if mms_verification_enabled
-            mms_cfg = (
-                enabled = true, tau_err = mms_tau_err, eps_u_l2 = mms_eps_u_l2, eps_u_h1 = mms_eps_u_h1,
-                eps_p_l2 = mms_eps_p_l2, max_extra_cycles = mms_max_extra_cycles,
+        verifier = mms_verification_enabled ?
+            PorousNSSolver.MMSPlateauVerifier(
+                oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, mms_setup.u_final, mms_setup.p_final, mms_setup.U_c, mms_setup.P_c, mms_setup.L, setup.dΩ),
+                max_extra_cycles = mms_max_extra_cycles,
                 require_consecutive_passes = mms_require_consecutive_passes,
+                tau_err = mms_tau_err,
+                eps_u_l2 = mms_eps_u_l2, eps_u_h1 = mms_eps_u_h1, eps_p_l2 = mms_eps_p_l2,
                 h_local = 1.0 / n,   # §5.1: mesh size for h-scaling plateau floors
                 kv = kv,             # §5.1: velocity polynomial order for the scaling exponent
                 rate_check_factor = mms_rate_check_factor,   # §5.2: sub-optimal-rate flag threshold
-                oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, mms_setup.u_final, mms_setup.p_final, mms_setup.U_c, mms_setup.P_c, mms_setup.L, setup.dΩ)
-            )
-        end
-        
+            ) :
+            PorousNSSolver.NoVerification()
+
         sys_success, sys_mms_plateau_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
             setup, formulation, iter_solvers,
             config, x0;
-            diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
+            diagnostics_cache=local_diagnostics_cache, verifier=verifier
         )
 
         # [trajectory] capture this attempt's stage-by-stage path (built by the orchestrator into
@@ -410,7 +404,7 @@ function execute_outer_homotopy_perturbation_loop!(
             initial_residual_attempt = get(local_diagnostics_cache, "initial_residual_norm", NaN)
             break
         else
-            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(local_stab_cfg.osgs_tolerance)`) or system fully diverged.")
+            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(dynamic_ftol)`) or system fully diverged.")
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
             initial_residual_attempt = get(local_diagnostics_cache, "initial_residual_norm", NaN)
         end
@@ -1000,17 +994,11 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     max_n_pert = Int(get(test_dict, "max_n_pert", 5))
 
                                     # [osgs-dispatch-fix 2026-05-26] The outer `config_dict` hardcodes
-                                    # "method" => "ASGS" (see line ~370). That makes solve_system always
-                                    # run the ASGS path regardless of the outer `method` loop variable —
-                                    # so OSGS rows in earlier HDF5s are mislabelled ASGS solves.
-                                    # Fix: rebuild a per-method PorousNSConfig with the right stabilization
-                                    # method AND propagate the test JSON's OSGS-specific overrides
-                                    # (osgs_iterations / osgs_tolerance / etc., which would otherwise be
-                                    # silently inherited from base_config.json defaults).
+                                    # "method" => "ASGS", so solve_system would always run the ASGS path
+                                    # regardless of the outer `method` loop variable. Rebuild a per-method
+                                    # stabilization dict with the correct method before loading.
                                     method_stab_dict = Dict{String,Any}(
                                         "method" => String(method),
-                                        "osgs_iterations"          => get(stab_dict, "osgs_iterations", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_iterations", 3)),
-                                        "osgs_tolerance"           => get(stab_dict, "osgs_tolerance", get(get(get(test_dict, "numerical_method", Dict()), "stabilization", Dict()), "osgs_tolerance", 1e-5)),
                                     )
                                     method_config_dict = deepcopy(config_dict)
                                     method_config_dict["numerical_method"]["stabilization"] = method_stab_dict
@@ -1021,7 +1009,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
 
                                     setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
                                     formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
-                                    iter_solvers = PorousNSSolver.IterativeSolvers(solver_picard, solver_newton)
+                                    iter_solvers = PorousNSSolver.StageSolvers(solver_picard, solver_newton)
                                     mms_setup = MMSSetup(u_final, p_final, h_raw_func, u_ex_L2, norm_h, U_c, P_c, L_cell)
                                     pert_cfg = PerturbationConfig(eps_pert_base, max_n_pert)
                                     

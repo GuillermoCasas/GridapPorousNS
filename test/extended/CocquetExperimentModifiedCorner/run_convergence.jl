@@ -176,7 +176,7 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
 
     setup = PorousNSSolver.FETopology(X, Y, model, Triangulation(model), dΩ, V_free, Q_free, h_cf, f_cf, alpha_h, g_cf)
     formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
-    iter_solvers = PorousNSSolver.IterativeSolvers(solver_picard, solver_newton)
+    iter_solvers = PorousNSSolver.StageSolvers(solver_picard, solver_newton)
 
     success, _mms_plateau_unused, final_x0, iter_count, eval_time = PorousNSSolver.solve_system(
         setup, formulation, iter_solvers, config, x0

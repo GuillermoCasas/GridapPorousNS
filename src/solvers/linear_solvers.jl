@@ -11,7 +11,7 @@ using SparseArrays
 # CholeskySolver — direct SPD factorization for L² mass matrices.
 #
 # Mathematically the L² mass matrices `M_u` and `M_p` used by the OSGS sub-grid
-# projections (porous_solver.jl) are symmetric positive-definite. The previous
+# projections (osgs_solver.jl) are symmetric positive-definite. The previous
 # `LUSolver` path runs UMFPack with partial pivoting, which (a) does extra work
 # vs Cholesky on SPD, (b) carries a larger factor and unnecessary permutation
 # tree, and (c) is structurally non-symmetric — the asymmetric permutation can
@@ -36,32 +36,12 @@ Gridap.Algebra.symbolic_setup(::CholeskySolver, mat::AbstractMatrix) = CholeskyS
 Gridap.Algebra.numerical_setup(::CholeskySymbolicSetup, mat::AbstractMatrix) =
     CholeskyNumericalSetup(cholesky(Symmetric(mat)))
 
-function Gridap.Algebra.numerical_setup!(ns::CholeskyNumericalSetup, mat::AbstractMatrix)
-    ns.factors = cholesky(Symmetric(mat))
-    ns
-end
-
-function Gridap.Algebra.numerical_setup!(ns::CholeskyNumericalSetup, mat::SparseMatrixCSC)
-    # CHOLMOD supports in-place numeric refactorization when the symbolic structure
-    # is unchanged. Mass matrices keep the same sparsity per mesh, so this branch
-    # is the fast-path for OSGS re-assembly. If the in-place call fails (e.g.
-    # because the factor was built for a different pattern), fall back to a
-    # fresh factorization.
-    try
-        cholesky!(ns.factors, Symmetric(mat))
-    catch
-        ns.factors = cholesky(Symmetric(mat))
-    end
-    ns
-end
-
 function Gridap.Algebra.solve!(x::AbstractVector, ns::CholeskyNumericalSetup, b::AbstractVector)
     # CHOLMOD's `Factor` does not implement the 2-arg `ldiv!(A, b)` that
     # `LinearAlgebra.ldiv!(x, A, b)` would internally rely on, so dispatch
     # through `\` which CHOLMOD implements directly. This allocates one
-    # intermediate vector per backsolve; acceptable because the OSGS staggered
-    # loop is a fixed-point on `(U_h, π_h)` and the dominant cost is the
-    # inner Newton solve, not the projection.
+    # intermediate vector per backsolve; acceptable because the dominant cost
+    # of the OSGS coupled solve is the inner Newton solve, not the projection.
     x .= ns.factors \ b
     x
 end

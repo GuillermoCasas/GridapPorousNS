@@ -159,7 +159,7 @@ end
 # `(success, final_x0, iter_count, eval_time)` so the caller does not branch downstream.
 function execute_solver_galerkin_inline!(
     setup::PorousNSSolver.FETopology, formulation::PorousNSSolver.VMSFormulation,
-    iter_solvers::PorousNSSolver.IterativeSolvers, config::PorousNSConfig, x0
+    iter_solvers::PorousNSSolver.StageSolvers, config::PorousNSConfig, x0
 )
     phys = config.physical_properties
     freeze_cusp = config.numerical_method.solver.freeze_jacobian_cusp
@@ -209,7 +209,7 @@ end
 # Algorithm E: Outer Homotopy Parameter Scaling
 function execute_outer_homotopy_perturbation_loop!(
     setup::PorousNSSolver.FETopology, formulation::PorousNSSolver.VMSFormulation,
-    iter_solvers::PorousNSSolver.IterativeSolvers, config::PorousNSConfig,
+    iter_solvers::PorousNSSolver.StageSolvers, config::PorousNSConfig,
     method::String, dynamic_ftol::Float64, mms_setup::MMSSetup, pert_cfg::PerturbationConfig,
     mms_verification_enabled::Bool, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
     mms_max_extra_cycles, mms_require_consecutive_passes,
@@ -241,26 +241,20 @@ function execute_outer_homotopy_perturbation_loop!(
         println("    [!] Delegating orchestration to PDE assembly module via `src/solvers/porous_solver.jl` (Mode: $method)")
         println("    ==================================================")
         
-        local_stab_cfg = PorousNSSolver.StabilizationConfig(
-            method=method,
-            osgs_iterations=config.numerical_method.stabilization.osgs_iterations,
-            osgs_tolerance=dynamic_ftol
-        )
-        
         local_diagnostics_cache = Dict{String, Any}()
-        mms_cfg = nothing
-        if mms_verification_enabled
-            mms_cfg = (
-                enabled = true, tau_err = mms_tau_err, eps_u_l2 = mms_eps_u_l2, eps_u_h1 = mms_eps_u_h1,
-                eps_p_l2 = mms_eps_p_l2, max_extra_cycles = mms_max_extra_cycles,
+        verifier = mms_verification_enabled ?
+            PorousNSSolver.MMSPlateauVerifier(
+                oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, mms_setup.u_final, mms_setup.p_final, mms_setup.U_c, mms_setup.P_c, mms_setup.L, setup.dΩ),
+                max_extra_cycles = mms_max_extra_cycles,
                 require_consecutive_passes = mms_require_consecutive_passes,
+                tau_err = mms_tau_err,
+                eps_u_l2 = mms_eps_u_l2, eps_u_h1 = mms_eps_u_h1, eps_p_l2 = mms_eps_p_l2,
                 h_local = 1.0 / n,   # §5.1: mesh size for h-scaling plateau floors
                 kv = kv,             # §5.1: velocity polynomial order for the scaling exponent
                 rate_check_factor = mms_rate_check_factor,   # §5.2: sub-optimal-rate flag threshold
-                oracle = (uh, ph) -> calculate_normalized_errors(uh, ph, mms_setup.u_final, mms_setup.p_final, mms_setup.U_c, mms_setup.P_c, mms_setup.L, setup.dΩ)
-            )
-        end
-        
+            ) :
+            PorousNSSolver.NoVerification()
+
         if uppercase(method) == "GALERKIN"
             # [paper-faithful] Cocquet-paper pure-Galerkin path (mult_mom = mult_mass = 0).
             # Bypasses solve_system's ASGS/OSGS machinery entirely. No plateau loop —
@@ -276,7 +270,7 @@ function execute_outer_homotopy_perturbation_loop!(
             sys_success, sys_mms_plateau_success, sys_final_x0, sys_iter_count, sys_eval_time = PorousNSSolver.solve_system(
                 setup, formulation, iter_solvers,
                 config, x0;
-                diagnostics_cache=local_diagnostics_cache, mms_cfg=mms_cfg
+                diagnostics_cache=local_diagnostics_cache, verifier=verifier
             )
         end
         
@@ -304,7 +298,7 @@ function execute_outer_homotopy_perturbation_loop!(
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
             break
         else
-            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(local_stab_cfg.osgs_tolerance)`) or system fully diverged.")
+            println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(dynamic_ftol)`) or system fully diverged.")
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
         end
     end
@@ -621,7 +615,7 @@ function run_mms(config_file="test_config.json")
                                     
                                     setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
                                     formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
-                                    iter_solvers = PorousNSSolver.IterativeSolvers(solver_picard, solver_newton)
+                                    iter_solvers = PorousNSSolver.StageSolvers(solver_picard, solver_newton)
                                     mms_setup = MMSSetup(u_final, p_final, h_raw_func, u_ex_L2, norm_h, U_c, P_c, L)
                                     pert_cfg = PerturbationConfig(eps_pert_base, max_n_pert)
                                     
