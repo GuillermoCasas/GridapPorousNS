@@ -2,7 +2,7 @@
 
 This file is the durable paper-code correspondence for the VMS solver. After the
 Phase-1 refactor of [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl)
-each named algorithm box in [osgs_algorithm.tex](../../theory/osgs_algorithm.tex) maps 1:1 to
+each named algorithm box in [osgs_algorithm.tex](../../theory/osgs_algorithm/osgs_algorithm.tex) maps 1:1 to
 a single Julia function. Helpers are file-local (leading-underscore convention)
 and not exported. The OSGS-MMS hook (Algorithm D for the OSGS branch) is the
 only piece that remains inlined — extracting it would have required returning a
@@ -12,11 +12,11 @@ Reviewers should re-check this table whenever `porous_solver.jl` is touched.
 
 | Algorithm / section | TeX location | Code helper | Code location |
 |---|---|---|---|
-| Algorithm O — `SimulationOrchestration` | [osgs_algorithm.tex:460](../../theory/osgs_algorithm.tex#L460) | `solve_system` (orchestration body) | [porous_solver.jl:974-1133](../../src/solvers/porous_solver.jl#L974-L1133) |
-| Algorithm B — `RobustNonlinearCascade` (Stage I) | [osgs_algorithm.tex:565](../../theory/osgs_algorithm.tex#L565) | `_initialize_asgs_state!` (H1) | [porous_solver.jl:482-596](../../src/solvers/porous_solver.jl#L482-L596) |
-| Algorithm C — `CoupledOSGSSolve` (single Newton; per-eval re-projection of `π`; frozen-`π` Jacobian; Picard fallback gated on `pingpong_enabled`; `stall_window=0`) | [osgs_algorithm.tex:1220](../../theory/osgs_algorithm.tex#L1220) | `_run_osgs_relaxation!` (H7) | [porous_solver.jl:749-961](../../src/solvers/porous_solver.jl#L749-L961) |
-| Algorithm D — `VerifyMMSPlateau` (ASGS branch) | [osgs_algorithm.tex:1334](../../theory/osgs_algorithm.tex#L1334) | `_run_asgs_mms_extension!` (H2) | [porous_solver.jl:614-707](../../src/solvers/porous_solver.jl#L614-L707) |
-| Algorithm D — `VerifyMMSPlateau` (OSGS branch) | [osgs_algorithm.tex:1334](../../theory/osgs_algorithm.tex#L1334) | inlined inside H7 (OSGS-MMS hook) | [porous_solver.jl:869-951](../../src/solvers/porous_solver.jl#L869-L951) |
+| Algorithm O — `SimulationOrchestration` | [osgs_algorithm.tex:460](../../theory/osgs_algorithm/osgs_algorithm.tex#L460) | `solve_system` (orchestration body) | [porous_solver.jl:974-1133](../../src/solvers/porous_solver.jl#L974-L1133) |
+| Algorithm B — `RobustNonlinearCascade` (Stage I) | [osgs_algorithm.tex:565](../../theory/osgs_algorithm/osgs_algorithm.tex#L565) | `_initialize_asgs_state!` (H1) | [porous_solver.jl:482-596](../../src/solvers/porous_solver.jl#L482-L596) |
+| Algorithm C — `CoupledOSGSSolve` (single Newton; per-eval re-projection of `π`; frozen-`π` Jacobian; Picard fallback gated on `pingpong_enabled`; `stall_window=0`) | [osgs_algorithm.tex:1220](../../theory/osgs_algorithm/osgs_algorithm.tex#L1220) | `_run_osgs_relaxation!` (H7) | [porous_solver.jl:749-961](../../src/solvers/porous_solver.jl#L749-L961) |
+| Algorithm D — `VerifyMMSPlateau` (ASGS branch) | [osgs_algorithm.tex:1334](../../theory/osgs_algorithm/osgs_algorithm.tex#L1334) | `_run_asgs_mms_extension!` (H2) | [porous_solver.jl:614-707](../../src/solvers/porous_solver.jl#L614-L707) |
+| Algorithm D — `VerifyMMSPlateau` (OSGS branch) | [osgs_algorithm.tex:1334](../../theory/osgs_algorithm/osgs_algorithm.tex#L1334) | inlined inside H7 (OSGS-MMS hook) | [porous_solver.jl:869-951](../../src/solvers/porous_solver.jl#L869-L951) |
 
 ## Reciprocal: code helpers seen from the paper
 
@@ -34,7 +34,7 @@ Reviewers should re-check this table whenever `porous_solver.jl` is touched.
   (`ExactNewtonPipeline`) corresponds to `_safe_solve_inner!` in
   [src/solvers/nonlinear.jl](../../src/solvers/nonlinear.jl), not to anything in
   `porous_solver.jl`. See the paper-side correspondence table at
-  [osgs_algorithm.tex line 310](../../theory/osgs_algorithm.tex#L310).
+  [osgs_algorithm.tex line 310](../../theory/osgs_algorithm/osgs_algorithm.tex#L310).
 - The four `SafeNewtonSolver` constructor sites (now consolidated via the
   `_with_overrides` helper in [src/solvers/nonlinear.jl:93](../../src/solvers/nonlinear.jl#L93))
   are pure plumbing and have no paper anchor.

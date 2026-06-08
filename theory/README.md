@@ -23,10 +23,11 @@ The `\Guillermo{}` / `\Joaquin{}` author-review macros are defined in `article.t
 - [`cocquet/cocquet_form_mms_manufactured_solution.tex`](cocquet/cocquet_form_mms_manufactured_solution.tex) — manufactured-solution sibling of the Cocquet form.
 - `cocquet/Cocquet et al. - 2021 - Error analysis ... .pdf` — the source paper.
 
-## Root
+## Dedicated Notes
 
-- [`osgs_algorithm.tex`](osgs_algorithm.tex) — OSGS algorithm derivation and pseudocode driving the solver.
-- `centered_encoding.tex` — verification working note, **pending merge** into `paper/article.tex` (mechanics in [`../docs/paper/errata.md`](../docs/paper/errata.md)).
+- [`osgs_algorithm/osgs_algorithm.tex`](osgs_algorithm/osgs_algorithm.tex) — OSGS algorithm derivation and pseudocode driving the solver.
+- [`centered_encoding/centered_encoding.tex`](centered_encoding/centered_encoding.tex) — verification working note, **pending merge** into `paper/article.tex` (mechanics in [`../docs/paper/errata.md`](../docs/paper/errata.md)).
+- [`osgs_reaction_note/osgs_reaction_note.tex`](osgs_reaction_note/osgs_reaction_note.tex) — OSGS reaction-dominated convergence analysis note.
 
 ## Where the meta-docs went
 

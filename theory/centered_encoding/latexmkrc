@@ -29,8 +29,11 @@ if ($target ne "") {
     $aux_dir = "latex compilation/default";
 }
 
-# The PDF output should always be placed in the dedicated latex compilation directory
-$out_dir = "latex compilation";
+# The PDF output should always be placed in the current directory (theory/)
+$out_dir = ".";
+
+# Move synctex.gz to the latex compilation folder so it doesn't clutter the directory
+$success_cmd = 'sh -c \'[ -f "%B.synctex.gz" ] && mv "%B.synctex.gz" "' . $aux_dir . '/" || true\'';
 
 # Print configuration info for transparency
 print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to '$out_dir/'\n";

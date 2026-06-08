@@ -29,8 +29,11 @@ if ($target ne "") {
     $aux_dir = "latex compilation/default";
 }
 
-# The PDF output should always be placed in the dedicated latex compilation directory
-$out_dir = "latex compilation";
+# The PDF output should always be placed in the current directory (theory/)
+$out_dir = ".";
+
+# Move synctex.gz to the latex compilation folder so it doesn't clutter the directory
+$success_cmd = 'sh -c \'[ -f "%B.synctex.gz" ] && mv "%B.synctex.gz" "' . $aux_dir . '/" || true\'';
 
 # 3. Make the local SIAM template files (in siam/) findable.
 #    siam/siamart190516.cls is loaded by \documentclass{siamart190516} (TEXINPUTS),

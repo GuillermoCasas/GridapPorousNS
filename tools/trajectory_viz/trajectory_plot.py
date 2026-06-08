@@ -20,7 +20,7 @@ Two render paths (auto-dispatched by `plot_attempt`):
     drift convergence vs outer iteration and (ii) one inner-cascade thumbnail per outer iteration,
     with the MMS plateau-verification cycles (outer iters after base convergence) shaded/annotated.
 
-Nomenclature (theory/osgs_algorithm.tex): Alg. O orchestrator; Alg. B RobustNonlinearCascade
+Nomenclature (theory/osgs_algorithm/osgs_algorithm.tex): Alg. O orchestrator; Alg. B RobustNonlinearCascade
 (Newton-1 -> Picard -> Newton-2); Alg. C OSGS outer loop; Alg. A ExactNewtonPipeline (the kernel
 that produces the per-iteration residual dots). Math symbols use mathtext ($...$); no system LaTeX.
 """

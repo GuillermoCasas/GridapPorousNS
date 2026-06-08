@@ -35,7 +35,7 @@ is drawn black, `subtitle` in `subtitle_color`. The `*_norm` fields hold the **n
 convergence gate compares to 1; `res_in`/`res_out`/`f_inf` are the raw inf-norm `‖R‖_∞`. The plotter
 prefers the normalized residual and falls back to the inf-norm for traces that predate it.
 
-## Nomenclature (matches `theory/osgs_algorithm.tex`)
+## Nomenclature (matches `theory/osgs_algorithm/osgs_algorithm.tex`)
 
 | code | meaning |
 |------|---------|

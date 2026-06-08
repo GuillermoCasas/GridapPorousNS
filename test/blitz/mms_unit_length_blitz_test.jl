@@ -13,7 +13,7 @@
 #
 # Associated Files / Functions:
 # - `src/problems/mms_paper_2d.jl` (`UExFunc`, `grad_u_ex`, `lap_u_ex`, `grad_div_u_ex`, `get_p_ex`)
-# - `theory/centered_encoding.tex` Section 6 (closed-form derivation)
+# - `theory/centered_encoding/centered_encoding.tex` Section 6 (closed-form derivation)
 # ==============================================================================================
 
 using Pkg

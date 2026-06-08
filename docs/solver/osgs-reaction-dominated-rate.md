@@ -6,7 +6,7 @@ defect) and the 2026-06-04 caveats in [`../mms/convergence-status.md`](../mms/co
 
 Last updated: 2026-06-05.
 
-Companion theory note: [`../../theory/osgs_reaction_note.tex`](../../theory/osgs_reaction_note.tex)
+Companion theory note: [`../../theory/osgs_reaction_note/osgs_reaction_note.tex`](../../theory/osgs_reaction_note/osgs_reaction_note.tex)
 (Prop. 1, the coercivity gap). Reproduction recipe: see §7 (the coupled probe is the only surviving
 route; the historical `staggered` A/B config was deleted in the 2026-06-08 leaning).
 

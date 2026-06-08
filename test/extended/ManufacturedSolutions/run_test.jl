@@ -72,7 +72,7 @@ function build_porosity_field(config, alpha_0, alpha_infty, L::Float64=1.0)
 end
 
 # [encoding] Compute the characteristic-length `L` and velocity scale `U_amp` for one
-# (Re, Da, α_∞) cell, per the chosen encoding strategy. See theory/centered_encoding.tex
+# (Re, Da, α_∞) cell, per the chosen encoding strategy. See theory/centered_encoding/centered_encoding.tex
 # Section 6 for the derivation of the four formulas.
 #
 #   "centered"  — historical default: `L=1`, `U=Re/√(α_∞·Da)`. Centers ν·σ=1.
@@ -479,7 +479,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     mms_rate_check_factor = Float64(get(test_dict, "mms_rate_check_factor", 100.0))
 
     # [encoding] Strategy for choosing the dimensional `(L, U_amp)` per cell. See
-    # theory/centered_encoding.tex Section 6 for the formulas. Default `"minmax"` minimises
+    # theory/centered_encoding/centered_encoding.tex Section 6 for the formulas. Default `"minmax"` minimises
     # max(|log U|, |log ν|, |log σ|), keeping the dimensional scale spread tame at extreme
     # (Re, Da). The legacy "centered" encoding's U_amp blows up to ~1e9 at Re=1e6, which
     # starves the nonlinear solves and produced the OSGS C20/C24 residual stall. The other
@@ -752,7 +752,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 # [encoding] Pick the per-cell characteristic length and velocity scale
                                 # from the configured strategy. Default "centered" reproduces the
                                 # pre-2026-06 behaviour (L=1, U=Re/√(α_∞·Da)) bit-identically.
-                                # See theory/centered_encoding.tex Section 6 for the four formulas.
+                                # See theory/centered_encoding/centered_encoding.tex Section 6 for the four formulas.
                                 (L_cell, U_amp) = compute_L_and_U(encoding_strategy, Float64(Re), Float64(Da), alpha_infty)
                                 println("  [cell setup] Re=$(Re), Da=$(Da), α=$(alpha_0), strategy=$encoding_strategy → L=$(L_cell), U_amp=$(U_amp)")
 

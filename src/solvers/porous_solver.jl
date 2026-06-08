@@ -18,7 +18,7 @@ Depending on the chosen space ``\widetilde{\mathcal{X}}`` for the sub-grid scale
 
 # Algorithm-to-code mapping
 See `docs/solver/algorithm-code-mapping.md` for the full table. In short, `solve_system` mirrors
-Algorithm O (SimulationOrchestration) of `theory/osgs_algorithm.tex`; it delegates to three
+Algorithm O (SimulationOrchestration) of `theory/osgs_algorithm/osgs_algorithm.tex`; it delegates to three
 file-local helpers — `_initialize_asgs_state!` (Stage-I ASGS boot, Algorithm B),
 `_run_asgs_mms_extension!`, and `_run_osgs_relaxation!` (the coupled OSGS solve, Algorithm C) —
 plus the shared Newton↔Picard cascade (`_pingpong_cascade!` / `cascade_step_outcome`). The
@@ -350,7 +350,7 @@ end
                              solver_newton_asgs, solver_picard, ftol,
                              diag_cache, iter_count_ref) → success::Bool
 
-Implements Algorithm B (RobustNonlinearCascade) of `theory/osgs_algorithm.tex`
+Implements Algorithm B (RobustNonlinearCascade) of `theory/osgs_algorithm/osgs_algorithm.tex`
 for the Stage I ASGS initialisation. Owns the algebraic initialisation cascade
 (Newton → Picard → Newton). The init-stage operators (`op_*_init`) and
 `solver_newton_asgs` are constructed by the caller because they close over
@@ -507,7 +507,7 @@ end
     _run_asgs_mms_extension!(final_x0, op_newton_init, solver_newton, mms_cfg,
                               ftol, diag_cache, iter_count_ref) → elapsed::Float64
 
-Implements Algorithm D (VerifyMMSPlateau) of `theory/osgs_algorithm.tex` for the
+Implements Algorithm D (VerifyMMSPlateau) of `theory/osgs_algorithm/osgs_algorithm.tex` for the
 ASGS-branch hook. Returns the elapsed wall time of the timed cycle loop only
 (matching the original `@elapsed begin ... end` region around the cycle loop);
 the caller adds this to its `eval_time`.
@@ -627,7 +627,7 @@ end
                           diag_cache, iter_count_ref)
         → (success::Bool, pi_u, pi_p, elapsed::Float64)
 
-Implements Algorithm C (OSGSFractionalRelaxation) of `theory/osgs_algorithm.tex`
+Implements Algorithm C (OSGSFractionalRelaxation) of `theory/osgs_algorithm/osgs_algorithm.tex`
 in its entirety, including the terminal `mms_budget_exhausted` branch (M9
 deviation: the post-loop MMS budget check lives inside this helper, not in
 `solve_system`, so Algorithm C's terminal logic stays in one place).
@@ -791,7 +791,7 @@ end
 """
     solve_system(...)
 
-Algorithm O (SimulationOrchestration) of `theory/osgs_algorithm.tex`. Orchestrates
+Algorithm O (SimulationOrchestration) of `theory/osgs_algorithm/osgs_algorithm.tex`. Orchestrates
 the nonlinear solver iteration loops over a defined Variational Multiscale space:
 Stage I ASGS algebraic initialisation → method dispatch (ASGS w/ optional MMS
 plateau extension, or OSGS staggered relaxation).

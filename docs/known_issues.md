@@ -72,7 +72,7 @@ Each is verified against the working tree. Severity is the author's call.
     conclusion stands and is now cleaner to state: the coupled solve **does** reach the discrete fixed
     point (it iterates to `ftol_reached`), so the suboptimality is a property of the **OSGS discrete
     fixed point itself**, matching the coercivity gap of
-    [`../theory/osgs_reaction_note.tex`](../theory/osgs_reaction_note.tex) Prop. 1 (degrades with Da_h,
+    [`../theory/osgs_reaction_note/osgs_reaction_note.tex`](../theory/osgs_reaction_note/osgs_reaction_note.tex) Prop. 1 (degrades with Da_h,
     recovers with Re_h). The reaction-projection trim is correct and *exonerated*. The old
     "budget exhausted" flag was the MMS *plateau-rate* verifier giving up, not a failed solve — and note
     that the coupled solve is **exempt from the Stage-I stall sensor** (`stall_window=0`): its slow,
