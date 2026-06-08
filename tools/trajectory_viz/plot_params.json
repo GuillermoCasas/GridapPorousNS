@@ -1,11 +1,9 @@
 {
   "_comment": "Hand-tunable parameters for trajectory_viz/trajectory_plot.py. Every layout/style number the plotter uses lives here (no hard-coded literals in the .py). Lengths suffixed _in are INCHES (the vertical flow reserves bounding boxes in inches, then the figure height = sum of all reserved heights, so elements never overlap/overflow); fractions are of the figure width/height; font sizes are points. Edit and re-run plot_trajectory.py; a per-test wrapper may point at an alternative file via trajectory_plot.set_params(path).",
-
   "dpi": 150,
   "mathtext_fontset": "cm",
   "base_font_size": 9,
   "linespacing": 1.45,
-
   "colors": {
     "green": "#2e7d32",
     "red": "#c62828",
@@ -21,7 +19,6 @@
     "plateau_shade": "#ffe0b2"
   },
   "plateau_shade_alpha": 0.5,
-
   "fonts": {
     "title": 11.0,
     "subtitle": 10.0,
@@ -44,16 +41,14 @@
     "cross_marker": 20.0,
     "mini_cross_marker": 13.0
   },
-
   "layout": {
     "vstack_top_margin_in": 0.22,
     "vstack_bottom_margin_in": 0.18,
-    "vstack_default_gap_in": 0.10,
+    "vstack_default_gap_in": 0.1,
     "text_pad_in": 0.04,
-    "box_xlabel_pad_in": 0.40,
+    "box_xlabel_pad_in": 0.4,
     "box_plain_pad_in": 0.06,
-    "arrow_length_in": 0.30,
-
+    "arrow_length_in": 0.3,
     "gap_title_in": 0.16,
     "gap_subtitle_in": 0.06,
     "gap_start_node_in": 0.12,
@@ -61,18 +56,15 @@
     "gap_end_node_in": 0.14,
     "gap_osgs_end_node_in": 0.16,
     "gap_container_in": 0.04,
-
     "flat_fig_width_in": 6.8,
     "flat_box_height_in": 1.25,
     "flat_box_width_frac": 0.46,
-
     "osgs_fig_width_min_in": 8.0,
     "osgs_fig_width_base_in": 2.6,
     "osgs_fig_width_per_col_in": 1.55,
     "stage_i_box_height_in": 1.05,
-    "stage_i_box_width_frac": 0.40
+    "stage_i_box_width_frac": 0.4
   },
-
   "container": {
     "x_frac": 0.04,
     "width_frac": 0.93,
@@ -82,23 +74,22 @@
     "label_height_in": 0.34,
     "drift_height_in": 2.05,
     "drift_left_pad_frac": 0.11,
-    "drift_right_pad_frac": 0.05,
-    "drift_to_thumb_gap_in": 0.60,
+    "drift_right_pad_frac": 0.08,
+    "drift_to_thumb_gap_in": 0.6,
     "note_height_in": 0.26,
     "thumb_grid_top_gap_in": 0.22,
     "thumb_max_cols": 5,
     "thumb_cell_height_in": 0.95,
     "thumb_row_gap_in": 0.55,
-    "thumb_col_gap_frac": 0.020,
+    "thumb_col_gap_frac": 0.02,
     "thumb_left_pad_frac": 0.045,
     "thumb_right_pad_frac": 0.045,
     "thumb_label_pad_in": 0.06,
     "thumb_ratio_pad_in": 0.12,
-    "bottom_pad_in": 0.30,
+    "bottom_pad_in": 0.3,
     "plateau_margin_frac": 0.006,
     "plateau_margin_in": 0.12
   },
-
   "markers": {
     "stage_dot": 14,
     "stage_entry": 34,
@@ -112,9 +103,12 @@
     "drift_marker": 4,
     "drift_line_width": 1.0
   },
-  "drift_markers": { "state": "o", "pi_u": "s", "pi_p": "^" },
+  "drift_markers": {
+    "state": "o",
+    "pi_u": "s",
+    "pi_p": "^"
+  },
   "drift_legend_ncol": 3,
-
   "spines": {
     "stage_width": 1.8,
     "mini_width": 1.4

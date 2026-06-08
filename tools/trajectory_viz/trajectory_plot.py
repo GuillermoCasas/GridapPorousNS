@@ -129,6 +129,39 @@ def _finite_pos(v):
     return isinstance(v, (int, float)) and math.isfinite(v) and v > 0
 
 
+def _rel_drift_series(osgs_outer, kk, drift_key, mag_key):
+    """Relative projection drift per outer iteration: ‖Δπ_k‖ / ½(‖π_k‖+‖π_{k-1}‖) — the scale-free
+    fraction of its own L²-size the projection still moves. The loop seeds π_0 ≡ 0, so the first
+    point is exactly 2 (the symmetric-relative-difference ceiling). Frozen iterations (Δπ=0, the
+    freeze_after_k finish) are KEPT as exact-0 points (drawn on a symlog axis), not dropped — they
+    mark where π stops updating. Returns [(k, rel), ...], skipping only entries whose magnitude is
+    missing/non-finite (legacy traces)."""
+    out, prev_mag = [], 0.0
+    for i, k in enumerate(kk):
+        if i >= len(osgs_outer):
+            break
+        d, m = osgs_outer[i].get(drift_key), osgs_outer[i].get(mag_key)
+        if isinstance(m, (int, float)) and math.isfinite(m):
+            denom = 0.5 * (m + prev_mag)
+            if isinstance(d, (int, float)) and math.isfinite(d) and d >= 0 and denom > 0:
+                out.append((k, d / denom))
+            prev_mag = m
+    return out
+
+
+def _freeze_onset_k(osgs_outer, kk):
+    """Outer iteration at which the projection is first frozen (Δπ_u == Δπ_p == 0 exactly — the
+    freeze_after_k quadratic finish writes literal 0.0 drifts), or None for a staggered run that
+    never freezes π. A non-frozen iteration never lands an exact 0.0, so the equality test is safe."""
+    for i, k in enumerate(kk):
+        if i >= len(osgs_outer):
+            break
+        o = osgs_outer[i]
+        if o.get("pi_u_drift") == 0 and o.get("pi_p_drift") == 0:
+            return k
+    return None
+
+
 def _residual_xy(stage_list):
     """Concatenate the residual histories of a B-cascade onto a global inner-iteration counter,
     prefixed with the entry residual. Prefers the NORMALIZED residual f_norm = ‖R‖/tol (the
@@ -363,7 +396,45 @@ def _osgs_container_drawer(stages, osgs_outer, bck, mms_relchange, K):
         kk = list(range(1, K + 1))
         has_drift = any(isinstance(o.get("x_diff_resolved"), (int, float))
                         and math.isfinite(o.get("x_diff_resolved")) for o in osgs_outer)
-        if has_drift:
+        # The projection drift is reported RELATIVE to the projection's own size,
+        # ‖Δπ_k‖ / ½(‖π_k‖+‖π_{k-1}‖): a scale-free "fraction of itself the projection still moves
+        # per outer iteration" (π_0 ≡ 0 ⇒ the first point is exactly 2). Absolute drift is misleading —
+        # a small-magnitude π_p whose increments are tiny in absolute terms can still be moving ~100%
+        # of its (shrinking) size each iteration. Needs the per-iteration magnitudes ‖π‖ (pi_u_l2 /
+        # pi_p_l2) from the enriched trace; legacy traces lacking them fall back to absolute drift.
+        have_mag = any(_finite_pos(o.get("pi_u_l2")) or _finite_pos(o.get("pi_p_l2")) for o in osgs_outer)
+        sax = None
+        if has_drift and have_mag:
+            dm = P["drift_markers"]
+            proj_pos, proj_has_zero = [], False
+            for lbl, dkey, mkey, col, mk in (
+                    (r"$\pi_u$ rel. drift", "pi_u_drift", "pi_u_l2", c["blue"], dm["pi_u"]),
+                    (r"$\pi_p$ rel. drift", "pi_p_drift", "pi_p_l2", c["green"], dm["pi_p"])):
+                pts = _rel_drift_series(osgs_outer, kk, dkey, mkey)
+                if pts:
+                    # plot()+explicit yscale (not semilogy) so the frozen Δπ=0 points survive.
+                    dax.plot([p[0] for p in pts], [p[1] for p in pts], "-" + mk, color=col,
+                             ms=M["drift_marker"], lw=M["drift_line_width"], label=lbl)
+                    proj_pos += [v for _, v in pts if v > 0]
+                    proj_has_zero = proj_has_zero or any(v == 0 for _, v in pts)
+            # symlog (linear through 0, knee at the smallest real drift) iff a frozen Δπ=0 point is
+            # present; otherwise plain log. Lets the exact-0 frozen points render at the axis floor.
+            if proj_has_zero and proj_pos:
+                dax.set_yscale("symlog", linthresh=min(proj_pos))
+            else:
+                dax.set_yscale("log")
+            dax.set_ylabel(r"rel. proj. drift  $\|\Delta\pi_k\|/\langle\|\pi\|\rangle$", fontsize=F["drift_axis"])
+            # State drift stays ABSOLUTE on a twin right axis (no ‖U_h‖ recorded to relativise against).
+            sax = dax.twinx()
+            spts = [(k, osgs_outer[i].get("x_diff_resolved")) for i, k in enumerate(kk) if i < len(osgs_outer)]
+            spts = [(k, v) for k, v in spts if isinstance(v, (int, float)) and math.isfinite(v) and v > 0]
+            if spts:
+                sax.semilogy([p[0] for p in spts], [p[1] for p in spts], "-" + dm["state"], color=c["red"],
+                             ms=M["drift_marker"], lw=M["drift_line_width"], label="state drift (abs)")
+            sax.set_ylabel(r"state drift $\|\Delta U_k\|$", fontsize=F["drift_axis"], color=c["red"])
+            sax.tick_params(axis="y", labelsize=F["drift_tick"], colors=c["red"])
+            title = r"outer-loop staggered convergence (relative $\pi$ drift)"
+        elif has_drift:
             dm = P["drift_markers"]
             for lbl, key, col, mk in (("state drift", "x_diff_resolved", c["red"], dm["state"]),
                                       (r"$\pi_u$ drift", "pi_u_drift", c["blue"], dm["pi_u"]),
@@ -373,6 +444,9 @@ def _osgs_container_drawer(stages, osgs_outer, bck, mms_relchange, K):
                 if pts:
                     dax.semilogy([p[0] for p in pts], [p[1] for p in pts], "-" + mk, color=col,
                                  ms=M["drift_marker"], lw=M["drift_line_width"], label=lbl)
+            dax.set_ylabel("drift", fontsize=F["drift_axis"])
+            title = "outer-loop staggered convergence"
+        if has_drift:
             extra = []   # plateau region + base-convergence marker shown in the LEGEND, not in-plot
             if bck and bck < K:
                 dax.axvspan(bck + 0.5, K + 0.5, color=c["plateau_shade"], alpha=P["plateau_shade_alpha"], zorder=0)
@@ -382,13 +456,19 @@ def _osgs_container_drawer(stages, osgs_outer, bck, mms_relchange, K):
                 dax.axvline(bck + 0.5 if bck < K else K, color=c["amber"], lw=M["drift_line_width"], ls="--")
                 extra.append(Line2D([0], [0], color=c["amber"], lw=M["drift_line_width"], ls="--",
                                     label=rf"base converged ($k={bck}$)"))
+            fz = _freeze_onset_k(osgs_outer, kk)
+            if fz is not None:
+                dax.axvline(fz - 0.5, color=c["grey"], lw=M["drift_line_width"], ls=":")
+                extra.append(Line2D([0], [0], color=c["grey"], lw=M["drift_line_width"], ls=":",
+                                    label=rf"$\pi$ frozen ($k\geq{fz}$)"))
             dax.set_xlabel(r"OSGS outer iteration $k$", fontsize=F["drift_axis"])
-            dax.set_ylabel("drift", fontsize=F["drift_axis"])
             dax.set_xticks(kk); dax.tick_params(labelsize=F["drift_tick"]); dax.set_xlim(0.5, K + 0.5)
             handles, _ = dax.get_legend_handles_labels()
+            if sax is not None:
+                handles += sax.get_legend_handles_labels()[0]
             dax.legend(handles=handles + extra, fontsize=F["drift_legend"], loc="upper right",
                        ncol=P["drift_legend_ncol"], framealpha=0.9)
-            dax.set_title("outer-loop staggered convergence", fontsize=F["drift_title"], color=c["blue"])
+            dax.set_title(title, fontsize=F["drift_title"], color=c["blue"])
         else:
             dax.axis("off")
             dax.text(0.5, 0.5, "outer-loop drift not recorded in this trace\n"
