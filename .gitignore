@@ -54,14 +54,15 @@ repomix-output.*
 
 # LaTeX build/compilation folders (e.g. build/, compilation/ in any directory)
 compilation/
+latex\ compilation/
 
 # Specific compiled PDF documents (that are build outputs rather than sources)
-osgs_algorithm.pdf
-cocquet_formulation.pdf
-cocquet_form_mms_manufactured_solution.pdf
-article.pdf
-supplement.pdf
-centered_encoding.pdf
-
-# compiled standalone note (build artifact of osgs_reaction_note.tex)
-theory/osgs_reaction_note.pdf
+/theory/centered_encoding.pdf
+/theory/osgs_algorithm.pdf
+/theory/osgs_reaction_note.pdf
+/theory/paper/article.pdf
+/theory/paper/supplement.pdf
+/theory/paper/shared.pdf
+/theory/paper/elemental_matrices_appendix.pdf
+/theory/cocquet/cocquet_formulation.pdf
+/theory/cocquet/cocquet_form_mms_manufactured_solution.pdf

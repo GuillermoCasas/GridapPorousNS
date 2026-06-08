@@ -23,14 +23,14 @@ foreach my $arg (@ARGV) {
 if ($target ne "") {
     # Strip path prefixes if target is specified with path (e.g. theory/article -> article)
     $target =~ s/.*\///;
-    $aux_dir = "compilation/$target";
+    $aux_dir = "latex compilation/$target";
 } else {
     # Fallback if latexmk is run without specifying a file
-    $aux_dir = "compilation/default";
+    $aux_dir = "latex compilation/default";
 }
 
-# The PDF output should always be placed in the current directory (theory/)
-$out_dir = ".";
+# The PDF output should always be placed in the dedicated latex compilation directory
+$out_dir = "latex compilation";
 
 # Print configuration info for transparency
 print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to '$out_dir/'\n";
