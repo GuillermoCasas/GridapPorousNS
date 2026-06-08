@@ -80,11 +80,12 @@ fast descent — and is well-established practice for stabilized incompressible-
   grinds its **entire** `max_iters` budget — exactly the wasted iterations observed. The bail is keyed on
   `best_b_inf` failing to improve by `≥ stall_min_rel_improvement` over `stall_window` iterations
   ([nonlinear.jl:686-704](../../src/solvers/nonlinear.jl#L686)).
-- **Cascade — one-way, not a ping-pong.** When Newton *does* fail, the orchestrator runs
-  Newton → Picard → **one** Newton retry, both in the ASGS initializer
-  ([porous_solver.jl:487-580](../../src/solvers/porous_solver.jl#L487)) and the OSGS inner cascade
-  ([porous_solver.jl:343-460](../../src/solvers/porous_solver.jl#L343)). There is no loop that keeps
-  swapping back keyed on per-iteration stagnation.
+- **Cascade — now landed as a ping-pong (`_pingpong_cascade!`).** The full Newton↔Picard ping-pong
+  described below landed: it is gated on `pingpong_enabled` and returns to Newton once Picard gains
+  `pingpong_picard_gain_orders`, keyed on the `newton_stall_window` stall sensor. It drives the ASGS
+  Stage-I boot and (when `pingpong_enabled`) the coupled Stage-II OSGS solve. (Historically, before the
+  2026-06-08 coupled-only leaning, this was a one-way Newton → Picard → **one** Newton retry, and a
+  separate OSGS inner cascade — both since superseded.)
 
 **Implementation, in two tiers.**
 
@@ -114,93 +115,28 @@ fast descent — and is well-established practice for stabilized incompressible-
 
 **Observation.** Picard does not appear to run for OSGS in the trace plots.
 
-**Why this is correct — by design.** In the OSGS inner cascade Picard is **only a structural-failure
-fallback**: it triggers solely on `:nonfinite`, `:exception`, or
-`stop_reason ∈ {linesearch_failed, merit_divergence_escaped, linear_solve_nan}`
-([porous_solver.jl:349-379](../../src/solvers/porous_solver.jl#L349)). And OSGS runs with
-`osgs_inner_newton_iters = 1`: that single inner step exits via `:max_iters_caught`, which is
-**explicitly accepted as outer-loop progress, not a failure** ([porous_solver.jl:352-354](../../src/solvers/porous_solver.jl#L352);
-see the P-003 note at [porous_solver.jl:370-378](../../src/solvers/porous_solver.jl#L370) — do not add
-`IterationCap` to the failure set without first revising `theory/osgs_algorithm.tex`). Consequently a
-well-behaved OSGS cell emits only `C:OSGS[k]:N1` stages — never `:Picard`. Picard surfaces only on
-catastrophic cells. So Picard being invisible for OSGS in the traces is **expected**, not a plotting gap.
+**Why this is correct — by design.** For a well-behaved OSGS cell Newton converges on its own, so the
+Picard fallback never has to fire — Picard surfaces only on catastrophic cells. So Picard being
+invisible for OSGS in the traces is **expected**, not a plotting gap.
 
-**Consequence for Idea 2.** With a *single-step* inner solve there is no room inside it for a Picard
-smoother — the OSGS "iteration" *is* the outer staggered projection loop
-(`_run_osgs_relaxation!`, [porous_solver.jl:765](../../src/solvers/porous_solver.jl#L765)). The Idea-2
-ping-pong therefore applies cleanly to **ASGS**, and to OSGS only if `osgs_inner_newton_iters > 1`. Any
-OSGS ping-pong experiment must first raise the inner-step budget, which itself changes the
-encoding-covariance story (the covariant inner-gate/warmup fixes were tuned for `inner = 1`; see
-[`lessons_learned.md`](../lessons_learned.md) 2026-06-02) — so re-run `encoding_invariance_test.jl` if the
-inner budget changes.
+**Consequence for Idea 2.** Post the 2026-06-08 coupled-only leaning, OSGS is **one coupled Newton
+solve** whose residual re-projects `π = Π(R(u))` at every evaluation (no staggered outer loop, no
+single-step inner solve). The Stage-II coupled solve already carries the Idea-2 ping-pong (gated on
+`pingpong_enabled`), so the smoother applies directly there as well as in the ASGS Stage-I boot — there
+is no longer an inner-step budget to raise first.
 
 ---
 
-## Idea 4 — Short-circuit OSGS plateau-verification cycles when the state is already at the machine floor
+## Idea 4 — Short-circuit OSGS plateau-verification cycles when the state is already at the machine floor — **SUPERSEDED / REVERTED**
 
-**Observation.** The OSGS outer loop often runs ~10 iterations with little or nothing evolving past
-the first ~3. The substantive work is front-loaded; the rest are static.
-
-**Why this happens (it is mostly *not* the fixed-point solving).** The outer loop is a staggered
-fixed-point on `(U_h, π_h)` (`_run_osgs_relaxation!`, [porous_solver.jl:802-943](../../src/solvers/porous_solver.jl#L802)):
-
-- **Iter 1**: `π_h^0 = 0`, so this *is* the ASGS problem ([porous_solver.jl:789-797](../../src/solvers/porous_solver.jl#L789)) → `U_h` = ASGS solution.
-- **Iter 2**: first non-trivial `π_h` from `R(U_ASGS)`; `U_h` re-solved → the OSGS correction.
-- **Iter ≥3**: for mild cells, `U_h`/`π_h` are already at the fixed point.
-
-There **already is a stop criterion** — the loop `break`s the moment it fires:
-
-- state-drift gate `x_diff ≤ max(osgs_tol, stagnation_tol)` ([porous_solver.jl:297](../../src/solvers/porous_solver.jl#L297), mode `state_drift`);
-- MMS plateau gate: once base-converged, requires `max_r < tau_err` for `require_consecutive_passes`
-  consecutive cycles, then breaks ([porous_solver.jl:904-925](../../src/solvers/porous_solver.jl#L904)).
-
-So the count cap is **not** the intended iteration number. It is
-`eff_osgs_iters = osgs_iterations + mms_max_extra_cycles` ([porous_solver.jl:770-772](../../src/solvers/porous_solver.jl#L770)) —
-for the k=1 sweep, `5 + 5 = 10` — a **budget ceiling** that fully runs only when convergence is never
-cleanly declared. The "static" tail iterations are therefore one of:
-
-- **(a) benign** — base convergence happened early and iters 4-10 are **MMS plateau-verification
-  re-solves** (re-solve → recompute error → confirm `< tau_err` over `require_consecutive_passes`
-  cycles, [porous_solver.jl:880-927](../../src/solvers/porous_solver.jl#L880)). They look static because
-  *confirming staticity is their job*;
-- **(b) the open rate issue** — `Re=1, Da=1e6` OSGS never cleanly base-converges/plateaus, so the loop
-  runs the full budget and exits `"mms_budget_exhausted"` ([porous_solver.jl:949-955](../../src/solvers/porous_solver.jl#L949)).
-  Tracked in [`mms_convergence_status.md`](../mms/convergence-status.md) — a criterion never *satisfied*,
-  not a missing criterion.
-
-**The refinement (targets case (a)).** When the state drift has already reached the machine floor
-(`x_diff ≤ osgs_tol`, with `osgs_tol = 1e-10` in the sweep), `U_h` is at a fixed point. The MMS error is
-a **deterministic function of `U_h`** (the oracle `mms_cfg.oracle(final_x0...)`), so it provably **cannot
-change** on the next cycle. Requiring `require_consecutive_passes` additional full inner-solve +
-error-eval cycles to "verify" a plateau that is already frozen is redundant work for the easy cells.
-
-Concretely: when `x_diff ≤ osgs_tol` (true machine-floor convergence, distinct from the looser
-`stagnation_tol` short-circuit), the plateau is trivially satisfied — accept it in **one** confirming
-cycle instead of `require_consecutive_passes`. This is **recognizing** the criterion holds, not
-**weakening** it (CLAUDE.md: *"Weakening plateau criteria to pass a flaky sweep is forbidden"* — this
-does not weaken; it skips re-confirming a provably-static quantity).
-
-**Implementation sketch.**
-
-- In the MMS verification branch ([porous_solver.jl:880-927](../../src/solvers/porous_solver.jl#L880)), gate
-  the "needs `require_consecutive_passes`" requirement: if the *state drift that produced this iterate*
-  was `≤ osgs_tol` (not just `≤ dynamic_osgs_tol = max(osgs_tol, stagnation_tol)`), treat one passing
-  plateau check as sufficient. This needs the raw `x_diff` (already computed at
-  [porous_solver.jl:839](../../src/solvers/porous_solver.jl#L839)) threaded into the decision.
-- Keep the `rate_check_factor` sub-optimal-rate flag intact ([porous_solver.jl:918-921](../../src/solvers/porous_solver.jl#L918)) —
-  it is a *quality* flag, not a stop criterion, and must still fire.
-- Do **not** apply the short-circuit when `x_diff` only met the looser `stagnation_tol` (the iterate may
-  be stalled, not converged) or in `projection_drift`/`both` modes where `π_h` may still be moving.
-
-**Caveats / validation.**
-
-- Purely an efficiency change for *already-converged* cells; the hard cells (case b) are untouched
-  because they never reach `x_diff ≤ osgs_tol`. So this must **not** alter any final error or rate.
-- Validate with a before/after MMS run: identical `err_u_l2`/`err_u_h1`/`err_p_l2` and identical
-  `mms_stop_reason` per cell, with a reduced outer-iteration count only on the benign cells. Any change
-  in a *final error* means the short-circuit is firing where the state was not truly frozen — back it out.
-- New numerical control (if any threshold is introduced beyond reusing `osgs_tol`) goes through the
-  schema → config struct → JSON → consumer chain per the no-hard-coded-parameters rule.
+**Status: superseded by the 2026-06-08 coupled-only leaning** — see
+[`coupled-only-leaning-and-jfnk-plan.md`](coupled-only-leaning-and-jfnk-plan.md). This idea optimized the
+*staggered outer loop* (`_run_osgs_relaxation!`) and its plateau-verification cycles, all of which were
+**deleted** in that leaning: the staggered loop, the `_decide_osgs_convergence` gate, the
+`projection_drift`/`both` stopping modes, and the multi-cycle plateau re-confirmation are all gone. The
+coupled solve now performs **one** Newton solve and sets `mms_plateau_reached` in a single shot, so there
+are no static tail iterations to short-circuit. Retained here only as a record of the pre-leaning loop
+shape; do not act on it.
 
 ---
 
@@ -208,48 +144,36 @@ does not weaken; it skips re-confirming a provably-static quantity).
 
 1. **(c)** Idea 1's empirical cross-check (iterations vs. rate) once the k=1 sweep lands — change with
    data in hand, and likely confirm no tolerance change is warranted.
-2. **(d)** Idea 4 — OSGS plateau short-circuit at the machine floor (low risk, bounded by an
-   exact-error A/B; the most direct answer to the "10 mostly-static outer iterations" observation).
+2. **(d)** ~~Idea 4 — OSGS plateau short-circuit at the machine floor.~~ **Superseded** by the
+   2026-06-08 coupled-only leaning (the staggered outer loop it optimized was deleted) — see
+   [`coupled-only-leaning-and-jfnk-plan.md`](coupled-only-leaning-and-jfnk-plan.md).
 3. **(a)** Idea 2 tier 1 — measured `stall_window` experiment for ASGS (cheap, reversible, config-only).
-4. **(b)** Idea 2 tier 2 — prototype the full Newton↔Picard ping-pong as a new orchestrator mode (real
-   change; new schema controls; A/B on iterations + rates).
+4. **(b)** Idea 2 tier 2 — the full Newton↔Picard ping-pong landed as `_pingpong_cascade!`
+   (`pingpong_enabled`); remaining work is the A/B on iterations + rates.
 
 ---
 
-## Idea 5 — `freeze_after_k`: coupled warm-up, then freeze π (IMPLEMENTED, 2026-06-05)
+## Idea 5 — `freeze_after_k`: coupled warm-up, then freeze π — **REVERTED**
 
-**Status: implemented.** New `osgs_projection_coupling = "freeze_after_k"` mode in `_run_osgs_relaxation!`
-(`porous_solver.jl`). It is the user's "project a few nonlinear iterations, then freeze" scheme:
+**Status: reverted** — see [`coupled-only-leaning-and-jfnk-plan.md`](coupled-only-leaning-and-jfnk-plan.md)
+section 2. The `osgs_projection_coupling = "freeze_after_k"` mode (and the `osgs_freeze_after_k` knob,
+its `_run_osgs_relaxation!` warm-up-then-freeze machinery, and its blitz/encoding tests) was removed in
+the 2026-06-08 coupled-only leaning. OSGS is now a single coupled Newton solve that re-projects
+`π = Π(R(u))` at every residual evaluation, so there is no warm-up phase to freeze after. Retained as a
+record of the explored design only; the mode no longer exists.
 
-1. **Warm-up** — `osgs_freeze_after_k` (=k) *single-step* staggered iterations: each takes ONE Newton step
-   against the current frozen π, then re-projects `π = Π(R(u))`. So the projection is refreshed at EVERY
-   nonlinear iteration for the first k iterations (the lagged map; ~linearly contracting). Because π is
-   frozen *within* each single step, every warm-up step is a valid Newton step (the `D=−2Φ` line-search
-   certificate holds) — π only changes *between* steps, so no two-phase line-search hack is needed.
-2. **Freeze + finish** — freeze `π = π_k` and run a full Newton solve to convergence. With π constant the
-   Jacobian is the *exact* tangent of `R(·;π_k)` (no `∂π/∂u` term), so the finish converges **quadratically**.
+---
 
-**Why it is correct (rate vs constant).** `U*(π_k)` is optimal-**rate** for *any* fixed k: the paper's
-stability/convergence theory rests on the π-independent bilinear form `B_S` (`article.tex` 553-557; the
-theorem is proved for π=0), so **ASGS is already optimal-order and orthogonality only shrinks the error
-*constant*.** k slides the constant from ASGS (k=0) toward OSGS (k→∞) without leaving the optimal-rate band.
+## Idea 6 — Enrichment: make future OSGS diagnosis self-contained from the saved data
 
-**The projection is ALWAYS applied — there is no ASGS fallback.** (An earlier draft added a velocity-H¹
-relative-drift gate that fell back to ASGS in the reaction-dominated corner; it was removed at the user's
-direction — "always do the projection in all cases.") Consequence: in that corner the OSGS *fixed point
-itself* is sub-optimal (the staggered-map defect, caveat #5 in
-[`../mms/convergence-status.md`](../mms/convergence-status.md)), so `freeze_after_k` there converges toward
-that sub-optimal point and those cells **honestly show OSGS's poor rate** — the mode does NOT mask the
-defect behind ASGS. Where the map is well-behaved (most of the parameter space), k=2-3 gives optimal rate +
-~all of the OSGS error-constant advantage in ~ASGS iteration counts.
+**Status: proposal / backlog.** (Migrated from the now-deleted `docs/mms/next-actions.md` section 5 — the
+only salvage from that doc.)
 
-**A/B:** the full k=1 QUAD sweep (`data/k1_quad_freeze.json`, N=10→320) is the characterization run; numbers
-to be filled from `results/k1_quad_freeze.h5` + `merged_convergence_report.md`. Earlier staggered-warm-up
-probes (since superseded by the single-step warm-up) showed, on the *mild* cell, freeze k=3 ≈ optimal rate
-(2.1/1.0) at ~8-9 iters/mesh capturing ~99% of the OSGS L² gain vs full-OSGS's ~40; on the *defect* cell
-(Da=1e6) the partially-frozen result tracks OSGS's own sub-optimal/negative H¹ rate (error grows with
-refinement) — expected, and now shown rather than gated away.
+Store, per mesh, in the HDF5 group attrs + the JSON trace sidecar: `tau1`/`tau2` (min / max /
+representative over Ω), `sigma`, `|u|_max`, the `encoding_strategy`, and the `L`/`U` scale factors.
+Optionally surface `tau1` and the σ-share-of-`(1/tau1)` on the trajectory plot.
 
-Knob: `osgs_freeze_after_k` (k≥1; k=2-3 default-good). Config-strictness pinned by
-`test/blitz/freeze_after_k_config_blitz_test.jl`; encoding-covariance of the mode pinned by the
-`freeze_after_k` case in `test/quick/encoding_invariance_quick_test.jl`.
+The solver already has all of these at each mesh — it is **only plumbing** into the `run_test.jl` HDF5
+write and the trace sidecar. The payoff is that the encoding / τ-balance story becomes readable straight
+from the saved data, so an OSGS rate diagnosis (e.g. the high-Da coercivity-gap cases) does not require
+re-instrumenting or re-running the solver.

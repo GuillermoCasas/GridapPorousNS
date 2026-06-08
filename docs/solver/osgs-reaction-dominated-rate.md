@@ -7,9 +7,8 @@ defect) and the 2026-06-04 caveats in [`../mms/convergence-status.md`](../mms/co
 Last updated: 2026-06-05.
 
 Companion theory note: [`../../theory/osgs_reaction_note.tex`](../../theory/osgs_reaction_note.tex)
-(Prop. 1, the coercivity gap). Reproduction configs:
-[`probe_re1_da1e6_staggered.json`](../../test/extended/ManufacturedSolutions/data/probe_re1_da1e6_staggered.json),
-[`probe_re1_da1e6_coupled.json`](../../test/extended/ManufacturedSolutions/data/probe_re1_da1e6_coupled.json).
+(Prop. 1, the coercivity gap). Reproduction recipe: see §7 (the coupled probe is the only surviving
+route; the historical `staggered` A/B config was deleted in the 2026-06-08 leaning).
 
 ---
 
@@ -45,14 +44,21 @@ reaction-dominated corner, where OSGS velocity rates collapse and ASGS does not.
 optimal **OSGS** velocity convergence at high Da (or to establish, with proof, that the paper's OSGS
 cannot deliver it there and document the limitation).
 
-## 2. The decisive test — `staggered` vs `coupled` (2026-06-05)
+## 2. The decisive test — `staggered` vs `coupled` (2026-06-05) — HISTORICAL
+
+> **Route note (2026-06-08):** the `staggered` coupling mode and its satellite (the outer relaxation
+> loop, the state-/projection-drift stopping metrics, the warm-up schedule, Anderson acceleration) were
+> subsequently **deleted**. The OSGS solver now runs the **coupled** scheme unconditionally, regardless
+> of any projection-coupling knob. The A/B below is retained as **historical evidence** that
+> `staggered == coupled` to ~4 sig figs — i.e. that the suboptimality is a property of the OSGS fixed
+> point, not of the route that reaches it. It is not a current reproduce recipe; see §7.
 
 **Cell:** Re=1, Da=1e6, α₀=1, k=1, QUAD, N=10→320, Dirichlet BCs, constant `σ = Da·α∞·ν/L²`.
 α₀=1 is chosen deliberately: no porosity layer, no fold — the *only* stressor is the large constant
 reaction. Three curves: **ASGS**; **OSGS-staggered** (paper `alg:StationarySystem`, `osgs_iterations=5`,
 `osgs_inner_newton_iters=1`); **OSGS-coupled** (one Newton solve recomputing `π=Π(R(u))` every nonlinear
-iteration — no staggering lag; converges to the *same* fixed point per
-[`porous_solver.jl`](../../src/solvers/porous_solver.jl) `_run_osgs_relaxation!` coupled branch).
+iteration — no staggering lag; converges to the *same* fixed point — this is the **sole surviving route**
+today).
 
 ### Velocity errors
 
@@ -108,15 +114,15 @@ iteration — no staggering lag; converges to the *same* fixed point per
 
 ## 4. The options
 
-### A. Solver / coupling options — change *how fast* you reach the fixed point, **not** the fixed point
+### A. Solver / coupling — changes *how fast* you reach the fixed point, **not** the fixed point
 
-All three converge to the *same* OSGS solution (so they share the §2 accuracy; none fixes the rate):
+The coupling never changes the OSGS solution (it shares the §2 accuracy; it does not fix the rate).
+`coupled` is the sole surviving route — the `staggered` and `freeze_after_k` modes, and the outer
+relaxation satellite, were deleted in the 2026-06-08 leaning:
 
 | mode | projection schedule | convergence | cost (this cell, N=80) |
 |---|---|---|---|
-| `staggered` (paper `alg:StationarySystem`, default today) | outer loop: freeze π → inner Newton → update π | linear (frozen-π lag) | budget-bound |
 | `coupled` | recompute `π=Π(R(u))` every Newton iter; local frozen-π Jacobian | linear (Picard; **44 iters** here) | slowest |
-| `freeze_after_k` | k projection-updating warm-ups, then **freeze π** and Newton to convergence | **quadratic finish** | ~ASGS counts |
 
 ### B. Formulation options — change the *fixed point* to recover the rate (the real lever)
 
@@ -134,35 +140,122 @@ Distinguish *very slow pre-asymptotic climb* (H¹→1.0 at N≫320 ⇒ note's it
 **this one cell**: N = 640, 1280, reporting the per-pair H¹ trajectory. Expensive (~1.2M, ~5M DOF;
 coupled needs ~40+ linear solves each), so it is a deliberate, user-triggered run.
 
-## 6. Recommendation on `freeze_after_k`
+## 6. Coupling: superseded — coupled is the only route
 
-**Make `freeze_after_k` (k=2–3) the recommended *default* OSGS coupling — but not yet the *only* one.**
-
-- *Why default:* it reaches the OSGS fixed point with a **quadratic finish in ~ASGS iteration counts**,
-  versus the linear staggered/coupled paths (44 Picard iters here). For every regime where OSGS is
-  healthy it captures the OSGS error-constant advantage cheaply; in the reaction-dominated corner it
-  lands on the same (sub-optimal) fixed point as the others — so it never does *worse* on accuracy and is
-  strictly better on cost. See [`efficiency-ideas.md`](efficiency-ideas.md) Idea 5.
-- *Why not yet the only option (more research needed):*
-  1. The §5 rate question is **open**; resolving it (and any §4B formulation fix) benefits from being
-     able to A/B the modes — pruning to one mode now removes that lever.
-  2. `staggered` is the **paper-faithful** `alg:StationarySystem` and the reference the
-     [algorithm-code-mapping](algorithm-code-mapping.md) is built on; keep it for paper correspondence.
-  3. `coupled` is the **zero-lag control** that *proved* the fixed-point property in §2; keep it for
-     future such checks.
-  4. `freeze_after_k`'s own claim ("`U*(π_k)` is optimal-rate for any fixed k") should be re-validated
-     against the resolved §5 rate before it is trusted as the sole path.
-
-  → Revisit "make it the only OSGS option" once §5 is settled and §4B is decided. Until then:
-  default = `freeze_after_k`, keep `staggered`/`coupled` available.
+The earlier recommendation here ("make `freeze_after_k` the default OSGS coupling") is **superseded and
+falsified**: against the coupling-equivalence oracle, `freeze_after_k` diverged / gave a negative rate in
+the reaction corner — it does *not* land on the coupled fixed point there — so it was rejected and, with
+`staggered`, **deleted** in the 2026-06-08 leaning. The OSGS solver now has the single `coupled` route.
+For the coupling rationale and the iteration-cost fix (JFNK, deferred), see
+[`coupled-only-leaning-and-jfnk-plan.md`](coupled-only-leaning-and-jfnk-plan.md) §2. The rate cure itself
+is the deferred **split / term-by-term OSGS** of §4B / §8.5 — a formulation change, not a coupling choice.
 
 ## 7. Reproduce
 
+Current (coupled is the only OSGS route):
+
 ```bash
 cd test/extended/ManufacturedSolutions
-julia --project=../../.. run_test.jl probe_re1_da1e6_staggered.json   # ASGS + OSGS-staggered, N=10→320
-julia --project=../../.. run_test.jl probe_re1_da1e6_coupled.json     # OSGS-coupled (same cell)
+julia --project=../../.. run_test.jl probe_re1_da1e6_coupled.json     # ASGS + OSGS-coupled, N=10→320
 ```
-The two configs differ only in `numerical_method.stabilization.osgs_projection_coupling`
-(`"staggered"` vs `"coupled"`) and the coupled Newton budget. Per-mesh `L2 u/p` / `H1 u/p` print to
-stdout; bit-identical OSGS errors between them are the §2 result.
+Per-mesh `L2 u/p` / `H1 u/p` print to stdout.
+
+The original §2 A/B used a second config, `probe_re1_da1e6_staggered.json`, differing only in
+`numerical_method.stabilization.osgs_projection_coupling` (`"staggered"` vs `"coupled"`). That knob and
+the `staggered` route **no longer exist** (2026-06-08 leaning), so the A/B is not re-runnable; the
+bit-identical OSGS errors it produced are recorded as the §2 historical result.
+
+---
+
+# 8. Deep root-cause audit (2026-06-06) — confirmed genuine, bug-hypothesis refuted
+
+A full audit was run to settle whether the rate loss is a **code bug** or a **genuine OSGS property**,
+double-checking every assumption. Method: a 22-agent code/theory/literature audit (parallel audits of
+trim, τ, stabilization operator/adjoint, coercivity-gap math, consistency, projection/boundary, MMS
+forcing, literature, asymptotics → adversarial verification → synthesis), plus **three independent
+empirical double-checks** I ran myself. **Conclusion: genuine, pre-asymptotic OSGS coercivity gap — not a
+bug.** The fix for optimal rate at practical meshes is formulation-level split/term-by-term OSGS.
+
+## 8.1 Components audited and cleared (no bug)
+τ₁/τ₂ (faithful to `eq:Tau1/Tau2/TauNavierStokes`, `c₁=4k⁴`, `c₂=2k²`); the adjoint and convective-adjoint
+signs; the MMS forcing and `σ_c = Da·α∞·ν/L²`; the L² projection operator; constant-σ derivative; the
+solver staggering. The reaction-projection **trim is correct** (see 8.2). No code error was found in any
+component.
+
+## 8.2 The decisive double-checks
+
+**(a) Annihilation probe — machine-exact.** Direct numerical test
+(`/tmp/annihilation_probe.jl`-style): project `σ·u_h` onto the implemented unconstrained `V_free`
+(`TestFESpace(model, refe_u)`, same degree as `u_h`, [run_test.jl:797](../../test/extended/ManufacturedSolutions/run_test.jl#L797))
+with **inhomogeneous Dirichlet** boundary data and σ=1e6:
+
+> `‖(I−Π)(σu_h)‖ / ‖σu_h‖ = 3e-16` at quadrature degree 2, 4, and 8.
+
+So `(I−Π)(σu_h)=0` holds to machine precision (`σu_h ∈ V_free` exactly; `b = σM·u ⇒ π = σu`). Therefore
+the **trimmed and full-residual OSGS stabilized residuals are bit-identical** — `(I−Π)(R_u−σu)=(I−Π)(R_u)` —
+and they target the **same OSGS fixed point**. The trim is provably equivalent at the fixed point and is
+**not** the cause.
+
+**(b) Da-sweep — the mechanism is the mesh-Damköhler.** Re=1, α=1, OSGS, N=40/80/160, with the mesh
+Damköhler `Da_h = σh²/(c₁ν) = Da·α∞/(c₁N²)`:
+
+| Da | Da_h@N160 | OSGS velocity rate | reading |
+|---|---|---|---|
+| 1 | 1e-5 | H¹ 1.00 / L² 2.00 | optimal — gap absent |
+| 10² | 1e-3 | H¹ 1.00 / L² 2.00 | optimal — gap absent |
+| 10⁴ | 0.1 (1.56→0.10 over N=40→160) | H¹ **1.63** / L² **2.68** (40→80) | *super-convergent recovery* as `Da_h` crosses 1 |
+| 10⁶ | 9.8 | H¹ 0.57→0.71 / L² 1.57 | degraded but **climbing** as h↓ |
+
+OSGS is **bit-optimal wherever `Da_h ≪ 1`** and the loss switches on as `Da_h` crosses O(1) — the signature
+of a coercivity gap `∝ Da_h`, **not** a bug (a bug would hit every Da). Because `Da_h ∝ 1/N²`, the gap
+**closes as h→0** ⇒ the degradation is **pre-asymptotic** (very slow at Da=10⁶: `Da_h<1` needs N≳640). This
+vindicates the note's "optimal rate retained asymptotically" (items i–iii) — the meshes were just never fine
+enough at Da=10⁶.
+
+**(c) Full-vs-trim A/B — full-residual OSGS is *unstable*, not "optimal".** Switching the harness to
+`ProjectFullResidual` (config-driven, [run_test.jl:185](../../test/extended/ManufacturedSolutions/run_test.jl#L185),
+`experimental_reaction_mode != "standard"`): full-residual OSGS at Da=10⁶ **stalls/diverges at every mesh**
+(`[❌] Outer loop completely stalled`, → NaN at N=80) and reports the **ASGS Stage-I fallback** — N=40 H¹
+`0.07789` and N=160 H¹ `0.01822`, *bit-identical to ASGS*. It never reaches the OSGS fixed point. The reason:
+although the residual equals the trim's (by 8.2a), the **Jacobians differ** — the trim subtracts a `−σ·du`
+term that is **load-bearing for solver stability**; the full Jacobian is unstable at high σ. **This is why
+the paper trims**, and the trim is not removable.
+
+## 8.3 Verified root cause
+The OSGS orthogonal projection annihilates the reactive residual (`(I−Π)(σu_h)=0`, 8.2a), so OSGS loses the
+reactive stabilization square `−‖τ₁^{1/2}σu‖²` that gives ASGS its H¹-strength `σ̃_α ~ α(1+Re_h)ν/h²` velocity
+control; OSGS controls velocity only at strength σ, weaker by the **mesh Damköhler** `Da_h = σh²/(c₁ν)`. The
+realized velocity rate is therefore degraded **pre-asymptotically**, recovering as `Da_h ∝ 1/N² → 0`. This is
+a genuine property of the paper's OSGS, faithfully implemented — **not a bug.**
+
+## 8.4 Methodological caution (recorded deliberately)
+The 22-agent audit's *synthesis* reached the **wrong** verdict ("code-bug; full-residual recovers optimal
+rate; trim is the cause", conf 88) by reading the **ASGS-fallback number** of an unstable full-OSGS solve as
+"full-OSGS optimal." Its own component agents disagreed (the trim dimension rated it 8/100, "no bug"). The
+error was caught by the two independent checks above (annihilation probe = 3e-16; the full-OSGS stall). **A
+confident multi-agent synthesis is not a substitute for a direct numerical probe of the load-bearing
+assumption.**
+
+## 8.5 The fix (in full detail)
+**Primary — split / term-by-term OSGS.** Keep the *reactive* zeroth-order term `σu` in the stabilization
+with **ASGS (identity-projection)** treatment, while the *convective* and *pressure-gradient* terms keep the
+**orthogonal** projection. This restores the `−‖τ₁^{1/2}σu‖²` reactive square (hence the `σ̃_α` velocity
+coercivity) **at all h**, recovering the optimal rate without the mesh-Damköhler pre-asymptotic penalty, and
+**preserves solver stability** (unlike full-residual). Standard in the OSGS reaction-dominated literature.
+Implementation: a new projection policy (e.g. `ProjectResidualSplitReaction`) whose `apply_projection_u`
+returns `(σu) + (I−Π)(R_u − σu)` for the OSGS branch — i.e. the convection/pressure part orthogonally
+projected, the reaction part kept whole (ASGS-style) — with the matching Jacobian; wired through
+`continuous_problem.jl` and selectable per config. Verify on the Da=10⁶ ladder: expect H¹→1.0 **and** a
+stable solve.
+
+**Alternatives.** (i) *Do nothing* — the rate is correct asymptotically; acceptable if meshes reach N≳640 at
+Da=10⁶ (confirm with the N=640/1280 ladder). (ii) *Full-residual OSGS* — **rejected**: solver-unstable
+(8.2c). (iii) *Constrained-space projection* — rejected (breaks the O(h^{k+1}) boundary property).
+
+## 8.6 Reproduce the audit checks
+```bash
+cd test/extended/ManufacturedSolutions
+julia --project=../../.. run_test.jl da_sweep_audit.json   # Da-gated degradation (rate vs Da)
+julia --project=../../.. run_test.jl da1e6_full.json       # full-residual OSGS (experimental_reaction_mode=full_residual) -> unstable/ASGS-fallback
+# annihilation probe: project σ·u_h onto V_free, measure ‖(I-Π)(σu_h)‖  -> ~3e-16
+```

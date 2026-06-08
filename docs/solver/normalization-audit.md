@@ -16,8 +16,8 @@ Convention reminders for the MMS encoding sweep (`run_test.jl`): velocity residu
 | 2 | Inner per-field noise floor | `effective_noise_floor_per_field` + `_residual_meets_per_field_noise_floor` | `‖R_k‖∞ ≤ max(nf, rel_nf_k·‖R₀_k‖∞)` | both ∝ residual | **OK** |
 | 3 | Honest-exit gate | `noise_floor_success_max_ftol_multiple` + `_residual_meets_per_field_honest_exit_gate` | `‖R_k‖∞ ≤ k_nf·effective_ftol_k` | both ∝ residual (k_nf dimensionless) | **OK** |
 | 4 | Divergence safeguard | `eval_safeguard_termination_bounds!` | Newton: `Φ_new > Φ_old·f`; Picard: `‖b‖∞,new > ‖b‖∞,old·f` | ratio → dimensionless | **OK** |
-| 5 | OSGS outer state-drift | `_compute_state_drift` + `_decide_osgs_convergence` | `x_diff ≤ max(osgs_tol, stagnation_tol)` | LHS ∝ U (L²-mass) or mixed (ℓ∞); RHS absolute | **SUSPECT** (inert — see below) |
-| 6 | OSGS projection-drift | `pi_u_drift`/`pi_p_drift` in `_update_and_project!` + `_decide_osgs_convergence` | `max(π_u_drift, π_p_drift) ≤ max(osgs_proj_tol, stagnation_tol)` | LHS ∝ mass-weighted Δπ; RHS absolute | **SUSPECT** (inert — see below) |
+| 5 | ~~OSGS outer state-drift~~ | ~~`_compute_state_drift` + `_decide_osgs_convergence`~~ | — | — | **REMOVED** (gate deleted with the staggered loop, 2026-06-07 leaning; no longer applicable) |
+| 6 | ~~OSGS projection-drift~~ | ~~`pi_u_drift`/`pi_p_drift` in `_update_and_project!` + `_decide_osgs_convergence`~~ | — | — | **REMOVED** (gate deleted with the staggered loop, 2026-06-07 leaning; no longer applicable) |
 | 7 | MMS plateau ratios | `_run_*_mms_extension!` / `_run_osgs_relaxation!` | `\|E_k−E_{k-1}\| / max(E_k,E_{k-1},ε·h^p) < τ_err` | ratio → dimensionless | **OK** |
 
 ## Gate-by-gate notes
@@ -41,29 +41,13 @@ dimensionless. The mode split is load-bearing: a Φ-based test in Picard mode ca
 `merit_divergence_escaped` exits (see `test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md`).
 Confirmed the `:picard` branch is taken in `:picard` mode.
 
-**#5 / #6 OSGS outer state-drift & projection-drift — SUSPECT but empirically inert; NOT changed in P5.**
-These are the prime dimensional suspects: `x_diff` (either the L²-mass functional `√∫(e_u·e_u)dΩ`, which
-scales `∝ U`, or the raw `ℓ∞` DOF norm, which mixes the velocity/pressure scales) and the mass-weighted
-projection drift are compared to **absolute** tolerances `max(osgs_tol, stagnation_tol)` /
-`max(osgs_projection_tolerance, stagnation_tol)`. Dimensionally this is the same class as the inner-gate bug.
-**However:**
-- The 2026-06-02 ledger records that making the outer state-drift gate *relative* "changed NOTHING" for
-  encoding covariance, because in the tested regime the outer loop **runs its full iteration budget**
-  rather than early-exiting on this gate — so the gate only governs an early-exit that does not occur, and
-  changing it moves no final error.
-- The open OSGS rate-stagnation defect is in the **discrete staggered map** `Π(R(U(π)))`, **not** this gate
-  (established 2026-06-02 + the 2026-06-04 complete-sweep analysis in `docs/known_issues.md`). So fixing the
-  gate cannot help the rate.
-- Therefore a relative rewrite has **zero demonstrated benefit** and a real **error-movement risk** (it
-  changes *which* outer iteration the loop declares converged, hence the converged OSGS fixed point on any
-  cell that does early-exit). Per the P5 rule ("only fix gates that are unambiguously dimensional bugs AND
-  can be fixed without moving any final error"), it is **deferred, not applied.**
-
-  **Recommended relative form (when a demonstrated need + full A/B justify it):** normalize the state drift
-  by the iterate magnitude, `x_diff / max(‖U_h‖, floor) ≤ rel_drift`, or by the first-iteration drift
-  `x_diff^{(m)} / x_diff^{(1)} ≤ rel_drift`; analogously normalize the projection drift by `‖π_h‖`. Acceptance:
-  `encoding_invariance_quick_test.jl` stays green AND every final `err_*` is unchanged on the full k=1 A/B;
-  if any error moves, that is a convergence-behaviour change (back out and document), not a normalization fix.
+**#5 / #6 OSGS outer state-drift & projection-drift — REMOVED with the staggered loop (2026-06-07 leaning).**
+Both gates, and the helpers that computed them (`_compute_state_drift`, `_update_and_project!`,
+`_decide_osgs_convergence`), were **deleted** when the OSGS solver was leaned to a single "coupled" mode (one
+Newton solve that re-projects `π = Π(R(u))` at every residual evaluation). There is no longer an outer
+relaxation loop, so neither the state-drift nor the projection-drift early-exit gate exists. The earlier
+dimensional analysis (absolute tolerance vs scale-dependent drift) and the recommended relative-form rewrite
+are **moot** and have been removed along with the gates.
 
 **#7 MMS plateau ratios — OK.** `r = |E_k − E_{k-1}| / max(E_k, E_{k-1}, ε·h^p)` is a dimensionless
 relative change; the `h`-scaled `ε` only sets the denominator's noise floor (the §5.1 fix). Compared to the
@@ -71,9 +55,8 @@ dimensionless `tau_err`.
 
 ## Summary
 
-Five of seven gates (1–4, 7) are dimensionally sound. The two OSGS outer drift gates (5, 6) are
-dimensionally suspect (absolute tolerance vs scale-dependent drift) but **empirically inert** for covariance
-in the tested regime and **not** the cause of the open OSGS rate defect — so they are documented with a
-recommended relative form and deferred rather than changed, to avoid moving converged solutions for no
-demonstrated benefit. The only P5 code change is the removal of the dead `_resolve_solution_scale_per_field`
-helper and its unused buffer.
+All five surviving gates (1–4, 7) are dimensionally sound. The two OSGS outer drift gates (5, 6) — which
+were dimensionally suspect (absolute tolerance vs scale-dependent drift) but empirically inert for covariance
+— no longer exist: they were deleted with the entire staggered outer loop in the 2026-06-07 leaning to the
+single coupled OSGS mode. The only P5 code change was the removal of the dead
+`_resolve_solution_scale_per_field` helper and its unused buffer.

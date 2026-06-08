@@ -52,24 +52,45 @@ Each is verified against the working tree. Severity is the author's call.
   covariant `eps_val`; snapshot in `test/extended/ManufacturedSolutions/previous_results/_archive_postFix_covariant_complete/`).
   Findings, now definitive:
   - **Scope:** OSGS velocity rates collapse only at **Da=1e6 with Re ∈ {1e-6, 1}** — H¹ rate **0.62–0.83**
-    (vs ASGS ~1.1–2.1), L² **1.59–1.78** (vs ASGS ~1.9–2.65). At **Re=1e6, same Da=1e6 OSGS is healthy**
-    (2.0/1.0). For Da ∈ {1e-6, 1} OSGS matches or beats ASGS everywhere.
+    (vs ASGS ~1.1–2.1), L² **1.59–1.78** (vs ASGS ~1.9–2.65) in this pre-leaning snapshot. At **Re=1e6,
+    same Da=1e6 OSGS is healthy** (2.0/1.0). For Da ∈ {1e-6, 1} OSGS matches or beats ASGS everywhere.
+    *(These magnitudes are the pre-leaning snapshot; for the current post-leaning numbers — final-segment
+    H¹ ~0.71–0.74 at α₀ ∈ {0.5, 1}, recovering to 0.95 at α₀=0.05 — see the canonical
+    [`mms/convergence-baseline.md`](mms/convergence-baseline.md). The verdict is unchanged.)*
   - **It is reaction-dominance, not the porosity fold:** the stagnation is just as severe at **α₀=1**
     (1.59/0.62, no porosity layer) as at α₀=0.05 — i.e. independent of α₀, a different axis from the
     high-Re/low-α₀ coarse-mesh fold.
   - **It is not the gates/encoding:** scale-covariance is fixed and verified, yet the stagnation persists
     exactly where predicted.
-  - **It is the fixed point, not the staggered map (CORRECTED 2026-06-05).** The earlier account here —
-    "discrete staggered map oscillating ~1e-4, budget exhausted" — is **superseded**. A controlled A/B
-    varying only the projection coupling (`staggered` vs `coupled`, the latter recomputing `π=Π(R(u))`
-    every Newton iteration with no staggering lag) gives **bit-identical errors to ~4 sig figs across 5+
-    meshes**, with `coupled` converging *gracefully* to `ftol`. So the staggered loop *does* reach the
-    fixed point; the "budget exhausted" flag is the MMS *plateau-rate* verifier giving up, not a failed
-    solve. The suboptimality is a property of the **OSGS discrete fixed point itself**, matching the
-    coercivity gap of [`../theory/osgs_reaction_note.tex`](../theory/osgs_reaction_note.tex) Prop. 1
-    (degrades with Da_h, recovers with Re_h). The reaction-projection trim is correct and *exonerated*.
-  - **Open:** the realized H¹ rate creeps upward (0.57→0.74 over N=10→320), so *slow pre-asymptotic
-    climb* vs *asymptotic reduction* is unresolved; a fine ladder (N=640, 1280) settles it.
-  - **Full write-up, evidence tables, and options** (incl. the `freeze_after_k` recommendation and the
-    formulation-level "split-OSGS" lever): canonical doc
-    [`solver/osgs-reaction-dominated-rate.md`](solver/osgs-reaction-dominated-rate.md).
+  - **It is the fixed point itself (CORRECTED 2026-06-05; updated 2026-06-08 for the coupled leaning).**
+    The earliest account here — "discrete staggered map oscillating ~1e-4, budget exhausted" — was
+    **superseded** by a controlled A/B (then varying only the projection coupling, `staggered` vs
+    `coupled`) that gave bit-identical errors to ~4 sig figs across 5+ meshes, with the coupled solve
+    converging *gracefully* to `ftol`. Since the 2026-06-08 leaning the **`coupled` solve is the sole
+    production OSGS path** — one inexact-Newton solve recomputing `π=Π(R(u))` at every residual
+    evaluation; the `staggered` map (and its outer relaxation loop) no longer exists in code. The
+    conclusion stands and is now cleaner to state: the coupled solve **does** reach the discrete fixed
+    point (it iterates to `ftol_reached`), so the suboptimality is a property of the **OSGS discrete
+    fixed point itself**, matching the coercivity gap of
+    [`../theory/osgs_reaction_note.tex`](../theory/osgs_reaction_note.tex) Prop. 1 (degrades with Da_h,
+    recovers with Re_h). The reaction-projection trim is correct and *exonerated*. The old
+    "budget exhausted" flag was the MMS *plateau-rate* verifier giving up, not a failed solve — and note
+    that the coupled solve is **exempt from the Stage-I stall sensor** (`stall_window=0`): its slow,
+    monotone, linear-rate convergence is *not* a stall. Mis-enabling that sensor on the coupled path is a
+    distinct, newer failure mode — it bails the solve after ~2 steps and lets `OSGS_INNER_POLICY` accept
+    the `no_progress_stall` as success, so OSGS silently degenerates into ASGS and reports ASGS's optimal
+    H¹ rate (~1.0) under the OSGS label (regression found and fixed 2026-06-08; see
+    [`../docs/lessons_learned.md`](lessons_learned.md) 2026-06-08).
+  - **RESOLVED by deep audit (2026-06-06): genuine, pre-asymptotic — not a bug.** A 22-agent code/theory
+    audit + three independent empirical checks settled it. (i) **Annihilation probe**: `‖(I−Π)(σu_h)‖/‖σu_h‖
+    = 3e-16` (machine-exact, with the Dirichlet lift) ⇒ the trim is bit-identical to full-residual OSGS at
+    the fixed point — trim **exonerated**. (ii) **Da-sweep** (fixed mesh): OSGS is bit-optimal at Da≤10²,
+    *super-convergent recovery* at Da=10⁴ as the mesh-Damköhler `Da_h = σh²/(c₁ν) = Da·α∞/(c₁N²)` crosses 1,
+    degraded only at Da=10⁶ — Da-gated, so **pre-asymptotic** (gap closes ∝1/N²), not a bug. (iii)
+    **Full-vs-trim A/B**: full-residual OSGS is **solver-unstable** at high σ (stalls/diverges → ASGS
+    fallback); the trim's `−σ·du` Jacobian term is load-bearing for stability — *why the paper trims*.
+    NOTE: the audit's auto-synthesis wrongly called it a "code-bug" by misreading the ASGS-fallback as
+    "full-OSGS optimal"; refuted by the probe. **Root cause = the OSGS coercivity gap (Prop. 1), pre-asymptotic.**
+  - **Fix** (for optimal rate at practical meshes) = formulation-level **split/term-by-term OSGS** (keep the
+    reactive term with ASGS identity-projection; convection+pressure orthogonal). Full detail + evidence
+    tables: canonical doc [`solver/osgs-reaction-dominated-rate.md`](solver/osgs-reaction-dominated-rate.md) §8.

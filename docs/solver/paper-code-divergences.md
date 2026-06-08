@@ -109,12 +109,10 @@ A future audit that re-raises P-001 ("τ₂ missing ε·h²") or P-008 ("τ₁ m
 ## 5. OSGS Preconditioning \u0026 Linearization Architecture
 **Location**: `src/solvers/porous_solver.jl`
 
-**Paper Theory**: In section 6.2 (Eq. 107a-107c), the theoretical staggered iterative scheme for the Orthogonal Subgrid Scale (OSGS) implicitly defines dual architectural boundaries: 
-1. The global momentum mapping applies a standard Picard (Oseen) linearization $B_S(\mathbf{u}^{m-1}, U_h^m)$.
-2. The orthogonal tracking subspace implies projection tests natively down generic finite element bounds utilizing standard physical topologies $\langle W_h, \boldsymbol{\pi}_h^m \rangle$.
+**Paper Theory**: In section 6.2 (Eq. 107a-107c), the paper presents a *staggered* iterative scheme for the Orthogonal Subgrid Scale (OSGS): an outer fixed-point that freezes the projection $\boldsymbol{\pi}_h^{m-1}$, performs a Picard (Oseen) momentum solve $B_S(\mathbf{u}^{m-1}, U_h^m)$, then updates $\langle W_h, \boldsymbol{\pi}_h^m \rangle$. This presentation implies two architectural boundaries: the global momentum linearization, and the orthogonal tracking subspace on which the projection lives.
 
-**Code Reality**: `[code-divergent-superior]` The numerical codebase explicitly diverges across both domains to enforce rigid numerical convergence guarantees missing from standard Picard iteration boundaries:
-1. **Exact-Newton Tangent Mapping**: Rather than settling for slow, linear Picard evaluation during the primary operator resolution, the nested subgrid extraction evaluates a fully consistent, exact Newton-Raphson tangent derivative Jacobian recursively (`ExactNewtonMode()`). This rigorously accelerates the sub-scale adaptation organically scaling cleanly quadratic internally.
+**Code Reality**: `[code-divergent-superior]` The codebase does **not** implement the staggered outer loop. As of the 2026-06-08 solver leaning, OSGS has a **single coupling mode** — the *coupled* solve — which is the only route to the OSGS fixed point. It diverges from the paper's staggered presentation in two ways, both of which reach the same converged orthogonal residual $\tilde{R} = R - \Pi(R)$:
+1. **Coupled Single Newton Solve (no staggering lag)**: Instead of freezing $\boldsymbol{\pi}_h$ across an outer relaxation loop, one Newton solve is run whose **residual re-projects $\boldsymbol{\pi}_h = \Pi(R(\mathbf{u}))$ from the current iterate at every residual evaluation**. The Jacobian stays the **local frozen-$\boldsymbol{\pi}$ form** (sparse — *not* the prohibitive monolithic $\partial\boldsymbol{\pi}/\partial\mathbf{u}$ tangent), so this is a Picard-type coupling on the projection while the rest of the tangent is the exact-Newton (`ExactNewtonMode()`) form. Removing the staggered freeze eliminates the lag that made the outer map contract only linearly; the per-evaluation re-projection is the cheap Cholesky-cached mass solve (`discrete_l2_projection`). This converges to the same OSGS fixed point as the staggered scheme, with the goal of reaching it in roughly ASGS iteration counts. (The residual-evaluation projection cost is the motivation for the deferred JFNK linear-convergence fix; see `theory/osgs_algorithm.tex`.)
 2. **Topologically Unconstrained Orthogonal Projection Bounds**: Classic geometric mapping assumes $W_h \subset \mathcal{V}_h(\Omega)$, inherently inheriting Dirichlet walls. In manufactured mathematical benchmarks, forcing boundary nodes to mirror extreme Dirichlet velocity assumptions annihilates the exact $L^2$-projection, causing an unphysical $O(1)$ residual explosion isolating $O(h^4)$ bounds explicitly on boundaries. To protect analytical limits perfectly, the codebase executes the projection bounds on dynamically unbound spaces (`V_free/Q_free` totally structurally stripped of geometric zero conditions). This protects pure optimal interpolation mathematically and empirically identically.
 
 ---
@@ -123,11 +121,11 @@ A future audit that re-raises P-001 ("τ₂ missing ε·h²") or P-008 ("τ₁ m
 
 **Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl) — `discrete_l2_projection` call site for `pi_p_next` ([line 256](../../src/solvers/porous_solver.jl#L256)). Also informs the projection-space selection at the `Q_proj = Q_free` assignment ([line 1094](../../src/solvers/porous_solver.jl#L1094)).
 
-**Status**: `[deferred]` — explicitly considered, intentionally **not** applied as of the Phase 5 batch. Documented here for future reconsideration. The companion plan item, **Phase 5 §3.6** of [algorithm-improvement-plan.md](algorithm-improvement.md), is excluded from the Phase 5 batch but is kept on the long-term ledger.
+**Status**: `[deferred]` — explicitly considered, intentionally **not** applied as of the Phase 5 batch. Documented here for future reconsideration. The companion plan item, **Phase 5 §3.6** (pressure-mean-removal), is excluded from the Phase 5 batch but is kept on the long-term ledger.
 
 ### The discrete operator the code currently uses
 
-For each OSGS outer iteration, the pressure-side projection $\pi_h^p$ is computed by an unweighted $L^2$ projection of the strong mass residual $R_p$ onto the FE space $\mathcal{Q}_h$. The projection space `Q_proj` is built from `Q_free` ([src/run_simulation.jl](../../src/run_simulation.jl)) — a `TestFESpace` with **no Dirichlet constraint and no zero-mean constraint**. So the resulting $\pi_h^p$ in general carries a non-zero constant mode equal to the $L^2$-mean of $R_p$.
+At every residual evaluation of the coupled OSGS solve, the pressure-side projection $\pi_h^p$ is recomputed by an unweighted $L^2$ projection of the strong mass residual $R_p$ onto the FE space $\mathcal{Q}_h$. The projection space `Q_proj` is built from `Q_free` ([src/run_simulation.jl](../../src/run_simulation.jl)) — a `TestFESpace` with **no Dirichlet constraint and no zero-mean constraint**. So the resulting $\pi_h^p$ in general carries a non-zero constant mode equal to the $L^2$-mean of $R_p$.
 
 ### What the paper says about the pressure gauge
 
@@ -141,7 +139,7 @@ The OSGS projection operator $\pi_h$ is defined in `eq:NonlinearResidualProjecti
 
 ### The candidate change — §3.6 of the plan
 
-The deferred patch is the cheap post-hoc form from [algorithm-improvement-plan.md §3.6](algorithm-improvement.md):
+The deferred patch is the cheap post-hoc form (plan §3.6):
 
 ```julia
 pi_p_next = discrete_l2_projection(R_p, ...)
@@ -153,7 +151,7 @@ i.e. subtract the $L^2$ mean from the projected scalar field, restricting $\pi_h
 
 ### Why it is plausibly beneficial
 
-The constant mode in $\pi_h^p$ is **inert for the velocity-side stabilization gradient** (the gradient annihilates constants), but it **inflates the projection-drift metric $d_\pi^m$** used as an OSGS convergence test ([osgs_algorithm.tex](../../theory/osgs_algorithm.tex), §"OSGS stopping mode"). Mean removal would keep $d_\pi^m$ clean of constant-mode noise and is expected to slightly improve pressure-rate measurements in MMS sweeps where $\alpha_0$ is small and the constant-mode pollution scales unfavourably.
+The constant mode in $\pi_h^p$ is **inert for the velocity-side stabilization gradient** (the gradient annihilates constants), but it is carried along by the **per-evaluation re-projection $\pi_h^p = \Pi(R_p(\mathbf{u}))$ inside the coupled solve** — every residual evaluation re-derives the constant mode from the current iterate's mass residual. Mean removal would strip that constant-mode noise from the projected scalar field and is expected to slightly improve pressure-rate measurements in MMS sweeps where $\alpha_0$ is small and the constant-mode pollution scales unfavourably.
 
 ### Why §3.6 is **not** in Phase 5
 
@@ -178,7 +176,7 @@ Three independent concerns, all flagged during the planning discussion that prec
 §3.6 should be re-considered when **any one** of the following becomes true:
 
 1. **A non-all-Dirichlet test config is added to the regression suite** (e.g. an open-outlet MMS variant, a Cocquet-style benchmark with traction BCs). At that point the regime branch is unavoidable and the right time to land Option B with a `bc_regime`-aware switch.
-2. **Post-Phase-5 MMS sweep shows pressure-rate sub-optimality traceable to constant-mode noise in $d_\pi^m$.** Symptom: OSGS outer iterations stall at large $d_\pi^m$ values whose $L^2$ decomposition is dominated by the constant mode. Diagnostic: dump `sum(∫(pi_p_next)dΩ)` per outer iteration on a coarse mesh and compare against the full $\|\pi_h^p\|_{L^2}$.
+2. **Post-Phase-5 MMS sweep shows pressure-rate sub-optimality traceable to constant-mode noise in the projected $\pi_h^p$.** Symptom: the coupled-solve pressure residual stagnates with a $\pi_h^p$ whose $L^2$ decomposition is dominated by the constant mode. Diagnostic: dump `sum(∫(pi_p_x)dΩ)` per residual evaluation (or for the final self-consistent $\pi_h^p$) on a coarse mesh and compare against the full $\|\pi_h^p\|_{L^2}$.
 3. **Phase 6 §2.1 continuation runs at $\alpha_0 = 0.05$** (narrow channel) show pressure-rate degradation in the corner cells. The constant-mode pollution scales unfavourably at small $\alpha_0$ per the critical-analysis discussion.
 4. **The paper-code-divergences ledger gains another mass-side entry** that interacts with the pressure space definition (different mass-residual form, different penalty, different test space). At that point the pressure-space treatment becomes part of a larger formal review and §3.6 should be settled definitively.
 
@@ -196,18 +194,17 @@ Three independent concerns, all flagged during the planning discussion that prec
 
 ---
 
-## 7. Three-Way Asymmetry in the Legacy `max_iters_caught` Exception Path — `[code-actual]`
+## 7. Two-Way Asymmetry in the Legacy `max_iters_caught` Exception Path — `[code-actual]`
 
-**Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl) — `_initialize_asgs_state!` (Stage I), `_run_osgs_inner_cascade!` (Stage II inner), `_run_asgs_mms_extension!` (MMS extension).
+**Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl) — `_initialize_asgs_state!` (Stage I), `_run_asgs_mms_extension!` (MMS extension).
 
-**Paper Theory**: Algorithm B (`theory/osgs_algorithm.tex` §"The shared cascade") describes a Newton→Picard→Newton cascade that is reused at three call sites. The pseudocode is mode-agnostic with respect to *how* a non-converged Newton exit is detected — only the success/failure binary matters.
+**Paper Theory**: Algorithm B (`theory/osgs_algorithm.tex` §"The shared cascade") describes a Newton→Picard→Newton cascade that is reused at these call sites. The pseudocode is mode-agnostic with respect to *how* a non-converged Newton exit is detected — only the success/failure binary matters.
 
-**Apparent Divergence**: The legacy Gridap exception path (`"Reached maximum iterations"`, caught as `:max_iters_caught` by `safe_fe_solve!`) is treated *differently* at the three sites:
+**Apparent Divergence**: The legacy Gridap exception path (`"Reached maximum iterations"`, caught as `:max_iters_caught` by `safe_fe_solve!`) is treated *differently* at the two surviving sites:
 - Stage I: structural failure → Picard fallback fires (matches the "Stage I quadratic-basin guarantee" addendum).
-- Stage II inner: single-iteration partial success, `iter_count` increments, no fallback, log line emitted.
 - ASGS-MMS extension: single-iteration partial success, `iter_count` increments, no fallback, **no** log line emitted.
 
-**Paper Alignment**: `[code-actual]` — These three policies are documented additions to Algorithm B, not divergences from it. The modern `SafeNewtonSolver` exits cleanly with `stop_reason = "max_iters_stagnation"` on the `:ok` path; the exception path is purely defensive against legacy or non-`SafeNewtonSolver` solver instances and is normally never taken. The paper now explicitly enumerates the three policies in `theory/osgs_algorithm.tex` §"The shared cascade" (paragraph "Legacy `max_iters_caught` exception path").
+**Paper Alignment**: `[code-actual]` — These policies are documented additions to Algorithm B, not divergences from it. The modern `SafeNewtonSolver` exits cleanly with `stop_reason = "max_iters_stagnation"` on the `:ok` path; the exception path is purely defensive against legacy or non-`SafeNewtonSolver` solver instances and is normally never taken. The paper now explicitly enumerates the three policies in `theory/osgs_algorithm.tex` §"The shared cascade" (paragraph "Legacy `max_iters_caught` exception path").
 
 **Re-evaluation trigger**: If a custom non-`SafeNewtonSolver` is plugged into the solver stack, or if Gridap's exception contract changes, re-audit which policy each site should apply.
 
@@ -222,12 +219,12 @@ Three independent concerns, all flagged during the planning discussion that prec
 **Implementation Reality**: `eval_time` measures the cumulative wall time of three regions:
 1. Stage I cascade (`@elapsed` around `_initialize_asgs_state!`).
 2. ASGS-MMS extension cycle loop (`@elapsed` *inside* `_run_asgs_mms_extension!`, around the cycle loop only).
-3. OSGS outer staggered loop (`@elapsed` *inside* `_run_osgs_relaxation!`, around the for-loop only).
+3. OSGS coupled solve (`@elapsed` *inside* `_run_osgs_relaxation!`, around the single coupled `begin … end` block only).
 
 Crucially, `eval_time` **excludes**:
 - OSGS mass-matrix assembly and Cholesky factorisation (run-once setup; lives outside the `@elapsed` block in `solve_system`).
 - The ASGS-MMS extension's setup (oracle call, local-solver construction).
-- The OSGS post-loop `mms_budget_exhausted` check.
+- The post-coupled-block `pi_u`/`pi_p` diagnostic writes in `_run_osgs_relaxation!`.
 - All `diag_cache` writes after the timed regions.
 
 **Paper Alignment**: `[code-actual]` — `eval_time` is the *iterative* wall time, not the *total* per-call wall time. Use a wall-clock `@elapsed` wrapper around the whole `solve_system` call if total cost is needed; that figure will be larger than `eval_time` by the OSGS setup cost (which can be a non-trivial chunk on large meshes).
@@ -236,14 +233,13 @@ Crucially, `eval_time` **excludes**:
 
 ---
 
-## 9. `mms_budget_exhausted` Reports Solver Success, Not Verification Success — `[paper-faithful]` (post P-007/Fix-6)
+## 9. OSGS MMS Stop Reason Reports Solver Success, Not Verification Success — `[paper-faithful]` (post P-007/Fix-6)
 
-**Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl), end of `_run_osgs_relaxation!`.
+**Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl), end of `_run_osgs_relaxation!` (~lines 780/783).
 
 **Paper Theory**: `theory/osgs_algorithm.tex` Algorithm C (OSGS branch with MMS hook) and Algorithm D (plateau verifier). The new paragraph "Budget exhaustion is not a verification failure of the solver" in §"How Algorithm D hooks into the core" now states the contract explicitly.
 
-**Implementation Reality**: When the OSGS outer-loop budget exhausts without the plateau test firing, the solver returns
-`(S_solver, S_plat, …) = (True, False, …)` with `diag_cache["mms_stop_reason"] = "mms_budget_exhausted"`. The base OSGS fixed point converged (necessary for the post-loop check to even fire); the plateau verifier ran out of samples.
+**Implementation Reality**: The coupled OSGS solve is a single Newton solve, not a staggered budget that can "exhaust." When MMS verification is active and the coupled solve converges, `_run_osgs_relaxation!` sets `diag_cache["mms_plateau_reached"] = true` with `diag_cache["mms_stop_reason"] = "coupled_single_solve"`; if the converged $\|e_u\|_{L^2}$ exceeds `rate_check_factor · h^(kv+1)` (the pre-asymptotic high-Da coercivity gap), the reason is instead set to `"coupled_at_suboptimal_rate"` and the solver still returns success. Either way the *solver* succeeded (the OSGS fixed point was reached); the second flag carries whether the converged error met the optimal-rate budget. The legacy `"mms_budget_exhausted"` reason now belongs solely to the ASGS-MMS extension path (`_run_asgs_mms_extension!`), not the OSGS path.
 
 **Paper Alignment**: `[paper-faithful]` — the documented two-flag split (`solver_success, mms_plateau_success`) is the resolution of audit finding P-007 / Fix 6 ("solver success conflated with verification success"). Callers must read both flags. The P-007 follow-up in the audit-findings triage plan migrates *callers* to use the second flag explicitly; the solver-side contract is already in this final form.
 

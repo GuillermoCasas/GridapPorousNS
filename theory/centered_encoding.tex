@@ -25,6 +25,10 @@
 \begin{document}
 \maketitle
 
+\noindent\emph{Status note.} The OSGS staggered loop these diagnostics
+reference was deleted in the 2026-06-07 coupled-only leaning; the encoding
+conclusions are unaffected.
+
 \section{Motivation}
 
 The stabilized FE solver in this codebase is dimensional. Its inputs are
@@ -60,12 +64,12 @@ While the dimensionless physics is unchanged, this one-sided spread breaks
 numerical components of the stabilized solver that are not scale-invariant
 once round-off enters:
 \begin{itemize}
-  \item the OSGS staggered fixed-point's $L^2$ projection
-        $\pi_h$ of the strong residual evaluates
+  \item the OSGS strong-residual $L^2$ projection
+        $\pi_h = \Pi(R(\boldsymbol{u}))$ evaluates
         $\sigma\,\boldsymbol{u}_h$ and $\nu \Delta \boldsymbol{u}_h$ at
         near-precision-floor $\boldsymbol{u}_h$ when
         $\boldsymbol{u}_h \sim 1/\sigma$, amplifying floating-point noise
-        into a non-contractive $\pi_h$ update sequence;
+        in $\pi_h$;
   \item the assembled Jacobian's row magnitudes span 12 orders, which the
         direct factorisation absorbs but the Newton merit function and
         line-search tolerances do not;
@@ -227,8 +231,8 @@ $\alpha_\infty = 1$, giving $U = 10^{-9}$ and $\sigma = 10^{3}$ exactly.
   \midrule
   $\nu$                           & $10^{6}$            & $1.41\cdot10^{-3}$ \\
   $\sigma$                        & $10^{12}$           & $1.41\cdot10^{3}$ \\
-  OSGS staggered iters            & 25 (budget)         & 0 (immediate) \\
-  $\pi_u$-drift                   & $7.6\cdot10^{8}$    & $1.03\cdot10^{-6}$ \\
+  OSGS staggered iters$^{\dagger}$            & 25 (budget)         & 0 (immediate) \\
+  $\pi_u$-drift$^{\dagger}$                   & $7.6\cdot10^{8}$    & $1.03\cdot10^{-6}$ \\
   \texttt{overall\_converged}     & \texttt{false}      & \texttt{true} \\
   Initial residual                & $1.27\cdot10^{-3}$  & $3.08\cdot10^{-10}$ \\
   $L^{2}(\boldsymbol{u})$         & $1.07\cdot10^{-3}$  & $4.72\cdot10^{-4}$ \\
@@ -236,7 +240,12 @@ $\alpha_\infty = 1$, giving $U = 10^{-9}$ and $\sigma = 10^{3}$ exactly.
   \bottomrule
 \end{tabular}
 \end{center}
-\noindent The OSGS staggered fixed-point's projection drift drops by
+\noindent ($^{\dagger}$ The ``OSGS staggered iters'' and ``$\pi_u$-drift''
+rows are pre-leaning (2026-05-28) staggered-loop diagnostics, retained here
+because they quantify the strong-residual-projection conditioning that the
+encoding argument turns on; the staggered loop itself was deleted in the
+2026-06-07 coupled-only leaning. The conditioning conclusion is unchanged.)
+The strong-residual projection drift drops by
 \emph{fourteen orders of magnitude}. Same physics; the difference is the
 floating-point conditioning of the strong-residual projection.
 

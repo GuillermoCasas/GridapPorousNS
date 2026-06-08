@@ -11,16 +11,15 @@ canonical doc**; the rest are kept for traceability and carry a status header po
   `src/formulations/`, `src/stabilization/`, or `src/solvers/`.
 - [`known_issues.md`](known_issues.md) — open code-correctness issues found in the 2026-06-04 audit
   (report-only): the `cfg.phys.f_x` crash, `base_config.json` missing `eps_val`, schema/loader enum
-  drift, and the open OSGS high-Da rate stagnation.
+  drift, and the (now-characterised, not-a-bug) high-Da OSGS rate item.
 
 ## `mms/` — Manufactured-Solution convergence
 
 | Role | Doc | Notes |
 |---|---|---|
-| **Canonical** | [convergence-status.md](mms/convergence-status.md) | Grid-wide status & knowledge of the `(Re, Da, α₀, h)` sweep. |
+| **Canonical** | [convergence-status.md](mms/convergence-status.md) | Grid-wide status & knowledge of the `(Re, Da, α₀, h)` sweep. (Grid-wide physics is current; the caveat block predates the 2026-06-08 coupled-only leaning — see convergence-baseline.md for current numbers.) |
+| **Reference** | [convergence-baseline.md](mms/convergence-baseline.md) | Per-cell baseline (H¹ rates + inner-iteration costs) from the corrected coupled-only solver — the authoritative post-leaning numbers; the reference future changes are measured against (JFNK target = OSGS iters; formulation target = high-Da rate). |
 | Sub-topic | [fold-recovery.md](mms/fold-recovery.md) | Stiff-corner fold diagnosis + continuation rescue (status §3, region B). |
-| Snapshot | [next-actions.md](mms/next-actions.md) | Dated action list (2026-06-02); its gate/cap "cure" is **superseded** (see `lessons_learned.md` 2026-06-02). |
-| Snapshot | [sweep-difficult-cases.md](mms/sweep-difficult-cases.md) | Convergence-difficulty taxonomy from a partial sweep (commit `15e466b`); historical. |
 
 (The raw artifacts of that partial sweep — `.partial-stdout.log`, `.partial.h5` — live under
 `../test/extended/ManufacturedSolutions/previous_results/`.)
@@ -40,12 +39,10 @@ canonical doc**; the rest are kept for traceability and carry a status header po
 |---|---|---|
 | **Canonical ref** | [paper-code-divergences.md](solver/paper-code-divergences.md) | Ledger of every code/paper divergence, classified and justified. Update when implementation diverges from the paper. |
 | **Canonical ref** | [algorithm-code-mapping.md](solver/algorithm-code-mapping.md) | 1:1 map from `osgs_algorithm.tex` algorithm boxes to `src/solvers/porous_solver.jl`. |
-| **Canonical** | [osgs-reaction-dominated-rate.md](solver/osgs-reaction-dominated-rate.md) | The open OSGS high-Da velocity-rate loss: `staggered`-vs-`coupled` evidence (it is the fixed point), the coercivity-gap mechanism, options + the `freeze_after_k` recommendation. |
-| Backlog | [efficiency-ideas.md](solver/efficiency-ideas.md) | Newton/Picard scheduling & convergence-gate proposals (2026-06-04). |
+| **Canonical** | [osgs-reaction-dominated-rate.md](solver/osgs-reaction-dominated-rate.md) | The (now-characterised, not-a-bug) high-Da OSGS velocity-rate loss: the coercivity-gap mechanism, with historical `staggered`-vs-`coupled` evidence that it is the fixed point (`coupled` is now the sole route). (The `freeze_after_k` recommendation here is SUPERSEDED — see the coupled-only-leaning doc below.) |
+| **Canonical** | [coupled-only-leaning-and-jfnk-plan.md](solver/coupled-only-leaning-and-jfnk-plan.md) | 2026-06-07 leaning: OSGS collapsed to a single `coupled` route (an equivalence oracle proved `freeze_after_k` diverges in the reaction corner), plus the deferred JFNK plan to recover near-quadratic speed (the dropped ∂π/∂U). |
+| Backlog | [efficiency-ideas.md](solver/efficiency-ideas.md) | Newton/Picard scheduling & convergence-gate proposals (2026-06-04; the ping-pong cascade has since landed). |
 | Audit | [normalization-audit.md](solver/normalization-audit.md) | Dimensional/scaling audit of every solver convergence/drift/divergence gate (encoding-invariance, P5 2026-06-04). |
-| Historical | [algorithm-improvement.md](solver/algorithm-improvement.md) | Consolidated critique → plan → progress (formerly three files). |
-| Historical | [refactor-brief.md](solver/refactor-brief.md) | The `solve_system` refactor brief. |
-| Transcripts | [code-audit-findings.md](solver/code-audit-findings.md), [reply.md](solver/reply.md) | Raw audit/review conversations. |
 
 ## `paper/` — about the SIAM article
 

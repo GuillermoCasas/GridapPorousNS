@@ -143,23 +143,28 @@ is computed, and the sub-grid scale is identified with
 $(I-\Pi_h)\mathcal{R}$. The projection itself depends on
 $U_h = (\boldsymbol{u}_h, p_h)$, so a fully monolithic Jacobian would
 embed the Fr\'echet derivative of an $L^2$ projection operator. Rather
-than carrying this dense block, the solver freezes $\boldsymbol{\pi}_h$,
-solves the nonlinear primary system, then re-projects, in a staggered
-(block-coordinate) fixed point.
+than carrying this dense block, the solver \emph{slaves}
+$\boldsymbol{\pi}_h$ to the current iterate: every residual evaluation
+re-projects $\boldsymbol{\pi}_h = \Pi(\mathcal{R}(U_h))$ via a cached
+mass solve while the assembled Jacobian holds it frozen, so the primary
+system is driven to its root by a single inexact-Newton solve rather
+than an outer fixed point.
 
 \paragraph{Architecture of the response.}  The architecture that emerges
 is a two-stage cascade. \emph{Stage~I} drives the algebraic system to a
 converged ASGS state, regardless of the final stabilization method
 requested. \emph{Stage~II} either reports the ASGS state directly or,
-when the user has selected OSGS, runs a staggered outer loop on
-$(U_h, \boldsymbol{\pi}_h)$ initialised at the Stage~I solution. The
+when the user has selected OSGS, runs a single coupled Newton solve on
+$U_h$---with $\boldsymbol{\pi}_h$ re-projected from the current iterate
+at every evaluation---initialised at the Stage~I solution. The
 outermost orchestration (Algorithm~\ref{alg:O}) wires all of these
 together.
 
 \begin{quote}
 \itshape
 ASGS is always run first; OSGS, when requested, refines the ASGS state
-through a staggered projection loop.
+through a single coupled Newton solve whose residual re-projects
+$\boldsymbol{\pi}_h$ at every evaluation.
 \end{quote}
 
 % ============================================================
@@ -187,7 +192,7 @@ Figure~\ref{fig:hierarchy} shows the full tree.
      \footnotesize Newton$\to$Picard$\to$Newton cascade};
 
 \node[modnode, below right=18mm and 22mm of O] (C)
-    {\textbf{Algorithm~\ref{alg:C}}\\$\mathrm{OSGSFractionalRelaxation}$\\
+    {\textbf{Algorithm~\ref{alg:C}}\\$\mathrm{CoupledOSGSSolve}$\\
      \footnotesize Stage~II (OSGS mode)};
 
 \node[modnode, below=30mm of O] (A)
@@ -208,9 +213,7 @@ Figure~\ref{fig:hierarchy} shows the full tree.
 \draw[edge] (B.south) to[bend right=5]
     node[edgelbl, midway, fill=white] {Newton / Picard mode} (A.north west);
 \draw[edge] (C.south) to[bend left=5]
-    node[edgelbl, midway, fill=white] {inner cascade (per outer iter.)} (A.north east);
-\draw[edge, dashed] (C.west) to[bend right=20]
-    node[edgelbl, midway, fill=white] {reuses (Alg.~\ref{alg:B})} (B.east);
+    node[edgelbl, midway, fill=white] {single coupled Newton solve} (A.north east);
 \draw[edge] (A.south) -- (A1.north);
 \draw[edge] (A.south) -- (A2.north);
 \draw[edge] (A.south) -- (A3.north);
@@ -219,10 +222,10 @@ Figure~\ref{fig:hierarchy} shows the full tree.
 \caption{Module hierarchy of the core algorithm. Arrows point from
 caller to callee. Each edge is annotated with the calling context.
 Algorithm~\ref{alg:A} is the shared workhorse: Algorithm~\ref{alg:B}
-invokes it three times in sequence (Newton, then Picard, then Newton)
-with different Jacobians, and is itself reused by Algorithm~\ref{alg:C}
-once per staggered outer iteration with the projection
-$\boldsymbol{\pi}_h$ frozen (the dashed edge). Leaf primitives
+(Stage~I) invokes it three times in sequence (Newton, then Picard, then
+Newton) with different Jacobians, while Algorithm~\ref{alg:C} (Stage~II,
+OSGS) invokes it once as a single coupled Newton solve whose residual
+re-projects $\boldsymbol{\pi}_h$ at every evaluation. Leaf primitives
 A.1--A.3 are pure procedures with no further dependencies.}
 \label{fig:hierarchy}
 \end{figure}
@@ -280,16 +283,8 @@ $F_{\mathrm{div}}$       & \code{sol.divergence\_merit\_factor}     & Threshold 
 $\mathfrak{m}$           & (built into the \code{SafeNewtonSolver} as \code{.mode})  & Cascade mode: \code{:newton} (merit-Armijo) or \code{:picard} (monotone residual reduction); cf.\ §\ref{sec:dir-deriv} and Alg.~\ref{alg:A2}. \\
 \code{freeze\_cusp} & \code{sol.freeze\_jacobian\_cusp}   & Boolean: skip Jacobian recomputation at Forchheimer cusps to avoid singular updates. \\
 \midrule
-\multicolumn{3}{l}{\emph{OSGS staggered outer loop}} \\
-$N_{\mathrm{OSGS}}$      & \code{stab.osgs\_iterations}             & Cap on outer (staggered) iterations. \\
-$N_{\mathrm{inner}}$     & \code{stab.osgs\_inner\_newton\_iters}   & Cap on inner Newton iterations per outer step. \\
-$\tau_{\mathrm{OSGS}}$   & \code{stab.osgs\_tolerance}              & Tolerance on the state drift $d_{\mathrm{state}}^m$. \\
-$\tau_{\mathrm{proj}}$   & \code{stab.osgs\_projection\_tolerance}  & Tolerance on the mass-weighted projection drift $d_{\pi}^m$. \\
-$m_{\mathrm{w}}$         & \code{stab.osgs\_warmup\_iterations}     & Outer iterations during which the inner Newton uses a relaxed tolerance. \\
-$\tau_{\mathrm{w}}$      & \code{stab.osgs\_warmup\_tolerance}      & Relaxed inner tolerance during warmup. \\
-$\mathsf{Mode}_{\mathrm{drift}}$ & \code{stab.osgs\_state\_drift\_scale} & Drift metric: \code{Linf} or \code{L2\_mass}. See Sec.~\ref{sec:drift-modes}. \\
-$\mathsf{Mode}_{\mathrm{stop}}$  & \code{stab.osgs\_stopping\_mode}      & Convergence predicate: \code{state\_drift}, \code{projection\_drift}, or \code{both}. \\
-$m$, $\beta$             & \code{sol.accelerator.\{m,relaxation\_factor\}} & Anderson history depth and damping. \\
+\multicolumn{3}{l}{\emph{OSGS coupled solve}} \\
+$N_{\mathrm{OSGS}}$      & \code{stab.osgs\_iterations}             & Inner-Newton iteration cap for the single coupled OSGS solve (Alg.~\ref{alg:C}); the projection $\boldsymbol{\pi}_h$ is re-slaved every residual evaluation, so there is no separate outer-loop budget or drift criterion. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -306,8 +301,8 @@ $m$, $\beta$             & \code{sol.accelerator.\{m,relaxation\_factor\}} & And
 \textbf{Algorithm} & \textbf{Code entry point} \\
 \midrule
 $\mathrm{SimulationOrchestration}$ (Alg.~\ref{alg:O})   & \code{run\_simulation(path)} $\to$ \code{solve\_system(setup, form, solvers, cfg, x0)}. \\
-$\mathrm{RobustNonlinearCascade}$ (Alg.~\ref{alg:B})    & The Newton$\to$Picard$\to$Newton cascade inside \code{solve\_system}; appears twice---once for Stage~I (ASGS operators, $\boldsymbol{x}^0_{\mathrm{backup}}$) and once inside the OSGS outer-loop body of Algorithm~\ref{alg:C} (OSGS operators, $\boldsymbol{x}_{\mathrm{prev}}$ at the start of each outer iteration). \\
-$\mathrm{OSGSFractionalRelaxation}$ (Alg.~\ref{alg:C})  & The OSGS staggered loop inside \code{solve\_system}. \\
+$\mathrm{RobustNonlinearCascade}$ (Alg.~\ref{alg:B})    & The Newton$\to$Picard$\to$Newton cascade inside \code{solve\_system}; used only by Stage~I, the ASGS algebraic boot (\code{\_initialize\_asgs\_state!}, with ASGS operators and the restore vector $\boldsymbol{x}^0_{\mathrm{backup}}$). \\
+$\mathrm{CoupledOSGSSolve}$ (Alg.~\ref{alg:C})  & The single coupled OSGS Newton solve inside \code{solve\_system}: one \code{safe\_fe\_solve!} call on Algorithm~\ref{alg:A} whose residual re-slaves $\boldsymbol{\pi}_h$ at every evaluation. \\
 $\mathrm{ExactNewtonPipeline}$ (Alg.~\ref{alg:A})       & \code{\_safe\_solve\_inner!} (\code{src/solvers/nonlinear.jl}), reused with either an exact-Newton or a Picard Jacobian. \\
 $\mathrm{SolveLinearSystem}$ (Alg.~\ref{alg:A1})        & \code{eval\_linear\_system\_resolution!(dx, A, b, solver, cache)}. \\
 $\mathrm{ArmijoLinesearch}$ (Alg.~\ref{alg:A2})         & \code{eval\_armijo\_linesearch\_pass!}. \\
@@ -440,6 +435,269 @@ without any continuation driver (see \code{probe\_stiff\_findings.md},
 2026-05-19).
 
 % ============================================================
+\section{Explicit Algebraic Systems Solved at Each Stage}
+\label{sec:algebraic-systems}
+% ============================================================
+
+The orchestrator of Section~\ref{sec:orchestration} chains two solves
+whose mathematical contracts are easy to conflate. This section pins
+down, for each stage, the \emph{exact} algebraic system the solver puts
+to its Newton kernel, with explicit iteration indices and dependency
+arrows. The notation follows the companion article: $U_h = (\boldsymbol{u}_h, p_h)
+\in X_h$ is the resolved field, $V_h = (\boldsymbol{v}_h, q_h)$ the test
+field, $W_h$ a projection test field, $\mathcal{R}$ the strong residual,
+$\Pi$ the $L^2$ projection onto the finite element space, and
+$\widetilde{U}$ the subgrid scale. We write $B(\boldsymbol{a}; U_h, V_h)$
+for the Galerkin form linearised about advection $\boldsymbol{a}$, and
+$B_S$, $L_S$ for the stabilised forms defined below.
+
+% ------------------------------------------------------------
+\subsection{The continuous strong problem and the residual operator}
+\label{sec:alg-continuous}
+
+The stationary differential operator is
+$\mathcal{L}_{\boldsymbol{w}} U
+  = -\partial_i (K_{ij}\partial_j U)
+  + A_{c,i}(\boldsymbol{w})\partial_i U
+  + A_{f,i}\partial_i U
+  + S(\boldsymbol{w}) U$ (the CDR form of the companion article,
+eq.~\eqref{eq:strong} written component-wise), and the strong problem is
+$\mathcal{L}_{\boldsymbol{u}} U = F$ with $F = (\boldsymbol{f}, g)$. The
+\emph{strong residual operator} evaluated at a state $U$ with advection
+frozen at $\boldsymbol{w}$ is
+\begin{equation}
+    \label{eq:alg-strong-residual}
+    \mathcal{R}_{\boldsymbol{w}} U
+        \;:=\; \mathcal{L}_{\boldsymbol{w}} U - F
+        \;=\;
+        \begin{pmatrix}
+            \mathcal{R}^{\boldsymbol{u}}_{\boldsymbol{w}}(U) \\[1mm]
+            \mathcal{R}^{p}(U)
+        \end{pmatrix},
+\end{equation}
+whose two components are exactly what the code assembles:
+\begin{align}
+    \label{eq:alg-Ru}
+    \mathcal{R}^{\boldsymbol{u}}_{\boldsymbol{w}}(U)
+        &= \alpha\,(\boldsymbol{w}\!\cdot\!\nabla)\boldsymbol{u}
+         + \alpha\,\nabla p
+         + \sigma(\alpha,\boldsymbol{w})\,\boldsymbol{u}
+         - \nabla\!\cdot\!\bigl(2\alpha\nu\,\Pi^{\mathrm{DS}}\nabla\boldsymbol{u}\bigr)
+         - \boldsymbol{f}, \\
+    \label{eq:alg-Rp}
+    \mathcal{R}^{p}(U)
+        &= \varepsilon\,p
+         + \alpha\,(\nabla\!\cdot\!\boldsymbol{u})
+         + \boldsymbol{u}\!\cdot\!\nabla\alpha
+         - g .
+\end{align}
+Here $\sigma(\alpha,\boldsymbol{u}) = a(\alpha) + b(\alpha)|\boldsymbol{u}|$
+is the Darcy--Forchheimer drag, $\varepsilon$ the pressure penalty, and
+the divergence has been expanded by the product rule,
+$\nabla\!\cdot\!(\alpha\boldsymbol{u}) = \alpha\,\nabla\!\cdot\!\boldsymbol{u}
++ \boldsymbol{u}\!\cdot\!\nabla\alpha$. Equations~\eqref{eq:alg-Ru}--\eqref{eq:alg-Rp}
+are the form realised in code; note that the plain strong
+form~\eqref{eq:strong} suppresses $\varepsilon p$, the porosity inside the
+divergence, and $g$, all of which are present here.
+
+% ------------------------------------------------------------
+\subsection{The discrete stabilised forms and the OSGS fixed point}
+\label{sec:alg-osgs-fixedpoint}
+
+The Galerkin bilinear form is
+\begin{equation}
+    \label{eq:alg-galerkin}
+    B(\boldsymbol{a}; U_h, V_h)
+        = \langle \boldsymbol{v}_h, \alpha\,\boldsymbol{a}\!\cdot\!\nabla\boldsymbol{u}_h\rangle
+        + 2\langle \nabla\boldsymbol{v}_h, \alpha\nu\,\Pi^{\mathrm{DS}}\nabla\boldsymbol{u}_h\rangle
+        + \langle \boldsymbol{v}_h, \alpha\nabla p_h\rangle
+        + \langle \boldsymbol{v}_h, \sigma\boldsymbol{u}_h\rangle
+        + \langle q_h, \varepsilon p_h\rangle
+        + \langle q_h, \nabla\!\cdot\!(\alpha\boldsymbol{u}_h)\rangle ,
+\end{equation}
+and $L(V_h) = \langle\boldsymbol{v}_h,\boldsymbol{f}\rangle + \langle q_h, g\rangle$. In the
+assembled weak form the pressure-gradient and viscous couplings are integrated
+by parts; e.g.\ the term $\langle\boldsymbol{v}_h,\alpha\nabla p_h\rangle$ is
+realised in code (\code{pres\_term}) as
+$-\langle\alpha\nabla\!\cdot\!\boldsymbol{v}_h + \nabla\alpha\!\cdot\!\boldsymbol{v}_h,\; p_h\rangle$.
+The stabilised forms add the subgrid coupling element by element, using
+the adjoint $\mathcal{L}^{*}_{\boldsymbol{w}}V_h$ and the local parameter
+matrix $\boldsymbol{\tau}_K(\boldsymbol{w}) = \mathrm{diag}(\tau_1,\tau_2)$:
+\begin{align}
+    \label{eq:alg-BS}
+    B_S(\boldsymbol{w}; U_h, V_h)
+        &:= B(\boldsymbol{w}; U_h, V_h)
+        - \sum_K \bigl\langle \mathcal{L}^{*}_{\boldsymbol{w}}V_h,\;
+            \boldsymbol{\tau}_K(\boldsymbol{w})\,\mathcal{R}_{\boldsymbol{w}} U_h \bigr\rangle_K , \\
+    \label{eq:alg-LS}
+    L_S(\boldsymbol{w}; V_h, \boldsymbol{\pi}_h)
+        &:= L(V_h)
+        - \sum_K \bigl\langle \mathcal{L}^{*}_{\boldsymbol{w}}V_h,\;
+            \boldsymbol{\tau}_K(\boldsymbol{w})\,(F - \boldsymbol{\pi}_h) \bigr\rangle_K .
+\end{align}
+The convective part of the adjoint carries a \emph{positive} sign,
+$(\mathcal{L}^{*}_{\boldsymbol{w}}V_h)_{\mathrm{conv}} = +\alpha\,\boldsymbol{w}\!\cdot\!\nabla\boldsymbol{v}_h$,
+because $B_S$ \emph{subtracts} the adjoint term; this sign is load-bearing
+(flipping it reproduces the anti-SUPG instability). The OSGS discrete
+problem is the fixed point
+\begin{subequations}
+\label{eq:alg-osgs-problem}
+\begin{align}
+    \label{eq:alg-osgs-B}
+    B_S(\boldsymbol{u}_h; U_h, V_h)
+        &= L_S(\boldsymbol{u}_h; V_h, \boldsymbol{\pi}_h)
+        && \forall V_h \in X_{h0}, \\
+    \label{eq:alg-osgs-proj}
+    \langle W_h, \boldsymbol{\pi}_h\rangle
+        &= \langle W_h, \mathcal{R}_{\boldsymbol{u}_h} U_h\rangle
+        && \forall W_h \in X_{\mathrm{free}}, \\
+    \label{eq:alg-osgs-subscale}
+    \widetilde{U}\big|_K
+        &= \boldsymbol{\tau}_K(\boldsymbol{u}_h)\,
+            \bigl(\mathcal{R}_{\boldsymbol{u}_h} U_h - \boldsymbol{\pi}_h\bigr)\big|_K ,
+\end{align}
+\end{subequations}
+where the test/trial space for the primary problem~\eqref{eq:alg-osgs-B}
+is the Dirichlet-constrained $X_{h0}$, while the projection~\eqref{eq:alg-osgs-proj}
+is posed on the \emph{unconstrained} space $X_{\mathrm{free}} =
+\boldsymbol{V}_{\mathrm{free}}\times Q_{\mathrm{free}}$ (projecting on the
+constrained space introduces an $O(1)$ boundary residual that destroys the
+$O(h^{k+1})$ rate). \textbf{ASGS} is the special case $\boldsymbol{\pi}_h
+\equiv 0$ of~\eqref{eq:alg-osgs-problem}, in which~\eqref{eq:alg-osgs-proj}
+is dropped entirely.
+
+% ------------------------------------------------------------
+\subsection{Stage~I --- the ASGS algebraic system}
+\label{sec:alg-stage1}
+
+Stage~I solves the ASGS problem ($\boldsymbol{\pi}_h \equiv 0$),
+regardless of the method ultimately requested: find $U_h^{\mathrm{ASGS}}
+\in X_{h0}$ such that
+\begin{equation}
+    \label{eq:alg-stage1-system}
+    B_S(\boldsymbol{u}_h^{\mathrm{ASGS}};\, U_h^{\mathrm{ASGS}}, V_h)
+        \;=\; L_S(\boldsymbol{u}_h^{\mathrm{ASGS}};\, V_h, \boldsymbol{0})
+        \qquad \forall V_h \in X_{h0},
+\end{equation}
+i.e.~\eqref{eq:alg-osgs-B}--\eqref{eq:alg-LS} with every projection term
+set to zero. Writing $\boldsymbol{b}^{\mathrm{ASGS}}(U_h)$ for the
+assembled residual of~\eqref{eq:alg-stage1-system}, the safeguarded
+Newton kernel (Algorithm~\ref{alg:A}, driven by the cascade of
+Algorithm~\ref{alg:B}) produces iterates $U_h^{\,j}$, $j = 0,1,2,\dots$,
+from the linearised system
+\begin{equation}
+    \label{eq:alg-stage1-newton}
+    \mathcal{J}^{\mathrm{ASGS}}(U_h^{\,j})\,\delta U^{\,j}
+        = -\,\boldsymbol{b}^{\mathrm{ASGS}}(U_h^{\,j}),
+    \qquad
+    U_h^{\,j+1} = U_h^{\,j} + \lambda^{\,j}\,\delta U^{\,j},
+\end{equation}
+with step length $\lambda^{\,j}$ chosen by the Armijo line search of
+Algorithm~\ref{alg:A2}. In exact-Newton mode the tangent
+$\mathcal{J}^{\mathrm{ASGS}}$ is consistent: it retains the full
+convective linearisation $\alpha(\nabla\delta\boldsymbol{u})^{\!\top}\!\boldsymbol{u}
++ \alpha(\nabla\boldsymbol{u})^{\!\top}\!\delta\boldsymbol{u}$ and the
+derivative terms $\partial\sigma/\partial\boldsymbol{u}$,
+$\partial\tau_1/\partial\boldsymbol{u}$, $\partial\tau_2/\partial\boldsymbol{u}$,
+$\partial\mathcal{L}^{*}/\partial\boldsymbol{u}$. The Picard fallback of
+the cascade freezes those derivative terms (advection frozen at
+$\boldsymbol{u}_h^{\,j}$), trading quadratic convergence for a wider basin.
+The converged $U_h^{\mathrm{ASGS}}$ is the output of Stage~I.
+
+% ------------------------------------------------------------
+\subsection{Stage~II --- the coupled OSGS solve}
+\label{sec:alg-stage2}
+
+When the method is OSGS, Stage~II solves the full fixed
+point~\eqref{eq:alg-osgs-problem} as a \emph{single} Newton loop on
+\begin{equation}
+    \label{eq:alg-stage2-F}
+    \mathcal{F}(U_h) \;=\; \boldsymbol{0},
+    \qquad
+    \mathcal{F}(U_h)
+        \;\longleftrightarrow\;
+        B_S(\boldsymbol{u}_h; U_h, V_h)
+        - L_S\bigl(\boldsymbol{u}_h; V_h, \boldsymbol{\pi}_h(U_h)\bigr),
+\end{equation}
+in which the projection is \emph{slaved} to the current iterate rather
+than lagged. Concretely, at Newton iterate $U_h^{\,k}$, $k = 0,1,2,\dots$
+(seeded with $U_h^{\,0} = U_h^{\mathrm{ASGS}}$, for which
+$\boldsymbol{\pi}_h^{\,0} = \boldsymbol{0}$), every residual evaluation
+first recomputes the projection from $U_h^{\,k}$,
+\begin{equation}
+    \label{eq:alg-stage2-proj}
+    \langle W_h, \boldsymbol{\pi}_h^{\,k}\rangle
+        = \langle W_h, \mathcal{R}_{\boldsymbol{u}_h^{\,k}} U_h^{\,k}\rangle
+        \quad \forall W_h \in X_{\mathrm{free}},
+    \qquad\text{i.e.}\qquad
+    \boldsymbol{\pi}_h^{\,k} = \boldsymbol{\pi}_h(U_h^{\,k}),
+\end{equation}
+which contrasts with the companion article's staggered scheme
+(its \code{eq:LinearizedOSGSProblem}), where $\boldsymbol{\pi}_h^{\,m}$ projects
+the residual at the \emph{outdated} iterate $U_h^{\,m-1}$. Equation
+\eqref{eq:alg-stage2-proj} is an $L^2$ mass solve, performed separately for
+velocity and pressure on the unconstrained spaces:
+\begin{equation}
+    \label{eq:alg-stage2-mass}
+    M_{\boldsymbol{u}}\,\boldsymbol{\pi}_{\boldsymbol{u}}^{\,k}
+        = \boldsymbol{b}_{\boldsymbol{u}}(U_h^{\,k}),
+    \qquad
+    M_{p}\,\boldsymbol{\pi}_{p}^{\,k}
+        = \boldsymbol{b}_{p}(U_h^{\,k}),
+\end{equation}
+with mass matrices $(M_{\boldsymbol{u}})_{ij} = \langle W_h^i, W_h^j\rangle_{\boldsymbol{V}_{\mathrm{free}}}$,
+$(M_p)_{ij} = \langle W_h^i, W_h^j\rangle_{Q_{\mathrm{free}}}$ and loads
+$(\boldsymbol{b}_{\boldsymbol{u}})_i = \langle W_h^i, \mathcal{R}^{\boldsymbol{u}}_{\boldsymbol{u}_h^{\,k}}(U_h^{\,k})\rangle$,
+$(\boldsymbol{b}_{p})_i = \langle W_h^i, \mathcal{R}^{p}(U_h^{\,k})\rangle$.
+Both $M_{\boldsymbol{u}}$ and $M_p$ are symmetric positive definite and
+state-independent, so they are assembled once and Cholesky-factored once;
+each evaluation of~\eqref{eq:alg-stage2-mass} is a back-substitution. (When
+$\sigma$ is constant, the reaction term $\sigma\boldsymbol{u}_h$ lies in
+$X_h$, so $(I-\Pi)(\sigma\boldsymbol{u}_h) = 0$ exactly and the velocity
+load omits it; see §\ref{sec:proj-policy}.)
+
+The Newton update is
+\begin{equation}
+    \label{eq:alg-stage2-newton}
+    \mathcal{J}(U_h^{\,k})\,\delta U^{\,k}
+        = -\,\mathcal{F}(U_h^{\,k}),
+    \qquad
+    U_h^{\,k+1} = U_h^{\,k} + \lambda^{\,k}\,\delta U^{\,k},
+\end{equation}
+where the residual $\mathcal{F}(U_h^{\,k})$ uses the freshly slaved
+$\boldsymbol{\pi}_h^{\,k}$ from~\eqref{eq:alg-stage2-mass}, but the tangent
+$\mathcal{J}(U_h^{\,k})$ is the \emph{frozen-$\boldsymbol{\pi}$} Jacobian:
+it differentiates $B_S$ in $(\sigma, \tau_1, \tau_2, \text{convection})$
+exactly --- including $\partial\sigma/\partial\boldsymbol{u}$,
+$\partial\tau_i/\partial\boldsymbol{u}$ and the full convective linearisation,
+as in~\eqref{eq:alg-stage1-newton} --- but \emph{drops} the dense coupling
+block $\partial\boldsymbol{\pi}_h/\partial U_h = M^{-1}\,\partial\boldsymbol{b}/\partial U_h$
+arising through~\eqref{eq:alg-stage2-mass}. Because that single block is
+omitted while the residual still re-slaves $\boldsymbol{\pi}_h$ at every
+$U_h^{\,k}$, Stage~II is an \emph{inexact} Newton iteration --- exact in
+$(\sigma,\tau,\text{conv})$, frozen in $\boldsymbol{\pi}$ --- converging
+linearly/superlinearly to the same fixed point~\eqref{eq:alg-osgs-problem}
+as the staggered scheme. The dropped block is precisely what the
+Jacobian-free recovery of §\ref{sec:jfnk} reinstates.
+
+% ------------------------------------------------------------
+\subsection{The inner safeguarded Newton objects}
+\label{sec:alg-inner}
+
+Both~\eqref{eq:alg-stage1-newton} and~\eqref{eq:alg-stage2-newton} are
+driven by the same kernel (Algorithm~\ref{alg:A}). The step length
+$\lambda^{\,j}$ / $\lambda^{\,k}$ is selected by minimising the diagonally
+equilibrated merit $\Phi_{\boldsymbol{w}}$ of~\eqref{eq:merit} along
+$-\delta U$, using the Armijo predicate of Algorithm~\ref{alg:A2}
+(Newton mode) or the monotone $\ell^\infty$ residual-reduction test
+(Picard-class steps); the linear solves are handled by
+Algorithm~\ref{alg:A1} and the divergence/stagnation guards by
+Algorithm~\ref{alg:A3}. We do not restate those objects here; the merit
+function and its Gauss--Newton directional-derivative identity are given
+in §\ref{sec:merit}--§\ref{sec:dir-deriv}, and the line search and
+safeguards in §\ref{sec:newton}.
+
+% ============================================================
 \section{The Top: Algorithm O (Orchestrator)}
 \label{sec:orchestration}
 
@@ -447,7 +705,7 @@ The orchestration drives one simulation end-to-end. Its central
 organising principle is a two-stage cascade: an unconditional ASGS
 algebraic initialisation followed by a method-dependent dispatch.
 Stage~I runs even when the user has requested OSGS, because the
-staggered projection loop is much better conditioned when initialised
+coupled OSGS Newton solve is much better conditioned when initialised
 at a converged ASGS state than at a zero initial guess.
 
 \moduleinterface
@@ -488,11 +746,10 @@ $(S, U_h^{\mathrm{ASGS}}) \gets \mathrm{RobustNonlinearCascade}(\boldsymbol{x}^0
 }
 \If{$\Theta.\mathrm{method} = \mathrm{OSGS}$}{
     pre-assemble and LU-factor $M_u = (V_{\mathrm{free}}, U_{\mathrm{free}})_{L^2}$, $M_p = (Q_{\mathrm{free}}, P_{\mathrm{free}})_{L^2}$ once\;
-    $\boldsymbol{\pi}_h^{0} \gets 0$ \tcp*{deliberate zero bootstrap; see §\ref{sec:osgs-bootstrap}}
     \extline{\If{$\code{mms\_cfg.enabled}$}{
-        $N_{\mathrm{OSGS}}^{\mathrm{eff}} \gets N_{\mathrm{OSGS}} + K_{\mathrm{extra}}$ \tcp*{inflate outer-loop budget for plateau verification}
+        $N_{\mathrm{OSGS}}^{\mathrm{eff}} \gets N_{\mathrm{OSGS}} + K_{\mathrm{extra}}$ \tcp*{inflate the coupled-solve Newton budget for plateau verification}
     }}
-    $(S, \boldsymbol{\pi}_h) \gets \mathrm{OSGSFractionalRelaxation}(U_h^{\mathrm{ASGS}}, \boldsymbol{\pi}_h^{0})$ \tcp*{Alg.~\ref{alg:C}; MMS hook in Alg.~\ref{alg:C} fires when \code{mms\_cfg.enabled}}
+    $(S, \boldsymbol{\pi}_h) \gets \mathrm{CoupledOSGSSolve}(U_h^{\mathrm{ASGS}})$ \tcp*{Alg.~\ref{alg:C}; $\boldsymbol{\pi}_h^0 = 0$ implied by the ASGS root; MMS hook in Alg.~\ref{alg:C} fires when \code{mms\_cfg.enabled}}
 }
 
 \vspace{0.15cm}
@@ -511,18 +768,19 @@ $O(h^{k+1})$ FE convergence rate.
 (Algorithm~\ref{alg:B}) composes an exact-Newton attempt, a Picard
 globalisation pass, and a final Newton polish, all with
 $\boldsymbol{\pi}_h \equiv 0$. The output $U_h^{\mathrm{ASGS}}$ is the
-algebraic root of the ASGS system; when Stage~II is OSGS, the
-staggered loop descends from this state with an already-converged
-primary field. The same cascade module is reused inside Stage~II
-(Algorithm~\ref{alg:C}) with the OSGS operators and a per-outer-iteration
-restore vector.
+algebraic root of the ASGS system; when Stage~II is OSGS, the coupled
+Newton solve descends from this state with an already-converged
+primary field. The cascade module is used only here, in Stage~I:
+Stage~II (Algorithm~\ref{alg:C}) is a single coupled Newton solve that
+calls the Newton kernel (Algorithm~\ref{alg:A}) directly, not the
+cascade.
 
 \paragraph{Stage II.}  Either accept the ASGS state, or hand off to the
-OSGS outer loop. The mass matrices $M_u, M_p$ are pre-assembled and
-LU-factored exactly once before the OSGS loop begins. Because the
-projection target spaces never change during the loop, these
-factorisations are reused at every outer iteration, which converts
-every $L^2$ projection into a constant-cost forward/back substitution.
+coupled OSGS Newton solve. The mass matrices $M_u, M_p$ are pre-assembled
+and LU-factored exactly once before the coupled solve begins. Because the
+projection target spaces never change, these factorisations are reused at
+every residual evaluation, which converts every $L^2$ re-projection of
+$\boldsymbol{\pi}_h$ into a constant-cost forward/back substitution.
 
 \paragraph{Failure propagation.}  If Stage~I returns $S = \mathrm{False}$,
 the orchestrator returns immediately without writing output. The
@@ -538,31 +796,27 @@ orchestration does not give up: it transitions to a Picard iteration
 map and then re-engages Newton. Algorithm~\ref{alg:B} packages this
 Newton $\to$ Picard $\to$ Newton cascade as a single \emph{generic}
 module that does not depend on which stabilisation mode it is driving.
-It is therefore reused as-is by both Stage~I (called from
-Algorithm~\ref{alg:O} with $\boldsymbol{\pi}_h \equiv 0$ and exact-Newton
-and Picard ASGS operators) and the inner solve of Stage~II (called from
-Algorithm~\ref{alg:C} once per staggered outer iteration with
-$\boldsymbol{\pi}_h$ frozen at the previous projection and OSGS-mode
-operators).
+It is used by Stage~I---the ASGS algebraic boot---called from
+Algorithm~\ref{alg:O} with $\boldsymbol{\pi}_h \equiv 0$ and the
+exact-Newton and Picard ASGS operators. Stage~II (the coupled OSGS solve
+of Algorithm~\ref{alg:C}) does \emph{not} use this cascade: it issues a
+single Newton solve through the kernel (Algorithm~\ref{alg:A}) directly.
 
-The only behavioural axis that varies between the two callers is the
-\emph{restore vector} used when Picard's first attempt has to be reset.
-Stage~I restores to a copy of the original initial guess
-$\boldsymbol{x}^0_{\mathrm{backup}}$ taken at the very start of the
-simulation; Stage~II restores to the iterate at the start of the
-current outer staggered iteration $\boldsymbol{x}_{\mathrm{prev}}$. The
-algorithm box below takes the restore vector as an explicit parameter,
-so that both callers reuse a single module without
-caller-specific branching.
+The cascade takes the \emph{restore vector} used when Picard's first
+attempt has to be reset as an explicit parameter. Stage~I restores to a
+copy of the original initial guess $\boldsymbol{x}^0_{\mathrm{backup}}$
+taken at the very start of the simulation. Carrying the restore vector as
+a parameter keeps the module self-contained and free of caller-specific
+branching.
 
 \moduleinterface
-    {Algorithm~\ref{alg:O} (Stage~I); Algorithm~\ref{alg:C} (OSGS inner solve, per outer staggered iteration)}
+    {Algorithm~\ref{alg:O} (Stage~I, the ASGS algebraic boot)}
     {Algorithm~\ref{alg:A} (invoked up to three times in sequence, with different Jacobians)}
     {Initial guess $\boldsymbol{x}^0$; restore vector $\boldsymbol{x}_{\mathrm{restore}}$; exact-Newton and Picard nonlinear operators $\mathrm{op}_{\mathrm{N}}, \mathrm{op}_{\mathrm{P}}$}
     {Success flag $S$ and the converged or best-seen iterate $\boldsymbol{x}^\star$}
 
 \begin{algorithm}[H]
-\caption{$\mathrm{RobustNonlinearCascade}$: the Newton $\to$ Picard $\to$ Newton cascade. Stage I instantiates $\boldsymbol{x}_{\mathrm{restore}}$ with a backup copy of the initial guess; Algorithm~\ref{alg:C} instantiates it with the iterate at the start of the current outer staggered iteration.}
+\caption{$\mathrm{RobustNonlinearCascade}$: the Newton $\to$ Picard $\to$ Newton cascade, used by Stage~I (the ASGS boot). Stage~I instantiates $\boldsymbol{x}_{\mathrm{restore}}$ with a backup copy of the initial guess.}
 \label{alg:B}
 \SetAlgoLined
 \textbf{Parameters:} $N_{\mathrm{N}}, N_{\mathrm{P}}, \textftol, \textstag$ and all Newton/line-search parameters from Table~\ref{tab:params}.\\
@@ -629,18 +883,19 @@ $\mathsf{stagnation\_noise\_floor\_reached}$---i.e.\ the residual has
 fallen below $\textstag$ but not below $\textftol$---Stage~I
 \emph{rejects} that as a success and falls through to Picard. This
 is intentional asymmetry: Stage~I is the only place where the iterate
-must enter the exact-Newton quadratic basin before the OSGS staggered
-loop can fragment the state via projections, and an extra Picard pass
+must enter the exact-Newton quadratic basin before the coupled OSGS
+solve re-slaves $\boldsymbol{\pi}_h$ to it, and an extra Picard pass
 on top of a noise-floor exit is a cheap empirical safeguard against
 starting OSGS from a non-quadratic-basin iterate. By contrast, the
-Stage~II inner cascade (called from Algorithm~\ref{alg:C}) accepts any
-non-structural Newton exit (including $\mathsf{stagnation\_noise\_floor\_reached}$,
-$\mathsf{xtol\_stagnation}$, $\mathsf{max\_iters\_stagnation}$): the
-OSGS outer loop re-evaluates convergence after every staggered
-iteration, so a non-tight inner exit is just outer-loop progress
-rather than a structural failure. The asymmetry exists in code
-because of this difference in what "good enough" means at each site;
-the Algorithm~\ref{alg:B} pseudocode above is the common subset.
+Stage~II coupled solve (Algorithm~\ref{alg:C}, which calls the kernel
+directly rather than this cascade) accepts any non-structural Newton
+exit (including $\mathsf{stagnation\_noise\_floor\_reached}$,
+$\mathsf{xtol\_stagnation}$, $\mathsf{max\_iters\_stagnation}$) as its
+result: with the projection slaved at every evaluation, a non-tight
+inner exit already sits at a self-consistent OSGS state rather than
+signalling a structural failure. The asymmetry exists in code because
+of this difference in what "good enough" means at each site; the
+Algorithm~\ref{alg:B} pseudocode above is the Stage~I instance.
 
 \paragraph{Legacy \texttt{max\_iters\_caught} exception path.}  Earlier
 Gridap solvers raised a \texttt{"Reached maximum iterations"}
@@ -656,10 +911,11 @@ state with three distinct policies:
   and falls through to the Picard branch---consistent with the noise-floor
   rejection above: any failure to reach the quadratic basin forces
   Picard.
-\item \textbf{Stage II (OSGS inner cascade)} treats it as a
+\item \textbf{Stage II (OSGS coupled solve)} treats it as a
   single-iteration partial success: $\mathrm{iter\_count}$ is
-  incremented but no fallback fires. The outer staggered loop will
-  re-evaluate convergence on the next iteration.
+  incremented but no fallback fires. The best-seen iterate---already at
+  a self-consistent slaved-$\boldsymbol{\pi}_h$ state---is returned as
+  the coupled solve's result.
 \item \textbf{ASGS-MMS extension loop} treats it as a single-iteration
   partial success too (matching Stage II), but emits no log line---the
   cycle counter advances silently.
@@ -669,28 +925,19 @@ actually wants from an iteration cap. The exception path is normally
 never taken with the modern solver stack; documenting it here prevents
 future auditors from re-flagging the asymmetry.
 
-\paragraph{Implementation note (2026-06): explicit cascade policy and the opt-in ping-pong.}
+\paragraph{Implementation note (2026-06): explicit success policy.}
 The Stage-I-vs-OSGS-inner success asymmetry above (noise-floor rejection; legacy
 \texttt{max\_iters\_caught}) is, in code, a single pure verdict
 $\mathrm{cascade\_step\_outcome}(\mathsf{res}, \mathsf{policy})$ parameterised by
 three boolean flags
 $(\mathsf{accept\_noise\_floor},\ \mathsf{accept\_soft\_stall},\ \mathsf{max\_iters\_caught\_is\_failure})$,
 rather than duplicated control flow. Three policy constants instantiate it:
-Stage-I~Newton-1 $=(\mathrm{false},\mathrm{false},\mathrm{true})$, Stage-I~Newton-2
-$=(\mathrm{true},\mathrm{false},\mathrm{true})$ (it accepts a noise-floor finish though
-Newton-1 does not, but still rejects a soft stall), and OSGS-inner
-$=(\mathrm{true},\mathrm{true},\mathrm{false})$. Two \emph{opt-in, default-off} efficiency
-variants reuse this machinery without altering the canonical algorithm above:
-(i) an adaptive Newton$\leftrightarrow$Picard \emph{ping-pong} that replaces the one-way
-Newton$\to$Picard$\to$Newton cascade in both instantiations when
-$\mathsf{pingpong\_enabled}$, running Picard only until $\|\mathcal{R}\|_\infty$ has dropped
-$\mathsf{pingpong\_picard\_gain\_orders}$ orders (just enough to re-enter Newton's basin)
-before returning to Newton, bounded by $\mathsf{pingpong\_max\_swaps}$; and (ii) an OSGS
-plateau short-circuit (Alg.~\ref{alg:C}) that accepts a single passing MMS-plateau check once
-the state drift has reached the \emph{tight} machine floor $x_{\mathrm{diff}}\le\mathsf{osgs\_tol}$
-in \code{state\_drift} mode, when $\mathsf{osgs\_plateau\_machine\_floor\_shortcut}$ is set.
-Both default off (canonical behaviour unchanged); see
-\code{docs/solver/efficiency-ideas.md} and \code{docs/solver/algorithm-code-mapping.md}.
+the Stage-I cascade's Newton-1 $=(\mathrm{false},\mathrm{false},\mathrm{true})$ and Newton-2
+$=(\mathrm{true},\mathrm{false},\mathrm{true})$ (Newton-2 accepts a noise-floor finish though
+Newton-1 does not, but still rejects a soft stall), and the OSGS-inner policy
+$=(\mathrm{true},\mathrm{true},\mathrm{false})$ (\code{OSGS\_INNER\_POLICY}) that classifies the
+single coupled-solve exit of Algorithm~\ref{alg:C}. See
+\code{docs/solver/algorithm-code-mapping.md}.
 
 % ============================================================
 \section{The Newton Kernel: Algorithm A and Its Leaves}
@@ -706,7 +953,7 @@ documents the kernel first, then its leaves.
 \subsection{Algorithm A: ExactNewtonPipeline}
 
 \moduleinterface
-    {Algorithm~\ref{alg:B} (three times per Stage~I); Algorithm~\ref{alg:C} (once per outer staggered iteration)}
+    {Algorithm~\ref{alg:B} (three times per Stage~I); Algorithm~\ref{alg:C} (once, as the single coupled OSGS solve)}
     {Algorithm~\ref{alg:A1} (linear solve); Algorithm~\ref{alg:A2} (Armijo line search); Algorithm~\ref{alg:A3} (safeguards)}
     {Initial fields $\boldsymbol{x}^0 \in \mathcal{X}_h$; nonlinear operator $\mathrm{op}$ (encoding the chosen Jacobian variant)}
     {Final iterate $\boldsymbol{x}^\star$; success flag $S$; iteration count $I$; residual norm $\|\boldsymbol{b}^\star\|_\infty$; exit reason $r$ (Table~\ref{tab:reasons})}
@@ -970,266 +1217,440 @@ honest-exit gate~\eqref{eq:per-field-honest} replacing the implicit
 single-scale gate that wraps each $\mathsf{NoiseFloor}$ exit.
 
 % ============================================================
-\section{Stage II: Algorithm C (OSGSFractionalRelaxation)}
+\section{Stage II: Algorithm C (CoupledOSGSSolve)}
 \label{sec:osgs}
 
 The orthogonal sub-grid scale formulation augments the discrete weak
 form with a stabilisation term that depends on the $L^2$ projection
-$\boldsymbol{\pi}_h$ of the strong residual. To avoid carrying the
-Fr\'echet derivative of $\Pi_h$ in the global Jacobian,
-Algorithm~\ref{alg:C} treats the pair $(U_h, \boldsymbol{\pi}_h)$ by
-block-coordinate relaxation: freeze $\boldsymbol{\pi}_h$, solve the
-inner nonlinear primary system for $U_h$ via the Newton kernel
-(Algorithm~\ref{alg:A}), then re-project to get the next
-$\boldsymbol{\pi}_h$.
+$\boldsymbol{\pi}_h$ of the strong residual onto the finite-element
+space. Writing $B_S$ for the stabilised bilinear form and $L_S$ for the
+stabilised linear form of the parent paper (the
+$B_S(\boldsymbol{w}, U_h, V_h) = L_S(\boldsymbol{w}, V_h, \boldsymbol{\pi}_h)$
+problem of \code{eq:OSGSProblem}, with ASGS recovered at
+$\boldsymbol{\pi}_h \equiv 0$), the discrete OSGS system couples the
+primary unknown $U_h = [\boldsymbol{u}_h; p_h]$ to the projection
+$\boldsymbol{\pi}_h = [\boldsymbol{\pi}_{h,u}; \pi_{h,p}]$ through
+\begin{equation}
+\label{eq:osgs-coupled}
+\left\{
+\begin{aligned}
+B_S(\boldsymbol{u}_h, U_h, V_h) &= L_S(\boldsymbol{u}_h, V_h, \boldsymbol{\pi}_h)
+   && \forall\, V_h \in X_{h0}, \\
+\langle W_h, \boldsymbol{\pi}_h \rangle
+   &= \langle W_h, \mathcal{R}_{\boldsymbol{u}_h} U_h \rangle
+   && \forall\, W_h \in X_{\mathrm{free}},
+\end{aligned}
+\right.
+\end{equation}
+where the second line is the $L^2$ projection of the strong residual
+$\mathcal{R}_{\boldsymbol{u}_h} U_h$ onto the \emph{unconstrained} space
+$V_{\mathrm{free}} \times Q_{\mathrm{free}}$. Equation~\eqref{eq:osgs-coupled}
+is exactly the parent paper's
+\code{eq:LinearizedOSGSProblem} with one modification: rather than
+projecting the residual at the \emph{outdated} iterate $U_h^{m-1}$ (the
+staggering lag $\boldsymbol{\pi}_h^m \gets \Pi(\mathcal{R}_{\boldsymbol{u}^{m-1}} U_h^{m-1})$
+the paper writes), the projection is \emph{re-slaved to the current
+iterate}: at nonlinear iteration $k$ the projection is
+$\boldsymbol{\pi}_h^k = \Pi(\mathcal{R}_{\boldsymbol{u}^k} U_h^k)$. The
+projection is thus not a separate unknown but a slaved variable
+$\boldsymbol{\pi}_h(U_h)$, evaluated afresh on every residual call.
+
+This is precisely the ``update $\boldsymbol{\pi}_h$ at every nonlinear
+iteration'' variant the parent paper considered and rejected as ``too
+cumbersome and expensive''. What makes it affordable here is that the
+projection is a single $L^2$ mass solve whose operator never changes:
+the velocity and pressure mass matrices $M_u, M_p$ are assembled and
+Cholesky-factored \emph{once} in Algorithm~\ref{alg:O}, and every
+re-projection is then a constant-cost forward/back substitution
+(§\ref{sec:proj-policy}). Consequently the staggered outer relaxation
+loop of the earlier design---freeze $\boldsymbol{\pi}_h$, run an inner
+Newton solve, re-project, test state/projection drift---is removed
+entirely. Algorithm~\ref{alg:C} issues a \emph{single} safeguarded
+Newton solve (Algorithm~\ref{alg:A}) on the primary unknown $U_h$, whose
+residual re-slaves $\boldsymbol{\pi}_h$ on every evaluation. Convergence
+is the ordinary per-field relative residual gate of that inner Newton;
+there is no separate OSGS stopping criterion, no drift metric, no warmup
+schedule, and no Anderson acceleration.
+
+\paragraph{Why the solve is inexact-Newton.}  The residual of
+\eqref{eq:osgs-coupled} carries the slaved $\boldsymbol{\pi}_h(U_h)$, but
+the Jacobian assembled for the Newton step (\code{build\_stabilized\_weak\_form\_jacobian}
+in \code{ExactNewtonMode}) \emph{freezes} that projection: it includes
+the analytic derivatives $\partial\sigma/\partial\boldsymbol{u}$,
+$\partial\tau_1/\partial\boldsymbol{u}$,
+$\partial\tau_2/\partial\boldsymbol{u}$ and the convective derivative
+$\partial(\boldsymbol{a}\cdot\nabla\boldsymbol{u})/\partial\boldsymbol{u}$,
+but drops the dense Fr\'echet-derivative term
+$\partial\boldsymbol{\pi}_h/\partial U_h$ (which would couple every DOF
+through the inverse mass operator $M^{-1}$). The Newton system is
+therefore exact in $(\sigma, \tau, \text{convection})$ but frozen in
+$\boldsymbol{\pi}_h$, i.e.\ a globally \emph{inexact} Newton iteration.
+It converges to the same fixed point as the staggered scheme---the root
+of \eqref{eq:osgs-coupled}, with the orthogonal residual
+$\widetilde{\mathcal{R}} = (I - \Pi)\mathcal{R}$, so the discrete errors
+match---but only at a linear/superlinear rate, since the compact coupling
+term is absent from the tangent. (Section~\ref{sec:jfnk} recovers the
+dropped action without forming it.) Passing a literal zero for
+$\boldsymbol{\pi}_h$ when assembling the Jacobian is intentional: the
+projection \emph{value} does not enter the frozen-$\boldsymbol{\pi}_h$
+tangent at all (it selects only the $\code{is\_osgs} = \mathrm{true}$
+branch), so a zero placeholder is the correct argument.
+
+\paragraph{Bootstrap.}  The coupled solve is seeded at the converged
+Stage~I state $U_h^0 \gets U_h^{\mathrm{ASGS}}$, which is the algebraic
+root of the ASGS system---exactly \eqref{eq:osgs-coupled} with
+$\boldsymbol{\pi}_h \equiv 0$. This is simultaneously the correct
+$\boldsymbol{\pi}_h^0 = 0$ bootstrap of the projection: starting the
+coupled solve from the ASGS state is starting from the iterate at which
+the slaved projection is the zero of the orthogonal complement. No
+separate pre-seeding of $\boldsymbol{\pi}_h^0$ with
+$\Pi(\mathcal{R}(U_h^{\mathrm{ASGS}}))$ is performed, and none is needed:
+the first residual evaluation produces the first non-trivial projection
+naturally.
 
 \moduleinterface
     {Algorithm~\ref{alg:O} (Stage~II, OSGS mode only)}
-    {Algorithm~\ref{alg:B} (once per outer iteration, with $\boldsymbol{\pi}_h$ frozen; the cascade itself invokes Alg.~\ref{alg:A} up to three times)}
-    {Stage~I state $U_h^{\mathrm{ASGS}}$; pre-factored mass solvers $(M_u^{-1}, M_p^{-1})$; optional block-wise Anderson accelerators}
-    {Success flag $S$; converged projection pair $(\boldsymbol{\pi}_{h,u}, \pi_{h,p})$}
+    {Algorithm~\ref{alg:A} (one safeguarded Newton solve, $\mathrm{op}$ carrying the slaved-$\boldsymbol{\pi}_h$ residual and the frozen-$\boldsymbol{\pi}_h$ Jacobian)}
+    {Stage~I state $U_h^{\mathrm{ASGS}}$; Cholesky-factored mass solvers $(M_u, M_p)$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$ and projection spaces $(V_{\mathrm{free}}, Q_{\mathrm{free}})$}
+    {Success flag $S$; final self-consistent projection pair $(\boldsymbol{\pi}_{h,u}, \pi_{h,p})$}
 
 \begin{algorithm}[H]
-\caption{$\mathrm{OSGSFractionalRelaxation}$: staggered fixed point on $(U_h, \boldsymbol{\pi}_h)$.}
+\caption{$\mathrm{CoupledOSGSSolve}$: a single safeguarded Newton solve with $\boldsymbol{\pi}_h$ re-slaved to the current iterate on every residual evaluation.}
 \label{alg:C}
 \SetAlgoLined
-\textbf{Parameters:} $N_{\mathrm{OSGS}}, N_{\mathrm{inner}}, m_{\mathrm{w}}, \tau_{\mathrm{w}}, \textftol, \tau_{\mathrm{OSGS}}, \tau_{\mathrm{proj}}, \textstag, \mathsf{Mode}_{\mathrm{drift}}, \mathsf{Mode}_{\mathrm{stop}}$.\\
-\KwIn{$U_h^{\mathrm{ASGS}}$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$; mass-matrix solvers; optional accelerators.}
+\textbf{Parameters:} $N_{\mathrm{OSGS}}$ (Newton budget), the inner-Newton parameters of Algorithm~\ref{alg:A}, and the inner-success policy $\mathcal{P}_{\mathrm{OSGS}}$ (\code{OSGS\_INNER\_POLICY}).\\
+\KwIn{$U_h^{\mathrm{ASGS}}$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$; Cholesky-factored mass solvers $(M_u, M_p)$; projection spaces $(V_{\mathrm{free}}, Q_{\mathrm{free}})$.}
 \KwOut{$(S, \boldsymbol{\pi}_{h,u}, \pi_{h,p})$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
-$U_h^{0} \gets U_h^{\mathrm{ASGS}}$;\quad
-$\boldsymbol{\pi}_{h,u}^{0} \gets 0$;\quad $\pi_{h,p}^{0} \gets 0$ \tcp*{see §\ref{sec:osgs-bootstrap}}
-\For{$m = 1, \dots, N_{\mathrm{OSGS}}$}{
-    set effective inner tolerance $\ftolinner{m} \gets (m \le m_{\mathrm{w}}) \,?\, \max(\textftol, \tau_{\mathrm{w}}) : \textftol$\;
-    fix $\boldsymbol{\pi}_h \gets \boldsymbol{\pi}_h^{m-1}$;\quad
-    $\boldsymbol{x}_{\mathrm{prev}} \gets U_h^{m-1}$ \tcp*{restore vector for the inner cascade}
-    $(S_m^{\mathrm{inner}}, U_h^{m}) \gets \mathrm{RobustNonlinearCascade}(U_h^{m-1},\ \boldsymbol{x}_{\mathrm{prev}},\ \mathrm{op}_{\mathrm{N}}^{\mathrm{OSGS}}(\boldsymbol{\pi}_h),\ \mathrm{op}_{\mathrm{P}}^{\mathrm{OSGS}}(\boldsymbol{\pi}_h))$ \tcp*{Alg.~\ref{alg:B}; inner cap $N_{\mathrm{inner}}$, tolerance $\ftolinner{m}$}
-    \If{$S_m^{\mathrm{inner}} = \mathrm{False}$ \textnormal{\textbf{and}} the cascade aborted with a structural failure}{
-        \Return $(\mathrm{False}, \boldsymbol{\pi}_{h,u}^{m-1}, \pi_{h,p}^{m-1})$ \tcp*{see §\ref{sec:osgs-inner-failure}}
-    }
-
-    $d_{\mathrm{state}}^m \gets \mathrm{StateDrift}(U_h^m, U_h^{m-1};\, \mathsf{Mode}_{\mathrm{drift}})$ \tcp*{see §\ref{sec:drift-modes}}
-
-    re-project: $\boldsymbol{\pi}_{h,u}^{m} \gets \Pi_{V_{\mathrm{free}}}(\mathcal{R}_u(U_h^m))$;\quad
-    $\pi_{h,p}^{m} \gets \Pi_{Q_{\mathrm{free}}}(\mathcal{R}_p(U_h^m))$\;
-
-    \If{accelerator present}{
-        $\boldsymbol{\pi}_{h,u}^{m} \gets \mathrm{Anderson}_u(\boldsymbol{\pi}_{h,u}^{m-1}, \boldsymbol{\pi}_{h,u}^{m})$ \tcp*{safety fallback (§\ref{sec:anderson}) handled internally}
-        $\pi_{h,p}^{m} \gets \mathrm{Anderson}_p(\pi_{h,p}^{m-1}, \pi_{h,p}^{m})$ \tcp*{idem}
-    }
-
-    $d_\pi^m \gets \max\!\bigl(
-        \|\Delta\boldsymbol{\pi}_{h,u}^m\|_{M_u},\
-        \|\Delta\pi_{h,p}^m\|_{M_p}\bigr)$ \tcp*{see §\ref{sec:proj-drift}}
-
-    $\tau_{\mathrm{OSGS}}^{\mathrm{eff}} \gets \max(\tau_{\mathrm{OSGS}}, \textstag)$;\quad
-    $\tau_{\mathrm{proj}}^{\mathrm{eff}} \gets \max(\tau_{\mathrm{proj}}, \textstag)$\;
-    decide $S_{\mathrm{conv}}$ from $\mathsf{Mode}_{\mathrm{stop}}$, $d_{\mathrm{state}}^m$, $d_\pi^m$ (see §\ref{sec:stopping-mode})\;
-    \If{$\mathsf{Mode}_{\mathrm{stop}} = \code{state\_drift}$ \textnormal{\textbf{and}} $m \ge 2$ \textnormal{\textbf{and}} $\|\boldsymbol{X}_h^m - \boldsymbol{X}_h^{m-1}\|_{\ell^\infty} \le \textstag$}{
-        $S_{\mathrm{conv}} \gets \mathrm{True}$ \tcp*{absolute noise-floor short circuit; gated to \code{state\_drift} only (§\ref{sec:stopping-mode})}
-    }
-    \If{$S_{\mathrm{conv}}$}{
-        \extline{\If{$\code{mms\_cfg.enabled}$ \textnormal{\textbf{and}} first $S_{\mathrm{conv}}$ event}{
-            initialise plateau-history $\mathcal{H}$ at $U_h^m$;\quad $I_{\mathrm{pass}} \gets 0$\;
-            \textbf{continue} \tcp*{do not exit yet; collect a plateau sample}
-        }
-        \If{$\code{mms\_cfg.enabled}$}{
-            $(S_{\mathrm{plat}}, I_{\mathrm{pass}}) \gets \mathrm{VerifyMMSPlateau}(U_h^m, U_{\mathrm{ex}}, \mathcal{H}, I_{\mathrm{pass}})$ \tcp*{Alg.~\ref{alg:D}}
-            \If{$\neg S_{\mathrm{plat}}$}{ \textbf{continue}\; }
-        }}
-        \Return $(\mathrm{True}, \boldsymbol{\pi}_{h,u}^m, \pi_{h,p}^m)$\;
-    }
-}
-\Return $(\mathrm{False}, \boldsymbol{\pi}_{h,u}^{N_{\mathrm{OSGS}}}, \pi_{h,p}^{N_{\mathrm{OSGS}}})$\;
+$U_h^{0} \gets U_h^{\mathrm{ASGS}}$ \tcp*{$\boldsymbol{\pi}_h^0 = 0$ implicitly (ASGS root)}
+\vspace{0.1cm}
+\tcc{Define the slaved-$\boldsymbol{\pi}_h$ residual operator and the frozen-$\boldsymbol{\pi}_h$ Jacobian.}
+\textbf{residual} $\mathrm{op}.\boldsymbol{b}(U_h)$:
+\Indp
+    project $\boldsymbol{\pi}_{h,u} \gets \Pi_{V_{\mathrm{free}}}(\mathcal{R}_u(U_h))$ via $M_u$;\quad
+    $\pi_{h,p} \gets \Pi_{Q_{\mathrm{free}}}(\mathcal{R}_p(U_h))$ via $M_p$\;
+    \Return residual of $B_S(\boldsymbol{u}_h, U_h, \cdot) - L_S(\boldsymbol{u}_h, \cdot, \boldsymbol{\pi}_h)$ \tcp*{$\boldsymbol{\pi}_h$ re-slaved every call}
+\Indm
+\textbf{Jacobian} $\mathrm{op}.\mathcal{J}(U_h)$:
+\Indp
+    \Return frozen-$\boldsymbol{\pi}_h$ tangent (\code{ExactNewtonMode}: $\partial\sigma, \partial\tau_1, \partial\tau_2, \partial\mathrm{conv}$ kept; $\partial\boldsymbol{\pi}_h/\partial U_h$ dropped)\;
+\Indm
+\vspace{0.1cm}
+$(S^{\mathrm{inner}}, U_h^\star, \cdot) \gets \mathrm{ExactNewtonPipeline}(U_h^{0},\ \mathrm{op})$ \tcp*{Alg.~\ref{alg:A}; budget $N_{\mathrm{OSGS}}$, restore $\gets U_h^{\mathrm{ASGS}}$}
+$S \gets S^{\mathrm{Stage\,I}} \wedge \bigl(\mathrm{outcome}(S^{\mathrm{inner}}; \mathcal{P}_{\mathrm{OSGS}}) \in \{\code{success}, \code{one\_iter\_success}\}\bigr)$ \tcp*{see §\ref{sec:osgs-inner-failure}}
+\vspace{0.1cm}
+\tcc{Final self-consistent projection for export / diagnostics.}
+$\boldsymbol{\pi}_{h,u} \gets \Pi_{V_{\mathrm{free}}}(\mathcal{R}_u(U_h^\star))$;\quad
+$\pi_{h,p} \gets \Pi_{Q_{\mathrm{free}}}(\mathcal{R}_p(U_h^\star))$\;
+\extline{\If{$\code{mms\_cfg.enabled}$}{
+    evaluate the MMS oracle at $U_h^\star$ once; record $\code{mms\_stop\_reason} = \code{coupled\_single\_solve}$\;
+    \If{$E_{u,2} > \kappa_{\mathrm{rate}}\, h^{\,k_v+1}$}{ record $\code{coupled\_at\_suboptimal\_rate}$ \tcp*{post-solve check only; no extra cycles} }
+}}
+\Return $(S, \boldsymbol{\pi}_{h,u}, \pi_{h,p})$\;
 \end{algorithm}
 
-\subsection{State drift: \texorpdfstring{$\ell^\infty$ vs continuous $L^2$}{Linf vs L2}}
-\label{sec:drift-modes}
+\paragraph{Reading the box.}  Algorithm~\ref{alg:C} is a thin wrapper:
+it builds the operator pair $\mathrm{op}$ (a residual closure that
+re-projects $\boldsymbol{\pi}_h$ on every call, and a Jacobian closure
+that freezes it), hands them to a single $\mathrm{ExactNewtonPipeline}$
+call (Algorithm~\ref{alg:A}) seeded at the Stage~I state, and re-projects
+once at the converged iterate for diagnostics. There is no outer loop:
+the only iteration is the inner Newton's, and its per-field relative
+residual gate is the sole convergence test. The inner-success policy
+$\mathcal{P}_{\mathrm{OSGS}}$ accepts either a clean convergence or a
+benign one-iteration success and conjoins it with the carried-forward
+Stage~I success flag.
 
-The state drift between consecutive outer iterations
-\begin{equation}
-    d_{\mathrm{state}}^m
-    = \begin{cases}
-        \max\!\bigl(
-            \|\boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1}\|_{L^2(\Omega)},\
-            \|p_h^m - p_h^{m-1}\|_{L^2(\Omega)} \bigr)
-            & \mathsf{Mode}_{\mathrm{drift}} = \code{L2\_mass}, \\[1mm]
-        \|\boldsymbol{X}_h^m - \boldsymbol{X}_h^{m-1}\|_{\ell^\infty}
-            & \mathsf{Mode}_{\mathrm{drift}} = \code{Linf},
-    \end{cases}
-\end{equation}
-admits two metrics with subtly different meanings. The \code{Linf}
-mode is the raw vector-space $\ell^\infty$ norm of the concatenated
-free-DOF array; it is cheap but pathological in mixed-physics systems
-because it lets the field with larger numerical magnitude dominate.
-The \code{L2\_mass} mode computes two independent continuous
-$L^2(\Omega)$ norms,
-$\sqrt{\int_\Omega (\boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1})\cdot(\boldsymbol{u}_h^m - \boldsymbol{u}_h^{m-1})\,\mathrm{d}\Omega}$
-and analogously for the pressure block, evaluated by Gridap quadrature
-on the same measure $\mathrm{d}\Omega$ used by the formulation, and
-takes their maximum. The distinction matters: \code{L2\_mass} is the
-continuous functional norm of the difference FE function, whereas
-\code{Linf} is the discrete maximum coefficient deviation, which is
-basis-dependent and mixes physical units across blocks. Only
-\code{L2\_mass} measures velocity and pressure in their own natural
-functional norms.
+\subsection{Failure of the inner solve}
+\label{sec:osgs-inner-failure}
 
-\subsection{Projection drift in the mass-weighted inner product}
-\label{sec:proj-drift}
-
-The projection drift
-\begin{equation}
-    d_\pi^m
-    = \max\!\Bigl(
-        \sqrt{(\Delta\boldsymbol{\pi}_{h,u}^m)^\top M_u (\Delta\boldsymbol{\pi}_{h,u}^m)},\
-        \sqrt{(\Delta\pi_{h,p}^m)^\top M_p (\Delta\pi_{h,p}^m)} \Bigr)
-\end{equation}
-is the natural distance in the inner product that defines the $L^2$
-projection itself. The Euclidean DOF norm would conflate this with
-inverse-mass scaling and report misleading drift values on graded
-meshes.
-
-\subsection{Choosing the stopping mode}
-\label{sec:stopping-mode}
-
-The user selects $\mathsf{Mode}_{\mathrm{stop}}$ between three options:
-\begin{itemize}
-\item \code{state\_drift}: terminate when $d_{\mathrm{state}}^m \le \tau_{\mathrm{OSGS}}^{\mathrm{eff}}$.
-\item \code{projection\_drift}: terminate when $d_\pi^m \le \tau_{\mathrm{proj}}^{\mathrm{eff}}$.
-\item \code{both} (default): require both predicates.
-\end{itemize}
-\code{both} is the strictest and corresponds to the mathematical
-definition of the staggered fixed point. The single-criterion modes
-sacrifice one of the two conditions in exchange for fewer iterations
-and are appropriate only when the user knows that the slacker
-condition is already satisfied. Only under \code{state\_drift} does
-an additional absolute short-circuit fire when the raw $\ell^\infty$
-DOF drift drops below $\textstag$ for $m \ge 2$; this protects against
-limit-cycle oscillations that never cleanly satisfy
-$\tau_{\mathrm{OSGS}}$. The short-circuit is \emph{deliberately
-disabled} in \code{projection\_drift} and \code{both} modes: when
-projection drift is part of the binding criterion, $\boldsymbol{\pi}_h$
-may legitimately continue moving even while the primary state appears
-stagnant, and short-circuiting on $\ell^\infty$ alone could return a
-non-fixed-point on the pair $(U_h, \boldsymbol{\pi}_h)$.
-
-\subsection{Bootstrap, mass-matrix pre-factoring, and warmup}
-\label{sec:osgs-bootstrap}
-
-\paragraph{Zero bootstrap of $\boldsymbol{\pi}_h^0$.}  The first sub-grid
-projection is initialised to zero, $\boldsymbol{\pi}_h^0 \equiv 0$,
-\emph{not} to the $L^2$ projection of the strong residual at
-$U_h^{\mathrm{ASGS}}$. The choice is deliberate. Solving the OSGS
-inner problem at $m = 1$ with $\boldsymbol{\pi}_h \equiv 0$ is, by
-definition, exactly the ASGS problem, and Stage~I has already converged
-that system to within $\textftol$. The very first inner solve therefore
-starts and ends at $U_h^{\mathrm{ASGS}}$, and the first non-trivial
-projection $\boldsymbol{\pi}_h^1$ is produced naturally by the
-$L^2$-projection step at the bottom of the outer-loop body. Pre-seeding
-$\boldsymbol{\pi}_h^0$ with $\Pi(\mathcal{R}(U_h^{\mathrm{ASGS}}))$
-would instead drive the $m = 1$ inner solve away from $U_h^{\mathrm{ASGS}}$
-to satisfy a stabilisation term whose projection has not yet been
-relaxed by an outer iteration---an ``off-distribution'' bootstrap that
-historically required the warmup phase (see below) to unwind.
-
-\paragraph{Mass-matrix pre-factoring.}  Each projection is the solution
-of an SPD linear system with $M_u$ or $M_p$. Because the projection
-target spaces never change between outer iterations, the matrices and
-their LU factorisations are assembled once (in Algorithm~\ref{alg:O})
-and reused: every projection is a constant-cost forward/back
-substitution.
-
-\paragraph{Warmup phase.}  The warmup phase ($m \le m_{\mathrm{w}}$)
-relaxes the inner-cascade tolerance to $\max(\textftol, \tau_{\mathrm{w}})$.
-Even with the zero bootstrap of $\boldsymbol{\pi}_h^0$, the projection
-$\boldsymbol{\pi}_h^{m}$ for small $m$ is still moving rapidly between
-outer iterations; driving the inner solve to a tight $\textftol$ in this
-regime would polish the iterate against a projection that gets replaced
-immediately. Relaxing the inner tolerance during the warmup trades a
-small amount of accuracy in the early iterates for a meaningful cut in
-inner-solver budget.
+Because Stage~II now issues a single safeguarded Newton solve rather
+than a cascade per outer iteration, the OSGS failure modes are exactly
+the structural-failure exits of that one
+$\mathrm{ExactNewtonPipeline}$ call, classified by the inner-success
+policy $\mathcal{P}_{\mathrm{OSGS}}$ (\code{OSGS\_INNER\_POLICY}). The
+solve is reported as failed when the safeguarded Newton returns with one
+of $\mathsf{LinesearchFailed}$ (\code{linesearch\_failed}),
+$\mathsf{MeritDivergence}$ (\code{merit\_divergence\_escaped}), or
+$\mathsf{LinearSolveNaN}$ (\code{linear\_solve\_nan}) (see Algorithm~\ref{alg:A3});
+these are the genuine non-progress exits. A merely budget-exhausted exit
+($\mathsf{IterationCap}$, i.e.\ \code{max\_iters\_stagnation}, after
+$N_{\mathrm{OSGS}}$ inner Newton steps) is
+\emph{not} a structural failure: the carried-forward Stage~I success is
+retained, the best-seen iterate is returned, and its self-consistent
+projection is exported. This mirrors the high-Re / low-$\alpha$ fold
+behaviour: when no coarse-mesh root exists, the solve fails honestly and
+$\alpha$-continuation outside the solver---not an internal relaxation
+loop---handles it.
 
 \subsection{Projection policy and the constant-$\sigma$ trim}
 \label{sec:proj-policy}
 
-The projection step
-$\boldsymbol{\pi}_h^{m} \gets \Pi(\mathcal{R}(U_h^m))$ does not always
-project the full strong residual; the policy is configurable, and the
-choice is determined jointly by the discrete formulation and the
-reaction model.
+The per-evaluation projection
+$\boldsymbol{\pi}_h \gets \Pi(\mathcal{R}(U_h))$ does not always project
+the full strong residual; the policy is configurable, and the choice is
+determined jointly by the discrete formulation and the reaction model.
+Each projection solves an SPD system with $M_u$ or $M_p$ on the
+unconstrained spaces $V_{\mathrm{free}}, Q_{\mathrm{free}}$; the velocity
+and pressure blocks are projected \emph{separately}, each with its own
+mass matrix, so the two physics never mix. Because the projection target
+spaces never change, $M_u$ and $M_p$ together with their Cholesky
+factorisations are assembled once in Algorithm~\ref{alg:O} and reused:
+every re-projection inside the coupled residual is a constant-cost
+forward/back substitution.
 
-The default policy projects the full residual. When the reaction
-tensor $\sigma(\alpha, \boldsymbol{u})$ is a constant
+The default policy projects the full residual. When the reaction tensor
+$\sigma(\alpha, \boldsymbol{u})$ is a spatial constant
 ($\code{reaction\_model = "Constant\_Sigma"}$ in
 \code{stabilization\_config}, paired with the
 \code{ProjectResidualWithoutReactionWhenConstantSigma} policy), the
 reaction term $\sigma \boldsymbol{u}_h$ is omitted from the residual
-before projection. The justification is exactness: when $\sigma$ is a
-spatial constant, $\sigma \boldsymbol{u}_h$ lies entirely in the FE
-velocity space $\boldsymbol{V}_h$ (which is closed under multiplication
-by a scalar), so its $L^2$ projection onto $V_{\mathrm{free}}$ is the
-function itself; subtracting it again in the orthogonal complement
-$I - \Pi_h$ gives exactly zero. Including the reaction term in the
-projection step would amount to projecting and re-subtracting an FE
-function---a no-op in exact arithmetic, but one that introduces avoidable
-floating-point noise. Removing it from the projected residual eliminates
-that noise at no cost. This corresponds to Section~4.4 of the parent
-paper.
+\emph{before} projection. The justification is exactness: when $\sigma$
+is constant, $\sigma \boldsymbol{u}_h$ lies entirely in the FE velocity
+space (closed under multiplication by a scalar), so its $L^2$ projection
+onto $V_{\mathrm{free}}$ is the function itself and its orthogonal
+complement $(I - \Pi)(\sigma \boldsymbol{u}_h)$ is exactly zero.
+Including it in the projection would project and re-subtract an FE
+function---a no-op in exact arithmetic that only injects floating-point
+noise. Removing it from the projected residual eliminates that noise at
+no cost. This corresponds to Section~4.4 of the parent paper. Note that
+the $-\sigma\,\mathrm{d}\boldsymbol{u}$ contribution is \emph{not}
+trimmed from the Jacobian: it remains load-bearing for stability and is
+kept in the frozen-$\boldsymbol{\pi}_h$ tangent.
 
 For non-constant $\sigma$ (e.g.\ the Forchheimer--Ergun law), the
-reaction term is \emph{not} an FE function and its projection is
-non-trivial; the trim does not apply and the policy reverts to the
-default of projecting the full residual.
+reaction term is not an FE function and its projection is non-trivial;
+the trim does not apply and the policy reverts to the default of
+projecting the full residual.
 
-\subsection{Block-wise Anderson acceleration}
-\label{sec:anderson}
+% ============================================================
+\section{Jacobian-Free Newton--Krylov Recovery of the Dropped Coupling}
+\label{sec:jfnk}
 
-For stiff fixed points on $\boldsymbol{\pi}_h$, Anderson acceleration
-extrapolates a new iterate from the last $m$ fixed-point residuals by
-solving a small mass-weighted least-squares problem
+\paragraph{Status.}  This section documents a \emph{planned} acceleration
+of the coupled OSGS solve of §\ref{sec:osgs}; it is \textbf{not yet
+implemented}. Everything below is a method/roadmap description, not a
+\code{[code-actual]} report. The current code path solves the coupled
+system with the frozen-$\boldsymbol{\pi}_h$ inexact Newton of
+Algorithm~\ref{alg:C}; this section explains how a matrix-free Krylov
+inner solve would recover the term that Algorithm~\ref{alg:C}
+deliberately drops, and what changes (and what does not) when it is
+switched on.
+
+% --------------------------------------------------------------
+\subsection{The bottleneck: the dropped \texorpdfstring{$\partial\boldsymbol{\pi}_h/\partial U_h$}{dpi/dU} coupling}
+\label{sec:jfnk-bottleneck}
+
+The coupled solve treats $\boldsymbol{\pi}_h$ as a variable
+\emph{slaved} to $U_h$ through the $L^2$ projection of the strong
+residual,
 \begin{equation}
-    \min_\gamma\ \|(\Delta F)\gamma - f_k\|_M^2.
+    \label{eq:jfnk-slaved-pi}
+    \boldsymbol{\pi}_h(U_h)
+        = \Pi_{V_{\mathrm{free}}\times Q_{\mathrm{free}}}
+            \bigl(\mathcal{R}_{u_h}(U_h)\bigr),
+    \qquad
+    M_u\,\boldsymbol{\pi}_{h,u}(U_h) = \boldsymbol{b}_u(U_h),
+    \quad
+    M_p\,\pi_{h,p}(U_h) = b_p(U_h),
 \end{equation}
-The accelerator operates independently on $\boldsymbol{\pi}_{h,u}$ and
-$\pi_{h,p}$, each with its own mass matrix; combining the blocks would
-force a cross-physical mixing that the OSGS formulation goes out of
-its way to avoid. The least-squares system uses the same $L^2$ inner
-product that defines the underlying projection. A safety fallback
-discards the extrapolation and reverts to a relaxed Picard step when
-the extrapolated state lies more than a fixed multiple of the
-unextrapolated residual away from the raw fixed-point candidate.
+where the right-hand sides $\boldsymbol{b}_u(U_h)$, $b_p(U_h)$ are the
+$L^2$ loads of the (policy-trimmed) strong residual assembled by
+\code{inner\_projection\_u} / \code{inner\_projection\_p}, and the mass
+factors are the Cholesky-cached \code{num\_u\_fac}, \code{num\_p\_fac}.
+The assembled coupled residual is
+\begin{equation}
+    \label{eq:jfnk-coupled-residual}
+    \boldsymbol{F}(U_h)
+        = \boldsymbol{B}_S\!\bigl(u_h, U_h, \cdot\bigr)
+        - \boldsymbol{L}_S\!\bigl(u_h, \cdot, \boldsymbol{\pi}_h(U_h)\bigr),
+\end{equation}
+i.e.\ the algebraic form of the orthogonal-subscale problem
+$B_S(u, U_h, V_h) = L_S(u, V_h, \boldsymbol{\pi}_h)$ of §\ref{sec:osgs}
+with the projection re-slaved to the \emph{current} iterate at every
+evaluation (no staggering lag; \code{res\_fn\_coupled},
+\code{porous\_solver.jl}).
+Differentiating~\eqref{eq:jfnk-coupled-residual} exactly gives the true
+tangent
+\begin{equation}
+    \label{eq:jfnk-true-tangent}
+    \mathcal{J}_{\mathrm{full}}(U_h)
+        = \underbrace{\frac{\partial \boldsymbol{B}_S}{\partial U_h}
+            - \frac{\partial \boldsymbol{L}_S}{\partial U_h}
+            \Bigg|_{\boldsymbol{\pi}_h\ \mathrm{fixed}}}_{
+            \displaystyle \mathcal{J}_{\bar\pi}(U_h)\ \text{(frozen-}\boldsymbol{\pi}_h\text{)}}
+        \;-\;
+        \underbrace{\frac{\partial \boldsymbol{L}_S}{\partial \boldsymbol{\pi}_h}
+            \,\frac{\partial \boldsymbol{\pi}_h}{\partial U_h}}_{
+            \displaystyle \mathcal{C}(U_h)\ \text{(coupling)}},
+    \qquad
+    \frac{\partial \boldsymbol{\pi}_h}{\partial U_h}
+        = M^{-1}\,\frac{\partial \boldsymbol{b}}{\partial U_h}.
+\end{equation}
+The coupling block $\mathcal{C}$ carries the Fr\'echet derivative of the
+projection operator, $\partial\boldsymbol{\pi}_h/\partial U_h = M^{-1}
+(\partial\boldsymbol{b}/\partial U_h)$, with $M = \mathrm{diag}(M_u,
+M_p)$. Although $\partial\boldsymbol{b}/\partial U_h$ is sparse, $M^{-1}$
+is \emph{dense}, so $\mathcal{C}$ is a dense operator that cannot be
+assembled or stored at production mesh sizes. The coupled Jacobian
+actually built by \code{build\_stabilized\_weak\_form\_jacobian}
+(with \code{ExactNewtonMode()} but a frozen $\boldsymbol{\pi}_h$;
+\code{jac\_fn\_coupled}) is therefore exactly the first block,
+\begin{equation}
+    \label{eq:jfnk-frozen-jac}
+    \mathcal{J}_{\bar\pi}(U_h)
+        = \mathcal{J}_{\mathrm{full}}(U_h) + \mathcal{C}(U_h),
+\end{equation}
+i.e.\ the true tangent \emph{minus} the dropped dense coupling. It
+retains the exact $\partial\sigma/\partial\boldsymbol{u}$,
+$\partial\tau_1/\partial\boldsymbol{u}$,
+$\partial\tau_2/\partial\boldsymbol{u}$, and convective derivatives, but
+holds $\boldsymbol{\pi}_h$ constant. Solving $\mathcal{J}_{\bar\pi}\,
+\delta U_h = -\boldsymbol{F}$ is therefore an \emph{inexact} Newton step,
+and the coupled iteration converges only linearly (super-linearly at
+best), with the contraction rate set by the spectral radius of
+$\mathcal{J}_{\bar\pi}^{-1}\mathcal{C}$.
 
-\subsection{Failure of the inner cascade}
-\label{sec:osgs-inner-failure}
-
-The inner solve inside Algorithm~\ref{alg:C} is the same
-$\mathrm{RobustNonlinearCascade}$ used in Stage~I, supplied with
-OSGS operators (so the Jacobian depends on the frozen projection
-$\boldsymbol{\pi}_h^{m-1}$) and with the iteration cap reduced to
-$N_{\mathrm{inner}}$ on each inner $\mathrm{ExactNewtonPipeline}$ call.
-The restore vector is $\boldsymbol{x}_{\mathrm{prev}} = U_h^{m-1}$,
-i.e.\ the iterate at the start of the current outer iteration; this
-differs from Stage~I, which restores to the global initial guess
-$\boldsymbol{x}^0_{\mathrm{backup}}$.
-
-Three failure modes are propagated as structural divergence and abort
-the outer loop:
+\paragraph{Proof of the diagnosis (freeze-finish vs.\ coupled).}  The
+diagnosis that the missing $\mathcal{C}$ \emph{is} the convergence gap
+is checkable without any new machinery, by comparing two solves that
+share the \emph{same} assembled Jacobian $\mathcal{J}_{\bar\pi}$ but
+differ in whether $\boldsymbol{\pi}_h$ is re-projected:
 \begin{itemize}
-\item The first exact-Newton attempt produces a non-finite iterate
-\emph{and} the Picard attempt subsequently produces a non-finite
-iterate as well (the cascade then returns
-$\boldsymbol{x}_{\mathrm{restore}}$ with $S = \mathrm{False}$).
-\item The Picard attempt itself raises an unrecoverable exception
-(distinct from the benign ``reached maximum iterations'' exception
-that is reinterpreted as a completed Picard smoothing pass).
-\item The terminal Newton retry, after a Picard smoothing pass,
-returns with one of $\mathsf{LinesearchFailed}$,
-$\mathsf{MeritDivergence}$, or $\mathsf{LinearSolveNaN}$.
+\item \emph{Freeze-finish.}  Hold $\boldsymbol{\pi}_h \equiv
+\boldsymbol{\pi}_h(U_h^\star)$ fixed at its converged value and run plain
+Newton on the residual $\boldsymbol{F}_{\bar\pi}(U_h) = \boldsymbol{B}_S
+- \boldsymbol{L}_S(\cdot,\boldsymbol{\pi}_h^\star)$. Now
+$\partial\boldsymbol{\pi}_h/\partial U_h \equiv 0$ by construction, so
+$\mathcal{C} \equiv 0$ and $\mathcal{J}_{\bar\pi}$ \emph{is} the exact
+tangent of $\boldsymbol{F}_{\bar\pi}$: the iteration is locally
+quadratic.
+\item \emph{Coupled.}  Re-project $\boldsymbol{\pi}_h(U_h)$ at every
+evaluation~\eqref{eq:jfnk-slaved-pi} but keep the same assembled
+$\mathcal{J}_{\bar\pi}$. Now $\mathcal{C} \neq 0$ while the solver still
+acts as if it were zero: the iteration is only linear.
 \end{itemize}
-All other exit configurations (notably $\mathsf{IterationCap}$ from
-exhausting $N_{\mathrm{inner}}$ inside one of the cascade's three
-sub-calls) are treated as progress: the next outer iteration simply
-re-engages with the updated projection.
+Both use byte-for-byte the same Jacobian; the \emph{only} difference is
+whether the residual carries the slaved $\boldsymbol{\pi}_h(U_h)$
+dependence. The drop from quadratic to linear convergence between them
+is thus attributable, in isolation, to the omitted
+$\partial\boldsymbol{\pi}_h/\partial U_h = M^{-1}\partial\boldsymbol{b}/
+\partial U_h$ term~\eqref{eq:jfnk-true-tangent}. (Both fixed points
+differ only at the level of $O(\|U_h^\star - U_h\|)$ in
+$\boldsymbol{\pi}_h$, so freeze-finish converges to the same root once
+warm-started near $U_h^\star$.)
+
+% --------------------------------------------------------------
+\subsection{What changes: a matrix-free Krylov inner solve}
+\label{sec:jfnk-change}
+
+JFNK changes \emph{exactly one} thing in the coupled Newton step: the
+inner linear solve $\mathcal{J}\,\delta U_h = -\boldsymbol{F}$ of
+Algorithm~\ref{alg:A1} is replaced by a matrix-free GMRES whose
+matrix--vector product is the directional finite difference of the
+\emph{full} coupled residual,
+\begin{equation}
+    \label{eq:jfnk-matvec}
+    \mathcal{J}_{\mathrm{full}}(U_h)\,\boldsymbol{v}
+        \;\approx\;
+        \frac{\boldsymbol{F}(U_h + \varepsilon\,\boldsymbol{v})
+              - \boldsymbol{F}(U_h)}{\varepsilon},
+    \qquad
+    \varepsilon
+        = \frac{\sqrt{\varepsilon_{\mathrm{mach}}}\,
+                \bigl(1 + \|U_h\|\bigr)}{\|\boldsymbol{v}\|}.
+\end{equation}
+The key point is that $\boldsymbol{F}$ in~\eqref{eq:jfnk-matvec} is the
+\emph{same} coupled residual~\eqref{eq:jfnk-coupled-residual} that
+re-projects $\boldsymbol{\pi}_h$ at its argument: evaluating
+$\boldsymbol{F}(U_h + \varepsilon\boldsymbol{v})$ recomputes
+$\boldsymbol{\pi}_h(U_h + \varepsilon\boldsymbol{v})$ via the cached mass
+solve~\eqref{eq:jfnk-slaved-pi}. The finite difference therefore
+samples the slaved-projection dependence and applies the \emph{full}
+tangent~\eqref{eq:jfnk-true-tangent}, including the dense
+$\mathcal{C}$ block, \emph{without ever forming it}---each matvec costs
+one extra coupled residual evaluation, i.e.\ one cheap
+Cholesky-cached projection plus one weak-form assembly.
+
+The already-assembled, already-factored frozen-$\boldsymbol{\pi}_h$
+Jacobian~\eqref{eq:jfnk-frozen-jac} is reused as the GMRES
+\emph{preconditioner}: it is $\mathcal{J}_{\mathrm{full}}$ minus only the
+compact coupling term, so $\mathcal{J}_{\bar\pi}^{-1}
+\mathcal{J}_{\mathrm{full}} = I - \mathcal{J}_{\bar\pi}^{-1}\mathcal{C}$
+clusters its spectrum tightly around $1$ whenever
+$\|\mathcal{J}_{\bar\pi}^{-1}\mathcal{C}\| < 1$ (the same quantity that
+governed the linear contraction rate in §\ref{sec:jfnk-bottleneck}).
+Right-preconditioned GMRES then converges in a handful of Krylov
+vectors, and each preconditioner application is a single back/forward
+substitution on the existing factorisation.
+
+\moduleinterface
+    {Coupled Newton step (the JFNK variant of Algorithm~\ref{alg:A})}
+    {Coupled residual $\boldsymbol{F}$ of~\eqref{eq:jfnk-coupled-residual} (re-projects $\boldsymbol{\pi}_h$); factored $\mathcal{J}_{\bar\pi}$ as right preconditioner}
+    {Current iterate $U_h$; residual $\boldsymbol{F}(U_h)$; assembled+factored $\mathcal{J}_{\bar\pi}(U_h)$; Krylov tolerance $\eta$, cap $N_{\mathrm{K}}$}
+    {Newton step $\delta U_h$ (full-tangent, matrix-free)}
+
+\begin{algorithm}[H]
+\caption{$\mathrm{JFNKStep}$ \emph{(planned)}: full-tangent Newton step via preconditioned matrix-free GMRES.}
+\label{alg:jfnk}
+\SetAlgoLined
+\textbf{Parameters:} forcing tolerance $\eta$ (Eisenstat--Walker or fixed), Krylov cap $N_{\mathrm{K}}$, restart $\ell$.\\
+\KwIn{$U_h$; coupled residual operator $\boldsymbol{F}(\cdot)$; current value $\boldsymbol{F}(U_h)$; factored frozen-$\boldsymbol{\pi}_h$ Jacobian $\mathcal{J}_{\bar\pi}$.}
+\KwOut{Newton step $\delta U_h$.}
+\vspace{0.2cm}\hrule\vspace{0.2cm}
+define matvec $\mathcal{A}[\boldsymbol{v}] \gets \bigl(\boldsymbol{F}(U_h + \varepsilon\boldsymbol{v}) - \boldsymbol{F}(U_h)\bigr)/\varepsilon$, $\varepsilon$ as in~\eqref{eq:jfnk-matvec} \tcp*{re-projects $\boldsymbol{\pi}_h$ at $U_h + \varepsilon\boldsymbol{v}$: full tangent}
+define preconditioner apply $\mathcal{P}^{-1}[\boldsymbol{r}] \gets \mathcal{J}_{\bar\pi}^{-1}\boldsymbol{r}$ \tcp*{back/forward substitution on the existing factor}
+$\delta U_h \gets \mathrm{GMRES}\bigl(\mathcal{A},\, -\boldsymbol{F}(U_h);\ \text{precond.}\ \mathcal{P}^{-1},\ \text{tol}\ \eta,\ \text{cap}\ N_{\mathrm{K}},\ \text{restart}\ \ell\bigr)$\;
+\Return $\delta U_h$\;
+\end{algorithm}
+
+The step $\delta U_h$ then enters the \emph{unchanged} safeguard stack
+of Algorithm~\ref{alg:A}: the merit-based Armijo line search
+(Algorithm~\ref{alg:A2}) and the safeguard arbiter
+(Algorithm~\ref{alg:A3}) are applied verbatim. Note, however, that the
+directional-derivative identity~\eqref{eq:dir-deriv} ($D = -2\Phi$) is
+exact only for the \emph{exact} Newton step; an inexact (forcing-term
+$\eta > 0$) Krylov step satisfies it only up to the Krylov residual. A JFNK
+implementation should therefore relax the line-search slope test to the
+inexact-Newton form $D \le -2\Phi(1-\eta)$; the current direct-solve code uses
+the exact $D = -2\Phi$ (Algorithm~\ref{alg:A2}), valid because its step is the
+exact frozen-$\boldsymbol{\pi}_h$ Newton direction.
+
+% --------------------------------------------------------------
+\subsection{The logic: cost, convergence, and the unchanged fixed point}
+\label{sec:jfnk-logic}
+
+The accounting is the entire case for JFNK:
+\begin{itemize}
+\item \emph{Per Krylov vector:} one extra coupled residual
+evaluation~\eqref{eq:jfnk-matvec} (one weak-form assembly plus one
+Cholesky-cached projection) and one preconditioner solve (one
+substitution on the cached factor). No new factorisation, no dense
+storage.
+\item \emph{Per Newton step:} a few preconditioned Krylov vectors,
+because $\mathcal{J}_{\bar\pi}$ already captures everything in
+$\mathcal{J}_{\mathrm{full}}$ except the compact $\mathcal{C}$, so the
+preconditioned operator is a low-rank-like perturbation of the identity.
+\item \emph{Globally:} the inner solve now applies the full
+tangent~\eqref{eq:jfnk-true-tangent}, restoring the quadratic local
+convergence that the frozen-$\boldsymbol{\pi}_h$ Jacobian forfeited---at
+the price of a small constant factor of extra residual evaluations per
+Newton iteration, not extra Newton iterations.
+\end{itemize}
+
+\paragraph{Same root, different path.}  JFNK does \emph{not} change the
+problem being solved. The fixed point is defined entirely by the
+residual $\boldsymbol{F}(U_h) = 0$
+of~\eqref{eq:jfnk-coupled-residual}---the orthogonal-subscale
+condition of §\ref{sec:osgs} with $\boldsymbol{\pi}_h$ slaved to
+$U_h$. JFNK only alters how the Newton \emph{direction} is computed at
+each iterate (full-tangent Krylov instead of frozen-$\boldsymbol{\pi}_h$
+direct solve); it changes the convergence \emph{path}, not the root.
+Consequently the converged $(U_h, \boldsymbol{\pi}_h)$, and in particular
+the MMS error plateau, must be identical to the plain coupled solve to
+within the nonlinear tolerance---which is exactly the regression invariant
+any future implementation must verify before the JFNK path is allowed to
+replace the direct inner solve.
 
 % ============================================================
 \section{Convergence-Analysis Notes}
@@ -1251,18 +1672,19 @@ The orchestration treats only the second as success. Coercing the
 first into a converged state---``it ran for many iterations and
 stopped; close enough''---is forbidden, because doing so would feed an
 unresolved iterate into Stage~II of the cascade. In OSGS in particular,
-an unresolved $U_h$ produces a stale $\boldsymbol{\pi}_h$ whose
-subsequent fixed-point iterations cannot recover.
+seeding the coupled solve from an unresolved $U_h^{\mathrm{ASGS}}$
+starts the Newton iteration outside its quadratic basin, from which the
+slaved-$\boldsymbol{\pi}_h$ residual cannot recover.
 
-\subsection{Why the OSGS stopping mode matters}
+\subsection{No separate OSGS stopping mode}
 
-The default \code{both} predicate corresponds to the mathematical
-definition of the staggered fixed point: $(U_h, \boldsymbol{\pi}_h)$
-is the converged pair when neither moves between outer iterations. The
-relaxed modes are appropriate only when the user knows that the
-slacker condition is already satisfied; using a single-criterion mode
-without that knowledge introduces the false-convergence trap that the
-noise-floor invariant forbids.
+The coupled OSGS solve of §\ref{sec:osgs} has no convergence predicate
+of its own: it terminates on the ordinary per-field relative residual
+gate of its single inner Newton (Algorithm~\ref{alg:A3}). There is no
+state-drift or projection-drift criterion, no \code{both}/\code{state\_drift}/%
+\code{projection\_drift} mode, because there is no staggered outer loop
+to stop---$\boldsymbol{\pi}_h$ is re-projected from the current iterate
+at every residual evaluation rather than compared across outer steps.
 
 % ============================================================
 \appendix
@@ -1315,8 +1737,8 @@ the core algorithm of Part~\ref{part:core}, byte-for-byte.}
 
 Two extensions are documented. The first
 (§\ref{sec:mms}) adds an MMS plateau verifier (Algorithm~\ref{alg:D})
-that hooks into the orchestrator (Algorithm~\ref{alg:O}) and the OSGS
-loop (Algorithm~\ref{alg:C}) by inserting coloured \extline{\extline{}}
+that hooks into the orchestrator (Algorithm~\ref{alg:O}) and the coupled
+OSGS solve (Algorithm~\ref{alg:C}) by inserting coloured \extline{\extline{}}
 lines directly in those algorithm boxes (§\ref{sec:mms-hooks}). The
 second (§\ref{sec:harness}) is a set of parameter substitutions applied
 by the sweep harness; it does not introduce new algorithm boxes.
@@ -1333,7 +1755,7 @@ tree of Figure~\ref{fig:hierarchy}.
 \node[modnode, below left=14mm and 14mm of O] (B)
     {\textbf{Algorithm~\ref{alg:B}}\\$\mathrm{RobustNonlinearCascade}$};
 \node[modnode, below right=14mm and 14mm of O] (C)
-    {\textbf{Algorithm~\ref{alg:C}}\\$\mathrm{OSGS}$};
+    {\textbf{Algorithm~\ref{alg:C}}\\$\mathrm{CoupledOSGSSolve}$};
 
 \node[modnode, below=18mm of O] (A)
     {\textbf{Algorithm~\ref{alg:A}}\\$\mathrm{NewtonKernel}$};
@@ -1354,13 +1776,13 @@ tree of Figure~\ref{fig:hierarchy}.
 \draw[->, extcolor, thick, dashed]
     (C.east) to[bend right=10]
     node[edgelbl, midway, fill=white, text=extcolor]
-    {\extline{post-convergence gate (inline in Alg.~\ref{alg:C})}} (D.south west);
+    {\extline{post-solve check (inline in Alg.~\ref{alg:C})}} (D.south west);
 
 \end{tikzpicture}
 \caption{Extension hierarchy. The MMS plateau verifier
 (\extline{Algorithm~\ref{alg:D}}, blue) is hooked directly into the
-core orchestrator (Algorithm~\ref{alg:O}) and the core OSGS loop
-(Algorithm~\ref{alg:C}) by inline \extline{\textbackslash extline\{\}}
+core orchestrator (Algorithm~\ref{alg:O}) and the core coupled OSGS
+solve (Algorithm~\ref{alg:C}) by inline \extline{\textbackslash extline\{\}}
 blue lines, displayed within the respective core algorithm boxes
 (§\ref{sec:mms-hooks}). Solid arrows reproduce the core hierarchy of
 Figure~\ref{fig:hierarchy}; \extline{dashed coloured arrows} mark the
@@ -1409,7 +1831,7 @@ does not advance the iterate.}
 \footnotesize
 \extline{%
 \begin{tabular}{@{}r@{\quad}p{0.82\textwidth}@{}}
-\textit{Called by:} & Inline blue hook in Algorithm~\ref{alg:O} (per extension cycle in the ASGS path); inline blue hook in Algorithm~\ref{alg:C} (per OSGS staggered iteration once $S_{\mathrm{conv}}$ has fired). See §\ref{sec:mms-hooks}. \\
+\textit{Called by:} & Inline blue hook in Algorithm~\ref{alg:O} (per extension cycle in the ASGS path); inline blue hook in Algorithm~\ref{alg:C} (once, after the single coupled OSGS solve). See §\ref{sec:mms-hooks}. \\
 \textit{Calls:}     & (none; pure procedure) \\
 \textit{Inputs:}    & Current iterate $U_h^m$; exact reference $U_{\mathrm{ex}}$; running error history $\mathcal{H}$; pass counter $I_{\mathrm{pass}}$ \\
 \textit{Outputs:}   & Plateau flag $S_{\mathrm{plat}}$; updated counter $I_{\mathrm{pass}}'$ \\
@@ -1463,48 +1885,39 @@ are run on top of the converged $U_h^{\mathrm{ASGS}}$, each followed
 by a call to Algorithm~\ref{alg:D}. The loop exits as soon as the
 plateau condition is satisfied or the budget is exhausted.}
 
-\extline{In the OSGS branch, the augmentation has two parts.
-The orchestrator inflates the outer-loop budget
-($N_{\mathrm{OSGS}}^{\mathrm{eff}} \gets N_{\mathrm{OSGS}} + K_{\mathrm{extra}}$)
-to leave room for the plateau samples. Inside Algorithm~\ref{alg:C},
-the $S_{\mathrm{conv}}$ branch is no longer terminal: the first
-$S_{\mathrm{conv}}$ event is intercepted to seed the plateau history
-and is followed by a \texttt{continue}, so the outer loop runs one
-more iteration to collect a sample; on subsequent $S_{\mathrm{conv}}$
-events, Algorithm~\ref{alg:D} is called and the loop either exits
-(plateau satisfied) or continues (still extending).}
+\extline{In the OSGS branch, there is no plateau loop: the coupled solve
+of Algorithm~\ref{alg:C} runs once and the MMS oracle is evaluated a
+single time at its converged iterate $U_h^\star$. The orchestrator still
+inflates the coupled-solve Newton budget
+($N_{\mathrm{OSGS}}^{\mathrm{eff}} \gets N_{\mathrm{OSGS}} + K_{\mathrm{extra}}$),
+but only to give the single solve extra inner-Newton room; the post-solve
+hook records \code{mms\_stop\_reason} $=$ \code{coupled\_single\_solve} and,
+if the velocity $L^2$ error exceeds the expected $O(h^{k_v+1})$ rate,
+additionally records \code{coupled\_at\_suboptimal\_rate}. No extra
+cycles are run and Algorithm~\ref{alg:D}'s consecutive-pass machinery
+applies only to the ASGS extension path.}
 
 \extline{\paragraph{What one $\mathcal{H}$-entry costs.}
-Algorithm~\ref{alg:D} is mode-agnostic; it compares the last two
-entries of the running error history $\mathcal{H}$ regardless of how
-those entries were produced. However, the semantic content of one
-$\mathcal{H}$-entry differs between the two paths:
-in the ASGS extension loop, one entry corresponds to one extra
-\emph{single-Newton-step} on top of the already-converged
-$U_h^{\mathrm{ASGS}}$, whereas in the OSGS path one entry
-corresponds to one full \emph{outer staggered iteration} (inner
-cascade + residual reprojection + Anderson mixing). The plateau
-tolerance $\tau_{\mathrm{err}}$ is calibrated against the relative
-change between consecutive entries; users tuning $\tau_{\mathrm{err}}$
-should keep in mind that the per-entry cost---and therefore the
-expected per-entry relative-change scale---is different in the two
-paths. The current default is conservative enough that either path
-satisfies it.}
+In the ASGS extension loop, Algorithm~\ref{alg:D} compares the last two
+entries of the running error history $\mathcal{H}$, each of which
+corresponds to one extra \emph{single-Newton-step} on top of the
+already-converged $U_h^{\mathrm{ASGS}}$. The plateau tolerance
+$\tau_{\mathrm{err}}$ is calibrated against the relative change between
+consecutive entries. The OSGS path takes no consecutive samples: it
+evaluates the oracle once after the coupled solve, so $\tau_{\mathrm{err}}$
+and the consecutive-pass count $N_{\mathrm{plat}}$ play no role there.}
 
-\extline{\paragraph{Budget exhaustion is not a verification failure
-of the solver.} When the OSGS branch reaches its inflated outer-loop
-budget $N_{\mathrm{OSGS}}^{\mathrm{eff}}$ without the plateau test
-firing, the solver returns
-$(S_{\mathrm{solver}}, S_{\mathrm{plat}}) = (\mathrm{True}, \mathrm{False})$
-with \code{diag\_cache["mms\_stop\_reason"] = "mms\_budget\_exhausted"}.
-The base OSGS fixed point converged (this is what $S_{\mathrm{conv}}$
-firing at least once established); the plateau verifier ran out of
-samples. Callers that care about FE-error verification must read
-$S_{\mathrm{plat}}$ explicitly: a $\mathrm{True}/\mathrm{False}$
-return means "solver converged at the algebraic level, but the FE
-error did not plateau within the budget." Treating $S_{\mathrm{solver}}$
-alone as "overall verification success" is a misuse of the return
-contract.}
+\extline{\paragraph{The OSGS post-solve check is not a verification gate
+on the solver.} The single OSGS oracle evaluation classifies the
+converged FE error against the $O(h^{k_v+1})$ rate but does not gate
+success: the coupled solve reports its own algebraic convergence, and the
+\code{coupled\_at\_suboptimal\_rate} flag is a diagnostic recorded
+alongside \code{mms\_stop\_reason} $=$ \code{coupled\_single\_solve}, not
+a failure. Callers that care about FE-error verification must read those
+diagnostics explicitly: a converged solver flag means the algebraic
+system was solved, not that the discretisation error attained its optimal
+rate. Treating $S_{\mathrm{solver}}$ alone as ``overall verification
+success'' is a misuse of the return contract.}
 
 \subsection{Parameters of this extension}
 
@@ -1521,7 +1934,7 @@ contract.}
 $N_{\mathrm{plat}}$ & \code{mms.require\_consecutive\_passes} & Consecutive passes of $r_{\max} \le \tau_{\mathrm{err}}$ required before declaring a plateau. \\
 $\tau_{\mathrm{err}}$ & \code{mms.tau\_err} & Relative-change tolerance against which $r_{\max}$ is tested. \\
 $\varepsilon_{u,L^2}, \varepsilon_{u,H^1}, \varepsilon_{p,L^2}$ & \code{mms.eps\_u\_l2,\_u\_h1,\_p\_l2} & Per-norm floors guarding the denominator in $r_{\max}$. \\
-$K_{\mathrm{extra}}$ & \code{mms.max\_extra\_cycles} & Cap on extension cycles (ASGS path) or staggered iterations added to the OSGS budget (OSGS path) for plateau verification. \\
+$K_{\mathrm{extra}}$ & \code{mms.max\_extra\_cycles} & Cap on extension cycles (ASGS path) or inner-Newton iterations added to the coupled-solve budget (OSGS path) for plateau verification. \\
 \bottomrule
 \end{tabularx}}
 \end{table}
@@ -1541,7 +1954,7 @@ Table~\ref{tab:params} verbatim. The harness changes parameter
 \emph{values} only; the algorithm boxes themselves are unchanged, so
 no $\mathrm{O}'$ or $\mathrm{B}'$ variants are needed.}
 
-\subsection{Discretisation-coupled outer-loop tolerance}
+\subsection{Discretisation-coupled residual tolerance}
 \label{sec:harness-ftol}
 
 \extline{Two error scales matter in an FE method. The \emph{algebraic
@@ -1559,8 +1972,9 @@ The harness derives a discretisation-coupled scalar tolerance,}
 discretisation rate; the ceiling $C_{\mathrm{ceil}}$ guards against
 trivially loose targets on coarse meshes; and the outer $\max$ pins
 the tolerance above the user-supplied $\textftol^{\,\mathrm{static}}$.
-Quantity~\eqref{eq:dynamic-ftol} governs the staggered drift criteria
-of Algorithm~\ref{alg:C} (Sec.~\ref{sec:osgs}) and the plateau target
+Quantity~\eqref{eq:dynamic-ftol} couples the inner-Newton residual
+target to the mesh---including the single coupled OSGS solve of
+Algorithm~\ref{alg:C} (Sec.~\ref{sec:osgs})---and sets the plateau target
 of Algorithm~\ref{alg:D} (Sec.~\ref{sec:mms}); for the
 algebraic convergence of the inner Newton kernel,
 Sec.~\ref{sec:harness-perfield} replaces this scalar criterion with a
@@ -1776,7 +2190,7 @@ the Picard iteration budget when a stiffness threshold is exceeded:}
 \toprule
 \textbf{Symbol} & \textbf{Field in code} & \textbf{Role / effect} \\
 \midrule
-$C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{sol.dynamic\_ftol\_ceiling}, \code{\_spatial\_safety\_factor} & Clamps for the discretisation-coupled outer-loop tolerance \eqref{eq:dynamic-ftol}, \S\ref{sec:harness-ftol}; $C_{\mathrm{sf}}$ also sets the per-field dimensionless rate \eqref{eq:per-field-rate}. \\
+$C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{sol.dynamic\_ftol\_ceiling}, \code{\_spatial\_safety\_factor} & Clamps for the discretisation-coupled residual tolerance \eqref{eq:dynamic-ftol}, \S\ref{sec:harness-ftol}; $C_{\mathrm{sf}}$ also sets the per-field dimensionless rate \eqref{eq:per-field-rate}. \\
 $\varepsilon_{k}$, $\varepsilon^{\mathrm{N}}_{k}$ & (built from $C_{\mathrm{sf}}$, $n^{\mathrm{sf}}$, $h$, $k_{v}$) & Dimensionless per-field convergence and noise-floor rates supplied to the inner Newton kernel as \code{relative\_ftol\_per\_field} and \code{relative\_stagnation\_noise\_floor\_per\_field}, \S\ref{sec:harness-perfield}. \\
 $\textftol^{\,\mathrm{static}}$ & (harness-set: $10\,\mathrm{eps}$) & Static machine-precision floor of~\eqref{eq:per-field-effective-ftol}; prevents per-field tolerances from descending below floating-point round-off. The corresponding noise-floor floor used in~\eqref{eq:per-field-noise} is $\textstag^{\,\mathrm{dyn}}$ from~\eqref{eq:dynamic-noise}. \\
 $n^{\mathrm{base}}, n^{\min}, n^{\mathrm{sf}}$ & \code{sol.condition\_noise\_floor\_*} & Adaptive noise-floor controls, \S\ref{sec:harness-noise}. \\
