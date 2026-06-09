@@ -23,7 +23,7 @@ The right-hand-side Galerkin terms are
 \end{align}
 and the right-hand side stabilization terms are
 \begin{align}
-  \smash{ - \sum_K{\dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau} \overline{F} )}_K}} & = ( \tau_{1} \alpha \left ( \VertSpace(\boldsymbol{a} \cdot \nabla)\boldsymbol{v} + \nu \overline{\Delta}\boldsymbol{v} + \nu \ViscProj \nabla \boldsymbol{u} \nabla \beta \right. \notag    \\
+  \smash{ - \sum_K{\dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau} \overline{F} )}_K}} & = ( \tau_{1} \alpha \left ( \VertSpace(\boldsymbol{a} \cdot \nabla)\boldsymbol{v} + \nu \overline{\Delta}\boldsymbol{v} + \nu \ViscProj \nabla \boldsymbol{v} \nabla \beta \right. \notag    \\
                                                                                         & \HorSpace \left. + \nabla q - \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{v} \right ),\, \overline{\boldsymbol{f}}) \notag                                                                \\
                                                                                         & \VertSpace + ( \tau_{2} \alpha \left( \nabla \cdot \boldsymbol{v} + \boldsymbol{v} \cdot \nabla \beta - \frac{\varepsilon}{\alpha} q\right),\, \overline{\phi}), \label{eq:StabilizationLVF}
 \end{align}
@@ -225,7 +225,7 @@ The second term in \cref{eq:ReactionTerm} produces $\mathbf{G}_{\alpha D}$:
 \end{align}
 
 \subsection{Components of $\mathbf{K}_{V, P}$} \label{sec:KVPComponents}
-The analogous equation to \cref{eq:GenericMatrixVP,eq:GenericMatrixQU} is
+The analogous equation to \cref{eq:GenericMatrixVU,eq:GenericMatrixQU} is
 \begin{equation} \label{eq:GenericMatrixVP}
   T_{(ai)b} = \frac{\partial T(N^a \delta_{ik}, P^c N^c)}{\partial P^b}.
 \end{equation}
@@ -371,6 +371,6 @@ If second-order contributions can be neglected (for example, if only linear fini
   \mathbf{F}_{\text{S}} = &
   \begin{bmatrix}
     \mathbf{A}_F + \mathbf{G}_{\beta, F} + \mathbf{D}_{\beta, F} + \mathbf{R}_{\sigma, F} + \mathbf{D}_{\phi} + \mathbf{V}_{\phi} \\
-    \mathbf{Q}_{\alpha F} + \mathbf{Q}_P
+    \mathbf{Q}_{\alpha F} + \mathbf{Q}_{\phi}
   \end{bmatrix}.
 \end{align}
