@@ -133,12 +133,15 @@
     "shrink": 1
   },
   "threshold": {
-    "_comment": "Convergence reference line at y=1 drawn on residual panels when the trace carries the NORMALIZED residual (f_norm = max-over-fields of ‖R‖/effective_ftol). Dots below the line are converged. ylim_pad is the multiplicative (log-axis) margin so the y=1 line stays visible even when all residuals sit far below it.",
+    "_comment": "Reference lines on the trajectory panels. The ε panel is now PRIMARY (left axis): the scale-free gate ε_M ≤ tol_M AND ε_C ≤ tol_C is what the solver actually decides convergence on, so a cell with ε_M below tol_M is converged even if the (de-emphasised, right-axis) residual ‖R‖/tol still sits above its own y=1 line — which is the visual confusion this foregrounding resolves. tol_M_default/tol_C_default are FALLBACK thresholds drawn when a trace does not carry its own tol_M/tol_C; they mirror the solver config defaults eps_tol_momentum / eps_tol_mass (config/base_config.json). Newer traces emit tol_M/tol_C and the plotter prefers those. ylim_pad is the multiplicative (log-axis) margin so threshold lines stay visible; eps_min_decades enforces a minimum decade span so a barely-moving ε axis still reads on clean ticks.",
     "color": "#757575",
     "line_width": 0.9,
     "mini_line_width": 0.7,
     "linestyle": "--",
     "ylim_pad": 3.0,
-    "eps_min_decades": 2.0
+    "eps_min_decades": 2.0,
+    "tol_M_default": 1e-6,
+    "tol_C_default": 0.8,
+    "residual_demph_alpha": 0.32
   }
 }

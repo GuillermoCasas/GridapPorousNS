@@ -1031,6 +1031,11 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                                     method=String(method), encoding=encoding_strategy),
                                             N = Int(n), success = success, successful_eps = successful_eps,
                                             final_residual = final_residual_attempt, initial_residual = initial_residual_attempt,
+                                            # Scale-free convergence thresholds the gate actually compares ε_M/ε_C
+                                            # against (eps_tol_momentum/eps_tol_mass). Emitted so the trajectory
+                                            # plotter can draw the true tol_M/tol_C lines instead of a generic ε=1.
+                                            tol_M = config.numerical_method.solver.eps_tol_momentum,
+                                            tol_C = config.numerical_method.solver.eps_tol_mass,
                                             attempts = cell_attempt_traces,
                                         )
                                         open(joinpath(traces_dir, trace_name), "w") do io

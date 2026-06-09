@@ -72,6 +72,26 @@ def set_params(path):
 _apply_params(_load_params(_DEFAULT_PARAMS))
 
 
+# Scale-free convergence thresholds the gate decides on (ε_M ≤ tol_M AND ε_C ≤ tol_C). A per-trace
+# value (emitted by run_test.jl into the trace top-level) is preferred; set_tols installs it. When a
+# trace predates that emission, _tol falls back to the plot_params default (mirrors the solver config
+# eps_tol_momentum / eps_tol_mass). Module-global so _fill_stage/_fill_mini need no extra threading,
+# matching the P-global pattern; the wrapper calls set_tols() once per trace before rendering.
+_TOLS = {"tol_M": None, "tol_C": None}
+
+
+def set_tols(tol_M=None, tol_C=None):
+    """Install the per-trace scale-free thresholds (None -> fall back to the plot_params default)."""
+    _TOLS["tol_M"], _TOLS["tol_C"] = tol_M, tol_C
+
+
+def _tol(which):
+    """Resolve a threshold ('tol_M' or 'tol_C'): the per-trace value if finite-positive, else the
+    plot_params fallback."""
+    v = _TOLS.get(which)
+    return v if _finite_pos(v) else P["threshold"][which + "_default"]
+
+
 def _bold(s):
     r"""Bold-mathtext a plain phrase so a stage label can emphasise just the solver-role words
     (e.g. "Newton (Alg. A)") while the surrounding context and suffix stay regular weight. Spaces
@@ -238,31 +258,37 @@ def _eps_xy(stage_list, key):
 
 
 def _legend_handles(stages):
-    """Build the figure's ONE shared key — proxy artists for the residual curve, the ε_M/ε_C overlay,
-    and the two y=1 reference lines — replacing the per-box legend. Entries are emitted only for
-    quantities this trajectory actually carries: the ε rows and the ε=1 line appear solely when the
-    run was probe-traced (eps_M/eps_C present), and the residual row labels how a box's colour encodes
-    its outcome. Both threshold lines sit at the value 1 because the residual axis is pre-normalised by
-    the per-field tolerance (‖R‖/tol) and ε is dimensionless — that '1' is the exact threshold value,
-    stated in each label."""
+    """Build the figure's ONE shared key (replacing per-box legends). Entries are emitted only for
+    quantities this trajectory actually carries. When the run was probe-traced (eps_M/eps_C present)
+    the key leads with the PRIMARY ε_M/ε_C curves and the scale-free gate lines tol_M/tol_C (what the
+    solver decides convergence on), then labels the algebraic residual ‖R‖/tol as the de-emphasised
+    right-axis context (box colour = outcome). Otherwise only the residual key and its y=1 threshold
+    appear (the legacy residual-primary layout)."""
     M, c, T = P["markers"], P["colors"], P["threshold"]
     ms = P["legend"]["marker_size"]
     hist = [h for s in (stages or []) for h in (s.get("history") or [])]
     has_eps_m = any(_finite_pos(h.get("eps_M")) for h in hist)
     has_eps_c = any(_finite_pos(h.get("eps_C")) for h in hist)
-    H = [Line2D([], [], color=c["grey"], marker="o", ms=ms, lw=M["stage_line_width"],
-                label=r"$\|R\|/\mathrm{tol}$ : per-field residual (box colour = outcome)")]
-    if has_eps_m:
-        H.append(Line2D([], [], color=c["blue"], marker="o", ms=ms, lw=M["mini_line_width"],
-                        label=r"$\varepsilon_M$ : momentum residual / force scale"))
-    if has_eps_c:
-        H.append(Line2D([], [], color=c["green"], marker="s", ms=ms, lw=M["mini_line_width"],
-                        label=r"$\varepsilon_C$ : mass, $\|\nabla\!\cdot(\alpha u)\|/\|\nabla(\alpha u)\|$"))
-    H.append(Line2D([], [], color=T["color"], ls=T["linestyle"], lw=T["line_width"] + 0.4,
-                    label=r"$\|R\|/\mathrm{tol}=1$ : convergence threshold ($\|R\|=$ effective ftol)"))
+    H = []
     if has_eps_m or has_eps_c:
-        H.append(Line2D([], [], color=c["grey"], ls=":", lw=T["line_width"] + 0.4,
-                        label=r"$\varepsilon=1$ : residual at the force/flux scale"))
+        if has_eps_m:
+            H.append(Line2D([], [], color=c["blue"], marker="o", ms=ms, lw=M["drift_line_width"],
+                            label=r"$\varepsilon_M$ : momentum residual / force scale (primary)"))
+            H.append(Line2D([], [], color=c["blue"], ls=T["linestyle"], lw=T["line_width"] + 0.4,
+                            label=rf"$\mathrm{{tol}}_M={sci(_tol('tol_M'))}$ : momentum gate ($\varepsilon_M\leq\mathrm{{tol}}_M$)"))
+        if has_eps_c:
+            H.append(Line2D([], [], color=c["green"], marker="s", ms=ms, lw=M["drift_line_width"],
+                            label=r"$\varepsilon_C$ : mass, $\|\nabla\!\cdot(\alpha u)\|/\|\nabla(\alpha u)\|$"))
+            H.append(Line2D([], [], color=c["green"], ls=T["linestyle"], lw=T["line_width"] + 0.4,
+                            label=rf"$\mathrm{{tol}}_C={sci(_tol('tol_C'))}$ : mass gate ($\varepsilon_C\leq\mathrm{{tol}}_C$)"))
+        H.append(Line2D([], [], color=c["muted"], marker="o", ms=ms, lw=M["mini_line_width"],
+                        alpha=T["residual_demph_alpha"],
+                        label=r"$\|R\|/\mathrm{tol}$ : algebraic residual (de-emph., right axis; box colour = outcome)"))
+    else:
+        H.append(Line2D([], [], color=c["grey"], marker="o", ms=ms, lw=M["stage_line_width"],
+                        label=r"$\|R\|/\mathrm{tol}$ : per-field residual (box colour = outcome)"))
+        H.append(Line2D([], [], color=T["color"], ls=T["linestyle"], lw=T["line_width"] + 0.4,
+                        label=r"$\|R\|/\mathrm{tol}=1$ : convergence threshold ($\|R\|=$ effective ftol)"))
     return H
 
 
@@ -287,12 +313,63 @@ def _final_node_text(last, ok):
 
 
 def _fill_stage(ax, stages):
-    """Draw a B-cascade's residual-vs-iteration dots (one stage or a list) into the given axes."""
+    """Draw a B-cascade's convergence trajectory.
+
+    When the run was probe-traced, the scale-free norms ε_M (momentum) and ε_C (mass) are the PRIMARY
+    curves on the left axis — with the actual gate lines tol_M / tol_C — because ε_M ≤ tol_M AND
+    ε_C ≤ tol_C is what the solver decides convergence on. The algebraic residual ‖R‖/tol is demoted
+    to a de-emphasised right (twin) axis. A cell can therefore read as converged (ε_M below tol_M)
+    even while the residual still sits above its own y=1 line — the visual confusion this foregrounding
+    resolves. With no probe data (the default, and all pre-change traces) the residual stays primary,
+    exactly as before."""
     stages = stages if isinstance(stages, list) else [stages]
     M, F, c, T = P["markers"], P["fonts"], P["colors"], P["threshold"]
     color = stage_color(stages[-1]) if stages else c["grey"]
     xs, ys, acc, normalized = _residual_xy(stages)
-    if ys:
+    em_x, em_y = _eps_xy(stages, "eps_M")
+    ec_x, ec_y = _eps_xy(stages, "eps_C")
+
+    if em_y or ec_y:
+        # ----- ε PRIMARY (left axis): the scale-free gate the solver decides on -----
+        prim_x, prim_y = (em_x, em_y) if em_y else (ec_x, ec_y)
+        if em_y:
+            ax.semilogy(em_x, em_y, "-o", color=c["blue"], ms=M["mini_dot"],
+                        lw=M["drift_line_width"], zorder=3)
+            ax.axhline(_tol("tol_M"), color=c["blue"], lw=T["line_width"], ls=T["linestyle"], zorder=2)
+        if ec_y:
+            ax.semilogy(ec_x, ec_y, "-s", color=c["green"], ms=M["mini_dot"],
+                        lw=M["drift_line_width"], zorder=3)
+            ax.axhline(_tol("tol_C"), color=c["green"], lw=T["line_width"], ls=T["linestyle"], zorder=2)
+        # entry square + exit star on the primary ε curve, in STAGE colour (ties the curve to its stage)
+        ax.scatter([prim_x[0]], [prim_y[0]], s=M["stage_entry"], marker="s", color=color, zorder=4)
+        ax.scatter([prim_x[-1]], [prim_y[-1]], s=M["stage_exit"], marker="*", color=color, zorder=4)
+        # y-range: include both ε curves AND both gate lines, with a minimum decade span so a
+        # barely-moving ε axis still reads on clean ticks (mirrors the legacy ε-overlay logic).
+        yall = [v for v in (em_y + ec_y) if v > 0] + [_tol("tol_M"), _tol("tol_C")]
+        lo, hi = min(yall), max(yall)
+        if math.log10(hi / lo) < T["eps_min_decades"]:
+            ctr, half = math.sqrt(lo * hi), 10 ** (T["eps_min_decades"] / 2.0)
+            lo, hi = ctr / half, ctr * half
+        ax.set_ylim(lo / T["ylim_pad"], hi * T["ylim_pad"])
+        ax.set_ylabel(r"$\varepsilon_M,\ \varepsilon_C$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
+        ax.set_xlabel(r"$\mathrm{iter}$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
+        ax.tick_params(labelsize=F["tick_label"])
+        # residual DE-EMPHASISED on a twin right axis (kept for context, never dominant)
+        if ys:
+            dem = T["residual_demph_alpha"]
+            rax = ax.twinx()
+            rax.semilogy(xs, ys, "-o", color=c["muted"], ms=M["mini_dot"],
+                         lw=M["mini_line_width"], alpha=dem, zorder=1)
+            if normalized:
+                rax.axhline(1.0, color=c["muted"], lw=T["mini_line_width"], ls=T["linestyle"],
+                            alpha=dem, zorder=1)
+                lo2, hi2 = min(min(ys), 1.0), max(max(ys), 1.0)
+                rax.set_ylim(lo2 / T["ylim_pad"], hi2 * T["ylim_pad"])
+            rax.set_ylabel(r"$\|R\|/\mathrm{tol}$", fontsize=F["axis_label"],
+                           labelpad=F["axis_label_pad"], color=c["muted"])
+            rax.tick_params(labelsize=F["tick_label"], colors=c["muted"])
+    elif ys:
+        # ----- RESIDUAL PRIMARY (no probe data): unchanged legacy behaviour -----
         ax.semilogy(xs, ys, "-", color=color, lw=M["stage_line_width"], alpha=M["stage_line_alpha"], zorder=1)
         ax.scatter([x for x, a in zip(xs, acc) if a], [y for y, a in zip(ys, acc) if a],
                    s=M["stage_dot"], color=color, zorder=3)
@@ -310,61 +387,51 @@ def _fill_stage(ax, stages):
         else:
             ax.set_ylabel(r"$\|R\|_\infty$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
         ax.set_xlabel(r"$\mathrm{iter}$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
+        ax.tick_params(labelsize=F["tick_label"])
     else:
         ax.text(0.5, 0.5, r"$\times$", ha="center", va="center", color=color,
                 fontsize=F["cross_marker"], transform=ax.transAxes)
         ax.set_xticks([]); ax.set_yticks([])
-    # [convergence norms] When the run was traced with the convergence probe, overlay the per-iteration
-    # scale-free norms ε_M (momentum) and ε_C (mass) on a twin axis. The residual stays the primary
-    # curve; with no probe data (the default, and all pre-change traces) this is a no-op — the box is
-    # unchanged. The dotted line marks ε = 1 (residual ≈ the force/flux scale); ε_C is bounded by √d.
-    em_x, em_y = _eps_xy(stages, "eps_M")
-    ec_x, ec_y = _eps_xy(stages, "eps_C")
-    if em_y or ec_y:
-        eax = ax.twinx()
-        if em_y:
-            eax.semilogy(em_x, em_y, "-o", color=c["blue"], ms=M["mini_dot"],
-                         lw=M["mini_line_width"], label=r"$\varepsilon_M$")
-        if ec_y:
-            eax.semilogy(ec_x, ec_y, "-s", color=c["green"], ms=M["mini_dot"],
-                         lw=M["mini_line_width"], label=r"$\varepsilon_C$")
-        eax.axhline(1.0, color=c["grey"], lw=T["line_width"], ls=":", zorder=1)
-        # Keep the ε axis from collapsing to a misleading sub-decade window when ε barely moves (a
-        # stalled stage): always include the ε=1 reference and enforce a minimum decade span, so the
-        # axis reads on clean decade ticks and the label stays proportionate across boxes. A tight
-        # auto-range otherwise emits verbose 4×10⁻¹/6×10⁻¹ subdecade ticks that make the same-size
-        # label *look* oversized relative to a wide-range neighbour.
-        yall = [v for v in (em_y + ec_y) if v > 0]
-        if yall:
-            lo, hi = min(min(yall), 1.0), max(max(yall), 1.0)
-            if math.log10(hi / lo) < T["eps_min_decades"]:
-                ctr, half = math.sqrt(lo * hi), 10 ** (T["eps_min_decades"] / 2.0)
-                lo, hi = ctr / half, ctr * half
-            eax.set_ylim(lo / T["ylim_pad"], hi * T["ylim_pad"])
-        eax.set_ylabel(r"$\varepsilon_M,\ \varepsilon_C$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
-        eax.tick_params(labelsize=F["tick_label"])
-        # The ε_M/ε_C key is drawn ONCE as a shared figure legend (see _legend_handles), not repeated
-        # in every box — so no per-axes legend here.
-    ax.tick_params(labelsize=F["tick_label"])
     for sp in ax.spines.values():
         sp.set_color(color); sp.set_linewidth(P["spines"]["stage_width"])
 
 
 def _fill_mini(ax, stage_list):
-    """Compact residual mini-plot for one B-cascade (the OSGS per-outer-iteration thumbnails)."""
+    """Compact convergence mini-plot for one B-cascade (the OSGS per-outer-iteration thumbnails).
+    Foregrounds ε_M/ε_C vs the gate lines tol_M/tol_C when probe-traced; falls back to the residual
+    sparkline otherwise. No twin axis here — the tiny cells stay legible and the residual detail lives
+    in the main Stage-I box."""
     M, c, T = P["markers"], P["colors"], P["threshold"]
     color = stage_color(stage_list[-1]) if stage_list else c["grey"]
-    xs, ys, _, normalized = _residual_xy(stage_list)
-    if ys:
-        ax.semilogy(xs, ys, "-o", color=color, ms=M["mini_dot"], lw=M["mini_line_width"])
-        ax.scatter([xs[-1]], [ys[-1]], s=M["mini_exit"], marker="*", color=color, zorder=4)
-        if normalized:  # convergence threshold (y=1) on each thumbnail
-            ax.axhline(1.0, color=T["color"], lw=T["mini_line_width"], ls=T["linestyle"], zorder=1)
-            lo, hi = min(min(ys), 1.0), max(max(ys), 1.0)
-            ax.set_ylim(lo / T["ylim_pad"], hi * T["ylim_pad"])
+    em_x, em_y = _eps_xy(stage_list, "eps_M")
+    ec_x, ec_y = _eps_xy(stage_list, "eps_C")
+    if em_y or ec_y:
+        prim_x, prim_y = (em_x, em_y) if em_y else (ec_x, ec_y)
+        if em_y:
+            ax.semilogy(em_x, em_y, "-o", color=c["blue"], ms=M["mini_dot"], lw=M["mini_line_width"])
+            ax.axhline(_tol("tol_M"), color=c["blue"], lw=T["mini_line_width"], ls=T["linestyle"], zorder=1)
+        if ec_y:
+            ax.semilogy(ec_x, ec_y, "-s", color=c["green"], ms=M["mini_dot"], lw=M["mini_line_width"])
+            ax.axhline(_tol("tol_C"), color=c["green"], lw=T["mini_line_width"], ls=T["linestyle"], zorder=1)
+        ax.scatter([prim_x[-1]], [prim_y[-1]], s=M["mini_exit"], marker="*", color=color, zorder=4)
+        yall = [v for v in (em_y + ec_y) if v > 0] + [_tol("tol_M"), _tol("tol_C")]
+        lo, hi = min(yall), max(yall)
+        if math.log10(hi / lo) < T["eps_min_decades"]:
+            ctr, half = math.sqrt(lo * hi), 10 ** (T["eps_min_decades"] / 2.0)
+            lo, hi = ctr / half, ctr * half
+        ax.set_ylim(lo / T["ylim_pad"], hi * T["ylim_pad"])
     else:
-        ax.text(0.5, 0.5, r"$\times$", ha="center", va="center", color=color,
-                fontsize=P["fonts"]["mini_cross_marker"], transform=ax.transAxes)
+        xs, ys, _, normalized = _residual_xy(stage_list)
+        if ys:
+            ax.semilogy(xs, ys, "-o", color=color, ms=M["mini_dot"], lw=M["mini_line_width"])
+            ax.scatter([xs[-1]], [ys[-1]], s=M["mini_exit"], marker="*", color=color, zorder=4)
+            if normalized:  # convergence threshold (y=1) on each thumbnail
+                ax.axhline(1.0, color=T["color"], lw=T["mini_line_width"], ls=T["linestyle"], zorder=1)
+                lo, hi = min(min(ys), 1.0), max(max(ys), 1.0)
+                ax.set_ylim(lo / T["ylim_pad"], hi * T["ylim_pad"])
+        else:
+            ax.text(0.5, 0.5, r"$\times$", ha="center", va="center", color=color,
+                    fontsize=P["fonts"]["mini_cross_marker"], transform=ax.transAxes)
     # Sparkline thumbnails carry no axes labels (the quantitative detail lives in the main stage
     # boxes). set_*ticks([]) only clears MAJOR ticks; on a multi-decade log y-axis matplotlib still
     # draws minor ticks that spill outside the box and overlap the plot — kill those too so every

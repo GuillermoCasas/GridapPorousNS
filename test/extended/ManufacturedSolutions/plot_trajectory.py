@@ -100,6 +100,10 @@ def main():
         cell, N = trace["cell"], trace["N"]
         if not args.file and not _match(cell, N, args.cell, args.N, args.method):
             continue
+        # Install this trace's scale-free gate thresholds so the plotter draws the true tol_M/tol_C
+        # lines (the gate ε_M ≤ tol_M, ε_C ≤ tol_C). Older traces lack them -> plotter falls back to
+        # the plot_params defaults (which mirror the solver config eps_tol_momentum / eps_tol_mass).
+        tp.set_tols(trace.get("tol_M"), trace.get("tol_C"))
         # Per-trace output dir: mirror the trace's location so plots sit under k<kv>/<etype>/plots/
         # alongside vtk/ and traces/ (consistent with run_test.jl's per-cell artifact layout). Each run's
         # plots are then grouped under a run-name subfolder, taken AUTOMATICALLY from the trace's own `run`
