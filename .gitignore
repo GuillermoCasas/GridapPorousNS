@@ -51,6 +51,7 @@ repomix-output.*
 *.run.xml
 *.synctex(busy)
 *.pdfsync
+*.thm
 
 # LaTeX build/compilation folders (e.g. build/, compilation/ in any directory)
 compilation/

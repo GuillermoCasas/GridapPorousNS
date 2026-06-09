@@ -1948,6 +1948,136 @@ $K_{\mathrm{extra}}$ & \code{mms.max\_extra\_cycles} & Cap on extension cycles (
 \end{tabularx}}
 \end{table}
 
+\section{Scale-free convergence criterion}
+\label{sec:convergence-criterion}
+
+\subsection{Motivation}
+The stopping tests used elsewhere in Part~\ref{part:core} decide convergence relative to a scale that
+is, in one way or another, supplied rather than measured: the scalar
+$\|\boldsymbol{b}\|_\infty \le \textftol$ of Algorithm~\ref{alg:A} presumes all residual components
+share one magnitude, and the harness per-field rule of Sec.~\ref{sec:harness-perfield} re-anchors the
+target to the \emph{initial} residual $\|\boldsymbol{R}_0\|$, which drifts with the iterate once the
+inner solve is split into Newton$\leftrightarrow$Picard segments. This section specifies a criterion
+whose normalisation is \emph{measured from the current iterate and the known material data alone}, so
+it is dimensionless and regime-robust with no a-priori characteristic velocity $U$, length $L$,
+pressure $P$, or global $\mathrm{Re}$/$\mathrm{Da}$. It is realised as the standalone module
+\code{src/solvers/convergence\_criterion.jl}, deliberately kept apart from the iteration machinery: it
+answers \emph{whether} an iterate is converged, not \emph{how} to step. The full design rationale and a
+critical audit of it live in \code{docs/solver/nonlinear-convergence-criterion-prompt.md}.
+
+\subsection{The criterion}
+With the momentum and mass residuals of the strong problem~\eqref{eq:alg-Ru}--\eqref{eq:alg-Rp}
+evaluated at the iterate $U^k=(\boldsymbol{u}^k,p^k)$, the outer loop stops when
+\begin{equation}
+    \label{eq:cc-converged}
+    \varepsilon_M \le \mathrm{tol}_M \quad\text{and}\quad \varepsilon_C \le \mathrm{tol}_C ,
+\end{equation}
+for the dimensionless momentum measure $\varepsilon_M$ and mass measure $\varepsilon_C$ below; both are
+reported separately each iteration, alongside the per-term breakdown of $D_M$ (the diagnostic that
+reveals which force balance is limiting a stalled solve).
+
+\subsection{Momentum: the term-magnitude envelope}
+\begin{equation}
+    \label{eq:cc-epsM}
+    \varepsilon_M = \frac{\|\boldsymbol{r}_M^k\|}{D_M^k}, \qquad
+    D_M^k = \|\alpha\,\boldsymbol{u}^k\!\cdot\!\nabla\boldsymbol{u}^k\|
+          + \|2\nabla\!\cdot\!(\alpha\nu\,\Pi^{\mathrm{ds}}\nabla\boldsymbol{u}^k)\|
+          + \|\alpha\nabla p^k\|
+          + \|\sigma(\alpha,\boldsymbol{u}^k)\,\boldsymbol{u}^k\|
+          + \|\boldsymbol{f}\| ,
+\end{equation}
+the residual normalised by a dynamic envelope of the five momentum force magnitudes (convection,
+viscous, pressure-gradient, Darcy--Forchheimer resistance, body force). At the solution these terms do
+not vanish---they balance---so whichever mechanism dominates (viscous as
+$\mathrm{Re},\mathrm{Da}\to0$, convection as $\mathrm{Re}\to\infty$, resistance as
+$\mathrm{Da}\to\infty$) automatically enters the sum and sets the scale, with no regime parameter to
+choose. The envelope is recomputed each iteration: $\sigma=a(\alpha)+b(\alpha)|\boldsymbol{u}^k|$ is
+read pointwise from the iterate, and $\boldsymbol{f}$ is included because in forced problems it is one
+of the balanced forces and can dominate.
+
+\paragraph{Weak-form (algebraic) realisation.} The numerator $\boldsymbol{r}_M^k$ is the
+\emph{stabilised} algebraic residual the solver actually drives to zero (the assembled ASGS/OSGS
+residual vector, velocity block), and each denominator term is assembled through the \emph{same} weak
+form with the same (Euclidean) vector norm. The viscous term is then the integrated-by-parts
+first-derivative quantity
+$\langle\boldsymbol{\varepsilon}^s(\boldsymbol{v}),\,2\alpha\nu\,\Pi^{\mathrm{ds}}\nabla\boldsymbol{u}^k\rangle$
+(\code{weak\_viscous\_operator}); no second derivative appears, so the construction needs no
+special-casing by polynomial order and is valid for the equal-order $P_{k_v}/P_{k_p}$ pair. Two
+properties follow: (i) $\varepsilon_M\to0$ at the discrete solution---it reports genuine convergence
+rather than plateauing at the $O(h^{k_v})$ floor of the \emph{strong} residual; and (ii) the
+sum-of-norms is a conservative envelope, $D_M^k \ge \|\sum_i \mathrm{term}_i\|$, so cancellation between
+co-dominant terms can never make $\varepsilon_M$ optimistically small. With consistent assembly
+$\varepsilon_M\in[0,1]$ up to the bounded stabilisation contribution; a \emph{persistent}
+$\varepsilon_M\gg1$ indicates the residual and the term decomposition were assembled inconsistently
+(different quadrature/space/sign), not that the flow diverged.
+
+\subsection{Mass: flux-divergence over flux-gradient}
+\begin{equation}
+    \label{eq:cc-epsC}
+    \varepsilon_C = \frac{\bigl\|\,\varepsilon\,p^k + \nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\,\bigr\|}
+                         {\|\nabla(\alpha\boldsymbol{u}^k)\|_F},
+    \qquad
+    \nabla(\alpha\boldsymbol{u}^k)=\alpha\nabla\boldsymbol{u}^k
+        + \boldsymbol{u}^k\!\otimes\!\nabla\alpha ,
+\end{equation}
+the dilatation of the porous flux $\boldsymbol{q}=\alpha\boldsymbol{u}$ normalised by the magnitude of
+the flux variation (Frobenius norm of the full flux gradient, which retains the porosity-gradient
+structure $\boldsymbol{u}\!\otimes\!\nabla\alpha$). Both norms are global $L^2(\Omega)$ and built only
+from $\boldsymbol{u}^k$ and the known field $\alpha$, so the ratio is dimensionless by construction.
+The penalty term $\varepsilon p^k$ is retained for strictness (negligible for the production
+$\varepsilon\sim10^{-4}$, but it keeps early iterations from looking over-converged). For constant
+$\alpha$ and $\varepsilon=0$ it reduces to the textbook
+$\|\nabla\!\cdot\!\boldsymbol{u}\|/\|\nabla\boldsymbol{u}\|$.
+
+\paragraph{The $\sqrt{d}$ bound (and self-check).} Because
+$\nabla\!\cdot\!\boldsymbol{q}=\operatorname{tr}(\nabla\boldsymbol{q})$ and, by Cauchy--Schwarz,
+$(\operatorname{tr}A)^2=(A:I)^2\le(A:A)(I:I)=d\,(A:A)$ pointwise, integration gives
+$\|\nabla\!\cdot\!\boldsymbol{q}\|^2\le d\,\|\nabla\boldsymbol{q}\|_F^2$, hence
+$\varepsilon_C\le\sqrt{d}$ in exact arithmetic (modulo the small $\varepsilon p$ term). This ceiling
+is a cheap correctness check: on a developed iterate a value above $\sqrt{d}$ flags a
+quadrature/assembly bug. It is \emph{logged as a warning, not asserted}---in the degenerate roundoff
+regime the signed divergence sum can suffer catastrophic cancellation and nudge the computed ratio
+slightly past $\sqrt{d}$ without any real defect.
+
+\subsection{Why it is scale-free, and what it is not}
+The mass ratio is the pressure-normalised relative mass error with the divergence$\to$pressure
+conversion factor \emph{measured from the iterate}: writing $\Phi/\alpha_\infty$ for the
+viscous+inertial+Darcy envelope, steady-state balance gives $\|p^k\|\sim(\Phi/\alpha_\infty)\,
+\|\nabla(\alpha\boldsymbol{u}^k)\|$, and substituting the measured
+$\Phi/\alpha_\infty=\|p^k\|/\|\nabla(\alpha\boldsymbol{u}^k)\|$ into
+$(\Phi/\alpha_\infty)\,\|\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$ cancels $\|p^k\|$
+identically and leaves~\eqref{eq:cc-epsC}. The conversion factor carries units---that is what a
+conversion does---while the surviving ratio is dimensionless because $\nabla\!\cdot$ and $\nabla$ of
+the same field differ by exactly one inverse length. A pressure-referenced variant
+$\varepsilon_C^{\mathrm{alt}}=\|(h^2/\alpha_K\tau_{1,K})\,\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$
+is deliberately \emph{not} used: it divides by $\|p^k\|$, which is indeterminate under all-Dirichlet
+velocity boundaries (pressure fixed only up to a constant) and is mesh-coupled through $\tau_1$ ---
+strictly inferior to the genuinely scale-free~\eqref{eq:cc-epsC}.
+
+\subsection{Edge cases and implementation guards}
+\begin{itemize}
+    \item \textbf{Trivial / degenerate iterate.} Every denominator is guarded by a pure machine-$\varepsilon$
+    underflow floor (\emph{not} a problem scale); a denominator sitting at that floor raises a
+    \code{degenerate} flag, and convergence is never accepted at $k=0$ (require $\ge1$ completed
+    iteration). The $\sqrt{d}$ bound keeps $\varepsilon_C$ well-posed whenever
+    $\|\nabla(\alpha\boldsymbol{u}^k)\|$ is above roundoff; the \code{degenerate} flag plus the
+    $k\ge1$ rule cover the roundoff regime that the analytic bound cannot.
+    \item \textbf{Genuine nonlinear residual.} $\boldsymbol{r}_M^k$ is the re-assembled operator residual
+    at $U^k$, never the inner linear-solve residual (which $\to0$ \emph{inside} each step and does not
+    reflect outer convergence).
+    \item \textbf{Tolerance floor.} $\varepsilon_M$ and $\varepsilon_C$ cannot fall below the level set
+    by the discretisation and by $\varepsilon$; $\mathrm{tol}$ must sit above it.
+\end{itemize}
+
+\subsection{Relation to the harness criterion}
+The discretisation-coupled scalar tolerance~\eqref{eq:dynamic-ftol} and the per-field intrinsic-scale
+rule of Sec.~\ref{sec:harness-perfield} are the parameter-sweep harness's convergence machinery; they
+key the algebraic target to $h$ and to the per-field initial residual, which is appropriate inside a
+manufactured-solution sweep where those quantities are known. The criterion of this section is their
+production-grade, a-priori-scale-free counterpart: it requires no manufactured solution, no $h$, and no
+initial-residual anchor, basing the normalisation entirely on the iterate's own force balance and flux
+structure.
+
 \section{Parameter-Sweep Harness Adaptations}
 \label{sec:harness}
 
