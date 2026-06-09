@@ -238,7 +238,7 @@ function execute_outer_homotopy_perturbation_loop!(
         
         println("\n    ==================================================")
         println("    [Attempt $(attempt+1)/$(pert_cfg.max_n_pert + 2)] Homotopy Perturbation Scale: eps_pert = $eps_p")
-        println("    [!] Delegating orchestration to PDE assembly module via `src/solvers/porous_solver.jl` (Mode: $method)")
+        println("    [!] Delegating orchestration to the VMS solver (`solve_system`, src/solvers/solver_core.jl) (Mode: $method)")
         println("    ==================================================")
         
         local_diagnostics_cache = Dict{String, Any}()

@@ -3,7 +3,9 @@
 # primitive `cascade_step_outcome(res, policy)` is what both cascades (and P4's ping-pong) route through;
 # this test fixes its decision boundaries on synthetic `safe_fe_solve!` results.
 #
-# Policy matrix (must match `src/solvers/porous_solver.jl`):
+# Policy matrix (the `CascadePolicy` type + interpreter live in `src/solvers/solver_core.jl`; the
+# values below are defined in their method files — STAGE_I_* in `asgs_solver.jl`, OSGS_INNER in
+# `osgs_solver.jl`):
 #                       accept_noise_floor | accept_soft_stall | max_iters_caught_is_failure
 #   STAGE_I_POLICY      false                false               true
 #   STAGE_I_N2_POLICY   true                 false               true

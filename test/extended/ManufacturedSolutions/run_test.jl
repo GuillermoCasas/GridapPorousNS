@@ -343,7 +343,7 @@ function execute_outer_homotopy_perturbation_loop!(
         
         println("\n    ==================================================")
         println("    [Attempt $(attempt+1)/$(pert_cfg.max_n_pert + 2)] Homotopy Perturbation Scale: eps_pert = $eps_p")
-        println("    [!] Delegating orchestration to PDE assembly module via `src/solvers/porous_solver.jl` (Mode: $method)")
+        println("    [!] Delegating orchestration to the VMS solver (`solve_system`, src/solvers/solver_core.jl) (Mode: $method)")
         println("    ==================================================")
         flush(stdout)  # [observability] surface the current eps_pert attempt live (log is block-buffered)
         
@@ -421,6 +421,13 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                  cli_h5=nothing, cli_max_n=nothing)
     config_path = joinpath(@__DIR__, "data", config_file)
     test_dict = JSON3.read(read(config_path, String), Dict{String, Any})
+
+    # [trajectory diagnostic] When true, attach the scale-free convergence probe to the inner solvers so
+    # the per-iteration ε_M (momentum) and ε_C (mass) normalized norms are recorded in each trace's
+    # iteration history (for the trajectory plots). OFF by default — the probe re-assembles the force
+    # envelope every inner iteration, too costly for a full production sweep; enable it only on the small
+    # cell selections you actually want to plot. It is a pure read-only observer (does not change the solve).
+    trace_conv_norms = Bool(get(test_dict, "trace_convergence_norms", false))
 
     # [concurrency] Our cross-process write safety is the mkpidlock sidecar (single-writer critical
     # sections, below). Disable libhdf5's OWN file lock so it neither rejects concurrent opens of
@@ -1010,6 +1017,10 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     setup = PorousNSSolver.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
                                     formulation = PorousNSSolver.VMSFormulation(form, c_1, c_2)
                                     iter_solvers = PorousNSSolver.StageSolvers(solver_picard, solver_newton)
+                                    # [convergence gate] The scale-free convergence evaluator (ε_M, ε_C) is now the
+                                    # AUTHORITATIVE success gate and is injected by `solve_system` itself (built from
+                                    # setup/formulation + the config tolerances), so it is always active and its ε_M/ε_C
+                                    # are always recorded in the trace history — no per-harness attach is needed here.
                                     mms_setup = MMSSetup(u_final, p_final, h_raw_func, u_ex_L2, norm_h, U_c, P_c, L_cell)
                                     pert_cfg = PerturbationConfig(eps_pert_base, max_n_pert)
                                     
