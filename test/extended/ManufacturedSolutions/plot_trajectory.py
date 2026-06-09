@@ -133,7 +133,7 @@ def main():
                             subtitle_color=(GREEN if ok else RED),
                             osgs_outer=att.get("osgs_outer"),
                             base_conv_k=att.get("base_conv_outer_iter"),
-                            mms_relchange=att.get("mms_relchange"))
+                            mms_relchange=att.get("mms_relchange"), success=ok)
             print(f"[traj] {os.path.relpath(out_path, args.traces)}")
             n += 1
     if len(out_dirs) == 1:

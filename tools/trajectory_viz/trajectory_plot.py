@@ -71,7 +71,22 @@ def set_params(path):
 
 _apply_params(_load_params(_DEFAULT_PARAMS))
 
-_STEP_NAME = {"N1": "Newton-1 (Alg. A)", "N2": "Newton-2 (Alg. A)", "Picard": "Picard smoother"}
+
+def _bold(s):
+    r"""Bold-mathtext a plain phrase so a stage label can emphasise just the solver-role words
+    (e.g. "Newton (Alg. A)") while the surrounding context and suffix stay regular weight. Spaces
+    are escaped to ``\ `` so mathtext keeps them; the cm fontset renders ``\mathbf`` as bold — the
+    same math typeface already used for the titles/axis labels elsewhere in the figure."""
+    return r"$\mathbf{" + s.replace(" ", r"\ ") + r"}$"
+
+
+# Solver-role names shown on each stage box. Newton AND Picard are two MODES of ONE kernel,
+# ExactNewtonPipeline = Algorithm A (theory/osgs_algorithm.tex, the Alg.↔code table): Newton mode
+# uses the exact Jacobian + merit-Armijo, Picard mode a frozen Jacobian + monotone residual descent.
+# So every role carries "(Alg. A)" — the Picard smoother is Alg. A in Picard mode, not a separate
+# algorithm. The names are bold so they stand out from the (regular-weight) context and stop-reason.
+_STEP_NAME = {"N1": _bold("Newton-1 (Alg. A)"), "N2": _bold("Newton-2 (Alg. A)"),
+              "Picard": _bold("Picard smoother (Alg. A)")}
 
 
 def stage_color(stage):
@@ -82,20 +97,40 @@ def stage_color(stage):
 
 
 def _parse_stage(code):
-    """(algorithm-context, step-name) from a stage code, using documentation nomenclature."""
+    """(algorithm-context, step-name) from a stage code, using documentation nomenclature.
+
+    Recognized stage-code forms:
+      B:StageI:N1 | B:StageI:Picard | B:StageI:N2     one-way Stage-I cascade
+      B:StageI:PP[k]:N | B:StageI:PP[k]:P             Stage-I Newton<->Picard ping-pong, swap k
+      C:OSGS:Coupled                                  coupled OSGS solve (no ping-pong fallback)
+      C:OSGS:PP[k]:N | C:OSGS:PP[k]:P                 coupled OSGS solve with the ping-pong fallback, swap k
+      C:OSGS[k]:N1 | ...                              legacy staggered OSGS, outer iteration k
+    In the ping-pong forms the swap index lives in the THIRD field (PP[k]) and the Newton/Picard role
+    in the FOURTH (N/P); in every other form the step is the third field itself.
+    """
     parts = code.split(":")
     algo = parts[0]
     mid = parts[1] if len(parts) > 1 else ""
-    step = parts[2] if len(parts) > 2 else mid
+    third = parts[2] if len(parts) > 2 else mid
+    fourth = parts[3] if len(parts) > 3 else ""
+    pp_swap = third[third.find("[") + 1:third.find("]")] if third.startswith("PP[") and "]" in third else None
+    step = (fourth or third) if pp_swap is not None else third
+
     if algo == "B" and mid == "StageI":
         context = "Alg. B - Stage I (ASGS init)"
-    elif algo == "C" and mid.startswith("OSGS") and step == "Coupled":
+    elif algo == "C" and mid.startswith("OSGS") and (third == "Coupled" or pp_swap is not None):
+        # The coupled OSGS solve is ONE Newton solve (pi recomputed each iter); the PP[k] segments are
+        # its Newton<->Picard ping-pong fallback, NOT a staggered outer loop.
         context = "Alg. C - OSGS coupled (single Newton; pi recomputed each iter)"
-    elif algo == "C" and mid.startswith("OSGS"):
-        idx = mid[mid.find("[") + 1:mid.find("]")] if "[" in mid else "?"
+    elif algo == "C" and mid.startswith("OSGS["):
+        idx = mid[mid.find("[") + 1:mid.find("]")]
         context = "Alg. C - OSGS outer it. {} (-> Alg. B)".format(idx)
     else:
         context = "{} - {}".format(algo, mid)
+
+    if pp_swap is not None:
+        role = {"N": _bold("Newton (Alg. A)"), "P": _bold("Picard smoother (Alg. A)")}.get(step, step)
+        return context, "{} - ping-pong swap {}".format(role, pp_swap)
     return context, _STEP_NAME.get(step, step)
 
 
@@ -185,6 +220,52 @@ def _residual_xy(stage_list):
     return xs, ys, acc, normalized
 
 
+def _eps_xy(stage_list, key):
+    """Per-iteration series of a scale-free convergence norm — key 'eps_M' (momentum) or 'eps_C' (mass) —
+    concatenated across a cascade's stages onto the inner-iteration counter. These are present only when
+    the run was traced with the convergence probe (src/solvers/convergence_criterion.jl); entries with a
+    missing/non-finite value are skipped, so probe-off and pre-change traces yield an empty series.
+    Returns (xs, ys)."""
+    xs, ys, gi = [], [], 0
+    for s in (stage_list or []):
+        for h in (s.get("history") or []):
+            gi += 1
+            v = h.get(key)
+            if _finite_pos(v):
+                xs.append(gi)
+                ys.append(v)
+    return xs, ys
+
+
+def _legend_handles(stages):
+    """Build the figure's ONE shared key — proxy artists for the residual curve, the ε_M/ε_C overlay,
+    and the two y=1 reference lines — replacing the per-box legend. Entries are emitted only for
+    quantities this trajectory actually carries: the ε rows and the ε=1 line appear solely when the
+    run was probe-traced (eps_M/eps_C present), and the residual row labels how a box's colour encodes
+    its outcome. Both threshold lines sit at the value 1 because the residual axis is pre-normalised by
+    the per-field tolerance (‖R‖/tol) and ε is dimensionless — that '1' is the exact threshold value,
+    stated in each label."""
+    M, c, T = P["markers"], P["colors"], P["threshold"]
+    ms = P["legend"]["marker_size"]
+    hist = [h for s in (stages or []) for h in (s.get("history") or [])]
+    has_eps_m = any(_finite_pos(h.get("eps_M")) for h in hist)
+    has_eps_c = any(_finite_pos(h.get("eps_C")) for h in hist)
+    H = [Line2D([], [], color=c["grey"], marker="o", ms=ms, lw=M["stage_line_width"],
+                label=r"$\|R\|/\mathrm{tol}$ : per-field residual (box colour = outcome)")]
+    if has_eps_m:
+        H.append(Line2D([], [], color=c["blue"], marker="o", ms=ms, lw=M["mini_line_width"],
+                        label=r"$\varepsilon_M$ : momentum residual / force scale"))
+    if has_eps_c:
+        H.append(Line2D([], [], color=c["green"], marker="s", ms=ms, lw=M["mini_line_width"],
+                        label=r"$\varepsilon_C$ : mass, $\|\nabla\!\cdot(\alpha u)\|/\|\nabla(\alpha u)\|$"))
+    H.append(Line2D([], [], color=T["color"], ls=T["linestyle"], lw=T["line_width"] + 0.4,
+                    label=r"$\|R\|/\mathrm{tol}=1$ : convergence threshold ($\|R\|=$ effective ftol)"))
+    if has_eps_m or has_eps_c:
+        H.append(Line2D([], [], color=c["grey"], ls=":", lw=T["line_width"] + 0.4,
+                        label=r"$\varepsilon=1$ : residual at the force/flux scale"))
+    return H
+
+
 def _start_node_text(stages, override=None):
     """Entry-node label: normalized residual (‖R₀‖/tol) if the trace carries it, else raw ‖R₀‖."""
     s0 = stages[0] if stages else {}
@@ -225,14 +306,45 @@ def _fill_stage(ax, stages):
             ax.axhline(1.0, color=T["color"], lw=T["line_width"], ls=T["linestyle"], zorder=2)
             lo, hi = min(min(ys), 1.0), max(max(ys), 1.0)
             ax.set_ylim(lo / T["ylim_pad"], hi * T["ylim_pad"])
-            ax.set_ylabel(r"$\|R\|/\mathrm{tol}$", fontsize=F["axis_label"])
+            ax.set_ylabel(r"$\|R\|/\mathrm{tol}$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
         else:
-            ax.set_ylabel(r"$\|R\|_\infty$", fontsize=F["axis_label"])
-        ax.set_xlabel(r"$\mathrm{iter}$", fontsize=F["axis_label"])
+            ax.set_ylabel(r"$\|R\|_\infty$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
+        ax.set_xlabel(r"$\mathrm{iter}$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
     else:
         ax.text(0.5, 0.5, r"$\times$", ha="center", va="center", color=color,
                 fontsize=F["cross_marker"], transform=ax.transAxes)
         ax.set_xticks([]); ax.set_yticks([])
+    # [convergence norms] When the run was traced with the convergence probe, overlay the per-iteration
+    # scale-free norms ε_M (momentum) and ε_C (mass) on a twin axis. The residual stays the primary
+    # curve; with no probe data (the default, and all pre-change traces) this is a no-op — the box is
+    # unchanged. The dotted line marks ε = 1 (residual ≈ the force/flux scale); ε_C is bounded by √d.
+    em_x, em_y = _eps_xy(stages, "eps_M")
+    ec_x, ec_y = _eps_xy(stages, "eps_C")
+    if em_y or ec_y:
+        eax = ax.twinx()
+        if em_y:
+            eax.semilogy(em_x, em_y, "-o", color=c["blue"], ms=M["mini_dot"],
+                         lw=M["mini_line_width"], label=r"$\varepsilon_M$")
+        if ec_y:
+            eax.semilogy(ec_x, ec_y, "-s", color=c["green"], ms=M["mini_dot"],
+                         lw=M["mini_line_width"], label=r"$\varepsilon_C$")
+        eax.axhline(1.0, color=c["grey"], lw=T["line_width"], ls=":", zorder=1)
+        # Keep the ε axis from collapsing to a misleading sub-decade window when ε barely moves (a
+        # stalled stage): always include the ε=1 reference and enforce a minimum decade span, so the
+        # axis reads on clean decade ticks and the label stays proportionate across boxes. A tight
+        # auto-range otherwise emits verbose 4×10⁻¹/6×10⁻¹ subdecade ticks that make the same-size
+        # label *look* oversized relative to a wide-range neighbour.
+        yall = [v for v in (em_y + ec_y) if v > 0]
+        if yall:
+            lo, hi = min(min(yall), 1.0), max(max(yall), 1.0)
+            if math.log10(hi / lo) < T["eps_min_decades"]:
+                ctr, half = math.sqrt(lo * hi), 10 ** (T["eps_min_decades"] / 2.0)
+                lo, hi = ctr / half, ctr * half
+            eax.set_ylim(lo / T["ylim_pad"], hi * T["ylim_pad"])
+        eax.set_ylabel(r"$\varepsilon_M,\ \varepsilon_C$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
+        eax.tick_params(labelsize=F["tick_label"])
+        # The ε_M/ε_C key is drawn ONCE as a shared figure legend (see _legend_handles), not repeated
+        # in every box — so no per-axes legend here.
     ax.tick_params(labelsize=F["tick_label"])
     for sp in ax.spines.values():
         sp.set_color(color); sp.set_linewidth(P["spines"]["stage_width"])
@@ -290,6 +402,15 @@ class _VStack:
     def arrow(self, gap=None):
         self.items.append(("arrow", {"h": P["layout"]["arrow_length_in"], "gap": self._g(gap)}))
 
+    def legend(self, handles, gap=None):
+        """Reserve a band for the shared key. Height auto-sizes to the number of rows the entries
+        wrap to at the configured column count, so probe-off traces (fewer entries) don't reserve
+        the whitespace of a full key."""
+        Lg = P["legend"]
+        rows = math.ceil(len(handles) / Lg["ncol"]) if handles else 0
+        h = rows * P["fonts"]["legend"] * P["linespacing"] / 72.0 + Lg["pad_in"]
+        self.items.append(("legend", {"handles": handles, "h": h, "gap": self._g(gap)}))
+
     def box(self, fill, height, width, xlabel=True, gap=None):
         pad = P["layout"]["box_xlabel_pad_in"] if xlabel else P["layout"]["box_plain_pad_in"]
         self.items.append(("box", {"fill": fill, "box_h": height, "width": width,
@@ -311,6 +432,16 @@ class _VStack:
             elif kind == "arrow":
                 _arrow(fig, self.xc, y / total, self.xc, (y - it["h"]) / total)
                 y -= it["h"]
+            elif kind == "legend":
+                Lg = P["legend"]
+                lax = fig.add_axes([self.xc - Lg["width_frac"] / 2.0, (y - it["h"]) / total,
+                                    Lg["width_frac"], it["h"] / total])
+                lax.axis("off")
+                lax.legend(handles=it["handles"], loc="center", ncol=Lg["ncol"],
+                           fontsize=P["fonts"]["legend"], frameon=True, framealpha=0.92,
+                           handlelength=Lg["handlelength"], columnspacing=Lg["columnspacing"],
+                           labelspacing=Lg["labelspacing"], borderpad=Lg["borderpad"])
+                y -= it["h"]
             elif kind == "box":
                 ax = fig.add_axes([self.xc - it["width"] / 2.0, (y - it["box_h"]) / total,
                                    it["width"], it["box_h"] / total])
@@ -324,8 +455,13 @@ class _VStack:
         return out_path
 
 
-def plot_stages(stages, out_path, title="", subtitle="", subtitle_color=None, start_residual=None):
-    """Flat render: a top-to-bottom column of algorithm-stage boxes. Used when no outer loop ran."""
+def plot_stages(stages, out_path, title="", subtitle="", subtitle_color=None, start_residual=None,
+                success=None):
+    """Flat render: a top-to-bottom column of algorithm-stage boxes. Used when no outer loop ran.
+
+    `success`, when given, is the attempt's actual converged/failed verdict and decides the end-node
+    mark; otherwise the mark falls back to whether the last stage's stop-reason is a converged one (a
+    weaker heuristic that can misread a trailing 0-iteration `initial_ftol` Picard segment as success)."""
     stages = stages or []
     L, F, c = P["layout"], P["fonts"], P["colors"]
     subtitle_color = subtitle_color or c["subtitle_default"]
@@ -334,6 +470,7 @@ def plot_stages(stages, out_path, title="", subtitle="", subtitle_color=None, st
         vs.text(title, F["title"], c["title"], gap=L["gap_title_in"])
     if subtitle:
         vs.text(subtitle, F["subtitle"], subtitle_color, gap=L["gap_subtitle_in"])
+    vs.legend(_legend_handles(stages), gap=L["gap_legend_in"])
     vs.text(_start_node_text(stages, override=start_residual), F["start_node"], c["start_node"],
             gap=L["gap_start_node_in"])
     for stage in stages:
@@ -345,7 +482,7 @@ def plot_stages(stages, out_path, title="", subtitle="", subtitle_color=None, st
         vs.box(lambda ax, s=stage: _fill_stage(ax, [s]), height=L["flat_box_height_in"], width=L["flat_box_width_frac"])
     if stages:
         last = stages[-1]
-        ok = last.get("stop_reason", "") in CONVERGED_REASONS
+        ok = success if success is not None else (last.get("stop_reason", "") in CONVERGED_REASONS)
         vs.text(_final_node_text(last, ok), F["end_node"], c["green"] if ok else c["red"],
                 gap=L["gap_end_node_in"])
     return vs.render(out_path)
@@ -519,7 +656,8 @@ def _osgs_container_drawer(stages, osgs_outer, bck, mms_relchange, K):
     return draw
 
 
-def _plot_osgs(stages, osgs_outer, base_conv_k, mms_relchange, out_path, title, subtitle, subtitle_color):
+def _plot_osgs(stages, osgs_outer, base_conv_k, mms_relchange, out_path, title, subtitle, subtitle_color,
+               success=None):
     """Nested OSGS render: Stage-I box, then an Algorithm-C container (drift + thumbnails)."""
     L, F, c = P["layout"], P["fonts"], P["colors"]
     subtitle_color = subtitle_color or c["subtitle_default"]
@@ -536,6 +674,7 @@ def _plot_osgs(stages, osgs_outer, base_conv_k, mms_relchange, out_path, title, 
         vs.text(title, F["title"], c["title"], gap=L["gap_title_in"])
     if subtitle:
         vs.text(subtitle, F["subtitle"], subtitle_color, gap=L["gap_subtitle_in"])
+    vs.legend(_legend_handles(stages), gap=L["gap_legend_in"])
     vs.text(_start_node_text(stage_i if stage_i else stages), F["start_node"], c["start_node"],
             gap=L["gap_start_node_in"])
 
@@ -553,14 +692,14 @@ def _plot_osgs(stages, osgs_outer, base_conv_k, mms_relchange, out_path, title, 
     osgs_stages = [(int(m.group(1)), s) for s in stages
                    for m in [re.search(r"C:OSGS\[(\d+)\]", s.get("stage", ""))] if m]
     last = (max(osgs_stages, default=(0, stages[-1] if stages else {}))[1]) if stages else {}
-    end_ok = last.get("stop_reason", "") in CONVERGED_REASONS
+    end_ok = success if success is not None else (last.get("stop_reason", "") in CONVERGED_REASONS)
     vs.text(_final_node_text(last, end_ok), F["end_node"], c["green"] if end_ok else c["red"],
             gap=L["gap_osgs_end_node_in"])
     return vs.render(out_path)
 
 
 def plot_attempt(stages, out_path, title="", subtitle="", subtitle_color=None,
-                 osgs_outer=None, base_conv_k=None, mms_relchange=None):
+                 osgs_outer=None, base_conv_k=None, mms_relchange=None, success=None):
     """Dispatch: a STAGGERED OSGS run (outer loop ran) -> nested C->B->A diagram; everything else
     (ASGS, or coupled OSGS = Stage I + a single coupled Newton solve with no staggered outer loop)
     -> flat stage list. Coupled mode is detected by the absence of any staggered structure: no
@@ -571,8 +710,9 @@ def plot_attempt(stages, out_path, title="", subtitle="", subtitle_color=None,
     has_staggered = bool(osgs_outer) or any(re.search(r"C:OSGS\[(\d+)\]", s.get("stage", "")) for s in stages)
     if has_staggered:
         return _plot_osgs(stages, osgs_outer, base_conv_k, mms_relchange or [],
-                          out_path, title, subtitle, subtitle_color)
-    return plot_stages(stages, out_path, title=title, subtitle=subtitle, subtitle_color=subtitle_color)
+                          out_path, title, subtitle, subtitle_color, success=success)
+    return plot_stages(stages, out_path, title=title, subtitle=subtitle, subtitle_color=subtitle_color,
+                       success=success)
 
 
 if __name__ == "__main__":
