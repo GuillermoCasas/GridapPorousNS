@@ -281,7 +281,9 @@ this table are written against the config struct, not the built solver.}
 $N_{\mathrm{N}}$         & \code{sol.newton\_iterations}           & Cap on inner Newton iterations. \\
 $N_{\mathrm{P}}$         & \code{sol.picard\_iterations}           & Cap on Picard fallback iterations. \\
 $N_{\mathrm{inc}}$       & \code{sol.max\_increases}               & Consecutive merit-function expansions tolerated before declaring divergence. \\
-$\textftol$              & \code{sol.ftol}                          & Terminal residual tolerance in $\ell^\infty$; the dominant convergence criterion. \\
+$\textftol$              & \code{sol.ftol}                          & Absolute $\ell^\infty$ residual floor; the \code{conv\_probe===nothing} fallback gate (Cocquet/unit tests). Superseded in production by the scale-free criterion below. \\
+$\mathrm{tol}_M$         & \code{sol.eps\_tol\_momentum}            & Scale-free momentum tolerance: converged when $\varepsilon_M\le\mathrm{tol}_M$ (§\ref{sec:convergence-criterion}). \\
+$\mathrm{tol}_C$         & \code{sol.eps\_tol\_mass}                & Scale-free mass tolerance: converged when $\varepsilon_C\le\mathrm{tol}_C$. \\
 $\textxtol$              & \code{sol.xtol}                          & Lower bound on the accepted step norm $\|\alpha\delta\boldsymbol{x}\|$ before declaring coordinate stagnation. \\
 $\textstag$              & \code{sol.stagnation\_noise\_floor}      & Noise-floor residual; a non-converged exit below this may still be classified as success (Sec.~\ref{sec:falseEquiv}). \\
 $\alpha_{\min}$          & \code{sol.linesearch\_alpha\_min}        & Smallest line-search step before giving up. \\
@@ -1277,7 +1279,8 @@ Newton solve, re-project, test state/projection drift---is removed
 entirely. Algorithm~\ref{alg:C} issues a \emph{single} safeguarded
 Newton solve (Algorithm~\ref{alg:A}) on the primary unknown $U_h$, whose
 residual re-slaves $\boldsymbol{\pi}_h$ on every evaluation. Convergence
-is the ordinary per-field relative residual gate of that inner Newton;
+is the scale-free $\varepsilon_M/\varepsilon_C$ gate of that inner Newton
+(§\ref{sec:convergence-criterion}), identical across ping-pong segments;
 there is no separate OSGS stopping criterion, no drift metric, no warmup
 schedule, and no Anderson acceleration.
 
@@ -1364,8 +1367,8 @@ re-projects $\boldsymbol{\pi}_h$ on every call, and a Jacobian closure
 that freezes it), hands them to a single $\mathrm{ExactNewtonPipeline}$
 call (Algorithm~\ref{alg:A}) seeded at the Stage~I state, and re-projects
 once at the converged iterate for diagnostics. There is no outer loop:
-the only iteration is the inner Newton's, and its per-field relative
-residual gate is the sole convergence test. The inner-success policy
+the only iteration is the inner Newton's, and its scale-free
+$\varepsilon_M/\varepsilon_C$ gate (§\ref{sec:convergence-criterion}) is the sole convergence test. The inner-success policy
 $\mathcal{P}_{\mathrm{OSGS}}$ accepts either a clean convergence or a
 benign one-iteration success and conjoins it with the carried-forward
 Stage~I success flag.
@@ -1688,8 +1691,8 @@ slaved-$\boldsymbol{\pi}_h$ residual cannot recover.
 \subsection{No separate OSGS stopping mode}
 
 The coupled OSGS solve of §\ref{sec:osgs} has no convergence predicate
-of its own: it terminates on the ordinary per-field relative residual
-gate of its single inner Newton (Algorithm~\ref{alg:A3}). There is no
+of its own: it terminates on the scale-free $\varepsilon_M/\varepsilon_C$
+gate (§\ref{sec:convergence-criterion}) of its single inner Newton (Algorithm~\ref{alg:A3}). There is no
 state-drift or projection-drift criterion, no \code{both}/\code{state\_drift}/%
 \code{projection\_drift} mode, because there is no staggered outer loop
 to stop---$\boldsymbol{\pi}_h$ is re-projected from the current iterate
