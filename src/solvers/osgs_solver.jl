@@ -177,7 +177,7 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             # to the local frozen-π tangent — only the is_osgs branch selection matters).
             jac_picard_coupled = (x, dx, y) -> build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=_pi_u0, pi_p=_pi_p0, mult_mom=1.0, mult_mass=1.0)
             op_picard_coupled  = FEOperator(res_fn_coupled, jac_picard_coupled, X, Y)
-            solver_picard_gain_c = FESolver(_with_overrides(coupled_nls; ftol=sol_cfg.picard_handoff_ftol, mode=:picard, picard_gain_target=sol_cfg.pingpong_picard_gain_orders))
+            solver_picard_gain_c = FESolver(_with_overrides(coupled_nls; ftol=sol_cfg.picard_ftol, mode=:picard, picard_gain_target=sol_cfg.pingpong_picard_gain_orders))
             v_c = _pingpong_cascade!(final_x0, x_backup, op_coupled, op_picard_coupled,
                                      FESolver(coupled_nls), solver_picard_gain_c, OSGS_INNER_POLICY,
                                      diag_cache, iter_count_ref; stage_prefix="C:OSGS", max_swaps=sol_cfg.pingpong_max_swaps)

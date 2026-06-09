@@ -281,7 +281,7 @@
                 1e-10
               ]
             },
-            "picard_handoff_ftol": {
+            "picard_ftol": {
               "type": "number",
               "description": "Residual tolerance for the Picard smoother to declare 'good enough' and hand off to Newton. Should be looser than ftol since Picard is a globalization aid, not a precise solver. Must be >= ftol.",
               "examples": [

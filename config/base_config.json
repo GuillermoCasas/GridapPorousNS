@@ -43,7 +43,7 @@
             "dynamic_newton_re_threshold": 10000.0,
             "dynamic_newton_re_iterations": 60,
             "ftol": 1e-8,
-            "picard_handoff_ftol": 1e-3,
+            "picard_ftol": 1e-3,
             "dynamic_ftol_ceiling": 1e-4,
             "dynamic_ftol_spatial_safety_factor": 1e-2,
             "xtol": 1e-8,

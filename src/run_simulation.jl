@@ -406,7 +406,7 @@ function run_simulation(config_path::String;
 
     # Build the (picard, newton) solver pair via the shared `build_iter_solvers`, the same builder
     # the MMS harness uses. Production runs use the plain scalar-ftol path: a Newton residual
-    # tolerance (`ftol`) and a separate, looser Picard hand-off tolerance (`picard_handoff_ftol`),
+    # tolerance (`ftol`) and a separate, looser Picard hand-off tolerance (`picard_ftol`),
     # with fixed iteration budgets. Dynamic Re/Da-driven budgets and per-field relative tolerances
     # stay harness-only — production has no manufactured solution or characteristic Re/Da to key them
     # to. `noise_floor_success_max_ftol_multiple = Inf` disables noise-floor success acceptance.
@@ -417,7 +417,7 @@ function run_simulation(config_path::String;
         newton_max_iters = sol_cfg.newton_iterations,
         picard_max_iters = sol_cfg.picard_iterations,
         newton_ftol = sol_cfg.ftol,
-        picard_ftol = sol_cfg.picard_handoff_ftol,
+        picard_ftol = sol_cfg.picard_ftol,
         noise_floor_success_max_ftol_multiple = Inf,
         stall_window = sol_cfg.newton_stall_window,
         stall_min_rel_improvement = sol_cfg.newton_stall_min_rel_improvement)

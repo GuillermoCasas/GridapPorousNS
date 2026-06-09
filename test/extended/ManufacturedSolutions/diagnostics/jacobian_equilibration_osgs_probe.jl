@@ -111,7 +111,7 @@ function setup_cell(; Re::Float64, Da::Float64, alpha_0::Float64, n::Int,
 
     nls_picard = PorousNSSolver.SafeNewtonSolver(
         LUSolver(), nit_p, config.numerical_method.solver.max_increases,
-        config.numerical_method.solver.xtol, config.numerical_method.solver.picard_handoff_ftol,
+        config.numerical_method.solver.xtol, config.numerical_method.solver.picard_ftol,
         config.numerical_method.solver.linesearch_alpha_min,
         config.numerical_method.solver.armijo_c1,
         config.numerical_method.solver.divergence_merit_factor,

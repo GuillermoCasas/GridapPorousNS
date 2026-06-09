@@ -122,7 +122,7 @@ Base.@kwdef struct SolverConfig
     dynamic_newton_re_iterations::Int              # Newton iterations to use past the Re threshold
     # --- Convergence tolerances ---
     ftol::Float64                                  # residual-norm tolerance ‖R‖ for declaring convergence
-    picard_handoff_ftol::Float64                   # looser ‖R‖ at which Picard hands control back to Newton
+    picard_ftol::Float64                           # absolute ‖R‖ ftol for the Picard solver (looser than Newton's; the ping-pong handoff itself fires via pingpong_picard_gain_orders)
     dynamic_ftol_ceiling::Float64                  # upper clamp on the mesh-scaled ABSOLUTE ftol O(h^{kv+1}) (not the removed per-segment relative gate)
     dynamic_ftol_spatial_safety_factor::Float64    # margin (0,1] applied to that O(h^{kv+1}) discretization-error ftol
     xtol::Float64                                  # step-size tolerance ‖Δu‖ for stagnation/convergence
@@ -225,7 +225,7 @@ StructTypes.StructType(::Type{PorousNSConfig}) = StructTypes.Struct()
 
 Assert the physical and numerical invariants the solver depends on, then return `cfg` unchanged. Each
 `@assert` carries the precise contract it guards (e.g. ν > 0, Armijo c₁ ∈ (0,1), an OSGS/ASGS-only
-method string). Several checks encode ordering relationships between knobs — e.g. `picard_handoff_ftol`
+method string). Several checks encode ordering relationships between knobs — e.g. `picard_ftol`
 must be ≥ `ftol` because Picard is a smoother handing off to Newton, not a precise solver. Raises on the
 first violated invariant.
 """
@@ -237,7 +237,7 @@ function validate!(cfg::PorousNSConfig)
     # Solver
     sol = cfg.numerical_method.solver
     @assert sol.ftol > 0 "Solver ftol must be > 0"
-    @assert sol.picard_handoff_ftol >= sol.ftol "Solver picard_handoff_ftol must be >= ftol (Picard is a smoother, not a precise solver)"
+    @assert sol.picard_ftol >= sol.ftol "Solver picard_ftol must be >= ftol (Picard is a smoother, not a precise solver)"
     @assert sol.dynamic_ftol_ceiling >= sol.ftol "Solver dynamic_ftol_ceiling must be strictly >= base ftol"
     @assert 0.0 < sol.dynamic_ftol_spatial_safety_factor <= 1.0 "Solver dynamic_ftol_spatial_safety_factor must be in (0, 1]"
     @assert sol.xtol > 0 "Solver xtol must be > 0"
