@@ -3,27 +3,46 @@
 # OSGS (Orthogonal Sub-Grid Scale) — the coupled Stage-II solve (Algorithm C of
 # `theory/osgs_algorithm/osgs_algorithm.tex`). The SGS space is taken strictly orthogonal to the FE
 # space (X_{h0}^⊥): we compute the L²-projection π_h = Π(R(U_h)) of the strong residual and subtract it
-# in the sub-scale equation. ASGS recovers π_h = 0 (identity projection) and lives in asgs_solver.jl.
+# in the sub-scale equation. ASGS is the special case π_h = 0 (identity projection) and lives in
+# asgs_solver.jl.
 #
-# Included AFTER asgs_solver.jl, which defines the shared core this file uses: the structs
-# FETopology/VMSFormulation (named in `solve_osgs_stage!`'s signature, so they must exist at parse
-# time — hence the include-order constraint), plus safe_fe_solve!, _record_stage!, cascade_step_outcome,
-# _pingpong_cascade!, OSGS_INNER_POLICY, the SolutionVerifier hooks, and _with_overrides (nonlinear.jl).
-# CholeskySolver lives in linear_solvers.jl.
+# This file owns the OSGS-specific pieces: the L²-projection helpers, the coupled solve
+# `solve_osgs_stage!`, and the OSGS_INNER_POLICY cascade-policy value (the ASGS counterpart STAGE_I_*
+# values live in asgs_solver.jl). It depends on the shared solver core in solver_core.jl, which defines
+# the structs FETopology/VMSFormulation (used in `solve_osgs_stage!`'s signature), plus safe_fe_solve!,
+# _record_stage!, cascade_step_outcome, _pingpong_cascade!, the SolutionVerifier hooks, and the
+# CascadePolicy type. `_with_overrides` lives in nonlinear.jl; CholeskySolver in linear_solvers.jl.
+# Because the dependencies are resolved at parse time, this file is included after solver_core.jl and
+# asgs_solver.jl (see the include order in PorousNSSolver.jl).
 using Gridap
 using Gridap.Algebra
 using LinearAlgebra
 
+# ==============================================================================
+# OSGS cascade success-policy (Algorithm B) — what the coupled solve accepts
+# ==============================================================================
+# OSGS's single `CascadePolicy` row (the type/interpreter/scheduler are shared, in solver_core.jl; see
+# the full cross-method truth table there and in test/blitz/cascade_policy_symmetry_blitz_test.jl).
+#                       accept_noise_floor | accept_soft_stall | max_iters_caught_is_failure
+#   OSGS_INNER_POLICY   true                 true                false  (accept ftol/noise/soft; struct → Picard; max_iters_caught → 1-iter)
+const OSGS_INNER_POLICY = CascadePolicy(true,  true,  false)
+
+# Build the CellField that gets L²-projected to form π_u, the momentum sub-scale. It is the strong
+# momentum residual R(U_h) (eval_strong_residual_u) filtered through the projection policy: the policy
+# decides which terms enter the orthogonal projection (e.g. the constant-σ reaction trim of paper §4.4
+# drops the reaction term, whose L² projection onto the FE space is exactly zero). σ is the reaction
+# tensor σ(α,u) evaluated pointwise via SigOp, passed so the policy can apply that trim.
 function inner_projection_u(u, p, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
-    # Define L2 projection for momentum residual natively as a CellField
     R_u = eval_strong_residual_u(form, u, p, h_cf, alpha_cf, f_cf, c_1, c_2)
     sig_op = SigOp(form.reaction_law, form.regularization, form.ν, c_1, c_2)
     σ = Operation(sig_op)(u, ∇(u), alpha_cf, ∇(alpha_cf), h_cf)
     return apply_projectable_residual_u(form.projection_policy, R_u, σ, u)
 end
 
+# Pressure-equation analogue: the CellField that gets L²-projected to form π_p, the mass sub-scale. It is
+# the strong mass residual R_p = eps_val·p + α(∇·u) + u·∇α − g (eval_strong_residual_p), again filtered
+# through the projection policy; eps_val is the pressure stabilization floor consulted by the policy.
 function inner_projection_p(u, p, form, dΩ, h_cf, alpha_cf, g_cf)
-    # Define L2 projection for mass residual natively as a CellField
     R_p = eval_strong_residual_p(form, u, p, alpha_cf, g_cf)
     return apply_projectable_residual_p(form.projection_policy, R_p, form.eps_val, p)
 end
@@ -31,10 +50,11 @@ end
 """
     discrete_l2_projection(field, U_proj, V_proj, dΩ, M_mat, num_fac)
 
-Generic high-efficiency continuous mapping tool. Evaluates the explicit discrete L2 analytical
-projection of a given analytical function (`field`) specifically onto a constructed target algebraic
-vector domain (`U_proj`, `V_proj`). Requires the pre-allocated topological mass matrix bounds
-(`M_mat`, `num_fac`) strictly to prevent invariant compilation allocations dynamically inside deep solver iterators.
+Compute the discrete L²-projection of a CellField `field` onto the FE space pair (`U_proj` trial,
+`V_proj` test): solve `M x = b` where `M` is the L² mass matrix and `bᵢ = ∫(vᵢ ⋅ field)dΩ`, then wrap
+the solution coefficients in an `FEFunction`. This is the workhorse called once per Newton evaluation to
+form π_u and π_p, so it takes the pre-assembled mass matrix `M_mat` and its factorization `num_fac` as
+arguments — reusing them avoids re-assembling/re-factoring inside the solver's inner loop.
 """
 function discrete_l2_projection(field, U_proj, V_proj, dΩ, M_mat, num_fac)
     b_vec = assemble_vector(v -> ∫(v ⋅ field)dΩ, V_proj)
@@ -46,9 +66,9 @@ end
 """
     discrete_l2_projection(field, U_proj, V_proj, dΩ)
 
-Convenience wrapper for single-pass diagnostics. Dynamically derives the underlying finite
-element mass matrices mapped to an explicit `CholeskySolver()`. Highly accurate but algebraically
-unsuitable for deep execution loops.
+Convenience wrapper that assembles and Cholesky-factors the L² mass matrix on the fly before delegating
+to the five-argument method. Use it for one-off diagnostics; inside the solver's inner loop prefer the
+five-argument form with a pre-factored mass matrix, since assembling/factoring per call is wasteful there.
 """
 function discrete_l2_projection(field, U_proj, V_proj, dΩ)
     p_ls = CholeskySolver()  # SPD mass matrix — see `CholeskySolver` in `linear_solvers.jl`.
@@ -67,17 +87,18 @@ end
 
 The single OSGS entry point the orchestrator dispatches to. Builds the unconstrained projection spaces
 and the Cholesky-factored L² mass matrices, then runs the coupled solve: ONE Newton solve whose residual
-recomputes `π = Π(R(u))` from the current iterate at every evaluation (local frozen-π Jacobian — sparse,
-NOT the prohibitive monolithic ∂π/∂u), so it is a Picard-type coupling, linearly convergent to the
-discrete OSGS fixed point `R̃ = R − Π(R)`. The shared Newton↔Picard cascade is the fallback
-(`pingpong_enabled`); the stall sensor is disabled for this solve (it converges slowly-monotone).
+recomputes `π = Π(R(u))` from the current iterate at every evaluation. The Jacobian holds π frozen,
+giving a local sparse tangent rather than the prohibitive monolithic ∂π/∂u; this makes the coupling
+Picard-type, converging linearly to the discrete OSGS fixed point `R̃ = R − Π(R)`. The shared
+Newton↔Picard cascade is the fallback when `pingpong_enabled`; the stall sensor is disabled for this
+solve because it converges slowly-monotone (a slow step is not a stall here).
 
 `success` carries Stage I's flag forward: it must survive a budget-exhausted, verification-disabled exit,
 so it is reassigned only by an explicit structural-failure / converged verdict below. After convergence,
 `on_osgs_converged!(verifier, …)` runs the optional verification (NoVerification ⇒ no-op).
 
-Returns the elapsed wall time of the timed coupled solve only; the mass-matrix assembly/factorization
-runs outside the `@elapsed` region (it is setup, not solve).
+Returns the elapsed wall time of the timed coupled solve only; the mass-matrix assembly/factorization is
+treated as setup and runs outside the `@elapsed` region.
 """
 function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VMSFormulation,
                            config::PorousNSConfig, solver_newton, verifier, diag_cache, iter_count_ref)
@@ -139,21 +160,21 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
 
         op_coupled = FEOperator(res_fn_coupled, jac_fn_coupled, X, Y)
         x_backup = copy(get_free_dof_values(final_x0))
-        # The coupled inexact-Newton converges SLOWLY-MONOTONE (the dropped ∂π/∂U gives a linear rate);
-        # DISABLE the stall sensor for it (a slow step is not a stall). With it on, the high-Da/fine-mesh
-        # coupled solve fails the "improve by stall_min_rel_improvement over stall_window steps" test and
-        # bails after ~2 steps, silently leaving U at the ASGS state — OSGS degenerates into ASGS and reports
-        # ASGS's (optimal) rate under the OSGS label. Its genuine failures (line-search failure, divergence,
-        # max-iters) are still caught. The Stage-I boot keeps the stall sensor (cold-start oscillation → Picard).
+        # [known-fragility] The coupled inexact-Newton converges SLOWLY-MONOTONE (the dropped ∂π/∂U gives a
+        # linear rate), so the stall sensor MUST be disabled here (stall_window=0): a slow-but-real step is
+        # not a stall. If left on, the high-Da/fine-mesh coupled solve trips the stall test and bails after a
+        # couple of steps with U still near the ASGS state — i.e. OSGS silently degenerates into ASGS while
+        # reporting under the OSGS label. Genuine failures (line-search failure, divergence, max-iters) are
+        # still caught. The Stage-I boot keeps its stall sensor (cold-start oscillation → Picard).
         coupled_nls = _with_overrides(base_nls; stall_window=0)
         if sol_cfg.pingpong_enabled
             # [coupled cascade] Give the coupled solve the SAME Newton↔Picard fallback as the Stage-I boot:
             # if Newton's line search fails or it diverges → hand to Picard (frozen-advection Oseen
-            # linearisation, wider basin) → back to Newton once Picard has cleared `picard_gain_orders`.
-            # Converging cells run Newton straight to ftol (Picard stays inert); the `linesearch_failed` cells
-            # (steep under-resolved porosity layers) now get a real fallback instead of quitting after one
-            # step. The Picard Jacobian uses the same zero-π placeholder (the π value is irrelevant to the
-            # local frozen-π tangent — only is_osgs is selected).
+            # linearisation, wider convergence basin) → back to Newton once Picard has cleared
+            # `picard_gain_orders`. Well-conditioned cells run Newton straight to ftol with Picard inert;
+            # hard cells (steep under-resolved porosity layers, where Newton's line search fails) lean on the
+            # Picard fallback. The Picard Jacobian uses the same zero-π placeholder (the π value is irrelevant
+            # to the local frozen-π tangent — only the is_osgs branch selection matters).
             jac_picard_coupled = (x, dx, y) -> build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=_pi_u0, pi_p=_pi_p0, mult_mom=1.0, mult_mass=1.0)
             op_picard_coupled  = FEOperator(res_fn_coupled, jac_picard_coupled, X, Y)
             solver_picard_gain_c = FESolver(_with_overrides(coupled_nls; ftol=sol_cfg.picard_handoff_ftol, mode=:picard, picard_gain_target=sol_cfg.pingpong_picard_gain_orders))

@@ -302,6 +302,20 @@
                 0.5
               ]
             },
+            "eps_tol_momentum": {
+              "type": "number",
+              "description": "Scale-free momentum tolerance tol_M: the nonlinear solve is converged when eps_M = ||r_M||/D_M <= tol_M, where D_M is the dynamic force-magnitude envelope (convergence_criterion.jl). Segment-independent (no per-segment re-anchoring). eps_M -> 0 at the discrete solution.",
+              "examples": [
+                1e-6
+              ]
+            },
+            "eps_tol_mass": {
+              "type": "number",
+              "description": "Scale-free mass tolerance tol_C: converged when eps_C = ||div(alpha u)||/||grad(alpha u)|| <= tol_C. eps_C floors at O(h^kv) (the discrete-divergence floor) and is bounded by sqrt(d); set tol_C above that floor.",
+              "examples": [
+                0.2
+              ]
+            },
             "max_increases": {
               "type": "integer",
               "description": "Number of successive residual increases before divergence abort.",
