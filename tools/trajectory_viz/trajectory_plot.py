@@ -279,7 +279,7 @@ def _legend_handles(stages):
                             label=rf"$\mathrm{{tol}}_M={sci(_tol('tol_M'))}$ : momentum gate ($\varepsilon_M\leq\mathrm{{tol}}_M$)"))
         if has_eps_c:
             H.append(Line2D([], [], color=c["green"], marker="s", ms=ms, lw=M["drift_line_width"],
-                            label=r"$\varepsilon_C$ : mass, $\|\nabla\!\cdot(\alpha u)\|/\|\nabla(\alpha u)\|$"))
+                            label=r"$\varepsilon_C$ : mass residual / flux-gradient scale"))
             H.append(Line2D([], [], color=c["green"], ls=T["linestyle"], lw=T["line_width"] + 0.4,
                             label=rf"$\mathrm{{tol}}_C={sci(_tol('tol_C'))}$ : mass gate ($\varepsilon_C\leq\mathrm{{tol}}_C$)"))
         H.append(Line2D([], [], color=c["muted"], marker="o", ms=ms, lw=M["mini_line_width"],
