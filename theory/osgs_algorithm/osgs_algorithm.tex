@@ -2011,33 +2011,44 @@ $\varepsilon_M\in[0,1]$ up to the bounded stabilisation contribution; a \emph{pe
 $\varepsilon_M\gg1$ indicates the residual and the term decomposition were assembled inconsistently
 (different quadrature/space/sign), not that the flow diverged.
 
-\subsection{Mass: flux-divergence over flux-gradient}
+\subsection{Mass: residual over a term-magnitude envelope}
 \begin{equation}
     \label{eq:cc-epsC}
-    \varepsilon_C = \frac{\bigl\|\,\varepsilon\,p^k + \nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\,\bigr\|}
-                         {\|\nabla(\alpha\boldsymbol{u}^k)\|_F},
+    \varepsilon_C = \frac{\bigl\|\,R_p^k\,\bigr\|}
+                         {\|\nabla(\alpha\boldsymbol{u}^k)\|_F + \|g\|},
     \qquad
+    R_p^k = \varepsilon\,p^k + \nabla\!\cdot\!(\alpha\boldsymbol{u}^k) - g ,
+    \quad
     \nabla(\alpha\boldsymbol{u}^k)=\alpha\nabla\boldsymbol{u}^k
-        + \boldsymbol{u}^k\!\otimes\!\nabla\alpha ,
+        + \boldsymbol{u}^k\!\otimes\!\nabla\alpha .
 \end{equation}
-the dilatation of the porous flux $\boldsymbol{q}=\alpha\boldsymbol{u}$ normalised by the magnitude of
-the flux variation (Frobenius norm of the full flux gradient, which retains the porosity-gradient
-structure $\boldsymbol{u}\!\otimes\!\nabla\alpha$). Both norms are global $L^2(\Omega)$ and built only
-from $\boldsymbol{u}^k$ and the known field $\alpha$, so the ratio is dimensionless by construction.
-The penalty term $\varepsilon p^k$ is retained for strictness (negligible for the production
-$\varepsilon\sim10^{-4}$, but it keeps early iterations from looking over-converged). For constant
-$\alpha$ and $\varepsilon=0$ it reduces to the textbook
+The numerator is the \emph{genuine mass-equation residual} $R_p^k$: it subtracts the mass source
+$g$ (the continuity forcing; $g\equiv0$ for the unforced physical problem, $g\neq0$ for a manufactured
+solution with a non-solenoidal flux). Without the $-g$ term the ratio would measure the raw flux
+divergence, which at the discrete solution equals the (nonzero) source and so floors at
+$\|g\|/\|\nabla(\alpha\boldsymbol{u})\|$ instead of $\to0$, making it useless as a convergence gate on
+a forced problem. The denominator is a mass-equation \emph{term-magnitude envelope}, exactly analogous
+to the momentum $D_M$ (which carries the body force $\|f\|$): the robust flux-variation scale
+$\|\nabla(\alpha\boldsymbol{u}^k)\|_F$ \emph{plus} the source magnitude $\|g\|$, so a strongly forced
+mass equation is normalised by a scale that reflects its forcing. The Frobenius flux gradient stands
+in for the divergence $\|\nabla\!\cdot\!(\alpha\boldsymbol{u})\|$ (which can collapse for a
+near-incompressible flow) because boundary-layer shear keeps it bounded away from zero. All norms are
+global $L^2(\Omega)$, built only from $\boldsymbol{u}^k$, $p^k$ and the known fields $\alpha$, $g$. The
+penalty term $\varepsilon p^k$ is retained for strictness (negligible at the production
+$\varepsilon\sim10^{-4}$). For constant $\alpha$, $\varepsilon=0$, $g=0$ it reduces to the textbook
 $\|\nabla\!\cdot\!\boldsymbol{u}\|/\|\nabla\boldsymbol{u}\|$.
 
-\paragraph{The $\sqrt{d}$ bound (and self-check).} Because
-$\nabla\!\cdot\!\boldsymbol{q}=\operatorname{tr}(\nabla\boldsymbol{q})$ and, by Cauchy--Schwarz,
-$(\operatorname{tr}A)^2=(A:I)^2\le(A:A)(I:I)=d\,(A:A)$ pointwise, integration gives
-$\|\nabla\!\cdot\!\boldsymbol{q}\|^2\le d\,\|\nabla\boldsymbol{q}\|_F^2$, hence
-$\varepsilon_C\le\sqrt{d}$ in exact arithmetic (modulo the small $\varepsilon p$ term). This ceiling
-is a cheap correctness check: on a developed iterate a value above $\sqrt{d}$ flags a
-quadrature/assembly bug. It is \emph{logged as a warning, not asserted}---in the degenerate roundoff
-regime the signed divergence sum can suffer catastrophic cancellation and nudge the computed ratio
-slightly past $\sqrt{d}$ without any real defect.
+\paragraph{The $\sqrt{d}$ bound (and self-check).} The bound applies to the \emph{pure-divergence
+ratio} $\|\nabla\!\cdot\!(\alpha\boldsymbol{u})\|/\|\nabla(\alpha\boldsymbol{u})\|_F$ (neither the
+$g$-subtracted numerator nor the $g$-augmented denominator of $\varepsilon_C$ is $\sqrt{d}$-bounded).
+Because $\nabla\!\cdot\!\boldsymbol{q}=\operatorname{tr}(\nabla\boldsymbol{q})$ and, by
+Cauchy--Schwarz, $(\operatorname{tr}A)^2=(A:I)^2\le(A:A)(I:I)=d\,(A:A)$ pointwise, integration gives
+$\|\nabla\!\cdot\!\boldsymbol{q}\|^2\le d\,\|\nabla\boldsymbol{q}\|_F^2$, so that ratio is
+$\le\sqrt{d}$ in exact arithmetic. The criterion computes it separately as a cheap correctness check:
+on a developed iterate a value above $\sqrt{d}$ flags a quadrature/assembly bug. It is \emph{logged as
+a warning, not asserted}---in the degenerate roundoff regime the signed divergence sum can suffer
+catastrophic cancellation and nudge the computed ratio slightly past $\sqrt{d}$ without any real
+defect.
 
 \subsection{Why it is scale-free, and what it is not}
 The mass ratio is the pressure-normalised relative mass error with the divergence$\to$pressure
@@ -2046,7 +2057,9 @@ viscous+inertial+Darcy envelope, steady-state balance gives $\|p^k\|\sim(\Phi/\a
 \|\nabla(\alpha\boldsymbol{u}^k)\|$, and substituting the measured
 $\Phi/\alpha_\infty=\|p^k\|/\|\nabla(\alpha\boldsymbol{u}^k)\|$ into
 $(\Phi/\alpha_\infty)\,\|\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$ cancels $\|p^k\|$
-identically and leaves~\eqref{eq:cc-epsC}. The conversion factor carries units---that is what a
+identically and leaves the flux-gradient denominator of~\eqref{eq:cc-epsC}; the added $\|g\|$ is a
+known forcing field (material/problem data, not an a-priori characteristic scale), so it preserves
+scale-freeness. The conversion factor carries units---that is what a
 conversion does---while the surviving ratio is dimensionless because $\nabla\!\cdot$ and $\nabla$ of
 the same field differ by exactly one inverse length. A pressure-referenced variant
 $\varepsilon_C^{\mathrm{alt}}=\|(h^2/\alpha_K\tau_{1,K})\,\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$

@@ -129,7 +129,8 @@ Base.@kwdef struct SolverConfig
     # --- Scale-free convergence gate (convergence_criterion.jl; the authoritative success test) ---
     # The nonlinear solve stops when two DIMENSIONLESS, segment-independent measures fall below these:
     # ε_M = ‖r_M‖/D_M (momentum residual over the force-magnitude envelope) and
-    # ε_C = ‖∇·(αu)‖/‖∇(αu)‖ (mass). Unlike the per-segment-re-anchored relative ftol, D_M is a PHYSICAL
+    # ε_C = ‖εp+∇·(αu)−g‖/(‖∇(αu)‖+‖g‖) (mass residual over a flux-gradient+source envelope; g = mass
+    # source, so it → 0 even for a forced/manufactured problem). Unlike the re-anchored relative ftol, D_M is a PHYSICAL
     # scale read from the current iterate, so the gate is IDENTICAL across ping-pong segments — which is
     # what removes the re-anchoring pathology (a fresh segment no longer demands another ×(1/ftol) drop
     # below wherever the previous one stopped). See docs/solver/nonlinear-convergence-criterion-prompt.md.

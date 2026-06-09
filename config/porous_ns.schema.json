@@ -311,7 +311,7 @@
             },
             "eps_tol_mass": {
               "type": "number",
-              "description": "Scale-free mass tolerance tol_C: converged when eps_C = ||div(alpha u)||/||grad(alpha u)|| <= tol_C. eps_C floors at O(h^kv) (the discrete-divergence floor) and is bounded by sqrt(d); set tol_C above that floor.",
+              "description": "Scale-free mass tolerance tol_C: converged when eps_C = ||eps*p + div(alpha u) - g||/(||grad(alpha u)|| + ||g||) <= tol_C, the genuine mass residual (source g subtracted) over a flux-gradient+source envelope. eps_C floors at O(h^kv) (the discrete mass-residual floor); set tol_C above that floor. The pure-divergence ratio ||div(alpha u)||/||grad(alpha u)|| is bounded by sqrt(d) and is checked separately.",
               "examples": [
                 0.2
               ]
