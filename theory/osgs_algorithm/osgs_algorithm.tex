@@ -1227,6 +1227,27 @@ and~\eqref{eq:per-field-noise} for these scalar tests, with the
 honest-exit gate~\eqref{eq:per-field-honest} replacing the implicit
 single-scale gate that wraps each $\mathsf{NoiseFloor}$ exit.
 
+\paragraph{Production gate: the scale-free criterion supersedes the $\textftol$ exit.}
+The $\mathsf{Ftol}$ test of line~5 and the $\mathsf{NoiseFloor}$ successes
+(lines~10,~19,~24) are the convergence gate only when no convergence probe is
+supplied---the \code{conv\_probe === nothing} fallback used by Cocquet runs and unit
+tests. In a production \code{run\_simulation}, and in the parameter-sweep harness, a
+\code{conv\_probe} is injected into every kernel instance, and the convergence
+verdict $S_{\mathrm{conv}}$ is then the scale-free $\varepsilon_M/\varepsilon_C$
+criterion of §\ref{sec:convergence-criterion}---$\varepsilon_M\le\mathrm{tol}_M$
+\emph{and} $\varepsilon_C\le\mathrm{tol}_C$ on a non-degenerate iterate---evaluated
+each iteration in place of line~5, with the noise-floor success branches
+simultaneously disabled so that a sub-$\textstag$ but non-converged residual is no
+longer silently accepted. The structural exits ($\mathsf{LinesearchFailed}$,
+$\mathsf{MeritDivergence}$, $\mathsf{Xtol}$, $\mathsf{IterationCap}$) are unchanged:
+they still classify \emph{failure} and drive the Picard fallback. Because the verdict
+lives in this shared kernel, the same $S_{\mathrm{conv}}$ flows unchanged through the
+cascade's $S_{\mathrm{N}}/S_{\mathrm{P}}$ flags (Algorithm~\ref{alg:B}) and through
+the ping-pong segments of the coupled solve (§\ref{sec:osgs}): a Picard pass that
+reaches $\varepsilon_M\le\mathrm{tol}_M$ is recognised as a genuine success rather
+than re-judged against a residual target re-anchored per segment (the failure mode
+the 2026-06 cleanup removed).
+
 % ============================================================
 \section{Stage II: Algorithm C (CoupledOSGSSolve)}
 \label{sec:osgs}
@@ -1665,6 +1686,153 @@ any future implementation must verify before the JFNK path is allowed to
 replace the direct inner solve.
 
 % ============================================================
+\section{Scale-free convergence criterion}
+\label{sec:convergence-criterion}
+
+\subsection{Motivation}
+The stopping tests used elsewhere in Part~\ref{part:core} decide convergence relative to a scale that
+is, in one way or another, supplied rather than measured: the scalar
+$\|\boldsymbol{b}\|_\infty \le \textftol$ of Algorithm~\ref{alg:A} presumes all residual components
+share one magnitude, and the harness per-field rule of Sec.~\ref{sec:harness-perfield} re-anchors the
+target to the \emph{initial} residual $\|\boldsymbol{R}_0\|$, which drifts with the iterate once the
+inner solve is split into Newton$\leftrightarrow$Picard segments. This section specifies a criterion
+whose normalisation is \emph{measured from the current iterate and the known material data alone}, so
+it is dimensionless and regime-robust with no a-priori characteristic velocity $U$, length $L$,
+pressure $P$, or global $\mathrm{Re}$/$\mathrm{Da}$. It is realised as the standalone module
+\code{src/solvers/convergence\_criterion.jl}, deliberately kept apart from the iteration machinery: it
+answers \emph{whether} an iterate is converged, not \emph{how} to step. The full design rationale and a
+critical audit of it live in \code{docs/solver/nonlinear-convergence-criterion-prompt.md}.
+
+\subsection{The criterion}
+With the momentum and mass residuals of the strong problem~\eqref{eq:alg-Ru}--\eqref{eq:alg-Rp}
+evaluated at the iterate $U^k=(\boldsymbol{u}^k,p^k)$, the outer loop stops when
+\begin{equation}
+    \label{eq:cc-converged}
+    \varepsilon_M \le \mathrm{tol}_M \quad\text{and}\quad \varepsilon_C \le \mathrm{tol}_C ,
+\end{equation}
+for the dimensionless momentum measure $\varepsilon_M$ and mass measure $\varepsilon_C$ below; both are
+reported separately each iteration, alongside the per-term breakdown of $D_M$ (the diagnostic that
+reveals which force balance is limiting a stalled solve).
+
+\subsection{Momentum: the term-magnitude envelope}
+\begin{equation}
+    \label{eq:cc-epsM}
+    \varepsilon_M = \frac{\|\boldsymbol{r}_M^k\|}{D_M^k}, \qquad
+    D_M^k = \|\alpha\,\boldsymbol{u}^k\!\cdot\!\nabla\boldsymbol{u}^k\|
+          + \|2\nabla\!\cdot\!(\alpha\nu\,\Pi^{\mathrm{ds}}\nabla\boldsymbol{u}^k)\|
+          + \|\alpha\nabla p^k\|
+          + \|\sigma(\alpha,\boldsymbol{u}^k)\,\boldsymbol{u}^k\|
+          + \|\boldsymbol{f}\| ,
+\end{equation}
+the residual normalised by a dynamic envelope of the five momentum force magnitudes (convection,
+viscous, pressure-gradient, Darcy--Forchheimer resistance, body force). At the solution these terms do
+not vanish---they balance---so whichever mechanism dominates (viscous as
+$\mathrm{Re},\mathrm{Da}\to0$, convection as $\mathrm{Re}\to\infty$, resistance as
+$\mathrm{Da}\to\infty$) automatically enters the sum and sets the scale, with no regime parameter to
+choose. The envelope is recomputed each iteration: $\sigma=a(\alpha)+b(\alpha)|\boldsymbol{u}^k|$ is
+read pointwise from the iterate, and $\boldsymbol{f}$ is included because in forced problems it is one
+of the balanced forces and can dominate.
+
+\paragraph{Weak-form (algebraic) realisation.} The numerator $\boldsymbol{r}_M^k$ is the
+\emph{stabilised} algebraic residual the solver actually drives to zero (the assembled ASGS/OSGS
+residual vector, velocity block), and each denominator term is assembled through the \emph{same} weak
+form with the same (Euclidean) vector norm. The viscous term is then the integrated-by-parts
+first-derivative quantity
+$\langle\boldsymbol{\varepsilon}^s(\boldsymbol{v}),\,2\alpha\nu\,\Pi^{\mathrm{ds}}\nabla\boldsymbol{u}^k\rangle$
+(\code{weak\_viscous\_operator}); no second derivative appears, so the construction needs no
+special-casing by polynomial order and is valid for the equal-order $P_{k_v}/P_{k_p}$ pair. Two
+properties follow: (i) $\varepsilon_M\to0$ at the discrete solution---it reports genuine convergence
+rather than plateauing at the $O(h^{k_v})$ floor of the \emph{strong} residual; and (ii) the
+sum-of-norms is a conservative envelope, $D_M^k \ge \|\sum_i \mathrm{term}_i\|$, so cancellation between
+co-dominant terms can never make $\varepsilon_M$ optimistically small. With consistent assembly
+$\varepsilon_M\in[0,1]$ up to the bounded stabilisation contribution; a \emph{persistent}
+$\varepsilon_M\gg1$ indicates the residual and the term decomposition were assembled inconsistently
+(different quadrature/space/sign), not that the flow diverged.
+
+\subsection{Mass: residual over a term-magnitude envelope}
+\begin{equation}
+    \label{eq:cc-epsC}
+    \varepsilon_C = \frac{\bigl\|\,R_p^k\,\bigr\|}
+                         {\|\nabla(\alpha\boldsymbol{u}^k)\|_F + \|g\|},
+    \qquad
+    R_p^k = \varepsilon\,p^k + \nabla\!\cdot\!(\alpha\boldsymbol{u}^k) - g ,
+    \quad
+    \nabla(\alpha\boldsymbol{u}^k)=\alpha\nabla\boldsymbol{u}^k
+        + \boldsymbol{u}^k\!\otimes\!\nabla\alpha .
+\end{equation}
+The numerator is the \emph{genuine mass-equation residual} $R_p^k$: it subtracts the mass source
+$g$ (the continuity forcing; $g\equiv0$ for the unforced physical problem, $g\neq0$ for a manufactured
+solution with a non-solenoidal flux). Without the $-g$ term the ratio would measure the raw flux
+divergence, which at the discrete solution equals the (nonzero) source and so floors at
+$\|g\|/\|\nabla(\alpha\boldsymbol{u})\|$ instead of $\to0$, making it useless as a convergence gate on
+a forced problem. The denominator is a mass-equation \emph{term-magnitude envelope}, exactly analogous
+to the momentum $D_M$ (which carries the body force $\|f\|$): the robust flux-variation scale
+$\|\nabla(\alpha\boldsymbol{u}^k)\|_F$ \emph{plus} the source magnitude $\|g\|$, so a strongly forced
+mass equation is normalised by a scale that reflects its forcing. The Frobenius flux gradient stands
+in for the divergence $\|\nabla\!\cdot\!(\alpha\boldsymbol{u})\|$ (which can collapse for a
+near-incompressible flow) because boundary-layer shear keeps it bounded away from zero. All norms are
+global $L^2(\Omega)$, built only from $\boldsymbol{u}^k$, $p^k$ and the known fields $\alpha$, $g$. The
+penalty term $\varepsilon p^k$ is retained for strictness (negligible at the production
+$\varepsilon\sim10^{-4}$). For constant $\alpha$, $\varepsilon=0$, $g=0$ it reduces to the textbook
+$\|\nabla\!\cdot\!\boldsymbol{u}\|/\|\nabla\boldsymbol{u}\|$.
+
+\paragraph{The $\sqrt{d}$ bound (and self-check).} The bound applies to the \emph{pure-divergence
+ratio} $\|\nabla\!\cdot\!(\alpha\boldsymbol{u})\|/\|\nabla(\alpha\boldsymbol{u})\|_F$ (neither the
+$g$-subtracted numerator nor the $g$-augmented denominator of $\varepsilon_C$ is $\sqrt{d}$-bounded).
+Because $\nabla\!\cdot\!\boldsymbol{q}=\operatorname{tr}(\nabla\boldsymbol{q})$ and, by
+Cauchy--Schwarz, $(\operatorname{tr}A)^2=(A:I)^2\le(A:A)(I:I)=d\,(A:A)$ pointwise, integration gives
+$\|\nabla\!\cdot\!\boldsymbol{q}\|^2\le d\,\|\nabla\boldsymbol{q}\|_F^2$, so that ratio is
+$\le\sqrt{d}$ in exact arithmetic. The criterion computes it separately as a cheap correctness check:
+on a developed iterate a value above $\sqrt{d}$ flags a quadrature/assembly bug. It is \emph{logged as
+a warning, not asserted}---in the degenerate roundoff regime the signed divergence sum can suffer
+catastrophic cancellation and nudge the computed ratio slightly past $\sqrt{d}$ without any real
+defect.
+
+\subsection{Why it is scale-free, and what it is not}
+The mass ratio is the pressure-normalised relative mass error with the divergence$\to$pressure
+conversion factor \emph{measured from the iterate}: writing $\Phi/\alpha_\infty$ for the
+viscous+inertial+Darcy envelope, steady-state balance gives $\|p^k\|\sim(\Phi/\alpha_\infty)\,
+\|\nabla(\alpha\boldsymbol{u}^k)\|$, and substituting the measured
+$\Phi/\alpha_\infty=\|p^k\|/\|\nabla(\alpha\boldsymbol{u}^k)\|$ into
+$(\Phi/\alpha_\infty)\,\|\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$ cancels $\|p^k\|$
+identically and leaves the flux-gradient denominator of~\eqref{eq:cc-epsC}; the added $\|g\|$ is a
+known forcing field (material/problem data, not an a-priori characteristic scale), so it preserves
+scale-freeness. The conversion factor carries units---that is what a
+conversion does---while the surviving ratio is dimensionless because $\nabla\!\cdot$ and $\nabla$ of
+the same field differ by exactly one inverse length. A pressure-referenced variant
+$\varepsilon_C^{\mathrm{alt}}=\|(h^2/\alpha_K\tau_{1,K})\,\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$
+is deliberately \emph{not} used: it divides by $\|p^k\|$, which is indeterminate under all-Dirichlet
+velocity boundaries (pressure fixed only up to a constant) and is mesh-coupled through $\tau_1$ ---
+strictly inferior to the genuinely scale-free~\eqref{eq:cc-epsC}.
+
+\subsection{Edge cases and implementation guards}
+\begin{itemize}
+    \item \textbf{Trivial / degenerate iterate.} Every denominator is guarded by a pure machine-$\varepsilon$
+    underflow floor (\emph{not} a problem scale); a denominator sitting at that floor raises a
+    \code{degenerate} flag, and convergence is never accepted at $k=0$ (require $\ge1$ completed
+    iteration). The $\sqrt{d}$ bound keeps $\varepsilon_C$ well-posed whenever
+    $\|\nabla(\alpha\boldsymbol{u}^k)\|$ is above roundoff; the \code{degenerate} flag plus the
+    $k\ge1$ rule cover the roundoff regime that the analytic bound cannot.
+    \item \textbf{Genuine nonlinear residual.} $\boldsymbol{r}_M^k$ is the re-assembled operator residual
+    at $U^k$, never the inner linear-solve residual (which $\to0$ \emph{inside} each step and does not
+    reflect outer convergence).
+    \item \textbf{Tolerance floor.} $\varepsilon_M$ and $\varepsilon_C$ cannot fall below the level set
+    by the discretisation and by $\varepsilon$; $\mathrm{tol}$ must sit above it.
+\end{itemize}
+
+\subsection{Relation to the harness criterion}
+This criterion is the authoritative convergence verdict in both production and the parameter-sweep
+harness: \code{solve\_system} injects it (as the \code{conv\_probe}) into every kernel instance
+(§\ref{sec:newton}). The harness additionally supplies the discretisation-coupled scalar
+tolerance~\eqref{eq:dynamic-ftol} as the \emph{fallback} floor $\textftol$, keyed to $h$ so the linear
+solve is not over-solved relative to the $O(h^{k_v+1})$ discretisation error; but the stopping decision
+itself is this section's scale-free $\varepsilon_M/\varepsilon_C$ gate, not a residual target.
+The earlier per-field intrinsic-scale rule of Sec.~\ref{sec:harness-perfield}---which re-anchored the
+target to the per-segment initial residual---was removed in the 2026-06 cleanup (see the superseded
+note there); this criterion requires no manufactured solution, no $h$, and no initial-residual anchor,
+basing the normalisation entirely on the iterate's own force balance and flux structure.
+
+% ============================================================
 \section{Convergence-Analysis Notes}
 \label{sec:falseEquiv}
 
@@ -1951,149 +2119,6 @@ $K_{\mathrm{extra}}$ & \code{mms.max\_extra\_cycles} & Cap on extension cycles (
 \end{tabularx}}
 \end{table}
 
-\section{Scale-free convergence criterion}
-\label{sec:convergence-criterion}
-
-\subsection{Motivation}
-The stopping tests used elsewhere in Part~\ref{part:core} decide convergence relative to a scale that
-is, in one way or another, supplied rather than measured: the scalar
-$\|\boldsymbol{b}\|_\infty \le \textftol$ of Algorithm~\ref{alg:A} presumes all residual components
-share one magnitude, and the harness per-field rule of Sec.~\ref{sec:harness-perfield} re-anchors the
-target to the \emph{initial} residual $\|\boldsymbol{R}_0\|$, which drifts with the iterate once the
-inner solve is split into Newton$\leftrightarrow$Picard segments. This section specifies a criterion
-whose normalisation is \emph{measured from the current iterate and the known material data alone}, so
-it is dimensionless and regime-robust with no a-priori characteristic velocity $U$, length $L$,
-pressure $P$, or global $\mathrm{Re}$/$\mathrm{Da}$. It is realised as the standalone module
-\code{src/solvers/convergence\_criterion.jl}, deliberately kept apart from the iteration machinery: it
-answers \emph{whether} an iterate is converged, not \emph{how} to step. The full design rationale and a
-critical audit of it live in \code{docs/solver/nonlinear-convergence-criterion-prompt.md}.
-
-\subsection{The criterion}
-With the momentum and mass residuals of the strong problem~\eqref{eq:alg-Ru}--\eqref{eq:alg-Rp}
-evaluated at the iterate $U^k=(\boldsymbol{u}^k,p^k)$, the outer loop stops when
-\begin{equation}
-    \label{eq:cc-converged}
-    \varepsilon_M \le \mathrm{tol}_M \quad\text{and}\quad \varepsilon_C \le \mathrm{tol}_C ,
-\end{equation}
-for the dimensionless momentum measure $\varepsilon_M$ and mass measure $\varepsilon_C$ below; both are
-reported separately each iteration, alongside the per-term breakdown of $D_M$ (the diagnostic that
-reveals which force balance is limiting a stalled solve).
-
-\subsection{Momentum: the term-magnitude envelope}
-\begin{equation}
-    \label{eq:cc-epsM}
-    \varepsilon_M = \frac{\|\boldsymbol{r}_M^k\|}{D_M^k}, \qquad
-    D_M^k = \|\alpha\,\boldsymbol{u}^k\!\cdot\!\nabla\boldsymbol{u}^k\|
-          + \|2\nabla\!\cdot\!(\alpha\nu\,\Pi^{\mathrm{ds}}\nabla\boldsymbol{u}^k)\|
-          + \|\alpha\nabla p^k\|
-          + \|\sigma(\alpha,\boldsymbol{u}^k)\,\boldsymbol{u}^k\|
-          + \|\boldsymbol{f}\| ,
-\end{equation}
-the residual normalised by a dynamic envelope of the five momentum force magnitudes (convection,
-viscous, pressure-gradient, Darcy--Forchheimer resistance, body force). At the solution these terms do
-not vanish---they balance---so whichever mechanism dominates (viscous as
-$\mathrm{Re},\mathrm{Da}\to0$, convection as $\mathrm{Re}\to\infty$, resistance as
-$\mathrm{Da}\to\infty$) automatically enters the sum and sets the scale, with no regime parameter to
-choose. The envelope is recomputed each iteration: $\sigma=a(\alpha)+b(\alpha)|\boldsymbol{u}^k|$ is
-read pointwise from the iterate, and $\boldsymbol{f}$ is included because in forced problems it is one
-of the balanced forces and can dominate.
-
-\paragraph{Weak-form (algebraic) realisation.} The numerator $\boldsymbol{r}_M^k$ is the
-\emph{stabilised} algebraic residual the solver actually drives to zero (the assembled ASGS/OSGS
-residual vector, velocity block), and each denominator term is assembled through the \emph{same} weak
-form with the same (Euclidean) vector norm. The viscous term is then the integrated-by-parts
-first-derivative quantity
-$\langle\boldsymbol{\varepsilon}^s(\boldsymbol{v}),\,2\alpha\nu\,\Pi^{\mathrm{ds}}\nabla\boldsymbol{u}^k\rangle$
-(\code{weak\_viscous\_operator}); no second derivative appears, so the construction needs no
-special-casing by polynomial order and is valid for the equal-order $P_{k_v}/P_{k_p}$ pair. Two
-properties follow: (i) $\varepsilon_M\to0$ at the discrete solution---it reports genuine convergence
-rather than plateauing at the $O(h^{k_v})$ floor of the \emph{strong} residual; and (ii) the
-sum-of-norms is a conservative envelope, $D_M^k \ge \|\sum_i \mathrm{term}_i\|$, so cancellation between
-co-dominant terms can never make $\varepsilon_M$ optimistically small. With consistent assembly
-$\varepsilon_M\in[0,1]$ up to the bounded stabilisation contribution; a \emph{persistent}
-$\varepsilon_M\gg1$ indicates the residual and the term decomposition were assembled inconsistently
-(different quadrature/space/sign), not that the flow diverged.
-
-\subsection{Mass: residual over a term-magnitude envelope}
-\begin{equation}
-    \label{eq:cc-epsC}
-    \varepsilon_C = \frac{\bigl\|\,R_p^k\,\bigr\|}
-                         {\|\nabla(\alpha\boldsymbol{u}^k)\|_F + \|g\|},
-    \qquad
-    R_p^k = \varepsilon\,p^k + \nabla\!\cdot\!(\alpha\boldsymbol{u}^k) - g ,
-    \quad
-    \nabla(\alpha\boldsymbol{u}^k)=\alpha\nabla\boldsymbol{u}^k
-        + \boldsymbol{u}^k\!\otimes\!\nabla\alpha .
-\end{equation}
-The numerator is the \emph{genuine mass-equation residual} $R_p^k$: it subtracts the mass source
-$g$ (the continuity forcing; $g\equiv0$ for the unforced physical problem, $g\neq0$ for a manufactured
-solution with a non-solenoidal flux). Without the $-g$ term the ratio would measure the raw flux
-divergence, which at the discrete solution equals the (nonzero) source and so floors at
-$\|g\|/\|\nabla(\alpha\boldsymbol{u})\|$ instead of $\to0$, making it useless as a convergence gate on
-a forced problem. The denominator is a mass-equation \emph{term-magnitude envelope}, exactly analogous
-to the momentum $D_M$ (which carries the body force $\|f\|$): the robust flux-variation scale
-$\|\nabla(\alpha\boldsymbol{u}^k)\|_F$ \emph{plus} the source magnitude $\|g\|$, so a strongly forced
-mass equation is normalised by a scale that reflects its forcing. The Frobenius flux gradient stands
-in for the divergence $\|\nabla\!\cdot\!(\alpha\boldsymbol{u})\|$ (which can collapse for a
-near-incompressible flow) because boundary-layer shear keeps it bounded away from zero. All norms are
-global $L^2(\Omega)$, built only from $\boldsymbol{u}^k$, $p^k$ and the known fields $\alpha$, $g$. The
-penalty term $\varepsilon p^k$ is retained for strictness (negligible at the production
-$\varepsilon\sim10^{-4}$). For constant $\alpha$, $\varepsilon=0$, $g=0$ it reduces to the textbook
-$\|\nabla\!\cdot\!\boldsymbol{u}\|/\|\nabla\boldsymbol{u}\|$.
-
-\paragraph{The $\sqrt{d}$ bound (and self-check).} The bound applies to the \emph{pure-divergence
-ratio} $\|\nabla\!\cdot\!(\alpha\boldsymbol{u})\|/\|\nabla(\alpha\boldsymbol{u})\|_F$ (neither the
-$g$-subtracted numerator nor the $g$-augmented denominator of $\varepsilon_C$ is $\sqrt{d}$-bounded).
-Because $\nabla\!\cdot\!\boldsymbol{q}=\operatorname{tr}(\nabla\boldsymbol{q})$ and, by
-Cauchy--Schwarz, $(\operatorname{tr}A)^2=(A:I)^2\le(A:A)(I:I)=d\,(A:A)$ pointwise, integration gives
-$\|\nabla\!\cdot\!\boldsymbol{q}\|^2\le d\,\|\nabla\boldsymbol{q}\|_F^2$, so that ratio is
-$\le\sqrt{d}$ in exact arithmetic. The criterion computes it separately as a cheap correctness check:
-on a developed iterate a value above $\sqrt{d}$ flags a quadrature/assembly bug. It is \emph{logged as
-a warning, not asserted}---in the degenerate roundoff regime the signed divergence sum can suffer
-catastrophic cancellation and nudge the computed ratio slightly past $\sqrt{d}$ without any real
-defect.
-
-\subsection{Why it is scale-free, and what it is not}
-The mass ratio is the pressure-normalised relative mass error with the divergence$\to$pressure
-conversion factor \emph{measured from the iterate}: writing $\Phi/\alpha_\infty$ for the
-viscous+inertial+Darcy envelope, steady-state balance gives $\|p^k\|\sim(\Phi/\alpha_\infty)\,
-\|\nabla(\alpha\boldsymbol{u}^k)\|$, and substituting the measured
-$\Phi/\alpha_\infty=\|p^k\|/\|\nabla(\alpha\boldsymbol{u}^k)\|$ into
-$(\Phi/\alpha_\infty)\,\|\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$ cancels $\|p^k\|$
-identically and leaves the flux-gradient denominator of~\eqref{eq:cc-epsC}; the added $\|g\|$ is a
-known forcing field (material/problem data, not an a-priori characteristic scale), so it preserves
-scale-freeness. The conversion factor carries units---that is what a
-conversion does---while the surviving ratio is dimensionless because $\nabla\!\cdot$ and $\nabla$ of
-the same field differ by exactly one inverse length. A pressure-referenced variant
-$\varepsilon_C^{\mathrm{alt}}=\|(h^2/\alpha_K\tau_{1,K})\,\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$
-is deliberately \emph{not} used: it divides by $\|p^k\|$, which is indeterminate under all-Dirichlet
-velocity boundaries (pressure fixed only up to a constant) and is mesh-coupled through $\tau_1$ ---
-strictly inferior to the genuinely scale-free~\eqref{eq:cc-epsC}.
-
-\subsection{Edge cases and implementation guards}
-\begin{itemize}
-    \item \textbf{Trivial / degenerate iterate.} Every denominator is guarded by a pure machine-$\varepsilon$
-    underflow floor (\emph{not} a problem scale); a denominator sitting at that floor raises a
-    \code{degenerate} flag, and convergence is never accepted at $k=0$ (require $\ge1$ completed
-    iteration). The $\sqrt{d}$ bound keeps $\varepsilon_C$ well-posed whenever
-    $\|\nabla(\alpha\boldsymbol{u}^k)\|$ is above roundoff; the \code{degenerate} flag plus the
-    $k\ge1$ rule cover the roundoff regime that the analytic bound cannot.
-    \item \textbf{Genuine nonlinear residual.} $\boldsymbol{r}_M^k$ is the re-assembled operator residual
-    at $U^k$, never the inner linear-solve residual (which $\to0$ \emph{inside} each step and does not
-    reflect outer convergence).
-    \item \textbf{Tolerance floor.} $\varepsilon_M$ and $\varepsilon_C$ cannot fall below the level set
-    by the discretisation and by $\varepsilon$; $\mathrm{tol}$ must sit above it.
-\end{itemize}
-
-\subsection{Relation to the harness criterion}
-The discretisation-coupled scalar tolerance~\eqref{eq:dynamic-ftol} and the per-field intrinsic-scale
-rule of Sec.~\ref{sec:harness-perfield} are the parameter-sweep harness's convergence machinery; they
-key the algebraic target to $h$ and to the per-field initial residual, which is appropriate inside a
-manufactured-solution sweep where those quantities are known. The criterion of this section is their
-production-grade, a-priori-scale-free counterpart: it requires no manufactured solution, no $h$, and no
-initial-residual anchor, basing the normalisation entirely on the iterate's own force balance and flux
-structure.
-
 \section{Parameter-Sweep Harness Adaptations}
 \label{sec:harness}
 
@@ -2138,6 +2163,27 @@ the regime varies by many orders of magnitude.}
 
 \subsection{Per-field intrinsic-scale convergence for the inner Newton}
 \label{sec:harness-perfield}
+
+\begin{tcolorbox}[colback=red!4!white, colframe=red!55!black, boxrule=0.5pt, arc=2pt, left=6pt, right=6pt, top=4pt, bottom=4pt]
+\small
+\textbf{Superseded (2026-06).} The dimensionless-rate-per-field gate described in
+this subsection---the per-block scale proxy~\eqref{eq:per-field-scale-resolve}, the
+Bernoulli surrogate, the rate $\varepsilon_k=C_{\mathrm{sf}}h^{k_v+1}$
+of~\eqref{eq:per-field-rate}, and the block-wise
+predicates~\eqref{eq:per-field-convergence}--\eqref{eq:per-field-honest}---was the
+\emph{re-anchored relative} convergence machinery (\code{relative\_ftol\_per\_field},
+\code{relative\_stagnation\_noise\_floor\_per\_field}). It was \emph{removed} from
+\code{SafeNewtonSolver} in the 2026-06 cleanup: re-anchoring the target to the
+per-segment initial residual created moving goalposts across
+Newton$\leftrightarrow$Picard handoffs. In the current code the harness passes the
+scalar discretisation-coupled $\textftol^{\mathrm{dyn}}$ of~\eqref{eq:dynamic-ftol}
+as the fallback floor, and the \emph{authoritative} convergence verdict---in the
+harness exactly as in production---is the scale-free $\varepsilon_M/\varepsilon_C$
+criterion of §\ref{sec:convergence-criterion}. The per-field residual \emph{vectors}
+survive only as an assembly detail (\code{effective\_ftol\_per\_field}, now filled
+uniformly from the scalar \code{ftol}); the rate/proxy construction below does not.
+It is retained here as a record of what the gate used to be.
+\end{tcolorbox}
 
 \extline{The scalar test $\|\boldsymbol{b}\|_\infty \le \textftol$ used
 throughout Algorithms~\ref{alg:A} and~\ref{alg:A3} carries a hidden
