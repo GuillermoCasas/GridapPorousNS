@@ -62,8 +62,8 @@
 \newcommand{\normh}[1]{\left\Vert #1\right\Vert_h}
 \newcommand{\norm}[1]{\left\Vert #1\right\Vert}
 
-\title{Why the orthogonal subscales lose coercivity-norm control \\[2pt]
-in the reaction-dominated limit}
+\title{Reactive coercivity in the reaction-dominated limit: \\[2pt]
+the constant-$\sigma$ annihilation favours the orthogonal subscales}
 \author{}
 \date{}
 
@@ -72,13 +72,21 @@ in the reaction-dominated limit}
 
 \noindent
 \textit{Scope.}\; This note isolates, in a setting and notation compatible with the
-manuscript, the mechanism by which the coercivity proof of the ASGS method fails
-to carry over to the OSGS method as the Damk\"ohler number grows. The conclusion
-is that the failure is structural for a constant reaction coefficient---it is not
-an artifact of the proof technique---but that it degrades the \emph{provable
-coercivity norm}, not the \emph{optimal convergence rate}, which both methods
-retain. We close by recording the precedents for this observation in the
-literature and the sense in which the present framing is new.
+manuscript, how the constant-$\sigma$ annihilation
+$(\mathcal{I}-\Pio)[\sigma\uh]=\boldsymbol{0}$ reshapes the reactive coercivity
+control of the two methods as the Damk\"ohler number grows. The conclusion is that,
+in the reaction-dominated limit with a constant reaction coefficient, the ASGS
+stabilization \emph{subtracts} a reactive drain $-\|\tau_1^{1/2}\sigma\uh\|_h^2$
+from the Galerkin reaction term, reducing the provable velocity control from the
+bare coefficient $\sigma$ down to the smaller $\siga$; whereas OSGS, for which that
+subtracted term vanishes identically, \emph{retains the full Galerkin
+$\sigma$-control}. The constant-$\sigma$ annihilation therefore \emph{favours} OSGS
+in the provable coercivity norm---the very algebraic fact that is only an
+algorithmic convenience there (excluding the reactive terms from the computed
+projection) here spares OSGS a drain that ASGS must pay. Both methods retain the
+\emph{optimal convergence rate}, so the distinction is one of provable stability
+margin, not of accuracy. We close by recording the precedents for this observation
+in the literature and the sense in which the present framing is new.
 
 %------------------------------------------------------------------------------
 \section{Setting and the common stabilized form}
@@ -135,7 +143,7 @@ with the reaction-dominated asymptotics ($\Damk_h\to\infty$, $h\to0$)
   \tau_1\sim\frac{\alpha_K}{\sigma},
   \qquad
   \siga\sim\alpha_K(1+\Reyn_h)\frac{\nu}{h^2}
-  \;\sim\;\frac{\alpha_K(1+\Reyn_h)}{\Damk_h}\,\frac{\sigma}{1},
+  \;\sim\;\frac{1+\Reyn_h}{\Damk_h}\,\sigma,
 \end{equation}
 %
 where the last form makes explicit that $\siga/\sigma\sim(1+\Reyn_h)/\Damk_h\to0$.
@@ -160,10 +168,10 @@ manuscript's identity
 %
 with $X(\Uh)\coloneqq\boldsymbol{a}\cdot\nabla\uh+\nabla\ph$. The decisive feature
 is purely algebraic. Expanding the squared norm of the difference on the second
-line produces a \emph{cross term} and, crucially, a \emph{positive} reactive
-square:
+line produces a \emph{cross term} and, crucially, a \emph{negative} reactive
+square---a drain that the stabilization subtracts from the Galerkin reaction:
 %
-\begin{equation}\label{eq:positive-square}
+\begin{equation}\label{eq:reactive-drain}
   -\big\|\tau_1^{1/2}\big(2\nabla\!\cdot(\alpha\nu\ViscProj\nabla\uh)-\sigma\uh\big)\big\|_h^2
   = -\big\|\tau_1^{1/2}\,2\nabla\!\cdot(\alpha\nu\ViscProj\nabla\uh)\big\|_h^2
     \;\underbrace{-\;\big\|\tau_1^{1/2}\sigma\uh\big\|_h^2}_{\text{from }\mathcal{L}^*\text{ paired with }\mathcal{L}}
@@ -187,14 +195,25 @@ manuscript's bound
   + \big\|\tau_2^{1/2}\nabla\!\cdot(\alpha\uh)\big\|_h^2 .
 \end{equation}
 %
-The point to retain: the $\siga$-control of $\uh$ comes from the term
-$-\|\tau_1^{1/2}\sigma\uh\|_h^2$ in \cref{eq:positive-square}, i.e.\ from the
-stabilization \emph{pairing the reactive part of $\mathcal{L}^*\Vh$ with the
-reactive part of $\mathcal{L}\Uh$}. This pairing is nonzero precisely because
-$\Porth=\mathcal{I}$ leaves $\sigma\uh$ untouched.
+The point to retain---and the one the original framing of this note got
+backwards---is that ASGS does \emph{not} gain its reactive control from the
+stabilization. On the contrary, the drain $-\|\tau_1^{1/2}\sigma\uh\|_h^2$ in
+\cref{eq:reactive-drain} \emph{subtracts} from the bare Galerkin reaction
+$\|\sigma^{1/2}\uh\|^2$ that is already present in \cref{eq:ASGS-expand}. Collecting
+the reactive bookkeeping, the net coefficient of $\|\uh\|^2$ is reduced from
+$\sigma$ down to
+\begin{equation}\label{eq:siga-as-net}
+  \sigma-\tau_1\sigma^2
+  = \frac{\alpha_K\tauNS^{-1}\,\sigma}{\alpha_K\tauNS^{-1}+\sigma}
+  = \siga \;<\;\sigma ,
+\end{equation}
+which is exactly the $\siga$ that appears in $\triplenorm{\cdot}$. The drain is
+nonzero precisely because $\Porth=\mathcal{I}$ feeds the \emph{entire} reactive
+residual $\sigma\uh$---including the part already resolved in $\Xh$---back into the
+stabilization, where the adjoint pairing turns it into a subtraction.
 
 %------------------------------------------------------------------------------
-\section{The analogous OSGS argument and where it breaks}
+\section{The analogous OSGS computation: the reactive drain vanishes}
 %------------------------------------------------------------------------------
 Repeating the computation with $\Porth=\mathcal{I}-\Pio$ replaces the stabilizing
 term in \cref{eq:BS}, when tested with $\Uh$, by the seminorm of the
@@ -216,14 +235,16 @@ constant, the reactive residual lies entirely in the finite element space, hence
 This is the same fact that, in the manuscript, justifies dropping the reactive
 terms from the computed projection (their projection ``is exactly zero for
 constant $\boldsymbol{\sigma}$''). Algorithmically convenient there, it is
-analytically obstructive here: the positive reactive square that ASGS extracted in
-\cref{eq:positive-square} is, for OSGS, \emph{identically zero in the
-reaction-dominated limit}. The only remaining source of $L^2$-control on $\uh$ is
-the bare Galerkin reactive term $\|\sigma^{1/2}\uh\|^2$ already present in
-\cref{eq:ASGS-expand}, which carries the coefficient $\sigma$ rather than the
-stabilization-enhanced $\siga$. Collecting this:
+analytically \emph{advantageous} here: the reactive drain
+$-\|\tau_1^{1/2}\sigma\uh\|_h^2$ that ASGS subtracts in \cref{eq:reactive-drain}
+is, for OSGS, \emph{identically zero in the reaction-dominated limit}, because the
+residual it would act on lies entirely in $\Xh$ and is removed by
+$\mathcal{I}-\Pio$ before it can be fed back through $\mathcal{L}^*$. OSGS therefore
+keeps the bare Galerkin reactive term $\|\sigma^{1/2}\uh\|^2$ of
+\cref{eq:ASGS-expand} \emph{intact}, with the full coefficient $\sigma$ rather than
+the drained $\siga<\sigma$ that ASGS is left with. Collecting this:
 
-\begin{proposition}[Reactive coercivity gap]\label{prop:gap}
+\begin{proposition}[Reactive coercivity gap, in favour of OSGS]\label{prop:gap}
 Under the constant-coefficient assumptions above, the largest coefficient
 $c_{\uh}$ for which an estimate of the form
 $B_\text{S}(\boldsymbol{a},\Uh,\Uh)\ge c_{\uh}\,\|\uh\|^2+(\text{other nonnegative terms})$
@@ -235,11 +256,15 @@ is provable from \cref{eq:BS} satisfies, as $\Damk_h\to\infty$,
   \qquad\Longrightarrow\qquad
   \frac{c_{\uh}^{\,\mathrm{OSGS}}}{c_{\uh}^{\,\mathrm{ASGS}}}\sim\frac{\Damk_h}{1+\Reyn_h}\to\infty,
 \end{equation}
-i.e.\ the OSGS coercivity argument controls $\uh$ in a norm weaker than
-$\triplenorm{\cdot}$ by a relative factor $\sim(1+\Reyn_h)/\Damk_h$ on the
-$\siga$-block. No reorganization of the proof recovers the $\siga$-control from
-\cref{eq:OSGS-stab} alone, because the relevant residual component is zero by
-construction \eqref{eq:annihilation}.
+i.e.\ the provable reactive control of OSGS \emph{exceeds} that of ASGS by the
+factor $\Damk_h/(1+\Reyn_h)$: where ASGS can only guarantee the drained $\siga$,
+OSGS guarantees the full $\sigma$. Equivalently, OSGS controls $\uh$ in a norm
+\emph{stronger} than $\triplenorm{\cdot}$ on the reactive block, the triple norm
+being built from the smaller ASGS coefficient $\siga$. The annihilation
+\eqref{eq:annihilation} is precisely what protects the OSGS coefficient: the
+residual component that ASGS would have drained through \cref{eq:reactive-drain} is
+removed before it can reach the stabilization, so OSGS never pays the drain in the
+first place.
 \end{proposition}
 
 \begin{remark}[Why only the reactive term is affected]
@@ -248,18 +273,19 @@ which acts as a (scaled) identity and therefore cannot map $\uh$ out of $\Xh$. B
 contrast, $\boldsymbol{a}\cdot\nabla\uh$ and $\nabla\ph$ generically possess
 nonzero components orthogonal to $\Xh$, so the convective and pressure-gradient
 stabilizations---the $\tau_1\|\alpha X(\Uh)\|_h^2$ and $\tau_2$-divergence blocks
-of $\triplenorm{\cdot}$---survive the orthogonal projection intact. The deficiency
-is thus confined to the zeroth-order term, exactly the term that
-LBB/convection-oriented OSGS analyses never needed to control.
+of $\triplenorm{\cdot}$---survive the orthogonal projection intact. The distinction
+between the two methods is thus confined to the zeroth-order term, exactly the term
+that LBB/convection-oriented OSGS analyses never needed to control.
 \end{remark}
 
 %------------------------------------------------------------------------------
 \section{Why optimal convergence rates are nevertheless retained}
 %------------------------------------------------------------------------------
 The gap of \cref{prop:gap} is a statement about the \emph{provable coercivity
-norm}, and must not be read as a loss of accuracy. Three observations, all
-consistent with the manuscript's numerical evidence, explain why the convergence
-\emph{rate} is unaffected.
+norm}, and must not be read as an accuracy difference. Although ASGS is left with
+the smaller reactive coefficient $\siga$, three observations---all consistent with
+the manuscript's numerical evidence---explain why \emph{both} methods retain the
+optimal convergence \emph{rate}.
 
 \smallskip
 \noindent\textbf{(i) Consistency is untouched.} The OSGS residual fed back through
@@ -274,23 +300,27 @@ $
 holds in the (smaller) OSGS norm with the same order.
 
 \smallskip
-\noindent\textbf{(ii) The Galerkin reaction term covers the velocity.} In the
-reaction-dominated limit the velocity error is itself governed by the shared term
-$\|\sigma^{1/2}\boldsymbol{e}_u\|$. The very fact that kills the OSGS coercivity
-contribution---$\sigma\uh$ being well represented in $\Xh$---also means this
-Galerkin term represents the reaction accurately. This is the same mechanism the
-manuscript invokes when it notes that the apparently weaker $\siga$-control ``turns
-out not to be the case'' once the asymptotics are examined.
+\noindent\textbf{(ii) The Galerkin reaction term covers the velocity for both
+methods.} In the reaction-dominated limit the velocity error is governed by the
+shared term $\|\sigma^{1/2}\boldsymbol{e}_u\|$, present with the full coefficient
+$\sigma$ in \emph{both} formulations. The very fact that removes the reactive drain
+for OSGS---$\sigma\uh$ being well represented in $\Xh$---also means this Galerkin
+term represents the reaction accurately, so even the smaller ASGS coefficient
+$\siga$ costs nothing in the rate. This is the same mechanism the manuscript invokes
+when it notes that the apparently weaker $\siga$-control ``turns out not to be the
+case'' once the asymptotics are examined.
 
 \smallskip
-\noindent\textbf{(iii) Variable resistance escapes the cancellation.} For a
-spatially varying $\sigma(\boldsymbol{x})$---as in the Darcy--Forchheimer closure
-actually solved, where $\sigma$ depends on $\alpha(\boldsymbol{x})$ and on
+\noindent\textbf{(iii) Variable resistance narrows the gap.} For a spatially
+varying $\sigma(\boldsymbol{x})$---as in the Darcy--Forchheimer closure actually
+solved, where $\sigma$ depends on $\alpha(\boldsymbol{x})$ and on
 $|\boldsymbol{u}|$---one has $\sigma\uh\notin\mathcal{V}_{h0}$ in general, so
-$(\mathcal{I}-\Pio)[\sigma\uh]\neq\boldsymbol{0}$ and OSGS recovers a genuine,
-nonzero reactive contribution. The degeneracy of \cref{prop:gap} is therefore the
-\emph{worst case of an idealized constant-coefficient model problem}, not of the
-formulation as implemented.
+$(\mathcal{I}-\Pio)[\sigma\uh]\neq\boldsymbol{0}$ and the OSGS stabilization now
+subtracts a partial reactive drain of its own, moving its effective coefficient back
+toward $\siga$. The constant-$\sigma$ separation of \cref{prop:gap} is therefore the
+\emph{extremal case of an idealized model problem}---where OSGS's advantage is
+largest---not a feature that persists undiminished in the formulation as
+implemented.
 
 \smallskip
 This reconciles the theory with the reported experiments, in which ASGS and OSGS
@@ -317,38 +347,45 @@ the algorithmic level (the reactive terms are excluded from the computed
 projection because their projection is exactly zero).
 
 What appears \emph{not} to have been stated in this form is the combination of:
-(a) the explicit side-by-side coercivity comparison of \cref{eq:positive-square}
+(a) the explicit side-by-side coercivity comparison of \cref{eq:reactive-drain}
 and \cref{eq:OSGS-stab}, identifying $-\|\tau_1^{1/2}\sigma\uh\|_h^2$ as precisely
-the term ASGS keeps and OSGS cannot, with the gap quantified as $\sim1/\Damk_h$ in
-\cref{eq:gap}; (b) the specialization to the reaction-dominated regime of the
-\emph{porous} (generalized Navier--Stokes) problem, with the porosity-weighted
-$\siga$; and (c) the reconciliation of items (i)--(iii) showing that the weaker
-provable bound coexists with optimal observed rates, the variable-$\sigma$ remark
-softening the result further. We therefore recommend presenting it not as a new
-phenomenon but as making explicit, for the reaction-dominated regime, a known
-limitation of orthogonal subscales.
+the reactive drain that ASGS pays and OSGS avoids, with the resulting coefficient
+ratio quantified as $\siga/\sigma\sim(1+\Reyn_h)/\Damk_h$ in \cref{eq:gap}; (b) the
+specialization to the reaction-dominated regime of the \emph{porous} (generalized
+Navier--Stokes) problem, with the porosity-weighted $\siga$; and (c) the
+reconciliation of items (i)--(iii) showing that the difference in provable bounds
+coexists with optimal observed rates for both methods, the variable-$\sigma$ remark
+narrowing the difference further. We therefore recommend presenting it not as a new
+phenomenon but as making explicit, for the reaction-dominated regime, how a known
+structural property of orthogonal subscales---no stabilization is added for residual
+components already representable on the mesh---plays out in the reactive coercivity
+balance, and that it does so to OSGS's advantage.
 
 %------------------------------------------------------------------------------
 \section*{Suggested one-paragraph version for the manuscript}
 %------------------------------------------------------------------------------
 \noindent\textit{(Drop-in text, parallel to the existing remark on $\siga$.)}
 \begin{quote}\small
-It is worth noting that the coercivity argument above does not carry over verbatim
-to the OSGS method in the reaction-dominated regime. The stabilizing term then
-controls only the component of the residual orthogonal to $\Xh$, whereas for a
-constant resistance $\sigma$ the reactive residual $\sigma\uh$ lies entirely in
-$\mathcal{V}_{h0}$ and is annihilated by the orthogonal projection---the same
-property that lets us exclude these terms from the computed projection. The
-positive contribution $-\|\tau_1^{1/2}\sigma\uh\|_h^2$ that yields the
-$\siga$-control in \cref{eq:ASGS-lemma} is therefore unavailable for OSGS, and the
-velocity is controlled only through the bare Galerkin term $\|\sigma^{1/2}\uh\|^2$,
-weaker by a factor $\sim(1+\Reyn_h)/\Damk_h$. This is a known feature of orthogonal
+It is worth noting how the coercivity argument above specializes to the OSGS method
+in the reaction-dominated regime. The stabilizing term then controls only the
+component of the residual orthogonal to $\Xh$, and for a constant resistance
+$\sigma$ the reactive residual $\sigma\uh$ lies entirely in $\mathcal{V}_{h0}$ and
+is annihilated by the orthogonal projection---the same property that lets us exclude
+these terms from the computed projection. Consequently the reactive drain
+$-\|\tau_1^{1/2}\sigma\uh\|_h^2$ that, for ASGS, \emph{reduces} the Galerkin control
+$\|\sigma^{1/2}\uh\|^2$ to the smaller $\siga$ entering \cref{eq:ASGS-lemma} simply
+vanishes for OSGS: the velocity is then controlled by the full Galerkin coefficient
+$\sigma$, larger than the ASGS coefficient $\siga$ by a factor
+$\sim\Damk_h/(1+\Reyn_h)$. The provable reactive coercivity of OSGS is thus, if
+anything, the stronger of the two in this regime. This is a direct consequence of a
+known feature of orthogonal
 subscales~\cite{gravenkamp2023dispersed,codina2002stabilized}: no stabilization is
-added for residual components already representable on the mesh. By consistency the
-convergence \emph{rate} is unaffected---as our experiments confirm---and for the
-spatially varying $\sigma(\boldsymbol{x})$ of the closure actually solved the
-cancellation is no longer exact, so a nonzero reactive stabilization is in fact
-recovered.
+added---and so none is subtracted as a drain---for residual components already
+representable on the mesh. By consistency the convergence \emph{rate} is identical
+for both methods---as our experiments confirm---and for the spatially varying
+$\sigma(\boldsymbol{x})$ of the closure actually solved the annihilation is no
+longer exact, so both methods carry a partial reactive drain and the
+constant-$\sigma$ separation above is the extremal, model-problem case.
 \end{quote}
 
 %------------------------------------------------------------------------------

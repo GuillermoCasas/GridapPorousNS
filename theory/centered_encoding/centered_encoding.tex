@@ -313,10 +313,13 @@ mesh ratio $h_{\text{dim}} = h / L = 1/N$ and the similarity analysis
 remain intact under any choice of $L$) unlocks the second degree of
 freedom.
 
-\paragraph{Status (2026-06-01).} The generalisation is implemented; the
-default \texttt{encoding\_strategy = "centered"} preserves the
-pre-generalisation behaviour bit-identically, and the new strategies
-\texttt{"balanced"} and \texttt{"minmax"} expose the second-DOF
+\paragraph{Status (2026-06-01; default updated 2026-06-09).} The
+generalisation is implemented. The harness default is now
+\texttt{encoding\_strategy = "minmax"} (\texttt{run\_test.jl}:
+\texttt{get(test\_dict, "encoding\_strategy", "minmax")}); the
+\texttt{"centered"} strategy ($L=1$) preserves the pre-generalisation
+behaviour bit-identically and remains available, alongside
+\texttt{"balanced"} and \texttt{"minmax"}, which expose the second-DOF
 machinery for use in MMS sweeps. The remainder of this section presents
 the math (§\ref{sec:varL-identities}--\ref{sec:varL-comparison}), the
 implementation (§\ref{sec:varL-impl}), the empirical validation
@@ -738,14 +741,18 @@ magnitudes change with the encoding; three plausible sites:
       differently. The relative position of summands in log-space
       changes between encodings, and Float64 cancels the smaller
       ones differently when summed with the larger ones.
-\item \textbf{Stabilisation parameter $\tau_{\text{NS}}$.} The
+\item \textbf{Momentum stabilisation inverse-scale $\tau_1^{-1}$.} The
       dimensional formula
-      $\tau_{\text{NS}} = (4 c_1 \nu / h^2 + 2 c_2 \sigma + c |u|/h)^{-1}$
-      contains summands that scale unequally per encoding. For C7 at
-      $N=10$:
+      $\tau_1^{-1} = \alpha\,c_1 \nu / h^2 + \alpha\,c_2 |u|/h + \sigma$
+      (with $c_1 = 4k^4$, $c_2 = 2k^2$; note the reaction $\sigma$ enters
+      $\tau_1$ directly, \emph{not} the Navier--Stokes parameter
+      $\tau_{\text{NS}} = (c_1 \nu / h^2 + c_2 |u|/h)^{-1}$, which carries no
+      reaction term) contains summands that scale unequally per encoding.
+      For C7 at $N=10$ the diffusion summand and the reaction summand
+      $\sigma$ sit four orders apart:
       \begin{itemize}
-      \item Centered: $4 c_1 \nu / h^2 \approx 0.4 c_1$, $2 c_2 \sigma \approx 2000 c_2$ — summands span four orders.
-      \item Minmax:   $4 c_1 \nu / h^2 \approx 12.6 c_1$, $2 c_2 \sigma \approx 6.3 \times 10^4 c_2$ — summands span four orders again, but the diffusion summand sits at a different relative weight and is more vulnerable to floating-point obliteration when added to the reaction summand.
+      \item Centered: $\alpha\,c_1 \nu / h^2 \approx 0.4\,c_1$, $\sigma \approx 2000$ — summands span four orders.
+      \item Minmax:   $\alpha\,c_1 \nu / h^2 \approx 12.6\,c_1$, $\sigma \approx 6.3 \times 10^4$ — summands span four orders again, but the diffusion summand sits at a different relative weight and is more vulnerable to floating-point obliteration when added to the reaction summand.
       \end{itemize}
       $\hat{\tau} = \tau \cdot U_c / L$ is encoding-invariant
       algebraically; the dimensional summation is not invariant in
