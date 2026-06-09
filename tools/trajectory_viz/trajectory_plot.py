@@ -261,9 +261,10 @@ def _legend_handles(stages):
     """Build the figure's ONE shared key (replacing per-box legends). Entries are emitted only for
     quantities this trajectory actually carries. When the run was probe-traced (eps_M/eps_C present)
     the key leads with the PRIMARY ε_M/ε_C curves and the scale-free gate lines tol_M/tol_C (what the
-    solver decides convergence on), then labels the algebraic residual ‖R‖/tol as the de-emphasised
-    right-axis context (box colour = outcome). Otherwise only the residual key and its y=1 threshold
-    appear (the legacy residual-primary layout)."""
+    solver decides convergence on), then labels the algebraic residual ‖R‖/ftol as the de-emphasised
+    right-axis context (box colour = outcome). 'ftol' (the linear-solve floor) is named distinctly from
+    the gate 'tol_M'/'tol_C' on purpose — they are different tolerances. Otherwise only the residual
+    key and its y=1 threshold appear (the legacy residual-primary layout)."""
     M, c, T = P["markers"], P["colors"], P["threshold"]
     ms = P["legend"]["marker_size"]
     hist = [h for s in (stages or []) for h in (s.get("history") or [])]
@@ -283,22 +284,22 @@ def _legend_handles(stages):
                             label=rf"$\mathrm{{tol}}_C={sci(_tol('tol_C'))}$ : mass gate ($\varepsilon_C\leq\mathrm{{tol}}_C$)"))
         H.append(Line2D([], [], color=c["muted"], marker="o", ms=ms, lw=M["mini_line_width"],
                         alpha=T["residual_demph_alpha"],
-                        label=r"$\|R\|/\mathrm{tol}$ : algebraic residual (de-emph., right axis; box colour = outcome)"))
+                        label=r"$\|R\|/\mathrm{ftol}$ : algebraic residual / linear-solve floor (right axis, $\neq$ gate; box colour = outcome)"))
     else:
         H.append(Line2D([], [], color=c["grey"], marker="o", ms=ms, lw=M["stage_line_width"],
-                        label=r"$\|R\|/\mathrm{tol}$ : per-field residual (box colour = outcome)"))
+                        label=r"$\|R\|/\mathrm{ftol}$ : per-field residual (box colour = outcome)"))
         H.append(Line2D([], [], color=T["color"], ls=T["linestyle"], lw=T["line_width"] + 0.4,
-                        label=r"$\|R\|/\mathrm{tol}=1$ : convergence threshold ($\|R\|=$ effective ftol)"))
+                        label=r"$\|R\|/\mathrm{ftol}=1$ : convergence threshold ($\|R\|=$ effective ftol)"))
     return H
 
 
 def _start_node_text(stages, override=None):
-    """Entry-node label: normalized residual (‖R₀‖/tol) if the trace carries it, else raw ‖R₀‖."""
+    """Entry-node label: normalized residual (‖R₀‖/ftol) if the trace carries it, else raw ‖R₀‖."""
     s0 = stages[0] if stages else {}
     if override is None:
         rn = s0.get("res_in_norm")
         if _finite_pos(rn):
-            return rf"$x_0:\ \|R_0\|/\mathrm{{tol}}={sci(rn)}$"
+            return rf"$x_0:\ \|R_0\|/\mathrm{{ftol}}={sci(rn)}$"
     r = override if override is not None else s0.get("res_in")
     return rf"$x_0:\ \|R_0\|={sci(r)}$"
 
@@ -308,7 +309,7 @@ def _final_node_text(last, ok):
     mark = r"$\checkmark$" if ok else r"$\times$"
     rn = last.get("res_out_norm")
     if _finite_pos(rn):
-        return mark + rf" final $\|R\|/\mathrm{{tol}}={sci(rn)}$"
+        return mark + rf" final $\|R\|/\mathrm{{ftol}}={sci(rn)}$"
     return mark + rf" final $\|R\|={sci(last.get('res_out'))}$"
 
 
@@ -317,11 +318,11 @@ def _fill_stage(ax, stages):
 
     When the run was probe-traced, the scale-free norms ε_M (momentum) and ε_C (mass) are the PRIMARY
     curves on the left axis — with the actual gate lines tol_M / tol_C — because ε_M ≤ tol_M AND
-    ε_C ≤ tol_C is what the solver decides convergence on. The algebraic residual ‖R‖/tol is demoted
-    to a de-emphasised right (twin) axis. A cell can therefore read as converged (ε_M below tol_M)
-    even while the residual still sits above its own y=1 line — the visual confusion this foregrounding
-    resolves. With no probe data (the default, and all pre-change traces) the residual stays primary,
-    exactly as before."""
+    ε_C ≤ tol_C is what the solver decides convergence on. The algebraic residual ‖R‖/ftol is kept as
+    faint context on a right (twin) axis; its denominator ftol is the linear-solve floor (dynamic_ftol
+    in the harness), NOT the gate, so it typically stays well above 1 even at convergence — the
+    nomenclature point, made explicit by naming it ftol rather than tol. With no probe data (the
+    default, and all pre-change traces) the residual stays primary, exactly as before."""
     stages = stages if isinstance(stages, list) else [stages]
     M, F, c, T = P["markers"], P["fonts"], P["colors"], P["threshold"]
     color = stage_color(stages[-1]) if stages else c["grey"]
@@ -354,7 +355,10 @@ def _fill_stage(ax, stages):
         ax.set_ylabel(r"$\varepsilon_M,\ \varepsilon_C$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
         ax.set_xlabel(r"$\mathrm{iter}$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
         ax.tick_params(labelsize=F["tick_label"])
-        # residual DE-EMPHASISED on a twin right axis (kept for context, never dominant)
+        # algebraic residual kept as faint right-axis context. Its denominator is ftol (the linear-solve
+        # floor = dynamic_ftol in the harness), NOT the convergence gate — labelled ‖R‖/ftol to keep it
+        # distinct from the left-axis tol_M / tol_C. Because the ε-gate fires first, this curve typically
+        # stays well above 1 even at convergence (that is the nomenclature point, made explicit).
         if ys:
             dem = T["residual_demph_alpha"]
             rax = ax.twinx()
@@ -365,7 +369,7 @@ def _fill_stage(ax, stages):
                             alpha=dem, zorder=1)
                 lo2, hi2 = min(min(ys), 1.0), max(max(ys), 1.0)
                 rax.set_ylim(lo2 / T["ylim_pad"], hi2 * T["ylim_pad"])
-            rax.set_ylabel(r"$\|R\|/\mathrm{tol}$", fontsize=F["axis_label"],
+            rax.set_ylabel(r"$\|R\|/\mathrm{ftol}$", fontsize=F["axis_label"],
                            labelpad=F["axis_label_pad"], color=c["muted"])
             rax.tick_params(labelsize=F["tick_label"], colors=c["muted"])
     elif ys:
@@ -383,7 +387,7 @@ def _fill_stage(ax, stages):
             ax.axhline(1.0, color=T["color"], lw=T["line_width"], ls=T["linestyle"], zorder=2)
             lo, hi = min(min(ys), 1.0), max(max(ys), 1.0)
             ax.set_ylim(lo / T["ylim_pad"], hi * T["ylim_pad"])
-            ax.set_ylabel(r"$\|R\|/\mathrm{tol}$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
+            ax.set_ylabel(r"$\|R\|/\mathrm{ftol}$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
         else:
             ax.set_ylabel(r"$\|R\|_\infty$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
         ax.set_xlabel(r"$\mathrm{iter}$", fontsize=F["axis_label"], labelpad=F["axis_label_pad"])
