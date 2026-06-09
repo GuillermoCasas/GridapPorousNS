@@ -3,19 +3,33 @@
 """
     compute_reference_errors(f_h, f_ref, if_ref, V_free, dΩ_h, dΩ_ref; filter_func=x->true, search_method=nothing)
 
-Computes exactly the cross-mesh topological errors for a single generic field (velocity, pressure, etc).
-An optional `filter_func(x) -> Bool` can geometrically isolate the evaluation metrics (e.g. `x -> x[1] < 1.5`).
+Computes the cross-mesh error of a coarse FE field `f_h` against a fine reference
+field `f_ref` for a single generic field (velocity, pressure, etc.). Two complementary
+norms are returned: a *nested* norm (project the reference onto the coarse space and
+integrate on the coarse mesh) and a *consistent* norm (interpolate the coarse field
+onto the fine quadrature and integrate on the fine mesh). An optional
+`filter_func(x) -> Bool` geometrically isolates a subdomain for the metric
+(e.g. `x -> x[1] < 1.5` keeps only the upstream half).
+
+Arguments:
+* `f_h`      — the coarse-mesh FE solution being assessed.
+* `f_ref`    — the fine-mesh reference solution (treated as ground truth).
+* `if_ref`   — an `Interpolable` wrapper of `f_ref`, used to pull the reference onto the coarse space.
+* `V_free`   — the coarse FE space (unconstrained / free DOFs) the reference is projected into.
+* `dΩ_h`     — quadrature measure on the coarse mesh.
+* `dΩ_ref`   — quadrature measure on the fine reference mesh.
 
 `search_method` controls the cross-mesh point-location used to build the *coarse* `Interpolable`
-evaluated at the reference quadrature points (the "consistent" metric). When `nothing` (default), Gridap's
-default `KDTreeSearch` is used — this is exact and robust for STRUCTURED, nested meshes (the benchmark
-path is byte-for-byte unchanged). For NON-nested UNSTRUCTURED meshes, reference quadrature points near the
-boundary can otherwise fall outside every coarse cell and the default search throws; pass a tolerant
-`KDTreeSearch(num_nearest_vertices=k)` (k≈10) to widen the candidate-cell set. The caller should build
-`if_ref` with the same tolerant search so the nested branch is robust too.
+evaluated at the reference quadrature points (the consistent metric). When `nothing` (default), Gridap's
+default `KDTreeSearch` is used — exact and robust for structured, nested meshes. For non-nested
+unstructured meshes, reference quadrature points near the boundary can fall outside every coarse cell
+and the default search throws; pass a tolerant `KDTreeSearch(num_nearest_vertices=k)` (k≈10) to widen
+the candidate-cell set. The caller should build `if_ref` with the same tolerant search so the nested
+branch is robust too.
 
-Returns:
-`l2_nested, h1_nested, l2_cons, h1_cons, e_nested, e_cons`
+Returns the six-tuple
+`(l2_nested, h1_nested, l2_cons, h1_cons, e_nested, e_cons)`,
+where `e_nested` and `e_cons` are the (unmasked) error `CellField`s for the two formulations.
 """
 function compute_reference_errors(f_h, f_ref, if_ref, V_free, dΩ_h, dΩ_ref; filter_func=(x)->true, search_method=nothing)
     # ---------------------------------------------------------------------
@@ -34,8 +48,10 @@ function compute_reference_errors(f_h, f_ref, if_ref, V_free, dΩ_h, dΩ_ref; fi
     # ---------------------------------------------------------------------
     # 2. EXACT CONTINUOUS METRIC (Consistent Fine-Mesh Formulation)
     # ---------------------------------------------------------------------
-    # Default (structured/nested): exact KDTree search, unchanged. Unstructured/non-nested: caller
-    # supplies a tolerant KDTreeSearch so near-boundary reference quadrature points still locate a coarse cell.
+    # Build an Interpolable of the coarse field (and its gradient) so it can be sampled at the
+    # fine-mesh quadrature points, then integrate the error on the fine mesh. Default (structured/nested)
+    # uses an exact KDTree search; for unstructured/non-nested meshes the caller supplies a tolerant
+    # KDTreeSearch so near-boundary reference quadrature points still locate a coarse cell.
     if_coarse      = search_method === nothing ? Gridap.FESpaces.Interpolable(f_h)    : Gridap.FESpaces.Interpolable(f_h;    searchmethod=search_method)
     if_coarse_grad = search_method === nothing ? Gridap.FESpaces.Interpolable(∇(f_h)) : Gridap.FESpaces.Interpolable(∇(f_h); searchmethod=search_method)
 
@@ -220,17 +236,15 @@ end
     compute_trial_projection_errors(f_h, if_ref, U_trial, dΩ_h; filter_func=x->true)
 
 H-C diagnostic metric: project the reference field onto the coarse-mesh **trial** space
-`U_trial` (with Dirichlet conditions baked in) rather than the free-DOF test space used by
-`compute_reference_errors`'s `l2_nested`. Returns `(l2_trial, h1_trial)`.
+`U_trial` (with Dirichlet conditions baked in) rather than the free-DOF test space `V_free`
+used by `compute_reference_errors`'s `l2_nested`. The Dirichlet DOFs are therefore fixed to
+the boundary data instead of being fit by the projection. Returns `(l2_trial, h1_trial)`.
 
 For a problem with P2-exact Dirichlet data (Cocquet's inlet `c_in y(1-y)` is exactly P2) this
 metric should agree with `l2_nested` to floating-point noise — any meaningful gap signals that
 the boundary-trace evaluation of the cross-mesh interpolant is contributing measurable error
 on unstructured meshes, which is the H-C hypothesis. See:
   - `theory/Replicating Cocquet et al. convergence results.md` (H-C)
-  - `/Users/guillermocasasgonzalez/.claude/plans/i-have-added-replicating-tidy-stonebraker.md`
-
-Standalone (does not change `compute_reference_errors`'s signature or behaviour).
 """
 function compute_trial_projection_errors(f_h, if_ref, U_trial, dΩ_h; filter_func=(x)->true)
     f_ref_in_trial = interpolate(if_ref, U_trial)

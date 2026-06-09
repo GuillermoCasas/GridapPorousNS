@@ -4,15 +4,24 @@
     run_simulation.jl
 
 # Role
-This file is the high-level orchestration layer and primary entry point for the Porous Navier-Stokes solver. 
-Its purpose is to convert structured, human-readable JSON configurations seamlessly into fully solved physical simulations.
+The high-level orchestration layer and primary entry point of the solver: it turns a single
+JSON configuration into a solved velocity/pressure field. `run_simulation` runs the pipeline
+below end to end; the other functions here are the per-stage building blocks it calls.
 
 # Pipeline Overview
-1. **Configuration**: Parses hierarchical JSON parameters into strongly-typed physical and numerical schemas (`load_frozen_config`, the strict single-file loader that fails on any missing field).
-2. **Topology & Spaces**: Generates the geometric mesh and constructs the finite element Trial and Test function spaces, natively applying required boundary conditions (`build_fe_spaces`).
-3. **Formulation Binding**: Dynamically constructs the mathematical `AbstractFormulation` (encapsulating exact viscous stress operators, drag laws, and projection policies) based on the inputs (`build_formulation`).
-4. **Assembly**: Computes fundamental geometric scales (like element characteristic sizes `h`) and safely translates the theoretical continuous operators into discrete, evaluatable `FEOperator` closures.
-5. **Execution**: Hands off the assembled, highly non-linear matrix system to the robust solver (`SafeNewtonSolver`) to converge to a discrete equilibrium, ultimately exporting the velocity and pressure fields.
+1. **Configuration**: `load_frozen_config` parses the JSON into strongly-typed physical and
+   numerical config structs, failing loudly on any missing field (no silent defaults).
+2. **Topology & Spaces**: `_build_default_mesh` builds the discrete mesh; `build_fe_spaces`
+   constructs the Taylor-Hood-style velocity/pressure Trial and Test spaces and applies the
+   Dirichlet boundary conditions.
+3. **Formulation Binding**: `build_formulation` assembles the continuous VMS weak form from a
+   viscous stress operator, a porous-drag reaction law, an OSGS projection policy, and a
+   velocity-floor regularization.
+4. **Assembly**: computes geometric scales (the element characteristic size `h` and the
+   stabilization constants `c₁`, `c₂`) and wires everything into the `FETopology` /
+   `VMSFormulation` bundles consumed by the solver.
+5. **Execution**: hands the nonlinear discrete system to `solve_system` (the safeguarded
+   Newton/Picard solver), then exports the converged velocity and pressure.
 """
 
 using LineSearches
@@ -20,12 +29,15 @@ using LineSearches
 """
     build_formulation(phys::PhysicalProperties, num_method::NumericalMethodConfig)
 
-Constructs the continuous mathematical formulation object defining the physical model logic.
-This object encapsulates the exact viscous operators, reaction/porosity fluid models 
-(Darcy or Forchheimer-Ergun), and SubGrid scale projection strategies needed for the VMS approach.
+Assembles the `PaperGeneralFormulation` — the continuous VMS weak form transcribed from
+`theory/paper/article.tex`. It bundles four interchangeable pieces selected from the config:
+the viscous stress operator, the porous-drag reaction law `σ` (constant or Forchheimer-Ergun),
+the OSGS subgrid projection policy, and the velocity-floor regularization, together with the
+viscosity `nu` and porosity-coupling parameter `eps_val`.
 """
 function build_formulation(phys::PhysicalProperties, num_method::NumericalMethodConfig)
-    # 1. Define the macroscopic drag reaction law imposed by the porous matrix.
+    # 1. Reaction law σ: the macroscopic drag the porous matrix exerts on the fluid.
+    #    Constant σ, or the Forchheimer-Ergun form σ = a(α) + b(α)|u| (linear + |u|-nonlinear).
     rxn_mode = phys.reaction_model
     if rxn_mode == "Constant_Sigma"
         reaction_law = ConstantSigmaLaw(phys.sigma_constant)
@@ -33,12 +45,14 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
         reaction_law = ForchheimerErgunLaw(phys.sigma_linear, phys.sigma_nonlinear)
     end
 
-    # 2. Velocity regularization strictly averts singular Jacobian matrices and non-differentiable 
-    # states when local velocity magnitudes approach exact zero in non-linear or Forchheimer flows.
+    # 2. Velocity-floor regularization. The Forchheimer term |u| is non-differentiable at u = 0,
+    #    which would make the Jacobian singular there; this smooths |u| near zero so Newton stays
+    #    well-posed. The floor scale combines a reference magnitude, an h-weight, and an ε offset.
     reg = SmoothVelocityFloor(phys.u_base_floor_ref, phys.h_floor_weight, phys.epsilon_floor)
 
-    # 3. Determine the algebraic SubGrid projection policy. Normally projects the full 
-    # convective residual; optionally trims reactions in legacy comparison modes.
+    # 3. Choose the OSGS subgrid projection policy. The default projects the full strong
+    #    residual. For constant σ in "standard" mode the reaction term is dropped from the
+    #    projection because its L² projection onto the FE space is exactly zero (paper §4.4).
     proj = ProjectFullResidual()
     if num_method.solver.experimental_reaction_mode == "standard" && rxn_mode == "Constant_Sigma"
         proj = ProjectResidualWithoutReactionWhenConstantSigma()
@@ -65,42 +79,49 @@ end
 """
     build_fe_spaces(model, elem::ElementSpacesConfig, dirichlet_tags, dirichlet_masks, dirichlet_values)
 
-Assembles the continuous Galerkin Test and Trial spaces. Generates a MultiField structure 
-for the tightly-coupled velocity-pressure system. LBB stability guides the respective `kv` and `kp` 
-interpolation orders.
+Builds the continuous-Galerkin velocity/pressure finite element spaces and returns the
+monolithic Trial space `X = U×P`, monolithic Test space `Y = V×Q`, and the interpolation
+orders `(kv, kp)`. Equal-order interpolation (kv == kp) is the primary configuration — the VMS
+stabilization supplies the LBB inf-sup stability the pair would otherwise lack; unequal Taylor-Hood
+pairs (kv > kp) are also representable.
 """
 function build_fe_spaces(model, elem::ElementSpacesConfig, dirichlet_tags, dirichlet_masks, dirichlet_values)
-    # Standard interpolation degree limits
+    # Polynomial interpolation orders: kv for velocity, kp for pressure.
     kv = elem.k_velocity
     kp = elem.k_pressure
-    
-    # Abstract definitions of the exact finite elements (Lagrangian polynomials).
+
+    # Reference elements: vector-valued Lagrangian for velocity, scalar Lagrangian for pressure.
     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
     refe_p = ReferenceFE(lagrangian, Float64, kp)
-    
-    # Test spaces V (Velocity) and Q (Pressure). H1-conformity enforces the integrability of PDE gradients.
-    V = TestFESpace(model, refe_u, conformity=:H1, labels=get_face_labeling(model), 
+
+    # Test spaces: V (velocity) carries the Dirichlet structure (tags/masks mark constrained DOFs);
+    # Q (pressure). H1-conformity makes the discrete gradients integrable, as the weak form needs.
+    V = TestFESpace(model, refe_u, conformity=:H1, labels=get_face_labeling(model),
                     dirichlet_tags=dirichlet_tags, dirichlet_masks=dirichlet_masks)
     Q = TestFESpace(model, refe_p, conformity=:H1)
-    
-    # Trial spaces built inheriting the strong Dirichlet boundary constraint values.
+
+    # Trial spaces: U lifts the prescribed Dirichlet velocity values into V; pressure is unconstrained.
     U = TrialFESpace(V, dirichlet_values)
     P = TrialFESpace(Q)
-    
-    # Bundle into strongly-coupled Monolithic MultiField space enabling joint matrix inversion 
-    # during Exact Newton or Picard sweeps.
+
+    # Monolithic MultiField spaces so (u, p) are solved as one coupled system in each
+    # Exact-Newton or Picard linear solve.
     Y = MultiFieldFESpace([V, Q])
     X = MultiFieldFESpace([U, P])
-    
+
     return X, Y, kv, kp
 end
 
 """
-    run_simulation(config_path::String; ...)
+    _build_default_mesh(domain_cfg::DomainConfig, mesh_cfg::MeshConfig)
 
-The foundational entry execution method. Evaluates JSON configurations to enforce parameter strictness. 
-Generates mesh mappings, extracts element geometries, determines VMS mathematical constants dynamically, 
-and drives the SafeNewton robust solver.
+Builds the canonical structured mesh for a run: a `CartesianDiscreteModel` over the
+`bounding_box`, partitioned by `mesh_cfg.partition`. For `element_type == "TRI"` the
+Cartesian cells are `simplexify`d into triangles; otherwise QUAD cells are kept.
+
+Boundary face groups follow the conventional tag IDs used throughout the solver:
+inlet = 7, outlet = 8, walls = 1..6. Downstream `build_fe_spaces` references these tag
+names ("inlet", "outlet", "walls") to impose Dirichlet velocity conditions.
 """
 function _build_default_mesh(domain_cfg::DomainConfig, mesh_cfg::MeshConfig)
     domain = Tuple(domain_cfg.bounding_box)
@@ -121,6 +142,15 @@ function _build_default_mesh(domain_cfg::DomainConfig, mesh_cfg::MeshConfig)
     return model
 end
 
+"""
+    freefem_to_gmsh(freefem_msh::String, gmsh_msh::String)
+
+Transcribe a FreeFem++ `.msh` (its header is `nv nt nbe` = #vertices, #triangles, #boundary
+edges, then the vertex/triangle/edge records) into a gmsh 2.2 ASCII `.msh` that `GmshDiscreteModel`
+can load. FreeFem boundary-edge labels 1/2/3/4 are mapped to named physical groups inlet/outlet/walls
+(labels 4+ fold into walls), and the triangles into the 2D "domain" group; those names become Gridap
+face-label tags. Used to import externally generated meshes (e.g. the Cocquet reference meshes).
+"""
 function freefem_to_gmsh(freefem_msh::String, gmsh_msh::String)
     nv, nt, nbe = 0, 0, 0
     verts = Vector{NTuple{3,Float64}}()   # (x, y, label) — label unused in gmsh nodes
@@ -185,6 +215,12 @@ function freefem_to_gmsh(freefem_msh::String, gmsh_msh::String)
     return gmsh_msh
 end
 
+"""
+    load_freefem_mesh(freefem_msh::String)
+
+Load a FreeFem++ `.msh` as a Gridap `DiscreteModel`: convert it to a temporary gmsh file via
+`freefem_to_gmsh`, hand that to `GmshDiscreteModel`, and clean up the temp directory afterwards.
+"""
 function load_freefem_mesh(freefem_msh::String)
     dir = mktempdir()
     try
@@ -287,8 +323,9 @@ function build_unstructured_model(N::Int; domain=(0.0, 2.0, 0.0, 1.0),
         dir = mktempdir()
         mshfile = joinpath(dir, "cocquet_$(N).msh")
         gmsh.write(mshfile)
-        # Optional persistent copy (e.g. into the test's data/ folder) — kept verbatim alongside
-        # the temp copy so the file can be inspected (gmsh GUI, Paraview) or imported elsewhere.
+        # Optional persistent copy (e.g. into the test's data/ folder) so the mesh can be
+        # inspected in the gmsh GUI / Paraview or imported elsewhere; the temp copy above is
+        # what this run loads.
         if !isempty(save_msh)
             mkpath(dirname(save_msh))
             gmsh.write(save_msh)
@@ -303,11 +340,22 @@ function build_unstructured_model(N::Int; domain=(0.0, 2.0, 0.0, 1.0),
     return model
 end
 
-function run_simulation(config_path::String; 
-                        dirichlet_tags=["walls"], 
+"""
+    run_simulation(config_path; dirichlet_tags, dirichlet_masks, dirichlet_values)
+
+Top-level entry point: solve one porous Navier-Stokes simulation described by the JSON at
+`config_path` and return `(u_h, p_h, model, Ω, dΩ)` (the converged velocity/pressure fields plus
+the mesh and integration measure). The keyword arguments set the velocity Dirichlet boundary:
+which tag names are constrained, which components of each are fixed (the masks), and the imposed
+values; the default is no-slip walls. Runs the full pipeline — load config, build mesh and FE
+spaces, build the VMS formulation, assemble the stabilized system, and drive `solve_system`,
+warning if the nonlinear solve fails to converge before exporting results.
+"""
+function run_simulation(config_path::String;
+                        dirichlet_tags=["walls"],
                         dirichlet_masks=[(true,true)],
                         dirichlet_values=[VectorValue(0.0,0.0)])
-    
+
     # Strict load: every field must be present in the JSON; no silent defaults.
     cfg = load_frozen_config(config_path)
     model = _build_default_mesh(cfg.domain, cfg.numerical_method.mesh)
@@ -328,17 +376,19 @@ function run_simulation(config_path::String;
     h_array = lazy_map(v -> is_tri_val ? sqrt(2.0 * abs(v)) : sqrt(abs(v)), cell_measures)
     h = CellField(h_array, Ω)
     
-    # Project analytical configurations smoothly into continuous CellFields
+    # Lift the scalar config inputs into CellFields over Ω so the formulation can evaluate them
+    # pointwise at quadrature: α is the (here uniform) porosity field; f is the constant body force.
     alpha_0_val = cfg.domain.alpha_0
     alpha_fn(x) = alpha_0_val
     alpha_cf = CellField(alpha_fn, Ω)
-    
+
     f_x_val = cfg.physical_properties.f_x
     f_y_val = cfg.physical_properties.f_y
     f_fn(x) = VectorValue(f_x_val, f_y_val)
     f_cf = CellField(f_fn, Ω)
-    
-    # Establish specific stabilization weights for momentum convective and viscous tau evaluations
+
+    # Stabilization constants c₁, c₂ entering τ₁/τ₂ (eq:Tau1/eq:Tau2): for equal-order interpolation
+    # get_c1_c2 returns c₁ = 4k⁴, c₂ = 2k² (paper Remark after eq:conditions_on_num_param).
     c_1, c_2 = get_c1_c2(typeof(form), kv)
     
     # Unconstrained (no-Dirichlet) test spaces V_free/Q_free — required for the OSGS L² projection of
@@ -354,14 +404,15 @@ function run_simulation(config_path::String;
     sol_cfg = cfg.numerical_method.solver
     p_ls = LUSolver()
 
-    # [P0 shared builder + P6 parity] Production builds the (picard, newton) pair through the same builder
-    # as the MMS harness. It keeps the bare scalar-ftol path (distinct picard_handoff_ftol / ftol; no
-    # per-field relative tolerances; static iteration budgets — option (b): production has no manufactured
-    # solution or characteristic Re/Da to drive the dynamic budgets, so those stay harness-only) and passes
-    # `noise_floor_success_max_ftol_multiple = Inf` to reproduce the prior positional-ctor default byte-for-byte.
-    # P6 wires the no-progress STALL GUARD from the config (`newton_stall_*`, default 0 ⇒ off ⇒ bit-identical);
-    # the Newton↔Picard PING-PONG needs no plumbing here — `solve_system` reads `pingpong_*` from `sol_cfg`
-    # and builds the gain-targeted Picard itself, so a production user opts in purely via config.
+    # Build the (picard, newton) solver pair via the shared `build_iter_solvers`, the same builder
+    # the MMS harness uses. Production runs use the plain scalar-ftol path: a Newton residual
+    # tolerance (`ftol`) and a separate, looser Picard hand-off tolerance (`picard_handoff_ftol`),
+    # with fixed iteration budgets. Dynamic Re/Da-driven budgets and per-field relative tolerances
+    # stay harness-only — production has no manufactured solution or characteristic Re/Da to key them
+    # to. `noise_floor_success_max_ftol_multiple = Inf` disables noise-floor success acceptance.
+    # The no-progress STALL GUARD comes straight from the config (`newton_stall_*`; defaults of 0
+    # turn it off). The Newton↔Picard ping-pong is not wired here — `solve_system` reads `pingpong_*`
+    # from `sol_cfg` and constructs the gain-targeted Picard itself, so it is opted into via config.
     solvers = build_iter_solvers(sol_cfg, p_ls;
         newton_max_iters = sol_cfg.newton_iterations,
         picard_max_iters = sol_cfg.picard_iterations,

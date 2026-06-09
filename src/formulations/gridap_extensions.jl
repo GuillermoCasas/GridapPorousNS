@@ -3,11 +3,16 @@ using Gridap
 using Gridap.TensorValues
 
 """
-    _contract_grad_div(H)
+    ContractGradDivOp
 
-Internal function to contract the 3rd-order Hessian tensor `H` to compute `∇(∇⋅u)`.
-For a vector field `u`, `H` is a 3D tensor where `H[i, j, k]` represents `∂_i ∂_j u_k`.
-The gradient of the divergence is a vector with components `v_i = ∑_j ∂_i ∂_j u_j = ∑_j H[i, j, j]`.
+Callable operator that contracts a vector field's 3rd-order Hessian tensor `H` into the
+vector `∇(∇⋅u)` (the gradient of the divergence). For a vector field `u`, `H[i, j, k]`
+holds the second derivative `∂_i ∂_j u_k`, so the wanted vector has components
+`v_i = ∑_j ∂_i ∂_j u_j = ∑_j H[i, j, j]`. Defined for 2D and 3D Hessians.
+
+This is the building block used to obtain `∇(∇⋅u)` analytically: Gridap can evaluate exact
+element Hessians (`∇∇`) on Lagrangian cells, so contracting that Hessian sidesteps Gridap's
+lack of a native chain-rule expansion for `∇(∇⋅u)` over composed operations.
 """
 struct ContractGradDivOp <: Function end
 @inline function (::ContractGradDivOp)(H::ThirdOrderTensorValue{2,2,2,T}) where T
@@ -20,9 +25,13 @@ end
 """
     grad_div_op(u)
 
-Custom Gridap algebraic operator that computes the exact analytical `∇(∇⋅u)` 
-by contracting the true element-wise Hessian `∇∇(u)`.
-Note: Your finite element space must use at least quadratic elements (\$P^2\$) 
-for this to evaluate to non-zero values on standard Lagrangian cells.
+Gridap-level operator that computes the exact analytical `∇(∇⋅u)` for a vector FE field `u`
+by wrapping `ContractGradDivOp` as a `CellField` `Operation` over the element Hessian `∇∇(u)`.
+The result is itself a `CellField`, so it composes inside weak/strong-form expressions (it
+feeds the dilatancy term `∇(∇⋅u)` that appears in the symmetric-gradient viscous strong
+operator; compare `EvalStrongViscSymOp` in `viscous_operators.jl`).
+
+The interpolation order must be at least quadratic (\$P^2\$): on lower-order Lagrangian cells
+the element Hessian is identically zero, so this would silently evaluate to the zero vector.
 """
 grad_div_op(u) = Operation(ContractGradDivOp())(∇∇(u))
