@@ -30,6 +30,7 @@ Reviewers should re-check this table whenever the solver files are touched.
 | Algorithm C — `CoupledOSGSSolve` (single Newton; per-eval re-projection of `π`; frozen-`π` Jacobian; Picard fallback gated on `pingpong_enabled`; `stall_window=0`) | `solve_osgs_stage!` | `osgs_solver.jl` |
 | Algorithm D — `VerifyMMSPlateau` (ASGS branch) | `on_asgs_converged!(::MMSPlateauVerifier, …)` | `mms_verification.jl` |
 | Algorithm D — `VerifyMMSPlateau` (OSGS branch) | `on_osgs_converged!(::MMSPlateauVerifier, …)` | `mms_verification.jl` |
+| Scale-free convergence criterion — the **authoritative** outer-iteration success gate (`ε_M ≤ tol_M ∧ ε_C ≤ tol_C`, momentum/mass dimensionless residual measures) | `evaluate_convergence` (momentum envelope `momentum_force_envelope`, mass measure `mass_criterion`); `solve_system` injects it via `build_convergence_probe` into each solver's `conv_probe` | `convergence_criterion.jl` (probe in `solver_core.jl`) |
 
 ## The verification seam (Algorithm D)
 

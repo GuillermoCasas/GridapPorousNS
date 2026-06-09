@@ -14,21 +14,38 @@ solver safeguards are intentional design (CLAUDE.md: *"do not weaken them in pur
 
 ## Background: what the convergence gate actually compares
 
-The inner solve does **not** stop at `‖R‖∞ ≤ ftol`. It stops on a per-field *normalized* residual
-([nonlinear.jl:680](../../src/solvers/nonlinear.jl#L680), checked at
-[nonlinear.jl:706](../../src/solvers/nonlinear.jl#L706)):
+The inner solve does **not** stop at `‖R‖∞ ≤ ftol`. The **production** success gate is the *scale-free*
+ε_M/ε_C criterion in [`convergence_criterion.jl`](../../src/solvers/convergence_criterion.jl), built into
+a `conv_probe` by `build_convergence_probe` ([solver_core.jl:462](../../src/solvers/solver_core.jl#L462))
+and injected onto the inner solver. When the probe is attached it is the **authoritative** success gate
+([nonlinear.jl:737](../../src/solvers/nonlinear.jl#L737)):
 
 ```
-f_norm = maxₖ( ‖R[block_k]‖∞ / effective_ftol_per_field[k] ) ≤ 1     ⟺  converged
+converged  ⇔  ε_M ≤ tol_M  AND  ε_C ≤ tol_C     # eps_tol_momentum / eps_tol_mass
+ε_M = ‖r_M‖ / D_M                               # momentum residual / dynamic force-magnitude envelope
+ε_C = ‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖ + ‖g‖)    # source-subtracted mass residual / flux-grad+source envelope
+```
+
+Both `D_M` and the mass envelope are **measured from the current iterate and known material data** — not
+from a frozen `‖R₀‖` or any a-priori `U/L/P/Re/Da` — so the gate is the SAME across ping-pong segments
+(no per-segment re-anchoring) and regime-robust. See `convergence_criterion.jl` for the full rationale.
+
+The per-field RELATIVE re-anchoring was REMOVED (commit `d1fac8e`); the formula below is historical, and the `conv_probe === nothing` fallback now uses the uniform scalar `ftol` per field. The remaining per-field f_norm machinery survives only as the `conv_probe === nothing`
+**fallback** (Cocquet unstabilized-Galerkin runs + kernel unit tests, which use the scalar `ftol`) and
+to keep producing the `f_norm` *trace diagnostic*. In that fallback path it stops on a per-field
+*normalized* residual ([nonlinear.jl:548](../../src/solvers/nonlinear.jl#L548)):
+
+```
+f_norm = maxₖ( ‖R[block_k]‖∞ / effective_ftol_per_field[k] ) ≤ 1     ⟺  converged  (fallback only)
 effective_ftol_per_field[k] = max( ftol , relative_ftol_per_field[k] · ‖R₀_k‖ )
 relative_ftol_per_field      = c_sf · h^(kv+1)        # run_test.jl:823, 849
 ```
 
-i.e. the algebraic target is deliberately pinned to **~1% of the FE discretization error**
+i.e. that fallback target is deliberately pinned to **~1% of the FE discretization error**
 `O(h^{kv+1})` — the `dynamic_ftol_ceiling` policy (CLAUDE.md): *"couples the residual tolerance to
 mesh resolution so the linear solve doesn't oversolve relative to discretization error."* The scalar
-`ftol` is only an absolute machine floor (`≈ 10·eps`), not the working target. The trajectory plots now
-draw `f_norm` against a `y = 1` threshold line, so "converged" reads directly as "dots dropped below 1".
+`ftol` is only an absolute machine floor (`≈ 10·eps`), not the working target. The trajectory plots still
+draw `f_norm` against a `y = 1` threshold line (now a diagnostic, not the production verdict).
 
 This framing is the key to reading the three observations below.
 

@@ -107,7 +107,7 @@ A future audit that re-raises P-001 ("τ₂ missing ε·h²") or P-008 ("τ₁ m
 - **Switch to `eq:Tau1` (with `C_α`)** if a future config has `h|∇α|/α ≳ 1` (steep porosity gradient under-resolved). `grad_alpha` is already plumbed through `MediumState`, so the implementation is unblocked when triggered.
 
 ## 5. OSGS Preconditioning \u0026 Linearization Architecture
-**Location**: `src/solvers/porous_solver.jl`
+**Location**: [src/solvers/osgs_solver.jl](../../src/solvers/osgs_solver.jl) — `solve_osgs_stage!` and the projection helpers (`discrete_l2_projection`). The orchestrator that dispatches into it (`solve_system` + the shared Newton→Picard→Newton cascade) lives in [src/solvers/solver_core.jl](../../src/solvers/solver_core.jl). (Pre-split this was all in `src/solvers/porous_solver.jl`.)
 
 **Paper Theory**: In section 6.2 (Eq. 107a-107c), the paper presents a *staggered* iterative scheme for the Orthogonal Subgrid Scale (OSGS): an outer fixed-point that freezes the projection $\boldsymbol{\pi}_h^{m-1}$, performs a Picard (Oseen) momentum solve $B_S(\mathbf{u}^{m-1}, U_h^m)$, then updates $\langle W_h, \boldsymbol{\pi}_h^m \rangle$. This presentation implies two architectural boundaries: the global momentum linearization, and the orthogonal tracking subspace on which the projection lives.
 
@@ -119,7 +119,7 @@ A future audit that re-raises P-001 ("τ₂ missing ε·h²") or P-008 ("τ₁ m
 
 ## 6. OSGS Pressure Projection — Constant-Mode Treatment (DEFERRED, OPEN QUESTION)
 
-**Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl) — `discrete_l2_projection` call site for `pi_p_next` ([line 256](../../src/solvers/porous_solver.jl#L256)). Also informs the projection-space selection at the `Q_proj = Q_free` assignment ([line 1094](../../src/solvers/porous_solver.jl#L1094)).
+**Location**: [src/solvers/osgs_solver.jl](../../src/solvers/osgs_solver.jl) — the `discrete_l2_projection` call site for the pressure projection `pi_p_x` inside `solve_osgs_stage!`'s coupled residual ([line 152](../../src/solvers/osgs_solver.jl#L152)). Also informs the projection-space selection at the `Q_proj = Q_free` assignment ([line 126](../../src/solvers/osgs_solver.jl#L126)); `Q_free` itself is the unconstrained `TestFESpace` built in [src/run_simulation.jl](../../src/run_simulation.jl#L399). (Pre-split this was all in `src/solvers/porous_solver.jl`.)
 
 **Status**: `[deferred]` — explicitly considered, intentionally **not** applied as of the Phase 5 batch. Documented here for future reconsideration. The companion plan item, **Phase 5 §3.6** (pressure-mean-removal), is excluded from the Phase 5 batch but is kept on the long-term ledger.
 
@@ -196,7 +196,7 @@ Three independent concerns, all flagged during the planning discussion that prec
 
 ## 7. Two-Way Asymmetry in the Legacy `max_iters_caught` Exception Path — `[code-actual]`
 
-**Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl) — `_initialize_asgs_state!` (Stage I), `_run_asgs_mms_extension!` (MMS extension).
+**Location**: [src/solvers/asgs_solver.jl](../../src/solvers/asgs_solver.jl) — `_initialize_asgs_state!` (Stage I). The MMS-extension site is now the decoupled verifier hook `on_asgs_converged!` in [src/solvers/mms_verification.jl](../../src/solvers/mms_verification.jl) (pre-split it was the inline `_run_asgs_mms_extension!`). The shared cascade and `safe_fe_solve!` they both call live in [src/solvers/solver_core.jl](../../src/solvers/solver_core.jl).
 
 **Paper Theory**: Algorithm B (`theory/osgs_algorithm/osgs_algorithm.tex` §"The shared cascade") describes a Newton→Picard→Newton cascade that is reused at these call sites. The pseudocode is mode-agnostic with respect to *how* a non-converged Newton exit is detected — only the success/failure binary matters.
 
@@ -212,19 +212,19 @@ Three independent concerns, all flagged during the planning discussion that prec
 
 ## 8. `eval_time` Reporting Convention — `[code-actual]`
 
-**Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl), the `eval_time` return-tuple slot of `solve_system`.
+**Location**: [src/solvers/solver_core.jl](../../src/solvers/solver_core.jl), the `eval_time` return-tuple slot of `solve_system` (which accumulates the `@elapsed` from each stage; the OSGS portion is `osgs_elapsed` returned by `solve_osgs_stage!` in `osgs_solver.jl`).
 
 **Paper Theory**: Algorithm O describes the orchestration without committing to a particular wall-clock reporting boundary.
 
-**Implementation Reality**: `eval_time` measures the cumulative wall time of three regions:
-1. Stage I cascade (`@elapsed` around `_initialize_asgs_state!`).
-2. ASGS-MMS extension cycle loop (`@elapsed` *inside* `_run_asgs_mms_extension!`, around the cycle loop only).
-3. OSGS coupled solve (`@elapsed` *inside* `_run_osgs_relaxation!`, around the single coupled `begin … end` block only).
+**Implementation Reality**: `eval_time` measures the cumulative wall time of three regions, accumulated in `solve_system` (`solver_core.jl`):
+1. Stage I cascade (`@elapsed` around `_initialize_asgs_state!`, `asgs_solver.jl`).
+2. ASGS-MMS extension (`eval_time += @elapsed on_asgs_converged!(...)`, the decoupled verifier hook in `mms_verification.jl`).
+3. OSGS coupled solve (`eval_time += osgs_elapsed`, where `osgs_elapsed` is `@elapsed` *inside* `solve_osgs_stage!` (`osgs_solver.jl`), around the single coupled `begin … end` block only).
 
 Crucially, `eval_time` **excludes**:
-- OSGS mass-matrix assembly and Cholesky factorisation (run-once setup; lives outside the `@elapsed` block in `solve_system`).
+- OSGS mass-matrix assembly and Cholesky factorisation (run-once setup; lives inside `solve_osgs_stage!` but outside its inner `@elapsed` block).
 - The ASGS-MMS extension's setup (oracle call, local-solver construction).
-- The post-coupled-block `pi_u`/`pi_p` diagnostic writes in `_run_osgs_relaxation!`.
+- The post-coupled-block `pi_u`/`pi_p` diagnostic writes in `solve_osgs_stage!`.
 - All `diag_cache` writes after the timed regions.
 
 **Paper Alignment**: `[code-actual]` — `eval_time` is the *iterative* wall time, not the *total* per-call wall time. Use a wall-clock `@elapsed` wrapper around the whole `solve_system` call if total cost is needed; that figure will be larger than `eval_time` by the OSGS setup cost (which can be a non-trivial chunk on large meshes).
@@ -235,12 +235,33 @@ Crucially, `eval_time` **excludes**:
 
 ## 9. OSGS MMS Stop Reason Reports Solver Success, Not Verification Success — `[paper-faithful]` (post P-007/Fix-6)
 
-**Location**: [src/solvers/porous_solver.jl](../../src/solvers/porous_solver.jl), end of `_run_osgs_relaxation!` (~lines 780/783).
+**Location**: [src/solvers/mms_verification.jl](../../src/solvers/mms_verification.jl), `on_osgs_converged!` (~lines 163–174) — the decoupled verifier hook the OSGS branch of `solve_system` calls after the coupled solve converges. (Pre-split this was inline at the end of `_run_osgs_relaxation!` in `porous_solver.jl`.)
 
 **Paper Theory**: `theory/osgs_algorithm/osgs_algorithm.tex` Algorithm C (OSGS branch with MMS hook) and Algorithm D (plateau verifier). The new paragraph "Budget exhaustion is not a verification failure of the solver" in §"How Algorithm D hooks into the core" now states the contract explicitly.
 
-**Implementation Reality**: The coupled OSGS solve is a single Newton solve, not a staggered budget that can "exhaust." When MMS verification is active and the coupled solve converges, `_run_osgs_relaxation!` sets `diag_cache["mms_plateau_reached"] = true` with `diag_cache["mms_stop_reason"] = "coupled_single_solve"`; if the converged $\|e_u\|_{L^2}$ exceeds `rate_check_factor · h^(kv+1)` (the pre-asymptotic high-Da coercivity gap), the reason is instead set to `"coupled_at_suboptimal_rate"` and the solver still returns success. Either way the *solver* succeeded (the OSGS fixed point was reached); the second flag carries whether the converged error met the optimal-rate budget. The legacy `"mms_budget_exhausted"` reason now belongs solely to the ASGS-MMS extension path (`_run_asgs_mms_extension!`), not the OSGS path.
+**Implementation Reality**: The coupled OSGS solve is a single Newton solve, not a staggered budget that can "exhaust." When MMS verification is active and the coupled solve converges, the `on_osgs_converged!` hook (`mms_verification.jl`) sets `diag["mms_plateau_reached"] = true` with `diag["mms_stop_reason"] = "coupled_single_solve"`; if the converged $\|e_u\|_{L^2}$ exceeds `rate_check_factor · h^(kv+1)` (the pre-asymptotic high-Da coercivity gap), the reason is instead set to `"coupled_at_suboptimal_rate"` and the solver still returns success. Either way the *solver* succeeded (the OSGS fixed point was reached); the second flag carries whether the converged error met the optimal-rate budget. The legacy `"mms_budget_exhausted"` reason now belongs solely to the ASGS-MMS extension hook (`on_asgs_converged!` in `mms_verification.jl`), not the OSGS path.
 
 **Paper Alignment**: `[paper-faithful]` — the documented two-flag split (`solver_success, mms_plateau_success`) is the resolution of audit finding P-007 / Fix 6 ("solver success conflated with verification success"). Callers must read both flags. The P-007 follow-up in the audit-findings triage plan migrates *callers* to use the second flag explicitly; the solver-side contract is already in this final form.
 
 **Re-evaluation trigger**: If the audit plan's Fix 6 caller migration changes the return-tuple shape or adds an `overall_verification_success` convenience flag, update this entry.
+
+---
+
+## 10. Scale-Free Nonlinear Convergence Criterion — `[code-actual]`
+
+**Location**: [src/solvers/convergence_criterion.jl](../../src/solvers/convergence_criterion.jl) (the pure criterion). Injected by `solve_system` via `build_convergence_probe` ([src/solvers/solver_core.jl](../../src/solvers/solver_core.jl#L462)) and consumed as `conv_probe` inside `_safe_solve_inner!` ([src/solvers/nonlinear.jl](../../src/solvers/nonlinear.jl), the `scale_free = solver.conv_probe !== nothing` gate ~L742 and the authoritative-success break ~L849). Config: `eps_tol_momentum` / `eps_tol_mass` ([config/base_config.json](../../config/base_config.json), [src/config.jl](../../src/config.jl#L137)).
+
+**Paper Theory**: The paper does not prescribe a discrete *stopping criterion* for the nonlinear iteration of `alg:StationarySystem` — the algorithm boxes describe the fixed-point map and assume an abstract "until converged" test. The continuous convergence statement is in the energy/stability norms of §4 (`eq:StabilityEstimate`), not a per-iterate algebraic residual threshold.
+
+**Implementation Reality**: `[code-actual]` — The authoritative success gate is **scale-free**: the iterate is converged iff `ε_M ≤ tol_M` **and** `ε_C ≤ tol_C`, where
+
+- `ε_M = ‖r_M‖ / D_M` — the assembled stabilized momentum residual (velocity block) over a *dynamic* force-magnitude envelope `D_M = ‖α u·∇u‖ + ‖2∇·(α ν Πˢ∇u)‖ + ‖α ∇p‖ + ‖σ(α,u) u‖ + ‖f‖` (Philosophy A: every term assembled through the same weak form, same Euclidean norm as the numerator);
+- `ε_C = ‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖_F + ‖g‖)` — the genuine, source-subtracted mass residual over a flux-gradient-plus-source envelope. The `−g` makes `ε_C → 0` at the discrete solution even for a manufactured/forced problem; the pure-divergence ratio `‖∇·(α u)‖/‖∇(α u)‖ ≤ √d` is checked separately as a quadrature self-check.
+
+Because `D_M` (and the mass envelope) are *measured from the current iterate and known material data*, the gate carries **no a-priori scale** (no `U`, `L`, `P`, `Re`, `Da`) and is the SAME threshold across ping-pong cascade segments. This deliberately supersedes the OLD per-field **re-anchored** relative-ftol gate (`effective_ftol = relative_ftol·‖R₀‖`, `f_norm = ‖R‖/effective_ftol`), whose re-anchoring forced each segment to demand another `×(1/ftol)` residual drop. **That relative gate was then REMOVED (commit `d1fac8e`): `relative_ftol_per_field` is gone, so the `conv_probe===nothing` fallback now uses the uniform scalar `ftol` per field.**
+
+The old re-anchored gate survives ONLY (a) as the `conv_probe === nothing` fallback — the Cocquet unstabilized-Galerkin runs and the kernel unit tests, which use the scalar `ftol` — and (b) as the `f_norm` trace diagnostic (merit normalization + the per-iteration history record), which no longer decides success. The `degenerate` flag (a denominator at the machine-eps underflow floor) stands in for the spec's k≥1 rule, rejecting the trivial all-zero entry while accepting an already-converged developed iterate.
+
+**Paper Alignment**: `[code-actual]` — This is an *addition* the paper leaves unspecified, not a contradiction of it. The criterion is decoupled by design (`convergence_criterion.jl` decides *whether* an iterate is converged; `nonlinear.jl`/`solver_core.jl` decide *how* to step) and is a pure read-only observer of a self-consistent `(iterate, residual)` pair — a probe failure degrades to `NaN` and can never perturb the solve. The full rationale (Philosophy A vs B, the `−g` subtraction, the √d self-check, why the §6 pressure-normalized fallback is intentionally NOT implemented) is in [docs/solver/nonlinear-convergence-criterion-prompt.md](nonlinear-convergence-criterion-prompt.md) and the module header.
+
+**Re-evaluation trigger**: If a future config drives the stabilization excess so `ε_M` persistently sits `≫ 1` on a *known-converged* case, that is NOT a loose tolerance — it means `r_M` and the `D_M` term decomposition have drifted apart (different quadrature/space/sign); chase the consistency bug, not the criterion. Also revisit if the `conv_probe === nothing` fallback set (Cocquet / kernel tests) is migrated onto the scale-free gate, or if a pressure-scale (§6) fallback is ever genuinely needed for an open-outlet regime where `‖∇(α u)‖` is not robustly bounded.
