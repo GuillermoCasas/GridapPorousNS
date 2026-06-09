@@ -881,23 +881,12 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 max_ls_iters = config.numerical_method.solver.max_linesearch_iterations
                                 ls_contract = config.numerical_method.solver.linesearch_contraction_factor
 
-                                # Per-field RELATIVE tolerances (Option C, intrinsic-scale variant):
-                                # pass dimensionless targets per field. The solver derives the per-field
-                                # absolute thresholds at each iteration from ‖x_current[block_k]‖_∞ (with
-                                # cross-field Bernoulli fallback when zero). No problem-specific external
-                                # scale (U_c, P_c) is plumbed through — the proxy comes from the iterate
-                                # itself. The shared target `c_sf · h^(k+1)` is the dimensionless "1% of
-                                # FE discretization error" goal; each field gets its own absolute threshold
-                                # via solver-side `relative_target * ‖x[block]‖` (floored at the scalar
-                                # ftol so the solver never tries below the user's absolute floor).
-                                rel_target_per_field = [c_sf * spatial_err_est, c_sf * spatial_err_est]
-                                # The noise-floor relative target mirrors `dynamic_noise_floor / dynamic_ftol`
-                                # in the legacy formula. With the per-iter intrinsic-scale machinery, the
-                                # solver applies the same `‖x[block]‖` scaling — so what we pass here is the
-                                # *relative* ratio between noise-floor and ftol, multiplied by c_sf·h^(k+1).
-                                # In the centered encoding this naturally scales with the solution magnitude.
-                                rel_noise_floor_per_field = [n_sf * c_sf * spatial_err_est, n_sf * c_sf * spatial_err_est]
-                                
+                                # [scale-free gate] The per-field RE-ANCHORED relative-ftol targets were removed:
+                                # convergence is now decided by the scale-free ε_M/ε_C criterion injected by
+                                # solve_system. `dynamic_ftol` (the absolute mesh-scaled O(h^{kv+1}) threshold) is
+                                # passed as the scalar ftol below — it sets the f_norm trace denominator and the
+                                # conv_probe===nothing fallback floor, but no longer re-anchors the gate per segment.
+
                                 # Extract dynamic algebraic complexity scaling for Picard limits
                                 local_picard_it = solver_picard_it
                                 if Re >= config.numerical_method.solver.dynamic_picard_re_threshold
@@ -925,16 +914,6 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 # ‖R‖∞ ≤ k_nf · effective_ftol. Read from config (base default 1e30 = disabled;
                                 # the Phase-1 sweep configs set 10.0 to reject high-Re fold stalls).
                                 k_nf = config.numerical_method.solver.noise_floor_success_max_ftol_multiple
-                                # Pass a true machine-precision floor as the SafeNewtonSolver scalar ftol —
-                                # NOT `dynamic_ftol`, and NOT the user's `config.solver.ftol`. The dynamic
-                                # spatial scaling (c_sf · h^{k+1}) is already encoded in `rel_target_per_field`,
-                                # and the per-field rule recovers absolute tolerances through ε_k · ‖x[block_k]‖.
-                                # The scalar floor's only role is to prevent the per-field rule from descending
-                                # below floating-point round-off. Setting it at `10 · eps(Float64)` keeps it
-                                # effectively inert for any regime in which `ε_k · ‖x[block_k]‖` exceeds
-                                # machine precision (i.e., for all physically meaningful cells), while leaving
-                                # one order of safety against κ(A)-amplified assembly round-off.
-                                static_ftol_floor = 10 * eps(Float64)
                                 # [P0 shared builder] Harness builds the rich (picard, newton) pair: one shared
                                 # machine-precision floor for both ftols, dynamic noise floor, per-field relative
                                 # tolerances, the honest-exit gate, dynamic-widened iteration budgets, and the stall
@@ -945,12 +924,10 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     config.numerical_method.solver, LUSolver();
                                     newton_max_iters = local_newton_it,
                                     picard_max_iters = local_picard_it,
-                                    newton_ftol = static_ftol_floor,
-                                    picard_ftol = static_ftol_floor,
+                                    newton_ftol = dynamic_ftol,
+                                    picard_ftol = dynamic_ftol,
                                     stagnation_noise_floor = dynamic_noise_floor,
                                     noise_floor_success_max_ftol_multiple = k_nf,
-                                    relative_ftol_per_field = rel_target_per_field,
-                                    relative_stagnation_noise_floor_per_field = rel_noise_floor_per_field,
                                     stall_window = solver_stall_window,
                                     stall_min_rel_improvement = solver_stall_min_rel_improvement)
 

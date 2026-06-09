@@ -290,14 +290,14 @@
             },
             "dynamic_ftol_ceiling": {
               "type": "number",
-              "description": "Upper bound on the dynamically-tightened ftol that couples residual tolerance to mesh resolution (O(h^(kv+1))). Prevents oversolving relative to discretization error.",
+              "description": "Upper clamp on the mesh-scaled ABSOLUTE ftol that couples residual tolerance to discretization error O(h^(kv+1)). Not the (removed) per-segment relative gate.",
               "examples": [
                 1e-4
               ]
             },
             "dynamic_ftol_spatial_safety_factor": {
               "type": "number",
-              "description": "Safety factor in (0, 1] applied to the spatially-scaled ftol. Lower values demand tighter convergence relative to discretization error.",
+              "description": "Safety factor in (0, 1] applied to the spatially-scaled ftol.",
               "examples": [
                 0.5
               ]

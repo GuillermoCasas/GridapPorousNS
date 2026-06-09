@@ -123,7 +123,7 @@ Base.@kwdef struct SolverConfig
     # --- Convergence tolerances ---
     ftol::Float64                                  # residual-norm tolerance ‖R‖ for declaring convergence
     picard_handoff_ftol::Float64                   # looser ‖R‖ at which Picard hands control back to Newton
-    dynamic_ftol_ceiling::Float64                  # upper clamp when ftol is relaxed to mesh resolution O(h^{kv+1})
+    dynamic_ftol_ceiling::Float64                  # upper clamp on the mesh-scaled ABSOLUTE ftol O(h^{kv+1}) (not the removed per-segment relative gate)
     dynamic_ftol_spatial_safety_factor::Float64    # margin (0,1] applied to that O(h^{kv+1}) discretization-error ftol
     xtol::Float64                                  # step-size tolerance ‖Δu‖ for stagnation/convergence
     # --- Scale-free convergence gate (convergence_criterion.jl; the authoritative success test) ---

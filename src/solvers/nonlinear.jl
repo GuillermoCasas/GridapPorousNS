@@ -51,22 +51,6 @@ struct SafeNewtonSolver <: NonlinearSolver
     # rejects high-Re fold stalls — where ‖R‖≈1e-5 sits ~10²–10³× above ftol — from masquerading
     # as a true root.
     noise_floor_success_max_ftol_multiple::Float64
-    # Per-field RELATIVE convergence tolerances (one entry per (u, p) field block). When set, the
-    # solver turns each dimensionless target into an absolute per-field threshold at iteration 0 by
-    # scaling it by the INITIAL RESIDUAL norm of that field block, ‖R₀_k‖:
-    #     effective_ftol_per_field[k] = max(ftol, relative_ftol_per_field[k] * ‖R₀_k‖)
-    # All termination checks then use those per-field thresholds, so the gate is the DIMENSIONLESS
-    # relative reduction `‖R_k‖ ≤ rel·‖R₀_k‖`. The scalar `ftol` is the per-field absolute FLOOR;
-    # `relative_ftol_per_field[k]` is the dimensionless target (e.g. c_sf·h^(k+1), the MMS plateau).
-    # `nothing` ⇒ the solver uses the scalar `ftol`/`stagnation_noise_floor` globally.
-    #
-    # [known-fragility] Scale by the RESIDUAL norm, not the solution magnitude ‖x₀‖: ‖R_k‖ and its
-    # scale ‖R₀_k‖ share units, so the ratio is dimensionless and encoding-invariant. Scaling by
-    # ‖x₀‖ is dimensional (velocity ∝ U, pressure ∝ U²) and makes the converged result non-covariant
-    # across fields (worst in pressure) under OSGS's single-step Picard-type coupling. A true-zero initial
-    # residual on a field collapses that field's threshold to the scalar `ftol` floor.
-    relative_ftol_per_field::Union{Nothing, Vector{Float64}}
-    relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}}
     # [no-progress stall guard] If `stall_window > 0`, the solve aborts with stop_reason
     # "no_progress_stall" once the BEST residual inf-norm fails to improve by the relative
     # factor `stall_min_rel_improvement` over `stall_window` consecutive iterations. This lets a
@@ -105,8 +89,6 @@ function SafeNewtonSolver(ls::LinearSolver, max_iters::Int, max_increases::Int,
                           stagnation_noise_floor::Float64, max_linesearch_iterations::Int,
                           linesearch_contraction_factor::Float64; mode::Symbol = :newton,
                           noise_floor_success_max_ftol_multiple::Float64 = Inf,
-                          relative_ftol_per_field::Union{Nothing, Vector{Float64}} = nothing,
-                          relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}} = nothing,
                           stall_window::Int = 0,
                           stall_min_rel_improvement::Float64 = 0.0,
                           picard_gain_target::Float64 = Inf,
@@ -116,7 +98,6 @@ function SafeNewtonSolver(ls::LinearSolver, max_iters::Int, max_increases::Int,
                             c1, divergence_merit_factor, stagnation_noise_floor,
                             max_linesearch_iterations, linesearch_contraction_factor, mode,
                             noise_floor_success_max_ftol_multiple,
-                            relative_ftol_per_field, relative_stagnation_noise_floor_per_field,
                             stall_window, stall_min_rel_improvement, picard_gain_target,
                             newton_residual_divergence_patience, conv_probe)
 end
@@ -152,8 +133,6 @@ function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing,
         nls.linesearch_contraction_factor,
         isnothing(mode) ? nls.mode : mode,
         nls.noise_floor_success_max_ftol_multiple,
-        nls.relative_ftol_per_field,
-        nls.relative_stagnation_noise_floor_per_field,
         # `stall_window` override: the cold-start (Stage-I) boot wants the early-bail stall sensor
         # (oscillation/divergence → Picard), but the OSGS Stage-II coupled solve converges slowly and
         # monotonically (inexact-Newton linear rate); there the stall sensor would mistake slow progress
@@ -185,8 +164,6 @@ function build_iter_solvers(sol_cfg::SolverConfig, ls::LinearSolver;
                             newton_ftol::Float64, picard_ftol::Float64,
                             stagnation_noise_floor::Float64 = sol_cfg.stagnation_noise_floor,
                             noise_floor_success_max_ftol_multiple::Float64 = sol_cfg.noise_floor_success_max_ftol_multiple,
-                            relative_ftol_per_field::Union{Nothing, Vector{Float64}} = nothing,
-                            relative_stagnation_noise_floor_per_field::Union{Nothing, Vector{Float64}} = nothing,
                             stall_window::Int = 0,
                             stall_min_rel_improvement::Float64 = 0.0,
                             picard_gain_target::Float64 = Inf,
@@ -197,8 +174,6 @@ function build_iter_solvers(sol_cfg::SolverConfig, ls::LinearSolver;
         stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor;
         mode = :picard,
         noise_floor_success_max_ftol_multiple = noise_floor_success_max_ftol_multiple,
-        relative_ftol_per_field = relative_ftol_per_field,
-        relative_stagnation_noise_floor_per_field = relative_stagnation_noise_floor_per_field,
         stall_window = stall_window, stall_min_rel_improvement = stall_min_rel_improvement,
         picard_gain_target = picard_gain_target, conv_probe = conv_probe)
     nls_newton = SafeNewtonSolver(
@@ -207,8 +182,6 @@ function build_iter_solvers(sol_cfg::SolverConfig, ls::LinearSolver;
         stagnation_noise_floor, sol_cfg.max_linesearch_iterations, sol_cfg.linesearch_contraction_factor;
         mode = :newton,
         noise_floor_success_max_ftol_multiple = noise_floor_success_max_ftol_multiple,
-        relative_ftol_per_field = relative_ftol_per_field,
-        relative_stagnation_noise_floor_per_field = relative_stagnation_noise_floor_per_field,
         stall_window = stall_window, stall_min_rel_improvement = stall_min_rel_improvement,
         newton_residual_divergence_patience = sol_cfg.newton_residual_divergence_patience,
         conv_probe = conv_probe)
@@ -228,31 +201,6 @@ function check_solver_parameters(s::SafeNewtonSolver)
     if s.noise_floor_success_max_ftol_multiple < 1.0 throw(ArgumentError("noise_floor_success_max_ftol_multiple must be >= 1.0 (Inf disables the honest-exit gate).")) end
     if !(s.picard_gain_target > 0.0) throw(ArgumentError("picard_gain_target must be > 0 (Inf disables the P4 Picard gain-then-return stop).")) end
     if s.newton_residual_divergence_patience < 0 throw(ArgumentError("newton_residual_divergence_patience must be >= 0 (0 disables the residual-divergence → Picard handoff).")) end
-    if s.relative_ftol_per_field !== nothing
-        if isempty(s.relative_ftol_per_field)
-            throw(ArgumentError("relative_ftol_per_field must be a non-empty Vector or nothing."))
-        end
-        for (k, v) in enumerate(s.relative_ftol_per_field)
-            if !(v > 0.0) || !isfinite(v)
-                throw(ArgumentError("relative_ftol_per_field[$k] = $v must be finite and > 0."))
-            end
-        end
-    end
-    if s.relative_stagnation_noise_floor_per_field !== nothing
-        if isempty(s.relative_stagnation_noise_floor_per_field)
-            throw(ArgumentError("relative_stagnation_noise_floor_per_field must be a non-empty Vector or nothing."))
-        end
-        for (k, v) in enumerate(s.relative_stagnation_noise_floor_per_field)
-            if !(v > 0.0) || !isfinite(v)
-                throw(ArgumentError("relative_stagnation_noise_floor_per_field[$k] = $v must be finite and > 0."))
-            end
-        end
-    end
-    # If both per-field vectors are present, their lengths must agree (same field count).
-    if s.relative_ftol_per_field !== nothing && s.relative_stagnation_noise_floor_per_field !== nothing &&
-       length(s.relative_ftol_per_field) != length(s.relative_stagnation_noise_floor_per_field)
-        throw(ArgumentError("relative_ftol_per_field and relative_stagnation_noise_floor_per_field must have the same length (one entry per field)."))
-    end
     if s.stall_window < 0 throw(ArgumentError("stall_window must be >= 0 (0 disables the no-progress stall guard).")) end
     if !(0.0 <= s.stall_min_rel_improvement < 1.0) throw(ArgumentError("stall_min_rel_improvement must be in [0, 1).")) end
 end
@@ -346,45 +294,18 @@ end
 """
     _initialize_effective_thresholds(solver, initial_residual_scale_per_field) -> (ftols, noise_floors)
 
-Derives the per-field absolute thresholds the solver uses throughout the run.
-
-`initial_residual_scale_per_field[k]` is the per-field initial-residual norm ‖R₀_k‖, frozen at iteration 0
-(see `SafeIterationState`). Scaling the gate by the residual norm keeps it encoding-invariant.
-
-The user's `relative_*_per_field[k]` is the dimensionless target (e.g. `c_sf·h^(k+1)`).
-The effective absolute threshold is `max(scalar_floor, relative_target * scale)` so
-the scalar value remains a hard floor (the solver never tries to go tighter than
-the user's absolute ftol, regardless of what relative×scale produces).
+Derives the per-field absolute thresholds for the conv_probe===nothing fallback gate: a uniform
+`solver.ftol` / `solver.stagnation_noise_floor` for every (u, p) field block. (Production uses the
+scale-free ε_M/ε_C criterion instead; the per-field vectors are retained only as the fallback gate
+and the f_norm-trace denominator.) `initial_residual_scale_per_field` is accepted for interface
+stability with `_safe_solve_inner!` but no longer scales the thresholds — the old per-segment
+re-anchored relative gate (`relative_*_per_field`) was removed.
 """
 function _initialize_effective_thresholds(solver::SafeNewtonSolver,
                                           initial_residual_scale_per_field::Vector{Float64})
     nfields = length(initial_residual_scale_per_field)
-    ftols = Vector{Float64}(undef, nfields)
-    noise_floors = Vector{Float64}(undef, nfields)
-
-    if solver.relative_ftol_per_field !== nothing
-        @assert length(solver.relative_ftol_per_field) == nfields "relative_ftol_per_field length mismatch"
-        @inbounds for k in 1:nfields
-            ftols[k] = max(solver.ftol, solver.relative_ftol_per_field[k] * initial_residual_scale_per_field[k])
-        end
-    else
-        @inbounds for k in 1:nfields
-            ftols[k] = solver.ftol
-        end
-    end
-
-    if solver.relative_stagnation_noise_floor_per_field !== nothing
-        @assert length(solver.relative_stagnation_noise_floor_per_field) == nfields "relative_stagnation_noise_floor_per_field length mismatch"
-        @inbounds for k in 1:nfields
-            noise_floors[k] = max(solver.stagnation_noise_floor,
-                                  solver.relative_stagnation_noise_floor_per_field[k] * initial_residual_scale_per_field[k])
-        end
-    else
-        @inbounds for k in 1:nfields
-            noise_floors[k] = solver.stagnation_noise_floor
-        end
-    end
-
+    ftols = fill(solver.ftol, nfields)
+    noise_floors = fill(solver.stagnation_noise_floor, nfields)
     return ftols, noise_floors
 end
 
@@ -697,14 +618,7 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
     # Per-field DOF index ranges for block-equilibrated merit (§3.1). `nothing` for a single-field
     # test space, in which case a single global equilibration block is used.
     field_blocks = _detect_field_blocks(op)
-    # If the solver carries per-field tolerances, the field count must match.
     nfields = field_blocks === nothing ? 1 : length(field_blocks)
-    if solver.relative_ftol_per_field !== nothing && length(solver.relative_ftol_per_field) != nfields
-        throw(ArgumentError("relative_ftol_per_field has length $(length(solver.relative_ftol_per_field)) but the operator's test space has $nfields field(s)."))
-    end
-    if solver.relative_stagnation_noise_floor_per_field !== nothing && length(solver.relative_stagnation_noise_floor_per_field) != nfields
-        throw(ArgumentError("relative_stagnation_noise_floor_per_field has length $(length(solver.relative_stagnation_noise_floor_per_field)) but the operator's test space has $nfields field(s)."))
-    end
 
     println("    [+] Evaluating initial PDE residual...")
     residual!(b, op, x)
