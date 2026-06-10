@@ -44,7 +44,17 @@ Each is verified against the working tree. Severity is the author's call.
   unknown keys, against the strict-config intent. (The loader does `@warn` on unknown keys,
   [config.jl:168](../src/config.jl#L168), so it is soft-guarded.)
 
-## Open numerical defect (not a code "bug")
+## Characterized numerical property — RESOLVED (was "open numerical defect")
+
+> **RESOLVED 2026-06-10 — the N=640 ladder confirms recovery; it was pre-asymptotic, not an order
+> ceiling.** The completed k=1 QUAD sweep (N=10→640) shows the reaction-dominated OSGS H¹ rate climbing
+> `0.57→0.54→0.58→0.73→1.11→1.85` (α₀=1, Da=1e6): flat ≈0.7 through N≤320 (the "0.71–0.74" tabulated
+> below), then **≥1.0 once the N=320→640 pair is in** (1.60 at α₀=0.5). So OSGS reaches the **optimal**
+> velocity rate after all — the coercivity gap degrades the bound's *constant* (σ_a), not the convergence
+> *rate*, consistent with [`../theory/osgs_reaction_note/osgs_reaction_note.tex`](../theory/osgs_reaction_note/osgs_reaction_note.tex)
+> (both methods retain optimal order). No split/term-by-term OSGS is needed. Full numbers:
+> [`mms/convergence-status.md`](mms/convergence-status.md) success box + [`mms/convergence-baseline.md`](mms/convergence-baseline.md).
+> The characterization below (why it is genuine and pre-asymptotic, not a gate/encoding/trim bug) stands.
 
 - **OSGS rate-stagnation in the reaction-dominated corner (high Da, low/moderate Re).** A convergence-*rate*
   issue, distinct from the (now-fixed) scale-covariance bug. **Confirmed with complete data 2026-06-04** — the

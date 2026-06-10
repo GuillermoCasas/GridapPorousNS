@@ -1,5 +1,7 @@
 {
-  "erase_past_results": true,
+  "erase_past_results": false,
+  "write_vtk": false,
+  "trace_convergence_norms": true,
   "encoding_strategy": "minmax",
   "solver_stall_window": 2,
   "solver_stall_min_rel_improvement": 0.01,

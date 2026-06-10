@@ -4,11 +4,27 @@
 "discrete staggered map" mechanistic account in [`../known_issues.md`](known_issues.md) (Open numerical
 defect) and the 2026-06-04 caveats in [`../mms/convergence-status.md`](../mms/convergence-status.md) §4–6.
 
-Last updated: 2026-06-05.
+Last updated: 2026-06-10.
+
+> **RESOLVED 2026-06-10 — the rate is pre-asymptotic and recovers; read two corrections below.**
+> 1. **Empirical (N=640).** The completed k=1 QUAD sweep shows the reaction-dominated OSGS velocity H¹
+>    rate climbing `0.57→0.54→0.58→0.73→1.11→1.85` (α₀=1, Da=1e6, N=10→640): the "0.5–0.7" quoted
+>    throughout this doc is the **N≤320 pre-asymptotic value**, and it **recovers to ≥1.0 once N=320→640
+>    is in**. So OSGS reaches the **optimal** rate — this is a slow pre-asymptotic climb, **not** an order
+>    ceiling. (Numbers: [`../mms/convergence-status.md`](../mms/convergence-status.md) success box.)
+> 2. **Mechanism (theory correction).** The companion note's thesis was **inverted and corrected
+>    2026-06-09**: the constant-σ annihilation means OSGS *retains the full Galerkin σ* on ‖u‖, whereas
+>    ASGS's stabilization *drains* its reactive coercivity to σ_a = σ−τ₁σ² < σ — so OSGS's coercivity
+>    constant is the **larger** of the two, not smaller. The high-Da OSGS rate dip is therefore **not a
+>    coercivity loss** (OSGS coercivity is stronger); it is a pre-asymptotic *consistency/approximation*
+>    transient in the under-resolved reaction regime that vanishes as h→0 (item 1). The TL;DR and
+>    §-mechanism below predate this correction and read the gap backwards — treat them as historical;
+>    the empirical conclusion (recovery) stands regardless.
 
 Companion theory note: [`../../theory/osgs_reaction_note/osgs_reaction_note.tex`](../../theory/osgs_reaction_note/osgs_reaction_note.tex)
-(Prop. 1, the coercivity gap). Reproduction recipe: see §7 (the coupled probe is the only surviving
-route; the historical `staggered` A/B config was deleted in the 2026-06-08 leaning).
+(corrected 2026-06-09 — OSGS retains σ; ASGS drains to σ_a). Reproduction recipe: see §7 (the coupled
+probe is the only surviving route; the historical `staggered` A/B config was deleted in the 2026-06-08
+leaning).
 
 ---
 

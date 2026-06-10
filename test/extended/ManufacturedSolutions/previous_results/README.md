@@ -3,12 +3,10 @@
 Raw output from earlier Manufactured-Solution sweeps, kept for reference. These are **not live tests**
 and are not run by the tier runners; live results go to the gitignored `../results/`.
 
-- `mms-sweep-difficult-cases.partial-stdout.log` — raw stdout of a partial sweep (commit `15e466b`).
-- `mms-sweep-difficult-cases.partial.h5` — partial results database for that run.
-
-The partial-sweep difficulty taxonomy that once analysed this run (`docs/mms/sweep-difficult-cases.md`) was
-retired in the 2026-06-08 docs cleanup as superseded — its conclusions are subsumed by
-[`../../../../docs/mms/convergence-status.md`](../../../../docs/mms/convergence-status.md),
+The old May-2026 partial sweep (`mms-sweep-difficult-cases.partial.{h5,-stdout.log}`) and its retired
+difficulty-taxonomy doc were **removed in the 2026-06-10 cleanup** — fully superseded by the complete,
+validated k=1 QUAD sweep (N=10→640). Current status + numbers:
+[`../../../../docs/mms/convergence-status.md`](../../../../docs/mms/convergence-status.md) (success box),
 [`../../../../docs/mms/fold-recovery.md`](../../../../docs/mms/fold-recovery.md), and
 [`../../../../docs/mms/convergence-baseline.md`](../../../../docs/mms/convergence-baseline.md).
 

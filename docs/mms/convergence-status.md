@@ -9,19 +9,48 @@ floor) and is **not** extreme; it will be re-interpreted in light of the manufac
 other way around. Where a Cocquet/CocquetFormMMS result is used below it is clearly labelled as
 **external supporting evidence**, never as a premise.
 
-Last updated: 2026-06-02 (caveats below carry their own dates; reviewed in the 2026-06-04 documentation audit). This is the **canonical** MMS reference; `mms_fold_recovery.md` is its fold sub-topic.
+Last updated: **2026-06-10** — the k=1 QUAD sweep is **complete (N=10→640) and a success**; see the
+status box below. This is the **canonical** MMS reference; `fold-recovery.md` is its fold sub-topic.
+The earlier dated caveat block (2026-05-26 → 06-05, dispatch-bug / encoding-covariance / "Da benign" /
+the high-Da coercivity-gap "open defect") is now **resolved or superseded** — preserved in git history
+and [`lessons_learned.md`](../lessons_learned.md); the live conclusions are folded into the box below.
 
-> **⚠ Caveats (added 2026-05-26):**
-> 1. **OSGS rows in this document's measurements are mislabelled ASGS.** The test harness `test/extended/ManufacturedSolutions/run_test.jl` hardcoded `"method" => "ASGS"` in the `config_dict` passed to `solve_system`, so every "ASGS vs OSGS" pair in `phase1_quad_k1.h5` / siblings is actually two ASGS solves. Any claim below that compares OSGS-specific behaviour to ASGS (e.g. §6 point 3 on "OSGS-specific pressure rate") is provisional. **The dispatch bug was fixed 2026-05-26** (the harness now passes the requested method to `solve_system`; see [lessons_learned.md](../lessons_learned.md) 2026-05-26), so OSGS-vs-ASGS comparisons require the post-fix re-run — measurements taken before that date are two ASGS solves.
-> 2. **Sub-optimal slopes at config_18 (Re=Da=10⁶, α=0.5) and config_23 (Re=10⁻⁶ Da=10⁶, α=0.05) are the solver's honest behaviour from a default-perturbed initial guess, not a harness bug.** Diagnostic (`diagnostics/velocity_centering_probe.jl`) showed that starting Newton from `x₀=u_ex` (eps_pert=0) achieves optimal slope at those cells, but the harness deliberately defaults to a large perturbation (eps_pert=1.0) precisely to test whether the solver can find the basin without that hint. At extreme regimes the basin's noise-floor region is wide enough that Newton "converges" (in the ftol sense) at a pseudo-root rather than the true minimum. This shows up as a sub-optimal slope and is the diagnostic signal we want — it tells you the solver needs help to reach the deep basin minimum at that regime. A revert of the initial-guess order (briefly applied 2026-05-26 then withdrawn after author clarification) would have masked this.
-> 3. The "fold at the extreme corner" diagnosis (§2 region B, §3) — that the discrete branch literally has no FE root at coarse mesh — remains as recorded; it is a genuine basin-vanishing phenomenon distinct from the noise-floor pseudo-root issue. The Phase-2 continuation rescue (super-convergent recovery to L²(u) rate ≈ 3 once N is large enough) remains valid.
-> 4. **(2026-06-02) Encoding-covariance fix for OSGS, and "Da is benign" (§ table below) is OSGS-false.** A controlled A/B (`centered` vs `minmax` encoding, only that knob varied) on **Re=1, Da=1e6, α=1, OSGS** showed the two encodings disagreeing on the OSGS answer — a covariance defect (the dimensionless problem is identical and `eps_pert=1.0` in both). The *covariance* half (the OSGS answer changing with the encoding) was fixed by freezing the per-field gate at the initial residual `‖R₀‖`, making the warmup tolerance a dimensionless relative-reduction target, and scaling `eps_val` covariantly ([`lessons_learned.md`](../lessons_learned.md) 2026-06-02, guarded by `encoding_invariance_test.jl`). **These covariance fixes are real and KEPT.** *(Historical note: the encoding A/B was originally diagnosed as a "scale-coupled inner-Newton gate × 1-iteration inner cap" pathology in the staggered/inner-cascade machinery; that satellite — the outer relaxation loop, inner-Newton cap, and the cells they gated — was DELETED in the 2026-06-08 OSGS leaning, so that mechanistic reading no longer describes live code.)* The genuinely separate **rate**-stagnation half (high-Da OSGS, Re=1/Da=1e6) is a pre-asymptotic coercivity gap — see the current-state note below. The "larger σ (high Da) is a coercive, stabilizing term — not a trouble source" claim below held only for the (then-mislabelled) ASGS data; for OSGS, high Da is the difficulty axis. Full record: [`lessons_learned.md`](../lessons_learned.md) 2026-06-02 entries.
-> 5. **(current state, confirmed 2026-06-05/08) High-Da OSGS H¹ suboptimality is a CONFIRMED pre-asymptotic coercivity gap — a real property of the OSGS fixed point, not a solver/harness bug.** The fully-covariant k=1 sweep (288/288, N=10→320; snapshot `test/extended/ManufacturedSolutions/previous_results/_archive_postFix_covariant_complete/phase1_quad_k1.h5`) scopes it sharply:
-> &nbsp;&nbsp;&nbsp;&nbsp;• **Only Da=1e6 with Re ∈ {1e-6, 1}**: OSGS velocity H¹ rate **0.62–0.83** (vs ASGS ~1.1–2.1), L² **1.59–1.78** (vs ASGS ~1.9–2.65).
-> &nbsp;&nbsp;&nbsp;&nbsp;• **Re=1e6, same Da=1e6 → OSGS healthy** (2.0/1.0); for Da ∈ {1e-6, 1}, OSGS matches/beats ASGS everywhere. Convection restores coercivity; pure reaction dominance does not.
-> &nbsp;&nbsp;&nbsp;&nbsp;• **α₀-independent**: just as severe at **α₀=1** (1.59/0.62, no porosity layer) as at α₀=0.05 — *pure reaction-dominance*, a different axis from the high-Re/low-α₀ fold of caveats #2/#3.
-> &nbsp;&nbsp;&nbsp;&nbsp;The defect lives in the **OSGS fixed point itself**: it is the genuine coercivity gap of [`../../theory/osgs_reaction_note/osgs_reaction_note.tex`](../../theory/osgs_reaction_note/osgs_reaction_note.tex) Prop. 1 (degrades with Da_h, recovers at Re=1e6); the reaction-projection trim is verified correct and **exonerated**. The H¹ rate is sub-optimal on every tested mesh but **creeps upward (0.57→0.74)** — so "asymptotic order reduction" vs "very slow pre-asymptotic climb" is settled by a fine ladder (N=640/1280). Canonical baseline numbers: [`convergence-baseline.md`](convergence-baseline.md). Canonical write-up + cure options (split / term-by-term OSGS): [`../solver/osgs-reaction-dominated-rate.md`](../solver/osgs-reaction-dominated-rate.md). Tracked as the open numerical defect in [`../known_issues.md`](../known_issues.md); efficiency-side context in [`../solver/efficiency-ideas.md`](../solver/efficiency-ideas.md) Idea 4.
-
+> ## ✅ 2026-06-10 — k=1 QUAD sweep COMPLETE (N=10→640): success
+>
+> The full `(Re, Da, α₀)` × {ASGS, OSGS} sweep at k=1 P1/P1 QUAD is finished on the scale-free-gate
+> solver (the authoritative ε_M/ε_C criterion; DB `results/phase1_quad_k1.h5`). Verified numbers:
+>
+> - **Velocity is optimal across the entire grid.** L² rate (finest pair N=320→640) ≥ **1.93** on every
+>   one of the 48 cells (median 2.00 ASGS / 2.07 OSGS); H¹ rate ≥ **1.00** everywhere.
+> - **Pressure is optimal across the entire grid too.** Its nominal equal-order order is
+>   O(h^{kp}) = O(h) (the "(1)" on the convergence plots, and the analyzer's `opt_p = kp` target); every
+>   cell's finest-segment L² rate is **1.5–2.4**, i.e. **at or above** that order on all 48 cells — in
+>   fact consistently **super-optimal** (1.5–2.4× the nominal order), reaching toward O(h²) on most.
+>   **Zero sub-optimal cells.** The low-Re/low-Da/α₀=1 (Stokes-like) cells sit at the low end (~1.5–1.7),
+>   still comfortably above the O(h) order; the rest run ~2.0+. (Pitfall: do **not** score pressure
+>   against the velocity O(h²) target — pressure's optimal order is O(h) for equal-order P1/P1.)
+> - **The high-Da OSGS "coercivity gap" open question is SETTLED — pre-asymptotic, and it recovers.**
+>   The Da=1e6 reaction-dominated OSGS cells show the H¹ rate climbing
+>   `0.57 → 0.54 → 0.58 → 0.73 → 1.11 → 1.85` (N=10→640): flat ≈ 0.7 through N≤320 (the value the old
+>   baseline reported as the "defect"), then climbing to ≥ 1.0 once the N=320→640 pair is in. This is
+>   exactly the **pre-asymptotic erosion, not asymptotic order reduction** hypothesis of §4/§7 — now
+>   demonstrated, not conjectured. Mechanism: the coercivity gap of
+>   [`../../theory/osgs_reaction_note/osgs_reaction_note.tex`](../../theory/osgs_reaction_note/osgs_reaction_note.tex)
+>   degrades the coercivity *constant* (σ_a), not the convergence *rate*, and closes like Da_h ∝ 1/N².
+> - **OSGS is ≈ 2× more accurate than ASGS** at the same rate (finest-mesh-error ratio 0.50 velocity,
+>   0.41 pressure) — the orthogonal projection buys accuracy, at higher iteration cost (the JFNK target).
+> - **Behaviour-preserving:** errors are byte-identical to the pre-scale-free-gate archive on every
+>   overlapping mesh — the ε_M/ε_C gate changed *when* the solver stops, not *where*.
+> - **Expected caveats (not defects):** Re=1e6 @ N=10 is `NaN` (boundary layers ∼ Re^{-1/2}=1e-3 ≪ h=0.1,
+>   hopeless on a 10×10 grid); the three Re=1e6/α₀=0.05 cells are `skip_cells` (the coarse-mesh fold, §3).
+>   `analyze_results.py`'s detector still flags ≈ 29/48 as fold/no-root — a **conservative per-pair
+>   artifact** (pre-asymptotic coarse meshes, the N=10 NaN pulling global fits, super-convergent tails);
+>   its own rate-check reports **0 sub-optimal and 0 super-convergent**. Read the per-pair ratios, not the
+>   one-word verdict.
+>
+> Per-cell numbers: [`convergence-baseline.md`](convergence-baseline.md). The former "open numerical
+> defect" (high-Da OSGS) is closed — [`../known_issues.md`](../known_issues.md),
+> [`../solver/osgs-reaction-dominated-rate.md`](../solver/osgs-reaction-dominated-rate.md).
 
 ---
 
@@ -207,24 +236,24 @@ will *inform* the Cocquet interpretation, per the project decision — not the r
 
 ## 7. What we DON'T know yet (open)
 
-1. **~~Does optimal recovery hold for every extreme cell?~~ RESOLVED (mostly).** The fold-driven
-   `Re=1e6,α=0.05` corner recovers optimally (C24/C21), and the full covariant k=1 sweep showed
-   recovery is the rule *except* for one scoped exception: the **high-Da reaction-dominated corner**
-   (`Da=1e6`, `Re∈{1e-6,1}`), which carries a confirmed pre-asymptotic coercivity gap rather than a
-   gate/map bug (caveat #5). That exception is a genuine, scoped formulation property, not a missing
-   verification. Still merely *unverified* (not problematic): `k=2` and `TRI` at the fold corner.
+1. **~~Does optimal recovery hold for every extreme cell?~~ RESOLVED (k=1 QUAD).** The full N=10→640
+   k=1 QUAD sweep (2026-06-10, success box above) confirms recovery is the rule across the *whole*
+   grid: every cell's velocity reaches optimal L²/H¹ at the finest pair, including the once-scoped
+   **high-Da reaction-dominated corner** (`Da=1e6`, `Re∈{1e-6,1}`) — its H¹ rate climbs
+   `0.57→…→0.73→1.11→1.85` and recovers by N=640 (pre-asymptotic, as hypothesised; not order
+   reduction). Still merely *unverified* (not problematic): `k=2` and `TRI`.
 2. **The exact A/B/C boundary** in `(Re,Da,α₀)` — which cells fold, which merely erode, which are
    clean — is not yet mapped. The sweep maps it.
 3. **OSGS-specific pressure rate.** A documented OSGS sub-optimality from **constant-mode noise in
    the projection increment `d_π^m`** (`docs/solver/paper-code-divergences.md`) can depress the *pressure*
    rate independently of the velocity story above — watch OSGS pressure slopes specifically.
-4. **~~Whether any genuine `τ`-induced order reduction exists at all~~ RESOLVED.** Yes, but narrowly:
-   the high-Da OSGS reaction corner (`Da=1e6`, `Re∈{1e-6,1}`) shows a genuine **pre-asymptotic
-   coercivity gap** scoped to the reaction-dominated regime (caveat #5) — not a gate or staggered-map
-   bug, and absent everywhere convection or low Da restores coercivity. Whether it is asymptotic order
-   reduction or a very slow pre-asymptotic climb is settled by the N=640/1280 ladder; either way it is
-   the genuine OSGS coercivity property of [`../solver/osgs-reaction-dominated-rate.md`](../solver/osgs-reaction-dominated-rate.md),
-   not a `τ`-balance artifact.
+4. **~~Whether any genuine `τ`-induced order reduction exists at all~~ RESOLVED: no.** The high-Da OSGS
+   reaction corner (`Da=1e6`, `Re∈{1e-6,1}`) showed a **pre-asymptotic coercivity gap**, not a `τ`
+   artifact — and the N=640 pair (above) settles the asymptotic-vs-pre-asymptotic question decisively:
+   the H¹ rate **climbs to ≥1.0**, i.e. a slow pre-asymptotic climb that recovers, *not* a fixed order
+   reduction. The mechanism is the OSGS coercivity *constant* (σ_a) of
+   [`../solver/osgs-reaction-dominated-rate.md`](../solver/osgs-reaction-dominated-rate.md), which
+   degrades the bound but not the rate.
 
 ---
 
