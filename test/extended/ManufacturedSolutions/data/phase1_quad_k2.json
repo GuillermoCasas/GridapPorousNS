@@ -1,7 +1,9 @@
 {
   "erase_past_results": false,
+  "write_vtk": false,
+  "trace_convergence_norms": true,
   "encoding_strategy": "minmax",
-  "solver_stall_window": 20,
+  "solver_stall_window": 2,
   "solver_stall_min_rel_improvement": 0.01,
   "h5_filename": "phase1_quad_k2.h5",
   "epsilon_pert": [
@@ -96,8 +98,8 @@
       ]
     },
     "solver": {
-      "picard_iterations": 2,
-      "newton_iterations": 10,
+      "picard_iterations": 15,
+      "newton_iterations": 150,
       "dynamic_newton_re_iterations": 150,
       "noise_floor_success_max_ftol_multiple": 10.0,
       "xtol": 1e-10,
@@ -110,7 +112,11 @@
       "linesearch_contraction_factor": 0.5,
       "max_increases": 3,
       "divergence_merit_factor": 1.05,
-      "armijo_c1": 0.0001
+      "armijo_c1": 0.0001,
+      "newton_residual_divergence_patience": 2,
+      "pingpong_enabled": true,
+      "pingpong_max_swaps": 4,
+      "pingpong_picard_gain_orders": 1.5
     },
     "stabilization": {
       "method": [

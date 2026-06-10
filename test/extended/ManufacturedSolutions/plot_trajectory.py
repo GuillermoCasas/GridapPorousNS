@@ -12,6 +12,7 @@ Usage:
     python plot_trajectory.py                                      # every attempt of every trace
     python plot_trajectory.py --cell Re=1e6,Da=1e-6,a0=0.5 --N 160 --method ASGS
     python plot_trajectory.py --file results/traces/traj_....json
+    python plot_trajectory.py --sweep k1/QUAD                      # only traces under k1/QUAD/
 """
 import argparse
 import glob
@@ -81,11 +82,19 @@ def main():
     ap.add_argument("--cell", default=None, help="filter, e.g. Re=1e6,Da=1e-6,a0=0.5")
     ap.add_argument("--N", type=int, default=None, help="filter by mesh resolution N")
     ap.add_argument("--method", default=None, help="filter by method (ASGS/OSGS)")
+    ap.add_argument("--sweep", default=None, help="only plot traces belonging to this sweep (e.g. k1/QUAD)")
     args = ap.parse_args()
 
     files = [args.file] if args.file else sorted(glob.glob(os.path.join(args.traces, "**", "traj_*.json"), recursive=True))
+    if args.sweep and not args.file:
+        sweep_normalized = args.sweep.replace("/", os.sep)
+        files = [f for f in files if sweep_normalized in f]
+
     if not files:
-        print(f"[traj] no trace files in {args.traces}")
+        if args.sweep:
+            print(f"[traj] no trace files found matching sweep {args.sweep} in {args.traces}")
+        else:
+            print(f"[traj] no trace files in {args.traces}")
         return
 
     n = 0

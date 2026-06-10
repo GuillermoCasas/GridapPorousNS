@@ -1,0 +1,1132 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.6cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+
+% ---------------------------------------------------------------------------
+% Macros (self-contained; chosen to match the notation of the main text)
+% ---------------------------------------------------------------------------
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\ba}{\boldsymbol{a}}
+\newcommand{\bn}{\boldsymbol{n}}
+\newcommand{\bff}{\boldsymbol{f}}
+\newcommand{\beu}{\boldsymbol{e}_{u}}
+\newcommand{\buh}{\boldsymbol{u}_h}
+\newcommand{\bvh}{\boldsymbol{v}_h}
+\newcommand{\buhat}{\widehat{\boldsymbol{u}}_h}
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
+\newcommand{\Th}{\mathcal{T}_h}
+\newcommand{\Xh}{\mathcal{X}_{h0}}
+\newcommand{\BS}{B_{\mathrm{S}}}
+\newcommand{\LS}{L_{\mathrm{S}}}
+\newcommand{\X}{X}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\Cinv}{C_{\mathrm{inv}}}
+\newcommand{\Cinva}{\overline{C}_{\mathrm{inv}}}
+\newcommand{\jump}[1]{[\![#1]\!]}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\newcommand{\triplenorm}[1]{{\left\vert\kern-0.25ex\left\vert\kern-0.25ex\left\vert #1
+\right\vert\kern-0.25ex\right\vert\kern-0.25ex\right\vert}}
+\newcommand{\sigmatilde}{\widetilde{\sigma}_{\alpha}}
+\newcommand{\Eint}[2]{\mathrm{E}^{#1}_{\mathrm{int}}(#2)}
+
+\theoremstyle{plain}
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{theorem}[lemma]{Theorem}
+\newtheorem{corollary}[lemma]{Corollary}
+\newtheorem{proposition}[lemma]{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}[lemma]{Remark}
+\theoremstyle{definition}
+\newtheorem{assumption}{Assumption}
+\crefname{assumption}{Assumption}{Assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+
+\numberwithin{equation}{section}
+
+\title{Continuity of the stabilized bilinear form for the linearized porous
+Navier--Stokes problem:\\ a self-contained proof for the ASGS method}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-3em}
+
+\begin{abstract}
+\noindent We give a complete and self-contained proof of the continuity estimate for the
+stabilized (ASGS) bilinear form associated with the linearized porous Navier--Stokes
+equations, in the form stated as the continuity lemma of the main text. The proof follows,
+step by step, the proof of Lemma~2 in Codina~\cite{codina2001}, adapting every estimate to
+the presence of the porosity field $\alpha$ in the differential operator, in the
+stabilization parameters and in the working norm. We also record the modifications needed
+to obtain the corresponding continuity estimate with respect to the interpolation error,
+from which the convergence theorem of the main text follows by the standard
+C\'{e}a-type argument of~\cite{codina2001}. Along the way we state precisely all the
+hypotheses that the proof requires, and we amend a few minor inaccuracies, both in the main
+text (the smallness condition on the penalty parameter $\varepsilon$, the definition of the
+broken norm, and the constants of the inverse estimates applied to $\alpha$-weighted
+quantities) and in~\cite{codina2001} (a sign in the inter-element term of Eq.~(66) and the
+regularity exponent for the pressure in Eq.~(77)); see \cref{sec:amendments}.
+\end{abstract}
+
+\section{Setting}\label{sec:setting}
+
+\subsection{The linearized problem and the stabilized bilinear form}
+Let $\Omega\subset\mathbb{R}^d$, $d\in\{2,3\}$, be a bounded polyhedral domain with
+boundary $\Gamma$. As in the analysis section of the main text, we consider the ASGS
+method applied to the linearized porous Navier--Stokes problem with homogeneous Dirichlet
+boundary conditions on the whole of $\Gamma$, uniform kinematic viscosity $\nu>0$ and a
+uniform, isotropic resistance $\boldsymbol{\sigma}=\sigma\mathbb{I}$, $\sigma\ge 0$. The
+linearized differential operator is, for $U=[\bu;p]$,
+\begin{equation}\label{eq:strongop}
+  \mathcal{L}_{\ba} U
+  = \begin{bmatrix}
+      \alpha\,\ba\cdot\nabla\bu
+      - 2\nabla\cdot\bigl(\alpha\nu\ViscProj\nabla\bu\bigr)
+      + \alpha\nabla p + \sigma\bu \\[2pt]
+      \varepsilon p + \nabla\cdot(\alpha\bu)
+    \end{bmatrix},
+\end{equation}
+where $\ba$ is the given advection field, $\alpha:\Omega\to(0,1]$ is the fluid volume
+fraction, $\varepsilon\ge 0$ is the penalty parameter, and $\ViscProj$ denotes the
+(pointwise, orthogonal) projection extracting the deviatoric--symmetric part of a
+second-order tensor, so that $\bigl|\ViscProj \mathbf{T}\bigr|\le|\mathbf{T}|$ pointwise
+for any tensor $\mathbf{T}$. Throughout we use the abbreviations
+\begin{equation}\label{eq:XG}
+  \X(V) \coloneqq \ba\cdot\nabla\bv + \nabla q,
+  \qquad
+  G(\bv) \coloneqq 2\nu\,\nabla\cdot\bigl(\alpha\ViscProj\nabla\bv\bigr) - \sigma\bv,
+  \qquad V=[\bv;q],
+\end{equation}
+so that the momentum component of $\mathcal{L}_{\ba}U$ reads
+$\alpha \X(U)-G(\bu)$. Under the assumption $\nabla\cdot(\alpha\ba)=0$ (see \cref{H:advection} below) and
+with the simplification of the main text (removal of the term proportional to
+$\nabla\cdot(\alpha\ba)$, which vanishes anyway in the present setting), the formal adjoint
+has momentum component $-\alpha\X(V)-G(\bv)$ and mass component
+$\varepsilon q - \nabla\cdot(\alpha\bv)$.
+
+Let $\Th$ be a finite element partition of $\overline{\Omega}$ of elements $K$ with
+diameters $h_K$, and let
+$\Xh = \mathcal{V}_{h0}\times\mathcal{Q}_{h0}$, with
+$\mathcal{V}_{h0}\subset H_0^1(\Omega)^d$ and
+$\mathcal{Q}_{h0}\subset H^1(\Omega)\cap\mathcal{Q}_0$, be the continuous finite element
+spaces of polynomial degrees $k_u\ge 1$ and $k_p\ge 1$ used for the velocity and the
+pressure ($\mathcal{Q}_0$ being $L^2(\Omega)$, or its zero-mean subspace when
+$\varepsilon=0$). The $L^2(\omega)$ inner product is written
+$(\cdot,\cdot)_\omega$, with $\omega$ omitted when $\omega=\Omega$, and for elementwise
+defined quantities we write
+\begin{equation}\label{eq:brokennotation}
+  (f,\tau g)_h \coloneqq \sum_{K\in\Th}\int_K f\,\tau\, g \dd\Omega,
+  \qquad
+  \norm{\tau^{1/2} f}_h \coloneqq \Bigl(\,\sum_{K\in\Th}\int_K \tau\, |f|^2
+  \dd\Omega\Bigr)^{1/2},
+\end{equation}
+where $\tau$ may take a different (constant) value $\tau_K$ on each element. Note that the
+broken norm is the square root of the \emph{sum of squares} of the elemental contributions
+(cf.\ \cref{sec:amendments}).
+
+Restricted to the present setting, the stabilized bilinear form of the main text,
+$\BS(\ba; U_h,V_h)=B(\ba; U_h,V_h)-\sum_K \langle \mathcal{L}^* V_h,
+\boldsymbol{\tau}_K \mathcal{L} U_h\rangle_K$, reads, for
+$U_h=[\buh;p_h]$ and $V_h=[\bvh;q_h]$ in $\Xh$,
+\begin{equation}\label{eq:Bstab}
+\begin{aligned}
+  \BS(\ba; U_h,V_h)
+  ={}& 2\nu\bigl(\ViscProj\nabla\bvh,\alpha\ViscProj\nabla\buh\bigr)
+     + \bigl(\bvh,\alpha\X(U_h)\bigr)
+     + \sigma\bigl(\bvh,\buh\bigr)
+     + \varepsilon\bigl(q_h,p_h\bigr)
+     + \bigl(q_h,\nabla\cdot(\alpha\buh)\bigr) \\
+   & + \bigl(\alpha\X(V_h)+G(\bvh),\,
+       \tau_1\bigl[\alpha\X(U_h)-G(\buh)\bigr]\bigr)_h \\
+   & + \bigl(\nabla\cdot(\alpha\bvh)-\varepsilon q_h,\,
+       \tau_2\bigl[\varepsilon p_h+\nabla\cdot(\alpha\buh)\bigr]\bigr)_h ,
+\end{aligned}
+\end{equation}
+together with
+$\LS(\ba;V_h)=(\bvh,\bff)
+ +\bigl(\alpha\X(V_h)+G(\bvh),\tau_1\bff\bigr)_h$.
+For the exact solution $U$ of the linearized continuous problem (assumed smooth enough,
+see \cref{sec:convergence}) one has $\mathcal{L}_{\ba}U=F$ in $L^2(K)$ for every $K$, and
+therefore the method is consistent:
+\begin{equation}\label{eq:consistency}
+  \BS(\ba; U-U_h, V_h) = 0 \qquad \forall\, V_h\in\Xh .
+\end{equation}
+
+\subsection{Stabilization parameters and working norm}
+On each element $K$ the stabilization parameters of the main text are
+\begin{equation}\label{eq:taus}
+  \tau_{1,K} = \frac{1}{\alpha_K\,\tau_{1,\mathrm{NS}}^{-1} + \sigma},
+  \qquad
+  \tau_{2,K} = \frac{h_K^2}{c_1\,\alpha_K\,\tau_{1,\mathrm{NS}}},
+  \qquad
+  \tau_{1,\mathrm{NS}}^{-1}
+  = c_1\frac{\nu}{h_K^2} + c_2\frac{|\ba|_{\infty,K}}{h_K},
+\end{equation}
+where $c_1,c_2>0$ are the algorithmic constants,
+$|\ba|_{\infty,K}\coloneqq\sup_K|\ba|$ (Euclidean norm), and
+$\alpha_K\coloneqq\alpha_{\infty,K}\coloneqq\sup_K\alpha$; we also write
+$\alpha_{0,K}\coloneqq\inf_K\alpha>0$. It is convenient to define, in analogy
+with~\cite{codina2001},
+\begin{equation}\label{eq:phi1}
+  \varphi_{1,K} \coloneqq \alpha_K\,\tau_{1,\mathrm{NS}}^{-1}
+  = \alpha_K\Bigl(c_1\frac{\nu}{h_K^2}+c_2\frac{|\ba|_{\infty,K}}{h_K}\Bigr),
+  \qquad\text{so that}\qquad
+  \tau_{1,K} = \bigl(\varphi_{1,K}+\sigma\bigr)^{-1},
+\end{equation}
+and
+\begin{equation}\label{eq:sigmatilde}
+  \sigmatilde\big|_K
+  \coloneqq \frac{\tau_{1,\mathrm{NS}}^{-1}\sigma}{\tau_{1,\mathrm{NS}}^{-1}
+  + \sigma/\alpha_K}
+  = \frac{\varphi_{1,K}\,\sigma}{\varphi_{1,K}+\sigma}
+  = \sigma - \sigma^2\tau_{1,K}
+  = \sigma\,\varphi_{1,K}\,\tau_{1,K}\;\ge 0 .
+\end{equation}
+We will drop the element subscript ($\tau_1$, $\tau_2$, $\varphi_1$, $\alpha_K$, $h$,
+$|\ba|_\infty$) whenever the elementwise character is clear from the context. The working
+norm of the main text is
+\begin{equation}\label{eq:triplenorm}
+  \triplenorm{V_h}
+  \coloneqq \Bigl(
+  \nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bvh\bigr\rVert^2
+  + \bigl\lVert\sigmatilde^{1/2}\bvh\bigr\rVert_h^2
+  + \varepsilon\norm{q_h}^2
+  + \bigl\lVert\tau_1^{1/2}\alpha\X(V_h)\bigr\rVert_h^2
+  + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bvh)\bigr\rVert_h^2
+  \Bigr)^{1/2}.
+\end{equation}
+
+\subsection{Assumptions}\label{sec:assumptions}
+Throughout, $C$ denotes a generic positive constant, possibly different at each occurrence,
+that may depend on $d$, on the polynomial degrees, on the shape regularity of the mesh
+family, on the algorithmic constants $c_1,c_2$ and on the constants
+$C_\alpha,C_2,c_J,c_J'$ introduced below, but \emph{not} on the mesh size, nor on
+$\nu,\sigma,\varepsilon,\ba$ or $\alpha$. We assume:
+
+\begin{assumption}[Data]\label{H:data}
+$\nu>0$ and $\sigma\ge 0$ are constants, $\bff\in L^2(\Omega)^d$, and the penalty
+parameter satisfies
+\begin{equation}\label{eq:epscond}
+  \varepsilon \;\le\; C_2\, c_1 \min_{K\in\Th}
+  \frac{\alpha_K^2\,\tau_{1,K}}{h_K^2},
+  \qquad 0\le C_2<1 .
+\end{equation}
+\end{assumption}
+
+\begin{assumption}[Porosity]\label{H:porosity}
+$\alpha\in W^{1,\infty}(\Omega)$ with $0<\alpha\le 1$ in $\overline{\Omega}$, and the
+porosity variations are resolved by the mesh: there is $C_\alpha\ge0$ such that
+\begin{equation}\label{eq:resolved}
+  h_K\,\norm{\nabla\alpha}_{L^\infty(K)} \le C_\alpha\,\alpha_{0,K}
+  \qquad\forall\,K\in\Th .
+\end{equation}
+In particular $\alpha_{\infty,K}\le \delta_\alpha\,\alpha_{0,K}$ with
+$\delta_\alpha\coloneqq 1+C_\alpha$, so that
+$\alpha_{0,K}\le\alpha(\boldsymbol{x})\le\alpha_K\le\delta_\alpha\,\alpha_{0,K}$ for
+$\boldsymbol{x}\in K$.
+\end{assumption}
+
+\begin{assumption}[Advection]\label{H:advection}
+$\ba\in C(\overline{\Omega})^d$ (in the application, $\ba$ is the finite element velocity
+of the previous iteration) and $\nabla\cdot(\alpha\ba)=0$ in the sense of distributions,
+i.e.\ $\int_\Omega \alpha\ba\cdot\nabla\psi \dd\Omega = 0$ for all
+$\psi\in W^{1,1}_0(\Omega)$.
+\end{assumption}
+
+\begin{assumption}[Mesh]\label{H:mesh}
+The family of partitions $\{\Th\}_{h>0}$ is nondegenerate (shape regular and locally
+quasi-uniform). In particular: (i) the inverse estimates
+\begin{equation}\label{eq:inverse}
+  \norm{\nabla\psi_h}_{K} \le \frac{\Cinv}{h_K}\norm{\psi_h}_{K},
+  \qquad
+  \norm{\psi_h}_{L^\infty(K)} \le \frac{\Cinv}{h_K^{d/2}}\norm{\psi_h}_{K},
+\end{equation}
+hold for every polynomial $\psi_h$ of the degrees employed (componentwise for vector- and
+tensor-valued functions); (ii) the diameters of neighboring elements are uniformly
+comparable, each element has a uniformly bounded number of faces, and
+$\operatorname{meas}(\Gamma^b)\le C\,h_K^{d-1}$ for each face $\Gamma^b$ of each element
+$K$.
+\end{assumption}
+
+\begin{assumption}[Jump control, needed only when $\sigma>0$]\label{H:jump}
+For every pair of elements $K_1,K_2$ sharing a face,
+\begin{equation}\label{eq:jumpcond}
+  c_J\,\varphi_{1,K_1}\le \varphi_{1,K_2}\le c_J'\,\varphi_{1,K_1},
+  \qquad 0<c_J\le 1\le c_J' .
+\end{equation}
+\end{assumption}
+
+\begin{remark}\label{rem:jump}
+\Cref{H:jump} is the analogue of condition~(39) in~\cite{codina2001}. By \cref{H:porosity}
+the factors $\alpha_{K_i}$ of neighboring elements are automatically comparable
+($\alpha_{K_1}\le\delta_\alpha\,\alpha_{K_2}$, since both suprema are bounded below by the
+value of $\alpha$ on the shared face up to the factor $\delta_\alpha$), and by
+\cref{H:mesh} so are $h_{K_1}$ and $h_{K_2}$. Hence \eqref{eq:jumpcond} reduces to the
+comparability of $|\ba|_{\infty,K_1}$ and $|\ba|_{\infty,K_2}$ relative to $\nu/h_K$, a
+mild requirement on the advection field already implicit in~\cite{codina2001}.
+\end{remark}
+
+\section{Auxiliary results}\label{sec:auxiliary}
+
+\begin{lemma}[Parameter inequalities]\label{lem:parameters}
+On each element $K$ (subscripts omitted) there hold:
+\begin{enumerate}[label=\textup{(P\arabic*)},leftmargin=3.2em]
+  \item\label{P:basic}
+  $\sigma\tau_1\le 1$, $\varphi_1\tau_1\le 1$, $\tau_1\le \varphi_1^{-1}$;
+  \item\label{P:components}
+  $c_1\,\nu\,\alpha_K\le \varphi_1 h^2$ and
+  $c_2\,\alpha_K\,|\ba|_{\infty}\,h\le \varphi_1 h^2$; in particular
+  $\nu\,\tau_1\,\alpha_K\le h^2/c_1$;
+  \item\label{P:27}
+  $\varphi_1 h^2 = c_1\,\alpha_K^2\,\tau_2$; in particular
+  $\varphi_1^{1/2} h = c_1^{1/2}\,\alpha_K\,\tau_2^{1/2}
+  \le c_1^{1/2}\,\tau_2^{1/2}$;
+  \item\label{P:sigmatilde}
+  $\sigmatilde\le\min\{\sigma,\varphi_1\}$ and
+  $\sigmatilde\,\tau_1\le 1$;
+  \item\label{P:eps}
+  under \eqref{eq:epscond}, $\varepsilon\tau_2\le C_2\,\varphi_1\tau_1\le C_2<1$;
+  moreover, $\varepsilon h^2\le C_2\,c_1\,\alpha_K^2\,\tau_1$, and hence
+  $\varepsilon^{1/2}\le c_1^{1/2}\,\alpha_K\,\tau_1^{1/2}/h$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+\ref{P:basic} and \ref{P:components} are immediate from
+\eqref{eq:taus}--\eqref{eq:phi1} and $\tau_1^{-1}=\varphi_1+\sigma$.
+For \ref{P:27}, $\varphi_1 h^2=\alpha_K h^2\tau_{1,\mathrm{NS}}^{-1}
+= \alpha_K^2\, c_1\, \frac{h^2}{c_1\alpha_K\tau_{1,\mathrm{NS}}} = c_1\alpha_K^2\tau_2$,
+and $\alpha_K\le1$ by \cref{H:porosity}. For \ref{P:sigmatilde}, use
+\eqref{eq:sigmatilde}: $\sigmatilde=\sigma\varphi_1/(\varphi_1+\sigma)$ is bounded by both
+factors of the harmonic-type mean, and
+$\sigmatilde\tau_1=\sigma\varphi_1\tau_1^2\le(\sigma\tau_1)(\varphi_1\tau_1)\le1$.
+For \ref{P:eps}: from \eqref{eq:epscond} on element $K$,
+$\varepsilon\le C_2 c_1\alpha_K^2\tau_1/h^2$; multiplying by $\tau_2$ and using
+\ref{P:27}, $\varepsilon\tau_2\le C_2\tau_1\varphi_1\le C_2$. The remaining statements
+follow from $\alpha_K\le 1$ and $C_2<1$.
+\end{proof}
+
+\begin{lemma}[Weighted inverse estimates]\label{lem:winv}
+Let \cref{H:porosity,H:mesh} hold. There is a constant
+$\Cinva = \Cinva(\Cinv,C_\alpha,d)$ such that, for all
+finite element functions $\boldsymbol{w}_h\in\mathcal{V}_{h0}$,
+$r_h\in\mathcal{Q}_{h0}$, and all $K\in\Th$,
+\begin{align}
+  \bigl\lVert\nabla\cdot\bigl(\alpha\ViscProj\nabla\boldsymbol{w}_h\bigr)
+  \bigr\rVert_{K}
+  &\le \frac{\Cinva}{h_K}\,\alpha_K^{1/2}\,
+  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\boldsymbol{w}_h\bigr\rVert_{K},
+  \label{eq:winv-divvisc}\\
+  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\boldsymbol{w}_h\bigr\rVert_{K}
+  &\le \frac{\Cinv}{h_K}\,\alpha_K^{1/2}\,
+  \norm{\boldsymbol{w}_h}_{K},
+  \label{eq:winv-grad}\\
+  \bigl\lVert\nabla\cdot(\alpha\boldsymbol{w}_h)\bigr\rVert_{K}
+  &\le \frac{\Cinva}{h_K}\,\alpha_K\,\norm{\boldsymbol{w}_h}_{K},
+  \label{eq:winv-divu}\\
+  \norm{\alpha\,\ba\cdot\nabla\boldsymbol{w}_h}_{K}
+  &\le \frac{\Cinv}{h_K}\,\alpha_K\,|\ba|_{\infty,K}\,
+  \norm{\boldsymbol{w}_h}_{K},
+  \qquad
+  \norm{\alpha\nabla r_h}_{K}
+  \le \frac{\Cinv}{h_K}\,\alpha_K\,\norm{r_h}_{K}.
+  \label{eq:winv-conv}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+Write $\mathbf{M}\coloneqq\ViscProj\nabla\boldsymbol{w}_h$, a polynomial tensor field on
+$K$ (the projection $\ViscProj$ acts pointwise with constant coefficients). By the product
+rule, $\nabla\cdot(\alpha\mathbf{M})=\alpha\,\nabla\cdot\mathbf{M}
++\mathbf{M}\,\nabla\alpha$. For the first contribution, using
+$\norm{\nabla\cdot\mathbf{M}}_K\le\sqrt{d}\,\norm{\nabla\mathbf{M}}_K$, the inverse
+estimate \eqref{eq:inverse}, and
+$\norm{\mathbf{M}}_K\le\alpha_{0,K}^{-1/2}\norm{\alpha^{1/2}\mathbf{M}}_K$,
+\[
+  \norm{\alpha\,\nabla\cdot\mathbf{M}}_K
+  \le \alpha_{\infty,K}\,\sqrt{d}\,\frac{\Cinv}{h_K}\,\norm{\mathbf{M}}_K
+  \le \sqrt{d}\,\frac{\Cinv}{h_K}\,
+  \frac{\alpha_{\infty,K}}{\alpha_{0,K}^{1/2}}\,
+  \norm{\alpha^{1/2}\mathbf{M}}_K
+  \le \sqrt{d\,\delta_\alpha}\,\frac{\Cinv}{h_K}\,\alpha_K^{1/2}\,
+  \norm{\alpha^{1/2}\mathbf{M}}_K,
+\]
+since $\alpha_{\infty,K}/\alpha_{0,K}^{1/2}
+=(\alpha_{\infty,K}/\alpha_{0,K})^{1/2}\alpha_{\infty,K}^{1/2}
+\le\delta_\alpha^{1/2}\alpha_K^{1/2}$ by \cref{H:porosity}. For the second contribution,
+by \eqref{eq:resolved},
+\[
+  \norm{\mathbf{M}\,\nabla\alpha}_K
+  \le \norm{\nabla\alpha}_{L^\infty(K)}\norm{\mathbf{M}}_K
+  \le \frac{C_\alpha\,\alpha_{0,K}}{h_K}\,
+  \alpha_{0,K}^{-1/2}\norm{\alpha^{1/2}\mathbf{M}}_K
+  \le \frac{C_\alpha}{h_K}\,\alpha_K^{1/2}\,
+  \norm{\alpha^{1/2}\mathbf{M}}_K .
+\]
+This proves \eqref{eq:winv-divvisc} with
+$\Cinva\coloneqq\sqrt{d\,\delta_\alpha}\,\Cinv+C_\alpha$. Estimate
+\eqref{eq:winv-grad} follows from $\alpha\le\alpha_K$ on $K$, the pointwise contraction
+property $|\ViscProj\nabla\boldsymbol{w}_h|\le|\nabla\boldsymbol{w}_h|$ and
+\eqref{eq:inverse}. For \eqref{eq:winv-divu}, expand
+$\nabla\cdot(\alpha\boldsymbol{w}_h)=\alpha\nabla\cdot\boldsymbol{w}_h
++\nabla\alpha\cdot\boldsymbol{w}_h$ and argue as above (using $\alpha_{0,K}\le\alpha_K$).
+The estimates \eqref{eq:winv-conv} are immediate from $\alpha\le\alpha_K$,
+$|\ba|\le|\ba|_{\infty,K}$ and \eqref{eq:inverse}.
+\end{proof}
+
+\begin{remark}\label{rem:winvconst}
+\Cref{lem:winv} makes precise the inverse estimates used in the stability proof of the
+main text for the $\alpha$-weighted second-order term: since $\alpha$ is \emph{not}
+piecewise polynomial, the constant is not the bare $\Cinv$ but the slightly larger
+$\Cinva$, which incorporates the porosity-resolution constant $C_\alpha$ of
+\eqref{eq:resolved}. All statements of the main text remain valid verbatim upon replacing
+$\Cinv$ by $\Cinva$ in the conditions on $c_1$ (cf.\ \cref{sec:amendments}).
+\end{remark}
+
+\begin{lemma}[Jump of $\tau_1$]\label{lem:jump}
+Let \cref{H:jump} hold and let $K_1,K_2$ share the face $\Gamma^b$. Setting
+$\jump{\tau_1}\coloneqq\tau_{1,K_1}-\tau_{1,K_2}$, there holds, for $i\in\{1,2\}$,
+\begin{equation}\label{eq:jumpest}
+  \sigma\,\bigl|\jump{\tau_1}\bigr|
+  \le C\,\frac{\sigma\,\varphi_{1,K_i}}{(\varphi_{1,K_i}+\sigma)^2}
+  = C\,\sigmatilde\big|_{K_i}\,\tau_{1,K_i}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+We have
+$\jump{\tau_1}
+=\dfrac{\varphi_{1,K_2}-\varphi_{1,K_1}}
+{(\varphi_{1,K_1}+\sigma)(\varphi_{1,K_2}+\sigma)}$,
+and \eqref{eq:jumpcond} gives
+$|\varphi_{1,K_1}-\varphi_{1,K_2}|\le
+\max\{c_J'-1,\,1-c_J\}\,\varphi_{1,K_i}$ as well as
+$\varphi_{1,K_2}+\sigma\ge \min\{c_J,1\}\,(\varphi_{1,K_1}+\sigma)$ (and symmetrically),
+from which \eqref{eq:jumpest} follows with the identity \eqref{eq:sigmatilde}.
+\end{proof}
+
+\section{The continuity estimate}\label{sec:continuity}
+
+\begin{lemma}[Continuity]\label{lem:continuity}
+Let \crefrange{H:data}{H:jump} hold, with $c_1,c_2>0$. Then there exists $C>0$,
+independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$, such that
+\begin{equation}\label{eq:continuity}
+  \BS(\ba; U_h,V_h)
+  \le C\Bigl(
+  \bigl\lVert\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
+  + \bigl\lVert\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h
+  \Bigr)\,\triplenorm{V_h}
+  \qquad\forall\, U_h,V_h\in\Xh .
+\end{equation}
+Moreover, the proof yields the sharper bound
+\begin{equation}\label{eq:sharpcont}
+  \BS(\ba; U_h,V_h)
+  \le C\Bigl(
+  \bigl\lVert\alpha_K\,\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
+  + \bigl\lVert\alpha_K\,\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h
+  \Bigr)\,\triplenorm{V_h},
+\end{equation}
+where $\alpha_K$ denotes the piecewise constant function equal to $\alpha_{\infty,K}$ on
+each $K\in\Th$; \eqref{eq:continuity} follows from \eqref{eq:sharpcont} since
+$\alpha\le 1$.
+\end{lemma}
+
+\begin{proof}
+Throughout the proof we write $U=U_h=[\bu;p]$ and $V=V_h=[\bv;q]$, dropping the subscript
+$h$ of the unknowns for conciseness, and we omit the element subscript $K$ in
+$\tau_1,\tau_2,\varphi_1,\alpha_K,h,|\ba|_\infty$ inside elementwise sums. The proof
+follows the steps of the proof of Lemma~2 in~\cite{codina2001}.
+
+\medskip\noindent\emph{Step 0: term decomposition.}
+Expanding the products in \eqref{eq:Bstab} we obtain
+$\BS(\ba;U,V) = \sum_{j=1}^{18} T_j$, with
+\begin{align}
+  T_1 &\coloneqq 2\nu\bigl(\ViscProj\nabla\bv,\alpha\ViscProj\nabla\bu\bigr), \label{eq:T1}\\
+  T_2 &\coloneqq \bigl(\bv,\alpha\X(U)\bigr), \label{eq:T2}\\
+  T_3 &\coloneqq \sigma\,(\bv,\bu), \label{eq:T3}\\
+  T_4 &\coloneqq \bigl(q,\nabla\cdot(\alpha\bu)\bigr), \label{eq:T4}\\
+  T_5 &\coloneqq \varepsilon\,(q,p), \label{eq:T5}\\
+  T_6 &\coloneqq -4\nu^2\bigl(\tau_1\nabla\cdot(\alpha\ViscProj\nabla\bv),
+        \nabla\cdot(\alpha\ViscProj\nabla\bu)\bigr)_h, \label{eq:T6}\\
+  T_7 &\coloneqq -2\nu\bigl(\alpha\X(V),
+        \tau_1\nabla\cdot(\alpha\ViscProj\nabla\bu)\bigr)_h, \label{eq:T7}\\
+  T_8 &\coloneqq 2\nu\sigma\bigl(\tau_1\bv,
+        \nabla\cdot(\alpha\ViscProj\nabla\bu)\bigr)_h, \label{eq:T8}\\
+  T_9 &\coloneqq 2\nu\bigl(\tau_1\nabla\cdot(\alpha\ViscProj\nabla\bv),
+        \alpha\X(U)\bigr)_h, \label{eq:T9}\\
+  T_{10} &\coloneqq \bigl(\alpha\X(V),\tau_1\alpha\X(U)\bigr)_h, \label{eq:T10}\\
+  T_{11} &\coloneqq -\sigma\bigl(\tau_1\alpha\X(U),\bv\bigr)_h, \label{eq:T11}\\
+  T_{12} &\coloneqq 2\nu\sigma\bigl(\tau_1\nabla\cdot(\alpha\ViscProj\nabla\bv),
+        \bu\bigr)_h, \label{eq:T12}\\
+  T_{13} &\coloneqq \sigma\bigl(\tau_1\bu,\alpha\X(V)\bigr)_h, \label{eq:T13}\\
+  T_{14} &\coloneqq -\sigma^2\bigl(\tau_1\bu,\bv\bigr)_h, \label{eq:T14}\\
+  T_{15} &\coloneqq -\varepsilon^2\bigl(\tau_2\,p,q\bigr)_h, \label{eq:T15}\\
+  T_{16} &\coloneqq \varepsilon\bigl(\nabla\cdot(\alpha\bv),\tau_2\,p\bigr)_h, \label{eq:T16}\\
+  T_{17} &\coloneqq -\varepsilon\bigl(\tau_2\nabla\cdot(\alpha\bu),q\bigr)_h, \label{eq:T17}\\
+  T_{18} &\coloneqq \bigl(\nabla\cdot(\alpha\bv),\tau_2\nabla\cdot(\alpha\bu)\bigr)_h .
+        \label{eq:T18}
+\end{align}
+Terms \eqref{eq:T1}--\eqref{eq:T5} come from the Galerkin part,
+\eqref{eq:T6}--\eqref{eq:T14} from the momentum stabilization and
+\eqref{eq:T15}--\eqref{eq:T18} from the mass stabilization in \eqref{eq:Bstab}; they
+correspond, in this order, to terms (42)--(59) of~\cite{codina2001}.
+
+\medskip\noindent\emph{Step 1: terms bounded directly by the working norm.}
+By the Cauchy--Schwarz inequality (elementwise and then for the sums over elements),
+\begin{align}
+  |T_1| + |T_{10}| + |T_{18}|
+  \le{}& 2\nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bu\bigr\rVert
+        \bigl\lVert\alpha^{1/2}\ViscProj\nabla\bv\bigr\rVert
+  + \bigl\lVert\tau_1^{1/2}\alpha\X(U)\bigr\rVert_h
+        \bigl\lVert\tau_1^{1/2}\alpha\X(V)\bigr\rVert_h \nonumber\\
+  &+ \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bu)\bigr\rVert_h
+        \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bv)\bigr\rVert_h
+  \;\le\; 2\,\triplenorm{U}\,\triplenorm{V}.
+  \label{eq:easystep}
+\end{align}
+
+\medskip\noindent\emph{Step 2: the reactive pair.}
+Since $\tau_1$ is constant on each element and
+$\sigma-\sigma^2\tau_{1}=\sigmatilde$ on each element by \eqref{eq:sigmatilde},
+\begin{equation}\label{eq:reactivestep}
+  T_3 + T_{14} = \bigl(\sigmatilde\,\bu,\bv\bigr)_h
+  \le \bigl\lVert\sigmatilde^{1/2}\bu\bigr\rVert_h
+      \bigl\lVert\sigmatilde^{1/2}\bv\bigr\rVert_h
+  \le \triplenorm{U}\,\triplenorm{V}.
+\end{equation}
+
+\medskip\noindent\emph{Step 3: the penalty pair.}
+By \cref{lem:parameters}\ref{P:eps}, $\varepsilon\tau_{2,K}\le C_2<1$ on every element,
+hence
+\begin{equation}\label{eq:penaltystep}
+  |T_5 + T_{15}|
+  \le \varepsilon\,\norm{p}\norm{q} + \varepsilon\,C_2\,\norm{p}\norm{q}
+  \le 2\,\varepsilon^{1/2}\norm{p}\;\varepsilon^{1/2}\norm{q}
+  \le 2\,\triplenorm{U}\,\triplenorm{V}.
+\end{equation}
+
+\medskip\noindent\emph{Step 4: terms containing the viscous operator.}
+The key elemental estimate is obtained from \eqref{eq:winv-divvisc} together with
+$\nu\tau_1\alpha_K\le h^2/c_1$ (\cref{lem:parameters}\ref{P:components}): for any finite
+element velocity $\boldsymbol{w}_h$,
+\begin{equation}\label{eq:keyvisc}
+  \bigl\lVert\tau_1^{1/2}\,2\nu\,
+  \nabla\cdot(\alpha\ViscProj\nabla\boldsymbol{w}_h)\bigr\rVert_{K}
+  \le 2\nu\,\tau_1^{1/2}\,\frac{\Cinva}{h}\,\alpha_K^{1/2}\,
+  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\boldsymbol{w}_h\bigr\rVert_{K}
+  \le \frac{2\Cinva}{c_1^{1/2}}\;\nu^{1/2}
+  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\boldsymbol{w}_h\bigr\rVert_{K}.
+\end{equation}
+Consequently, by the Cauchy--Schwarz inequality and \eqref{eq:keyvisc} applied to $\bu$
+and/or $\bv$,
+\begin{align}
+  |T_6| &\le
+  \bigl\lVert\tau_1^{1/2}2\nu\nabla\cdot(\alpha\ViscProj\nabla\bu)\bigr\rVert_h
+  \bigl\lVert\tau_1^{1/2}2\nu\nabla\cdot(\alpha\ViscProj\nabla\bv)\bigr\rVert_h \nonumber\\
+  &\le \frac{4\Cinva^2}{c_1}\,
+  \nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bu\bigr\rVert
+  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\bv\bigr\rVert
+  \le C\,\triplenorm{U}\triplenorm{V}, \label{eq:T6bound}\\
+  |T_7| &\le
+  \bigl\lVert\tau_1^{1/2}\alpha\X(V)\bigr\rVert_h
+  \bigl\lVert\tau_1^{1/2}2\nu\nabla\cdot(\alpha\ViscProj\nabla\bu)\bigr\rVert_h \nonumber\\
+  &\le \frac{2\Cinva}{c_1^{1/2}}\,
+  \nu^{1/2}\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bu\bigr\rVert\,
+  \bigl\lVert\tau_1^{1/2}\alpha\X(V)\bigr\rVert_h
+  \le C\,\triplenorm{U}\triplenorm{V}, \label{eq:T7bound}
+\end{align}
+and $|T_9|\le C\triplenorm{U}\triplenorm{V}$ in the same way as $T_7$, with the roles of
+$\bu$ and $\bv$ interchanged. For $T_8$, the chained estimates
+\eqref{eq:winv-divvisc}--\eqref{eq:winv-grad} give the ``double'' inverse estimate
+\begin{equation}\label{eq:doubleinv}
+  \bigl\lVert\nabla\cdot(\alpha\ViscProj\nabla\boldsymbol{w}_h)\bigr\rVert_{K}
+  \le \frac{\Cinva\,\Cinv}{h^2}\,\alpha_K\,\norm{\boldsymbol{w}_h}_{K},
+\end{equation}
+whence, using $c_1\nu\alpha_K/h^2\le\varphi_1$ (\cref{lem:parameters}\ref{P:components})
+and $\sigma\varphi_1\tau_1=\sigmatilde$,
+\begin{align}
+  |T_8|
+  &\le \sum_{K} 2\nu\sigma\tau_1\,\frac{\Cinva\Cinv}{h^2}\,\alpha_K\,
+  \norm{\bu}_K\norm{\bv}_K
+  = \frac{2\Cinva\Cinv}{c_1}\sum_{K}
+  \sigma\,\Bigl(\frac{c_1\nu\alpha_K}{h^2}\Bigr)\tau_1\,\norm{\bu}_K\norm{\bv}_K
+  \nonumber\\
+  &\le \frac{2\Cinva\Cinv}{c_1}
+  \bigl\lVert\sigmatilde^{1/2}\bu\bigr\rVert_h
+  \bigl\lVert\sigmatilde^{1/2}\bv\bigr\rVert_h
+  \le C\,\triplenorm{U}\triplenorm{V},
+  \label{eq:T8bound}
+\end{align}
+and $|T_{12}|\le C\triplenorm{U}\triplenorm{V}$ identically, applying
+\eqref{eq:doubleinv} to $\bv$ instead of $\bu$. Summarizing this step,
+\begin{equation}\label{eq:viscstep}
+  |T_6|+|T_7|+|T_8|+|T_9|+|T_{12}| \le C\,\triplenorm{U}\,\triplenorm{V}.
+\end{equation}
+
+\medskip\noindent\emph{Step 5: splitting of $T_{13}$.}
+Write $T_{13}=\sigma(\tau_1\bu,\alpha\,\ba\cdot\nabla\bv)_h
++\sigma(\tau_1\bu,\alpha\nabla q)_h$. For the first contribution,
+\eqref{eq:winv-conv} and $c_2\alpha_K|\ba|_\infty/h\le\varphi_1$
+(\cref{lem:parameters}\ref{P:components}) give
+\begin{align}
+  \bigl|\sigma(\tau_1\bu,\alpha\,\ba\cdot\nabla\bv)_h\bigr|
+  &\le \sum_K \sigma\tau_1\,\alpha_K|\ba|_{\infty}\frac{\Cinv}{h}\,
+  \norm{\bu}_K\norm{\bv}_K
+  \le \frac{\Cinv}{c_2}\sum_K \sigma\varphi_1\tau_1\norm{\bu}_K\norm{\bv}_K
+  \nonumber\\
+  &\le \frac{\Cinv}{c_2}\,
+  \bigl\lVert\sigmatilde^{1/2}\bu\bigr\rVert_h
+  \bigl\lVert\sigmatilde^{1/2}\bv\bigr\rVert_h .
+  \label{eq:T13conv}
+\end{align}
+The second contribution, $R\coloneqq\sigma(\tau_1\bu,\alpha\nabla q)_h$, is kept and
+treated in the next step.
+
+\medskip\noindent\emph{Step 6: the convective--pressure group
+$N\coloneqq R+T_2+T_4+T_{11}$.}
+
+\smallskip\noindent\emph{Step 6a: exact rewriting of $N$.}
+We first record three integration-by-parts identities.
+\begin{enumerate}[label=\textup{(\roman*)},leftmargin=2.6em]
+\item (Global skew-symmetry of convection.) For $\bu,\bv\in\mathcal{V}_{h0}$ the
+pointwise identity
+$(\alpha\ba\cdot\nabla\bu)\cdot\bv+(\alpha\ba\cdot\nabla\bv)\cdot\bu
+=\alpha\ba\cdot\nabla(\bu\cdot\bv)$ holds, and $\bu\cdot\bv\in W^{1,1}_0(\Omega)$;
+\cref{H:advection} then gives $\int_\Omega\alpha\ba\cdot\nabla(\bu\cdot\bv)\dd\Omega=0$,
+i.e.
+\begin{equation}\label{eq:skew}
+  (\bv,\alpha\,\ba\cdot\nabla\bu) = -(\bu,\alpha\,\ba\cdot\nabla\bv).
+\end{equation}
+\item (Global pressure/mass integration by parts.) Since
+$\alpha\in W^{1,\infty}(\Omega)$ and $\bv\in H^1_0(\Omega)^d$, we have
+$\alpha\bv\in H^1_0(\Omega)^d$, and similarly for $\bu$; hence
+\begin{equation}\label{eq:globalibp}
+  (\bv,\alpha\nabla p) = -\bigl(p,\nabla\cdot(\alpha\bv)\bigr),
+  \qquad
+  \bigl(q,\nabla\cdot(\alpha\bu)\bigr) = -(\bu,\alpha\nabla q).
+\end{equation}
+\item (Elementwise convective integration by parts.) On each $K$, with $\tau_1$ constant
+on $K$, $\ba$ continuous on $\overline{K}$ and $\nabla\cdot(\alpha\ba)=0$ in $K$, the
+divergence theorem gives
+\begin{equation}\label{eq:elemibp}
+  \bigl(\tau_1\,\alpha\,\ba\cdot\nabla\bu,\bv\bigr)_K
+  = -\bigl(\tau_1\,\alpha\,\ba\cdot\nabla\bv,\bu\bigr)_K
+  + \tau_{1}\int_{\partial K}\alpha\,(\bn\cdot\ba)\,(\bu\cdot\bv)\dd\Gamma .
+\end{equation}
+\end{enumerate}
+Using \eqref{eq:skew}--\eqref{eq:globalibp} in $T_2$ and $T_4$,
+\begin{equation*}
+  T_2 + T_4 = -\bigl(\bu,\alpha\X(V)\bigr) - \bigl(p,\nabla\cdot(\alpha\bv)\bigr),
+\end{equation*}
+while \eqref{eq:elemibp} applied to the convective part of $T_{11}$ gives
+\begin{equation*}
+  T_{11}
+  = \sigma\bigl(\tau_1\,\alpha\,\ba\cdot\nabla\bv,\bu\bigr)_h
+  - \sigma\sum_{K}\tau_{1,K}\int_{\partial K}\alpha(\bn_K\cdot\ba)(\bu\cdot\bv)\dd\Gamma
+  - \sigma\bigl(\tau_1\bv,\alpha\nabla p\bigr)_h .
+\end{equation*}
+Adding $R=\sigma(\tau_1\bu,\alpha\nabla q)_h$ and collecting terms,
+\begin{align}
+  N ={}& \underbrace{-\sigma\bigl(\tau_1\bv,\alpha\nabla p\bigr)_h}_{\textup{[I]}}
+  \;+\; \underbrace{\sigma\bigl(\tau_1\bu,\alpha\X(V)\bigr)_h}_{\textup{[II]}}
+  \;\underbrace{-\,\sigma\sum_{K}\tau_{1,K}\int_{\partial K}
+  \alpha(\bn_K\cdot\ba)(\bu\cdot\bv)\dd\Gamma}_{\textup{[III]}}
+  \nonumber\\
+  &\;\underbrace{-\,\bigl(p,\nabla\cdot(\alpha\bv)\bigr)}_{\textup{[IV]}}
+  \;\underbrace{-\,\bigl(\bu,\alpha\X(V)\bigr)}_{\textup{[V]}} ,
+  \label{eq:fiveterms}
+\end{align}
+which is the porous counterpart of Eq.~(66) of~\cite{codina2001}. (Note that the
+inter-element term [III] carries a \emph{minus} sign; in~\cite{codina2001} it is printed
+with a plus sign, a harmless typo since the term is estimated in absolute value, cf.\
+\cref{sec:amendments}.)
+
+\smallskip\noindent\emph{Step 6b: the pressure terms \textup{[I]+[IV]}.}
+Integrating by parts elementwise, $(\tau_1\bv,\alpha\nabla p)_K
+= -(\tau_1\nabla\cdot(\alpha\bv),p)_K
++ \tau_{1}\int_{\partial K}\alpha(\bn\cdot\bv)\,p\dd\Gamma$, and using
+$1-\sigma\tau_{1}=\varphi_{1}\tau_{1}$ on each element,
+\begin{equation}\label{eq:IandIV}
+  -\bigl(\textup{[I]}+\textup{[IV]}\bigr)
+  = \sigma\bigl(\tau_1\bv,\alpha\nabla p\bigr)_h
+  + \bigl(p,\nabla\cdot(\alpha\bv)\bigr)
+  = \bigl(\varphi_1\tau_1\,p,\nabla\cdot(\alpha\bv)\bigr)_h
+  + \sigma\sum_{b}\int_{\Gamma^b}\jump{\tau_1}\,\alpha\,(\bn\cdot\bv)\,p\dd\Gamma,
+\end{equation}
+where the sum extends over the interior faces $\Gamma^b$ of the partition: the elemental
+boundary contributions have been assembled facewise using the continuity of
+$\alpha,\bv,p$ across interior faces ($\bn$ is a fixed unit normal on each face and
+$\jump{\tau_1}$ the corresponding jump), while the faces lying on $\Gamma$ vanish because
+$\bv=\boldsymbol{0}$ there.
+
+For the volumetric part of \eqref{eq:IandIV}, on each element
+$\varphi_1\tau_1\le\varphi_1^{1/2}\tau_1^{1/2}$
+(since $\varphi_1\tau_1\le1$, \cref{lem:parameters}\ref{P:basic}), and
+$\varphi_1^{1/2}=c_1^{1/2}\alpha_K\tau_2^{1/2}/h$
+(\cref{lem:parameters}\ref{P:27}), so that
+\begin{equation}\label{eq:volpart}
+  \bigl|\bigl(\varphi_1\tau_1\,p,\nabla\cdot(\alpha\bv)\bigr)_h\bigr|
+  \le c_1^{1/2}\sum_K
+  \tau_2^{1/2}\bigl\lVert\nabla\cdot(\alpha\bv)\bigr\rVert_K\;
+  \alpha_K\,\tau_1^{1/2}h^{-1}\norm{p}_K
+  \le c_1^{1/2}\,\triplenorm{V}\,
+  \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h .
+\end{equation}
+
+For the jump part, fix an interior face $\Gamma^b$ shared by $K_1$ and $K_2$ and set
+$\Omega^b=K_1\cup K_2$. By \cref{H:jump} the elemental quantities
+$\varphi_1,\tau_1,\sigmatilde$ of $K_1$ and $K_2$ are uniformly comparable, so
+\cref{lem:jump} yields, for any $i,j\in\{1,2\}$,
+\begin{equation}\label{eq:jumpsplit}
+  \sigma\bigl|\jump{\tau_1}\bigr|
+  \le C\,\Bigl(\sigmatilde\tau_1\big|_{K_i}\Bigr)^{1/2}
+        \Bigl(\sigmatilde\tau_1\big|_{K_j}\Bigr)^{1/2}
+  \le C\,\sigmatilde^{1/2}\big|_{K_i}\;\tau_{1,K_j}^{1/2},
+\end{equation}
+the last step using $\sigmatilde\tau_1\le1$ (\cref{lem:parameters}\ref{P:sigmatilde})
+on $K_j$ together with the comparability of $\tau_{1,K_i}$ and $\tau_{1,K_j}$.
+Moreover $\alpha\le\alpha_{K_j}$ on $\Gamma^b\subset\overline{K}_j$. Bounding the face
+integral by the $L^\infty$ norms over $\Omega^b$, expanding
+$\norm{\bv}_{L^\infty(\Omega^b)}\norm{p}_{L^\infty(\Omega^b)}
+\le\sum_{i,j\in\{1,2\}}\norm{\bv}_{L^\infty(K_i)}\norm{p}_{L^\infty(K_j)}$, and applying
+the $L^\infty$ inverse estimate \eqref{eq:inverse} on each element (the diameters of
+$K_1,K_2$ being comparable by \cref{H:mesh}), together with
+$\operatorname{meas}(\Gamma^b)\le C h^{d-1}$,
+\begin{equation}\label{eq:jumppart}
+  \sigma\Bigl|\int_{\Gamma^b}\jump{\tau_1}\alpha(\bn\cdot\bv)p\dd\Gamma\Bigr|
+  \le C\sum_{i,j\in\{1,2\}}
+  \sigmatilde^{1/2}\big|_{K_i}\norm{\bv}_{K_i}\;
+  \alpha_{K_j}\,\tau_{1,K_j}^{1/2}\,h^{-1}\norm{p}_{K_j}.
+\end{equation}
+Summing over the interior faces and applying the Cauchy--Schwarz inequality to the sums
+(each element meets a uniformly bounded number of faces, \cref{H:mesh}),
+\begin{equation}\label{eq:jumptotal}
+  \sigma\sum_{b}\Bigl|\int_{\Gamma^b}\jump{\tau_1}\alpha(\bn\cdot\bv)p
+  \dd\Gamma\Bigr|
+  \le C\,\bigl\lVert\sigmatilde^{1/2}\bv\bigr\rVert_h\,
+  \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h
+  \le C\,\triplenorm{V}\,
+  \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h .
+\end{equation}
+Combining \eqref{eq:volpart} and \eqref{eq:jumptotal},
+\begin{equation}\label{eq:IIVbound}
+  \bigl|\textup{[I]}+\textup{[IV]}\bigr|
+  \le C\,\triplenorm{V}\,
+  \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h .
+\end{equation}
+
+\smallskip\noindent\emph{Step 6c: the terms \textup{[II]+[V]}.}
+Again with $1-\sigma\tau_1=\varphi_1\tau_1$ elementwise, and using
+$\varphi_1^{1/2}\tau_1\le\tau_1^{1/2}$ together with
+\cref{lem:parameters}\ref{P:27},
+\begin{align}
+  \bigl|\textup{[II]}+\textup{[V]}\bigr|
+  = \bigl|\bigl(\varphi_1\tau_1\,\bu,\alpha\X(V)\bigr)_h\bigr|
+  &\le \sum_K \varphi_1^{1/2}\norm{\bu}_K\;
+  \varphi_1^{1/2}\tau_1\bigl\lVert\alpha\X(V)\bigr\rVert_K
+  \nonumber\\
+  &\le c_1^{1/2}\sum_K \alpha_K\tau_2^{1/2}h^{-1}\norm{\bu}_K\;
+  \tau_1^{1/2}\bigl\lVert\alpha\X(V)\bigr\rVert_K
+  \nonumber\\
+  &\le c_1^{1/2}\,
+  \bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\bu\bigr\rVert_h\,\triplenorm{V}.
+  \label{eq:IIVterm}
+\end{align}
+
+\smallskip\noindent\emph{Step 6d: the inter-element term \textup{[III]}.}
+As in Step~6b, the elemental boundary contributions assemble facewise (the integrand
+$\alpha(\bn\cdot\ba)(\bu\cdot\bv)$ is single-valued on interior faces and $\bu$ vanishes
+on $\Gamma$):
+\begin{equation*}
+  \textup{[III]}
+  = -\sigma\sum_b\int_{\Gamma^b}\jump{\tau_1}\,
+  \alpha(\bn\cdot\ba)(\bu\cdot\bv)\dd\Gamma .
+\end{equation*}
+On $\Gamma^b$ we bound $\alpha\,|\bn\cdot\ba|\le\alpha_{K_j}|\ba|_{\infty,K_j}
+\le\varphi_{1,K_j}h_{K_j}/c_2$ (\cref{lem:parameters}\ref{P:components}). Using
+\eqref{eq:jumpsplit} in the symmetric form
+$\sigma|\jump{\tau_1}|\le C(\sigmatilde\tau_1|_{K_i})^{1/2}
+(\sigmatilde\tau_1|_{K_j})^{1/2}$, and
+$\tau_{1,K_i}^{1/2}\varphi_{1,K_j}^{1/2}\le C\,(\tau_1\varphi_1|_{K_j})^{1/2}\le C$ (comparability of $\tau_1$ across the face
+and $\varphi_1\tau_1\le1$), we obtain on each face, after applying the $L^\infty$ inverse
+estimates and $\operatorname{meas}(\Gamma^b)\le Ch^{d-1}$ exactly as in Step~6b,
+\begin{equation}\label{eq:IIIface}
+  \sigma\Bigl|\int_{\Gamma^b}\jump{\tau_1}\alpha(\bn\cdot\ba)(\bu\cdot\bv)
+  \dd\Gamma\Bigr|
+  \le C\sum_{i,j\in\{1,2\}}
+  \sigmatilde^{1/2}\big|_{K_i}\norm{\bu}_{K_i}\;
+  \sigmatilde^{1/2}\big|_{K_j}\norm{\bv}_{K_j},
+\end{equation}
+whence, summing over faces and applying the Cauchy--Schwarz inequality as before,
+\begin{equation}\label{eq:IIIbound}
+  \bigl|\textup{[III]}\bigr|
+  \le C\,\bigl\lVert\sigmatilde^{1/2}\bu\bigr\rVert_h
+  \bigl\lVert\sigmatilde^{1/2}\bv\bigr\rVert_h
+  \le C\,\triplenorm{U}\,\triplenorm{V}.
+\end{equation}
+Collecting \eqref{eq:T13conv}, \eqref{eq:IIVbound}, \eqref{eq:IIVterm} and
+\eqref{eq:IIIbound},
+\begin{equation}\label{eq:groupstep}
+  |T_{13}| + |N|
+  \le C\,\triplenorm{V}\Bigl(\triplenorm{U}
+  + \bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\bu\bigr\rVert_h
+  + \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h\Bigr).
+\end{equation}
+
+\medskip\noindent\emph{Step 7: the penalty cross terms.}
+By \cref{lem:parameters}\ref{P:eps}, on each element
+$\varepsilon\tau_2^{1/2}=(\varepsilon\tau_2)^{1/2}\varepsilon^{1/2}
+\le C_2^{1/2}\varepsilon^{1/2}$, hence
+\begin{equation}\label{eq:crosspenalty}
+  |T_{16}|
+  \le \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bv)\bigr\rVert_h\;
+  \varepsilon\bigl\lVert\tau_2^{1/2}p\bigr\rVert_h
+  \le C_2^{1/2}\,\triplenorm{V}\;\varepsilon^{1/2}\norm{p}
+  \le \triplenorm{V}\,\triplenorm{U},
+\end{equation}
+and likewise $|T_{17}|\le\triplenorm{U}\,\triplenorm{V}$.
+
+\medskip\noindent\emph{Step 8: assembly.}
+Adding the estimates of Steps 1--7,
+\begin{equation}\label{eq:assembly}
+  \BS(\ba;U,V)
+  \le C\,\triplenorm{V}\Bigl(\triplenorm{U}
+  + \bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\bu\bigr\rVert_h
+  + \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h\Bigr).
+\end{equation}
+
+\medskip\noindent\emph{Step 9: absorption of the working norm.}
+It remains to bound $\triplenorm{U}$ for \emph{discrete} $U=U_h$ by the bracketed norms.
+We estimate each contribution to \eqref{eq:triplenorm} elementwise, using
+\cref{lem:winv,lem:parameters}:
+\begin{align}
+  \nu^{1/2}\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bu\bigr\rVert_K
+  &\le \nu^{1/2}\frac{\Cinv}{h}\alpha_K^{1/2}\norm{\bu}_K
+  \le \frac{\Cinv}{c_1^{1/2}}\,\varphi_1^{1/2}\norm{\bu}_K
+  = \Cinv\,\alpha_K\,\tau_2^{1/2}h^{-1}\norm{\bu}_K,
+  \label{eq:absorb1}\\
+  \bigl\lVert\sigmatilde^{1/2}\bu\bigr\rVert_K
+  &\le \varphi_1^{1/2}\norm{\bu}_K
+  = c_1^{1/2}\,\alpha_K\,\tau_2^{1/2}h^{-1}\norm{\bu}_K,
+  \label{eq:absorb2}\\
+  \varepsilon^{1/2}\norm{p}_K
+  &\le c_1^{1/2}\,\alpha_K\,\tau_1^{1/2}h^{-1}\norm{p}_K,
+  \label{eq:absorb3}\\
+  \tau_1^{1/2}\bigl\lVert\alpha\X(U)\bigr\rVert_K
+  &\le \tau_1^{1/2}\alpha_K|\ba|_\infty\frac{\Cinv}{h}\norm{\bu}_K
+   + \tau_1^{1/2}\alpha_K\frac{\Cinv}{h}\norm{p}_K \nonumber\\
+  &\le \frac{\Cinv\,c_1^{1/2}}{c_2}\,\alpha_K\tau_2^{1/2}h^{-1}\norm{\bu}_K
+   + \Cinv\,\alpha_K\,\tau_1^{1/2}h^{-1}\norm{p}_K,
+  \label{eq:absorb4}\\
+  \tau_2^{1/2}\bigl\lVert\nabla\cdot(\alpha\bu)\bigr\rVert_K
+  &\le \Cinva\,\alpha_K\,\tau_2^{1/2}h^{-1}\norm{\bu}_K .
+  \label{eq:absorb5}
+\end{align}
+Here \eqref{eq:absorb1} uses \eqref{eq:winv-grad} and
+\ref{P:components}--\ref{P:27}; \eqref{eq:absorb2} uses
+\ref{P:sigmatilde} and \ref{P:27}; \eqref{eq:absorb3} uses \ref{P:eps};
+in \eqref{eq:absorb4} the velocity part uses \eqref{eq:winv-conv},
+$\tau_1^{1/2}\alpha_K|\ba|_\infty/h \le \varphi_1\tau_1^{1/2}/c_2
+\le\varphi_1^{1/2}/c_2$ and \ref{P:27}, while the pressure part uses
+\eqref{eq:winv-conv} directly; and \eqref{eq:absorb5} uses \eqref{eq:winv-divu}. Squaring
+and summing over the elements,
+\begin{equation}\label{eq:normconv}
+  \triplenorm{U_h}
+  \le C\Bigl(
+  \bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
+  + \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h\Bigr).
+\end{equation}
+Inserting \eqref{eq:normconv} in \eqref{eq:assembly} proves \eqref{eq:sharpcont}, and
+$\alpha_K\le1$ (\cref{H:porosity}) gives \eqref{eq:continuity}.
+\end{proof}
+
+\begin{remark}[Sharper, porosity-weighted estimate]\label{rem:sharper}
+The bound \eqref{eq:sharpcont} is strictly sharper than \eqref{eq:continuity} wherever
+$\alpha$ is small, and it propagates to the convergence estimate (cf.\
+\cref{rem:sharperconv}). It is remarkable that the smallness condition
+\eqref{eq:epscond} on $\varepsilon$, with its factor $\alpha_K^2$, is exactly what is
+needed for the penalty contribution \eqref{eq:absorb3} to carry the weight $\alpha_K$ as
+well; the same factor is the one required by the stability analysis of the main text.
+\end{remark}
+
+\begin{remark}[Where each hypothesis is used]\label{rem:hypotheses}
+\Cref{H:data} (condition \eqref{eq:epscond}) enters Steps 3, 7 and 9;
+\cref{H:porosity} enters through \cref{lem:winv} (Steps 4, 5 and 9) and through
+$\alpha_K\le1$; \cref{H:advection} enters Step 6a; \cref{H:mesh} enters every inverse
+estimate and the facewise bookkeeping of Steps 6b and 6d; \cref{H:jump} enters only
+\eqref{eq:jumpsplit}, i.e.\ the jump terms of Steps 6b and 6d, which carry the factor
+$\sigma$ and hence vanish identically when $\sigma=0$. As in~\cite{codina2001}, the jump
+condition and the $L^\infty$ inverse estimate are therefore needed only when $\sigma>0$.
+\end{remark}
+
+\section{Consequences for the convergence analysis}\label{sec:convergence}
+
+\subsection{Interpolation estimates}
+Let $U=[\bu;p]$ denote the solution of the continuous linearized problem and assume the
+regularity
+\begin{equation}\label{eq:regularity}
+  U\in\mathcal{W}_r \coloneqq
+  \bigl(H^{m}(\Omega)\cap H^1_0(\Omega)\bigr)^d
+  \times\bigl(H^{n}(\Omega)\cap\mathcal{Q}_0\bigr),
+  \qquad m\ge k_u+1\ (\ge 2),\quad n\ge k_p+1\ (\ge 2),
+\end{equation}
+(see \cref{sec:amendments} concerning the exponent $n$). In particular
+$\mathcal{L}_{\ba}U\in L^2(K)$ for every $K$, so that the consistency property
+\eqref{eq:consistency} holds, and for $d\le3$ both $\bu$ and $p$ are continuous on
+$\overline{\Omega}$. Let $\buhat\in\mathcal{V}_{h0}$ and
+$\widehat{p}_h\in\mathcal{Q}_{h0}$ be interpolants of $\bu$ and $p$
+(e.g.\ the Lagrange interpolants), set
+$\widehat{U}_h\coloneqq[\buhat;\widehat{p}_h]$, and define the elemental interpolation
+errors
+\begin{equation}\label{eq:Eint}
+  \Eint{K}{\bu}\coloneqq h_K^{k_u+1}\norm{\bu}_{H^{k_u+1}(K)},
+  \qquad
+  \Eint{K}{p}\coloneqq h_K^{k_p+1}\norm{p}_{H^{k_p+1}(K)} .
+\end{equation}
+Standard interpolation theory~\cite{brennerscott,ernguermond} provides, on every $K$,
+\begin{equation}\label{eq:interp}
+\begin{aligned}
+  \norm{\bu-\buhat}_{H^{m'}(K)} &\le C\,h_K^{-m'}\,\Eint{K}{\bu},
+  \qquad m'\in\{0,1,2\},\\
+  \norm{p-\widehat{p}_h}_{H^{m'}(K)} &\le C\,h_K^{-m'}\,\Eint{K}{p},
+  \qquad m'\in\{0,1\},
+\end{aligned}
+\end{equation}
+and, since $k_u+1,\,k_p+1>d/2$ for $d\le3$, also the $L^\infty$ estimates
+\begin{equation}\label{eq:interpinfty}
+  \norm{\bu-\buhat}_{L^\infty(K)} \le C\,h_K^{-d/2}\,\Eint{K}{\bu},
+  \qquad
+  \norm{p-\widehat{p}_h}_{L^\infty(K)} \le C\,h_K^{-d/2}\,\Eint{K}{p},
+\end{equation}
+which are the analogues of Eqs.~(78)--(79) of~\cite{codina2001}. We abbreviate
+$E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
+\begin{equation}\label{eq:psih}
+  \psi(h)\coloneqq \sum_{K\in\Th}\alpha_K\,h_K^{-1}
+  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr)
+  \;\le\;
+  \sum_{K\in\Th}h_K^{-1}
+  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr).
+\end{equation}
+
+\subsection{Continuity with respect to the interpolation error}
+
+\begin{lemma}[Continuity for the interpolation error]\label{lem:continterp}
+Let \crefrange{H:data}{H:jump} hold and let $U\in\mathcal{W}_r$. Then
+\begin{equation}\label{eq:continterp}
+  \BS\bigl(\ba;\,U-\widehat{U}_h,\,V_h\bigr)
+  \le C\,\psi(h)\,\triplenorm{V_h}
+  \qquad\forall\,V_h\in\Xh .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+We rerun the proof of \cref{lem:continuity} with first argument $E=[\beu;e_p]$ and second
+argument $V_h$, which remains discrete and is treated exactly as before. Two
+observations make this possible.
+
+\smallskip\noindent\emph{(1) The exact identities remain valid.}
+The decomposition of Step~0 and the identities of Steps 2, 3 and 6a--6b only require of
+the first argument that $\beu\in H^1_0(\Omega)^d$ with $\beu|_K\in H^2(K)^d$, and
+$e_p\in H^1(\Omega)$, together with the continuity of $\beu$ and $e_p$ across interior
+faces; all of this holds by \eqref{eq:regularity} (for $d\le 3$,
+$H^2(K)\hookrightarrow C^0(\overline{K})$ and $\bu,p\in C^0(\overline{\Omega})$, while
+$\buhat,\widehat{p}_h$ are continuous finite element functions). In particular
+$\beu\cdot\bvh\in W^{1,1}_0(\Omega)$, so \eqref{eq:skew} holds, and the elementwise
+identities \eqref{eq:elemibp} and those preceding \eqref{eq:IandIV} hold with
+well-defined traces.
+
+\smallskip\noindent\emph{(2) Inverse estimates on the first argument are replaced by
+interpolation estimates.}
+Inspection of the proof of \cref{lem:continuity} shows that the first argument enters the
+estimates only through the following elemental quantities; next to each we record the
+discrete estimate used there and its replacement, obtained from \eqref{eq:resolved},
+\eqref{eq:interp}--\eqref{eq:interpinfty} and
+$|\ViscProj\mathbf{T}|\le|\mathbf{T}|$:
+\begin{align}
+  \bigl\lVert\nabla\cdot(\alpha\ViscProj\nabla\beu)\bigr\rVert_K
+  &\le \alpha_{\infty,K}\bigl\lVert\nabla\cdot(\ViscProj\nabla\beu)\bigr\rVert_K
+   + \norm{\nabla\alpha}_{L^\infty(K)}\bigl\lVert\ViscProj\nabla\beu\bigr\rVert_K
+   \le C\,\alpha_K\,h^{-2}\,\Eint{K}{\bu},
+  \label{eq:interpdivvisc}\\[2pt]
+  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\beu\bigr\rVert_K
+  &\le \alpha_K^{1/2}\,|\beu|_{H^1(K)}
+   \le C\,\alpha_K^{1/2}\,h^{-1}\,\Eint{K}{\bu},
+  \label{eq:interpgrad}\\
+  \bigl\lVert\nabla\cdot(\alpha\beu)\bigr\rVert_K
+  &\le C\,\alpha_K\,h^{-1}\,\Eint{K}{\bu},
+  \qquad
+   \norm{\alpha\,\ba\cdot\nabla\beu}_K
+   \le C\,\alpha_K\,|\ba|_{\infty,K}\,h^{-1}\,\Eint{K}{\bu},
+  \label{eq:interpfirst}\\
+  \norm{\alpha\nabla e_p}_K
+  &\le C\,\alpha_K\,h^{-1}\,\Eint{K}{p},
+  \qquad
+   \norm{\beu}_K \le C\,\Eint{K}{\bu},
+  \qquad
+   \norm{e_p}_K \le C\,\Eint{K}{p},
+  \label{eq:interpzero}\\
+  \norm{\beu}_{L^\infty(K)}
+  &\le C\,h^{-d/2}\,\Eint{K}{\bu},
+  \qquad
+   \norm{e_p}_{L^\infty(K)} \le C\,h^{-d/2}\,\Eint{K}{p}.
+  \label{eq:interpinftyE}
+\end{align}
+These have exactly the same elemental coefficients as the weighted inverse estimates of
+\cref{lem:winv} applied in Steps 4, 5, 6 and 9, with $\norm{\buh}_K$ and $\norm{p_h}_K$
+replaced by $\Eint{K}{\bu}$ and $\Eint{K}{p}$. Consequently:
+\begin{itemize}[leftmargin=2em]
+\item Step 9 (the elemental bounds \eqref{eq:absorb1}--\eqref{eq:absorb5}) carried out
+with \eqref{eq:interpdivvisc}--\eqref{eq:interpinftyE} gives
+\begin{equation}\label{eq:Enorm}
+  \triplenorm{E}
+  \le C\Bigl(\sum_{K}\alpha_K^2\,h_K^{-2}\bigl(\tau_{2,K}(\Eint{K}{\bu})^2
+  + \tau_{1,K}(\Eint{K}{p})^2\bigr)\Bigr)^{1/2}
+  \le C\,\psi(h),
+\end{equation}
+the last step by the discrete $\ell^2\subset\ell^1$ inequality.
+\item The bracketed norms in \eqref{eq:assembly} are bounded, by the $m'=0$ estimates in
+\eqref{eq:interpzero}, as
+$\bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\beu\bigr\rVert_h
++\bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}e_p\bigr\rVert_h\le C\,\psi(h)$.
+\item In the jump terms \eqref{eq:jumppart} and \eqref{eq:IIIface} the $L^\infty$ inverse
+estimates applied to the \emph{first} argument are replaced by the $L^\infty$
+interpolation estimates \eqref{eq:interpinftyE} (those applied to $\bvh$ are kept), with
+identical powers of $h$.
+\end{itemize}
+Steps 1--8 then yield
+$\BS(\ba;E,V_h)\le C\triplenorm{V_h}\bigl(\triplenorm{E}+C\psi(h)\bigr)$, and
+\eqref{eq:Enorm} concludes the proof.
+\end{proof}
+
+\subsection{Convergence}
+For completeness we recall the stability result of the main text, whose proof is given
+there (with the amendments of \cref{rem:winvconst,sec:amendments}).
+
+\begin{proposition}[Stability; main text]\label{prop:stability}
+Let \crefrange{H:data}{H:mesh} hold and let $c_1>2\xi\,\Cinva^2$ for some $\xi>2$. Then
+there is $C>0$ such that
+$\BS(\ba;U_h,U_h)\ge C\,\triplenorm{U_h}^2$ for all $U_h\in\Xh$.
+\end{proposition}
+
+\begin{theorem}[Convergence]\label{thm:convergence}
+Under the hypotheses of \cref{prop:stability,lem:continterp},
+\begin{equation}\label{eq:convergence}
+  \triplenorm{U-U_h}
+  \le C\,\psi(h)
+  \le C\sum_{K\in\Th}h_K^{-1}
+  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr).
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+Let $E_h\coloneqq\widehat{U}_h-U_h\in\Xh$. By \cref{prop:stability}, consistency
+\eqref{eq:consistency} and \cref{lem:continterp},
+\begin{equation*}
+  C\,\triplenorm{E_h}^2
+  \le \BS(\ba;E_h,E_h)
+  = \BS\bigl(\ba;\widehat{U}_h-U,E_h\bigr)
+  \le C\,\psi(h)\,\triplenorm{E_h},
+\end{equation*}
+so $\triplenorm{E_h}\le C\psi(h)$. The triangle inequality and \eqref{eq:Enorm} give
+$\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{E_h}\le C\psi(h)$.
+\end{proof}
+
+\begin{remark}[Sharper convergence estimate]\label{rem:sharperconv}
+Since the proof goes through with the porosity-weighted quantity $\psi(h)$ of
+\eqref{eq:psih}, the convergence estimate of the main text in fact holds in the slightly
+sharper form $\triplenorm{U-U_h}\le C\sum_K \alpha_K h_K^{-1}
+(\tau_{2,K}^{1/2}\Eint{K}{\bu}+\tau_{1,K}^{1/2}\Eint{K}{p})$, with the local weight
+$\alpha_K\le1$. This refinement is consistent with (and slightly strengthens) the
+robustness discussion of the main text in regions of low porosity.
+\end{remark}
+
+\section{Amendments to the original statements}\label{sec:amendments}
+
+We collect here the small corrections that the above analysis introduces with respect to
+the statements in the main text and in~\cite{codina2001}.
+
+\begin{enumerate}[label=\textup{(A\arabic*)},leftmargin=3.2em,itemsep=2pt]
+\item\label{am:eps}
+\emph{Smallness condition on $\varepsilon$ (main text).} The condition should be stated
+in the two-constant form \eqref{eq:epscond},
+$\varepsilon\le C_2\,c_1\min_K\{\alpha_K^2\tau_{1,K}/h_K^2\}$ with a fixed $C_2<1$,
+rather than as a strict inequality with $C_2=1$. Indeed, with the latter one has
+$\varepsilon\tau_{2,K}<\varphi_{1,K}\tau_{1,K}\le1$ but \emph{without a uniform margin}
+when $\sigma=0$, so the coercivity of the penalty block,
+$\varepsilon(1-\varepsilon\tau_2)\norm{p_h}^2\ge C\varepsilon\norm{p_h}^2$, would not
+hold with a constant independent of the data. The same uniform margin
+($\varepsilon\tau_2\le C_2<1$) is used here in Steps 3 and 7, and the factor
+$\alpha_K^2$ in \eqref{eq:epscond} is what allows the penalty term to be absorbed with
+the weight $\alpha_K$ in \eqref{eq:absorb3}. This mirrors Eq.~(34)
+of~\cite{codina2001}.
+\item\label{am:brokennorm}
+\emph{Definition of the broken norm (main text).}
+The elementwise norm must be defined as the $\ell^2$ combination
+\eqref{eq:brokennotation}, $\norm{\tau^{1/2}f}_h=(\sum_K\tau_K\norm{f}_K^2)^{1/2}$, and
+not as the plain sum $\sum_K\norm{f}_{L^2(K)}$; otherwise the working norm
+\eqref{eq:triplenorm} and all Cauchy--Schwarz manipulations would be inconsistent.
+\item\label{am:hypotheses}
+\emph{Hypotheses of the continuity lemma (main text).} Besides positivity of the
+algorithmic constants and $\nabla\cdot(\alpha\ba)=0$, the proof requires: the porosity
+resolution condition \eqref{eq:resolved} (assumed earlier in the analysis section of the
+main text, but to be included among the hypotheses of the lemma); the smallness condition
+\eqref{eq:epscond}; when $\sigma>0$, the jump condition \eqref{eq:jumpcond} together with
+the $L^\infty$ inverse estimate in \eqref{eq:inverse} (the exact analogue of conditions
+(38)--(39) of~\cite{codina2001}); and trace regularity of $\ba$ (\cref{H:advection}).
+The trial and test pairs should range over $\Xh=\mathcal{X}_{h0}$ (homogeneous boundary
+values), since the boundary faces must drop from the inter-element terms.
+\item\label{am:winv}
+\emph{Inverse estimates for $\alpha$-weighted quantities (main text).} Since $\alpha$ is
+not piecewise polynomial, the inverse estimates applied to
+$\nabla\cdot(\alpha\ViscProj\nabla\buh)$ and $\nabla\cdot(\alpha\buh)$ hold with the
+constant $\Cinva=\sqrt{d\,\delta_\alpha}\,\Cinv+C_\alpha$ of \cref{lem:winv} rather than
+with the bare $\Cinv$; accordingly, the lower bounds imposed on $c_1$ in the stability
+lemma should be read with $\Cinva$ in place of $\Cinv$ (cf.\ \cref{rem:winvconst}).
+\item\label{am:codinasign}
+\emph{Sign of the inter-element term in Eq.~(66) of~\cite{codina2001}.} The elementwise
+integration by parts of the convective stabilization term produces the inter-element
+contribution with a \emph{negative} sign, cf.\ \eqref{eq:fiveterms}; in~\cite{codina2001}
+it is printed with a positive sign. The slip is harmless: the term is subsequently
+estimated in absolute value.
+\item\label{am:codinadiva}
+\emph{The term $\tfrac12(\nabla\cdot\ba)\bv_h$ in~\cite{codina2001}.} In the original
+proof (Eqs.~(65) and~(74)) the contribution of $\tfrac12(\nabla\cdot\ba)\bv_h$ to
+$X(\bv_h,q_h)$ is absorbed without comment; estimating it as the convective part requires
+control of $\norm{\nabla\cdot\ba}_{L^\infty(K)}$ by $|\ba|_{\infty,K}/h_K$, which holds,
+e.g., when $\ba$ is a finite element function (by an inverse estimate), but not for
+general $\ba\in L^\infty$. In the porous formulation analyzed here the issue does not
+arise: under $\nabla\cdot(\alpha\ba)=0$ the convective operator is $\alpha\ba\cdot\nabla$
+with no skew term.
+\item\label{am:codinaregularity}
+\emph{Pressure regularity in Eq.~(77) of~\cite{codina2001}.} The regularity space is
+stated with $n\ge k_p$; since the interpolation error
+$E_{\mathrm{int}}(p)$ involves $\norm{p}_{H^{k_p+1}}$, it should read $n\ge k_p+1$, as in
+\eqref{eq:regularity}.
+\end{enumerate}
+
+\begin{thebibliography}{9}
+\bibitem{codina2001}
+R.~Codina,
+\emph{A stabilized finite element method for generalized stationary incompressible
+flows},
+Computer Methods in Applied Mechanics and Engineering \textbf{190} (2001) 2681--2706.
+
+\bibitem{brennerscott}
+S.~C. Brenner and L.~R. Scott,
+\emph{The Mathematical Theory of Finite Element Methods}, 3rd ed.,
+Texts in Applied Mathematics 15, Springer, New York, 2008.
+
+\bibitem{ernguermond}
+A.~Ern and J.-L. Guermond,
+\emph{Theory and Practice of Finite Elements},
+Applied Mathematical Sciences 159, Springer, New York, 2004.
+\end{thebibliography}
+
+\end{document}

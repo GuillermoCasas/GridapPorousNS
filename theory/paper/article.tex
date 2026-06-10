@@ -100,6 +100,11 @@
 % like this: \Guillermo{BBBB\sout{AAAAAA}}
 \newcommand\Guillermo[1]{\textcolor{red}{#1}}
 \newcommand\Joaquin[1]{\textcolor{blue}{#1}}
+% Review markup for the 2026 amendment pass (math/prose corrections).
+% Distinct dark green so it is not confused with the author annotations
+% above (red/blue). To flatten/accept all corrections, redefine as {#1}.
+\definecolor{amendcolor}{rgb}{0.0,0.55,0.0}
+\newcommand{\amend}[1]{\textcolor{amendcolor}{#1}}
 
 % Integer interval
 \newcommand{\isep}{\mathrel{{.}\,{.}}\nobreak}
@@ -141,6 +146,32 @@
 \newcommand{\Damk}{\operatorname{\mathit{Da}}}
 \newcommand{\Darcy}{\operatorname{\mathit{Dar}}}
 
+% ---- Macros & environment for the inlined continuity appendix (App. B) ----
+% Shorthands matching the notation of theory/continuity appendix/. The macros
+% \ViscProj and \triplenorm are already defined above and are reused (not redefined).
+\newsiamremark{assumption}{Assumption}
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\ba}{\boldsymbol{a}}
+\newcommand{\bn}{\boldsymbol{n}}
+\newcommand{\bff}{\boldsymbol{f}}
+\newcommand{\beu}{\boldsymbol{e}_{u}}
+\newcommand{\buh}{\boldsymbol{u}_h}
+\newcommand{\bvh}{\boldsymbol{v}_h}
+\newcommand{\buhat}{\widehat{\boldsymbol{u}}_h}
+\newcommand{\Th}{\mathcal{T}_h}
+\newcommand{\Xh}{\mathcal{X}_{h0}}
+\newcommand{\BS}{B_{\mathrm{S}}}
+\newcommand{\LS}{L_{\mathrm{S}}}
+\newcommand{\X}{X}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\Cinv}{C_{\mathrm{inv}}}
+\newcommand{\Cinva}{\overline{C}_{\mathrm{inv}}}
+\newcommand{\jump}[1]{[\![#1]\!]}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\newcommand{\sigmatilde}{\widetilde{\sigma}_{\alpha}}
+\newcommand{\Eint}[2]{\mathrm{E}^{#1}_{\mathrm{int}}(#2)}
+
 
 \begin{document}
 \def\mystrut(#1,#2){\vrule height #1pt depth #2pt width 0pt}
@@ -163,7 +194,7 @@ We present a finite element method for a generalized version of the Navier{\hyp}
 \end{AMS}
 
 \section{Introduction}\label{sec:Introduction}
-Porous media flows are typically modelled by a pointwise generalization of the classical Darcy equation, which results from postulating that the flow is in a state of permanent local mechanical equilibrium, with the pressure gradient and external body forces balancing the interfacial viscous resistance caused by the fluid's motion relative to the porous matrix. In these conditions, the fluid's inertia, as well as the contribution of the viscous forces arising from the fluid motion relative to itself, can be neglected. %Darcy flows are by far the most commonly encountered in engineering applications, especially in hydrogeology, and have been extensively studied with numerical methods. In particular, stabilized finite element methods have proven very robust for incompressible Darcy flows and are widespread in applications (see \cite{Masud2002ASM,Juanes2005AVM,Codina2015OnSM,Braack2011EqualorderFE} and the references therein).
+Porous media flows are typically \amend{modeled} by a pointwise generalization of the classical Darcy equation, which results from postulating that the flow is in a state of permanent local mechanical equilibrium, with the pressure gradient and external body forces balancing the interfacial viscous resistance caused by the fluid's motion relative to the porous matrix. In these conditions, the fluid's inertia, as well as the contribution of the viscous forces arising from the fluid motion relative to itself, can be neglected. %Darcy flows are by far the most commonly encountered in engineering applications, especially in hydrogeology, and have been extensively studied with numerical methods. In particular, stabilized finite element methods have proven very robust for incompressible Darcy flows and are widespread in applications (see \cite{Masud2002ASM,Juanes2005AVM,Codina2015OnSM,Braack2011EqualorderFE} and the references therein).
 
 The adequacy of the Darcy model in describing a wide range of porous media flows is empirically well established and has even been rigorously derived in a number of idealized scenarios by applying homogenization theory, with the Stokes equations as a description of the microscopic flow~\cite{hornung1997homogenization,calvo2022justification}. However, the underlying assumptions of negligible inertia and clear separation of scales fail to hold in a number of practical scenarios encountered in the oil and gas~\cite{vincent1999non,smith2004investigation}, biomedical~\cite{shaw2014bioconvection,grillo2014darcy} or food~\cite{verboven2006modelling} industries, to name but a few. Nonetheless, the application of homogenization theory under relaxed assumptions is still possible, yielding generalized equations that encompass the Darcy equation as a limiting case~\cite{chen2001derivation,calvo2019brinkman}.
 
@@ -178,7 +209,7 @@ Non-Darcy effects can be mathematically captured by incorporating a more sophist
 
 % In addition to the above non-Darcy porous media flows, it is worth mentioning a different situation in which equations of such type also appear: the equations of motion of the fluid through a matrix made up of a dispersed suspension of particles, where the latter are considered as static or frozen in time. Such systems may have little direct physical relevance, as in reality the fluid tends to affect the matrix as much as the other way around. However, they do often arise in the context of segregated algorithms for the numerical simulation of particle-laden flows~\cite{prosperetti2009computational}. In this work we will consider only the stationary form of the equations, although the method presented can be readily extended to the instationary case, as it will be shown in upcoming publications. Consequently, we will focus on the properties of the spatial discretization of the equations of motion.
 
-From the numerical standpoint, the generalized equations bring about all the well-known problems associated with the discretization of the generalized Navier{\hyp}Stokes system. That is, the Galerkin form of their finite element discretization suffers from instabilities that appear when the viscous term is dominated by any of the lower-order terms such as in convection-dominated or reaction-dominated \Guillermo{(i.e, dominated by the term that is proportional to the fluid velocity by analogy with classical convection-diffusion-reaction systems)} flows. Furthermore, the use of equal{\hyp}order interpolations for the velocity and the pressure leads to the violation of the Ladyzhenskaya{\hyp}Babu\v{s}ka{\hyp}Brezzi (LBB) condition, requiring stabilization regardless of the situation.
+From the numerical standpoint, the generalized equations bring about all the well-known problems associated with the discretization of the generalized Navier{\hyp}Stokes system. That is, the Galerkin form of their finite element discretization suffers from instabilities that appear when the viscous term is dominated by any of the lower-order terms such as in convection-dominated or reaction-dominated \Guillermo{(i.e\amend{.}, dominated by the term that is proportional to the fluid velocity by analogy with classical convection-diffusion-reaction systems)} flows. Furthermore, the use of equal{\hyp}order interpolations for the velocity and the pressure leads to the violation of the Ladyzhenskaya{\hyp}Babu\v{s}ka{\hyp}Brezzi (LBB) condition, requiring stabilization regardless of the situation.
 
 For the Navier{\hyp}Stokes system, all of these numerical issues have been successfully addressed in the past~\cite{codina2001stabilized,codina2002stabilized} using the Variational Multi-scale (VMS) framework~\cite{Hughes1998TheVM} to design stabilized methods. In~\cite{codina2001stabilized}, the so-called Algebraic Sub{\hyp}Grid Scale (ASGS) formulation is applied to the Navier{\hyp}Stokes system, including a reactive term (as well as additional terms related to Coriolis forces which we will not consider here), where optimal error estimates are proven for the linearized problem.
 
@@ -199,7 +230,7 @@ Let our problem spatial domain be $\Omega\subset\mathbb{R}^d$, with $d\in\{2,3\}
   \alpha \boldsymbol{u} \cdot \nabla \boldsymbol{u} - 2\nabla \cdot ( \alpha \nu \ViscProj \nabla \boldsymbol{u}) + \alpha \nabla p + \boldsymbol{\sigma}(\alpha, \boldsymbol{u})\boldsymbol{u} = \boldsymbol{f} \quad \text{in } \Omega \label{eq:StrongMomentumEquation}, \\
   \varepsilon p + \nabla \cdot (\alpha \boldsymbol{u}) = 0 \quad \text{in } \Omega \label{eq:StrongMassEquation},
 \end{align}
-where $\boldsymbol{\sigma}$ represents a viscous resistance tensor (the inverse of the permeability tensor), which we will assume to be symmetric and positive semidefinite, \Joaquin{$\nu$ is the kinematic viscosity}, and $\boldsymbol{f}$ is a forcing term representing external body forces, such as gravity, which for simplicity we will assume to be independent of the solution. Finally, $\varepsilon \geq 0$ represents a small compressibility, which we mainly include for numerical reasons (i.e., in order to implement the \emph{iterative penalty method}~\cite{codina1993iterative}), as in some cases it helps to ensure the well-posedness of the problem; see \cref{sec:NumericalExamplesStationaryCase3D}. %(i.e. as may be the case within a segregated approach where the particles' phase is resolved using the old values of the velocity field)%. $\scriptstyle{\ViscProj}$ is an orthogonal linear projection operator.
+where $\boldsymbol{\sigma}$ represents a viscous resistance tensor (the \amend{kinematic viscosity times the }inverse of the permeability tensor), which we will assume to be symmetric and positive semidefinite, \Joaquin{$\nu$ is the kinematic viscosity}, and $\boldsymbol{f}$ is a forcing term representing external body forces, such as gravity, which for simplicity we will assume to be independent of the solution. Finally, $\varepsilon \geq 0$ represents a small compressibility, which we mainly include for numerical reasons (i.e., in order to implement the \emph{iterative penalty method}~\cite{codina1993iterative}), as in some cases it helps to ensure the well-posedness of the problem; see \cref{sec:NumericalExamplesStationaryCase3D}. %(i.e. as may be the case within a segregated approach where the particles' phase is resolved using the old values of the velocity field)%. $\scriptstyle{\ViscProj}$ is an orthogonal linear projection operator.
 
 By defining $\scriptstyle{\ViscProj} \displaystyle{\coloneqq} \scriptstyle{\DPi\SPi}$, where $\scriptstyle{\DPi}$ and $\scriptstyle{\SPi}$ are (commutative) orthogonal linear projection operators, and considering different versions of the latter two, we obtain alternative formulations found in different contexts in the literature. Our particular choice for these operators in the examples presented, corresponds to taking $\scriptstyle\DPi$ and $\scriptstyle\SPi$ as the operators that extract, respectively, the deviatoric and symmetric components of the tensor upon which they act. This yields
 \begin{equation}
@@ -207,7 +238,7 @@ By defining $\scriptstyle{\ViscProj} \displaystyle{\coloneqq} \scriptstyle{\DPi\
   \end{equation}
   where $\nabla^\text{S} \boldsymbol{u} \coloneqq \frac{1}{2}(\nabla \boldsymbol{u} + (\nabla \boldsymbol{u})^\top)$. This particular formulation for the second term in \cref{eq:StrongMomentumEquation} is based on the assumption that the bulk viscosity is zero (Stokes' hypothesis) and it is consistent with the formulation used in multicomponent fluid formulations, where the full system involving several phases is solved in a segregated way, taking one phase at a time and assuming the porosity to be given~\cite{prosperetti2009computational,norouzi2016coupled}. \Guillermo{Note that for $\alpha \equiv 1$ the model considered in~\cite{codina2001stabilized} is recovered (i.e., the standard incompressible Navier{\hyp}Stokes system with a viscous resistance term)}. 
   
-  As mentioned, other combinations are possible. For instance, taking $\scriptstyle{\DPi} \displaystyle{\equiv} \mathbb{I}$, $\scriptstyle{\SPi} \displaystyle{=} \nabla^\text{S} \boldsymbol{u}$, together with a particular expression for $\boldsymbol{\sigma}$, we recover the DBF equations~\cite{cocquet2021error}\footnote{Although in other works we find $\scriptstyle{\DPi} \displaystyle{=} \scriptstyle{\SPi} \displaystyle{\equiv} \mathbb{I}$~\cite{skrzypacz}, even though the name used for the equations is also DBF.}
+  As mentioned, other combinations are possible. For instance, taking $\scriptstyle{\DPi} \displaystyle{\equiv} \mathbb{I}$, $\scriptstyle{\SPi} \displaystyle{=} \nabla^\text{S} \boldsymbol{u}$, together with a particular expression for $\boldsymbol{\sigma}$, we recover the DBF equations~\cite{cocquet2021error}\footnote{Although in other works we find $\scriptstyle{\DPi} \displaystyle{=} \scriptstyle{\SPi} \displaystyle{\equiv} \mathbb{I}$~\cite{skrzypacz}, even though the name used for the equations is also DBF.}\amend{.}
 
 To complete the definition of the problem, it is necessary to supply the above equations with suitable boundary conditions, whose form will be specified in the following sections. We are not aware of any analysis addressing the well-posedness of the resulting problem in its full generality, although in~\cite{cocquet2021error} it is proven for the particular case of $\scriptstyle\DPi \displaystyle\equiv \mathbb{I}$, $\scriptstyle\SPi\displaystyle = \nabla^\text{S} \boldsymbol{u}$, a resistance term of the form $ \boldsymbol{\sigma} = \sigma(\alpha, \boldsymbol{u}) \mathbb{I}$, with $\sigma$ a scalar function defined in terms of additional scalar functions $a(\alpha), b(\alpha)$ as
 \begin{equation} \label{eq:DBFResistanceTerm}
@@ -231,7 +262,7 @@ In the equations above, the $n \times n$ matrices $\mathbf{K}_{ij}$, $\mathbf{A}
 
 % One can also define $\mathbf{A}_{U}$ such that $\mathcal{L}(W,U) = \mathbf{A}_{U} W$, whose properties will depend on those of $\mathbf{A}_{\text{c},i}(W)$ (see below).
 
-Using these definitions, the boundary value problem defined by Equations \cref{eq:StrongMassEquation,eq:StrongMomentumEquation}, together with appropriate boundary conditions can be cast in the following standard form:
+Using these definitions, the boundary value problem defined by \cref{eq:StrongMassEquation,eq:StrongMomentumEquation}, together with appropriate boundary conditions\amend{,} can be cast in the following standard form:
 
 \emph{Find $U=[\boldsymbol{u}; p]\in \mathcal{X}$ such that}
 \begin{subequations}
@@ -293,7 +324,7 @@ where $\delta_{\bullet \bullet}$ is the Kronecker delta and where in the reactio
 The particular version of the trace operator that we will be interested in is given by
 \begin{equation} \label{eq:TraceOperator}
   \begin{aligned}
-    \mathcal{D}_U \colon \Gamma &\rightarrow \mathbb{R}^3 \\
+    \mathcal{D}_U \colon \Gamma &\rightarrow \mathbb{R}^{\amend{d}} \\
     \boldsymbol{x} &\mapsto \left\{
       \begin{matrix}
       \mathcal{D}_{\text{D},U}(\boldsymbol{x}) & \text{if}\quad \boldsymbol{x} \in \Gamma_\text{D}, \\
@@ -306,13 +337,13 @@ where $\Gamma = \Gamma_\text{D} \cup \Gamma_\text{N}$, $\Gamma_\text{D} \cap \Ga
 \begin{align}
   \label{eq:dirichlet_bc}
   &\begin{aligned}
-    \mathcal{D}_{\text{D},U} \colon \Gamma_\text{D} &\rightarrow \mathbb{R}^3 \\
+    \mathcal{D}_{\text{D},U} \colon \Gamma_\text{D} &\rightarrow \mathbb{R}^{\amend{d}} \\
     \boldsymbol{x} &\mapsto \boldsymbol{u}|_{\Gamma} (\boldsymbol{x}),
   \end{aligned} \\
   \label{eq:neumann_bc}
   &\begin{aligned}
-    \mathcal{D}_{\text{N},U} \colon \Gamma_\text{N} &\rightarrow \mathbb{R}^3 \\
-    \boldsymbol{x} &\mapsto \alpha \big ( \nu \ViscProj \nabla \boldsymbol{u} \small\vert_{\Gamma}(\boldsymbol{x}) - p \small\vert_{\Gamma}(\boldsymbol{x})  \mathbb{I} \big ) \cdot \boldsymbol{n},
+    \mathcal{D}_{\text{N},U} \colon \Gamma_\text{N} &\rightarrow \mathbb{R}^{\amend{d}} \\
+    \boldsymbol{x} &\mapsto \alpha \big ( \amend{2} \nu \ViscProj \nabla \boldsymbol{u} \small\vert_{\Gamma}(\boldsymbol{x}) - p \small\vert_{\Gamma}(\boldsymbol{x})  \mathbb{I} \big ) \cdot \boldsymbol{n},
   \end{aligned}
 \end{align}
 where $\vert_{\Gamma}$ denotes the trace of the function on $\Gamma$ (we may assume $\alpha$ to be defined on the whole of $\partial\Omega$). Moreover, we take
@@ -419,9 +450,9 @@ In order to conveniently reexpress this problem in terms of linear functionals, 
   B(\boldsymbol{w}, U, V) &\coloneqq \dualpairing{\partial_i V, \mathbf{K}_{ij} \partial_j U} + \dualpairing{V, \mathbf{A}_{\text{c},i}(\boldsymbol{w}) \partial_i U} \notag \\
                     &\phantom{\coloneqq{}} - \dualpairing{\partial_i(\mathbf{A}^{\top}_{\text{f},i} V) , U} + \dualpairing{V, \mathbf{S}(\boldsymbol{w}) U },
 \end{align}
-%\begin{equation} \label{eq:AdjointFlux}
+%\begin{equation} \label{eq:AdjointFlux_commented}
   %\mathcal{F}^*_n V &= n_i \mathbf{K}_{ij} \partial_j V + n_i \mathbf{A}^{\top}_{c,i} Us
-%\end{equation} \label{eq:AdjointFlux}
+%\end{equation} \label{eq:AdjointFlux_commented}
 and the linear form $L \colon \mathcal{X} \rightarrow \mathbb{R}$, defined as
 \begin{equation} \label{eq:RHSLinearForm}
   L(V) \coloneqq \dualpairing{V, F} + \dualpairing{V, G}_{\Gamma_\text{N}}.
@@ -465,7 +496,7 @@ where $\mathcal{R}$ is the residual operator, i.e., $\mathcal{R}_{\boldsymbol{w}
 \end{equation}
 where $\Pi_h$ is a linear projection onto $\mathcal{X}_{h0}$ and $\Pi_h^\top$ its transpose. \Cref{eq:weak_form_eliminated_subscales} \Guillermo{does not entail any approximation} and (assuming the continuous problem is well posed) the second term must be providing the desired stability that the first term alone (i.e., the Galerkin method) lacks. Moreover, note that the equation that we obtain by substituting \cref{eq:ExplicitExactSubscales} in \cref{eq:weak_form_eliminated_subscales} is entirely in terms of $\mathcal{L}^{-1}$ and $\Pi_h$. Accordingly, all VMS-stabilized methods are characterized by the way in which these two operators are approximated. The idea is always to obtain a computable numerical method, while \emph{still preserving the desired stability properties of the original equation}. In the following subsection, we describe the particular choices made here in order to achieve this.
 
-\subsection{Finite element discretization \& modelling of SGSs}\label{sec:FEDiscretization} \hfill\\
+\subsection{Finite element discretization \& modeling of SGSs}\label{sec:FEDiscretization} \hfill\\
 The standard Galerkin finite element method consists in replacing the infinite{\hyp}dimensional space $\mathcal{X}$ by a finite{\hyp}dimensional analogue, leading to a problem that is finite dimensional and therefore computable. Thus, let us consider a finite element discretization $\bigcup_{K \in \mathcal{T}_h} K = \bar{\Omega}$ (the closure of $\Omega$), constructed with a mesh of diameter $h$. Let us denote the velocity and pressure finite element spaces as $\mathcal{V}_{h0} \subset \mathcal{V}_0$, and $\mathcal{Q}_{h0} \subset \mathcal{Q}_0$ with $\mathcal{X}_{h0}\coloneqq \mathcal{V}_{h0} \times \mathcal{Q}_{h0}$ and the finite element functions $U_h = [u_{h,1},\dots, u_{h,d}, p_h] \in \mathcal{X}_{h0}$ (identifying $[[\bullet_1\dots\bullet_d], \bullet]$ with $[\bullet_1 \dots \bullet_{d+1}]$). To simplify the exposition, we will consider that $\mathcal{V}_{h0}$ and $\mathcal{Q}_{h0}$ are constructed using continuous polynomial interpolations.
 
 As mentioned in the introduction, the discretized problem obtained with the Galerkin method will suffer from numerical instabilities due to the violation of the LBB condition (e.g., for equal{\hyp}order spaces) and from the degeneration of its inherent stability for extreme values of the physical parameters. Let us therefore use the VMS framework to produce a stabilized formulation of the discrete problem. Considering the finite element spaces defined by the discretization above in \cref{eq:weak_form_resolved} and applying Stokes' theorem to each element domain (which, in particular, is possible for piecewise polynomials), we obtain
@@ -507,7 +538,7 @@ Using Assumption \labelcref{LinearInverseDifferentialOperator}, this equation ca
 Note that \cref{eq:simplified_weak_form_subscales} is nonlinear, due to the dependence of both $\boldsymbol{\tau}_K$ and $\mathcal{R} U_h \left. \right \vert_{K}$ on the SGS. Thus, it will be necessary to linearize it at each integration point to obtain a solution in the final formulation; see \cref{sec:LinearizationOfCoupledSystem}.
 
 Summarizing, under \labelcref{ExactAtBoundaries,ZeroAtInterElementBoundaries,LinearInverseDifferentialOperator}, \cref{eq:simplified_weak_form_resolved} can be written as the following stabilized system:
-% \begin{align} \label{eq:VMSWeakFormSystem}
+% \begin{align} \label{eq:VMSWeakFormSystem_commented}
 %   B(V_h, U_h) + \sum_K{ \dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau}_K \boldsymbol{\pi}}_K} \eqqcolon B_\text{S}(V_h, U_h) &= L(V_h) \notag \\*
 %   \boldsymbol{\pi} - \widetilde{\Pi}\mathcal{R}U_h &= 0
 % \end{align}
@@ -551,7 +582,7 @@ Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakForm
 \endgroup
 \emph{where}
 \begin{align}
-  B_\text{S}(\boldsymbol{w}, U, V) &\coloneqq B(\boldsymbol{w}, U, V) - \sum_K{ \dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \mathcal{L}_{\boldsymbol{w}} U}}, \\
+  B_\text{S}(\boldsymbol{w}, U, V) &\coloneqq B(\boldsymbol{w}, U, V) - \sum_K{ \dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \mathcal{L}_{\boldsymbol{w}} U}\amend{_K}}, \\
   L_\text{S}(\boldsymbol{w}, V, \boldsymbol{\pi}) &\coloneqq L(V)
   - \sum_K{\dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \left (F - \boldsymbol{\pi} \right )}_K}.
 \end{align}
@@ -661,10 +692,10 @@ with $ \left \| \bullet \right \|_{L^2_{\Lambda^{-1}}(K)}$ defined analogously.
 
 The argument to \emph{motivate} the design of the stabilization parameters, adapted from~\cite{codina2008analysis} (see also~\cite{Roa2016VariationalMF}), goes as follows. There holds
 \begin{align} \label{eq:BoundProjectionOfLBySubscales}
-   \| \widetilde{\Pi} [\mathcal{L}\widetilde{U}] \|_{L^2_\Lambda(K)}^2 & \approx \|\widetilde{\Pi} [\mathcal{L}\widetilde{U}]\|_{L^2_\Lambda(\mathbb{R}^d)}^2 = \| \compositeaccents{\widehat}{\widetilde{\Pi}[\mathcal{L}\widetilde{U}]} \|_{L^2_\Lambda(\mathbb{R}^d)}^2 = \int_{\mathbb{R}^d}{ | \widehat{\mathcal{L}} \compositeaccents{\widehat}{\widetilde{U}}|_{\Lambda}^2 \, \mathrm{d} \boldsymbol{k}} \notag \\
+   \| \widetilde{\Pi} [\mathcal{L}\widetilde{U}] \|_{L^2_\Lambda(K)}^2 & \approx \|\widetilde{\Pi} [\mathcal{L}\widetilde{U}]\|_{L^2_\Lambda(\mathbb{R}^d)}^2 = \| \compositeaccents{\widehat}{\widetilde{\Pi}[\mathcal{L}\widetilde{U}]} \|_{L^2_\Lambda(\mathbb{R}^d)}^2 \amend{\le} \int_{\mathbb{R}^d}{ | \widehat{\mathcal{L}} \compositeaccents{\widehat}{\widetilde{U}}|_{\Lambda}^2 \, \mathrm{d} \boldsymbol{k}} \notag \\
    & \le \int_{\mathbb{R}^d}{ | \widehat{\mathcal{L}}|_{\Lambda}^2 | \compositeaccents{\widehat}{\widetilde{U}}|_{\Lambda^{-1}}^2 \, \mathrm{d} \boldsymbol{k}} = | \widehat{\mathcal{L}}(\boldsymbol{k}_0)|_{\Lambda}^2 \| \widetilde{U} \|_{L^2_{\Lambda^{-1}}(\mathbb{R}^d)}^2 \approx | \widehat{\mathcal{L}}(\boldsymbol{k}_0)|_{\Lambda}^2 \| \widetilde{U} \|_{L^2_{\Lambda^{-1}}(K)}^2,
 \end{align}
-where $\boldsymbol{k}$ is the dimensionless $h$-normalized wave number. The first (strict) equality stems from Plancherel's theorem, while the approximations in the first and second line are the result of neglecting the value of the SGSs (and of their derivatives) on the element boundary (cf. Assumption \labelcref{ZeroAtInterElementBoundaries}). The first equality in the second line is due to the mean value theorem, which predicts the existence of a $\boldsymbol{k}_0$ which, assuming the SGSs are dominated by large wave numbers, must be $|\boldsymbol{k}_0| \gtrsim 1$.
+where $\boldsymbol{k}$ is the dimensionless $h$-normalized wave number. The first (strict) equality stems from Plancherel's theorem, while the approximations in the first and second line are the result of neglecting the value of the SGSs (and of their derivatives) on the element boundary (cf. Assumption \labelcref{ZeroAtInterElementBoundaries}). The first equality in the second line is due to the mean value theorem, which predicts the existence of a $\boldsymbol{k}_0$ which, assuming the SGSs are dominated by large wave numbers, must be $|\boldsymbol{k}_0| \gtrsim 1$. \amend{Here, $| \widehat{\mathcal{L}} |_{\Lambda}$ denotes the operator norm of the matrix $\widehat{\mathcal{L}}(\boldsymbol{k})$ from $(\mathbb{C}^n, |\bullet|_{\Lambda^{-1}})$ to $(\mathbb{C}^n, |\bullet|_{\Lambda})$, which coincides with $\rho_{\Lambda^{-1}}\bigl(\widehat{\mathcal{L}}^\dagger \Lambda \widehat{\mathcal{L}}\bigr)^{1/2}$ in the notation introduced below.}
 
 So, if we are to approximate $\mathcal{L}^{-1}$ on each element $K$ by a matrix $\boldsymbol{\tau}_K$, a possible design restriction could be that the approximate version of the inequality in \cref{eq:BoundProjectionOfLBySubscales} holds. This is automatically achieved if one imposes that
 \begin{equation} \label{eq:DesignConditionOnTau}
@@ -699,7 +730,7 @@ where
                 0 &           0 &           0 & \delta_{i2} \\
                 0 &           0 &           0 & \delta_{i3} \\
       \delta_{i1} & \delta_{i2} & \delta_{i3} & 0
-    \end{bmatrix} \\
+    \end{bmatrix}\amend{,} \\
     \mathbf{S}_{\nabla \alpha} &=
     \begin{bmatrix}
           0 & 0 & 0 & 0 \\
@@ -716,8 +747,8 @@ Now, due to the complexity of the operator $\mathcal{L}$, instead of \cref{eq:De
 \end{equation}
 For simplicity, we take $\boldsymbol{\tau}_K = \diag{(\tau_1, \tau_1, \tau_1, \tau_2)}$ (for $d=3$) and every matrix on the right-hand side of \cref{eq:DesignConditionOnTauWeak} is taken of the same form. Every approximate operator is thus defined by a pair of (positive) eigenvalues, whose value is fixed by the following design criterion: their value should be taken as the minimum still ensuring that the spectral radius of the approximate operator is as large as that of its corresponding Fourier-transformed differential operator, and such that the kernel of the former is contained in that of the latter. Note that this condition guarantees that
 \begin{align} \label{eq:FTOfDifferentialOperator}
-  | \boldsymbol{\tau}_K^{-1} |_{\Lambda}^2 &\le | \boldsymbol{\tau}_{\nu}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{c}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{b}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{\sigma}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{\nabla \alpha}^{-1} |_{\Lambda}^2\\
-  & = |\widehat{ \mathcal{L}}_{\nu}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{c}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{b}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{\sigma}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{\nabla \alpha}(\boldsymbol{k}_0) |_{\Lambda}^2
+  | \boldsymbol{\tau}_K^{-1} |_{\Lambda}^2 &\le \amend{5} \left( | \boldsymbol{\tau}_{\nu}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{c}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{b}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{\sigma}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{\nabla \alpha}^{-1} |_{\Lambda}^2 \right) \notag \\
+  & = \amend{5} \left( |\widehat{ \mathcal{L}}_{\nu}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{c}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{b}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{\sigma}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{\nabla \alpha}(\boldsymbol{k}_0) |_{\Lambda}^2 \right)
 \end{align}
 which, while not strictly implying \cref{eq:DesignConditionOnTau}, reduces to it in the limit when any one of the operators becomes dominant. The same design criterion has been successfully applied to other problems~\cite{Roa2016VariationalMF}. The expression of the Fourier-transformed operators is (summation over repeated indices is implied)
 \begin{align}
@@ -732,8 +763,8 @@ where $\mathrm{i}$ denotes the imaginary unit and where we have used the fact th
 Using these definitions and applying the design criteria above yields the following stabilization parameters:
 \begin{equation} \label{eq:StabilizationParameters}
 \begin{aligned}
-  \tau_{\nu, 1}^{-1} &= \frac{4}{3} \alpha \nu \frac{|\boldsymbol{k}_0|}{h^2}, & \tau_{\nu, 2}^{-1} &= 0, \\
-  \tau_{c, 1}^{-1} &= \alpha \frac{\boldsymbol{w} \cdot \boldsymbol{k}_0}{h}, & \tau_{c, 2}^{-1} &= 0, \\
+  \tau_{\nu, 1}^{-1} &= \frac{4}{3} \alpha \nu \frac{|\boldsymbol{k}_0|^{\amend{2}}}{h^2}, & \tau_{\nu, 2}^{-1} &= 0, \\
+  \tau_{c, 1}^{-1} &= \alpha \frac{\amend{|}\boldsymbol{w} \cdot \boldsymbol{k}_0\amend{|}}{h}, & \tau_{c, 2}^{-1} &= 0, \\
   \tau_{b, 1}^{-1} &= \alpha \frac{|\boldsymbol{k}_0|}{h}\sqrt{\lambda}, & \tau_{b, 2}^{-1} &= \alpha \frac{|\boldsymbol{k}_0|}{h} \frac{1}{\sqrt{\lambda}}, \\
   \tau_{\sigma, 1}^{-1} &= \rho_{\Lambda^{-1}}(\boldsymbol{\sigma}), & \tau_{\sigma, 2}^{-1} &= \varepsilon, \\
   \tau_{\nabla \alpha, 1}^{-1} &= \sqrt{\lambda}|\nabla \alpha|, & \tau_{\nabla \alpha, 2}^{-1} &= 0.
@@ -797,7 +828,7 @@ Let us now study the stability of the stabilized bilinear form. We follow the an
   &\phantom{={}} + \Big\| \tau_1^{1/2} \alpha X(U_h)\Big\|_h^2 - \Big\| \tau_1^{1/2} \big( 2 \nabla \cdot (\alpha \nu \ViscProj \nabla \boldsymbol{u}_h) - \sigma \boldsymbol{u}_h \big) \Big\|_h^2 \notag \\[1.0ex]
   &\phantom{={}} + \Big\| \tau_2^{1/2} \nabla \cdot (\alpha \boldsymbol{u}_h)\Big\|_h^2 - \varepsilon^2 \Big\| \tau_2^{1/2} p_h \Big\|_h^2, \label{eq:StabilityEstimate}
 \end{align}
-where $\| \bullet \|_h \coloneqq \sum_K{\| \bullet \|_{L^2(K)}}$ and $X(U_h) \coloneqq \boldsymbol{a} \cdot \nabla \boldsymbol{u}_h + \nabla p_h$. Note that, strictly speaking, one has the term $\frac{1}{\alpha}\nabla \cdot (\alpha \boldsymbol{a}) \boldsymbol{v}_h$ in the expansion of $\mathcal{L}^* V_h$. The inclusion of such term generates a number of crossed terms in \cref{eq:StabilityEstimate} that actually harm stability. This could be solved by adding an analogous term on the original equation to reestablish that symmetry. By doing this, the strong form of the problem would not be changed, and one would have none of the undesirable crossed terms. This was the case analyzed in~\cite{codina2001stabilized}, where it is mentioned that such a formulation helps to make the problem well posed, especially for large values of $\varepsilon$. Here, we have opted for simplifying the formulation by removing the aforementioned term from $\mathcal{L}^* V_h$, leading to a simpler formulation with similar stability properties. Given that our focus is on small values of the compressibility, we do not miss out much in terms of the numerical advantages of the alternative formulation.
+where $\| \bullet \|_h \coloneqq \amend{\big( \sum_K{\| \bullet \|_{L^2(K)}^2} \big)^{1/2}}$ and $X(U_h) \coloneqq \boldsymbol{a} \cdot \nabla \boldsymbol{u}_h + \nabla p_h$. Note that, strictly speaking, one has the term $\frac{1}{\alpha}\nabla \cdot (\alpha \boldsymbol{a}) \boldsymbol{v}_h$ in the expansion of $\mathcal{L}^* V_h$. The inclusion of such term generates a number of crossed terms in \cref{eq:StabilityEstimate} that actually harm stability. This could be solved by adding an analogous term on the original equation to reestablish that symmetry. By doing this, the strong form of the problem would not be changed, and one would have none of the undesirable crossed terms. This was the case analyzed in~\cite{codina2001stabilized}, where it is mentioned that such a formulation helps to make the problem well posed, especially for large values of $\varepsilon$. Here, we have opted for simplifying the formulation by removing the aforementioned term from $\mathcal{L}^* V_h$, leading to a simpler formulation with similar stability properties. Given that our focus is on small values of the compressibility, we do not miss out much in terms of the numerical advantages of the alternative formulation.
 
 Let us bound the negative term in the second line of \cref{eq:StabilityEstimate}:
 \begin{align} \label{eq:BoundOfCrossedTerm}
@@ -821,6 +852,8 @@ where we have used the inequality $-2xy \geq - \frac{1}{\xi} x^2 - \xi y^2$, val
 \end{equation}
 which is valid for $0 \leq m \leq l$ and $1\leq p,q \leq \infty$ and any function $\psi_h$ belonging to a finite-dimensional subspace of $H^l(K)$, under the assumption that the sequence of mesh refinements is non-degenerate (see, e.g., \cite{brenner2008mathematical}).
 
+\amend{Note that, since $\alpha$ is not piecewise polynomial, \cref{eq:InverseEstimateFiniteOrderNorm} does not directly apply to quantities of the form $\nabla \cdot (\alpha \nu \ViscProj \nabla \boldsymbol{u}_h)$. Expanding the divergence and using \cref{eq:SmallPorosityGradient}, the same elemental estimates hold with $C_\text{inv}$ replaced by a constant $\overline{C}_\text{inv}$ that additionally depends on the constant in \cref{eq:SmallPorosityGradient}. With a slight abuse of notation, we keep the symbol $C_\text{inv}$ for this modified constant in what follows.}
+
 Now, using \cref{eq:BoundOfCrossedTerm} in \cref{eq:StabilityEstimate} we obtain
 \begin{align} \label{eq:StabilityEstimateFinal}
     B_\text{S}(\boldsymbol{a}, U_h, U_h) &\geq \sum_{K}\bigg\{ \varepsilon (1 - \varepsilon \tau_2) \big\| p_h \big\|_K^2  \notag \\[1.0ex]
@@ -830,16 +863,17 @@ Now, using \cref{eq:BoundOfCrossedTerm} in \cref{eq:StabilityEstimate} we obtain
 \end{align}
 We have mentioned that $\varepsilon$ must be small. In particular, we will require that
 \begin{equation} \label{eq:UpperBoundOnEpsilon}
-    \varepsilon < c_1 \inf_K{\left\{\frac{\alpha_K^2 \tau_{1,K}}{h^2}\right\}}.
+    \varepsilon \amend{\leq C_2\, c_1 \inf_K{\left\{\frac{\alpha_K^2 \tau_{1,K}}{h_K^2}\right\}},}
 \end{equation}
+\amend{for some fixed constant $0 \leq C_2 < 1$, independent of the mesh and of the physical parameters.}
 
-From \cref{eq:UpperBoundOnEpsilon}, we have that the coefficient of the norm of the pressure term is
+From \cref{eq:UpperBoundOnEpsilon}, \amend{since $\varepsilon \tau_2 \leq C_2 < 1$ on every element,} the coefficient of the norm of the pressure term \amend{satisfies}
 \begin{equation} \label{eq:PressureTermStabilityBound}
-    \varepsilon (1 - \varepsilon \tau_2) > C \varepsilon,
+    \varepsilon (1 - \varepsilon \tau_2) \amend{\geq (1 - C_2)\, \varepsilon \eqqcolon C \varepsilon,}
 \end{equation}
-with $C>0$, so as to make sure that the compressibility term does not switch, from adding, to removing stability. Using \cref{eq:Tau1}, the coefficient of $\big \| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \big\|^2_K$ in \cref{eq:StabilityEstimateFinal} can be expanded into
+with $C>0$, so as to make sure that the compressibility term does not switch, from adding, to removing stability. \amend{Note that the strict inequality $\varepsilon \tau_2 < 1$ alone would not suffice here, as it provides no uniform margin when $\sigma = 0$.} Using \amend{\cref{eq:Tau1Final}}, the coefficient of $\big \| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \big\|^2_K$ in \cref{eq:StabilityEstimateFinal} can be expanded into
 \begin{equation}
-    \nu \tau_1 \left( \alpha_K \Big( 2 - 4 \frac{C_\text{inv}^2}{c_1}  \Big)\frac{c_1\nu}{h^2} + 2\alpha_K \frac{c_2 |\boldsymbol{w}|_{\infty, K}}{h} + 2\Big( 1 - \frac{2}{\xi} \Big) \sigma \right) \geq C\nu,
+    \nu \tau_1 \left( \alpha_K \Big( 2 - 4 \frac{C_\text{inv}^2}{c_1}  \Big)\frac{c_1\nu}{h^2} + 2\alpha_K \frac{c_2 \amend{\lVert \boldsymbol{a} \rVert_{\infty, K}}}{h} + 2\Big( 1 - \frac{2}{\xi} \Big) \sigma \right) \geq C\nu,
 \end{equation}
 if we take
 \begin{equation}
@@ -847,7 +881,7 @@ if we take
 \end{equation}
 On the other hand, the coefficient of $\big\| \boldsymbol{u}_h \big\|^2_K$ becomes
 \begin{equation}
-    \alpha_K \tau_1 \sigma \left( \Bigl( 1 - \frac{\xi C_\text{inv}^2}{c_1} \Bigr) \frac{c_1\nu}{h^2} + \frac{c_2|\boldsymbol{w}|_{\infty,K}}{h} \right) \geq C \widetilde{\sigma}_\alpha,
+    \alpha_K \tau_1 \sigma \left( \Bigl( 1 - \frac{\xi C_\text{inv}^2}{c_1} \Bigr) \frac{c_1\nu}{h^2} + \frac{c_2\amend{\lVert \boldsymbol{a} \rVert_{\infty,K}}}{h} \right) \geq C \widetilde{\sigma}_\alpha,
 \end{equation}
 where
 \begin{equation} \label{eq:SigmaAlpha}
@@ -871,7 +905,7 @@ is met.
 We have just shown that the following stability bound holds for the stabilized method:
 
 \begin{lemma} \label{lemma:Stability}
-  Assume that $\tau_1$ is defined as in \cref{eq:Tau1} and that $c_1 > 2\xi C_\text{inv}^2$, with $\xi > 2$. Then there exists a positive constant C such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_h$ it holds that
+  Assume that \amend{$\tau_1, \tau_2$ are defined as in \cref{eq:Tau1Final,eq:Tau2Final}, that $\varepsilon$ satisfies \cref{eq:UpperBoundOnEpsilon}, that $\nabla \cdot (\alpha \boldsymbol{a}) = 0$, that all boundary conditions are of Dirichlet type, and} that $c_1 > 2\xi C_\text{inv}^2$, with $\xi > 2$. Then there exists a positive constant $C$ such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_{h\amend{0}}$ it holds that
   \begin{equation}
     B_\text{S}(\boldsymbol{a}, U_h, U_h) \geq C \triplenorm{U_h}^2,
   \end{equation}
@@ -885,20 +919,20 @@ with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
     Note that the quantity $\widetilde{\sigma}_\alpha$ differs from the quantity $\widetilde{\sigma}$ defined in~\cite{codina2001stabilized} simply by the division of $\sigma$ by $\alpha_K $ in the denominator. This seems to indicate a weaker control on $\boldsymbol{u}_h$ for large reaction terms when $\alpha_K$ is simultaneously very small. It turns out this is not the case, as the asymptotic analysis presented below shows (see \cref{sec:DominantReaction}) and the numerical tests corroborate.
 \end{remark}
 
-It is also straightforward to follow an analogous process to that used in the proof of Lemma 2 in~\cite{codina2001stabilized} to prove a certain continuity of the bilinear form $B_\text{S}$. In particular, it is possible to show that
+\amend{Following the process used in the proof of Lemma 2 in~\cite{codina2001stabilized}, adapting every estimate to the presence of the porosity field, one can prove the following continuity result for the bilinear form $B_\text{S}$ (a complete proof is given in \cref{app:Continuity}):}
 
 \begin{lemma} \label{lemma:Continuity}
-    Assume that $\tau_1, \tau_2$ are defined as in \cref{eq:Tau1,eq:Tau2} and that all the algorithmic constants involved are positive. Assume also that the field $\alpha\boldsymbol{a}$ is (weakly) divergence-free and $\nabla\alpha$ is uniformly bounded in $\Omega$. Then, there exist a positive constant $C$, such that
+    Assume that $\tau_1, \tau_2$ are defined as in \amend{\cref{eq:Tau1Final,eq:Tau2Final}, that the hypotheses of \cref{lemma:Stability} hold, that the porosity field satisfies the resolution condition \cref{eq:SmallPorosityGradient}, and that $\boldsymbol{a}$ is continuous. Assume in addition, when $\sigma > 0$, that $\tau_1$ satisfies a jump condition across interior faces analogous to Eq.~(39) of~\cite{codina2001stabilized}.} Then, there exist\amend{s} a positive constant $C$, such that
     \begin{equation}
         B_\text{S}(\boldsymbol{a}, U_h, V_h)\leq C \bigg( \Big\| \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h},
     \end{equation}
-    for all $U_h, V_h \in \mathcal{X}_h$.
+    for all $U_h, V_h \in \mathcal{X}_{h\amend{0}}$.
 \end{lemma}
 
 Using \cref{lemma:Stability} and the modified version of \cref{lemma:Continuity}, and assuming that the solution of the linearized problem is sufficiently smooth, convergence follows as in~\cite{codina2001stabilized}:
 
 \begin{theorem} \label{th:Convergence}
- Let $U$ be the exact solution of the linearized problem corresponding to \cref{eq:DiscretizedNonlinearStabilizedEquation}, where $\boldsymbol{u}^{m-1}$ is replaced by a given $\boldsymbol{a}$ such that $\nabla \cdot (\alpha\boldsymbol{a})=0$ and where $\boldsymbol{\pi}_h^m=\boldsymbol{0}$ (ASGS method). Then, under the assumptions of \cref{lemma:Stability,lemma:Continuity}, there exists a positive constant $C$, such that
+ Let $U$ be the exact solution of the linearized problem corresponding to \cref{eq:DiscretizedNonlinearStabilizedEquation}, where $\boldsymbol{u}^{m-1}$ is replaced by a given $\boldsymbol{a}$ such that $\nabla \cdot (\alpha\boldsymbol{a})=0$ and where $\boldsymbol{\pi}_h^m=\boldsymbol{0}$ (ASGS method). Then, under the assumptions of \cref{lemma:Stability,lemma:Continuity}\amend{, and assuming $\boldsymbol{u} \in H^{k_u+1}(\Omega)^d$ and $p \in H^{k_p+1}(\Omega)$}, there exists a positive constant $C$, such that
  \begin{equation}\label{eq:ConvergenceResult}
     \triplenorm{E_h} \leq C \sum_K{\frac{1}{h_K} \left( \tau_{2,K}^{1/2}\mathrm{E}_{\textup{int},K}(\boldsymbol{u}) + \tau_{1,K}^{1/2} \mathrm{E}_{\textup{int},K}(p) \right)},
  \end{equation}
@@ -908,6 +942,10 @@ where $E_h \coloneqq U - U_h$ and where the interpolation error is defined as
     \mathrm{E}_{\text{int},K}(\psi) \coloneqq h_K^{k_\psi + 1} \| \psi \|_{H^{k_\psi + 1}(K)},
 \end{equation}
 where $\psi$ is the field being interpolated and $k_\psi$ the corresponding polynomial order of the interpolation.
+
+\begin{remark}
+\amend{The continuity proof in \cref{app:Continuity} yields a sharper, locally $\alpha_K$-weighted bound, from which the estimate above follows using $\alpha_K \leq 1$; the corresponding convergence estimate then carries the local weight $\alpha_K$ inside the sum, which mildly strengthens the robustness discussion in regions of low porosity.}
+\end{remark}
 
 % Section on variational crimes:
 %\input{variational_crimes}
@@ -922,7 +960,7 @@ with
     \Reyn = \dfrac{U L}{\nu}, \quad
     \Damk = \frac{\sigma L^2}{\alpha_\infty \nu},
 \end{equation}
-where the constants $L$, $U$, are the (problem-dependent) characteristic length and velocity scales, \Joaquin{$\Reyn$, $\Damk$ are the Reynolds and the Damk\"ohler numbers, respectively}, and $\alpha_\infty>0$ is the supremum of the porosity field in the domain of interest. These scales are used in \cref{eq:DimensionlessMomentumEquation} to define the dimensionless counterparts of the various variables and differential operators: $\boldsymbol{u} = U\boldsymbol{u}^*$, $\alpha = \alpha_\infty\alpha^*$, $\nabla = L^{-1}\nabla^*$ and $\boldsymbol{f} = L^2/(\alpha_\infty \nu U) \boldsymbol{f}^*$\footnote{\Guillermo{One can check that substituting back into \eqref{eq:DimensionlessMomentumEquation} the various definitions of the dimensionless variables and multiplying through by $L^2 / (\alpha_\infty \nu U)$ yields the original momentum conservation equation.}}. For the pressure, we have used a scaling that reflects our implicit assumption of the pressure gradient term being always of relevance. It is based on taking $p = Pp^*$, with
+where the constants $L$, $U$, are the (problem-dependent) characteristic length and velocity scales, \Joaquin{$\Reyn$, $\Damk$ are the Reynolds and the Damk\"ohler numbers, respectively}, and $\alpha_\infty>0$ is the supremum of the porosity field in the domain of interest. These scales are used in \cref{eq:DimensionlessMomentumEquation} to define the dimensionless counterparts of the various variables and differential operators: $\boldsymbol{u} = U\boldsymbol{u}^*$, $\alpha = \alpha_\infty\alpha^*$, $\nabla = L^{-1}\nabla^*$ and $\boldsymbol{f} = \amend{(\alpha_\infty \nu U / L^2)} \boldsymbol{f}^*$\footnote{\Guillermo{One can check that substituting back into \eqref{eq:DimensionlessMomentumEquation} the various definitions of the dimensionless variables and multiplying through by $\amend{\alpha_\infty \nu U / L^2}$ yields the original momentum conservation equation.}}. For the pressure, we have used a scaling that reflects our implicit assumption of the pressure gradient term being always of relevance. It is based on taking $p = Pp^*$, with
 \begin{equation}\label{eq:PressureScale}
     P = (1 + \Reyn + \Damk) \frac{U\nu}{L}.
 \end{equation}
@@ -933,7 +971,7 @@ Clearly, such a scaling is not universally valid for all the solutions of \cref{
     \begin{split}
         \tau_1 &\sim \frac{1}{\alpha_K (1 + \Reyn_h + \Damk_h)} \, \frac{h^2}{\nu}, \\
         \tau_2 &\sim \frac{1 + \Reyn_h}{\alpha_K} \, \nu, \\
-        \widetilde{\sigma}_{\alpha} &\sim \frac{(1 + \Reyn_h)\Damk_h}{1 + \Reyn_h + \Damk_h} \, \frac{\nu}{h^2},
+        \widetilde{\sigma}_{\alpha} &\sim \amend{\alpha_K} \frac{(1 + \Reyn_h)\Damk_h}{1 + \Reyn_h + \Damk_h} \, \frac{\nu}{h^2},
     \end{split}
 \end{align}
 where the $h$ subindices refer to the fact that the element is considered the \emph{domain of interest} (i.e., $L=h$).
@@ -943,7 +981,7 @@ In this case we have that
 \begin{align*}
     \tau_1 &\sim \frac{h^2}{\alpha_K \nu}, \\
     \tau_2 &\sim \frac{\nu}{\alpha_K}, \\
-    \widetilde{\sigma}_{\alpha} &\sim \Damk_h \frac{\nu}{h^2}.
+    \widetilde{\sigma}_{\alpha} &\sim \amend{\alpha_K} \Damk_h \frac{\nu}{h^2}.
 \end{align*}
 With these estimates, \cref{eq:ConvergenceResult} yields
 \begin{equation}
@@ -967,7 +1005,7 @@ In this case, we have the following estimates:
 \begin{align*}
     \tau_1 &\sim \frac{h}{\alpha \lVert \boldsymbol{a} \rVert_{\infty, K}}, \\
     \tau_2 &\sim \frac{h \lVert \boldsymbol{a} \rVert_{\infty, K}}{\alpha}, \\
-    \widetilde{\sigma}_{\alpha} &\sim \Damk_h \frac{\nu}{h^2},
+    \widetilde{\sigma}_{\alpha} &\sim \amend{\alpha} \Damk_h \frac{\nu}{h^2},
 \end{align*}
 from which \cref{eq:ConvergenceResult} yields
 \begin{equation}
@@ -989,30 +1027,30 @@ which is optimal whenever the term $\boldsymbol{a} \cdot \nabla \boldsymbol{e}_u
 \subsection{Dominant reaction ($\Damk_h \rightarrow \infty$)} \label{sec:DominantReaction} \hfill \\
 The estimates for the numerical parameters are now as follows:
 \begin{align*}
-    \tau_1 &\sim \frac{\alpha}{\sigma}, \\
+    \tau_1 &\sim \frac{\amend{1}}{\sigma}, \\
     \tau_2 &\sim \frac{1 + \Reyn_h}{\alpha} \nu, \\
     \widetilde{\sigma}_{\alpha} &\sim \alpha(1 + \Reyn_h) \frac{\nu }{h^2}.
 \end{align*}
 They yield the following error bound:
 \begin{align*}
-    \lVert \ViscProj \nabla \boldsymbol{e}_u \rVert + (1 + \Reyn_h)^{1/2} \frac{\lVert \boldsymbol{e}_u \rVert}{h} + \frac{\alpha_0}{\sigma^{1/2} \nu^{1/2}} \lVert \nabla e_p \rVert_h + \frac{(1 + \Reyn_h)^{1/2}}{\alpha_0^{1/2}} \lVert \nabla \cdot(\alpha \boldsymbol{e}_u)\rVert_h, \\
-    \lesssim \frac{1}{\alpha_0} \left( (1 + \Reyn_h)^{1/2} \frac{\mathrm{E}_\text{int}(\boldsymbol{u})}{h} + \frac{\alpha_0}{\sigma^{1/2} \nu^{1/2}} \frac{\mathrm{E}_\text{int}(p)}{h} \right).
+    \lVert \ViscProj \nabla \boldsymbol{e}_u \rVert + (1 + \Reyn_h)^{1/2} \frac{\lVert \boldsymbol{e}_u \rVert}{h} + \frac{\alpha_0^{\amend{1/2}}}{\sigma^{1/2} \nu^{1/2}} \lVert \nabla e_p \rVert_h + \frac{(1 + \Reyn_h)^{1/2}}{\alpha_0^{1/2}} \lVert \nabla \cdot(\alpha \boldsymbol{e}_u)\rVert_h \\
+    \lesssim \frac{1}{\alpha_0} \left( (1 + \Reyn_h)^{1/2} \frac{\mathrm{E}_\text{int}(\boldsymbol{u})}{h} + \frac{\alpha_0^{\amend{1/2}}}{\sigma^{1/2} \nu^{1/2}} \frac{\mathrm{E}_\text{int}(p)}{h} \right).
 \end{align*}
 Here the bound can again be considered optimal, even though the first term on the LHS will provide a more or less weak control, depending on the particular form of the $\ViscProj$ operator. Furthermore, note that the control on the pressure term deteriorates for very large Reynolds numbers, although this deterioration is slow, growing only with its square root. For equal{\hyp}order discretizations, we can derive the following estimates:
 \begin{align}
-    \lVert \ViscProj \nabla \boldsymbol{e}_u \rVert \lesssim \frac{1}{\alpha_0} \left( (1 + \Reyn_h)^{1/2} + \frac{\alpha_0}{\sigma^{1/2} \nu^{1/2}} \frac{P}{U}\right) \frac{\mathrm{E}_\text{int}(\boldsymbol{u})}{h} \notag \\ \label{eq:DominantReactionVelocityGradientEstimate}
-    \sim \left(\frac{1}{\alpha_0} (1 + \Reyn_h)^{1/2} + \frac{\Damk^{1/2}}{\alpha_\infty^{1/2}}\right) \frac{\mathrm{E}_\text{int}(\boldsymbol{u})}{h}.
+    \lVert \ViscProj \nabla \boldsymbol{e}_u \rVert &\lesssim \frac{1}{\alpha_0} \left( (1 + \Reyn_h)^{1/2} + \frac{\alpha_0^{\amend{1/2}}}{\sigma^{1/2} \nu^{1/2}} \frac{P}{U}\right) \frac{\mathrm{E}_\text{int}(\boldsymbol{u})}{h} \notag \\ \label{eq:DominantReactionVelocityGradientEstimate}
+    &\sim \left(\frac{1}{\alpha_0} (1 + \Reyn_h)^{1/2} + \frac{\Damk^{1/2}}{\amend{(\alpha_0\alpha_\infty)}^{1/2}}\right) \frac{\mathrm{E}_\text{int}(\boldsymbol{u})}{h},
 \end{align}
-where we have used that $P \sim \Damk U \nu / h$ as $\Damk_h \rightarrow \infty$. It implies that the growth of either $\Reyn_h$ or $\Damk$ could potentially undermine the optimality of the approximation of the gradient. Note however that the latter is the Damk\"ohler number based on the macroscopic length $L$; that is, $\Damk = \Damk_h L^2/h^2$ and is thus not expected to be relevant except perhaps in extremely reaction{\hyp}dominated flows. The dependence of accuracy on the Reynolds number is similar to that of convection-dominated flows. These dependencies remain unaltered for $\alpha \equiv 1$. A similar reasoning leads to analogous estimates for $\|\boldsymbol{e}_u \|$.
+where we have used that $P \sim \Damk U \nu / \amend{L}$ as $\Damk_h \rightarrow \infty$. It implies that the growth of either $\Reyn_h$ or $\Damk$ could potentially undermine the optimality of the approximation of the gradient. Note however that the latter is the Damk\"ohler number based on the macroscopic length $L$; that is, $\Damk = \Damk_h L^2/h^2$ and is thus not expected to be relevant except perhaps in extremely reaction{\hyp}dominated flows. The dependence of accuracy on the Reynolds number is similar to that of convection-dominated flows. These dependencies remain unaltered for $\alpha \equiv 1$. A similar reasoning leads to analogous estimates for $\|\boldsymbol{e}_u \|$.
 
 Let us thus derive estimates for the norm of the gradient of the pressure. In this case, we have:
 \begin{equation}
-    \lVert \nabla e_p \rVert_h \lesssim \frac{1}{\alpha_0} \left( \frac{(1 + \Reyn_h)^{1/2}}{\alpha_0} \Damk_h^{-1/2} \frac{L}{h} + 1 \right) \frac{\mathrm{E}_\text{int}(p)}{h}. \label{eq:DominantReactionPressureGradientEstimate}
+    \lVert \nabla e_p \rVert_h \lesssim \frac{1}{\alpha_0} \left( \amend{(1 + \Reyn_h)^{1/2} \Bigl(\frac{\alpha_\infty}{\alpha_0}\Bigr)^{1/2} \Damk^{-1/2}} + 1 \right) \frac{\mathrm{E}_\text{int}(p)}{h}. \label{eq:DominantReactionPressureGradientEstimate}
 \end{equation}
-Here the situation is reversed with respect to the dependence on $\Damk_h$. The loss of one order in the pressure accuracy is greatly mitigated by the presence of $\Damk_h^{-1/2}$ in reaction-dominated flows, except for the very finest meshes.
+Here the situation is reversed with respect to the dependence on $\amend{\Damk}$. The loss of one order in the pressure accuracy is greatly mitigated by the \amend{factor $\Damk^{-1/2} = \Damk_h^{-1/2}\, h/L$} in reaction-dominated flows\amend{. Note that this mitigation factor is independent of the mesh size, since $\Damk_h \propto h^2$}.
 
 \section{Numerical examples}\label{sec:NumericalExamples}
-We will resort to the method of manufactured solutions, deriving the exact expression for the forcing term that corresponds to the chosen velocity and pressure fields. We consider the unit square $(0,1) \times (0,1)$ as the domain with null Dirichlet boundary conditions on all sides. \Guillermo{All the implementations have been made within the Kratos Multiphysics software\cite{dadvand2010object,ferrandiz2022kratosmultiphysics}}. Our pick for the fluid and pressure fields are
+We will resort to the method of manufactured solutions, deriving the exact expression for the forcing term that corresponds to the chosen velocity and pressure fields. We consider the unit square $(0,1) \times (0,1)$ as the domain\amend{, with Dirichlet boundary conditions on all sides given by the trace of the manufactured velocity field}. \Guillermo{All the implementations have been made within the Kratos Multiphysics software\cite{dadvand2010object,ferrandiz2022kratosmultiphysics}}. Our \amend{picks} for the \amend{velocity} and pressure fields are
 \begin{align}\label{eq:ManufacturedProblem}
     \begin{split}
         \boldsymbol{u}(x_1, x_2) &= U \frac{\alpha_0}{\alpha} \left( \text{sin}(\pi x_1)\text{sin}(\pi x_2)\boldsymbol{e}_1 + \text{cos}(\pi x_1)\text{cos}(\pi x_2)\boldsymbol{e}_2\right), \\
@@ -1048,7 +1086,7 @@ where $0 < r_1 < r_2 < 1$. The formulas above define a smooth bump function with
 
 The objective of this example is to check the robustness of the empirical convergence rates obtained for the ASGS and OSGS formulations and to compare them to the analytical estimates derived in the previous sections. In particular, we will focus on the $L^2$-norm and the $H^1$-seminorm of the error, normalizing the velocity and pressure errors using their respective characteristic values $U$ and $P$.
 
-In order to cover a wide range of regimes, we will consider all the combinations resulting from taking $\Reyn,\Damk \in \{10^{-6},1,10^{6}\}$ and $\alpha_0 \in \{0.05,0.5\}$. The large separation between the different values taken by $\Reyn$ and $\Damk$ guarantees that the various flow regimes considered are approximately independent of the mesh refinement level, in the sense that the ordering and several-order-of-magnitude separation between the dimensionless numbers are preserved despite their values changing with $h$. As the characteristic velocity and length scales are fixed, we vary the value of $\Reyn$ by changing the viscosity. The value of $\Damk$ is varied through $\boldsymbol{\sigma}$. Doing so will allow us to analyse the performance of our formulation in the three limiting cases of interest, i.e., convection, diffusion and reaction-dominated flows.
+In order to cover a wide range of regimes, we will consider all the combinations resulting from taking $\Reyn,\Damk \in \{10^{-6},1,10^{6}\}$ and $\alpha_0 \in \{0.05,0.5\}$. The large separation between the different values taken by $\Reyn$ and $\Damk$ guarantees that the various flow regimes considered are approximately independent of the mesh refinement level, in the sense that the ordering and several-order-of-magnitude separation between the dimensionless numbers are preserved despite their values changing with $h$. As the characteristic velocity and length scales are fixed, we vary the value of $\Reyn$ by changing the viscosity. The value of $\Damk$ is varied through $\boldsymbol{\sigma}$. Doing so will allow us to \amend{analyze} the performance of our formulation in the three limiting cases of interest, i.e., convection, diffusion and reaction-dominated flows.
 
 For both 2D and 3D tests, we have considered the problem defined by \cref{eq:ManufacturedProblem}. In the following subsections we present the particularities of the various simulations and the results obtained.
 
@@ -1061,9 +1099,9 @@ Indeed, one can immediately check that the effect of variations in the minimum p
 
 For viscosity-dominated flows (rows 1-4, 7-8), the results are consistent with the predicted asymptotic bounds given by \cref{eq:DominantViscosityVelocityGradientEstimate,eq:DominantViscosityPressureGradientEstimate}. Note that the FME values indicate that both the ASGS and OSGS methods show a very similar accuracy independently of the values taken by the physical parameters in this regime, except for the above-mentioned decrease in accuracy as $\alpha$ decreases. The predicted drop of one order in the pressure accuracy is observed in most cases for linear elements and is even more prevalent for biquadratic elements. The velocity error is optimal in all cases.
 
-With respect to convection-dominated flows (cf.\ rows 5-6, 11-12, 17-18), we were unable to get the nonlinear iterations to converge with biquadratic elements on the finest mesh when $\alpha = 0.5$, probably due to the stationary problem becoming ill-defined in this case. Such cases are identified in \cref{tab:Quadratic2DL2,tab:Quadratic2DH1} by the notation \emph{n.c.} (not converged). For the remaining cases, the picture is very similar to that seen in the viscosity-dominated regime: The predicted optimal asymptotic behavior is observed for the velocity and the pressure (which this time converges quadratically in all cases), as the estimates \cref{eq:DominantConvectionXTermEstimate,eq:DominantPressureGradientXTermEstimate} suggest.
+With respect to convection-dominated flows (cf.\ rows 5-6, 11-12, 17-18), we were unable to get the nonlinear iterations to converge with biquadratic elements on the finest mesh when $\alpha_{\amend{0}} = 0.5$, probably due to the stationary problem becoming ill-defined in this case. Such cases are identified in \cref{tab:Quadratic2DL2,tab:Quadratic2DH1} by the notation \emph{n.c.} (not converged). For the remaining cases, the picture is very similar to that seen in the viscosity-dominated regime: The predicted optimal asymptotic behavior is observed for the velocity and the pressure (which this time converges quadratically in all cases), as the estimates \cref{eq:DominantConvectionXTermEstimate,eq:DominantPressureGradientXTermEstimate} suggest.
 
-For reaction-dominated flows (rows 13-16), the analysis indicates a slightly more complex convergence profile. As a preamble, let us note the relation $\Damk = \Damk_h L^2/h^2$. The latter implies that the values of $\Damk_h$ actually exhibit considerable variation across the different meshes, becoming about \num{64} times smaller when passing from the coarsest discretization to the finest one. In particular, we can estimate $\Damk_h \approx 10^6/640^2 \approx 2.44$ for the finest mesh, which could be considered marginally reaction-dominated. Nonetheless, note that the 3-order increase in $\Damk_h^{1/2}$ over the range that goes from 1 to $10^6$ (compare rows 7-10 with rows 13-16) still leads to a quite robust decrease of the pressure error by a similar amount in the $L^2$-norm. For the $H^1$-norm, the decrease in error is smaller, although a consistent optimal-order (i.e., one order above the general case) convergence rate is only observed in the high-$\Damk$ cases. These results are all consistent with \cref{eq:DominantReactionPressureGradientEstimate}. For the velocity error, the deterioration of its bound with $\Damk$ suggested by \cref{eq:DominantReactionVelocityGradientEstimate} is not realised for linear elements (the FME barely grows when increasing $\Damk=1$ to $\Damk=10^6$ while leaving the other parameters unchanged). For biquadratic elements, a noticeable error growth is observed (compare, e.g., rows 9 and 15 in \cref{tab:Quadratic2DL2,tab:Quadratic2DH1}), although still very far from the estimated $\sim \Damk^{1/2}$ effect.
+For reaction-dominated flows (rows 13-16), the analysis indicates a slightly more complex convergence profile. As a preamble, let us note the relation $\Damk = \Damk_h L^2/h^2$. The latter implies that the values of $\Damk_h$ actually exhibit considerable variation across the different meshes, becoming about \amend{$64^2 \approx \num{4.1e3}$} times smaller when passing from the coarsest discretization to the finest one. In particular, we can estimate $\Damk_h \approx 10^6/640^2 \approx 2.44$ for the finest mesh, which could be considered marginally reaction-dominated. Nonetheless, note that the 3-order increase in $\Damk_h^{1/2}$ over the range that goes from 1 to $10^6$ (compare rows 7-10 with rows 13-16) still leads to a quite robust decrease of the pressure error by a similar amount in the $L^2$-norm. For the $H^1$-norm, the decrease in error is smaller, although a consistent optimal-order (i.e., one order above the general case) convergence rate is only observed in the high-$\Damk$ cases. These results are all consistent with \cref{eq:DominantReactionPressureGradientEstimate}. For the velocity error, the deterioration of its bound with $\Damk$ suggested by \cref{eq:DominantReactionVelocityGradientEstimate} is not \amend{realized} for linear elements (the FME barely grows when increasing $\Damk=1$ to $\Damk=10^6$ while leaving the other parameters unchanged). For biquadratic elements, a noticeable error growth is observed (compare, e.g., rows 9 and 15 in \cref{tab:Quadratic2DL2,tab:Quadratic2DH1}), although still very far from the estimated $\sim \Damk^{1/2}$ effect.
 
 \setlength{\heavyrulewidth}{1.5pt}
 \setlength{\abovetopsep}{4pt}
@@ -1420,11 +1458,11 @@ The computational domain is a rectangle given by $\Omega = (0, 2) \times (0, 1)$
   \item $\boldsymbol{u}=\boldsymbol{u}_\text{in}$ on $\Gamma_\text{in} = \{0\} \times [0,1]$.
   \item $\boldsymbol{t}_\text{N} = \boldsymbol{0}$ on $\Gamma_\text{out} = \{2\} \times [0,1]$.
 \end{itemize}
-where we recall that $\boldsymbol{t}_\text{N}$ represents the imposed traction (see \cref{eq:neumann_bc,eq:RHS_neumann}), and the imposed velocity field at the inlet is normal to $\Gamma_\text{in}$ and defined by the parabolic profile given by $\boldsymbol{u}_\text{in,1}(y) = c_\text{in}y(1-y)$, where $c_\text{in}$ is used as a free parameter to control the Reynolds number of the example. 
+where we recall that $\boldsymbol{t}_\text{N}$ represents the imposed traction (see \cref{eq:neumann_bc,eq:RHS_neumann}), and the imposed velocity field at the inlet is normal to $\Gamma_\text{in}$ and defined by the parabolic profile given by $\amend{u}_\text{in,1}(y) = c_\text{in}y(1-y)$, where $c_\text{in}$ is used as a free parameter to control the Reynolds number of the example. 
 
 The porous medium considered has a spatially varying porosity field given by
 \begin{equation}
-  \alpha(x,y) = 0.45\big(1+\frac{1-0.45}{0.45}\mathrm{e}^{y-1}\big)
+  \alpha(x,y) = 0.45\big(1+\frac{1-0.45}{0.45}\mathrm{e}^{y-1}\big)\amend{.}
 \end{equation}
 As in the reference, the porosity field will be nodally interpolated and represented using the finite elements used in the calculation in each case. 
 
@@ -1433,13 +1471,13 @@ We consider a sequence of structured triangular meshes parametrized by the numbe
 \begin{equation}
 E_\text{tot} \coloneqq \lVert \SPi \nabla (\boldsymbol{u}_h-\boldsymbol{u})\rVert + \lVert p_h-p\rVert.
 \end{equation}
-The results are presented in\Guillermo{Add figures}.
+The results are presented in \Guillermo{Add figures}.
 \section{Conclusions}\label{sec:Conclusions}
 We have applied the VMS framework to generalize the formulation and analysis presented in~\cite{codina2001stabilized} to the porous Navier{\hyp}Stokes system, in such a way that the original method is recovered when $\alpha\equiv1$. By using the abstract notation introduced in later works on VMS~\cite{codina2018variational}, we have strived to make it clearer to the less versed reader how the whole process is largely systematic once the particular equations are fit to the general framework.
 
 Our analysis and numerical experiments show that the convergence properties of the original Navier{\hyp}Stokes formulation are essentially preserved in the generalized setting. The analytical results have been corroborated in the numerical experiments, which show that the method remains just as robust in front of extreme variations in the physical parameters in the general case, as it is well-established to be for the original problem.
 
-The specialization of the robustness analysis to equal{\hyp}order polynomial elements presented in \cref{sec:Robustness} shows a few details previously not discussed, such as the mechanism of pressure error improvement with growing $\Damk_h$ or the (very weak in practice) deterioration of the velocity error with $\Damk$. By normalizing all the variables adequately, we have shown that the absolute errors are very stable with respect to changes in the physical parameters when the convergence rate is similar.
+The specialization of the robustness analysis to equal{\hyp}order polynomial elements presented in \cref{sec:Robustness} shows a few details previously not discussed, such as the mechanism of pressure error improvement with growing $\amend{\Damk}$ or the (very weak in practice) deterioration of the velocity error with $\Damk$. By normalizing all the variables adequately, we have shown that the absolute errors are very stable with respect to changes in the physical parameters when the convergence rate is similar.
 
 The abstract framework favored here makes it natural to include different particularizations of VMS in a very concise way. This has allowed us to implement both the ASGS and the OSGS versions of the method, showing through the many numerical experiments that both variants have very similar properties, at least for the problem considered.
 
@@ -1463,5 +1501,7 @@ R. Codina acknowledges the support received from the ICREA Acad\`emia Research P
 
 \appendix
 \input{elemental_matrices_appendix.tex}
+\input{continuity_appendix.tex}
+\input{fourier_appendix.tex}
 
 \end{document}

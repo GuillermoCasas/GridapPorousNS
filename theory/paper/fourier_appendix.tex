@@ -1,0 +1,122 @@
+% =============================================================================
+% Appendix C: Fourier symbols of the differential operator and the term-by-term
+% derivation of the stabilization parameters (added June 2026).
+%
+% Every matrix identity, eigenvalue and limit stated below is checked
+% symbolically by the companion script fourier_tau_verification.py (sympy);
+% see the closing remark.  Equation labels are namespaced eq:ft* to avoid
+% collisions with the main text.
+% =============================================================================
+\section{Fourier symbols of the differential operator and the design of the stabilization parameters}\label{app:FourierTau}
+
+This appendix records, term by term, the matrix operations sketched in \cref{sec:StabilizationDesign} that turn the Fourier symbol of the differential operator $\mathcal{L}_{\boldsymbol{w}}$ into the stabilization parameters \cref{eq:StabilizationParameters}, and ultimately into the simplified expressions \cref{eq:Tau1,eq:Tau2}. The design criterion is the one stated below \cref{eq:DesignConditionOnTauWeak}: each approximate operator $\boldsymbol{\tau}_\bullet^{-1}$ is taken as the spectral radius (in the $\Lambda$-metric) of the corresponding Fourier-transformed differential operator, with kernels respected. All the identities, eigenvalues and asymptotic limits below have been verified symbolically (see the closing remark).
+
+Throughout, $\boldsymbol{k}_0$ denotes the dimensionless, $h$-normalized wavenumber, so that a spatial derivative becomes $\partial_i \mapsto \mathrm{i}\,k_{0,i}/h$ under the Fourier transform, with $\alpha$, $\nu$ and $\nabla\alpha$ treated as locally constant (slowly varying over the element). We write $n=d+1$ for the number of unknown fields and order the components as $[\boldsymbol{u};p]$.
+
+\subsection{Splitting of the symbol}\label{sec:ftSplit}
+Recall the operator \cref{eq:CDR_equation} and its matrices \cref{eq:matrices_stationary_strong_problem}. For the design it is convenient to split the first-order part $\mathbf{A}_{\text{c},i}+\mathbf{A}_{\text{f},i}$ into a purely \emph{convective} block and a symmetric \emph{pressure-gradient/divergence} coupling,
+\begin{equation}\label{eq:ftSplit}
+  \mathbf{A}_{\text{c},i}(\boldsymbol{w}) + \mathbf{A}_{\text{f},i}
+   = \underbrace{\alpha\,\diag(w_i,\dots,w_i,0)}_{\textstyle \mathbf{A}_{\text{v},i}}
+   \; + \; \underbrace{\alpha\bigl(\boldsymbol{e}_i\boldsymbol{e}_{n}^{\top}+\boldsymbol{e}_{n}\boldsymbol{e}_i^{\top}\bigr)}_{\textstyle \mathbf{A}_{\text{b},i}},
+\end{equation}
+where $\boldsymbol{e}_m$ is the $m$-th canonical vector of $\mathbb{R}^n$. Likewise the zeroth-order matrix splits as $\mathbf{S}=\mathbf{S}_\sigma+\mathbf{S}_{\nabla\alpha}$ exactly as in \cref{sec:StabilizationDesign}. The full symbol is then the sum of five contributions,
+\begin{equation}\label{eq:ftSymbolSplit}
+  \widehat{\mathcal{L}}(\boldsymbol{k}_0)
+  = \widehat{\mathcal{L}}_{\nu} + \widehat{\mathcal{L}}_{c} + \widehat{\mathcal{L}}_{b}
+  + \widehat{\mathcal{L}}_{\sigma} + \widehat{\mathcal{L}}_{\nabla\alpha},
+\end{equation}
+analysed one by one below.
+
+\subsection{Viscous term: the contraction \texorpdfstring{$k_{0,i}k_{0,j}\mathbf{K}_{ij}$}{k0i k0j Kij}}\label{sec:ftViscous}
+The viscous part is second order, so its symbol is the double contraction of the wavenumber with the diffusion matrix,
+\begin{equation}\label{eq:ftViscSymbol}
+  \widehat{\mathcal{L}}_{\nu}(\boldsymbol{k}_0)
+  = \frac{1}{h^2}\, k_{0,i}\,k_{0,j}\,\mathbf{K}_{ij}.
+\end{equation}
+Inserting the velocity block of $\mathbf{K}_{ij}$ from \cref{eq:matrices_stationary_strong_problem}, whose entries are $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{ij}\delta_{ab}+\tfrac13\delta_{ai}\delta_{aj})$ on the diagonal $a=b$ and $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{bi}\delta_{aj}-\tfrac23\delta_{ai}\delta_{bj})$ off it, the contraction collapses to
+\begin{equation}\label{eq:ftViscClosed}
+  k_{0,i}k_{0,j}(\mathbf{K}_{ij})_{ab}
+   = \alpha\nu\Bigl(|\boldsymbol{k}_0|^2\,\delta_{ab} + \bigl(1-\tfrac{2}{d}\bigr)\,k_{0,a}k_{0,b}\Bigr),
+\end{equation}
+i.e.\ $\widehat{\mathcal{L}}_{\nu}=\frac{\alpha\nu}{h^2}\bigl(|\boldsymbol{k}_0|^2\mathbb{I}_d+(1-\tfrac{2}{d})\,\boldsymbol{k}_0\otimes\boldsymbol{k}_0\bigr)$ on the velocity block and zero on the pressure row and column (for $d=3$ the factor is $1-\tfrac23=\tfrac13$). This symmetric matrix has the eigenpairs
+\begin{equation}\label{eq:ftViscEig}
+  \widehat{\mathcal{L}}_{\nu}\,\boldsymbol{v}_\perp = \frac{\alpha\nu}{h^2}\,|\boldsymbol{k}_0|^2\,\boldsymbol{v}_\perp
+  \quad(\boldsymbol{v}_\perp\perp\boldsymbol{k}_0,\ \text{multiplicity }d-1),\qquad
+  \widehat{\mathcal{L}}_{\nu}\,\boldsymbol{k}_0 = \Bigl(2-\tfrac{2}{d}\Bigr)\frac{\alpha\nu}{h^2}\,|\boldsymbol{k}_0|^2\,\boldsymbol{k}_0,
+\end{equation}
+so that the longitudinal eigenvalue is $\tfrac43\,\alpha\nu|\boldsymbol{k}_0|^2/h^2$ for $d=3$ (and equals the transverse one for $d=2$). Its spectral radius gives
+\begin{equation}\label{eq:ftTauNu}
+  \tau_{\nu,1}^{-1} = \frac{4}{3}\,\alpha\nu\,\frac{|\boldsymbol{k}_0|^2}{h^2},\qquad \tau_{\nu,2}^{-1}=0,
+\end{equation}
+which is the first row of \cref{eq:StabilizationParameters}. The squared wavenumber is what makes the identification $c_1\coloneqq|\boldsymbol{k}_0|^2$ consistent downstream.
+
+\subsection{Convective term}\label{sec:ftConvective}
+The convective block $\mathbf{A}_{\text{v},i}$ is first order, so
+\begin{equation}\label{eq:ftConvSymbol}
+  \widehat{\mathcal{L}}_{c}(\boldsymbol{k}_0)
+  = \mathrm{i}\,\frac{k_{0,i}}{h}\,\mathbf{A}_{\text{v},i}
+  = \mathrm{i}\,\frac{\alpha}{h}\,(\boldsymbol{w}\cdot\boldsymbol{k}_0)\,\diag(\mathbb{I}_d,0),
+\end{equation}
+a multiple of the identity on the velocity block with eigenvalue $\mathrm{i}\,\alpha(\boldsymbol{w}\cdot\boldsymbol{k}_0)/h$. Its spectral radius is the modulus
+\begin{equation}\label{eq:ftTauC}
+  \tau_{c,1}^{-1} = \alpha\,\frac{|\boldsymbol{w}\cdot\boldsymbol{k}_0|}{h},\qquad \tau_{c,2}^{-1}=0,
+\end{equation}
+the absolute value being intrinsic to a spectral radius.
+
+\subsection{Pressure-gradient/divergence coupling}\label{sec:ftCoupling}
+The block $\mathbf{A}_{\text{b},i}$ couples the $i$-th velocity component to the pressure, and its symbol is the off-diagonal matrix
+\begin{equation}\label{eq:ftBSymbol}
+  \widehat{\mathcal{L}}_{b}(\boldsymbol{k}_0)
+  = \mathrm{i}\,\frac{k_{0,i}}{h}\,\mathbf{A}_{\text{b},i}
+  = \mathrm{i}\,\frac{\alpha}{h}
+    \begin{bmatrix} \mathbf{0} & \boldsymbol{k}_0 \\[2pt] \boldsymbol{k}_0^{\top} & 0 \end{bmatrix}.
+\end{equation}
+The real coupling matrix $\bigl[\begin{smallmatrix}\mathbf{0}&\boldsymbol{k}_0\\ \boldsymbol{k}_0^{\top}&0\end{smallmatrix}\bigr]$ has eigenvalues $\{+|\boldsymbol{k}_0|,\,-|\boldsymbol{k}_0|,\,0^{(d-1)}\}$, so $\widehat{\mathcal{L}}_b$ has spectral radius $\alpha|\boldsymbol{k}_0|/h$. Because this single magnitude couples two fields carried at different scales, the design seeks a \emph{diagonal} approximation $\boldsymbol{\tau}_b=\diag(\tau_{b,1}\mathbb{I}_d,\tau_{b,2})$. Introducing a free scale $\lambda$ (of units of velocity squared) for the relative momentum/mass weighting, the two design conditions read
+\begin{equation}\label{eq:ftBdesign}
+  \tau_{b,1}^{-1}\,\tau_{b,2}^{-1} = \Bigl(\frac{\alpha|\boldsymbol{k}_0|}{h}\Bigr)^{2}
+  \quad(\text{matching the coupling magnitude}),\qquad
+  \frac{\tau_{b,1}^{-1}}{\tau_{b,2}^{-1}} = \lambda
+  \quad(\text{the free scale}),
+\end{equation}
+whose unique positive solution is the generalized-eigenproblem pair
+\begin{equation}\label{eq:ftTauB}
+  \tau_{b,1}^{-1} = \alpha\,\frac{|\boldsymbol{k}_0|}{h}\,\sqrt{\lambda},\qquad
+  \tau_{b,2}^{-1} = \alpha\,\frac{|\boldsymbol{k}_0|}{h}\,\frac{1}{\sqrt{\lambda}}.
+\end{equation}
+
+\subsection{Reaction and porosity-gradient terms}\label{sec:ftZeroth}
+The zeroth-order matrices contribute their symbols directly. The reaction block is $\mathbf{S}_\sigma=\diag(\boldsymbol{\sigma},\varepsilon)$ (the symmetric resistance tensor on the velocity block, the compressibility $\varepsilon$ on the pressure), giving
+\begin{equation}\label{eq:ftTauSigma}
+  \tau_{\sigma,1}^{-1} = \rho_{\Lambda^{-1}}(\boldsymbol{\sigma}),\qquad \tau_{\sigma,2}^{-1} = \varepsilon,
+\end{equation}
+with $\rho_{\Lambda^{-1}}$ the generalized spectral radius. The porosity-gradient block $\mathbf{S}_{\nabla\alpha}=\boldsymbol{e}_{n}(\nabla\alpha)^{\top}$ couples the mass equation back to the velocity; balanced in the same metric as the coupling \cref{eq:ftTauB}, it yields
+\begin{equation}\label{eq:ftTauGradA}
+  \tau_{\nabla\alpha,1}^{-1} = \sqrt{\lambda}\,|\nabla\alpha|,\qquad \tau_{\nabla\alpha,2}^{-1}=0.
+\end{equation}
+Equations \cref{eq:ftTauNu,eq:ftTauC,eq:ftTauB,eq:ftTauSigma,eq:ftTauGradA} are exactly \cref{eq:StabilizationParameters}.
+
+\subsection{Assembly and recovery of \texorpdfstring{$\tau_1$, $\tau_2$}{tau1, tau2}}\label{sec:ftAssembly}
+Summing the five contributions componentwise, $\boldsymbol{\tau}_K^{-1}=\sum_\bullet\boldsymbol{\tau}_\bullet^{-1}$, and choosing
+\begin{equation}\label{eq:ftLambda}
+  \lambda = \frac{h^2}{|\boldsymbol{k}_0|^2\,\tau_{1,\text{NS}}^2},
+  \qquad\text{so that}\qquad
+  \sqrt{\lambda} = \frac{h}{|\boldsymbol{k}_0|\,\tau_{1,\text{NS}}},
+\end{equation}
+the coupling and porosity-gradient entries become $\tau_{b,1}^{-1}=\alpha/\tau_{1,\text{NS}}$, $\tau_{b,2}^{-1}=c_1\,\alpha\,\tau_{1,\text{NS}}/h^2$ and $\tau_{\nabla\alpha,1}^{-1}=(h/|\boldsymbol{k}_0|)\,|\nabla\alpha|\,\tau_{1,\text{NS}}^{-1}$, with $c_1=|\boldsymbol{k}_0|^2$. For the \emph{momentum} eigenvalue, the viscous and convective entries collapse onto $\alpha\,\tau_{1,\text{NS}}^{-1}$ (absorbing the constant $\tfrac43$ into $c_1$, and writing $c_2=|\boldsymbol{k}_0\cos\phi|$ so that $c_2|\boldsymbol{w}|=|\boldsymbol{w}\cdot\boldsymbol{k}_0|$, cf.\ \cref{eq:TauNavierStokes}); the $\tau_{b,1}^{-1}$ entry coincides with this same momentum scale and is therefore the self-referential contribution absorbed into the algorithmic constants (the cancellation noted after \cref{eq:StabilizationParameters}). Adding the porosity-gradient and reaction entries gives
+\begin{equation}\label{eq:ftTau1}
+  \tau_1^{-1}
+   = \Bigl(\alpha + \tfrac{h}{|\boldsymbol{k}_0|}|\nabla\alpha|\Bigr)\tau_{1,\text{NS}}^{-1} + \rho_{\Lambda^{-1}}(\boldsymbol{\sigma})
+   = C_\alpha\,\tau_{1,\text{NS}}^{-1} + \rho_{\Lambda^{-1}}(\boldsymbol{\sigma}),
+\end{equation}
+which is \cref{eq:Tau1} with $C_\alpha$ as in \cref{eq:CAlpha}. For the \emph{mass} eigenvalue, only the coupling and the compressibility survive,
+\begin{equation}\label{eq:ftTau2}
+  \tau_2^{-1} = \tau_{b,2}^{-1} + \tau_{\sigma,2}^{-1} = \frac{c_1\,\alpha\,\tau_{1,\text{NS}}}{h^2} + \varepsilon
+  \quad\Longrightarrow\quad
+  \tau_2 = \frac{h^2}{c_1\,\alpha\,\tau_{1,\text{NS}} + \varepsilon\,h^2},
+\end{equation}
+which is \cref{eq:Tau2}. This closes the derivation of the simplified parameters from the Fourier symbols.
+
+\begin{remark}
+All the matrix identities and limits of this appendix --- the contraction \cref{eq:ftViscClosed} and the eigenpairs \cref{eq:ftViscEig}, the convective and coupling symbols \cref{eq:ftConvSymbol,eq:ftBSymbol} with the eigenvalues $\{\pm|\boldsymbol{k}_0|,0^{(d-1)}\}$, the $\sqrt{\lambda}$ pair \cref{eq:ftTauB}, and the assembly \cref{eq:ftTau1,eq:ftTau2} under the scaling \cref{eq:ftLambda} --- are checked symbolically by the companion script \texttt{fourier\_tau\_verification.py} (\textsc{SymPy}), which reports $19/19$ passing checks and is provided with the source of this article.
+\end{remark}
