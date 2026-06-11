@@ -258,6 +258,42 @@ bil = (tau1*alpha**2*sum(d(Na, dd)*d(pp, dd) for dd in I3)
 check("G + Q_P  = tau1 a^2 grad(Na).grad p + tau2 a^2 L*_mass(q) L_mass(p)",
       sp.simplify(Dpre(bil) - QPstab()) == 0)
 
+# =====================================================================
+# Right-hand-side stabilization vectors F_V, F_Q  (eq:StabilizationLVF):
+#   -sum_K <L*V, tau Fbar> = ( tau1 alpha L*_mom(V), fbar ) + ( tau2 alpha L*_mass(V), phibar ).
+# F_V (velocity test i) and F_Q (mass test) are the test-evaluations of this
+# linear form against the forcing fbar = (f1,f2,f3) and mass source phibar.
+# =====================================================================
+print("\n[F_V / F_Q] RHS stabilization vectors (eq:StabilizationLVF)")
+fb = sp.symbols('f1 f2 f3', real=True); phib = sp.Symbol('phibar', real=True)
+
+def FV_printed(i):
+    aNa = S(lambda l: a[l]*d(Na, l)); ll = S(lambda l: d(d(Na, l), l))
+    A_F = tau1*alpha*aNa*fb[i]
+    L_F = tau1*alpha*nu*(ll*fb[i] + S(lambda k: d(d(Na, i), k)*fb[k]))
+    C_F = -sp.Rational(2, 3)*tau1*alpha*nu*S(lambda k: d(d(Na, i), k)*fb[k])
+    # G_betaF: appendix prints the 2nd forcing index as f_k; the bilinear form requires f_i (delta_ik).
+    G_bF = tau1*nu*(d(alpha, i)*S(lambda k: d(Na, k)*fb[k]) + S(lambda l: d(alpha, l)*d(Na, l))*fb[i])
+    D_bF = -sp.Rational(2, 3)*tau1*nu*d(Na, i)*S(lambda k: d(alpha, k)*fb[k])
+    R_sF = -tau1*Na*S(lambda k: sig[i, k]*fb[k])
+    D_phi = tau2*alpha*d(Na, i)*phib
+    V_phi = tau2*alpha*Na*d(beta, i)*phib
+    return A_F + L_F + C_F + G_bF + D_bF + R_sF + D_phi + V_phi
+okfv = True
+for i in I3:
+    v = vtest(i)
+    truth = tau1*alpha*sum(Lstar_mom(v, sp.Integer(0), dd)*fb[dd] for dd in I3) + tau2*alpha*Lstar_mass(v, sp.Integer(0))*phib
+    if sp.simplify(truth - FV_printed(i)) != 0: okfv = False
+check("F_V = A_F+L_F+C_F+G_betaF+D_betaF+R_sigmaF+D_phi+V_phi   [G_betaF forcing index f_i, not f_k]", okfv)
+
+def FQ_printed():
+    Q_aF = tau1*alpha*S(lambda k: d(Na, k)*fb[k])      # Q_alphaF
+    Q_phi = -tau2*eps*Na*phib                          # appendix prints +tau2 eps Na phibar (sign convention of -(eps/alpha)q)
+    return Q_aF + Q_phi
+truthQ = tau1*alpha*sum(d(Na, dd)*fb[dd] for dd in I3) + tau2*alpha*Lstar_mass([sp.Integer(0)]*3, Na)*phib
+check("F_Q = Q_alphaF + Q_phi  = tau1 alpha grad(Na).fbar + tau2 alpha L*_mass(q=Na) phibar   [Q_phi sign]",
+      sp.simplify(truthQ - FQ_printed()) == 0)
+
 # -------------------------------------------------------------------------
 print("\n" + "=" * 70)
 npass = sum(1 for t, _ in results if t == "PASS")

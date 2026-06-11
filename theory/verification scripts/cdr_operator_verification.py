@@ -175,6 +175,92 @@ check("int_cell ( V.L_w U - (L^*V).U ) = 0  (L^* is the formal adjoint)",
       sp.simplify(box) == 0)
 
 # -------------------------------------------------------------------------
+# (4) Natural Neumann co-normal: n_i K_ij d_j u = 2 alpha nu (Pi grad u).n
+#     (the factor-2 viscous traction of eq:neumann_bc, amendment A3).
+# -------------------------------------------------------------------------
+print("\n[4] Natural Neumann co-normal n_i K_ij d_j u = 2 a nu (Pi grad u).n   (A3 factor 2)")
+nrm = sp.symbols('n0 n1 n2', real=True)
+visc_conormal = [sum(nrm[i]*sum(Kblk(i, j, dd, b)*d(u[b], j) for j in range(D) for b in range(D))
+                     for i in range(D)) for dd in range(D)]
+traction = [2*alpha*nu*sum(Pi(dd, m)*nrm[m] for m in range(D)) for dd in range(D)]
+check("n_i K_ij d_j u == 2 alpha nu (Pi grad u).n   (all components, varying alpha)",
+      all(sp.simplify(visc_conormal[dd] - traction[dd]) == 0 for dd in range(D)))
+
+# -------------------------------------------------------------------------
+# (5) Green's identity on the unit box, with VARYING alpha(x), a(x):
+#       int_Omega ( V.L_w U - (L^*V).U ) = int_dOmega ( U.D*_N V - V.D_N U ),
+#     with  D_N U  = n_i ( K_ij d_j U - A_f,i U ) = alpha(2 nu Pi grad u - p I).n  (eq:neumann_bc, A3)
+#      and  D*_N V = n_i ( K_ji^T d_j V + A_c,i^T V )                               (eq:AdjointFlux).
+# -------------------------------------------------------------------------
+print("\n[5] Green's identity on the box -> verifies D*_N (eq:AdjointFlux) and D_N (A3)")
+y = sp.symbols('y0 y1 y2', real=True)
+def dy(f, i): return sp.diff(f, y[i])
+al = 2 + y[0]/3 + y[1]**2/4 + y[2]/5                                    # alpha(x) > 0 on the box
+av = [sp.Rational(1, 2) + y[0]/4 - y[1]/6, sp.Rational(1, 3) + y[2]/5, sp.Rational(1, 5) - y[0]/7]
+Up = [y[0]**2 - y[1]*y[2], y[1]**2 + y[0]/2, y[2]**2 - y[0]*y[1], y[0]*y[1] + y[2]**2/2]    # U=[u;p]
+Vp = [y[1]*y[2] + y[0], y[0]**2 - y[2], y[1]**2 + y[0]*y[2], y[0] - y[1]*y[2]]              # V=[v;q]
+sg = sp.Matrix(D, D, lambda p, q: sp.Integer(1 + (p == q)))                                # const symmetric sigma
+nn = D + 1
+def Km(i, j):
+    M = sp.zeros(nn, nn)
+    for dd in range(D):
+        for b in range(D):
+            M[dd, b] = (nu*al*(int(i == j) + sp.Rational(1, D)*int(dd == i)*int(dd == j)) if dd == b
+                        else nu*al*(int(b == i)*int(dd == j) - sp.Rational(2, D)*int(dd == i)*int(b == j)))
+    return M
+def Acm(i):
+    M = sp.zeros(nn, nn)
+    for dd in range(D): M[dd, dd] = al*av[i]
+    for b in range(D): M[D, b] = al*int(i == b)
+    return M
+def Afm(i):
+    M = sp.zeros(nn, nn)
+    for dd in range(D): M[dd, D] = al*int(i == dd)
+    return M
+def Sm():
+    M = sp.zeros(nn, nn)
+    for dd in range(D):
+        for b in range(D): M[dd, b] = sg[dd, b]
+    for b in range(D): M[D, b] = dy(al, b)
+    M[D, D] = eps
+    return M
+def LU_box():
+    out = sp.zeros(nn, 1)
+    for e in range(nn):
+        visc = -sum(dy(sum(Km(i, j)[e, b]*dy(Up[b], j) for j in range(D) for b in range(nn)), i) for i in range(D))
+        conv = sum(sum(Acm(i)[e, b]*dy(Up[b], i) for b in range(nn)) for i in range(D))
+        flux = sum(sum(Afm(i)[e, b]*dy(Up[b], i) for b in range(nn)) for i in range(D))
+        out[e] = visc + conv + flux + sum(Sm()[e, b]*Up[b] for b in range(nn))
+    return out
+def LsV_box():
+    out = sp.zeros(nn, 1)
+    for e in range(nn):
+        visc = -sum(dy(sum(Km(j, i)[b, e]*dy(Vp[b], j) for j in range(D) for b in range(nn)), i) for i in range(D))
+        conv = -sum(dy(sum(Acm(i)[b, e]*Vp[b] for b in range(nn)), i) for i in range(D))
+        flux = -sum(dy(sum(Afm(i)[b, e]*Vp[b] for b in range(nn)), i) for i in range(D))
+        out[e] = visc + conv + flux + sum(Sm()[b, e]*Vp[b] for b in range(nn))
+    return out
+LUb, LsVb = LU_box(), LsV_box()
+vol_integrand = sp.expand(sum(Vp[e]*LUb[e] - LsVb[e]*Up[e] for e in range(nn)))
+vol = sp.integrate(sp.integrate(sp.integrate(vol_integrand, (y[0], 0, 1)), (y[1], 0, 1)), (y[2], 0, 1))
+def DstarN(nv):    # n_i ( K_ji^T d_j V + A_c,i^T V )
+    return [sum(nv[i]*(sum(Km(j, i)[b, e]*dy(Vp[b], j) for j in range(D) for b in range(nn))
+                       + sum(Acm(i)[b, e]*Vp[b] for b in range(nn))) for i in range(D)) for e in range(nn)]
+def DN(nv):        # n_i ( K_ij d_j U - A_f,i U )
+    return [sum(nv[i]*(sum(Km(i, j)[dd, b]*dy(Up[b], j) for j in range(D) for b in range(nn))
+                       - sum(Afm(i)[dd, b]*Up[b] for b in range(nn))) for i in range(D)) for dd in range(nn)]
+bdry = 0
+for k in range(D):
+    other = [t for t in range(D) if t != k]
+    for s, sgn in ((0, -1), (1, +1)):
+        nv = [sgn if t == k else 0 for t in range(D)]
+        dsn, dn = DstarN(nv), DN(nv)
+        face = sp.expand(sum(Up[e]*dsn[e] - Vp[e]*dn[e] for e in range(nn))).subs(y[k], s)
+        bdry += sp.integrate(sp.integrate(face, (y[other[0]], 0, 1)), (y[other[1]], 0, 1))
+check("int_box (V.L_w U - (L*V).U) == int_bdry (U.D*_N V - V.D_N U)   (D*_N eq:AdjointFlux, D_N=A3 flux)",
+      sp.simplify(vol - bdry) == 0)
+
+# -------------------------------------------------------------------------
 print("\n" + "=" * 70)
 npass = sum(1 for t, _ in results if t == "PASS")
 print(f"SUMMARY: {npass}/{len(results)} checks passed.")
