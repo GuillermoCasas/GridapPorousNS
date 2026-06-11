@@ -9,7 +9,7 @@
 % =============================================================================
 \section{Fourier symbols of the differential operator and the design of the stabilization parameters}\label{app:FourierTau}
 
-This appendix records, term by term, the matrix operations sketched in \cref{sec:StabilizationDesign} that turn the Fourier symbol of the differential operator $\mathcal{L}_{\boldsymbol{w}}$ into the stabilization parameters \cref{eq:StabilizationParameters}, and ultimately into the simplified expressions \cref{eq:Tau1,eq:Tau2}. The design criterion is the one stated below \cref{eq:DesignConditionOnTauWeak}: each approximate operator $\boldsymbol{\tau}_\bullet^{-1}$ is taken as the spectral radius (in the $\Lambda$-metric) of the corresponding Fourier-transformed differential operator, with kernels respected. All the identities, eigenvalues and asymptotic limits below have been verified symbolically (see the closing remark).
+This appendix records, term by term, the matrix operations sketched in \cref{sec:StabilizationDesign} that turn the Fourier symbol of the differential operator $\mathcal{L}_{\boldsymbol{w}}$ into the stabilization parameters \cref{eq:StabilizationParameters}, and ultimately into the simplified expressions \cref{eq:Tau1,eq:Tau2}. The design criterion is the one stated below \cref{eq:DesignConditionOnTauWeak}: each approximate operator $\boldsymbol{\tau}_\bullet^{-1}$ is taken as the spectral radius (in the $\Lambda$-metric) of the corresponding Fourier-transformed differential operator, with kernels respected. All the identities, eigenvalues and asymptotic limits below have been verified symbolically.
 
 Throughout, $\boldsymbol{k}_0$ denotes the dimensionless, $h$-normalized wavenumber, so that a spatial derivative becomes $\partial_i \mapsto \mathrm{i}\,k_{0,i}/h$ under the Fourier transform, with $\alpha$, $\nu$ and $\nabla\alpha$ treated as locally constant (slowly varying over the element). We write $n=d+1$ for the number of unknown fields and order the components as $[\boldsymbol{u};p]$.
 
@@ -118,7 +118,3 @@ which is \cref{eq:Tau1} with $C_\alpha$ as in \cref{eq:CAlpha}. For the \emph{ma
   \tau_2 = \frac{h^2}{c_1\,\alpha\,\tau_{1,\text{NS}} + \varepsilon\,h^2},
 \end{equation}
 which is \cref{eq:Tau2}. This closes the derivation of the simplified parameters from the Fourier symbols.
-
-\begin{remark}
-All the matrix identities and limits of this appendix --- the contraction \cref{eq:ftViscClosed} and the eigenpairs \cref{eq:ftViscEig}, the convective and coupling symbols \cref{eq:ftConvSymbol,eq:ftBSymbol} with the eigenvalues $\{\pm|\boldsymbol{k}_0|,0^{(d-1)}\}$, the $\sqrt{\lambda}$ pair \cref{eq:ftTauB}, and the assembly \cref{eq:ftTau1,eq:ftTau2} under the scaling \cref{eq:ftLambda} --- are checked symbolically by the companion script \texttt{fourier\_tau\_verification.py} (\textsc{SymPy}), which reports $19/19$ passing checks and is provided with the source of this article.
-\end{remark}

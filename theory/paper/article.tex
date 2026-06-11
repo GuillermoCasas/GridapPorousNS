@@ -134,8 +134,11 @@
 \left.\rule{0pt}{#1}\right\}\text{#2}}
 
 % Triple norm
-\newcommand{\triplenorm}[1]{{\left\vert\kern-0.25ex\left\vert\kern-0.25ex\left\vert #1
-\right\vert\kern-0.25ex\right\vert\kern-0.25ex\right\vert}}
+% Fixed-size triple bars: \lvert/\rvert do not auto-grow with the argument, so the
+% norm has the same height regardless of its contents (e.g. a \widehat does not
+% enlarge it).
+\newcommand{\triplenorm}[1]{{\lvert\kern-0.25ex\lvert\kern-0.25ex\lvert #1
+\rvert\kern-0.25ex\rvert\kern-0.25ex\rvert}}
 
 % Two dots for integer sequences
 \newcommand{\twodots}{\mathinner {\ldotp \ldotp}}
@@ -750,7 +753,7 @@ Now, due to the complexity of the operator $\mathcal{L}$, instead of \cref{eq:De
 \begin{equation} \label{eq:DesignConditionOnTauWeak}
   \boldsymbol{\tau}_K^{-1} = \boldsymbol{\tau}_{\nu}^{-1} + \boldsymbol{\tau}_{c}^{-1} + \boldsymbol{\tau}_{b}^{-1} + \boldsymbol{\tau}_{\sigma}^{-1} + \boldsymbol{\tau}_{\nabla \alpha}^{-1}.
 \end{equation}
-For simplicity, we take $\boldsymbol{\tau}_K = \diag{(\tau_1, \tau_1, \tau_1, \tau_2)}$ (for $d=3$) and every matrix on the right-hand side of \cref{eq:DesignConditionOnTauWeak} is taken of the same form. Every approximate operator is thus defined by a pair of (positive) eigenvalues, whose value is fixed by the following design criterion: their value should be taken as the minimum still ensuring that the spectral radius of the approximate operator is as large as that of its corresponding Fourier-transformed differential operator, and such that the kernel of the former is contained in that of the latter. Note that this condition guarantees that
+For simplicity, we take $\boldsymbol{\tau}_K = \diag{(\tau_1, \tau_1, \tau_1, \tau_2)}$ (for $d=3$) and every matrix on the right-hand side of \cref{eq:DesignConditionOnTauWeak} is taken of the same form. Every approximate operator is thus defined by a pair of (positive) eigenvalues, whose value is fixed by the following design criterion: their value should be taken as the minimum still ensuring that the spectral radius of the approximate operator is as large as that of its corresponding Fourier-transformed differential operator, and such that the kernel of the former is contained in that of the latter. Note that this condition guarantees, \amend{by the triangle and Cauchy--Schwarz inequalities applied to the five contributions in \cref{eq:DesignConditionOnTauWeak},} that
 \begin{align} \label{eq:FTOfDifferentialOperator}
   | \boldsymbol{\tau}_K^{-1} |_{\Lambda}^2 &\le \amend{5} \left( | \boldsymbol{\tau}_{\nu}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{c}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{b}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{\sigma}^{-1} |_{\Lambda}^2 + | \boldsymbol{\tau}_{\nabla \alpha}^{-1} |_{\Lambda}^2 \right) \notag \\
   & = \amend{5} \left( |\widehat{ \mathcal{L}}_{\nu}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{c}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{b}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{\sigma}(\boldsymbol{k}_0) |_{\Lambda}^2 + |\widehat{ \mathcal{L}}_{\nabla \alpha}(\boldsymbol{k}_0) |_{\Lambda}^2 \right)
@@ -929,7 +932,7 @@ with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
 \begin{lemma} \label{lemma:Continuity}
     Assume that $\tau_1, \tau_2$ are defined as in \amend{\cref{eq:Tau1Final,eq:Tau2Final}, that the hypotheses of \cref{lemma:Stability} hold (these are sufficient but not minimal: strictly speaking, the continuity estimate requires only $c_1, c_2 > 0$ and not the coercivity condition $c_1 > 2\xi C_\text{inv}^2$ assumed in \cref{lemma:Stability}; the complete proof in \cref{app:Continuity} is carried out under these weaker hypotheses), that the porosity field satisfies the resolution condition \cref{eq:SmallPorosityGradient}, and that $\boldsymbol{a}$ is continuous. Assume in addition, when $\sigma > 0$, that $\tau_1$ satisfies a jump condition across interior faces analogous to Eq.~(39) of~\cite{codina2001stabilized}.} Then, there exist\amend{s} a positive constant $C$, such that
     \begin{equation}
-        B_\text{S}(\boldsymbol{a}, U_h, V_h)\leq C \bigg( \Big\| \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h},
+        B_\text{S}(\boldsymbol{a}, U_h, V_h)\leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h},
     \end{equation}
     for all $U_h, V_h \in \mathcal{X}_{h\amend{0}}$.
 \end{lemma}
@@ -947,10 +950,6 @@ where $E_h \coloneqq U - U_h$ and where the interpolation error is defined as
     \mathrm{E}_{\text{int},K}(\psi) \coloneqq h_K^{k_\psi + 1} \| \psi \|_{H^{k_\psi + 1}(K)},
 \end{equation}
 where $\psi$ is the field being interpolated and $k_\psi$ the corresponding polynomial order of the interpolation.
-
-\begin{remark}
-\amend{The continuity proof in \cref{app:Continuity} yields a sharper, locally $\alpha_K$-weighted bound, from which the estimate above follows using $\alpha_K \leq 1$; the corresponding convergence estimate then carries the local weight $\alpha_K$ inside the sum, which mildly strengthens the robustness discussion in regions of low porosity.}
-\end{remark}
 
 % Section on variational crimes:
 %\input{variational_crimes}

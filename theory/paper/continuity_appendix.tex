@@ -10,7 +10,7 @@
 %     (its main-text amendments are now applied in the body of the article);
 %   - macros and the assumption environment are declared in the article preamble.
 % =============================================================================
-\section{A self-contained continuity proof for the stabilized bilinear form $\BS$}\label{app:Continuity}
+\section{A continuity proof for the stabilized bilinear form $\BS$}\label{app:Continuity}
 
 \subsection{Setting}\label{sec:setting}
 
@@ -113,10 +113,8 @@ with~\cite{codina2001stabilized},
 \begin{equation}\label{eq:phi1}
   \varphi_{1,K} \coloneqq \alpha_K\,\tau_{1,\mathrm{NS}}^{-1}
   = \alpha_K\Bigl(c_1\frac{\nu}{h_K^2}+c_2\frac{|\ba|_{\infty,K}}{h_K}\Bigr),
-  \qquad\text{so that}\qquad
-  \tau_{1,K} = \bigl(\varphi_{1,K}+\sigma\bigr)^{-1},
 \end{equation}
-and
+so that $\tau_{1,K} = \bigl(\varphi_{1,K}+\sigma\bigr)^{-1}$, and
 \begin{equation}\label{eq:sigmatilde}
   \sigmatilde\big|_K
   \coloneqq \frac{\tau_{1,\mathrm{NS}}^{-1}\sigma}{\tau_{1,\mathrm{NS}}^{-1}
@@ -235,18 +233,33 @@ On each element $K$ (subscripts omitted) there hold:
 \end{lemma}
 
 \begin{proof}
-\ref{P:basic} and \ref{P:components} are immediate from
+Items \ref{P:basic} and \ref{P:components} are immediate from
 \eqref{eq:taus}--\eqref{eq:phi1} and $\tau_1^{-1}=\varphi_1+\sigma$.
-For \ref{P:27}, $\varphi_1 h^2=\alpha_K h^2\tau_{1,\mathrm{NS}}^{-1}
-= \alpha_K^2\, c_1\, \frac{h^2}{c_1\alpha_K\tau_{1,\mathrm{NS}}} = c_1\alpha_K^2\tau_2$,
-and $\alpha_K\le1$ by \cref{H:porosity}. For \ref{P:sigmatilde}, use
-\eqref{eq:sigmatilde}: $\sigmatilde=\sigma\varphi_1/(\varphi_1+\sigma)$ is bounded by both
-factors of the harmonic-type mean, and
-$\sigmatilde\tau_1=\sigma\varphi_1\tau_1^2\le(\sigma\tau_1)(\varphi_1\tau_1)\le1$.
-For \ref{P:eps}: from \eqref{eq:epscond} on element $K$,
-$\varepsilon\le C_2 c_1\alpha_K^2\tau_1/h^2$; multiplying by $\tau_2$ and using
-\ref{P:27}, $\varepsilon\tau_2\le C_2\tau_1\varphi_1\le C_2$. The remaining statements
-follow from $\alpha_K\le 1$ and $C_2<1$.
+
+For \ref{P:27}, \eqref{eq:phi1} and the definition of $\tau_2$ give
+\begin{equation*}
+  \varphi_1 h^2 = \alpha_K\,h^2\,\tau_{1,\mathrm{NS}}^{-1}
+  = c_1\,\alpha_K^2\,\frac{h^2}{c_1\,\alpha_K\,\tau_{1,\mathrm{NS}}}
+  = c_1\,\alpha_K^2\,\tau_2 ,
+\end{equation*}
+and $\alpha_K\le1$ (\cref{H:porosity}) gives the second statement.
+
+For \ref{P:sigmatilde}, \eqref{eq:sigmatilde} exhibits
+$\sigmatilde=\sigma\varphi_1/(\varphi_1+\sigma)$ as a harmonic-type mean, hence bounded by
+each of its two factors; moreover
+\begin{equation*}
+  \sigmatilde\,\tau_1 = \sigma\,\varphi_1\,\tau_1^2
+  \le (\sigma\tau_1)\,(\varphi_1\tau_1)\le 1 .
+\end{equation*}
+
+For \ref{P:eps}, \eqref{eq:epscond} on the element $K$ reads
+$\varepsilon\le C_2\,c_1\,\alpha_K^2\,\tau_1/h^2$; multiplying by $\tau_2$ and using
+\ref{P:27},
+\begin{equation*}
+  \varepsilon\,\tau_2 \le C_2\,c_1\,\alpha_K^2\,\tau_1\,\frac{\tau_2}{h^2}
+  = C_2\,\varphi_1\,\tau_1 \le C_2 .
+\end{equation*}
+The remaining statements follow from $\alpha_K\le 1$ and $C_2<1$.
 \end{proof}
 
 \begin{lemma}[Weighted inverse estimates]\label{lem:winv}
@@ -269,10 +282,9 @@ $r_h\in\mathcal{Q}_{h0}$, and all $K\in\Th$,
   \label{eq:winv-divu}\\
   \norm{\alpha\,\ba\cdot\nabla\boldsymbol{w}_h}_{K}
   &\le \frac{\Cinv}{h_K}\,\alpha_K\,|\ba|_{\infty,K}\,
-  \norm{\boldsymbol{w}_h}_{K},
-  \qquad
+  \norm{\boldsymbol{w}_h}_{K}, \\
   \norm{\alpha\nabla r_h}_{K}
-  \le \frac{\Cinv}{h_K}\,\alpha_K\,\norm{r_h}_{K}.
+  &\le \frac{\Cinv}{h_K}\,\alpha_K\,\norm{r_h}_{K}.
   \label{eq:winv-conv}
 \end{align}
 \end{lemma}
@@ -337,9 +349,11 @@ $\jump{\tau_1}\coloneqq\tau_{1,K_1}-\tau_{1,K_2}$, there holds, for $i\in\{1,2\}
 
 \begin{proof}
 We have
-$\jump{\tau_1}
-=\dfrac{\varphi_{1,K_2}-\varphi_{1,K_1}}
-{(\varphi_{1,K_1}+\sigma)(\varphi_{1,K_2}+\sigma)}$,
+\begin{equation*}
+  \jump{\tau_1}
+  = \frac{\varphi_{1,K_2}-\varphi_{1,K_1}}
+  {(\varphi_{1,K_1}+\sigma)(\varphi_{1,K_2}+\sigma)} ,
+\end{equation*}
 and \eqref{eq:jumpcond} gives
 $|\varphi_{1,K_1}-\varphi_{1,K_2}|\le
 \max\{c_J'-1,\,1-c_J\}\,\varphi_{1,K_i}$ as well as
