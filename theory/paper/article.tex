@@ -105,6 +105,9 @@
 % above (red/blue). To flatten/accept all corrections, redefine as {#1}.
 \definecolor{amendcolor}{rgb}{0.0,0.55,0.0}
 \newcommand{\amend}[1]{\textcolor{amendcolor}{#1}}
+% Absorb the occasional unbreakable-token overflow (e.g. grant IDs/DOIs in the
+% Acknowledgments) without affecting normal line breaking elsewhere.
+\setlength{\emergencystretch}{3em}
 
 % Integer interval
 \newcommand{\isep}{\mathrel{{.}\,{.}}\nobreak}
@@ -150,6 +153,8 @@
 % Shorthands matching the notation of theory/continuity appendix/. The macros
 % \ViscProj and \triplenorm are already defined above and are reused (not redefined).
 \newsiamremark{assumption}{Assumption}
+\crefname{assumption}{Assumption}{Assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
 \newcommand{\bu}{\boldsymbol{u}}
 \newcommand{\bv}{\boldsymbol{v}}
 \newcommand{\ba}{\boldsymbol{a}}
@@ -922,7 +927,7 @@ with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
 \amend{Following the process used in the proof of Lemma 2 in~\cite{codina2001stabilized}, adapting every estimate to the presence of the porosity field, one can prove the following continuity result for the bilinear form $B_\text{S}$ (a complete proof is given in \cref{app:Continuity}):}
 
 \begin{lemma} \label{lemma:Continuity}
-    Assume that $\tau_1, \tau_2$ are defined as in \amend{\cref{eq:Tau1Final,eq:Tau2Final}, that the hypotheses of \cref{lemma:Stability} hold, that the porosity field satisfies the resolution condition \cref{eq:SmallPorosityGradient}, and that $\boldsymbol{a}$ is continuous. Assume in addition, when $\sigma > 0$, that $\tau_1$ satisfies a jump condition across interior faces analogous to Eq.~(39) of~\cite{codina2001stabilized}.} Then, there exist\amend{s} a positive constant $C$, such that
+    Assume that $\tau_1, \tau_2$ are defined as in \amend{\cref{eq:Tau1Final,eq:Tau2Final}, that the hypotheses of \cref{lemma:Stability} hold (these are sufficient but not minimal: strictly speaking, the continuity estimate requires only $c_1, c_2 > 0$ and not the coercivity condition $c_1 > 2\xi C_\text{inv}^2$ assumed in \cref{lemma:Stability}; the complete proof in \cref{app:Continuity} is carried out under these weaker hypotheses), that the porosity field satisfies the resolution condition \cref{eq:SmallPorosityGradient}, and that $\boldsymbol{a}$ is continuous. Assume in addition, when $\sigma > 0$, that $\tau_1$ satisfies a jump condition across interior faces analogous to Eq.~(39) of~\cite{codina2001stabilized}.} Then, there exist\amend{s} a positive constant $C$, such that
     \begin{equation}
         B_\text{S}(\boldsymbol{a}, U_h, V_h)\leq C \bigg( \Big\| \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h},
     \end{equation}

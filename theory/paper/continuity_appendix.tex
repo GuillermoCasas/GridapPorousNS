@@ -76,8 +76,8 @@ $U_h=[\buh;p_h]$ and $V_h=[\bvh;q_h]$ in $\Xh$,
   \BS(\ba; U_h,V_h)
   ={}& 2\nu\bigl(\ViscProj\nabla\bvh,\alpha\ViscProj\nabla\buh\bigr)
      + \bigl(\bvh,\alpha\X(U_h)\bigr)
-     + \sigma\bigl(\bvh,\buh\bigr)
-     + \varepsilon\bigl(q_h,p_h\bigr)
+     + \sigma\bigl(\bvh,\buh\bigr) \\
+   & + \varepsilon\bigl(q_h,p_h\bigr)
      + \bigl(q_h,\nabla\cdot(\alpha\buh)\bigr) \\
    & + \bigl(\alpha\X(V_h)+G(\bvh),\,
        \tau_1\bigl[\alpha\X(U_h)-G(\buh)\bigr]\bigr)_h \\
@@ -286,13 +286,12 @@ $\norm{\nabla\cdot\mathbf{M}}_K\le\sqrt{d}\,\norm{\nabla\mathbf{M}}_K$, the inve
 estimate \eqref{eq:inverse}, and
 $\norm{\mathbf{M}}_K\le\alpha_{0,K}^{-1/2}\norm{\alpha^{1/2}\mathbf{M}}_K$,
 \[
+\begin{aligned}
   \norm{\alpha\,\nabla\cdot\mathbf{M}}_K
-  \le \alpha_{\infty,K}\,\sqrt{d}\,\frac{\Cinv}{h_K}\,\norm{\mathbf{M}}_K
-  \le \sqrt{d}\,\frac{\Cinv}{h_K}\,
-  \frac{\alpha_{\infty,K}}{\alpha_{0,K}^{1/2}}\,
-  \norm{\alpha^{1/2}\mathbf{M}}_K
-  \le \sqrt{d\,\delta_\alpha}\,\frac{\Cinv}{h_K}\,\alpha_K^{1/2}\,
-  \norm{\alpha^{1/2}\mathbf{M}}_K,
+  &\le \alpha_{\infty,K}\,\sqrt{d}\,\frac{\Cinv}{h_K}\,\norm{\mathbf{M}}_K \\
+  &\le \sqrt{d}\,\frac{\Cinv}{h_K}\,\frac{\alpha_{\infty,K}}{\alpha_{0,K}^{1/2}}\,\norm{\alpha^{1/2}\mathbf{M}}_K \\
+  &\le \sqrt{d\,\delta_\alpha}\,\frac{\Cinv}{h_K}\,\alpha_K^{1/2}\,\norm{\alpha^{1/2}\mathbf{M}}_K,
+\end{aligned}
 \]
 since $\alpha_{\infty,K}/\alpha_{0,K}^{1/2}
 =(\alpha_{\infty,K}/\alpha_{0,K})^{1/2}\alpha_{\infty,K}^{1/2}
@@ -453,12 +452,14 @@ The key elemental estimate is obtained from \eqref{eq:winv-divvisc} together wit
 $\nu\tau_1\alpha_K\le h^2/c_1$ (\cref{lem:parameters}\ref{P:components}): for any finite
 element velocity $\boldsymbol{w}_h$,
 \begin{equation}\label{eq:keyvisc}
+\begin{aligned}
   \bigl\lVert\tau_1^{1/2}\,2\nu\,
   \nabla\cdot(\alpha\ViscProj\nabla\boldsymbol{w}_h)\bigr\rVert_{K}
-  \le 2\nu\,\tau_1^{1/2}\,\frac{\Cinva}{h}\,\alpha_K^{1/2}\,
-  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\boldsymbol{w}_h\bigr\rVert_{K}
-  \le \frac{2\Cinva}{c_1^{1/2}}\;\nu^{1/2}
+  &\le 2\nu\,\tau_1^{1/2}\,\frac{\Cinva}{h}\,\alpha_K^{1/2}\,
+  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\boldsymbol{w}_h\bigr\rVert_{K} \\
+  &\le \frac{2\Cinva}{c_1^{1/2}}\;\nu^{1/2}
   \bigl\lVert\alpha^{1/2}\ViscProj\nabla\boldsymbol{w}_h\bigr\rVert_{K}.
+\end{aligned}
 \end{equation}
 Consequently, by the Cauchy--Schwarz inequality and \eqref{eq:keyvisc} applied to $\bu$
 and/or $\bv$,
@@ -589,11 +590,13 @@ Integrating by parts elementwise, $(\tau_1\bv,\alpha\nabla p)_K
 + \tau_{1}\int_{\partial K}\alpha(\bn\cdot\bv)\,p\dd\Gamma$, and using
 $1-\sigma\tau_{1}=\varphi_{1}\tau_{1}$ on each element,
 \begin{equation}\label{eq:IandIV}
+\begin{aligned}
   -\bigl(\textup{[I]}+\textup{[IV]}\bigr)
-  = \sigma\bigl(\tau_1\bv,\alpha\nabla p\bigr)_h
-  + \bigl(p,\nabla\cdot(\alpha\bv)\bigr)
-  = \bigl(\varphi_1\tau_1\,p,\nabla\cdot(\alpha\bv)\bigr)_h
+  &= \sigma\bigl(\tau_1\bv,\alpha\nabla p\bigr)_h
+  + \bigl(p,\nabla\cdot(\alpha\bv)\bigr) \\
+  &= \bigl(\varphi_1\tau_1\,p,\nabla\cdot(\alpha\bv)\bigr)_h
   + \sigma\sum_{b}\int_{\Gamma^b}\jump{\tau_1}\,\alpha\,(\bn\cdot\bv)\,p\dd\Gamma,
+\end{aligned}
 \end{equation}
 where the sum extends over the interior faces $\Gamma^b$ of the partition: the elemental
 boundary contributions have been assembled facewise using the continuity of
@@ -607,12 +610,14 @@ $\varphi_1\tau_1\le\varphi_1^{1/2}\tau_1^{1/2}$
 $\varphi_1^{1/2}=c_1^{1/2}\alpha_K\tau_2^{1/2}/h$
 (\cref{lem:parameters}\ref{P:27}), so that
 \begin{equation}\label{eq:volpart}
+\begin{aligned}
   \bigl|\bigl(\varphi_1\tau_1\,p,\nabla\cdot(\alpha\bv)\bigr)_h\bigr|
-  \le c_1^{1/2}\sum_K
+  &\le c_1^{1/2}\sum_K
   \tau_2^{1/2}\bigl\lVert\nabla\cdot(\alpha\bv)\bigr\rVert_K\;
-  \alpha_K\,\tau_1^{1/2}h^{-1}\norm{p}_K
-  \le c_1^{1/2}\,\triplenorm{V}\,
+  \alpha_K\,\tau_1^{1/2}h^{-1}\norm{p}_K \\
+  &\le c_1^{1/2}\,\triplenorm{V}\,
   \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h .
+\end{aligned}
 \end{equation}
 
 For the jump part, fix an interior face $\Gamma^b$ shared by $K_1$ and $K_2$ and set
@@ -843,11 +848,14 @@ and, since $k_u+1,\,k_p+1>d/2$ for $d\le3$, also the $L^\infty$ estimates
 which are the analogues of Eqs.~(78)--(79) of~\cite{codina2001stabilized}. We abbreviate
 $E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
 \begin{equation}\label{eq:psih}
-  \psi(h)\coloneqq \sum_{K\in\Th}\alpha_K\,h_K^{-1}
-  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr)
-  \;\le\;
+\begin{aligned}
+  \psi(h)
+  &\coloneqq \sum_{K\in\Th}\alpha_K\,h_K^{-1}
+  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr) \\
+  &\;\le\;
   \sum_{K\in\Th}h_K^{-1}
   \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr).
+\end{aligned}
 \end{equation}
 
 \subsubsection{Continuity with respect to the interpolation error}
@@ -887,30 +895,27 @@ $|\ViscProj\mathbf{T}|\le|\mathbf{T}|$:
 \begin{align}
   \bigl\lVert\nabla\cdot(\alpha\ViscProj\nabla\beu)\bigr\rVert_K
   &\le \alpha_{\infty,K}\bigl\lVert\nabla\cdot(\ViscProj\nabla\beu)\bigr\rVert_K
-   + \norm{\nabla\alpha}_{L^\infty(K)}\bigl\lVert\ViscProj\nabla\beu\bigr\rVert_K
-   \le C\,\alpha_K\,h^{-2}\,\Eint{K}{\bu},
+   + \norm{\nabla\alpha}_{L^\infty(K)}\bigl\lVert\ViscProj\nabla\beu\bigr\rVert_K \\
+  &\le C\,\alpha_K\,h^{-2}\,\Eint{K}{\bu},
   \label{eq:interpdivvisc}\\[2pt]
   \bigl\lVert\alpha^{1/2}\ViscProj\nabla\beu\bigr\rVert_K
-  &\le \alpha_K^{1/2}\,|\beu|_{H^1(K)}
-   \le C\,\alpha_K^{1/2}\,h^{-1}\,\Eint{K}{\bu},
+  &\le \alpha_K^{1/2}\,|\beu|_{H^1(K)} \\
+  &\le C\,\alpha_K^{1/2}\,h^{-1}\,\Eint{K}{\bu},
   \label{eq:interpgrad}\\
   \bigl\lVert\nabla\cdot(\alpha\beu)\bigr\rVert_K
-  &\le C\,\alpha_K\,h^{-1}\,\Eint{K}{\bu},
-  \qquad
+  &\le C\,\alpha_K\,h^{-1}\,\Eint{K}{\bu}, \\
    \norm{\alpha\,\ba\cdot\nabla\beu}_K
-   \le C\,\alpha_K\,|\ba|_{\infty,K}\,h^{-1}\,\Eint{K}{\bu},
+   &\le C\,\alpha_K\,|\ba|_{\infty,K}\,h^{-1}\,\Eint{K}{\bu},
   \label{eq:interpfirst}\\
   \norm{\alpha\nabla e_p}_K
-  &\le C\,\alpha_K\,h^{-1}\,\Eint{K}{p},
-  \qquad
-   \norm{\beu}_K \le C\,\Eint{K}{\bu},
+  &\le C\,\alpha_K\,h^{-1}\,\Eint{K}{p}, \\
+   \norm{\beu}_K &\le C\,\Eint{K}{\bu},
   \qquad
    \norm{e_p}_K \le C\,\Eint{K}{p},
   \label{eq:interpzero}\\
   \norm{\beu}_{L^\infty(K)}
-  &\le C\,h^{-d/2}\,\Eint{K}{\bu},
-  \qquad
-   \norm{e_p}_{L^\infty(K)} \le C\,h^{-d/2}\,\Eint{K}{p}.
+  &\le C\,h^{-d/2}\,\Eint{K}{\bu}, \\
+  \norm{e_p}_{L^\infty(K)} &\le C\,h^{-d/2}\,\Eint{K}{p}.
   \label{eq:interpinftyE}
 \end{align}
 These have exactly the same elemental coefficients as the weighted inverse estimates of
@@ -953,10 +958,12 @@ $\BS(\ba;U_h,U_h)\ge C\,\triplenorm{U_h}^2$ for all $U_h\in\Xh$.
 \begin{theorem}[Convergence]\label{thm:convergence}
 Under the hypotheses of \cref{prop:stability,lem:continterp},
 \begin{equation}\label{eq:convergence}
+\begin{aligned}
   \triplenorm{U-U_h}
-  \le C\,\psi(h)
-  \le C\sum_{K\in\Th}h_K^{-1}
+  &\le C\,\psi(h) \\
+  &\le C\sum_{K\in\Th}h_K^{-1}
   \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr).
+\end{aligned}
 \end{equation}
 \end{theorem}
 

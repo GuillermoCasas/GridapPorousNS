@@ -74,10 +74,12 @@ The block $\mathbf{A}_{\text{b},i}$ couples the $i$-th velocity component to the
 \end{equation}
 The real coupling matrix $\bigl[\begin{smallmatrix}\mathbf{0}&\boldsymbol{k}_0\\ \boldsymbol{k}_0^{\top}&0\end{smallmatrix}\bigr]$ has eigenvalues $\{+|\boldsymbol{k}_0|,\,-|\boldsymbol{k}_0|,\,0^{(d-1)}\}$, so $\widehat{\mathcal{L}}_b$ has spectral radius $\alpha|\boldsymbol{k}_0|/h$. Because this single magnitude couples two fields carried at different scales, the design seeks a \emph{diagonal} approximation $\boldsymbol{\tau}_b=\diag(\tau_{b,1}\mathbb{I}_d,\tau_{b,2})$. Introducing a free scale $\lambda$ (of units of velocity squared) for the relative momentum/mass weighting, the two design conditions read
 \begin{equation}\label{eq:ftBdesign}
-  \tau_{b,1}^{-1}\,\tau_{b,2}^{-1} = \Bigl(\frac{\alpha|\boldsymbol{k}_0|}{h}\Bigr)^{2}
-  \quad(\text{matching the coupling magnitude}),\qquad
-  \frac{\tau_{b,1}^{-1}}{\tau_{b,2}^{-1}} = \lambda
+\begin{aligned}
+  \tau_{b,1}^{-1}\,\tau_{b,2}^{-1} &= \Bigl(\frac{\alpha|\boldsymbol{k}_0|}{h}\Bigr)^{2}
+  \quad(\text{matching the coupling magnitude}), \\
+  \frac{\tau_{b,1}^{-1}}{\tau_{b,2}^{-1}} &= \lambda
   \quad(\text{the free scale}),
+\end{aligned}
 \end{equation}
 whose unique positive solution is the generalized-eigenproblem pair
 \begin{equation}\label{eq:ftTauB}

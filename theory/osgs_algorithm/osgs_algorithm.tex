@@ -1,5 +1,5 @@
 \documentclass{article}
-\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools,amsmath,amssymb,amsfonts}
 \usepackage{geometry}
 \usepackage{hyperref}
 \usepackage[ruled,vlined]{algorithm2e}
@@ -479,7 +479,7 @@ frozen at $\boldsymbol{w}$ is
 \begin{equation}
     \label{eq:alg-strong-residual}
     \mathcal{R}_{\boldsymbol{w}} U
-        \;:=\; \mathcal{L}_{\boldsymbol{w}} U - F
+        \;\coloneqq\; \mathcal{L}_{\boldsymbol{w}} U - F
         \;=\;
         \begin{pmatrix}
             \mathcal{R}^{\boldsymbol{u}}_{\boldsymbol{w}}(U) \\[1mm]
@@ -537,12 +537,12 @@ matrix $\boldsymbol{\tau}_K(\boldsymbol{w}) = \mathrm{diag}(\tau_1,\tau_2)$:
 \begin{align}
     \label{eq:alg-BS}
     B_S(\boldsymbol{w}; U_h, V_h)
-        &:= B(\boldsymbol{w}; U_h, V_h)
+        &\coloneqq B(\boldsymbol{w}; U_h, V_h)
         - \sum_K \bigl\langle \mathcal{L}^{*}_{\boldsymbol{w}}V_h,\;
             \boldsymbol{\tau}_K(\boldsymbol{w})\,\mathcal{R}_{\boldsymbol{w}} U_h \bigr\rangle_K , \\
     \label{eq:alg-LS}
     L_S(\boldsymbol{w}; V_h, \boldsymbol{\pi}_h)
-        &:= L(V_h)
+        &\coloneqq L(V_h)
         - \sum_K \bigl\langle \mathcal{L}^{*}_{\boldsymbol{w}}V_h,\;
             \boldsymbol{\tau}_K(\boldsymbol{w})\,(F - \boldsymbol{\pi}_h) \bigr\rangle_K .
 \end{align}
@@ -2208,9 +2208,9 @@ inf-norms of the residual and the iterate,}
 \begin{equation}
     \label{eq:per-field-norms}
     \textcolor{extcolor}{
-    R_{k}(\boldsymbol{b}) := \|\boldsymbol{b}[\mathcal{B}_{k}]\|_{\infty},
+    R_{k}(\boldsymbol{b}) \coloneqq \|\boldsymbol{b}[\mathcal{B}_{k}]\|_{\infty},
     \qquad
-    \mathcal{U}_{k}^{\mathrm{raw}}(\boldsymbol{x}) := \|\boldsymbol{x}[\mathcal{B}_{k}]\|_{\infty},
+    \mathcal{U}_{k}^{\mathrm{raw}}(\boldsymbol{x}) \coloneqq \|\boldsymbol{x}[\mathcal{B}_{k}]\|_{\infty},
     \qquad k \in \{u, p\}.}
 \end{equation}
 
@@ -2228,7 +2228,7 @@ square or square root:}
 \begin{equation}
     \label{eq:per-field-scale-resolve}
     \textcolor{extcolor}{
-    \mathcal{U}_{k}(\boldsymbol{x}) :=
+    \mathcal{U}_{k}(\boldsymbol{x}) \coloneqq
     \begin{cases}
         \mathcal{U}_{k}^{\mathrm{raw}}(\boldsymbol{x})
             & \text{if } \mathcal{U}_{u}^{\mathrm{raw}}>0 \ \text{and}\ \mathcal{U}_{p}^{\mathrm{raw}}>0, \\[2pt]
@@ -2256,7 +2256,7 @@ accepted Newton iterate $\boldsymbol{x}^{(i)}$, is}
     \label{eq:per-field-effective-ftol}
     \textcolor{extcolor}{
     \tau^{\mathrm{F}}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)
-    := \max\!\Bigl(\textftol^{\,\mathrm{static}},\
+    \coloneqq \max\!\Bigl(\textftol^{\,\mathrm{static}},\
         \varepsilon_{k} \cdot \mathcal{U}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr),}
 \end{equation}
 \extline{where $\textftol^{\,\mathrm{static}}$ is a static
@@ -2286,7 +2286,7 @@ Algorithms~\ref{alg:A} and~\ref{alg:A3} are the block-wise rules}
     \label{eq:per-field-convergence}
     \textcolor{extcolor}{
     \rho_{\mathrm{F}}\!\bigl(\hat{\boldsymbol{b}}, \boldsymbol{x}^{(i)}\bigr)
-        := \bigwedge_{k \in \{u,p\}}
+        \coloneqq \bigwedge_{k \in \{u,p\}}
             \Bigl[\,R_{k}(\hat{\boldsymbol{b}})
                 \le \tau^{\mathrm{F}}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr],
     }
@@ -2295,10 +2295,10 @@ Algorithms~\ref{alg:A} and~\ref{alg:A3} are the block-wise rules}
     \label{eq:per-field-noise}
     \textcolor{extcolor}{
     \rho_{\mathrm{N}}\!\bigl(\hat{\boldsymbol{b}}, \boldsymbol{x}^{(i)}\bigr)
-        := \bigwedge_{k \in \{u,p\}}
+        \coloneqq \bigwedge_{k \in \{u,p\}}
             \Bigl[\,R_{k}(\hat{\boldsymbol{b}})
                 \le \tau^{\mathrm{N}}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr],
-        \qquad \tau^{\mathrm{N}}_{k} := \max\!\Bigl(\textstag^{\,\mathrm{dyn}},
+        \qquad \tau^{\mathrm{N}}_{k} \coloneqq \max\!\Bigl(\textstag^{\,\mathrm{dyn}},
         \varepsilon_{k}^{\mathrm{N}} \cdot \mathcal{U}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr),}
 \end{equation}
 \extline{with the noise-floor scalar floor $\textstag^{\,\mathrm{dyn}}$
@@ -2312,7 +2312,7 @@ gate that wraps every $\mathsf{NoiseFloor}$ exit
     \label{eq:per-field-honest}
     \textcolor{extcolor}{
     \rho_{\mathrm{HE}}\!\bigl(\hat{\boldsymbol{b}}, \boldsymbol{x}^{(i)}\bigr)
-        := \bigwedge_{k \in \{u,p\}}
+        \coloneqq \bigwedge_{k \in \{u,p\}}
             \Bigl[\,R_{k}(\hat{\boldsymbol{b}})
                 \le K_{\mathrm{nf}}\, \tau^{\mathrm{F}}_{k}\!\bigl(\boldsymbol{x}^{(i)}\bigr)\Bigr].}
 \end{equation}
