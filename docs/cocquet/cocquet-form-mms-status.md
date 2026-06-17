@@ -144,8 +144,13 @@ unconfirmed; `theory/tau_saturation_note` deliberately does not assert it.
 - **Recovering the fold cells** (if wanted as converged, not folded): **continuation into the corner**
   (start at α=0.5 or Re=1, walk to α=0.1 / Re=1e5), the same device the regular harness's Phase-2
   `run_continuation.jl` uses for its excluded corner.
-- **Throwaway probes to clean** before/after commit: `data/isolation_*.json`, `results/isolation_*.h5`,
-  `diagnose_*.jl`, `data/_validate_*.json`.
+- **Throwaway probes removed (2026-06-16):** the `diagnose_*.jl` probes, `data/_validate_*.json`, the
+  superseded `plot_combined.py`, the stale `cocquet_form_mms.json.orig`, and the dead-end A/B configs
+  (`isolation_{trim,full,osgs_trim,osgs_full}.json`) were deleted. **Kept:** `data/isolation_alphasweep.json`
+  + `data/isolation_linctrl.json` (they back the §4 reaction-magnitude finding); `results/` h5 outputs are
+  gitignored. **Still untriaged for pruning** (your call): the pre-redesign
+  `cocquet_form_mms_comparison_C*.json` / `cocquet_form_mms_equalorder.json` (refs=0) and the
+  `cocquet_form_mms_vms_k2.json` shard helper.
 - **Diagnostic harness change left in place:** `run_test.jl` now gates the `Constant_Sigma` reaction
   trim on `experimental_reaction_mode` (mirroring `src/run_simulation.jl:57`); it does not affect the
   Forchheimer path the real sweep uses.
