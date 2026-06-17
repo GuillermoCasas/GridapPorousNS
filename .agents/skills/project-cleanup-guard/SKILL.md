@@ -40,6 +40,26 @@ Find and remove files, directories, or outputs that were created only to inspect
 Never preserve AI-created scratch artifacts “just in case” unless the user explicitly wants them kept. 
 *Note: If a temporary file contains useful insight, convert its content into canonical documentation (e.g., `lessons_learned.md`) and delete the staging file.*
 
+### HARD CONSTRAINT: never sever the result↔config provenance link
+
+Removing artifacts must **never** make it impossible to reconstruct *which parameters produced which
+results* (see `.agents/rules/reproducible-results.md`). This guard outranks the "delete scratch"
+instinct above.
+
+- **A configuration file is NOT scratch if results were produced from it.** Do not unify, merge,
+  rename, or delete a config — even one that looks like a duplicate "of the same kind" as another, a
+  per-`(etype,k)` shard, or a one-off tolerance "patch" — when committed, archived
+  (`previous_results/`), or on-disk results depend on it for their parameter provenance. Each such
+  config is the *record of how a result set was obtained*.
+- **Distinguish true scratch from provenance.** Genuinely deletable: configs/scripts that produced
+  *no* kept result, debug probes, ad-hoc plotters. NOT deletable without preserving provenance: any
+  config tied to a kept `.h5`/`.json`/report, and the results themselves.
+- **Targeted/sharded reruns** use `run_test.jl --filter/--shard`, not config consolidation.
+- **If consolidation is genuinely wanted, make provenance explicit FIRST** — embed a config snapshot
+  into each result, or write a result→config+parameters manifest — *then* collapse. Reversibility via
+  git is not sufficient: the producing config of an archived result is not recoverable if it was
+  deleted in the same era.
+
 ## 3. Restore Canonical Computational State
 
 During development, solvers are often downgraded to bypass bottlenecks. You MUST ensure the code is restored to production limits:

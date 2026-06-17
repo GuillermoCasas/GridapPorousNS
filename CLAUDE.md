@@ -129,6 +129,10 @@ This is enforced at the cultural level (`.agents/rules/no-hard-coded-parameters.
 
 If you need a new numerical control, add it to the schema, the config struct, the JSON, and the consuming function — in that order. Do not introduce inline literals like `1e-8`, `0.5`, `100` in solver/formulation code unless they are mathematically universal (e.g. `2` in `2μ∇^s u`).
 
+### Reproducible results — never sever the parameters→results link
+
+Enforced at the cultural level (`.agents/rules/reproducible-results.md`). It must **always be possible to reconstruct which parameters/configuration produced any given result** — that traceability is the basis of all reasoning in this project (comparing results across regimes to understand the method). Never unify, rename, or delete a config or result file if it would orphan existing results (committed, archived in `previous_results/`, or on disk) from the parameters that produced them — a config "of the same kind" as another is still the *provenance record* of its result set, not redundant clutter. Do targeted/sharded re-runs with `run_test.jl --filter/--shard`, not by collapsing the configs that document past runs. Every result must carry its own parameters: MMS HDF5 groups store `Re/Da/alpha_0/k_velocity/method/…` as attributes; trajectory sidecars encode the full cell in filename + body; `previous_results/` archives keep the config + report alongside the data. When in doubt, preserve the link — or make provenance explicit (config snapshot / result→config manifest) *before* consolidating.
+
 ### Verification gate
 
 Per `.agents/rules/fast-verification.md`: after editing anything in `src/formulations/`, `src/stabilization/tau.jl`, `src/models/reaction.jl`, or `src/solvers/nonlinear.jl`, run Blitz immediately. For changes to assembly, residual/Jacobian construction, or solver orchestration, run Quick after Blitz. For convergence-study or MMS-touching changes, also run Extended. A change is not complete until the relevant tiers pass with no failures and no tier-warning messages.
