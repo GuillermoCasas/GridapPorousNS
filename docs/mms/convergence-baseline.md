@@ -59,7 +59,9 @@ Iters = inner Newton steps per mesh, shown as range across N.
 | 1e6  | 1e6  | 1    | 1.00 | 10–20 | 1.00 | 44–86 | |
 
 *(The three `Re=1e6, α₀=0.05` cells are deliberately skipped — the high-Re/low-porosity fold has no
-coarse-mesh root; they are rescued by α/mesh continuation, see `continuation_c24.json` below.)*
+coarse-mesh root. Continuation is one way to reach a root, but the fold clears by ≈N=512, after which a
+**direct exact-guess Newton solve** converges in ~3 iters with no continuation; see
+[fold-recovery.md](fold-recovery.md).)*
 
 ## Reading it
 
@@ -86,8 +88,10 @@ coarse-mesh root; they are rescued by α/mesh continuation, see `continuation_c2
 - **`phase1_quad_k2.json`** — the k=2 (P2/P2) sweep; **not yet run** on the corrected solver. Run it to
   extend this baseline to higher order.
 - **`continuation_c24.json` / `continuation_c24_rate.json`** — α + mesh continuation for the high-Re/low-α
-  **fold** (the three skipped `Re=10⁶, α₀=0.05` cells), via `run_continuation.jl`; reaches H¹≈1.0 at the
-  target corner (see [fold-recovery.md](fold-recovery.md)).
+  **fold** (the three skipped `Re=10⁶, α₀=0.05` cells), via `run_continuation.jl` (which was broken on
+  `main` — missing `probe_stiff_diagnose.jl` `include` — and is now restored). Reaches H¹≈1.0 at the
+  target corner. **As of 2026-06-17 the preferred corner path is the direct exact-guess solve**
+  (`run_corner_article.jl` ASGS, `run_corner_osgs.jl` OSGS) at N≥512 — see [fold-recovery.md](fold-recovery.md).
 - **`test_config.json`** — the small CLAUDE.md "single simulation" example; not a convergence study.
 
 ## Regenerate

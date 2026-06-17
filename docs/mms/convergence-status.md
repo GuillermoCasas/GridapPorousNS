@@ -43,6 +43,9 @@ and [`lessons_learned.md`](../lessons_learned.md); the live conclusions are fold
 >   overlapping mesh — the ε_M/ε_C gate changed *when* the solver stops, not *where*.
 > - **Expected caveats (not defects):** Re=1e6 @ N=10 is `NaN` (boundary layers ∼ Re^{-1/2}=1e-3 ≪ h=0.1,
 >   hopeless on a 10×10 grid); the three Re=1e6/α₀=0.05 cells are `skip_cells` (the coarse-mesh fold, §3).
+>   **(Update 2026-06-17:** these three TRI/P1 corner cells are now reproduced — ASGS+OSGS — by a *direct
+>   exact-guess solve* at N≥512, no continuation needed; the Q2/QUAD-k2 corner is still uncomputed. See
+>   [`fold-recovery.md`](fold-recovery.md).)
 >   `analyze_results.py`'s detector still flags ≈ 29/48 as fold/no-root — a **conservative per-pair
 >   artifact** (pre-asymptotic coarse meshes, the N=10 NaN pulling global fits, super-convergent tails);
 >   its own rate-check reports **0 sub-optimal and 0 super-convergent**. Read the per-pair ratios, not the
@@ -64,7 +67,8 @@ and [`lessons_learned.md`](../lessons_learned.md); the live conclusions are fold
    removes every confound, so this corner is the *pure* signal.
 3. **In that corner the discrete solution branch _folds_ at coarse mesh** — there is literally no
    FE root to converge to, so the sweep "fails" there for a genuine mathematical reason, not a bug.
-   The fold **recedes with refinement**; continuation reaches the root at fine mesh.
+   The fold **recedes with refinement**; once a root exists (≈N=512) a *direct exact-guess solve*
+   reaches it (continuation is only needed to reach a root at coarse N).
 4. **Once past the fold, the corner converges optimally — even super-convergently.** The decisive
    measurement (cell C24, `Re=1e6, Da=1, α₀=0.05`, via continuation to `N=512→1024`): velocity
    **`H¹` rate ≈ 1.01–1.04** (textbook-optimal for `k=1`) and velocity **`L²` rate ≈ 2.99–3.03**

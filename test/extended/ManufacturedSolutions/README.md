@@ -11,9 +11,12 @@ research harness** — it is *not* part of the automated `runtests.jl` tiers.
 |---|---|
 | `run_test.jl` | **Canonical sweep driver.** Reads a `data/<config>.json`, sweeps the factor grid, writes one HDF5 results DB under `results/`. |
 | `analyze_results.py` | **Single analysis entry point.** Detects flagged cells, builds the merged + detailed convergence reports and summary tables, optional plots. |
-| `run_continuation.jl` | Fold-recovery driver for the stiff high-Re/low-α corner (α / mesh-ladder regimes; batch `phase2` mode). See [`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md). |
+| `run_continuation.jl` | Coarse-N fold-**reach** driver (α / mesh-ladder continuation to *find* a root when none exists at coarse N; batch `phase2` mode). At N≥512 a root exists, so prefer the direct solve below. See [`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md). |
+| `run_corner_article.jl` | **Direct exact-guess corner solve (ASGS).** Solves the Re=1e6/α₀=0.05 fold corner cells at base N=512 + mesh-step to N=768 — the fold clears by ≈N=512, so plain Newton from the exact guess converges (~3 iters); no α-continuation needed. Writes `results/debug_results/corner_tri_k1_a005.json`. |
+| `run_corner_osgs.jl`, `osgs_corner_lib.jl` | **Direct corner solve (OSGS).** OSGS coupled solve (mirrors `solve_osgs_stage!`), warm-started from the ASGS corner root. Writes `corner_tri_k1_a005_osgs*.json`. |
+| `make_results_tables.py` | Generates `results/paper_tables.tex` — the four `article.tex` tables filled with the latest Gridap results (FME at a common N=320, corner cells extrapolated + daggered; an `ε_pert (N_NS+N_Pic)` solver-effort column). |
 | `plot_mesh.py` | Mesh visualizations (thin wrapper over `tools/mesh_viz/`). |
-| `probe_stiff_diagnose.jl`, `run_diagnostics.jl` | `[diagnostic-tool]` — manually-run, single-cell investigations (not the sweep). `probe_stiff_diagnose.jl` also supplies the cell primitives `run_continuation.jl` reuses. |
+| `probe_stiff_diagnose.jl`, `run_diagnostics.jl` | `[diagnostic-tool]` — manually-run, single-cell investigations (not the sweep). `probe_stiff_diagnose.jl` supplies the `build_cell`/`probe_a2_heavy_solve` primitives that `run_continuation.jl` + the corner drivers reuse (it was restored 2026-06-17 — `run_continuation.jl`'s `include` of it had been left broken by its deletion in `3c66edd`). |
 | `diagnostics/{jacobian_equilibration_osgs,velocity_centering}_probe.jl` | Retained negative-result probes (see `docs/lessons_learned.md`). |
 | `data/*.json` | Sweep configs (see below). | 
 | `results/` | All output (**gitignored**). HDF5 DB + merged reports at the root; per-cell artifacts under `results/k<kv>/<etype>/` (convergence `.png` from `analyze_results.py`, plus `vtk/` and `traces/`). Ad-hoc/debug runs mirror under `results/debug_results/`. |
@@ -59,8 +62,11 @@ julia --project=../../.. run_test.jl test_config.json --filter etype=QUAD,kv=2 -
 # quick smoke (1 cell, short ladder):
 julia --project=../../.. run_test.jl test_config.json --filter Re=1.0,Da=1.0,etype=QUAD,kv=1 --max-N 40 --h5 smoke.h5
 ```
-The **fold corner** (Re=1e6, α₀=0.05) is excluded from the sweep by `skip_cells` and handled by
-`run_continuation.jl` — see [`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md).
+The **fold corner** (Re=1e6, α₀=0.05) is excluded from the sweep by `skip_cells` (it folds — no root —
+at N≤320). It is **reproduced** (P1/TRI, both methods) by a direct exact-guess solve at N≥512 via
+`run_corner_article.jl` (ASGS) / `run_corner_osgs.jl` (OSGS); `run_continuation.jl` is the fallback for
+reaching a root at coarse N. The Q2/QUAD-k2 corner is still uncomputed. See
+[`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md).
 
 ### Concurrent launches into ONE shared database
 
@@ -106,7 +112,7 @@ To recreate a retired sibling (e.g. the old `continuation_c21` = `c24` with `Da=
 A fast multi-regime gate to confirm the harness runs cleanly and to spot convergence regressions —
 e.g. before merging a change. No throwaway config needed: `--filter` a representative spread, `--max-N`
 a short ladder, into a scratch `--h5` DB. (The α₀=0.05 fold corner is already excluded by the config's
-`skip_cells`; it is covered by `run_continuation.jl`.)
+`skip_cells`; it is reproduced separately by the direct-solve corner drivers — see the Layout table.)
 
 ```bash
 # Da=1 column × all Re × all α, QUAD k=1, ASGS+OSGS, N≤40, 2 shards into one scratch DB:

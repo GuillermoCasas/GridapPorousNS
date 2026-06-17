@@ -30,6 +30,16 @@ Each is verified against the working tree. Severity is the author's call.
   2026-05-26, `lessons_learned.md`). Not triggered today (that test only iterates `{ASGS, Galerkin}`), but it
   would mislabel runs if `OSGS` is ever added.
 
+- **Gridap-vs-Kratos MMS magnitude offset (open, 2026-06-17).** When the high-Re/low-α corner cells are
+  reproduced in Gridap (`run_corner_article.jl`/`run_corner_osgs.jl`), the normalized FME come out
+  **~3–12× larger** than the paper's Kratos values, in a norm-dependent way (vel L² ~7×, pressure L² ~5×,
+  H¹ ~2.4×). Convergence *rates* agree (≈2–3) and the Gridap TRI numbers match the Gridap QUAD continuation
+  to ~2%, so the discretization is internally consistent — the offset is a **code-vs-code calibration**
+  question (candidate causes: characteristic-scale `U_c`/`P_c` normalization, porosity-field definition,
+  MMS amplitude). It affects how literally `results/paper_tables.tex` can be read against the paper. Not a
+  convergence failure. Canonical detail: [`mms/fold-recovery.md`](mms/fold-recovery.md) ("Current status &
+  remaining work").
+
 ## Minor / cleanup
 
 - ~~**Dead helper after the covariance fix** — `_resolve_solution_scale_per_field` + the `x_per_field_raw`

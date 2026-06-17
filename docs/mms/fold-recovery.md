@@ -3,14 +3,32 @@
 > Canonical fold sub-topic — parent: [`mms_convergence_status.md`](convergence-status.md) §3 (region B). This file carries the deep diagnosis and the continuation rescue; the parent has the grid-wide picture.
 
 Permanent record of why the high-Re / low-porosity MMS corner appears to "fail" on coarse meshes,
-and the harness-level continuation method that recovers the true FE solution. Consolidated from the
-investigation diagnostics (`probe_stiff_diagnose.jl` → `probe_diag_v2.md`, and the
-`c24_resolution_and_continuation.md` scratch note, both since removed). The reusable driver is
-[run_continuation.jl](../../test/extended/ManufacturedSolutions/run_continuation.jl); the evidence
-configs are `data/continuation_{c24,c24_rate,c21}.json`.
+and the two methods that recover the true FE solution: the original harness-level **continuation**
+driver, and the simpler **direct exact-guess solve** (the production path since 2026-06-17). The
+diagnostics were consolidated from `probe_stiff_diagnose.jl` (the minimal version was **restored**
+2026-06-17 — see below) and the `c24_resolution_and_continuation.md` scratch note (removed). Drivers:
+[run_continuation.jl](../../test/extended/ManufacturedSolutions/run_continuation.jl) (continuation;
+evidence configs `data/continuation_{c24,c24_rate}.json`) and the newer
+[run_corner_article.jl](../../test/extended/ManufacturedSolutions/run_corner_article.jl) /
+[run_corner_osgs.jl](../../test/extended/ManufacturedSolutions/run_corner_osgs.jl) (direct solve).
 
-Cells under study — **C24**: `Re=1e6, Da=1, α₀=0.05, k=1, QUAD` (and its sibling **C21** `Da=1e-6`).
-These are the only cells in the MMS sweep that genuinely fail from the exact-solution initial guess.
+Cells under study — `Re=1e6, α₀=0.05, Da∈{1e-6,1,1e6}`, both ASGS and OSGS, for each element family.
+These are the only cells in the MMS sweep that fail from the exact-solution initial guess at coarse N.
+
+> ## ✅ 2026-06-17 — TRI k=1 (P1) corner REPRODUCED; direct solve supersedes continuation
+>
+> The three P1/TRI corner cells (and both stabilizations) were solved in Gridap. **Key finding: once
+> the discrete fold has cleared (≈N=512), no α-continuation is needed** — a plain Newton solve from
+> the interpolated exact solution reaches the true root in ~3 iters. Continuation is only required to
+> *reach* a root when **none exists** at coarse N (the fold). Evidence: N=160 still folds
+> (`err_u=NaN`, ‖R‖≈0.85); N=512 converges in 3 Newton iters to ‖R‖≈7e-11. So the production recipe is
+> now **direct-solve-at-N≥512 + mesh-step up**, not the ~70-LU α-ramp.
+>
+> Results match the QUAD continuation numbers below (vel L² slope ≈3.0, H¹ ≈1.0). OSGS≈ASGS at this
+> corner (Pe≈5e4, projection negligible). `Da=1e-6 ≡ Da=1` (Forchheimer Da no-op). Full per-cell
+> numbers and the LaTeX reproduction of the paper tables: `make_results_tables.py` →
+> `results/paper_tables.tex`. **Remaining work and the unresolved Gridap-vs-Kratos magnitude offset:
+> see "Current status & remaining work" at the bottom of this file.**
 
 ---
 
@@ -124,3 +142,70 @@ counts as success only when `‖R‖∞ ≤ k_nf · effective_ftol`, controlled 
 relative-residual `is_true_root` test. The Phase-1 sweep configs set `k_nf = 10.0` to reject these
 fold stalls so they are reported as flagged cells (then rescued via the continuation method above)
 rather than as wrong "successes."
+
+---
+
+## The production method (2026-06-17): direct exact-guess solve
+
+Continuation is the **conservative** route — it can reach the corner even before knowing a root
+exists. But the diagnosis above ("the fold recedes with mesh") implies a cheaper path: at any mesh
+where a root *does* exist, the interpolated exact solution is an excellent initial guess for it, so a
+plain Newton solve converges directly — no α-ramp. Empirically the fold clears α=0.05 by **≈N=512**, so:
+
+- **`run_corner_article.jl` (ASGS).** For each `Da`, direct Newton from the exact guess at base N=512
+  (≈3 iters to ‖R‖~1e-11), then mesh-step (Gridap `Interpolable`) up to N=768 (~2 iters). All four
+  normalized norms (u/p × L²/H¹) + the two-finest-mesh slopes are written to
+  `results/debug_results/corner_tri_k1_a005.json`. This is ~6 LU solves total vs ~70 for an α-ramp
+  (each N=512 LU is ~200 s, so the α-ramp was ~4 h/cell; direct solve is ~25 min/cell).
+- **`run_corner_osgs.jl` + `osgs_corner_lib.jl` (OSGS).** The OSGS coupled solve (mirrors
+  `solve_osgs_stage!`) is **warm-started from the ASGS root** at each mesh — the ASGS root is O(h²)
+  from the OSGS root, so the error is reliable in a few iters. ⚠️ **Caveat:** the OSGS coupled solve
+  converges *slowly-linearly* (frozen-π) and is stopped at the production-level residual
+  (`ftol=1e-6`/noise-floor `1e-5`), not a tight true root. The **FME is reliable** (warm-from-ASGS,
+  OSGS≈ASGS), but the OSGS *slope* can be mildly inflated when the coarse (N=512) point is not fully
+  settled — e.g. Da=1e6 reads slope 2.63 vs ASGS 2.11; tighten the N=512 OSGS solve for a cleaner slope.
+
+**`run_continuation.jl` was broken on `main`** and is fixed: it `include`s `probe_stiff_diagnose.jl`,
+which had been deleted in commit `3c66edd`. A minimal `probe_stiff_diagnose.jl` (just `build_cell` +
+`probe_a2_heavy_solve` + `CellArtifacts` + `calc_normalized_errors`, verbatim from `3c66edd~1`) was
+restored; all referenced package symbols/config fields survived the refactor. Both the continuation
+driver and the direct-solve drivers reuse these primitives.
+
+---
+
+## Current status & remaining work (for future sessions)
+
+| Corner family | Cells | Status | Path used |
+|---|---|---|---|
+| **P1 / TRI k=1** | Re=1e6, α₀=0.05, Da∈{1e-6,1,1e6}, ASGS+OSGS | ✅ **DONE** | direct solve N=512→768 |
+| **Q2 / QUAD k=2** | same 6 cells | ❌ **NOT COMPUTED** | — (future work) |
+
+The P1 results populate the `n.c.` corner rows of the **Linear** tables in `results/paper_tables.tex`;
+the **Quadratic** tables still show `n.c.` for the corner.
+
+**Open item — Gridap-vs-Kratos magnitude offset (unresolved).** Our Gridap corner FME are **~3–12×
+larger** than the article's (Kratos) values, in a norm-dependent way (e.g. vel L²: Gridap 7.9e-5 @N=768
+vs the paper's 1.1e-5 @N=640; pressure L² ~5×; H¹ ~2.4×). The **rates agree** (optimal/super-optimal,
+≈2–3) and the Gridap TRI numbers match the Gridap QUAD continuation to ~2%, so the discretization is
+internally consistent — the offset is a code-vs-code calibration question (candidates: characteristic
+scale `U_c`/`P_c` normalization, porosity-field definition, MMS amplitude). Worth reconciling before
+the table is taken as a literal reproduction of the paper.
+
+**To finish the Q2 corner (next session).** Expected to be the same recipe — direct exact-guess solve
+at N≥512 — but k=2 was not yet run, so a few things to verify/watch:
+- The fold-clearing mesh may differ for Q2 (k=2 resolves the α-layer better per-DOF; the fold may
+  clear at a coarser N, or the larger per-mesh DOF count may make N=512+ LU heavier — watch memory).
+- Q2 has **no corner trace/JSON** yet, so `make_results_tables.py` shows those iteration cells as
+  `n.c.`/`--`; the generator already reads a `corner_quad_k2_*.json` if one is added (mirror the
+  `corner_tri_k1_a005*.json` plumbing in `load_corner`).
+- Reuse `run_corner_article.jl` (it takes `etype`/`kv` — generalize `main()` from TRI/k=1 to QUAD/k=2)
+  and `run_corner_osgs.jl`. Both already worked for TRI; the only TRI-specific bit is the hardcoded
+  output filename and the `[1e6]/[0.05]` grid in `main()`.
+- **What was tried that did NOT work / was wasteful (avoid repeating):** (i) the standard sweep
+  (`run_test.jl`) cannot produce these — they fold at N≤320 (`skip_cells` exists for this reason);
+  (ii) the α-continuation `mesh_ladder` at base N=512 is correct but **~4 h/cell** (each failing step
+  near the fold burns up to `max_iters_per_step` LU factorizations) — the direct solve is ~10× faster
+  and was validated to give identical roots; (iii) a transient **swap episode** (process RSS climbing
+  across cells) made one N=512 solve 9× slower — run corner cells in **fresh processes** to keep
+  memory clean; (iv) tight OSGS tolerance (ftol=1e-8) grinds for ~hours (frozen-π linear rate) — use
+  the production noise-floor stop and warm-start from the ASGS root.
