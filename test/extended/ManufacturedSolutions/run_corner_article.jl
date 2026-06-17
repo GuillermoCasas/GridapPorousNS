@@ -100,14 +100,27 @@ function run_corner(Re, Da, αt; kv=1, etype="TRI",
     return out
 end
 
+# CLI:  run_corner_article.jl [etype kv base_candidates fine_ladder outname das]
+#   etype           "TRI" (default) | "QUAD"
+#   kv              1 (default) | 2
+#   base_candidates comma list, e.g. "512,640,768" (default) — first that converges is the base
+#   fine_ladder     comma list, e.g. "768" (default) — meshes to mesh-step up to (skipped if ≤ base)
+#   outname         debug_results JSON filename (default corner_tri_k1_a005.json)
+#   das             comma list of Da (default "1e-6,1,1e6")
 function main()
     Re = 1e6; αt = 0.05
-    Das = [1e-6, 1.0, 1e6]
-    outpath = joinpath(@__DIR__, "results", "debug_results", "corner_tri_k1_a005.json")
+    etype = length(ARGS) >= 1 ? ARGS[1] : "TRI"
+    kv    = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 1
+    base_candidates = length(ARGS) >= 3 ? parse.(Int, split(ARGS[3], ",")) : [512, 640, 768]
+    fine_ladder     = length(ARGS) >= 4 ? parse.(Int, split(ARGS[4], ",")) : [768]
+    outname = length(ARGS) >= 5 ? ARGS[5] : "corner_tri_k1_a005.json"
+    Das = length(ARGS) >= 6 ? parse.(Float64, split(ARGS[6], ",")) : [1e-6, 1.0, 1e6]
+    outpath = joinpath(@__DIR__, "results", "debug_results", outname)
     mkpath(dirname(outpath))
+    println(@sprintf("[run_corner] etype=%s kv=%d base=%s fine=%s -> %s", etype, kv, string(base_candidates), string(fine_ladder), outname)); flush(stdout)
     results = Any[]
     for Da in Das
-        r = run_corner(Re, Da, αt)
+        r = run_corner(Re, Da, αt; kv=kv, etype=etype, base_candidates=base_candidates, fine_ladder=fine_ladder)
         push!(results, r)
         # incremental write so a partial run is not lost
         open(outpath, "w") do io

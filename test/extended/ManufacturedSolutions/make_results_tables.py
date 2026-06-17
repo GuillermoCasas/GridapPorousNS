@@ -402,9 +402,15 @@ def build():
     corner = alias_forchheimer_da(corner)
     p1.update(corner)  # corner rescued cells override / fill (carry their own iters)
 
-    # ---- Q2 family: QUAD k=2 sweep + iters from traces (no corner data computed yet) ----
+    # ---- Q2 family: QUAD k=2 sweep + iters from traces + corner JSON overrides ----
     q2 = load_h5(args.quad_h5)
     _attach_iters(q2, os.path.join(RESULTS, "k2", "QUAD", "traces"))
+    corner_q2 = load_corner([
+        (os.path.join(DEBUG, "corner_quad_k2_a005.json"), "ASGS"),
+        (os.path.join(DEBUG, "corner_quad_k2_a005_osgs.json"), "OSGS"),
+    ])
+    corner_q2 = alias_forchheimer_da(corner_q2)
+    q2.update(corner_q2)  # Q2/QUAD-k2 corner: converges directly at the standard 160→320 (no fold)
 
     specs = [
         dict(data=p1, norm="L2", label="tab:Linear2DL2", vel_rate="2", prs_rate="1", fme_col6_mm="18",

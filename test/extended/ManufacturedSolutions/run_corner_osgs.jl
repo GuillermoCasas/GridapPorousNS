@@ -77,16 +77,23 @@ function osgs_corner(Re, Da, αt; kv=1, etype="TRI", base_N=512, fine_N=768, asg
     return out
 end
 
+# CLI:  run_corner_osgs.jl [etype kv base_N fine_N outname das]
+#   etype  "TRI"(default)|"QUAD"; kv 1(default)|2; base_N/fine_N the two meshes; outname the
+#   debug_results JSON; das comma list of Da. Defaults reproduce the TRI/k1 Da=1e6 single-cell run.
 function main()
     Re = 1e6; αt = 0.05
-    # Da=1e-6 ≡ Da=1 (σ∝Da negligible vs convection — byte-identical ASGS roots), already in
-    # corner_tri_k1_a005_osgs.json from a prior run; only Da=1e6 (reaction matters) is left.
-    Das = [1e6]
-    outpath = joinpath(@__DIR__, "results", "debug_results", "corner_tri_k1_a005_osgs_da1e6.json")
+    etype  = length(ARGS) >= 1 ? ARGS[1] : "TRI"
+    kv     = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 1
+    base_N = length(ARGS) >= 3 ? parse(Int, ARGS[3]) : 512
+    fine_N = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : 768
+    outname = length(ARGS) >= 5 ? ARGS[5] : "corner_tri_k1_a005_osgs_da1e6.json"
+    Das = length(ARGS) >= 6 ? parse.(Float64, split(ARGS[6], ",")) : [1e6]
+    outpath = joinpath(@__DIR__, "results", "debug_results", outname)
     mkpath(dirname(outpath))
+    println(@sprintf("[run_corner_osgs] etype=%s kv=%d N=%d→%d -> %s", etype, kv, base_N, fine_N, outname)); flush(stdout)
     results = Any[]
     for Da in Das
-        r = osgs_corner(Re, Da, αt)
+        r = osgs_corner(Re, Da, αt; kv=kv, etype=etype, base_N=base_N, fine_N=fine_N)
         push!(results, r)
         open(outpath, "w") do io
             JSON3.write(io, [Dict(k => (v isa AbstractFloat && !isfinite(v) ? nothing : v) for (k,v) in d) for d in results])

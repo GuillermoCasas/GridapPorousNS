@@ -65,8 +65,8 @@ julia --project=../../.. run_test.jl test_config.json --filter Re=1.0,Da=1.0,ety
 The **fold corner** (Re=1e6, α₀=0.05) is excluded from the sweep by `skip_cells` (it folds — no root —
 at N≤320). It is **reproduced** (P1/TRI, both methods) by a direct exact-guess solve at N≥512 via
 `run_corner_article.jl` (ASGS) / `run_corner_osgs.jl` (OSGS); `run_continuation.jl` is the fallback for
-reaching a root at coarse N. The Q2/QUAD-k2 corner is still uncomputed. See
-[`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md).
+reaching a root at coarse N. The Q2/QUAD-k2 corner is **also** reproduced (it does not fold — k=2
+converges directly at N=160→320). See [`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md).
 
 ### Concurrent launches into ONE shared database
 

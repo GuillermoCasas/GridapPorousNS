@@ -44,7 +44,8 @@ and [`lessons_learned.md`](../lessons_learned.md); the live conclusions are fold
 > - **Expected caveats (not defects):** Re=1e6 @ N=10 is `NaN` (boundary layers ∼ Re^{-1/2}=1e-3 ≪ h=0.1,
 >   hopeless on a 10×10 grid); the three Re=1e6/α₀=0.05 cells are `skip_cells` (the coarse-mesh fold, §3).
 >   **(Update 2026-06-17:** these three TRI/P1 corner cells are now reproduced — ASGS+OSGS — by a *direct
->   exact-guess solve* at N≥512, no continuation needed; the Q2/QUAD-k2 corner is still uncomputed. See
+>   exact-guess solve* at N≥512, no continuation needed; the Q2/QUAD-k2 corner is also done (it does
+>   not fold — k=2 converges directly at N=160→320). See
 >   [`fold-recovery.md`](fold-recovery.md).)
 >   `analyze_results.py`'s detector still flags ≈ 29/48 as fold/no-root — a **conservative per-pair
 >   artifact** (pre-asymptotic coarse meshes, the N=10 NaN pulling global fits, super-convergent tails);

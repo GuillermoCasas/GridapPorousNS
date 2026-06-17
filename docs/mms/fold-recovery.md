@@ -27,8 +27,12 @@ These are the only cells in the MMS sweep that fail from the exact-solution init
 > Results match the QUAD continuation numbers below (vel L² slope ≈3.0, H¹ ≈1.0). OSGS≈ASGS at this
 > corner (Pe≈5e4, projection negligible). `Da=1e-6 ≡ Da=1` (Forchheimer Da no-op). Full per-cell
 > numbers and the LaTeX reproduction of the paper tables: `make_results_tables.py` →
-> `results/paper_tables.tex`. **Remaining work and the unresolved Gridap-vs-Kratos magnitude offset:
-> see "Current status & remaining work" at the bottom of this file.**
+> `results/paper_tables.tex`.
+>
+> **Update 2026-06-17 (later): the Q2/QUAD-k2 corner is ALSO done** — and it does **not** fold at the
+> standard meshes (k=2 resolves the α-layer better, so a direct solve converges at N=160 and N=320).
+> Every result cell of all four paper tables is now filled (zero `n.c.`). The unresolved Gridap-vs-Kratos
+> magnitude offset still applies. See "Current status & remaining work" at the bottom of this file.
 
 ---
 
@@ -177,11 +181,19 @@ driver and the direct-solve drivers reuse these primitives.
 
 | Corner family | Cells | Status | Path used |
 |---|---|---|---|
-| **P1 / TRI k=1** | Re=1e6, α₀=0.05, Da∈{1e-6,1,1e6}, ASGS+OSGS | ✅ **DONE** | direct solve N=512→768 |
-| **Q2 / QUAD k=2** | same 6 cells | ❌ **NOT COMPUTED** | — (future work) |
+| **P1 / TRI k=1** | Re=1e6, α₀=0.05, Da∈{1e-6,1,1e6}, ASGS+OSGS | ✅ **DONE** | direct solve, base N=512 + mesh-step N=768 (**folds** for N≤320) |
+| **Q2 / QUAD k=2** | same 6 cells | ✅ **DONE** (2026-06-17) | direct solve N=160→320 (**no fold** at standard meshes) |
 
-The P1 results populate the `n.c.` corner rows of the **Linear** tables in `results/paper_tables.tex`;
-the **Quadratic** tables still show `n.c.` for the corner.
+Both corners now populate `results/paper_tables.tex` — **every result cell (slope + FME) is filled;
+zero `n.c.`** The P1 corner FME is extrapolated to the common N=320 (daggered, since it lives at
+N=512→768); the Q2 corner needs **no extrapolation** (it converges at N=320 directly).
+
+> **Key finding (Q2 corner does NOT fold at standard meshes).** Unlike P1/TRI (folds until ≈N=512),
+> the Q2/QUAD-k2 corner converges by a direct exact-guess solve at **both N=160 and N=320** — k=2
+> (biquadratic) resolves the steep α-layer ~2× better per direction, so the fold clears at roughly
+> half the N. The blanket `skip_cells` rule `[1e6, *, 0.05]` was therefore **over-conservative for
+> k=2**: those cells were skipped on the precaution of the P1 fold, but the k=2 sweep could have
+> produced them directly at N≤320. (Cost: N=320 k=2 ≈ 1.23M DOFs, ~105 s/solve, ~2.7 GB — cheap.)
 
 **Open item — Gridap-vs-Kratos magnitude offset (unresolved).** Our Gridap corner FME are **~3–12×
 larger** than the article's (Kratos) values, in a norm-dependent way (e.g. vel L²: Gridap 7.9e-5 @N=768
@@ -191,16 +203,24 @@ internally consistent — the offset is a code-vs-code calibration question (can
 scale `U_c`/`P_c` normalization, porosity-field definition, MMS amplitude). Worth reconciling before
 the table is taken as a literal reproduction of the paper.
 
-**To finish the Q2 corner (next session).** Expected to be the same recipe — direct exact-guess solve
-at N≥512 — but k=2 was not yet run, so a few things to verify/watch:
-- The fold-clearing mesh may differ for Q2 (k=2 resolves the α-layer better per-DOF; the fold may
-  clear at a coarser N, or the larger per-mesh DOF count may make N=512+ LU heavier — watch memory).
-- Q2 has **no corner trace/JSON** yet, so `make_results_tables.py` shows those iteration cells as
-  `n.c.`/`--`; the generator already reads a `corner_quad_k2_*.json` if one is added (mirror the
-  `corner_tri_k1_a005*.json` plumbing in `load_corner`).
-- Reuse `run_corner_article.jl` (it takes `etype`/`kv` — generalize `main()` from TRI/k=1 to QUAD/k=2)
-  and `run_corner_osgs.jl`. Both already worked for TRI; the only TRI-specific bit is the hardcoded
-  output filename and the `[1e6]/[0.05]` grid in `main()`.
+**How the Q2 corner was run (2026-06-17).** Both corner drivers now take CLI args
+`etype kv base_candidates fine_ladder outname das` (defaults reproduce the TRI/k=1 runs):
+```bash
+# ASGS Q2 corner (all 3 Da), base N=160 → mesh-step N=320:
+julia --project=../../.. run_corner_article.jl QUAD 2 160 320 corner_quad_k2_a005.json 1e-6,1,1e6
+# OSGS Q2 corner:
+julia --project=../../.. run_corner_osgs.jl     QUAD 2 160 320 corner_quad_k2_a005_osgs.json 1e-6,1,1e6
+```
+`make_results_tables.py` reads `corner_quad_k2_a005*.json` (wired into `load_corner` for the Q2 family).
+Result: vel L² slope ≈2.90 (Da≤1) / 2.63 (Da=1e6), FME @N=320 ≈5.1e-6 / 4.3e-6; OSGS≈ASGS.
+
+**Remaining polish (not results):** the 6 `Re=1e6, α₀=0.05`... no — those are filled. The only `--`
+cells left are the **`Re=1e6, α₀=0.5` Q2 standard cells' iteration counts**: the k=2 traces dir holds
+only Re∈{1e-6,1} (the high-Re Q2 sweep ran from `_surgical_k2_hiRe.json` without kept traces), so their
+`ε_pert (N_NS+N_Pic)` reads `--`. Their *results* (slope+FME) are present; to fill the iters, re-run
+those cells through `run_test.jl --filter Re=1e6,alpha0=0.5,etype=QUAD,kv=2` (writes traces). The
+**Gridap-vs-Kratos magnitude offset above still applies to the Q2 corner too** (open).
+
 - **What was tried that did NOT work / was wasteful (avoid repeating):** (i) the standard sweep
   (`run_test.jl`) cannot produce these — they fold at N≤320 (`skip_cells` exists for this reason);
   (ii) the α-continuation `mesh_ladder` at base N=512 is correct but **~4 h/cell** (each failing step
