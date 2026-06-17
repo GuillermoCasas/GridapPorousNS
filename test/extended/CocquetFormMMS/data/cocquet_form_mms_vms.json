@@ -1,5 +1,5 @@
 {
-  "_comment": "Manufactured-solution sweep whose FORMULATION is identical to the Cocquet benchmark (SymmetricGradient viscous operator + nonlinear Forchheimer-Ergun reaction, Taylor-Hood P2/P1, ASGS), but with a known smooth exact solution and the standard radial porosity. Discriminator: if this converges optimally the Cocquet suboptimality is physical/pre-asymptotic; if it degrades, a real formulation bug is isolated. The Cocquet experiment itself is untouched. alpha_0=1.0 is the pure-NS control (sigma=0); alpha_0<1 activates the Forchheimer drag (sigma_linear/sigma_nonlinear match Cocquet).",
+  "_comment": "VMS equal-order stabilized triangles (P1/P1 + P2/P2, ASGS+OSGS) on the Cocquet formulation (SymmetricGradient viscous + full Forchheimer-Ergun reaction sigma=a(alpha)+b(alpha)|u|, Cocquet coefficients sigma_linear=0.3/sigma_nonlinear=1.75). Definitive (Re,alpha) MMS convergence study. Da is held at 1.0: under fixed Forchheimer coefficients Da is a no-op (run_test.jl only reads Da in the Constant_Sigma branch), so the porosity sweep alpha_0=[0.5,0.1] supplies the effective-Da variation through the collective linear+nonlinear drag. Re=[1,1e5] spans the viscous and convection-dominated regimes. Meshes capped at 160. Companion: cocquet_form_mms_taylorhood.json (the Cocquet et al. element, Galerkin Taylor-Hood P2/P1).",
   "erase_past_results": true,
   "epsilon_pert": [
     1.0
@@ -7,12 +7,11 @@
   "max_n_pert": 5,
   "mms_verification_enabled": true,
   "mms_tau_err": 0.0001,
-  "h5_filename": "cocquet_form_mms.h5",
+  "h5_filename": "cocquet_form_mms_vms.h5",
   "physical_properties": {
     "Re": [
       1.0,
-      100.0,
-      500.0
+      100000.0
     ],
     "Da": [
       1.0
@@ -31,9 +30,8 @@
   },
   "domain": {
     "alpha_0": [
-      1.0,
       0.5,
-      0.05
+      0.1
     ],
     "r_1": 0.2,
     "r_2": 0.4,
@@ -48,12 +46,14 @@
     "viscous_operator_type": "SymmetricGradient",
     "element_spaces": {
       "k_velocity": [
+        1,
         2
       ],
       "k_pressure": [
-        1
+        1,
+        2
       ],
-      "equal_order_only": false
+      "equal_order_only": true
     },
     "mesh": {
       "partition": [
@@ -65,8 +65,7 @@
         20,
         40,
         80,
-        160,
-        320
+        160
       ],
       "element_type": [
         "TRI"
@@ -96,13 +95,14 @@
     },
     "stabilization": {
       "method": [
-        "ASGS"
+        "ASGS",
+        "OSGS"
       ]
     }
   },
   "output": {
     "directory": "test/extended/CocquetFormMMS/results",
-    "basename": "cocquet_form_mms"
+    "basename": "cocquet_form_mms_vms"
   },
   "write_vtk": false,
   "trace_convergence_norms": true

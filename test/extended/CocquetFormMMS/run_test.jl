@@ -39,8 +39,11 @@ using LinearAlgebra
 # Helper Constructors
 # ==============================================================================
 
-function _build_local_mesh(domain_cfg, mesh_cfg)
-    domain = Tuple(domain_cfg.bounding_box)
+function _build_local_mesh(domain_cfg, mesh_cfg, L::Float64=1.0)
+    # The JSON `bounding_box` is the L=1 baseline; the physical domain extends as `L .* bounding_box`,
+    # so the manufactured shape sin(πx/L) and the domain scale together (the dimensionless problem is
+    # preserved; only the conditioning changes). Mirrors the regular ManufacturedSolutions harness.
+    domain = Tuple(collect(L .* domain_cfg.bounding_box))
     partition = Tuple(mesh_cfg.partition)
     if mesh_cfg.element_type == "TRI"
         model = CartesianDiscreteModel(domain, partition; isperiodic=Tuple(fill(false, length(partition))), map=identity)
@@ -55,9 +58,40 @@ function _build_local_mesh(domain_cfg, mesh_cfg)
     return model
 end
 
-# Creates the domain porosity field structure parameterized by alpha bounds and geometry
-function build_porosity_field(config, alpha_0, alpha_infty)
-    PorousNSSolver.SmoothRadialPorosity(Float64(alpha_0), Float64(alpha_infty), config.domain.r_1, config.domain.r_2)
+# Creates the domain porosity field structure parameterized by alpha bounds and geometry.
+# `r_1, r_2` are L=1 baselines; the porosity bump lives at L*r_1 < r < L*r_2 so its relative footprint
+# on the L-scaled domain is unchanged (mirrors the regular ManufacturedSolutions harness).
+function build_porosity_field(config, alpha_0, alpha_infty, L::Float64=1.0)
+    PorousNSSolver.SmoothRadialPorosity(Float64(alpha_0), Float64(alpha_infty), L * config.domain.r_1, L * config.domain.r_2)
+end
+
+# Forchheimer-minmax encoding: pick (L, U) minimising the dynamic range of {U, ν, σ} for the NONLINEAR
+# Ergun reaction σ(U) = a(α₀) + b(α₀)·U (which GROWS with the velocity scale U and FLOORS at a(α₀)).
+# Standard minmax (Constant_Sigma) balances ν=σ=1/U; the correction for the nonlinear reaction picks U
+# solving 1/U = a + b·U (so |ln U| = |ln σ|) and sets ν = √(U·σ) (geometric mean ⇒ |ln ν| ≤ max(|ln U|,|ln σ|)),
+# giving L = ν·Re/U. This lifts ν to O(1), avoiding the ν=U·L/Re → 0 τ-saturation that floors ε_M at high
+# Re (validated: unit U=L=1 floors ε_M~1e-3 at Re=1e5/α=0.1; this encoding reaches the 1e-9 gate). α_0 is
+# the CORE porosity (strongest drag). "unit" reproduces the legacy L=1/U=1 behaviour bit-identically.
+function compute_L_and_U(strategy, Re, sigma_linear, sigma_nonlinear, alpha_0)
+    if strategy == "unit"
+        return (1.0, 1.0)
+    elseif strategy != "forchheimer_minmax"
+        error("Unknown encoding_strategy \"$strategy\". Valid: \"forchheimer_minmax\", \"unit\".")
+    end
+    # Damköhler number = dimensionless reaction-term size (article.tex eq:DimensionlessParameters,
+    # Da = σL²/(α_∞ν); the reaction term is `Da·u*` in eq:DimensionlessMomentumEquation). With a,b now
+    # scaling with the encoding (see build_mms_formulation) Da is Re-INDEPENDENT: for σ(U)=a+b|u| at |u*|~1,
+    # Da(α) = σ_lin·((1-α)/α)² + σ_nl·((1-α)/α). α_∞ = 1 in this harness.
+    ratio = (1.0 - Float64(alpha_0)) / Float64(alpha_0)
+    Da_eff = Float64(sigma_linear) * ratio^2 + Float64(sigma_nonlinear) * ratio
+    if Da_eff <= 0.0
+        return (1.0, 1.0)                       # pure Navier–Stokes (α₀→1, no drag): no reaction to balance
+    end
+    # minmax encoding (centered_encoding.tex / regular ManufacturedSolutions harness, with Da→Da_eff):
+    # L = √(α_∞·Da), U = (Re²/(α_∞·Da))^{1/4}  ⇒  ν = σ = (α_∞·Da/Re²)^{1/4}, minimal {U,ν,σ} dynamic range.
+    L = sqrt(Da_eff)
+    U = (Float64(Re)^2 / Da_eff)^(0.25)
+    return (L, U)
 end
 
 # Sets up the continuous VMS formulation for the Cocquet-form Manufactured Solution.
@@ -76,16 +110,37 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
 
     # Derive kinematic viscosity from the Reynolds sweep input.
     nu_calculated = U_amp * L / Float64(Re)
-    eps_calculated = config.physical_properties.eps_val
+    # [covariance] eps_val is DIMENSIONAL: in the continuity penalty `eps_val·p`, [eps_val] = (U/L)/P_c, so
+    # it MUST scale with the (L,U) encoding. The config value is the DIMENSIONLESS penalty ε̂; eps_calculated
+    # is derived per cell so ε̂ = eps_calculated·P_c·L/U is encoding-invariant. A FIXED eps_val breaks
+    # scale-covariance (worst in the pressure / OSGS projection). Mirrors the regular ManufacturedSolutions
+    # harness; P_c per get_characteristic_scales: P_c = (1+Re+Da)·U·ν/L.
+    P_c_cell = (1.0 + Float64(Re) + Float64(Da)) * U_amp * nu_calculated / L
+    eps_calculated = config.physical_properties.eps_val * (U_amp / L) / P_c_cell
 
     if config.physical_properties.reaction_model == "Constant_Sigma"
         sigma_c = Float64(Da) * alpha_infty * nu_calculated / (L^2)
         rxn = PorousNSSolver.ConstantSigmaLaw(sigma_c)
-        proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
+        # Mirror src/run_simulation.jl:57 — the constant-σ reaction trim (paper §4.4, removes σu from
+        # the stabilization/projection) is applied ONLY under experimental_reaction_mode=="standard";
+        # otherwise keep the FULL residual so the reaction stays IN the stabilization. This lets us A/B,
+        # at matched uniform σ, whether reaction-in-the-stabilization is what folds the low-α cells.
+        proj = config.numerical_method.solver.experimental_reaction_mode == "standard" ?
+            PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma() :
+            PorousNSSolver.ProjectFullResidual()
     else
+        # [encoding-covariant reaction] σ_linear/σ_nonlinear are the DIMENSIONLESS Darcy/Forchheimer
+        # numbers (cf. article.tex eq:DimensionlessParameters Da = σL²/(α_∞ν), and the Ergun a(α)=(150/Re)·…
+        # whose 1/Re=ν factor keeps Da Re-independent). The dimensional drags must therefore scale with the
+        # (L,U) encoding: a(α)=σ_lin·((1-α)/α)²·(ν/L²), b(α)=σ_nl·((1-α)/α)·(ν/(U·L²)), so the Damköhler
+        # number Da(α)=σ_lin·((1-α)/α)²+σ_nl·((1-α)/α) (the reaction-term size, eq:DimensionlessMomentumEquation
+        # `Da·u*`) is Re-INDEPENDENT — exactly as in article.tex. Passing them FIXED (the old code) made the
+        # effective Da ∝ Re (~4e6 at Re=1e5), spuriously reaction-dominating and breaking the encoding.
+        a_scale = nu_calculated / (L^2)
+        b_scale = nu_calculated / (U_amp * L^2)
         rxn = PorousNSSolver.ForchheimerErgunLaw(
-            config.physical_properties.sigma_linear,
-            config.physical_properties.sigma_nonlinear,
+            config.physical_properties.sigma_linear   * a_scale,
+            config.physical_properties.sigma_nonlinear * b_scale,
         )
         proj = PorousNSSolver.ProjectFullResidual()
     end
@@ -109,21 +164,27 @@ function calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L, d�
     e_u = u_final - u_h
     e_p = p_final - p_h
     
-    # 1. Absolute Velocity L2 norm rigorously divided by Characteristic Velocity `U_c`
-    el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ)) / U_c
-    
-    # Align pressure exactly (cancelling null space integration variations) 
+    # [encoding-invariant] L²-error scales as U_c·L^{d/2} on the L-scaled domain, so divide by U_c·√|Ω|
+    # (NOT U_c alone) to get a genuinely dimensionless norm — invariant under the (L,U) encoding. Mirrors
+    # the regular ManufacturedSolutions harness; without √|Ω| the rate is correct but the magnitude blows
+    # up with L. In 2D the H¹ semi-norm's 1/L (gradient) cancels the L from integration ⇒ divide by U_c.
     area = sum(∫(1.0)dΩ)
+    sqrt_area = sqrt(abs(area))            # √|Ω| = L·√|Ω̂| ; = 1.0 for L=1 on [-0.5,0.5]²
+
+    # 1. Velocity L² error, dimensionless via ‖e_u‖/(U_c·√|Ω|)
+    el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ)) / (U_c * sqrt_area)
+
+    # Align pressure exactly (cancelling null space integration variations)
     mean_e_p = sum(∫(e_p)dΩ) / area
     e_p_centered = e_p - mean_e_p
-    
-    # 2. Absolute Pressure L2 norm strictly divided by Characteristic Pressure `P_c`
-    el2_p = sqrt(sum(∫(e_p_centered * e_p_centered)dΩ)) / P_c
-    
-    # 3. Absolute Semi-H1 gradient errors normalized by exact corresponding characteristic scales taking into account geometric `L` characteristic derivation factors.
-    eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ)) / (U_c / L)
-    eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ)) / (P_c / L)
-    
+
+    # 2. Pressure L² error, dimensionless via ‖e_p‖/(P_c·√|Ω|)
+    el2_p = sqrt(sum(∫(e_p_centered * e_p_centered)dΩ)) / (P_c * sqrt_area)
+
+    # 3. Semi-H¹ errors: in 2D the L from integration cancels the 1/L from the gradient ⇒ divide by U_c/P_c.
+    eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ)) / U_c
+    eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ)) / P_c
+
     return el2_u, el2_p, eh1_semi_u, eh1_semi_p
 end
 
@@ -414,7 +475,8 @@ function run_mms(config_file="test_config.json")
                         "eval_eps" => Float64[],
                         "eval_residuals" => Float64[],
                         "mms_plateau_success" => Union{Bool,Nothing}[],
-                        "overall_verification_success" => Bool[]
+                        "overall_verification_success" => Bool[],
+                        "fold" => Bool[]   # true ⇒ recorded at the achievable ε_M floor (gate not reached), not NaN
                     )
                 end
                 
@@ -459,56 +521,21 @@ function run_mms(config_file="test_config.json")
                     
                     # Dynamically instantiate hierarchy overrides ensuring JSON parser rigor
                     config = PorousNSSolver.load_config_from_dict(config_dict)
+
+                    # [graceful fold recording] A config with a RELAXED scale-free momentum gate, used ONLY as a
+                    # retry for cells that fail the tight gate — the high-Re×low-α "fold" corner the paper itself
+                    # skips, where ε_M floors above 1e-9 yet the solution is a usable (pre-asymptotic O(h^k)) one.
+                    # The solver then accepts the achievable floor and returns the real solution instead of NaN.
+                    # Cells that reach the tight gate never enter this retry, so they are BIT-UNAFFECTED.
+                    eps_tol_momentum_fold = Float64(get(test_dict, "eps_tol_momentum_fold", 1e-2))
+                    config_fold_dict = deepcopy(config_dict)
+                    config_fold_dict["numerical_method"]["solver"] = merge(config_fold_dict["numerical_method"]["solver"], Dict("eps_tol_momentum" => eps_tol_momentum_fold))
+                    config_fold = PorousNSSolver.load_config_from_dict(config_fold_dict)
                     
-                    # Generate logical cell models natively spanning bounded domain
-                    model = _build_local_mesh(config.domain, config.numerical_method.mesh)
-                    labels = get_face_labeling(model)
-                    add_tag_from_tags!(labels, "all_boundaries", [1,2,3,4,5,6,7,8])
-                    
-                    # Pre-compile the structural geometric perturbation offset mapping purely algebraically outside evaluations!
-                    xmin, xmax, ymin, ymax = config.domain.bounding_box[1], config.domain.bounding_box[2], config.domain.bounding_box[3], config.domain.bounding_box[4]
-                    B_fn(x) = (x[1] - xmin)^2 * (xmax - x[1])^2 * (x[2] - ymin)^2 * (ymax - x[2])^2
-                    h_raw_func(x) = B_fn(x) * VectorValue(sin(3π*x[1])*cos(2π*x[2]), -cos(3π*x[1])*sin(2π*x[2]))
-                    
-                    # Compile Taylor-Hood Finite Element Spaces relying heavily on ReferenceFE definitions
-                    refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
-                    refe_p = ReferenceFE(lagrangian, Float64, kp)
-                    V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["all_boundaries"])
-                    Q = TestFESpace(model, refe_p, conformity=:H1)
-                    
-                    # Structurally generate topologically unbound sub-grid reference domains 
-                    # stripped of physical inlet/wall definitions for mathematically pure exact L2 bounds mapping
-                    V_free = TestFESpace(model, refe_u, conformity=:H1)
-                    Q_free = TestFESpace(model, refe_p, conformity=:H1)
-                    
-                    # Coordinate quadrature degree evaluation recursively mapped back to formulation definitions.
-                    # Build a type-representative reaction law from config so the §3.5 degree bump applies
-                    # for the Forchheimer law (its non-polynomial |u| factor would otherwise be
-                    # under-integrated). Coefficients are irrelevant — only the law's type drives the bump.
-                    quad_rxn_law = config.physical_properties.reaction_model == "Constant_Sigma" ?
-                        PorousNSSolver.ConstantSigmaLaw(0.0) :
-                        PorousNSSolver.ForchheimerErgunLaw(0.0, 0.0)
-                    degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, kv, quad_rxn_law)
-                    Ω = Triangulation(model)
-                    dΩ = Measure(Ω, degree + 4) # Extra numeric points exactly resolving high order source integration
-                    
-                    # Compute element-wise characteristic length variable 'h' structurally defined for stabilizations
-                    if etype == "TRI"
-                        h_array = lazy_map(v -> sqrt(2.0 * abs(v)), get_cell_measure(Ω))
-                    else
-                        h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
-                    end
-                    h_cf = CellField(collect(h_array), Ω)
-                    
-                    # Strictly define physical topology and scaling fields statically to prevent Gridap AST leaks
-                    h_pert_cf = CellField(h_raw_func, Ω)
-                    norm_h = sqrt(abs(sum(∫( h_pert_cf ⋅ h_pert_cf )dΩ)))
-                    if norm_h <= 0.0
-                        error("Perturbation field norm must be strictly positive (when perturbing).")
-                    end
-                    
-                    Y = MultiFieldFESpace([V, Q])
-                    
+                    # [encoding] The mesh, FE spaces, quadrature, perturbation field and porosity are all
+                    # L-scaled and therefore built PER CELL below (L depends on α and Re via the encoding),
+                    # not once per N. Only the L-independent controls (c_1/c_2, solver tolerances) stay here.
+
                     c_1, c_2 = PorousNSSolver.get_c1_c2(PorousNSSolver.PaperGeneralFormulation, kv)
                     tau_reg_lim = config.physical_properties.tau_regularization_limit
                     solver_newton_it = config.numerical_method.solver.newton_iterations
@@ -519,20 +546,65 @@ function run_mms(config_file="test_config.json")
                     ftol = config.numerical_method.solver.ftol
                     ls_alpha_min = config.numerical_method.solver.linesearch_alpha_min
                     freeze_cusp = config.numerical_method.solver.freeze_jacobian_cusp
-                    
+
+                    # [encoding] (L,U) per cell via the Forchheimer-minmax (default) so ν=U·L/Re stays O(1)
+                    # and the high-Re τ-saturation that floored ε_M is avoided. Set "unit" in the JSON to
+                    # reproduce the legacy L=1/U=1 behaviour. Coefficients drive the σ(U)=a+b·U balance.
+                    encoding_strategy = get(test_dict, "encoding_strategy", "forchheimer_minmax")
+                    sigma_lin_enc = config.physical_properties.sigma_linear
+                    sigma_nl_enc  = config.physical_properties.sigma_nonlinear
+
                     # ==============================================================================
                     # PHYSICS PARAMETER SWEEP
                     # Iterate fluid configurations using precompiled outer topological operators
                     # ==============================================================================
                     for alpha_0 in alpha_list
-                        # Outer extraction of dynamic CellFields evaluating purely geometric domains
                         alpha_infty = 1.0
-                        alpha_field = build_porosity_field(config, alpha_0, alpha_infty)
-                        alpha_cf = CellField(x -> PorousNSSolver.alpha(alpha_field, x), Ω)
                         for Da in Da_list
                             for Re in Re_list
-                                U_amp = 1.0
-                                L = 1.0
+                                # [encoding] per-cell (L, U): minmax with the Forchheimer correction so the
+                                # kinematic viscosity ν = U·L/Re stays O(1) and the high-Re τ-saturation that
+                                # floored ε_M is avoided. L scales the mesh, porosity bump and perturbation,
+                                # so all mesh-dependent objects are (re)built here, per cell.
+                                (L, U_amp) = compute_L_and_U(encoding_strategy, Re, sigma_lin_enc, sigma_nl_enc, alpha_0)
+
+                                model = _build_local_mesh(config.domain, config.numerical_method.mesh, L)
+                                labels = get_face_labeling(model)
+                                add_tag_from_tags!(labels, "all_boundaries", [1,2,3,4,5,6,7,8])
+
+                                # L-scaled homotopy perturbation field (bump × oscillation on the L-scaled domain)
+                                xmin, xmax = L*config.domain.bounding_box[1], L*config.domain.bounding_box[2]
+                                ymin, ymax = L*config.domain.bounding_box[3], L*config.domain.bounding_box[4]
+                                B_fn(x) = (x[1]-xmin)^2 * (xmax-x[1])^2 * (x[2]-ymin)^2 * (ymax-x[2])^2
+                                h_raw_func(x) = B_fn(x) * VectorValue(sin(3π*x[1]/L)*cos(2π*x[2]/L), -cos(3π*x[1]/L)*sin(2π*x[2]/L))
+
+                                refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv)
+                                refe_p = ReferenceFE(lagrangian, Float64, kp)
+                                V = TestFESpace(model, refe_u, conformity=:H1, labels=labels, dirichlet_tags=["all_boundaries"])
+                                Q = TestFESpace(model, refe_p, conformity=:H1)
+                                V_free = TestFESpace(model, refe_u, conformity=:H1)
+                                Q_free = TestFESpace(model, refe_p, conformity=:H1)
+
+                                quad_rxn_law = config.physical_properties.reaction_model == "Constant_Sigma" ?
+                                    PorousNSSolver.ConstantSigmaLaw(0.0) : PorousNSSolver.ForchheimerErgunLaw(0.0, 0.0)
+                                degree = PorousNSSolver.get_quadrature_degree(PorousNSSolver.PaperGeneralFormulation, kv, quad_rxn_law)
+                                Ω = Triangulation(model)
+                                dΩ = Measure(Ω, degree + 4)
+
+                                if etype == "TRI"
+                                    h_array = lazy_map(v -> sqrt(2.0 * abs(v)), get_cell_measure(Ω))
+                                else
+                                    h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
+                                end
+                                h_cf = CellField(collect(h_array), Ω)
+                                h_pert_cf = CellField(h_raw_func, Ω)
+                                norm_h = sqrt(abs(sum(∫( h_pert_cf ⋅ h_pert_cf )dΩ)))
+                                norm_h > 0.0 || error("Perturbation field norm must be strictly positive.")
+                                Y = MultiFieldFESpace([V, Q])
+
+                                alpha_field = build_porosity_field(config, alpha_0, alpha_infty, L)
+                                alpha_cf = CellField(x -> PorousNSSolver.alpha(alpha_field, x), Ω)
+
                                 form = build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
                                 
                                 # Exact execution of full manufactured solutions analytical expressions
@@ -606,7 +678,20 @@ function run_mms(config_file="test_config.json")
                                 for method in methods
                                     run_idx += 1
                                     println("\n--- Progress $(run_idx) / $(total_runs * length(conv_parts)) | Re=$(Re), Da=$(Da), α=$(alpha_0), method=$(method), N=$(n) ---")
-                                    
+
+                                    # [fix: ASGS≠OSGS] The per-N config_dict hardcodes stabilization.method="ASGS"; without
+                                    # this override every OSGS cell silently ran ASGS (solve_system reads the method from the
+                                    # config, not the loop variable). Rebuild config + its fold variant with the LOOP's method.
+                                    # Galerkin bypasses solve_system (execute_solver_galerkin_inline!), so its config method is
+                                    # irrelevant — keep "ASGS" (load_config_from_dict need not accept "Galerkin").
+                                    cell_stab_method = uppercase(method) == "GALERKIN" ? "ASGS" : method
+                                    config_dict_m = deepcopy(config_dict)
+                                    config_dict_m["numerical_method"]["stabilization"]["method"] = cell_stab_method
+                                    config_m = PorousNSSolver.load_config_from_dict(config_dict_m)
+                                    config_fold_dict_m = deepcopy(config_dict_m)
+                                    config_fold_dict_m["numerical_method"]["solver"] = merge(config_fold_dict_m["numerical_method"]["solver"], Dict("eps_tol_momentum" => eps_tol_momentum_fold))
+                                    config_fold_m = PorousNSSolver.load_config_from_dict(config_fold_dict_m)
+
                                     eps_pert_base = Float64(get(test_dict, "epsilon_pert", [0.1])[1])
                                     max_n_pert = Int(get(test_dict, "max_n_pert", 5))
                                     
@@ -624,13 +709,30 @@ function run_mms(config_file="test_config.json")
                                     # Incrementally shrink initial numerical perturbation forcing iterative validation
                                     # ==============================================================================
                                     success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt = execute_outer_homotopy_perturbation_loop!(
-                                        setup, formulation, iter_solvers, config, method, dynamic_ftol,
+                                        setup, formulation, iter_solvers, config_m, method, dynamic_ftol,
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
                                         mms_max_extra_cycles, mms_require_consecutive_passes,
                                         mms_rate_check_factor,
                                         n, kv
                                     )
+
+                                    # [graceful fold recording] If the tight gate was not reached, retry ONCE with
+                                    # the relaxed gate so the solver accepts the achievable ε_M floor and returns the
+                                    # real (pre-asymptotic O(h^k)) solution — flagged 'fold' — instead of NaN. Mirrors
+                                    # the regular ManufacturedSolutions harness recording its high-Re fold cells.
+                                    is_fold = false
+                                    if !success
+                                        println("  [fold] Tight ε_M gate not reached — retrying with relaxed gate $(eps_tol_momentum_fold) to record the achievable-floor solution (high-Re×low-α corner)...")
+                                        succ_f, _, x0_f, it_f, t_f = PorousNSSolver.solve_system(setup, formulation, iter_solvers, config_fold_m, x0_exact)
+                                        if succ_f && x0_f !== nothing && all(isfinite, get_free_dof_values(x0_f))
+                                            success = true; is_fold = true; final_x0 = x0_f; successful_eps = 0.0
+                                            eval_time += t_f; iter_count_attempt += it_f
+                                            println("  [fold] Recorded at the achievable floor — flagged 'fold' (NOT gate-converged).")
+                                        else
+                                            println("  [fold] Relaxed-gate retry also failed — genuine non-convergence, recording NaN.")
+                                        end
+                                    end
 
                                     # Fix 6: overall verification combines solver convergence and (when MMS
                                     # is enabled) the MMS plateau status. `nothing` plateau means MMS was
@@ -668,8 +770,9 @@ function run_mms(config_file="test_config.json")
                                     push!(results_cache[k_id]["eval_residuals"], final_residual_attempt)
                                     push!(results_cache[k_id]["mms_plateau_success"], mms_plateau_success)
                                     push!(results_cache[k_id]["overall_verification_success"], overall_verification_success)
+                                    push!(results_cache[k_id]["fold"], is_fold)
                                     
-                                    println("  -> L2 u/p: ", round(el2_u, sigdigits=4), " / ", round(el2_p, sigdigits=4), " | H1 u/p: ", round(eh1_u, sigdigits=4), " / ", round(eh1_p, sigdigits=4))
+                                    println("  -> L2 u/p: ", round(el2_u, sigdigits=4), " / ", round(el2_p, sigdigits=4), " | H1 u/p: ", round(eh1_u, sigdigits=4), " / ", round(eh1_p, sigdigits=4), is_fold ? "  [FOLD — recorded at floor, gate not reached]" : (success ? "  [converged]" : "  [NaN]"))
                                     # =========================================================================================
                                     # EXPORT CURRENT CURVE TO HDF5 DYNAMICALLY
                                     # =========================================================================================
@@ -700,7 +803,8 @@ function run_mms(config_file="test_config.json")
                                         g["eval_iters"] = res["eval_iters"]
                                         g["eval_eps"] = res["eval_eps"]
                                         g["eval_residuals"] = res["eval_residuals"]
-                                        
+                                        g["fold"] = res["fold"]
+
                                         attributes(g)["total_time_s"] = sum(res["eval_times"])
                                         attributes(g)["total_iters"] = sum(res["eval_iters"])
                                         attributes(g)["Re"] = Float64(Re)

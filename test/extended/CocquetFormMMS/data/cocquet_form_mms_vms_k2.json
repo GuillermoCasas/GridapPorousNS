@@ -1,5 +1,5 @@
 {
-  "_comment": "Manufactured-solution sweep whose FORMULATION is identical to the Cocquet benchmark (SymmetricGradient viscous operator + nonlinear Forchheimer-Ergun reaction, Taylor-Hood P2/P1, ASGS), but with a known smooth exact solution and the standard radial porosity. Discriminator: if this converges optimally the Cocquet suboptimality is physical/pre-asymptotic; if it degrades, a real formulation bug is isolated. The Cocquet experiment itself is untouched. alpha_0=1.0 is the pure-NS control (sigma=0); alpha_0<1 activates the Forchheimer drag (sigma_linear/sigma_nonlinear match Cocquet).",
+  "_comment": "k=2-ONLY shard of cocquet_form_mms_vms.json (P2/P2 equal-order, ASGS+OSGS). Launched in parallel with the k=1 run to land k=2 results without waiting behind the k=1 N=160 tail. Writes to its OWN h5 (cocquet_form_mms_vms_k2.h5) so there is zero lock contention with the live cocquet_form_mms_vms.h5; plot_combined_all.py merges both via --h5. Identical grid/solver/physics to the parent; only the element order is restricted to k=2.",
   "erase_past_results": true,
   "epsilon_pert": [
     1.0
@@ -7,12 +7,11 @@
   "max_n_pert": 5,
   "mms_verification_enabled": true,
   "mms_tau_err": 0.0001,
-  "h5_filename": "cocquet_form_mms.h5",
+  "h5_filename": "cocquet_form_mms_vms_k2.h5",
   "physical_properties": {
     "Re": [
       1.0,
-      100.0,
-      500.0
+      100000.0
     ],
     "Da": [
       1.0
@@ -31,9 +30,8 @@
   },
   "domain": {
     "alpha_0": [
-      1.0,
       0.5,
-      0.05
+      0.1
     ],
     "r_1": 0.2,
     "r_2": 0.4,
@@ -51,9 +49,9 @@
         2
       ],
       "k_pressure": [
-        1
+        2
       ],
-      "equal_order_only": false
+      "equal_order_only": true
     },
     "mesh": {
       "partition": [
@@ -65,8 +63,7 @@
         20,
         40,
         80,
-        160,
-        320
+        160
       ],
       "element_type": [
         "TRI"
@@ -96,13 +93,14 @@
     },
     "stabilization": {
       "method": [
-        "ASGS"
+        "ASGS",
+        "OSGS"
       ]
     }
   },
   "output": {
     "directory": "test/extended/CocquetFormMMS/results",
-    "basename": "cocquet_form_mms"
+    "basename": "cocquet_form_mms_vms_k2"
   },
   "write_vtk": false,
   "trace_convergence_norms": true

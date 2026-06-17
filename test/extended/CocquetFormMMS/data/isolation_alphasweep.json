@@ -1,0 +1,70 @@
+{
+  "_comment": "ISOLATION EXPERIMENT A — does the high-Re fold track the REACTION strength? Hold Re=1e5 fixed and walk porosity alpha_0 = [0.9, 0.5, 0.2, 0.1] (reaction near-off -> strong) with the full nonlinear Forchheimer-Ergun law, ASGS, P1/P1, coarse meshes [10,20,40]. alpha_0=0.9 is the near-pure-NS proxy (Da_eff~0.2): if it CONVERGES while alpha_0=0.1 (Da_eff~40) FOLDS, the fold is reaction-driven (Layer 2), not the generic high-Re gate (Layer 1). NB: exactly alpha=1 degenerates the forchheimer_minmax encoding (Da_eff=0 -> L=0), so 0.9 is the near-NS endpoint. Companion control: isolation_linctrl.json (linear reaction at matched Da).",
+  "erase_past_results": true,
+  "epsilon_pert": [1.0],
+  "max_n_pert": 5,
+  "mms_verification_enabled": true,
+  "mms_tau_err": 0.0001,
+  "h5_filename": "isolation_alphasweep.h5",
+  "physical_properties": {
+    "Re": [100000.0],
+    "Da": [1.0],
+    "physical_epsilon": [0.0],
+    "numerical_epsilon_coefficient": [0.0001],
+    "reaction_model": "Forchheimer_Ergun",
+    "sigma_linear": 0.3,
+    "sigma_nonlinear": 1.75,
+    "f_x": 0.0,
+    "f_y": 0.0
+  },
+  "domain": {
+    "alpha_0": [0.9, 0.5, 0.2, 0.1],
+    "r_1": 0.2,
+    "r_2": 0.4,
+    "bounding_box": [-0.5, 0.5, -0.5, 0.5]
+  },
+  "numerical_method": {
+    "viscous_operator_type": "SymmetricGradient",
+    "element_spaces": {
+      "k_velocity": [1],
+      "k_pressure": [1],
+      "equal_order_only": true
+    },
+    "mesh": {
+      "partition": [10, 10],
+      "convergence_partitions": [10, 20, 40],
+      "element_type": ["TRI"]
+    },
+    "solver": {
+      "picard_iterations": 15,
+      "newton_iterations": 150,
+      "dynamic_newton_re_iterations": 150,
+      "noise_floor_success_max_ftol_multiple": 10.0,
+      "xtol": 1e-12,
+      "ftol": 1e-12,
+      "eps_tol_momentum": 1e-09,
+      "dynamic_ftol_ceiling": 0.0001,
+      "dynamic_ftol_spatial_safety_factor": 0.01,
+      "stagnation_noise_floor": 1e-05,
+      "linesearch_alpha_min": 0.0001,
+      "max_linesearch_iterations": 25,
+      "linesearch_contraction_factor": 0.5,
+      "max_increases": 3,
+      "divergence_merit_factor": 1.05,
+      "armijo_c1": 0.0001,
+      "newton_residual_divergence_patience": 2,
+      "pingpong_enabled": true,
+      "pingpong_max_swaps": 4,
+      "pingpong_picard_gain_orders": 1.5
+    },
+    "stabilization": {
+      "method": ["ASGS"]
+    }
+  },
+  "output": {
+    "directory": "test/extended/CocquetFormMMS/results",
+    "basename": "isolation_alphasweep"
+  },
+  "write_vtk": false,
+  "trace_convergence_norms": true
+}

@@ -1,0 +1,71 @@
+{
+  "_comment": "ISOLATION EXPERIMENT C (FULL) — companion to isolation_trim.json. IDENTICAL Constant_Sigma setup (Re=1e5, alpha_0=0.1, Da=40, uniform σ_c) EXCEPT experimental_reaction_mode='remove_tau' which, via the harness toggle at run_test.jl, selects ProjectFullResidual: the reaction σu is LEFT IN the stabilization (exactly the Forchheimer/ProjectFullResidual behaviour). NB 'remove_tau' is only a not-'standard' sentinel here — it has NO effect on the adjoint or τ in this harness's solve path (get_reaction_mode_trait is consulted only in diagnostics_helpers.jl, not the residual/Jacobian). So TRIM vs FULL differ ONLY in whether the reaction is in the stabilization. If FULL folds while TRIM converges ⇒ reaction-in-stabilization is the cause of the low-α fold (σ̃_α coercivity collapse); Taylor-Hood, having no stabilization term, never pays this.",
+  "erase_past_results": true,
+  "epsilon_pert": [1.0],
+  "max_n_pert": 5,
+  "mms_verification_enabled": true,
+  "mms_tau_err": 0.0001,
+  "h5_filename": "isolation_full.h5",
+  "physical_properties": {
+    "Re": [100000.0],
+    "Da": [40.0],
+    "physical_epsilon": [0.0],
+    "numerical_epsilon_coefficient": [0.0001],
+    "reaction_model": "Constant_Sigma",
+    "sigma_linear": 0.4944,
+    "sigma_nonlinear": 0.0,
+    "f_x": 0.0,
+    "f_y": 0.0
+  },
+  "domain": {
+    "alpha_0": [0.1],
+    "r_1": 0.2,
+    "r_2": 0.4,
+    "bounding_box": [-0.5, 0.5, -0.5, 0.5]
+  },
+  "numerical_method": {
+    "viscous_operator_type": "SymmetricGradient",
+    "element_spaces": {
+      "k_velocity": [1],
+      "k_pressure": [1],
+      "equal_order_only": true
+    },
+    "mesh": {
+      "partition": [10, 10],
+      "convergence_partitions": [10, 20, 40],
+      "element_type": ["TRI"]
+    },
+    "solver": {
+      "experimental_reaction_mode": "remove_tau",
+      "picard_iterations": 15,
+      "newton_iterations": 150,
+      "dynamic_newton_re_iterations": 150,
+      "noise_floor_success_max_ftol_multiple": 10.0,
+      "xtol": 1e-12,
+      "ftol": 1e-12,
+      "eps_tol_momentum": 1e-09,
+      "dynamic_ftol_ceiling": 0.0001,
+      "dynamic_ftol_spatial_safety_factor": 0.01,
+      "stagnation_noise_floor": 1e-05,
+      "linesearch_alpha_min": 0.0001,
+      "max_linesearch_iterations": 25,
+      "linesearch_contraction_factor": 0.5,
+      "max_increases": 3,
+      "divergence_merit_factor": 1.05,
+      "armijo_c1": 0.0001,
+      "newton_residual_divergence_patience": 2,
+      "pingpong_enabled": true,
+      "pingpong_max_swaps": 4,
+      "pingpong_picard_gain_orders": 1.5
+    },
+    "stabilization": {
+      "method": ["ASGS"]
+    }
+  },
+  "output": {
+    "directory": "test/extended/CocquetFormMMS/results",
+    "basename": "isolation_full"
+  },
+  "write_vtk": false,
+  "trace_convergence_norms": true
+}
