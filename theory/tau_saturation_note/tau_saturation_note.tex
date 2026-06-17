@@ -1,0 +1,395 @@
+\documentclass[11pt]{article}
+
+% ---------------------------------------------------------------------------
+%  The high-Reynolds tau-saturation residual floor of the stabilized porous
+%  Navier-Stokes method, contrasted with pure Galerkin.
+%
+%  Companion note to theory/paper/article.tex
+%  ("A stabilized finite element method for incompressible, inertial flows in
+%   inhomogeneous porous media", Casas, Gonzalez-Usua, Codina, de-Pouplana).
+%  ALL notation, operators, stabilization parameters and asymptotic regimes
+%  are taken verbatim from that paper; cross-references of the form
+%  (paper, eq:Label) point to its equation labels.
+%
+%  Compiles with a standard TeX install:  pdflatex tau_saturation_note.tex
+% ---------------------------------------------------------------------------
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+% --- notation, matched to theory/paper/article.tex ------------------------
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\buh}{\boldsymbol{u}_h}
+\newcommand{\bw}{\boldsymbol{w}}
+\newcommand{\ba}{\boldsymbol{a}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\bvh}{\boldsymbol{v}_h}
+\newcommand{\bef}{\boldsymbol{f}}
+\newcommand{\bn}{\boldsymbol{n}}
+\newcommand{\bx}{\boldsymbol{x}}
+\newcommand{\bsig}{\boldsymbol{\sigma}}
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}} % paper's Xi
+\newcommand{\Lop}{\mathcal{L}}
+\newcommand{\Ladj}{\mathcal{L}^{*}}
+\newcommand{\Rop}{\mathcal{R}}
+\newcommand{\tauK}{\boldsymbol{\tau}_K}
+\newcommand{\tauNS}{\tau_{1,\mathrm{NS}}}
+\newcommand{\sigtil}{\widetilde{\sigma}_{\alpha}}
+\newcommand{\Reyn}{\mathrm{Re}}
+\newcommand{\Damk}{\mathrm{Da}}
+\newcommand{\BS}{B_{\mathrm S}}
+\newcommand{\LS}{L_{\mathrm S}}
+\newcommand{\rG}{r_{\mathrm{G}}}
+\newcommand{\rS}{r_{\mathrm{S}}}
+\newcommand{\rM}{r_{\mathrm{M}}}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\grad}{\nabla}
+\newcommand{\divg}{\nabla\!\cdot\!}
+\newcommand{\bigOh}{\mathcal{O}}
+\newcommand{\innerK}[2]{\langle #1, #2\rangle_K}
+\newcommand{\normh}[1]{\big\|#1\big\|_h}
+\newcommand{\triplenorm}[1]{{\lvert\kern-0.25ex\lvert\kern-0.25ex\lvert #1
+  \rvert\kern-0.25ex\rvert\kern-0.25ex\rvert}}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+
+\title{\bf The high-Reynolds $\tau_1$-saturation residual floor\\
+of the stabilized porous Navier--Stokes method, contrasted with Galerkin}
+\author{Companion note to \texttt{article.tex} --- porous Navier--Stokes VMS solver}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note explains, in the notation and within the analytical framework of the
+paper \texttt{article.tex}, why the equal-order stabilized (ASGS/OSGS) method
+develops an irreducible \emph{algebraic residual floor} at high Reynolds number
+when judged by a tight, scale-free, \emph{absolute} stopping gate, whereas the
+pure Galerkin discretization does not. The mechanism is the saturation of the
+stabilization parameter $\tau_1$ defined in (paper, \texttt{eq:Tau1Final}) as the
+viscosity $\nu\to0$ -- the same saturation that underlies the paper's
+dominant-convection asymptotics (paper, \S\,\texttt{sec:Robustness},
+$\tau_1\sim h/(\alpha\lVert\ba\rVert_{\infty,K})$) and the paper's own warning,
+below the Galerkin coercivity identity (paper, Eq.~after \texttt{eq:Galerkin
+coercivity}), that ``for very small viscosities or fluid volume fractions [the
+viscous term] will provide almost no control over the gradient of the velocity.''
+We make two scopes explicit, both consistent with the paper: the floor is
+\emph{generic} to high-$\Reyn$ Navier--Stokes (it survives $\bsig\equiv0$), and
+the additional difficulty of the low-porosity cells is the \emph{separate},
+ubiquitous $1/\alpha_0$ degradation that the paper's robustness analysis already
+predicts. Crucially, the paper's convergence theorem (paper,
+\texttt{eq:ConvergenceResult}) guarantees the solution error stays optimal, so
+the floor is a stopping-criterion artifact, not an under-resolved solution.
+\end{abstract}
+
+\section{The problem, operators and parameters (paper notation)}\label{sec:setup}
+
+We reproduce only what is needed; every object is that of \texttt{article.tex}.
+On $\Omega\subset\mathbb{R}^d$ with fluid volume fraction $\alpha:\Omega\to(0,1]$,
+kinematic viscosity $\nu$, and symmetric positive-semidefinite resistance tensor
+$\bsig(\alpha,\bu)$, the strong porous Navier--Stokes problem is (paper,
+\texttt{eq:StrongMomentumEquation}--\texttt{eq:StrongMassEquation})
+\begin{equation}
+  \alpha\,\bu\!\cdot\!\grad\bu \;-\; 2\divg(\alpha\nu\,\ViscProj\grad\bu)
+  \;+\;\alpha\grad p \;+\;\bsig(\alpha,\bu)\bu \;=\;\bef,
+  \qquad
+  \varepsilon p + \divg(\alpha\bu)=0,
+  \label{eq:strong}
+\end{equation}
+with $\ViscProj$ the deviatoric--symmetric projection of the velocity gradient and
+$\varepsilon\ge0$ the iterative-penalty compressibility. The Darcy--Brinkman--%
+Forchheimer closure is $\bsig=\sigma(\alpha,\bu)\,\mathbb I$ with (paper,
+\texttt{eq:DBFResistanceTerm})
+\begin{equation}
+  \sigma(\alpha,\bu)=a(\alpha)+b(\alpha)\,|\bu| .
+  \label{eq:dbf}
+\end{equation}
+Writing $U=[\bu;p]$, $F=[\bef;0]$, the problem is cast (paper,
+\texttt{eq:CDR\_equation}) as $\Lop_{\bu}U=F$ with the convection--diffusion--%
+reaction operator $\Lop_{\bw}U=-\partial_i(\mathbf K_{ij}\partial_jU)
++\mathbf A_{\mathrm c,i}(\bw)\partial_iU+\mathbf A_{\mathrm f,i}\partial_iU
++\mathbf S(\bw)U$, and \emph{residual operator}
+$\Rop_{\bw}U_h := F-\Lop_{\bw}U_h$.
+
+\paragraph{Galerkin and stabilized forms.}
+The Galerkin bilinear form is (paper, \texttt{eq:823})
+\begin{equation}
+  B(\ba,U_h,V_h)=\langle\bvh,\alpha\,\ba\!\cdot\!\grad\buh\rangle
+  +2\langle\grad\bvh,\alpha\nu\ViscProj\grad\buh\rangle
+  +\langle\bvh,\alpha\grad p_h\rangle
+  +\langle\bvh,\sigma\buh\rangle
+  +\langle q_h,\varepsilon p_h\rangle
+  +\langle q_h,\divg(\alpha\buh)\rangle .
+  \label{eq:B}
+\end{equation}
+The VMS stabilized problem (paper, \texttt{eq:OSGSProblem}) reads
+$\BS(\bw,U_h,V_h)=\LS(\bw,V_h,\boldsymbol\pi_h)$ with (paper, Eqs.~under
+\texttt{eq:OSGSProblem})
+\begin{equation}
+  \BS(\bw,U,V)=B(\bw,U,V)-\sum_K\innerK{\Ladj_{\bw}V}{\tauK(\bw)\,\Lop_{\bw}U},
+  \quad
+  \LS(\bw,V,\boldsymbol\pi)=L(V)-\sum_K\innerK{\Ladj_{\bw}V}{\tauK(\bw)\,(F-\boldsymbol\pi)},
+  \label{eq:BS}
+\end{equation}
+where $\Ladj_{\bw}$ is the adjoint operator (paper, \texttt{eq:AdjointDifferential%
+Operator}); ASGS is $\boldsymbol\pi_h=\boldsymbol0$, OSGS is
+$\boldsymbol\pi_h=\Pi_{\boldsymbol\tau h}\Rop U_h$. (As in the paper, the term
+$\tfrac1\alpha\divg(\alpha\ba)\bvh$ is dropped from $\Ladj V_h$ to preserve the
+symmetry of the stability estimate.)
+
+\paragraph{Stabilization parameters.}
+With the porosity well resolved by the mesh and $\bsig=\sigma\mathbb I$ uniform,
+the parameters are (paper, \texttt{eq:Tau1Final}, \texttt{eq:Tau2Final},
+\texttt{eq:TauNavierStokes})
+\begin{equation}
+  \boxed{\;\tau_1=\frac{1}{\alpha_K\,\tauNS^{-1}+\sigma}\;},
+  \qquad
+  \tau_2=\frac{h^2}{c_1\alpha_K\tauNS},
+  \qquad
+  \tauNS=\Big(c_1\frac{\nu}{h^2}+c_2\frac{|\bw|}{h}\Big)^{-1},
+  \label{eq:tau}
+\end{equation}
+with $\alpha_K$ a representative (taken as the maximal) porosity on $K$, $|\bw|$
+the elemental velocity modulus, and, for equal-order order-$k$ interpolation,
+$c_1=4k^4$, $c_2=2k^2$ (paper, Remark after \texttt{eq:conditions\_on\_num\_param}).
+
+\section{The Galerkin coercivity already loses control as $\nu\to0$}\label{sec:galcoerc}
+
+Testing \eqref{eq:B} with $U_h$ itself, under $\divg(\alpha\ba)=0$ and homogeneous
+Dirichlet data, gives the Galerkin coercivity identity (paper, \texttt{eq:Galerkin
+coercivity})
+\begin{equation}
+  B(\ba,U_h,U_h)=2\nu\big\|\alpha^{1/2}\ViscProj\grad\buh\big\|^2
+  +\big\|\sigma^{1/2}\buh\big\|^2+\varepsilon\|p_h\|^2 .
+  \label{eq:galcoerc}
+\end{equation}
+The paper observes immediately below this identity that \emph{``for very small
+viscosities or fluid volume fractions, the first term above will provide almost no
+control over the gradient of the velocity, leading to oscillations on the
+solution; this is what happens in the standard case, but here the problem is
+aggravated for small porosities.''} This is the root cause, stated at the
+continuous-analysis level: as $\nu\to0$ the only velocity-gradient control in
+\eqref{eq:galcoerc}, the factor $2\nu\|\cdots\|^2$, vanishes. Equal-order Galerkin
+is therefore unusable at high $\Reyn$, and the stabilization exists precisely to
+restore that lost control.
+
+\section{Asymptotics I: $\tau_1$ saturates as $\Reyn\to\infty$}\label{sec:tausat}
+
+The stabilization restores control through the parameter \eqref{eq:tau}. Its
+behaviour as $\nu\to0$ is the crux.
+
+\begin{proposition}[Saturation of $\tau_1$, consistent with paper \S\,\texttt{sec:Robustness}]\label{prop:tau}
+Fix $h$, $|\bw|$, $\alpha_K$, $\sigma$ and let $\nu=\Reyn^{-1}\to0$. From the
+definition of $\tauNS$ in \eqref{eq:tau}, the diffusive contribution
+$c_1\nu/h^2$ drops relative to the convective $c_2|\bw|/h$ at a rate set by the
+cell (mesh) Reynolds number $\Reyn_h:=|\bw|h/\nu$,
+\begin{equation}
+  \frac{\text{diffusive part of }\tauNS^{-1}}{\text{convective part}}
+  =\frac{c_1\nu/h^2}{c_2|\bw|/h}
+  =\frac{c_1}{c_2}\,\Reyn_h^{-1}\;\xrightarrow[\;\Reyn_h\to\infty\;]{}\;0,
+  \label{eq:ratio}
+\end{equation}
+so that $\tauNS\to h/(c_2|\bw|)$ and hence
+\begin{equation}
+  \tau_1\;\longrightarrow\;\frac{1}{\alpha_K\,c_2|\bw|/h+\sigma}
+  \;=\;
+  \begin{cases}
+    \dfrac{h}{\alpha_K c_2|\bw|}=\bigOh(h), & \text{convection-dominated }(\alpha_K c_2|\bw|/h\gg\sigma),\\[1.4ex]
+    \dfrac{1}{\sigma}, & \text{reaction-dominated }(\sigma\gg\alpha_K c_2|\bw|/h),
+  \end{cases}
+  \label{eq:tausat}
+\end{equation}
+a finite, $\nu$-independent limit in both cases. These coincide with the paper's
+robustness estimates $\tau_1\sim h/(\alpha\lVert\ba\rVert_{\infty,K})$ (dominant
+convection) and $\tau_1\sim1/\sigma$ (dominant reaction). By contrast, in the
+viscous limit $\Reyn_h\to0$ the paper gives $\tau_1\sim h^2/(\alpha_K\nu)\to0$.
+\end{proposition}
+
+For the momentum equation $\Reyn_h=|\bw|h/\nu$ is genuinely a Reynolds number, not
+a P\'eclet number: what opposes advection here is the kinematic viscosity $\nu$
+itself, the very $\nu$ of the global $\Reyn=UL/\nu$ (paper,
+\texttt{eq:DimensionlessParameters}). It coincides with the cell P\'eclet number
+of the generic advection--diffusion template (diffusivity an independent $k$) only
+because the advected quantity is momentum.
+
+\section{Asymptotics II: the stabilization residual does not vanish}\label{sec:rS}
+
+It is convenient to read the discrete equation \eqref{eq:BS} as a single residual
+functional. With $\Rop_{\bw}U_h=F-\Lop_{\bw}U_h$, the ASGS equation
+$\BS=\LS|_{\boldsymbol\pi=0}$ is
+\begin{equation}
+  \rM(V):=\underbrace{\big[B(\bw,U_h,V)-L(V)\big]}_{\textstyle \rG(V)}
+  \;+\;\underbrace{\sum_K\innerK{\Ladj_{\bw}V}{\tauK(\bw)\,\Rop_{\bw}U_h}}_{\textstyle \rS(V)}
+  \;=\;0 ,
+  \label{eq:resdecomp}
+\end{equation}
+(the OSGS variant replaces $\Rop U_h$ by $\Rop U_h-\boldsymbol\pi_h$). Hence at the
+discrete root
+\begin{equation}
+  \rG(V)=-\,\rS(V)\qquad\forall V .
+  \label{eq:cancel}
+\end{equation}
+The two functionals need not be individually small; only their sum must vanish.
+Their size is governed by $\tau_1$. Since $\Rop_{\bw}U=F-\Lop_{\bw}U$ vanishes at
+the exact solution, $\Rop_{\bw}U_h$ is, to leading order, the operator acting on
+the error $\boldsymbol e_u=\buh-\bu$, $e_p=p_h-p$; as $\nu\to0$ it is carried by
+the $\nu$-independent convective part $\alpha\,\ba\!\cdot\!\grad\boldsymbol e_u
++\alpha\grad e_p=\alpha X(U_h)|_{\text{err}}$, with $X(U_h):=\ba\!\cdot\!\grad\buh
++\grad p_h$ as in the paper's stability estimate. Combined with the saturated
+$\tau_1=\bigOh(h/(\alpha_K|\bw|))$ of Proposition~\ref{prop:tau},
+
+\begin{proposition}[Saturation of the stabilization residual]\label{prop:rS}
+Let $S:=\|\rS\|$ be the dual norm of the stabilization functional at a near
+solution. As $\nu\to0$ at fixed $h$, $S\to S_\infty=\bigOh(1)>0$
+(convective limit), whereas $S\to0$ as $\nu\to\infty$ (viscous limit, where
+$\tau_1\sim h^2/(\alpha_K\nu)\to0$). By \eqref{eq:cancel}, $\|\rG\|\to S_\infty$
+too: \emph{both} pieces saturate to the same finite size.
+\end{proposition}
+
+This is the precise sense in which the stabilization \emph{restores} the control
+that \eqref{eq:galcoerc} lost: the stabilized coercivity (paper,
+\texttt{eq:StabilityEstimate}) adds the term
+$\|\tau_1^{1/2}\alpha X(U_h)\|_h^2$ to the working norm, so the saturated $\tau_1$
+now controls $\ba\!\cdot\!\grad\buh+\grad p_h$ that the vanishing viscous term no
+longer could. The same $\tau_1$ that buys this control makes $\rS$ an
+$\bigOh(1)$ contribution to the residual \eqref{eq:resdecomp}.
+
+\section{The residual floor: cancellation digits demanded by the gate}\label{sec:floor}
+
+The nonlinear solver drives the assembled vector $\rho_i=\rM(\boldsymbol\varphi_i)$
+to zero and the gate declares success when
+$\varepsilon_{\mathrm M}=\|\rho\|/D_{\mathrm M}\le\texttt{tol}=10^{-9}$, with
+$D_{\mathrm M}=\bigOh(1)$ a $\tau$-free force-scale normalization. By
+\eqref{eq:cancel} both $\rG$ and $\rS$ have the saturated size $S$, and the
+equation residual is their remainder. Passing the gate requires the two large
+pieces to agree to
+\begin{equation}
+  N_{\mathrm{digits}}\approx\log_{10}\frac{S}{\texttt{tol}\,D_{\mathrm M}}
+  \label{eq:digits}
+\end{equation}
+decimal digits. As $\Reyn\to\infty$, $S\to S_\infty=\bigOh(1)$
+(Prop.~\ref{prop:rS}) while $\texttt{tol},D_{\mathrm M}$ are fixed, so
+$N_{\mathrm{digits}}$ rises to a large constant; the globalized Newton iteration
+attains only $3$--$4$ digits of cancellation before the merit
+$\Phi=\tfrac12\|\rM\|^2$ plateaus and the line search collapses, and
+$\varepsilon_{\mathrm M}$ floors above \texttt{tol}. At low $\Reyn$, $S\to0$ and
+$N_{\mathrm{digits}}\to0$: no cancellation is demanded and the residual reaches
+machine precision. The floor is \emph{not} floating-point cancellation
+($0.079-0.079$ is exact to $\sim10^{-17}$ in double precision) and \emph{not}
+conditioning (it tracks $S$, not $\mathrm{cond}(J)$).
+
+\paragraph{Numerical illustration.}
+A representative convection-dominated cell ($\Reyn=10^5$, $N=10$, equal-order
+$P_1/P_1$, ASGS) measured
+$\|\rG\|\approx\|\rS\|\approx0.079$,
+$\|\rM\|=\|\rG+\rS\|\approx2.4\times10^{-4}$,
+$D_{\mathrm M}\approx2.85$, i.e. $\varepsilon_{\mathrm M}\approx8\times10^{-5}$
+against $10^{-9}$. From \eqref{eq:digits},
+$N_{\mathrm{digits}}=\log_{10}(0.079/(10^{-9}\!\cdot\!2.85))\approx7.4$: the gate
+asks for $\sim7$--$8$ digit cancellation; the solver delivers $\sim3.5$. The
+velocity error at this plateau is already optimal, $\|\boldsymbol e_u\|_0
+=\bigOh(h^{k+1})$ -- as the paper's convergence theorem (paper,
+\texttt{eq:ConvergenceResult}) guarantees -- so the leftover residual lies
+\emph{below} the discretization error: the floor is a stopping-criterion
+artifact, not an under-resolved solution.
+
+\section{Contrast with pure Galerkin}\label{sec:galerkin}
+
+Setting $\rS\equiv0$ in \eqref{eq:resdecomp} leaves $\rM=\rG$: no second large
+term, so Newton drives $\rM$ to machine precision at \emph{any} $\Reyn$, with no
+floor. But \eqref{eq:galcoerc} shows that residual belongs to a method with no
+high-$\Reyn$ stability and (for equal order) no inf--sup control:
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Pure Galerkin} & \textbf{Stabilized (ASGS/OSGS)}\\
+\midrule
+Stabilization residual $\rS$        & absent                & present, $S\to S_\infty=\bigOh(1)$ \\
+Velocity-gradient control as $\nu\to0$ & lost ($2\nu\|\cdots\|^2\to0$) & restored by $\|\tau_1^{1/2}\alpha X(U_h)\|_h^2$\\
+Equal-order inf--sup (LBB)          & violated              & restored (Lemma, paper \texttt{lemma:Stability})\\
+High cell-$\Reyn_h$ oscillations    & present               & damped (SUPG-type upwinding)\\
+High-$\Reyn$ absolute residual floor& none ($\to$ machine $\epsilon$) & $\varepsilon_{\mathrm M}$ floors $\gg\texttt{tol}$\\
+Usable at high $\Reyn$, equal order & \textbf{no}           & \textbf{yes}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The term that makes equal-order interpolation stable -- $\sum_K\langle\Ladj V,
+\tauK\Lop U\rangle_K$, equivalently the control $\|\tau_1^{1/2}\alpha X(U_h)\|_h^2$
+in the paper's coercivity bound -- is exactly the term whose $\tau_1$-saturation
+floors the residual. The floor is the \emph{price} of consistent stabilization,
+visible only under a tight absolute gate. Galerkin avoids the price by not buying
+stability; it is a foil that isolates the mechanism, not a usable alternative.
+
+\section{Scope: the two layers, both consistent with the paper}\label{sec:scope}
+
+\paragraph{Layer 1 (this note) is generic, and is a high-$\Reyn$ phenomenon.}
+Nothing in \S\ref{sec:galcoerc}--\ref{sec:floor} uses $\sigma$ essentially:
+putting $\bsig\equiv0$ (i.e. $\alpha\equiv1$, the standard Navier--Stokes system
+recovered by the paper at $\alpha\equiv1$) leaves the argument intact. The
+high-$\Reyn$ residual floor is therefore generic; it is invisible in ordinary
+practice only because ordinary practice stops on a \emph{relative} residual and
+never drives a scale-free absolute residual to $10^{-9}$ on the finest
+manufactured-solution mesh. The paper's Galerkin-coercivity remark
+(\S\ref{sec:galcoerc}) is the continuous-level statement of the same loss of
+control. Empirically (\S\ref{sec:experiment}) this floor sets in only at very high
+$\Reyn$: at $\Reyn=10^5$ the near-Navier--Stokes cell $\alpha_0=0.9$ still reaches
+the $10^{-9}$ gate with optimal $\bigOh(h^{k+1})$ velocity error; the regular
+harness first shows it at $\Reyn=10^6$.
+
+\paragraph{Layer 2 (low porosity) is the paper's ubiquitous $1/\alpha_0$ degradation,
+driven by reaction \emph{magnitude}.}
+The reason the \emph{low-porosity} cells fold -- already at $\Reyn=10^5$, where
+Layer 1 is dormant -- is a \emph{separate} effect that the paper's robustness
+analysis predicts. Its convergence estimates carry an overall factor $1/\alpha_0$
+in every regime (paper, \texttt{eq:ConvergenceResultDominantViscosity} and the
+following remark: ``this linear drop in accuracy with decreasing minimal porosity
+is ubiquitous over the space of physical parameters\dots\ because the terms
+involving derivatives of the velocity are multiplied by the porosity''); the
+working norm itself weights the velocity gradient by $\alpha$ (paper,
+\texttt{eq:SigmaAlpha}, $\sigtil$, and the triple norm); and in the
+reaction-dominated regime $\Damk_h\to\infty$ (paper, \S\,\texttt{sec:DominantReaction})
+the parameter degenerates to $\tau_1\sim1/\sigma$ with the weakened control
+$\sigtil$. At low $\alpha_0$ the linear Darcy drag $a(\alpha)\propto((1-\alpha)/\alpha)^2$
+makes $\sigma$ -- and hence $\Damk$ -- large, pushing the cell into exactly this
+regime. \emph{The driver is the reaction magnitude, not its nonlinearity}: the
+controlled experiment of \S\ref{sec:experiment} shows that removing the
+$b(\alpha)|\bu|$ term (so $\partial\sigma/\partial\bu=0$) at matched $\Damk$ folds
+identically, so the $|\bu|$-coupling basin-shrink is \emph{not} the cause.
+
+\paragraph{Numerical confirmation.}\label{sec:experiment}
+Holding $\Reyn=10^5$ fixed (ASGS, $P_1/P_1$, $N=10,20,40$) and sweeping the minimum
+porosity gives a clean onset: $\alpha_0=0.9$ and $0.5$ \textbf{converge} to the
+$10^{-9}$ gate with optimal rate $\approx2.2$, while $\alpha_0=0.2$ and $0.1$
+\textbf{fold} (large, pre-asymptotic $\|\boldsymbol e_u\|$). A matched-$\Damk$
+\emph{linear}-reaction control at $\alpha_0=0.1$ ($b\equiv0$, $a$ rescaled to keep
+$\Damk_h$ fixed) also folds, with essentially the same errors as the full
+Forchheimer case. The two controls jointly locate the difficulty: it is the
+low-porosity reaction \emph{magnitude} (Layer 2), not the high-$\Reyn$
+$\tau_1$-saturation floor (Layer 1, dormant at $\Reyn=10^5$) and not the
+Forchheimer $|\bu|$ nonlinearity.
+
+\begin{center}
+\fbox{\parbox{0.93\linewidth}{\centering
+\textbf{Layer 1} ($\tau_1$ saturation, this note): a high-$\Reyn$ residual floor
+under a tight absolute gate -- \emph{generic}, Navier--Stokes included, the
+solver shadow of the paper's ``almost no control over the velocity gradient'';
+empirically dormant until $\Reyn\!\gtrsim\!10^6$.\\[3pt]
+\textbf{Layer 2} (low $\alpha_0$): the paper's ubiquitous $1/\alpha_0$ accuracy
+degradation and reaction-dominated regime $\tau_1\sim1/\sigma$, driven by reaction
+\emph{magnitude} (confirmed: the $|\bu|$ nonlinearity is \emph{not} the cause) --
+\emph{porous-specific}, why low-porosity cells fold already at $\Reyn=10^5$.}}
+\end{center}
+
+The two are consistent: the paper proves the \emph{solution} stays optimal in the
+triple norm (paper, \texttt{eq:ConvergenceResult}); this note explains why the
+\emph{algebraic} residual nonetheless cannot reach a tight absolute gate at high
+$\Reyn$, and why low porosity makes the nonlinear solve harder still.
+
+\end{document}
