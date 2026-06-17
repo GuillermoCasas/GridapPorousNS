@@ -31,6 +31,7 @@ artifacts were removed in the 2026-06-10 cleanup — see
 | Role | Doc | Notes |
 |---|---|---|
 | **Canonical** | [investigation-synthesis.md](cocquet/investigation-synthesis.md) | Audited synthesis; the former magnitude hypothesis-ledger is now its Appendix. Latest mesh-recipe result narrows the gap to ~2×. |
+| **MMS sibling** | [cocquet-form-mms-status.md](cocquet/cocquet-form-mms-status.md) | Canonical doc for `CocquetFormMMS` (equal-order VMS vs Taylor–Hood under MMS, Forchheimer reaction). 2026-06-16: moderate-α complete & clean; high-Re×low-α corner **folds for VMS, Taylor–Hood converges**; exact low-α fold cause **open** (σ̃_α hypothesis unconfirmed; ASGS≠OSGS reaction handling). |
 | Historical | [convergence-analysis.md](cocquet/convergence-analysis.md) | 12-phase slope investigation (some early phases withdrawn). |
 | Artifact | [email-questions.md](cocquet/email-questions.md) | Draft email to the authors (unsent). |
 | Transcripts | [replicating-cocquet-transcript.md](cocquet/replicating-cocquet-transcript.md), [corner-singularity-transcript.md](cocquet/corner-singularity-transcript.md) | Raw investigation conversations. |
