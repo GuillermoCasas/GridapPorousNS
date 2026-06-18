@@ -133,6 +133,18 @@ At `N≤40` the steep part of the `α₀=0.05` transition is resolved by only **
 where slopes are depressed. By `N=512–1024` it is resolved by ~100–200 cells — exactly where C24
 recovers optimal/superconvergent rates. The numbers and the observed recovery agree.
 
+> **Direct confirmation for the *standard* (non-folding) `α₀=0.05` cells (2026-06-18).** The same
+> layer-under-resolution depresses the velocity-L² rate of the **low/unit-Re** `α₀=0.05` ASGS cells —
+> these read ≈1.88–1.95 at the sweep's `N=160→320` finest pair (the values in
+> [`paper_tables.tex`](../../test/extended/ManufacturedSolutions/results/paper_tables.tex) / the
+> article's `P1` table), below the optimal 2. They are **pre-asymptotic, not a rate loss**: a direct
+> exact-guess solve of the *worst* cell (`Re=1, Da=1e-6, α₀=0.05`, ASGS, TRI k=1) extended one mesh
+> shows the velocity-L² slope **climbing 1.888 (160→320) → 1.960 (320→512)** — within ~2 % of optimal.
+> This matches the QUAD k=1 sweep, where every `α₀=0.05` cell recovers to ≥1.93 by `N=640`. So the
+> TRI table's ~1.9 values are honest pre-asymptotic readings at `N=320`; they reach ≈2.0 by `N≈640`.
+> (The TRI k=1 sweep stops at `N=320`, so the table cannot show the recovered value without re-running
+> the sweep finer — a deliberate scope choice, not a defect.)
+
 ---
 
 ## 3. The fold (region B) — established
