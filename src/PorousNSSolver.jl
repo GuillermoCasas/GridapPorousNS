@@ -88,6 +88,9 @@ export compute_trial_projection_errors
 export compute_mode_decomposition
 export compute_corner_excluded_norm
 export ILUGMRESSolver
+export CholeskySolver
+export LinearSolverConfig
+export instantiate_linear_solver   # config (LinearSolverConfig) -> concrete LU | ILU_GMRES backend
 export AndersonAccelerator   # accelerator for the slow OSGS coupled fixed-point
 
 end # module

@@ -103,6 +103,29 @@ Base.@kwdef struct MeshConfig
 end
 
 """
+Linear (inner) solver backend for the monolithic (u, p) Jacobian solve of every Newton/Picard iterate.
+The CHOICE of backend does not change the converged solution (both solve `J Δx = −R` to tolerance); it
+trades robustness/speed against peak memory:
+
+- `method = "LU"`        — Gridap's sparse direct `LUSolver` (one backsolve per Newton step; exact, the
+                           previously-hardcoded default, but its 3D fill-in can exhaust RAM on fine meshes).
+- `method = "ILU_GMRES"` — restarted GMRES left-preconditioned by an incomplete-LU factor
+                           (`ILUGMRESSolver`); far lower peak memory for large 3D systems at the cost of
+                           inner Krylov iterations.
+
+The `ilu_*`/`gmres_*` fields are the ILU drop tolerance and GMRES restart/rel-tol/iteration cap; they are
+consumed only when `method == "ILU_GMRES"` but are ALWAYS required (no silent default), per the
+no-implicit-defaults rule.
+"""
+Base.@kwdef struct LinearSolverConfig
+    method::String                 # "LU" (direct, exact) or "ILU_GMRES" (low-memory iterative)
+    ilu_drop_tolerance::Float64    # ILU drop tolerance τ (smaller ⇒ denser/stronger preconditioner)
+    gmres_restart::Int             # GMRES Krylov subspace size before restart
+    gmres_rel_tol::Float64         # relative residual tolerance for GMRES convergence
+    gmres_maxiter::Int             # cap on GMRES iterations
+end
+
+"""
 All knobs for the safeguarded nonlinear solver in `src/solvers/`.
 
 The solver orchestrates Exact-Newton ↔ Picard fallbacks, an Armijo line search, and homotopy. Iteration
@@ -165,6 +188,8 @@ Base.@kwdef struct SolverConfig
     # [residual-divergence guard] Consecutive ‖R‖∞ increases (beyond divergence_merit_factor) that abort a
     # Newton solve → Picard. 0 ⇒ disabled (Newton runs its full budget even while diverging).
     newton_residual_divergence_patience::Int
+    # --- Linear (inner) solver backend ---
+    linear_solver::LinearSolverConfig              # LU (direct, exact) vs ILU_GMRES (low-memory iterative)
 end
 
 """
@@ -215,6 +240,7 @@ StructTypes.StructType(::Type{DomainConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{ElementSpacesConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{StabilizationConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{MeshConfig}) = StructTypes.Struct()
+StructTypes.StructType(::Type{LinearSolverConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{SolverConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{NumericalMethodConfig}) = StructTypes.Struct()
 StructTypes.StructType(::Type{OutputConfig}) = StructTypes.Struct()
@@ -255,6 +281,17 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.dynamic_newton_re_iterations >= 1 "dynamic_newton_re_iterations must be >= 1"
     @assert sol.max_linesearch_iterations >= 1 "Linesearch iterations must be strictly bounded >= 1"
     @assert 0.0 < sol.linesearch_contraction_factor < 1.0 "Linesearch contraction map alpha must strictly be in (0, 1)"
+
+    # Linear (inner) solver backend — the ilu_*/gmres_* knobs are required even for LU (no silent default),
+    # but only constrained when ILU_GMRES is actually selected.
+    lsc = sol.linear_solver
+    @assert lsc.method in ("LU", "ILU_GMRES") "linear_solver.method must be \"LU\" or \"ILU_GMRES\""
+    if lsc.method == "ILU_GMRES"
+        @assert lsc.ilu_drop_tolerance > 0 "linear_solver.ilu_drop_tolerance must be > 0 when method=ILU_GMRES"
+        @assert lsc.gmres_restart >= 1 "linear_solver.gmres_restart must be >= 1 when method=ILU_GMRES"
+        @assert lsc.gmres_rel_tol > 0 "linear_solver.gmres_rel_tol must be > 0 when method=ILU_GMRES"
+        @assert lsc.gmres_maxiter >= 1 "linear_solver.gmres_maxiter must be >= 1 when method=ILU_GMRES"
+    end
 
     # Stabilization
     stab = cfg.numerical_method.stabilization
@@ -303,6 +340,9 @@ function _check_unknown_keys_hierarchical(dict::AbstractDict)
         end
         if haskey(nm, "solver") && nm["solver"] isa AbstractDict
             _check_unknown_keys(SolverConfig, nm["solver"], "numerical_method.solver")
+            if haskey(nm["solver"], "linear_solver") && nm["solver"]["linear_solver"] isa AbstractDict
+                _check_unknown_keys(LinearSolverConfig, nm["solver"]["linear_solver"], "numerical_method.solver.linear_solver")
+            end
         end
         if haskey(nm, "mesh") && nm["mesh"] isa AbstractDict
             _check_unknown_keys(MeshConfig, nm["mesh"], "numerical_method.mesh")

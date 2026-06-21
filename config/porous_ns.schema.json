@@ -479,6 +479,41 @@
                 0,
                 2
               ]
+            },
+            "linear_solver": {
+              "type": "object",
+              "title": "Linear (inner) solver backend",
+              "description": "Backend for the monolithic (u,p) Jacobian solve of each Newton/Picard iterate. The choice does not change the converged solution; it trades robustness/speed against peak memory. 'LU' = exact sparse direct solver (default, previously hardcoded). 'ILU_GMRES' = restarted GMRES left-preconditioned by an incomplete-LU factor, far lower peak memory for large 3D systems whose LU fill-in would exhaust RAM. The ilu_*/gmres_* fields are required even for LU (no silent default) but consumed only when method=ILU_GMRES.",
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": ["LU", "ILU_GMRES"],
+                  "description": "Inner linear solver: 'LU' (direct, exact) or 'ILU_GMRES' (low-memory iterative).",
+                  "examples": ["LU", "ILU_GMRES"]
+                },
+                "ilu_drop_tolerance": {
+                  "type": "number",
+                  "description": "ILU drop tolerance tau (smaller => denser/stronger preconditioner). Used only for ILU_GMRES.",
+                  "examples": [1e-4]
+                },
+                "gmres_restart": {
+                  "type": "integer",
+                  "description": "GMRES Krylov subspace size before restart. Used only for ILU_GMRES.",
+                  "examples": [30]
+                },
+                "gmres_rel_tol": {
+                  "type": "number",
+                  "description": "GMRES relative residual tolerance. Used only for ILU_GMRES.",
+                  "examples": [1e-11]
+                },
+                "gmres_maxiter": {
+                  "type": "integer",
+                  "description": "Cap on GMRES iterations. Used only for ILU_GMRES.",
+                  "examples": [300]
+                }
+              },
+              "required": ["method", "ilu_drop_tolerance", "gmres_restart", "gmres_rel_tol", "gmres_maxiter"],
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

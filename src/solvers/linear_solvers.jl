@@ -123,3 +123,23 @@ function Gridap.Algebra.solve!(x::AbstractVector, ns::ILUGMRESNumericalSetup, b:
 end
 
 
+# =============================================================================
+# instantiate_linear_solver — the single seam mapping a `LinearSolverConfig` to a concrete Gridap
+# `LinearSolver` for the monolithic (u, p) Jacobian solves (production `run_simulation.jl` and the
+# MMS harness). "LU" is the exact sparse direct solver (the previously-hardcoded backend); "ILU_GMRES"
+# is the low-memory iterative path for large 3D systems whose LU fill-in would exhaust RAM. The backend
+# choice does not change the converged solution. `validate!` already enforces the method enum; we guard
+# again here so the factory is total on its own.
+# =============================================================================
+function instantiate_linear_solver(lsc::LinearSolverConfig)::LinearSolver
+    if lsc.method == "LU"
+        return LUSolver()
+    elseif lsc.method == "ILU_GMRES"
+        return ILUGMRESSolver(m=lsc.gmres_restart, drop_tolerance=lsc.ilu_drop_tolerance,
+                              rel_tol=lsc.gmres_rel_tol, maxiter=lsc.gmres_maxiter)
+    else
+        error("Unknown linear_solver.method \"$(lsc.method)\" (expected \"LU\" or \"ILU_GMRES\")")
+    end
+end
+
+

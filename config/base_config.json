@@ -69,7 +69,14 @@
             "pingpong_enabled": false,
             "pingpong_max_swaps": 0,
             "pingpong_picard_gain_orders": 1.5,
-            "newton_residual_divergence_patience": 0
+            "newton_residual_divergence_patience": 0,
+            "linear_solver": {
+                "method": "LU",
+                "ilu_drop_tolerance": 1e-4,
+                "gmres_restart": 30,
+                "gmres_rel_tol": 1e-11,
+                "gmres_maxiter": 300
+            }
         },
         "mesh": {
             "partition": [

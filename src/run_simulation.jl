@@ -402,7 +402,7 @@ function run_simulation(config_path::String;
     formulation = VMSFormulation(form, c_1, c_2)
     
     sol_cfg = cfg.numerical_method.solver
-    p_ls = LUSolver()
+    p_ls = instantiate_linear_solver(sol_cfg.linear_solver)   # config-selected backend: LU (default) | ILU_GMRES
 
     # Build the (picard, newton) solver pair via the shared `build_iter_solvers`, the same builder
     # the MMS harness uses. Production runs use the plain scalar-ftol path: a Newton residual
