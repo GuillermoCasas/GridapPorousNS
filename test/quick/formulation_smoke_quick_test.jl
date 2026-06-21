@@ -1,8 +1,9 @@
 # ==============================================================================================
 # Nature & Intent:
 # A critical Gridap AST (Abstract Syntax Tree) compiler hygiene check. Verifies that the nested
-# algebraic complexity within `PaperGeneralFormulation` and `Legacy90d5749Mode` does not overflow 
-# the Julia compiler or trigger extreme >10 minute symbolic auto-differentiation tree build times.
+# algebraic complexity within `PaperGeneralFormulation` (across its deviatoric/symmetric-gradient and
+# pseudo-traction viscous operators) does not overflow the Julia compiler or trigger extreme >10 minute
+# symbolic auto-differentiation tree build times.
 # Evaluates matrix block assembly without actually solving the resultant linear system.
 #
 # Mathematical Formulation Alignment:
@@ -42,7 +43,10 @@ include("../test_utils.jl")
         1e-6
     )
 
-    form_pseudo = PorousNSSolver.Legacy90d5749Mode(
+    # The pseudo-traction viscous operator has a distinct (simpler) AST; exercise it through the
+    # canonical PaperGeneralFormulation so both viscous branches are guarded against AST overflow.
+    form_pseudo = PorousNSSolver.PaperGeneralFormulation(
+        PorousNSSolver.LaplacianPseudoTractionViscosity(),
         PorousNSSolver.ConstantSigmaLaw(1.0),
         PorousNSSolver.ProjectFullResidual(),
         PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8),
@@ -77,7 +81,10 @@ include("../test_utils.jl")
         x0, dx, y, setup, formulation_pseudo, phys_cfg, false, PorousNSSolver.ExactNewtonMode(); pi_u=nothing, pi_p=nothing
     )
 
-    # Smoke Test: actual sparse structure assembly
+    # Smoke Test: actual sparse structure assembly for BOTH the canonical deviatoric/symmetric-gradient
+    # form and the pseudo-traction form — neither AST may overflow the Gridap JIT.
+    @test_nowarn assemble_vector(res_paper, Y)
+    @test_nowarn assemble_matrix((dx,y)->jac_paper(x, dx, y), X, Y)
     @test_nowarn assemble_vector(res_pseudo, Y)
     @test_nowarn assemble_matrix((dx,y)->jac_pseudo(x, dx, y), X, Y)
 end

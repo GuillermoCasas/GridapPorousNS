@@ -23,7 +23,10 @@ using LinearAlgebra
         model = tiny_model_2d()
         Ω, dΩ, h = tiny_measure(model; degree=6)
         αf = CellField(alpha_lin, Ω)
-        form = PorousNSSolver.Legacy90d5749Mode(
+        # The strong mass residual is viscous-operator-independent, so the canonical
+        # PaperGeneralFormulation (deviatoric) exercises eval_strong_residual_p directly.
+        form = PorousNSSolver.PaperGeneralFormulation(
+            PorousNSSolver.DeviatoricSymmetricViscosity(),
             PorousNSSolver.ConstantSigmaLaw(1.0),
             PorousNSSolver.ProjectFullResidual(),
             PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8),

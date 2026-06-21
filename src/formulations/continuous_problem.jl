@@ -163,26 +163,6 @@ struct PaperGeneralFormulation{V<:AbstractViscousOperator, R<:AbstractReactionLa
     end
 end
 
-# [legacy] A formulation variant hard-wired to the LaplacianPseudoTractionViscosity
-# operator instead of the canonical deviatoric-symmetric one. Kept only for
-# regression comparison against the legacy viscous form; the deviatoric operator
-# in PaperGeneralFormulation is canonical and should be preferred. Fields mirror
-# PaperGeneralFormulation.
-struct Legacy90d5749Mode{R<:AbstractReactionLaw, P<:AbstractProjectionPolicy, Reg<:AbstractVelocityRegularization} <: AbstractFormulation
-    viscous_operator::LaplacianPseudoTractionViscosity
-    reaction_law::R
-    projection_policy::P
-    regularization::Reg
-    ν::Float64
-    eps_val::Float64
-
-    function Legacy90d5749Mode(r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64; autocorrect_policy=false) where {R, P, Reg}
-        eps_val >= 0.0 || throw(ArgumentError("eps_val must be nonnegative; got $eps_val"))
-        valid_policy = sanitize_projection_policy(p_in, r; autocorrect=autocorrect_policy)
-        new{R, typeof(valid_policy), Reg}(LaplacianPseudoTractionViscosity(), r, valid_policy, reg, ν, eps_val)
-    end
-end
-
 # Accessors for the pluggable policies a formulation carries, used by the solver
 # and projection code without depending on the concrete formulation type.
 function get_reaction(form::AbstractFormulation)
@@ -225,18 +205,14 @@ end
 # rule. Prefer this 3-arg form.
 get_quadrature_degree(::Type{<:PaperGeneralFormulation}, k_velocity::Int, rxn_law::AbstractReactionLaw) =
     max(compute_consistent_quadrature_degree(k_velocity), min_quadrature_degree(rxn_law, k_velocity))
-get_quadrature_degree(::Type{<:Legacy90d5749Mode}, k_velocity::Int, rxn_law::AbstractReactionLaw) =
-    max(compute_consistent_quadrature_degree(k_velocity), min_quadrature_degree(rxn_law, k_velocity))
 
 # Reaction-law-agnostic fallback. Returns the base rule only and so misses any
 # reaction-specific bump (e.g. Forchheimer's ⌊k_v/2⌋). Use only where the caller
 # genuinely cannot supply a reaction law at the quadrature decision point.
 get_quadrature_degree(::Type{<:PaperGeneralFormulation}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
-get_quadrature_degree(::Type{<:Legacy90d5749Mode}, k_velocity::Int) = compute_consistent_quadrature_degree(k_velocity)
 
-# Exposes c₁, c₂ keyed on the formulation type (both share the equal-order rule).
+# Exposes c₁, c₂ keyed on the formulation type (the equal-order rule).
 get_c1_c2(::Type{<:PaperGeneralFormulation}, k_velocity::Int) = compute_stabilization_constants(k_velocity)
-get_c1_c2(::Type{<:Legacy90d5749Mode}, k_velocity::Int) = compute_stabilization_constants(k_velocity)
 
 # ------------------------------------------------------------------------------
 # Mode-dispatched coefficient derivatives.
@@ -569,19 +545,3 @@ function _get_dL_du_star_v(::PicardMode, form::PaperGeneralFormulation, α, v, d
     return 0.0 * (∇(v)' ⋅ du)
 end
 
-# [legacy] Adjoint for the Laplacian/pseudo-traction variant: no separate viscous
-# adjoint term (it is folded into that operator's weak form), otherwise identical.
-function strong_adjoint_momentum(form::Legacy90d5749Mode, u, v, q, α)
-    ν = form.ν
-    conv_adj = α * (∇(v)' ⋅ u)
-    pres_adj = α * ∇(q)
-    return conv_adj + pres_adj
-end
-
-# dL*/∂u for the legacy formulation, same ExactNewton / Picard split as above.
-function _get_dL_du_star_v(::ExactNewtonMode, form::Legacy90d5749Mode, α, v, du, dsigma_du_val)
-    return α * (∇(v)' ⋅ du) - (dsigma_du_val * v)
-end
-function _get_dL_du_star_v(::PicardMode, form::Legacy90d5749Mode, α, v, du, dsigma_du_val)
-    return 0.0 * (∇(v)' ⋅ du)
-end
