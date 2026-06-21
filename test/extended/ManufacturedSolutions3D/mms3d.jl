@@ -105,6 +105,8 @@ struct Paper3DMMS{F<:PNS.AbstractFormulation}
     alpha_field::PNS.AbstractPorosityField
     L::Float64
     alpha_infty::Float64
+    eps_phys::Float64   # PHYSICAL compressibility ε_phys (enters the manufactured g); the NUMERICAL penalty
+                        # ε_num is NOT in g — it is lagged to the RHS by the iterative penalty and cancels.
 end
 
 get_u_ex3d(mms::Paper3DMMS) = UExFunc3D(mms.U, mms.alpha_field.alpha_0, mms.alpha_field, mms.L)
@@ -184,7 +186,9 @@ function evaluate_exactness_diagnostics3d(mms::Paper3DMMS, Ω, dΩ, c_1, c_2)
     g_oracle = function(x)
         u  = u_f(x); gu = grad_u_ex3d(u_f, x)
         A  = αf(x);  gA = _grad_alpha3d(αf, x)
-        return mms.formulation.eps_val * p_f(x) + A * tr(gu) + (gA ⋅ u)
+        # PHYSICAL mass equation: ε_phys·p + ∇·(αu) = g. The numerical penalty ε_num is excluded here — it is
+        # added to BOTH sides by the iterative penalty (cancels at convergence), so g must NOT carry it.
+        return mms.eps_phys * p_f(x) + A * tr(gu) + (gA ⋅ u)
     end
 
     return CellField(f_oracle, Ω), CellField(g_oracle, Ω), u_f, p_f

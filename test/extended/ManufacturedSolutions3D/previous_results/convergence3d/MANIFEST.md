@@ -1,0 +1,2 @@
+- `convergence3d_results_pre_cells_20260620_155209.json` — snapshot 20260620_155209 before full-mesh cells upgrade [(2, "ASGS", 2, 4)]; git HEAD c2490c5. Holds the prior memory-capped OSGS results so they stay reconstructable.
+- `convergence3d_results_pre_cells_20260620_162518.json` — snapshot 20260620_162518 before full-mesh cells upgrade [(2, "ASGS", 2, 4)]; git HEAD c2490c5. Holds the prior memory-capped OSGS results so they stay reconstructable.

@@ -18,6 +18,11 @@ import h5py
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
+# Render ALL text (axis labels, tick numbers, titles, symbols) with real LaTeX for consistency.
+try:
+    matplotlib.rcParams.update({"text.usetex": True, "font.family": "serif"})
+except Exception:
+    pass
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
@@ -54,12 +59,14 @@ def draw(ax, coords, tets, title):
     ax.add_collection3d(pc)
     mn, mx = coords.min(0), coords.max(0)
     ax.set_xlim(mn[0], mx[0]); ax.set_ylim(mn[1], mx[1]); ax.set_zlim(mn[2], mx[2])
+    # only the first and last tick per axis (domain endpoints) — less clutter
+    ax.set_xticks([mn[0], mx[0]]); ax.set_yticks([mn[1], mx[1]]); ax.set_zticks([mn[2], mx[2]])
     try:
         ax.set_box_aspect((mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2]))
     except Exception:
         pass
-    ax.set_title(title, fontsize=10)
-    ax.set_xlabel("x"); ax.set_ylabel("y"); ax.set_zlabel("z")
+    ax.set_title(title, fontsize=10, y=0.90)   # closer to the mesh (less title-to-mesh gap)
+    ax.set_xlabel(r"$x$"); ax.set_ylabel(r"$y$"); ax.set_zlabel(r"$z$")
     ax.view_init(elev=22, azim=-58)
 
 
@@ -75,17 +82,21 @@ def main():
         raise SystemExit(f"No mesh_level*.h5 in {args.dir}")
     out = args.out or os.path.join(args.dir, "mesh_levels.png")
 
+    # 2-column mosaic (2x2 for the four levels) with tight gaps — 3D axes reserve a lot of
+    # whitespace, so pull panels together with negative wspace/hspace (no content overlap).
     n = len(files)
-    fig = plt.figure(figsize=(5.2 * n, 5.0))
+    ncols = 2
+    nrows = (n + ncols - 1) // ncols
+    fig = plt.figure(figsize=(4.8 * ncols, 4.4 * nrows))
     for i, path in enumerate(files):
         coords, tets, attrs = load(path)
         lvl = int(re.search(r"level(\d+)", path).group(1))
         hmean = float(attrs.get("hmean", np.nan)); ncells = int(attrs.get("ncells", len(tets)))
-        ax = fig.add_subplot(1, n, i + 1, projection="3d")
-        draw(ax, coords, tets, f"level {lvl}\n{ncells} tets, h̄={hmean:.4g}")
+        ax = fig.add_subplot(nrows, ncols, i + 1, projection="3d")
+        draw(ax, coords, tets, fr"level {lvl}:  {ncells} tets,  $\bar{{h}} = {hmean:.4g}$")
         print(f"[plot] level {lvl}: {ncells} tets, {coords.shape[0]} nodes, hmean={hmean:.4g}")
-    fig.suptitle("3D nested tetrahedral mesh family (boundary surface)", fontsize=13)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.suptitle(r"3D nested tetrahedral mesh family (boundary surface)", fontsize=12, y=0.985)
+    fig.subplots_adjust(left=0.0, right=1.0, bottom=0.02, top=0.93, wspace=-0.08, hspace=-0.18)
     fig.savefig(out, dpi=130)
     print(f"[plot] wrote {out}")
 

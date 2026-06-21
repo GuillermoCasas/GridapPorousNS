@@ -49,6 +49,13 @@ ROW_KEYS = [(re, da, al) for da in DA_VALS for re in RE_VALS for al in ALPHA_VAL
 NORM_FIELDS = ["slope_uL2", "FME_uL2", "slope_uH1", "FME_uH1",
                "slope_pL2", "FME_pL2", "slope_pH1", "FME_pH1"]
 
+# 3D tables (article tab:3DL2 / tab:3DH1): theoretical convergence orders shown after the element
+# type, keyed by (norm, field, kv). "-" = no predicted rate (P1 pressure H1).
+RATES_3D = {
+    ("L2", "u", 1): "2", ("L2", "u", 2): "3", ("L2", "p", 1): "1", ("L2", "p", 2): "2",
+    ("H1", "u", 1): "1", ("H1", "u", 2): "2", ("H1", "p", 1): "-", ("H1", "p", 2): "1",
+}
+
 
 def approx(a, b, rtol=1e-6):
     return abs(a - b) <= rtol * max(abs(a), abs(b), 1.0)
@@ -348,6 +355,97 @@ def emit_table(dataset, *, norm, label, caption, vel_rate, prs_rate, fme_col6_mm
     return "\n".join(L), n_ext, n_nc
 
 
+# ---- 3D tables (article tab:3DL2 / tab:3DH1) -----------------------------------------------
+def load_3d(path):
+    """Read the 3D nested-family sweep JSON (smoke3d.jl `sweep`). Returns {(kv,method): metrics}
+    with the two-finest-mesh slope + finest-mesh error (FME) for all four norms."""
+    data = {}
+    if not os.path.isfile(path):
+        return data
+    for rec in json.load(open(path)):
+        kv = int(rec["kv"])
+        method = str(rec["method"]).upper()
+        hs = [float(x) for x in rec["hs"]]
+        if len(hs) < 2:
+            continue
+        # Honesty gate: a two-finest-mesh slope/FME is only meaningful if BOTH of those meshes actually
+        # converged. If either finest solve reported success=false, leave the cell as n.c. rather than
+        # emit a slope off a diverged iterate. (General — it auto-recovers once the solve is fixed.)
+        levels = rec.get("levels", [])
+        if len(levels) >= 2 and not (bool(levels[-1].get("success", True)) and
+                                     bool(levels[-2].get("success", True))):
+            sys.stderr.write(f"[make_results_tables] 3D cell P{kv}/{method}: finest meshes did NOT "
+                             f"converge (success=false) -> reported as n.c.\n")
+            continue
+        m = {}
+        for tag, jk in (("uL2", "l2u"), ("uH1", "h1u"), ("pL2", "l2p"), ("pH1", "h1p")):
+            e = [float(x) for x in rec[jk]]
+            m[f"slope_{tag}"] = math.log(e[-2] / e[-1]) / math.log(hs[-2] / hs[-1])
+            m[f"FME_{tag}"] = e[-1]
+        m["n_meshes"] = len(hs)
+        # solver effort at the finest mesh; the 3D solve is from the exact guess -> eps_pert = 0
+        levels = rec.get("levels", [])
+        if levels:
+            fin = levels[-1]
+            m["iters_eps"] = 0.0
+            m["iters_ns"] = int((fin.get("n_ns") if fin.get("n_ns") is not None else fin.get("iters", 0)) or 0)
+            m["iters_pic"] = int(fin.get("n_pic", 0) or 0)
+            m["finest_ncells"] = int(fin.get("ncells", 0) or 0)
+        data[(kv, method)] = m
+    return data
+
+
+def emit_3d_table(data, *, norm, label, caption, fme_col_mm="18", iter_compact=True):
+    """The 3D table — article.tex tab:3DL2/3DH1 structure (element type | slope ASGS/OSGS |
+    FME ASGS/OSGS), velocity+pressure blocks, P1/P2 rows — extended with the same
+    eps_pert (N_NS+N_Pic) solver-effort columns as the 2D tables (the 3D solves are direct
+    exact-guess, so eps_pert = 0)."""
+    # Honest provenance note: where OSGS ran on fewer meshes than ASGS, the finest OSGS mesh was
+    # omitted because the direct solver exceeded available RAM (a hardware limit, not a method one).
+    capnote = []
+    for kv, pname in ((1, r"\mathbb{P}_1"), (2, r"\mathbb{P}_2")):
+        a, o = data.get((kv, "ASGS")), data.get((kv, "OSGS"))
+        if a and o and o.get("n_meshes", 0) < a.get("n_meshes", 0):
+            capnote.append(r"$%s$ OSGS uses %d meshes (finest OSGS mesh, \num{%d} elements, omitted)"
+                           % (pname, o["n_meshes"], a.get("finest_ncells", 0)))
+    if capnote:
+        caption = caption + (r". OSGS finest-mesh values are memory-capped: " + "; ".join(capnote)
+                             + r"; the direct solver exceeded available RAM on the finest OSGS mesh "
+                               r"(a hardware limit, not a method limitation), while ASGS uses the full mesh family.")
+    colspec = "\n                ".join(
+        [r">{\raggedleft\arraybackslash}p{20mm}"]
+        + [r">{\raggedleft\arraybackslash}p{7.5mm}"] * 2
+        + [r">{\raggedleft\arraybackslash}p{%smm}" % fme_col_mm] * 2
+        + [r">{\raggedleft\arraybackslash}p{17mm}"] * 2)
+    L = [r"\begin{table}[!htbp]", r"\centering", r"\caption{%s}" % caption,
+         r"\label{%s}" % label, r"\begin{tabular}{%s}" % colspec]
+    for block, field in (("velocity", "u"), ("pressure", "p")):
+        L.append(r"\toprule" if block == "velocity" else r"\midrule")
+        L.append(r"\multicolumn{7}{c}{%s} \\" % block)
+        L.append(r"\midrule")
+        L.append(r"{} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME} & "
+                 r"\multicolumn{2}{c}{${\varepsilon_{\text{pert}}}_{N_{\text{NS}}{+}N_{\text{Pic}}}$}\\")
+        L.append(r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}")
+        L.append(r"element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & "
+                 r"\multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & "
+                 r"\multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\")
+        L.append(r"\midrule")
+        for kv, pname in ((1, r"\mathbb{P}_1"), (2, r"\mathbb{P}_2")):
+            rate = RATES_3D[(norm, field, kv)]
+            a, o = data.get((kv, "ASGS")), data.get((kv, "OSGS"))
+            sa = _fmt_slope(a[f"slope_{field}{norm}"]) if a else NC
+            so = _fmt_slope(o[f"slope_{field}{norm}"]) if o else NC
+            fa = _fmt_fme(a[f"FME_{field}{norm}"]) if a else NC
+            fo = _fmt_fme(o[f"FME_{field}{norm}"]) if o else NC
+            ia = _fmt_iter(a, compact=iter_compact) if a else ITER_NA
+            io = _fmt_iter(o, compact=iter_compact) if o else ITER_NA
+            L.append(r"$%s$ (%s) & %s & %s & %s & %s & %s & %s \\" % (pname, rate, sa, so, fa, fo, ia, io))
+    L.append(r"\bottomrule")
+    L.append(r"\end{tabular}")
+    L.append(r"\end{table}")
+    return "\n".join(L), sum(1 for k in (1, 2) for mth in ("ASGS", "OSGS") if (k, mth) not in data)
+
+
 PREAMBLE = r"""\documentclass[11pt]{article}
 \usepackage[margin=2cm]{geometry}
 \usepackage{booktabs}
@@ -370,6 +468,10 @@ def build():
                     help="P1 (TRI k=1) sweep HDF5")
     ap.add_argument("--quad-h5", default=os.path.join(RESULTS, "phase1_quad_k2.h5"),
                     help="Q2 (QUAD k=2) sweep HDF5")
+    ap.add_argument("--threed-json",
+                    default=os.path.join(HERE, "..", "ManufacturedSolutions3D", "results",
+                                         "convergence3d_results.json"),
+                    help="3D nested-family sweep JSON (smoke3d.jl sweep). Omit/absent -> 3D tables n.c.")
     ap.add_argument("--out", default=os.path.join(RESULTS, "paper_tables.tex"),
                     help="output LaTeX file")
     ap.add_argument("--common-n", type=int, default=320,
@@ -439,6 +541,19 @@ def build():
         tables.append(tex)
         total_ext += n_ext
         total_nc += n_nc
+
+    # ---- 3D tables (tab:3DL2 / tab:3DH1): one case (α,Re,Da)=(0.5,1,1), P1/P2, nested-tet family ----
+    d3 = load_3d(args.threed_json)
+    _cap3d = lambda nm: (r"Observed convergence rates and normalized finest mesh error (FME) for the 3D "
+                         r"problem ($\alpha_0=0.5$, $\Reyn=1$, $\Damk=1$), calculated from the %s of the error "
+                         r"obtained with the two finest meshes of a nested red-refined tetrahedral family "
+                         r"(one base mesh subdivided $1\!\to\!8$ per level; theoretical convergence rates "
+                         r"in parentheses)" % nm)
+    for norm, label, nmkind in (("L2", "tab:3DL2", r"$L^2$-norm"), ("H1", "tab:3DH1", r"$H^1$-seminorm")):
+        tex3d, n_nc3 = emit_3d_table(d3, norm=norm, label=label, caption=_cap3d(nmkind),
+                                     iter_compact=not args.iter_inline)
+        tables.append(tex3d)
+        total_nc += n_nc3
 
     # ---- provenance: per-cell source + missing/pending report ----
     stamp = datetime.date.today().isoformat()
