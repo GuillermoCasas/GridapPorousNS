@@ -413,7 +413,7 @@ function run_diagnostics()
     Da_list = [1.0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     for da in Da_list
         loc_cfg = PorousNSSolver.PorousNSConfig(
-            physical_properties=PorousNSSolver.PhysicalProperties(nu=1e-6, eps_val=1e-8, reaction_model="Constant_Sigma", sigma_constant=1.0/da, sigma_linear=150.0/(da*1e6), sigma_nonlinear=1.75),
+            physical_properties=PorousNSSolver.PhysicalProperties(nu=1e-6, eps_val=1e-8, numerical_epsilon=0.0, reaction_model="Constant_Sigma", sigma_constant=1.0/da, sigma_linear=150.0/(da*1e6), sigma_nonlinear=1.75),
             domain=base_config.domain, numerical_method=base_config.numerical_method, output=base_config.output
         )
         run_experiment_block("DA SWEEP: Da = $da", loc_cfg, 0.0, false)

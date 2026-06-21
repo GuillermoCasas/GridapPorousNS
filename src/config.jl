@@ -34,7 +34,13 @@ Base.@kwdef struct PhysicalProperties
     nu::Float64
     f_x::Float64
     f_y::Float64
-    eps_val::Float64
+    eps_val::Float64            # PHYSICAL compressibility ε_phys: enters BOTH residual and Jacobian (mass LHS
+                                # and the manufactured source); may be 0.
+    numerical_epsilon::Float64  # NUMERICAL penalty ε_num (Codina iterative penalty). Lagging ε_num·p to the
+                                # iterate cancels it in the RESIDUAL and leaves ε_num·dp ONLY in the JACOBIAN's
+                                # pressure block — a Newton-step regularization that vanishes at convergence
+                                # (no consistency error, no outer loop). Bounded: ε_num ≤ C₂·c₁·inf{α²τ₁/h²}
+                                # (article.tex eq:UpperBoundOnEpsilon) or stability is lost. 0 ⇒ off.
     reaction_model::String
     sigma_constant::Float64
     sigma_linear::Float64
@@ -258,7 +264,11 @@ first violated invariant.
 function validate!(cfg::PorousNSConfig)
     # Physical
     @assert cfg.physical_properties.nu > 0 "Kinematic viscosity 'nu' must be > 0"
-    @assert cfg.physical_properties.eps_val > 0 "eps_val must be > 0"
+    # eps_val is now the PHYSICAL compressibility ε_phys — it may be 0 (no physical compressibility); the
+    # NUMERICAL penalty ε_num provides stability separately. Both must be nonnegative; well-posedness for an
+    # all-Dirichlet incompressible problem needs ε_phys + ε_num > 0 (or a pinned pressure), left to the caller.
+    @assert cfg.physical_properties.eps_val >= 0 "eps_val (physical ε) must be >= 0"
+    @assert cfg.physical_properties.numerical_epsilon >= 0 "numerical_epsilon (penalty ε) must be >= 0"
     
     # Solver
     sol = cfg.numerical_method.solver

@@ -33,9 +33,18 @@
         },
         "eps_val": {
           "type": "number",
-          "description": "Absolute numerical stabilization limit for pressure.",
+          "description": "Physical compressibility epsilon (ε_phys), added to the mass-equation LHS only (ε_phys·p). May be 0 (no physical compressibility). Must be >= 0.",
           "examples": [
+            0.0,
             1e-08
+          ]
+        },
+        "numerical_epsilon": {
+          "type": "number",
+          "description": "Numerical penalty epsilon (ε_num), the Codina iterative penalty. Lagging ε_num*p to the nonlinear iterate makes it cancel in the RESIDUAL and survive only as ε_num*dp in the JACOBIAN's pressure block — a Newton-step regularization that vanishes at convergence, so the physical/manufactured solution is unaltered (no consistency error, no outer loop). Provides pressure stability where the discretization lacks it (e.g. P2 in 3D). Bounded by ε_num <= C2*c1*inf{alpha^2*tau1/h^2} (article.tex eq:UpperBoundOnEpsilon) — larger destroys stability. 0 disables it. Must be >= 0.",
+          "examples": [
+            0.0,
+            1e-04
           ]
         },
         "reaction_model": {

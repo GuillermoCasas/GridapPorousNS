@@ -58,6 +58,10 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
         proj = ProjectResidualWithoutReactionWhenConstantSigma()
     end
 
+    # eps_val is the PHYSICAL compressibility ε_phys — it enters BOTH the residual and the Jacobian
+    # (the mass-equation LHS and the manufactured source). The numerical penalty ε_num is carried
+    # separately into the formulation; lagged to the iterate it survives ONLY in the Jacobian's
+    # pressure block (Codina iterative penalty), so it must NOT be folded into eps_val here.
     eps_val = phys.eps_val
     nu = phys.nu
 
@@ -72,7 +76,8 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
 
     # 4. Assemble the chosen viscous operator, reaction law, projection policy and regularization
     #    into the PaperGeneralFormulation (the VMS weak form transcribed from article.tex).
-    form = PaperGeneralFormulation(visc_op, reaction_law, proj, reg, nu, eps_val)
+    form = PaperGeneralFormulation(visc_op, reaction_law, proj, reg, nu, eps_val;
+                                   numerical_epsilon=phys.numerical_epsilon)
     return form
 end
 

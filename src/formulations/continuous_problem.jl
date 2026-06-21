@@ -154,12 +154,18 @@ struct PaperGeneralFormulation{V<:AbstractViscousOperator, R<:AbstractReactionLa
     projection_policy::P
     regularization::Reg
     ν::Float64
-    eps_val::Float64
+    eps_val::Float64             # ε_phys: physical compressibility, in BOTH residual and Jacobian (mass LHS)
+    numerical_epsilon::Float64   # ε_num: Codina iterative penalty. Lagging ε_num·p to the iterate makes it
+                                 # CANCEL in the residual and survive only as ε_num·dp in the JACOBIAN — a
+                                 # pressure-block regularization that vanishes at convergence (no consistency
+                                 # error, no outer loop). 0 ⇒ off (Jacobian == residual ε).
 
-    function PaperGeneralFormulation(v::V, r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64; autocorrect_policy=false) where {V, R, P, Reg}
+    function PaperGeneralFormulation(v::V, r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64;
+                                     numerical_epsilon::Float64=0.0, autocorrect_policy=false) where {V, R, P, Reg}
         eps_val >= 0.0 || throw(ArgumentError("eps_val must be nonnegative; got $eps_val"))
+        numerical_epsilon >= 0.0 || throw(ArgumentError("numerical_epsilon must be nonnegative; got $numerical_epsilon"))
         valid_policy = sanitize_projection_policy(p_in, r; autocorrect=autocorrect_policy)
-        new{V, R, typeof(valid_policy), Reg}(v, r, valid_policy, reg, ν, eps_val)
+        new{V, R, typeof(valid_policy), Reg}(v, r, valid_policy, reg, ν, eps_val, numerical_epsilon)
     end
 end
 
@@ -397,7 +403,10 @@ function build_picard_jacobian(X, dX, Y, setup, formulation, phys_cfg; pi_u=noth
     res_term_jac  = v ⋅ ( σ * du )
 
     div_alpha_du = α * (∇⋅du) + du ⋅ ∇(α)
-    mass_term_jac = q * (eps_val * dp + div_alpha_du)
+    # ε_num (Codina iterative penalty): lagging ε_num·p to the iterate cancels it in the residual and
+    # leaves ε_num·dp ONLY here, a pressure-block regularization that vanishes at convergence. The VMS
+    # subscale (R_dp, L_q_star) stays at ε_phys so it remains residual-consistent (no consistency error).
+    mass_term_jac = q * ((eps_val + form.numerical_epsilon) * dp + div_alpha_du)
 
     conv_term_jac = v ⋅ conv_du
 
@@ -476,7 +485,10 @@ function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_
     res_term_jac  = v ⋅ ( σ * du + (dsigma_du_val * u) )
 
     div_alpha_du = α * (∇⋅du) + du ⋅ ∇(α)
-    mass_term_jac = q * (eps_val * dp + div_alpha_du)
+    # ε_num (Codina iterative penalty): lagging ε_num·p to the iterate cancels it in the residual and
+    # leaves ε_num·dp ONLY here, a pressure-block regularization that vanishes at convergence. The VMS
+    # subscale (R_dp, L_q_star) stays at ε_phys so it remains residual-consistent (no consistency error).
+    mass_term_jac = q * ((eps_val + form.numerical_epsilon) * dp + div_alpha_du)
 
     conv_term_jac = v ⋅ conv_du
 
