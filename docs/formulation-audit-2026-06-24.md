@@ -49,7 +49,7 @@ produces them, and (iii) hygiene/validation/fragility gaps.** In order of import
 | **A-2** | ✅ **RESOLVED 2026-06-25 (Batch 1, `2f50d6d`).** The scale-free ε_M/ε_C gate is unconditionally attached by `solve_system` as THE production success test; the three comments that mislabeled it "diagnostic / not yet wired in" were corrected to state it is authoritative, the per-iteration cost is documented as intentional (with a `[future]` opt-out note), and `eps_tol_momentum`/`eps_tol_mass` now fail loud at load (C.2). | High | doc↔code / perf |
 | **B-4** | Provenance gap: the most recent committed 3D result files cannot be reproduced from the current (uncommitted-modified) harness; their `mesh_algorithm`/level-set match no function now in `smoke3d.jl`. | Med | reproducibility |
 | **C-x** | Fragility: silent ILU→identity preconditioner fallback + no GMRES convergence check (F3, open); missing load-time validation (Batch 1); **✅ the `1e-12` `|u|`-floor magic number → config input `velocity_magnitude_derivative_floor` (C.4, done 2026-06-25)**; a very loose 3D mass gate `eps_tol_mass=0.8` (F4, open). | Med/Low | fragility |
-| **D-x** | Simplification: **✅ `build_picard_jacobian` now a wrapper (FORM-01); `_build_coeffs`/`_tau_ns_inv`/`_grad_div` helpers dedup the setup/τ/grad-div (FORM-05, TAU-05, VISC-01); dead `gridap_extensions.jl` deleted (VISC-02); dynamic-budget knobs relocated (F1) — all 2026-06-25.** Remaining dead code: `accelerators.jl` (NONL-03), `diagnostics_helpers.jl` removed in Batch 1. | Low | cleanup |
+| **D-x** | Simplification: **✅ `build_picard_jacobian` now a wrapper (FORM-01); `_build_coeffs`/`_tau_ns_inv`/`_grad_div` helpers dedup the setup/τ/grad-div (FORM-05, TAU-05, VISC-01); dead `gridap_extensions.jl` deleted (VISC-02); dynamic-budget knobs relocated (F1); `accelerators.jl` wired into OSGS (NONL-03); `p_ex` dedup'd (DRIV-07) — all 2026-06-25.** `diagnostics_helpers.jl` removed in Batch 1. | Low | cleanup |
 
 The rest of this document expands each part with `file:line` evidence, the recommended action, and (for
 fragility items) a viable alternative.
@@ -354,9 +354,11 @@ through and silently corrupt the OSGS stabilization (the trim `(1−Π)(σu)=0` 
 > **✅ Landed 2026-06-25 (behavior-preserving, 2D MMS bit-identical; Blitz 196/196, Quick 54/54):**
 > FORM-01 (`build_picard_jacobian` → wrapper + byte-equality guard test), FORM-03 (already Batch 1),
 > FORM-05 (`_build_coeffs`), TAU-05 (`_tau_ns_inv`), VISC-01 + VISC-02 (`_grad_div` helper unifies the 4
-> inline grad-div copies; dead `gridap_extensions.jl` deleted). Still open below: `accelerators.jl`
-> (NONL-03, dead), the per-dimension grad-div coefficient note (VISC-01 coefficient `0.5−1/D`), and
-> `mms_paper_2d.jl`'s inline `p_ex` (DRIV-07).
+> inline grad-div copies; dead `gridap_extensions.jl` deleted). Also 2026-06-25: ✅ NONL-03
+> (`AndersonAccelerator` wired into OSGS behind `osgs_anderson_enabled`, OFF by default — verified to
+> accelerate, docs/solver/osgs-anderson-acceleration.md) and ✅ DRIV-07 (`PExFunc` with registered ∇).
+> Still open: only the per-dimension grad-div *coefficient* note (VISC-01 `0.5−1/D`; the contraction
+> itself is already unified in `_grad_div`).
 
 - **`build_picard_jacobian` is a byte-equivalent duplicate** of
   `build_stabilized_weak_form_jacobian(…, PicardMode())` — every term coincides (traced). Both are live
@@ -374,8 +376,10 @@ through and silently corrupt the OSGS stabilization (the trim `(1−Π)(σu)=0` 
 - **Dead code to remove or label:**
   - `gridap_extensions.jl` (`ContractGradDivOp`/`grad_div_op`) — no caller; `∇(∇·u)` is re-implemented
     inline in `viscous_operators.jl`. (**VISC-02**)
-  - `accelerators.jl` (`AndersonAccelerator`) — fully implemented and *exported* but no consumer, no
-    config, no test. Wire it in or move it behind an `[experimental]` label. (**NONL-03**)
+  - ✅ `accelerators.jl` (`AndersonAccelerator`) — 2026-06-25 wired into the OSGS stage
+    (`_osgs_anderson_outer!`) behind the opt-in `osgs_anderson_enabled` (OFF by default), with
+    depth/relaxation/safety/max-outer config + a unit test; verified to cut the staggered outer-iteration
+    count ≈1.4–2.2× (docs/solver/osgs-anderson-acceleration.md). (**NONL-03**)
   - `diagnostics_helpers.jl` — references the removed `config.phys.*` / `ThermodynamicState` /
     `build_reaction_model` / 7-arg `compute_tau_1` API; it cannot run. Delete or rewrite + test.
     (**DRIV-02**)
@@ -383,8 +387,11 @@ through and silently corrupt the OSGS stabilization (the trim `(1−Π)(σu)=0` 
 - **`EvalDivDevSymOp`/`EvalStrongViscSymOp` hand-transcribe the grad-div coefficient per dimension**
   (`0.0` for 2D, `0.5-1/3` for 3D). Compute `0.5 − 1/D` from the tensor's `D` and reuse the single
   `grad_div_op` contraction so a new dimension can't drift. (**VISC-01/VISC-02**)
-- **`mms_paper_2d.jl` re-derives `p_ex` and `∇p_ex` inline** (three copies of the manufactured
-  pressure). Define a `PExFunc` with registered `∇` (mirroring `UExFunc`) and reuse. (**DRIV-07**)
+- ✅ **DRIV-07 (done 2026-06-25):** `mms_paper_2d.jl`'s three inline copies of `p_ex`/`∇p_ex` are unified
+  into a `PExFunc` with a registered analytic `∇` (mirroring `UExFunc`). Solution bit-identical; the only
+  change is the harness H1-pressure error metric, which shifts ≤2 ULP because it now uses the exact
+  analytic `∇p_ex` rather than Gridap's ForwardDiff autodiff of the former closure — consistent with how
+  the velocity H1 error already used `UExFunc`'s analytic ∇. (**DRIV-07**)
 - **No tracked analytic regression test** for the canonical deviatoric strong/adjoint operator's 3D
   grad-div coefficient (the only such check is an untracked debug script). Promote it to a blitz/quick
   test. (**VISC-03**)

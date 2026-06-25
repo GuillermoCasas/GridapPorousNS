@@ -78,6 +78,81 @@ function discrete_l2_projection(field, U_proj, V_proj, dΩ)
 end
 
 # ==============================================================================
+# Anderson-accelerated staggered OSGS outer loop  (opt-in: sol_cfg.osgs_anderson_enabled)
+# ==============================================================================
+# When `osgs_anderson_enabled` is set, the OSGS stage runs the STAGGERED fixed point of the OSGS problem
+# instead of the default single recompute-π-each-eval inexact Newton. At each outer step k it freezes the
+# projection π_k = Π(R(u_k,p_k)), solves the FROZEN-π nonlinear system (exact tangent — π constant ⇒ the
+# usual ∂π/∂u drop is moot) to obtain the plain fixed-point map output g_k = G(x_k), then Anderson-mixes the
+# (u,p) free-DOF vector: x_{k+1} = update!(acc, x_k, g_k). The bare staggered π-iteration is only linearly
+# convergent; Anderson extrapolates it. The least-squares fit is L²-weighted by the block (u,p) mass matrix
+# so the mix respects the function-space norm, not raw DOF magnitudes. (src/solvers/accelerators.jl; NONL-03.)
+# OFF by default — when disabled, solve_osgs_stage! runs the existing path unchanged (bit-identical).
+function _osgs_anderson_outer!(final_x0, setup::FETopology, formulation::VMSFormulation, config::PorousNSConfig,
+                               base_nls, U_proj, V_proj, P_proj, Q_proj, M_u, num_u_fac, M_p, num_p_fac,
+                               diag_cache, iter_count_ref, initial_success)
+    X, Y = setup.X, setup.Y
+    dΩ = setup.dΩ
+    h_cf, f_cf, alpha_cf, g_cf = setup.h_cf, setup.f_cf, setup.alpha_cf, setup.g_cf
+    form, c_1, c_2 = formulation.form, formulation.c_1, formulation.c_2
+    phys_cfg = config.physical_properties
+    sol_cfg  = config.numerical_method.solver
+    freeze_cusp = sol_cfg.freeze_jacobian_cusp
+
+    println("      [+] OSGS ANDERSON mode: staggered outer fixed-point (freeze π → solve → re-project) with Anderson mixing of (u,p).")
+
+    # L²-weight Anderson by the block (u,p) mass matrix on the (Dirichlet-constrained) state space, so the
+    # least-squares fit measures the residual in the function-space norm rather than by raw DOF magnitudes.
+    M_state = assemble_matrix((du, dv) -> ∫(du[1] ⋅ dv[1] + du[2] * dv[2])dΩ, X, Y)
+    acc = AndersonAccelerator(sol_cfg.osgs_anderson_depth, sol_cfg.osgs_anderson_relaxation,
+                              sol_cfg.osgs_anderson_safety_factor, M_state)
+
+    inner_solver = FESolver(_with_overrides(base_nls; stall_window=0))
+    drifts = Float64[]
+    converged = false
+
+    for outer in 1:sol_cfg.osgs_anderson_max_outer
+        u_k, p_k = final_x0
+        x_k = copy(get_free_dof_values(final_x0))
+
+        # Freeze π at the current iterate (projected on the UNCONSTRAINED spaces, as everywhere in OSGS).
+        pi_u_k = discrete_l2_projection(inner_projection_u(u_k, p_k, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2), U_proj, V_proj, dΩ, M_u, num_u_fac)
+        pi_p_k = discrete_l2_projection(inner_projection_p(u_k, p_k, form, dΩ, h_cf, alpha_cf, g_cf), P_proj, Q_proj, dΩ, M_p, num_p_fac)
+
+        # g_k = G(x_k): solve the frozen-π nonlinear system (π held fixed in BOTH residual and Jacobian).
+        res_frozen = (x, y) -> build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u_k, pi_p=pi_p_k)
+        jac_frozen = (x, dx, y) -> build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u_k, pi_p=pi_p_k)
+        op_frozen = FEOperator(res_frozen, jac_frozen, X, Y)
+        res_in = safe_fe_solve!(final_x0, inner_solver, op_frozen; backup=copy(x_k))
+        _record_stage!(diag_cache, "C:OSGS:Anderson[$outer]", res_in)
+        if res_in.state == :ok
+            iter_count_ref[] += res_in.iterations
+        elseif res_in.state == :max_iters_caught
+            iter_count_ref[] += 1
+        else
+            break   # inner frozen-π solve structurally failed → stop, keep the last accepted iterate
+        end
+        g_k = copy(get_free_dof_values(final_x0))
+
+        # Anderson extrapolation x_{k+1} = update!(acc, x_k, g_k); write it back into final_x0.
+        x_next = update!(acc, x_k, g_k)
+        copyto!(get_free_dof_values(final_x0), x_next)
+
+        # Outer convergence: relative ℓ∞ drift of the (u,p) state across the π update.
+        drift = norm(x_next .- x_k, Inf) / max(1.0, norm(x_next, Inf))
+        push!(drifts, drift)
+        if drift < sol_cfg.xtol
+            converged = true
+            break
+        end
+    end
+
+    diag_cache["outer_anderson_drift"] = drifts
+    diag_cache["outer_anderson_iters"] = length(drifts)
+    return initial_success && converged
+end
+
+# ==============================================================================
 # solve_osgs_stage!  (Algorithm C — the coupled OSGS solve)
 # ==============================================================================
 """
@@ -158,6 +233,12 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
         _zp = allocate_in_domain(M_p); fill!(_zp, 0.0); _pi_p0 = FEFunction(P_proj, _zp)
         jac_fn_coupled = (x, dx, y) -> build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=_pi_u0, pi_p=_pi_p0)
 
+        if sol_cfg.osgs_anderson_enabled
+            # Opt-in staggered Anderson path (off by default ⇒ the existing path below runs, bit-identical).
+            success = _osgs_anderson_outer!(final_x0, setup, formulation, config, base_nls,
+                                            U_proj, V_proj, P_proj, Q_proj, M_u, num_u_fac, M_p, num_p_fac,
+                                            diag_cache, iter_count_ref, initial_success)
+        else
         op_coupled = FEOperator(res_fn_coupled, jac_fn_coupled, X, Y)
         x_backup = copy(get_free_dof_values(final_x0))
         # [known-fragility] The coupled inexact-Newton converges SLOWLY-MONOTONE (the dropped ∂π/∂U gives a
@@ -195,6 +276,7 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             outcome_c = cascade_step_outcome(res_c, OSGS_INNER_POLICY)
             success = initial_success && (outcome_c == :success || outcome_c == :one_iter_success)
         end
+        end  # if sol_cfg.osgs_anderson_enabled
 
         # Final self-consistent projection (for π export / diagnostics).
         u_h, p_h = final_x0

@@ -18,6 +18,7 @@ files = [
     "porosity_hessian_blitz_test.jl",
     "projection_blitz_test.jl",
     "nonlinear_blitz_test.jl",
+    "anderson_accelerator_blitz_test.jl",
     "mms_exactness_blitz_test.jl",
     "mms_unit_length_blitz_test.jl",
     "config_strict_loader_blitz_test.jl",

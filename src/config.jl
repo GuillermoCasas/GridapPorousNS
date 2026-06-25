@@ -208,6 +208,16 @@ Base.@kwdef struct SolverConfig
     # [residual-divergence guard] Consecutive ‖R‖∞ increases (beyond divergence_merit_factor) that abort a
     # Newton solve → Picard. 0 ⇒ disabled (Newton runs its full budget even while diverging).
     newton_residual_divergence_patience::Int
+    # --- OSGS Anderson acceleration (osgs_solver.jl) ---
+    # OFF by default. When disabled the OSGS coupled solve is the existing single inexact-Newton path
+    # (bit-identical). When enabled, the OSGS stage runs a staggered outer fixed-point (freeze π, solve,
+    # re-project) with Anderson mixing of the (u,p) iterate, which the inexact-Newton's dropped ∂π/∂u
+    # makes only linearly convergent. See src/solvers/accelerators.jl (NONL-03).
+    osgs_anderson_enabled::Bool                    # opt in to the Anderson-accelerated staggered OSGS outer loop
+    osgs_anderson_depth::Int                       # m: Anderson history depth (how many past differences are mixed)
+    osgs_anderson_relaxation::Float64              # β: relaxation/mixing factor on the fixed-point residual
+    osgs_anderson_safety_factor::Float64           # Powell-style restart threshold (too-large extrapolation → reset history)
+    osgs_anderson_max_outer::Int                   # cap on the staggered outer iterations
     # --- Linear (inner) solver backend ---
     linear_solver::LinearSolverConfig              # LU (direct, exact) vs ILU_GMRES (low-memory iterative)
 end
@@ -328,6 +338,10 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"
     @assert sol.max_linesearch_iterations >= 1 "Linesearch iterations must be strictly bounded >= 1"
     @assert 0.0 < sol.linesearch_contraction_factor < 1.0 "Linesearch contraction map alpha must strictly be in (0, 1)"
+    @assert sol.osgs_anderson_depth >= 1 "osgs_anderson_depth must be >= 1"
+    @assert sol.osgs_anderson_relaxation > 0.0 "osgs_anderson_relaxation must be > 0"
+    @assert sol.osgs_anderson_safety_factor > 0.0 "osgs_anderson_safety_factor must be > 0"
+    @assert sol.osgs_anderson_max_outer >= 1 "osgs_anderson_max_outer must be >= 1"
 
     # Linear (inner) solver backend — the ilu_*/gmres_* knobs are required even for LU (no silent default),
     # but only constrained when ILU_GMRES is actually selected.

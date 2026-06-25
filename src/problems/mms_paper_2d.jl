@@ -236,13 +236,36 @@ function get_characteristic_scales(mms::Paper2DMMS)
     return U, P
 end
 
-# Exact pressure p_ex(x) = P·cos(kx₁) sin(kx₂), with amplitude P from get_characteristic_scales
-# and frequency k = π/L. Returned as a plain closure for interpolation and error metrics.
+"""
+    PExFunc <: Function
+
+Callable exact pressure field p_ex(x) = P·cos(kx₁) sin(kx₂) with manufactured frequency k = π/L and
+amplitude P from `get_characteristic_scales`. Mirrors `UExFunc`: subtyping `Function` lets Gridap treat
+it as a field, and the `∇` overload below registers the exact analytic gradient so the forcing oracle (and
+any strong-residual evaluation) sees machine-exact ∇p instead of differentiating a closure. This is the
+single source of truth for p_ex / ∇p_ex (DRIV-07 — previously re-derived inline in three places).
+"""
+struct PExFunc <: Function
+    P::Float64              # pressure amplitude
+    L::Float64              # characteristic length: spatial frequency k = π/L
+end
+function (f::PExFunc)(x)
+    k = pi / f.L            # spatial frequency k = π/L
+    return f.P * cos(k*x[1])*sin(k*x[2])
+end
+# Exact pressure gradient ∇p_ex = (−P·k·sin(kx₁)sin(kx₂), P·k·cos(kx₁)cos(kx₂)); registered as Gridap's
+# ∇ for PExFunc (mirroring grad_u_ex / ∇(::UExFunc)).
+function grad_p_ex(f::PExFunc, x)
+    k = pi / f.L
+    return VectorValue(f.P * -k*sin(k*x[1])*sin(k*x[2]), f.P * k*cos(k*x[1])*cos(k*x[2]))
+end
+∇(f::PExFunc) = x -> grad_p_ex(f, x)
+
+# Exact pressure p_ex(x) = P·cos(kx₁) sin(kx₂), amplitude P from get_characteristic_scales, frequency
+# k = π/L. Returned as a PExFunc (one source of truth, with a registered analytic ∇).
 function get_p_ex(mms::Paper2DMMS)
     U_amp, P_amp = get_characteristic_scales(mms)
-    L = mms.L
-    k = pi / L
-    return x -> P_amp * cos(k*x[1])*sin(k*x[2])
+    return PExFunc(P_amp, mms.L)
 end
 
 # Placeholder stub: the real momentum forcing is assembled analytically in
@@ -287,12 +310,9 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
 
     alpha_field = mms.alpha_field
     nu = mms.formulation.ν
-    P_c = get_characteristic_scales(mms)[2]
-    
+
     u_f = get_u_ex(mms)
-    L_local = mms.L
-    k_local = pi / L_local
-    p_f(x) = P_c * cos(k_local*x[1])*sin(k_local*x[2])
+    # p_ex value and ∇p_ex both come from the single PExFunc returned by get_p_ex (DRIV-07).
 
     reaction_law = mms.formulation.reaction_law
 
@@ -310,7 +330,7 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
         grad_u = grad_u_ex(u_f, x)
         lap_u = lap_u_ex(u_f, x)
         
-        grad_p = VectorValue(P_c * -k_local*sin(k_local*x[1])*sin(k_local*x[2]), P_c * k_local*cos(k_local*x[1])*cos(k_local*x[2]))
+        grad_p = grad_p_ex(p_ex_func, x)
         
         A = alpha_field(x)
         grad_A = PorousNSSolver.grad_alpha(alpha_field, x)
@@ -391,7 +411,7 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
         grad_A = PorousNSSolver.grad_alpha(alpha_field, x)
 
         div_u_val = tr(grad_u)
-        return mms.formulation.eps_val * p_f(x) + A * div_u_val + (grad_A ⋅ u)
+        return mms.formulation.eps_val * p_ex_func(x) + A * div_u_val + (grad_A ⋅ u)
     end
 
     g_ex_raw = CellField(g_ex_oracle, Ω)
@@ -399,7 +419,7 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
     # Interpolants of the exact fields onto the FE spaces — used only for error metrics, never
     # as forcing (the forcing is the pointwise oracle above). X.spaces[1] is velocity, [2] pressure.
     u_ex_cf = interpolate_everywhere(x -> u_f(x), X.spaces[1])
-    p_ex_cf = interpolate_everywhere(p_f, X.spaces[2])
+    p_ex_cf = interpolate_everywhere(p_ex_func, X.spaces[2])
 
     println("Calculated MMS Exact Forcing...")
     return f_ex_raw, g_ex_raw

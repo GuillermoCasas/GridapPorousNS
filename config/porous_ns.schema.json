@@ -440,6 +440,41 @@
                 2
               ]
             },
+            "osgs_anderson_enabled": {
+              "type": "boolean",
+              "description": "Opt in to Anderson-accelerated OSGS (osgs_solver.jl). OFF by default: when disabled the OSGS coupled solve is the existing single inexact-Newton path (bit-identical). When enabled, the OSGS stage runs a staggered outer fixed-point (freeze pi, solve, re-project) with Anderson mixing of the (u,p) iterate.",
+              "examples": [
+                false
+              ]
+            },
+            "osgs_anderson_depth": {
+              "type": "integer",
+              "description": "Anderson history depth m: how many past consecutive differences are mixed in the extrapolation. Used only when osgs_anderson_enabled.",
+              "examples": [
+                5
+              ]
+            },
+            "osgs_anderson_relaxation": {
+              "type": "number",
+              "description": "Anderson relaxation/mixing factor beta applied to the fixed-point residual. Used only when osgs_anderson_enabled.",
+              "examples": [
+                1.0
+              ]
+            },
+            "osgs_anderson_safety_factor": {
+              "type": "number",
+              "description": "Powell-style safeguard threshold: an extrapolation that moves farther than safety_factor times the residual norm is rejected and the Anderson history is reset. Used only when osgs_anderson_enabled.",
+              "examples": [
+                10.0
+              ]
+            },
+            "osgs_anderson_max_outer": {
+              "type": "integer",
+              "description": "Cap on the staggered Anderson outer iterations. Used only when osgs_anderson_enabled.",
+              "examples": [
+                50
+              ]
+            },
             "linear_solver": {
               "type": "object",
               "title": "Linear (inner) solver backend",

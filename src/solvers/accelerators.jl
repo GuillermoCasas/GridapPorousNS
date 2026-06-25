@@ -5,12 +5,13 @@
 # short history of past states and fixed-point residuals by solving a small least-squares problem,
 # turning linearly-convergent fixed-point loops into faster (super-linear in practice) ones.
 #
-# [unused — kept for possible future use] Self-contained here and exported as `AndersonAccelerator`, but
-# as of 2026-06 it has ZERO consumers: never constructed, never wired into osgs_solver.jl / solver_core.jl,
-# and there is no depth/relaxation/safety config (NONL-03, docs/formulation-audit-2026-06-24.md §D). It is
-# intended for the OSGS coupled solve, whose inexact-Newton iteration (the dense ∂π/∂U term is dropped)
-# converges only *linearly*. If/when wired in, the controlling config knobs (depth / relaxation / safety)
-# must be added AT THE POINT OF CONSUMPTION (schema + struct + JSON) so they are never dead config.
+# Wired into the OSGS stage (osgs_solver.jl `_osgs_anderson_outer!`) behind the opt-in config flag
+# `osgs_anderson_enabled` — OFF by default. The controlling knobs (depth / relaxation / safety / max-outer)
+# live in SolverConfig + schema + base_config (the point of consumption, so they are never dead config).
+# The OSGS coupled solve's inexact-Newton iteration drops the dense ∂π/∂U term and so converges only
+# *linearly*; the staggered Anderson path extrapolates it — verified to cut the outer-iteration count
+# ≈1.4–2.2× (docs/solver/osgs-anderson-acceleration.md). Previously dead (NONL-03,
+# docs/formulation-audit-2026-06-24.md §D).
 using LinearAlgebra
 
 """

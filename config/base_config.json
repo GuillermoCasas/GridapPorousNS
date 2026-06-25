@@ -64,6 +64,11 @@
             "pingpong_max_swaps": 0,
             "pingpong_picard_gain_orders": 1.5,
             "newton_residual_divergence_patience": 0,
+            "osgs_anderson_enabled": false,
+            "osgs_anderson_depth": 5,
+            "osgs_anderson_relaxation": 1.0,
+            "osgs_anderson_safety_factor": 10.0,
+            "osgs_anderson_max_outer": 50,
             "linear_solver": {
                 "method": "LU",
                 "ilu_drop_tolerance": 1e-4,
