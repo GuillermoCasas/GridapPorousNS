@@ -6,6 +6,16 @@ canonical doc**; the rest are kept for traceability and carry a status header po
 
 ## Top level — repo-wide ledgers
 
+- [`formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md) — **deep theory↔code + results
+  audit (2026-06-24/25).** Verdict: the continuous VMS formulation is faithfully transcribed (no
+  weak-form correctness bug). The substantive findings are (A) two doc↔code contract drifts — the dynamic
+  Re/Da budget knobs have no `src/` consumer, and the scale-free ε_M/ε_C gate is the *authoritative*
+  production gate despite "not yet wired in / diagnostic only" comments; (B) the results story — 3D
+  P1-ASGS is method-intrinsically sub-optimal and P2 is under-stabilised at paper c₁ *on a perfect
+  uniform mesh* (c₁×4 fixes P2; ≈40× smaller errors), the committed "P2 divergence" tables mix in
+  `success=False` solves, and a failed OSGS solve silently reports the ASGS state; (C/D) ILU silent
+  identity fallback, missing config validation, a copy-pasted `1e-12` floor, and several dead-code /
+  duplication cleanups. Corroborates the structured-Kuhn finding below and completes the P2 case.
 - [`lessons_learned.md`](lessons_learned.md) — append-only ledger of past regressions and their
   canonical fixes. The authority on anything marked "fixed". Read it before touching
   `src/formulations/`, `src/stabilization/`, or `src/solvers/`.
@@ -21,7 +31,7 @@ canonical doc**; the rest are kept for traceability and carry a status header po
 | **Canonical** | [convergence-status.md](mms/convergence-status.md) | Grid-wide status & knowledge of the `(Re, Da, α₀, h)` sweep. **2026-06-10: the k=1 QUAD sweep is complete (N=10→640) and a success** — velocity optimal across the whole grid (L² O(h²), H¹ O(h)), pressure optimal everywhere too (≥ its nominal O(h^{kp})=O(h) equal-order order; super-optimal at 1.5–2.4×), the high-Da OSGS rate confirmed pre-asymptotic (recovers to ≥1.0 at N=640), OSGS ≈2× more accurate than ASGS. See its success box. |
 | **Reference** | [convergence-baseline.md](mms/convergence-baseline.md) | Per-cell baseline (H¹ rates + inner-iteration costs). The N≤320 table is the pre-asymptotic reference; the 2026-06-10 note records the N=640 recovery. Remaining tracked target: JFNK = cut OSGS iters (the high-Da rate target is **met** — recovers). |
 | Sub-topic | [fold-recovery.md](mms/fold-recovery.md) | Stiff-corner fold diagnosis + continuation rescue (status §3, region B). |
-| **3D P₂** | [3d-p2-convergence-investigation.md](mms/3d-p2-convergence-investigation.md) | Canonical for the 3D-P₂ (tet, §5.2) divergence. **2026-06-21:** errors grow under refinement while Newton converges deeply; ruled out tolerances/mesh/formulation/ε (A/B); c₁ is the only lever. Hypothesis: gmsh-Delaunay P₂ tets exceed the `C_inv` the uniform `c₁=4k⁴` budgets (`c₁ > 2ξC_inv²`) — a mesh-quality/c₁ calibration, not a formulation bug. Includes the numerical-ε (Jacobian-only) redesign note. |
+| **3D ASGS (P₁ & P₂)** | [3d-p2-convergence-investigation.md](mms/3d-p2-convergence-investigation.md) | Canonical for 3D tet MMS (§5.2): ASGS vs OSGS, c₁, ε, mesh quality. **2026-06-24:** the structured-Kuhn control **falsifies** the old "gmsh mesh-quality" hypothesis — ASGS L²u is sub-optimal (P₁) / divergent (P₂) at paper c₁ *even on a perfect, constant-quality mesh*, while OSGS is optimal there. The deficit is a coercivity-limited **discrete fixed point** (`c₁=4k⁴` under-budgets `2ξC_inv²` for 3D tets); c₁ moves the converged error. Nonlinear iteration, analytic Jacobian, and orchestration all rigorously **exonerated** (residual-identity + Jacobian Taylor + bare-Newton, §4). `eps_phys=0` (incompressible; ε is the numerical Jacobian-only iterative penalty). OSGS-better-here vs OSGS-worse-at-high-Da reconciled (regime-dependent projection effect). |
 
 (The complete, validated k=1 QUAD sweep is the current authority; the old May-2026 partial-sweep
 artifacts were removed in the 2026-06-10 cleanup — see
