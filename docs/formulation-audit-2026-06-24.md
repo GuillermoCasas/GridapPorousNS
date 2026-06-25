@@ -56,6 +56,76 @@ fragility items) a viable alternative.
 
 ---
 
+## Deferred follow-ups — implementation checklist (post Batch-1)
+
+**Batch 1 landed 2026-06-25** (branch `cleanup/contract-drift-and-fragility`, commit `2f50d6d`,
+behavior-preserving — 2D MMS bit-identical, Blitz 194/194, Quick 57/57): A.2 (conv-gate comment
+corrections), C.2 (fail-loud `validate!` asserts), C.3 (loose-gate doc), C.4 (`1e-12`→named const),
+C.5 (`is_sigma_constant` trait), NONL-05 (ILU ctor defaults removed), the dead-code removals
+(`diagnostics_helpers.jl`, FORM-03 dup) + `[unused]` labels, the A.1 **documentation** fix, and two new
+tests. The items below were intentionally deferred; each is self-contained and ordered roughly by value.
+
+### F1 — A.1 field relocation: move the `dynamic_*` Re/Da knobs out of production `SolverConfig` → §A.1
+- **Why deferred:** behavior-preserving in principle but **38 config files** set these keys (every
+  `test/extended/Cocquet*/data/*.json`, `CocquetFormMMS/data/*.json`, `ManufacturedSolutions/data/*.json`),
+  inheriting the `base_config.json` defaults; and `dynamic_ftol_ceiling`/`dynamic_ftol_spatial_safety_factor`
+  set **every** cell's stopping ftol (bit-identity sensitive). Too wide to bundle into a bit-identical PR.
+- **Recipe:** (1) delete the 8 fields from `SolverConfig` (`src/config.jl` ~L145-156) + their `validate!`
+  asserts (the `dynamic_ftol_*` and `dynamic_newton_re_*` ones); (2) delete the 8 properties from
+  `config/porous_ns.schema.json`; (3) delete them from `config/base_config.json`'s `solver` block;
+  (4) change the harness read sites to read from the raw `test_dict` (not `config.numerical_method.solver`):
+  `test/extended/ManufacturedSolutions/run_test.jl` ~L869-911, `CocquetFormMMS/run_test.jl` ~L631-667,
+  `ManufacturedSolutions/probe_stiff_diagnose.jl` ~L160-182 — use `get(test_dict, "dynamic_X", <default>)`
+  with the current `base_config` values as the defaults; (5) in every harness JSON that overrides a
+  `dynamic_*` key under `numerical_method.solver`, move it to a top-level `mms_dynamic_budget` object.
+- **Verify:** re-run one ManufacturedSolutions cell **and** one Cocquet cell **and** one CocquetFormMMS
+  cell — bit-identical errors and clean config loads on all three (the 2D check alone does NOT cover the
+  Cocquet harnesses).
+- **Alternative (bigger):** instead build a production element-wise **cell-Péclet** adaptive budget in
+  `src/solvers` (the frame-independent analogue) — changes production behavior, needs its own baselines.
+
+### F2 — FORM-01: collapse `build_picard_jacobian` to a wrapper → §D
+- `build_picard_jacobian` (`src/formulations/continuous_problem.jl`) is byte-equivalent to
+  `build_stabilized_weak_form_jacobian(…, false, PicardMode())` (all differences are ×0.0 structural zeros).
+- **Recipe:** (1) add a Blitz/Quick test that assembles BOTH Jacobians on a tiny mesh at a non-trivial
+  iterate and asserts the matrices are byte-identical; (2) only if it passes, replace the body with a
+  one-line wrapper. The lockstep comment already in the function points here.
+- **Verify:** the new equality test + a 2D OSGS run (exercises the Picard fallback path).
+
+### F3 — Batch 2 / C.1: ILU-GMRES honesty (behavior-CHANGING, 3D-only) → §C.1
+- `src/solvers/linear_solvers.jl`: call `gmres!(…; log=true)`, inspect `ch.isconverged`; on non-convergence
+  signal failure through `eval_linear_system_resolution!` (cascade → Picard) or loud-warn with the achieved
+  residual. Make the ILU→identity fallback an explicit config-gated `allow_unpreconditioned_fallback`
+  (schema + `LinearSolverConfig` + JSON).
+- **Scope:** only the `ILU_GMRES` path (3D meshes > `LU_DOF_LIMIT`); the 2D harnesses use `LUSolver`, so 2D
+  is unaffected. **Re-baseline the 3D structured-Kuhn control before/after** (it is *expected* to change
+  which fine-mesh OSGS solves report success — that is the point).
+
+### F4 — C.3: tighten / supplement the mass gate → §C.3
+- Investigate why `eps_tol_mass` cannot be < 0.8 for 3D k=2; if it genuinely must stay loose, add a
+  separate tighter check on the pure-divergence ratio `‖∇·(αu)‖/‖∇(αu)‖ ≤ √d` (already computed in
+  `convergence_criterion.jl` as the self-check) so continuity is still gated. No behavior change landed.
+
+### F5 — element-type-aware c₁ for P2 tets (the B.5 fix) → §B.5
+- Add a config-driven `c1_multiplier` (or a per-`(element, order)` table), explicitly `[code-actual]`, so
+  P2 tetrahedra use a larger c₁ (the control showed **c₁×4 fixes P2-3D**); 2D/quad stays paper-faithful at
+  `4k⁴`. Also reconcile `docs/mms/3d-p2-convergence-investigation.md`'s TL;DR (still says "mesh quality")
+  with its README pointer (says falsified) using the B.5 c₁×1-vs-c₁×4 numbers. (That doc currently has
+  uncommitted edits from a prior session — coordinate.)
+
+### Minor / opportunistic
+- `_inv_centered.json` latent fragility: the official `test/quick/encoding_invariance_quick_test.jl` reads
+  a config it must generate first — fine today, but a stale leftover can confuse a clean checkout.
+- NONL-01/NONL-04 (Anderson guards) only matter if `accelerators.jl` is ever wired in (currently `[unused]`).
+
+**Bit-identity verification recipe (reused for F1/F2):** capture a clean pre-change baseline by
+`git stash push -- src/`, run a couple of 2D cells
+(`run_test.jl phase1_quad_k1.json --filter kv=1,kp=1,etype=QUAD,Re=1.0,Da=1.0,alpha0=0.5 --max-N 40 --h5 debug_results/baseline_pre.h5`),
+`git checkout -- src/` to restore edits, re-run to `baseline_post.h5`, and compare the `err_*` arrays for
+exact equality.
+
+---
+
 ## Part A — Theory ↔ code consistency
 
 ### A.0 What is faithful (re-verified, not assumed)
