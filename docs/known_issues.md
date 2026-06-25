@@ -40,6 +40,19 @@ Each is verified against the working tree. Severity is the author's call.
   convergence failure. Canonical detail: [`mms/fold-recovery.md`](mms/fold-recovery.md) ("Current status &
   remaining work").
 
+- **3D P₂ is memory-capped + unstable at paper c₁ (2026-06-24).** On this 32 GB machine, direct LU OOMs
+  past ~30–40k DOF; the `(24,24,6)` ≈ 104k-DOF P₂ mesh auto-switches to ILU-GMRES, which **stalls on the
+  indefinite (u,p) saddle point** (>3 h, no convergence — ILU is a weak preconditioner there). So the 3D P₂
+  convergence study is confined to a narrow LU-feasible h-window and the OSGS finest meshes are unreachable.
+  Separately, at the **paper's uniform c₁ = 4k⁴**, P₂-3D errors **grow / are non-monotone under refinement
+  even on perfect structured (Kuhn) meshes** (L²u 0.022→0.049→0.056→0.011; occasional `ok=false` — the solver
+  reaches the scale-free gate on a refinement-worsening branch). This is a **coercivity** deficit (c₁
+  under-budgets `2ξ C_inv²` for 3D tets), NOT mesh quality and NOT a nonlinear-solver bug — both are ruled
+  out in [`mms/3d-p2-convergence-investigation.md`](mms/3d-p2-convergence-investigation.md). c₁×4 tames the
+  divergence but does not reach optimal on accessible meshes. Hardware/linear-solver limit + an open
+  coercivity question; the memory wall motivates the deferred JFNK plan
+  ([`solver/coupled-only-leaning-and-jfnk-plan.md`](solver/coupled-only-leaning-and-jfnk-plan.md) §4).
+
 ## Minor / cleanup
 
 - ~~**Dead helper after the covariance fix** — `_resolve_solution_scale_per_field` + the `x_per_field_raw`

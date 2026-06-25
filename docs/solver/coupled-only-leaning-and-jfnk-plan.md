@@ -130,3 +130,23 @@ iteration counts as the baseline — that quantifies how much of the 44–69 ite
 **Acceptance test for JFNK:** identical converged MMS errors to plain `coupled` (same fixed point — JFNK
 only changes the path), with materially fewer nonlinear iterations at high Re, on the reaction-dominated
 and healthy Da=10⁶ cells (Re∈{1, 10⁶}, α=1, N=10/20/40) and the high-Re fold cells.
+
+### 4a. Verification methodology already executed (2026-06-24) — and a second motivation
+
+The Jacobian-consistency / fixed-point part of this plan's diagnostic toolkit was run on **ASGS-P₁ 3D**
+(structured (16,16,4), a one-off diagnostic; see
+[`mms/3d-p2-convergence-investigation.md`](../mms/3d-p2-convergence-investigation.md) §4). Results that
+bear on the JFNK plan:
+
+- **The analytic `ExactNewtonMode` Jacobian is the exact ∂R** — a Taylor test `‖R(U+εδU) − R(U) − εJδU‖`
+  drops as O(ε²) (~100×/decade) to round-off. So for **ASGS** there is no inexactness to recover (π ≡ 0,
+  no `∂π/∂U`); the dropped-coupling problem is **OSGS-specific**, exactly as §4's diagnosis says.
+- **Bare Newton (analytic J, plain LU, zero orchestration) reaches production's fixed point** (velocity
+  DOFs ~3e-6, MMS errors identical). This validates the JFNK acceptance criterion's premise — the iteration
+  picks the *path*, not the *fixed point* — on a real cell.
+
+**Second motivation for JFNK (new): the P₂-3D memory wall.** Beyond OSGS speed, JFNK (matrix-free GMRES
+preconditioned by the assembled frozen-π / ASGS Jacobian) is the natural route to clear the
+**ILU-saddle-point trap** that blocks the 104k-DOF P₂ meshes (`known_issues.md`): it avoids both the dense
+`∂π/∂U` *and* the direct-LU fill-in that OOMs, so a matrix-free Krylov is the path to the finer P₂ cells the
+direct solver cannot reach.
