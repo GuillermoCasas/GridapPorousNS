@@ -101,6 +101,13 @@
             1e-12
           ]
         },
+        "velocity_magnitude_derivative_floor": {
+          "type": "number",
+          "description": "Additive floor on |u| regularizing the d|u|/du = u/|u| factor in the Exact-Newton derivative terms (dsigma/du, dtau/du) at a stagnation point. Jacobian-only (zeroed in Picard, absent from the residual), so it cannot move the converged solution. See theory/velocity_floor_regularization/.",
+          "examples": [
+            1e-12
+          ]
+        },
         "tau_regularization_limit": {
           "type": "number",
           "description": "Minimum limit applied to stabilization parameters (tau).",

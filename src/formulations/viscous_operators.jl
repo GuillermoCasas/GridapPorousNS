@@ -11,6 +11,7 @@
 # assembled monolithic (u, p) system. `α` is the porosity field, `ν` the kinematic viscosity.
 using Gridap
 using Gridap.Algebra
+using Gridap.TensorValues   # ThirdOrderTensorValue (the velocity-Hessian type used by the grad-div ops)
 using LinearAlgebra
 
 """
@@ -88,6 +89,14 @@ function adjoint_viscous_operator(::LaplacianPseudoTractionViscosity, v, α, ν)
     return ν * (∇(v)' ⋅ ∇(α)) + α * ν * Δ(v)
 end
 
+# ∇(∇·u) extracted from the velocity Hessian H (H[i,j,k] = ∂_i ∂_j u_k, so component i = Σ_j H[i,j,j]).
+# [VISC-01] Single shared contraction for the symmetric AND deviatoric divergence operators (2D & 3D),
+# replacing four byte-identical inline copies (formerly the dead ContractGradDivOp in gridap_extensions.jl).
+@inline _grad_div(H::ThirdOrderTensorValue{2,2,2,T}) where T =
+    VectorValue(H[1,1,1] + H[1,2,2], H[2,1,1] + H[2,2,2])
+@inline _grad_div(H::ThirdOrderTensorValue{3,3,3,T}) where T =
+    VectorValue(H[1,1,1] + H[1,2,2] + H[1,3,3], H[2,1,1] + H[2,2,2] + H[2,3,3], H[3,1,1] + H[3,2,2] + H[3,3,3])
+
 # =======================
 # Symmetric Gradient Viscosity
 # =======================
@@ -96,15 +105,11 @@ end
 # dimension-specialized below for 2D and 3D. Used by both the strong and adjoint operators.
 struct EvalStrongViscSymOp <: Function end
 @inline function (::EvalStrongViscSymOp)(Δu::VectorValue{2, T1}, ∇∇u::ThirdOrderTensorValue{2,2,2,T2}) where {T1, T2}
-    grad_div_u = VectorValue(∇∇u[1,1,1] + ∇∇u[1,2,2], ∇∇u[2,1,1] + ∇∇u[2,2,2])
+    grad_div_u = _grad_div(∇∇u)
     return 0.5 * Δu + 0.5 * grad_div_u
 end
 @inline function (::EvalStrongViscSymOp)(Δu::VectorValue{3, T1}, ∇∇u::ThirdOrderTensorValue{3,3,3,T2}) where {T1, T2}
-    grad_div_u = VectorValue(
-        ∇∇u[1,1,1] + ∇∇u[1,2,2] + ∇∇u[1,3,3], 
-        ∇∇u[2,1,1] + ∇∇u[2,2,2] + ∇∇u[2,3,3],
-        ∇∇u[3,1,1] + ∇∇u[3,2,2] + ∇∇u[3,3,3]
-    )
+    grad_div_u = _grad_div(∇∇u)
     return 0.5 * Δu + 0.5 * grad_div_u
 end
 
@@ -157,15 +162,11 @@ end
 # +1/6 in 3D), unlike the plain symmetric case where that coefficient is 0.5. Dimension-specialized below.
 struct EvalDivDevSymOp <: Function end
 @inline function (::EvalDivDevSymOp)(Δu::VectorValue{2, T1}, ∇∇u::ThirdOrderTensorValue{2,2,2,T2}) where {T1, T2}
-    grad_div_u = VectorValue(∇∇u[1,1,1] + ∇∇u[1,2,2], ∇∇u[2,1,1] + ∇∇u[2,2,2])
+    grad_div_u = _grad_div(∇∇u)
     return 0.5 * Δu + 0.0 * grad_div_u
 end
 @inline function (::EvalDivDevSymOp)(Δu::VectorValue{3, T1}, ∇∇u::ThirdOrderTensorValue{3,3,3,T2}) where {T1, T2}
-    grad_div_u = VectorValue(
-        ∇∇u[1,1,1] + ∇∇u[1,2,2] + ∇∇u[1,3,3], 
-        ∇∇u[2,1,1] + ∇∇u[2,2,2] + ∇∇u[2,3,3],
-        ∇∇u[3,1,1] + ∇∇u[3,2,2] + ∇∇u[3,3,3]
-    )
+    grad_div_u = _grad_div(∇∇u)
     return 0.5 * Δu + (0.5 - 1.0/3.0) * grad_div_u
 end
 

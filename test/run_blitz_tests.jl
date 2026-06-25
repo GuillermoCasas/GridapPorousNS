@@ -13,6 +13,7 @@ files = [
     "reaction_regularization_blitz_test.jl",
 
     "formulation_consistency_blitz_test.jl",
+    "picard_jacobian_equivalence_blitz_test.jl",
     "tau_blitz_test.jl",
     "porosity_hessian_blitz_test.jl",
     "projection_blitz_test.jl",

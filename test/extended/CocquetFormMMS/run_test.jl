@@ -108,7 +108,8 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     reg = PorousNSSolver.SmoothVelocityFloor(
         config.physical_properties.u_base_floor_ref,
         0.0,
-        config.physical_properties.epsilon_floor
+        config.physical_properties.epsilon_floor,
+        config.physical_properties.velocity_magnitude_derivative_floor
     )
 
     # Derive kinematic viscosity from the Reynolds sweep input.

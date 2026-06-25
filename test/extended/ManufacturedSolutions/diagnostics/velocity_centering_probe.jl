@@ -98,7 +98,8 @@ function setup_cell(; Re::Float64, Da::Float64, alpha_0::Float64, n::Int,
         PorousNSSolver.ConstantSigmaLaw(sigma_c),
         PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma(),
         PorousNSSolver.SmoothVelocityFloor(config.physical_properties.u_base_floor_ref, 0.0,
-                                            config.physical_properties.epsilon_floor),
+                                            config.physical_properties.epsilon_floor,
+                                            config.physical_properties.velocity_magnitude_derivative_floor),
         nu_calc, config.physical_properties.eps_val,
     )
     mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)

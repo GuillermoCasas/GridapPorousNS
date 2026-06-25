@@ -19,13 +19,15 @@ using Gridap
 using Gridap.Algebra
 using LinearAlgebra
 
-# Denominator guard for the `d|u|/du = u/|u|` factor in the Exact-Newton reaction/τ derivatives
-# (`dsigma_du`, `compute_dtau_1_du`, `compute_dtau_2_du`): |u| can be exactly 0 at a perfect Dirichlet
-# stagnation point, where that factor is singular. A tiny additive floor keeps it finite. This is the
-# single source of truth for the value previously copy-pasted as an inline `1e-12` across `reaction.jl`
-# and `tau.jl`; it equals the default `PhysicalProperties.epsilon_floor`, and could be threaded from
-# config if a tunable is ever needed. It enters ONLY the Jacobian (these derivatives are zeroed in Picard
-# and never appear in the residual), so it cannot move a converged solution.
+# DEFAULT value of the derivative floor ε_d that regularizes the `d|u|/du = u/|u|` factor in the
+# Exact-Newton reaction/τ derivatives (`dsigma_du`, `compute_dtau_1_du`, `compute_dtau_2_du`): |u| can be
+# exactly 0 at a perfect Dirichlet stagnation point, where that factor is singular; a tiny additive floor
+# keeps it finite. The PRODUCTION value is now a documented config input
+# (`PhysicalProperties.velocity_magnitude_derivative_floor`, mirrored as `1e-12` in `base_config.json`)
+# carried on `SmoothVelocityFloor` and read via `velocity_magnitude_derivative_floor(reg)`. This constant
+# remains as the canonical DEFAULT, used by test/harness regularization construction. It enters ONLY the
+# Jacobian (these derivatives are zeroed in Picard and never appear in the residual), so it cannot move a
+# converged solution. See theory/velocity_floor_regularization/.
 const VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR = 1e-12
 
 # Common interface for the floor policies below. A policy is a small struct holding
@@ -48,12 +50,24 @@ end
 #                      term below (set 0 to disable it).
 #   epsilon_floor    : tiny denominator guard so the diffusive floor stays finite as
 #                      h → 0.
-# T is the shared scalar element type of the three parameters.
+#   velocity_magnitude_derivative_floor : additive floor ε_d on |u| regularizing
+#                      ∂|u|/∂u = u/|u| in the Exact-Newton dσ/du, dτ/du terms (read via the
+#                      `velocity_magnitude_derivative_floor(reg)` accessor). Jacobian-only; cannot move
+#                      the converged solution. See theory/velocity_floor_regularization/.
+# T is the shared scalar element type of the parameters.
 struct SmoothVelocityFloor{T} <: AbstractVelocityRegularization
     u_base_floor_ref::T
     h_floor_weight::T
     epsilon_floor::T
+    velocity_magnitude_derivative_floor::T
 end
+
+# Accessor for the Exact-Newton derivative floor ε_d (see the const above). Defined on the regularization
+# policy because it is another |u|-flooring decision, a sibling of u_base_floor_ref / epsilon_floor.
+velocity_magnitude_derivative_floor(reg::SmoothVelocityFloor) = reg.velocity_magnitude_derivative_floor
+# NoRegularization opts out of ALL velocity flooring (the caller guarantees no stagnation); with no floor
+# the |u|=0 derivative is genuinely undefined, so this returns 0.0 — consistent with the "no floor" policy.
+velocity_magnitude_derivative_floor(::NoRegularization) = 0.0
 
 # Floored speed used to evaluate the convective stabilization parameters τ.
 # The floor blends a constant part with a diffusive part `c₁ν/(c₂h)` (the same

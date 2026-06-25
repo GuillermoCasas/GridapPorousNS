@@ -23,7 +23,7 @@ using LinearAlgebra
         kin, med, du = make_local_states()
         law = PorousNSSolver.ConstantSigmaLaw(3.5)
         @test PorousNSSolver.sigma(law, kin, med, kin.mag_u) == 3.5
-        @test PorousNSSolver.dsigma_du(law, kin, med, kin.mag_u, du) == 0.0 * (kin.u ⋅ du)
+        @test PorousNSSolver.dsigma_du(law, kin, med, kin.mag_u, du, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR) == 0.0 * (kin.u ⋅ du)
     end
 
     @testset "ForchheimerErgunLaw value" begin
@@ -51,7 +51,7 @@ using LinearAlgebra
 
         mag_u = sqrt(sum(abs2, u0) + 1e-8)
         kin = PorousNSSolver.KinematicState(VectorValue(u0...), grad_u, mag_u)
-        dσ = PorousNSSolver.dsigma_du(law, kin, med, mag_u, VectorValue(du0...))
+        dσ = PorousNSSolver.dsigma_du(law, kin, med, mag_u, VectorValue(du0...), PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR)
         dσ_fd = directional_fd(f, u0, du0)
         @test isapprox(dσ, dσ_fd; rtol=1e-5, atol=1e-7)
     end
@@ -65,7 +65,7 @@ using LinearAlgebra
 
         @test PorousNSSolver.effective_speed(PorousNSSolver.NoRegularization(), VectorValue(3.0,4.0), ν, h, c1, c2) ≈ 5.0
 
-        reg = PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8)
+        reg = PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR)
         val = PorousNSSolver.effective_speed(reg, u, ν, h, c1, c2)
         @test isfinite(val)
         @test val > 0.0

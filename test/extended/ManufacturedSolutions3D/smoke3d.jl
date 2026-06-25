@@ -127,7 +127,8 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     proj = sol.experimental_reaction_mode == "standard" ?
            PNS.ProjectResidualWithoutReactionWhenConstantSigma() : PNS.ProjectFullResidual()
     reg  = PNS.SmoothVelocityFloor(config.physical_properties.u_base_floor_ref, 0.0,
-                                   config.physical_properties.epsilon_floor)
+                                   config.physical_properties.epsilon_floor,
+                                   config.physical_properties.velocity_magnitude_derivative_floor)
     visc_op = visc == "SymmetricGradient" ? PNS.SymmetricGradientViscosity() :
               visc == "Laplacian" ? PNS.LaplacianPseudoTractionViscosity() :
               PNS.DeviatoricSymmetricViscosity()

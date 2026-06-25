@@ -38,7 +38,7 @@ include("../test_utils.jl")
         PorousNSSolver.SymmetricGradientViscosity(),
         PorousNSSolver.ConstantSigmaLaw(1.0),
         PorousNSSolver.ProjectFullResidual(),
-        PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8),
+        PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR),
         1e-2,
         1e-6
     )
@@ -49,7 +49,7 @@ include("../test_utils.jl")
         PorousNSSolver.LaplacianPseudoTractionViscosity(),
         PorousNSSolver.ConstantSigmaLaw(1.0),
         PorousNSSolver.ProjectFullResidual(),
-        PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8),
+        PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR),
         1e-2,
         1e-6
     )
@@ -62,7 +62,7 @@ include("../test_utils.jl")
         nu=1e-2, f_x=0.0, f_y=0.0, eps_val=1e-6, numerical_epsilon=0.0,
         reaction_model="Constant", sigma_constant=1.0, sigma_linear=0.0,
         sigma_nonlinear=0.0, u_base_floor_ref=1e-2, h_floor_weight=1.0,
-        epsilon_floor=1e-12, tau_regularization_limit=1e-8
+        epsilon_floor=1e-12, velocity_magnitude_derivative_floor=1e-12, tau_regularization_limit=1e-8
     )
 
     x = interpolate_everywhere([u_poly, p_poly], X)

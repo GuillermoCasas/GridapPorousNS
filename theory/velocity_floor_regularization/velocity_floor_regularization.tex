@@ -1,0 +1,130 @@
+%==============================================================================
+%  Standalone note: the velocity-magnitude derivative floor.
+%
+%  Documents the single numerical regularization parameter
+%      velocity_magnitude_derivative_floor      (Julia: PhysicalProperties field;
+%                                                 default 1e-12, base_config.json)
+%  that keeps the Exact-Newton Jacobian finite at a stagnation point.
+%
+%  Notation is kept compatible with the manuscript
+%  "A stabilized finite element method for incompressible, inertial flows
+%   in inhomogeneous porous media" (Casas, Gonzalez-Usua, Codina, de-Pouplana):
+%      sigma(alpha,u) = a(alpha) + b(alpha)|u|         (eq:DBFResistanceTerm)
+%      tau_1, tau_2, tau_{1,NS}                          (eq:Tau1, eq:Tau2, eq:TauNavierStokes)
+%==============================================================================
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+
+\newcommand{\eps}{\varepsilon_{\mathrm{d}}}          % the derivative floor
+\newcommand{\uu}{\bm{u}}
+\newcommand{\du}{\mathrm{d}\bm{u}}
+\newcommand{\norm}[1]{\lvert #1 \rvert}
+
+\title{The velocity-magnitude derivative floor\\
+       \large Regularizing $\partial\norm{\uu}/\partial\uu$ in the Exact-Newton Jacobian}
+\author{Porous Navier--Stokes solver --- implementation note}
+\date{}
+
+\begin{document}
+\maketitle
+
+\noindent
+\textbf{Code anchor.} Julia parameter \texttt{PhysicalProperties.velocity\_magnitude\_derivative\_floor}
+(default $\eps = 10^{-12}$ in \texttt{config/base\_config.json}); carried on the velocity-regularization
+policy \texttt{SmoothVelocityFloor} and consumed at three leaf sites:
+\texttt{dsigma\_du} (\texttt{src/models/reaction.jl}),
+\texttt{compute\_dtau\_1\_du} and \texttt{compute\_dtau\_2\_du} (\texttt{src/stabilization/tau.jl}).
+
+\section{Where it arises}
+
+Both the reaction coefficient and the stabilization parameters depend on the velocity \emph{only}
+through the Euclidean speed
+\begin{equation}
+  \norm{\uu} \;=\; \sqrt{\uu\cdot\uu}\,,
+\end{equation}
+namely
+\begin{equation}
+  \sigma(\alpha,\uu) = a(\alpha) + b(\alpha)\,\norm{\uu},
+  \qquad
+  \tau_{1,\mathrm{NS}}^{-1} = \frac{c_1\nu}{h^2} + \frac{c_2\,\norm{\uu}}{h},
+\end{equation}
+with $\tau_1=\big(\alpha\,\tau_{1,\mathrm{NS}}^{-1}+\sigma\big)^{-1}$ and
+$\tau_2 = h^2/\!\big(c_1\alpha\,\tau_{1,\mathrm{NS}}\big)$.
+
+The Exact-Newton tangent requires the directional derivatives $\partial\sigma/\partial\uu$,
+$\partial\tau_1/\partial\uu$ and $\partial\tau_2/\partial\uu$, every one of which factors through the
+gradient of the speed,
+\begin{equation}\label{eq:normderiv}
+  \frac{\partial \norm{\uu}}{\partial \uu}\cdot\du
+  \;=\; \frac{\uu\cdot\du}{\norm{\uu}}\,.
+\end{equation}
+
+\section{The singularity and its regularization}
+
+The map $\uu\mapsto\norm{\uu}$ is only $C^0$ at the origin: \eqref{eq:normderiv} is the indeterminate
+$0/0$ at $\uu=\bm 0$. A stagnation point with $\uu=\bm 0$ is not exotic --- it occurs exactly on
+perfect Dirichlet walls (and at interior stagnation points of a manufactured field), where the discrete
+velocity is pinned to zero. Evaluated verbatim, \eqref{eq:normderiv} returns \texttt{NaN} and poisons the
+whole Jacobian.
+
+We regularize the denominator with a single additive floor $\eps>0$:
+\begin{equation}\label{eq:reg}
+  \frac{\partial \norm{\uu}}{\partial \uu}\cdot\du
+  \;\approx\; \frac{\uu\cdot\du}{\norm{\uu}+\eps}\,.
+\end{equation}
+This is the only role of \texttt{velocity\_magnitude\_derivative\_floor}. Concretely it enters
+\begin{align}
+  \partial_{\uu}\sigma\cdot\du
+    &= b(\alpha)\,\frac{\uu\cdot\du}{\norm{\uu}+\eps}
+    && \text{(\texttt{dsigma\_du}, Forchheimer)},\\
+  \partial_{\uu}\tau_{1,\mathrm{NS}}^{-1}\cdot\du
+    &= \frac{c_2}{h}\,\frac{\uu\cdot\du}{\norm{\uu}+\eps}
+    && \text{(inside \texttt{compute\_dtau\_1\_du}, \texttt{compute\_dtau\_2\_du})},
+\end{align}
+with $\partial_{\uu}\tau_1=-\tau_1^2\big(\alpha\,\partial_{\uu}\tau_{1,\mathrm{NS}}^{-1}
++\partial_{\uu}\sigma\big)$ and the analogous chain for $\tau_2$.
+
+\section{Why it cannot move the converged solution}
+
+Three facts pin down the status of $\eps$ as a \emph{Jacobian-only} regularization:
+\begin{enumerate}
+  \item \textbf{It is absent from the residual.} The nonlinear residual $\bm R(\uu,p)$ that the solver
+        drives to zero contains $\sigma\,\uu$, $\tau_1$, $\tau_2$ --- but never \eqref{eq:reg}. The fixed
+        point $\bm R=\bm 0$ is therefore independent of $\eps$.
+  \item \textbf{It is dropped in Picard.} In \texttt{PicardMode} the coefficient derivatives
+        $\partial_{\uu}\sigma$, $\partial_{\uu}\tau$ are frozen to structural zeros, so $\eps$ does not
+        appear at all; the Picard tangent is exact in $\eps$ trivially.
+  \item \textbf{It is an inexact-Newton perturbation.} In \texttt{ExactNewtonMode} it perturbs the tangent
+        by $O\!\big(\eps/\norm{\uu}\big)$, which vanishes in the bulk where $\norm{\uu}\gg\eps$ and is
+        bounded near stagnation. A perturbed tangent changes only the Newton \emph{convergence rate}, never
+        the root it converges to.
+\end{enumerate}
+Hence $\eps$ is a pure conditioning knob: it guarantees a finite, well-defined Jacobian everywhere while
+leaving the discrete solution --- and thus every reported error and convergence rate --- untouched.
+
+\section{Interaction with the speed floors (no double counting)}
+
+The speed handed to \eqref{eq:reg} is already the \emph{regularized} speed produced by the velocity policy:
+\texttt{reaction\_speed} $=\sqrt{\uu\cdot\uu+u_{\mathrm{base}}^2}$ for $\sigma$, and
+\texttt{effective\_speed} (which additionally carries a mesh-diffusive floor) for $\tau$. Thus whenever the
+base floor $u_{\mathrm{base}}=\texttt{u\_base\_floor\_ref}>0$ one already has $\norm{\uu}\ge u_{\mathrm{base}}\gg\eps$
+and \eqref{eq:reg} is a no-op. The floor $\eps$ is load-bearing precisely in the regime the convergence
+studies use, where the harness sets $u_{\mathrm{base}}=0$ to keep the drag law mesh-independent: there
+$\norm{\uu}$ can reach $0$ and $\eps$ is the only guard against the $0/0$. Keeping $\eps$ a \emph{separate}
+parameter from \texttt{u\_base\_floor\_ref} and \texttt{epsilon\_floor} (which guards an unrelated
+$h\to0$ denominator) lets the three be reasoned about and tuned independently.
+
+\section{Recommended value}
+
+$\eps=10^{-12}$ (double precision near the rounding floor) is small enough to be numerically invisible
+wherever $\norm{\uu}$ is not itself at the level of machine epsilon, yet large enough to keep
+$\uu/(\norm{\uu}+\eps)$ finite. Because the parameter only conditions the Jacobian, any value in a wide
+band $\eps\in[10^{-14},10^{-8}]$ gives indistinguishable solves; it is exposed as a config input purely so
+the value is documented, validated at load, and tunable rather than buried as a literal.
+
+\end{document}

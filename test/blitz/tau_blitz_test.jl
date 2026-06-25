@@ -46,7 +46,7 @@ using LinearAlgebra
 
         mag_u = sqrt(sum(abs2, u0) + 1e-8)
         kin = PorousNSSolver.KinematicState(VectorValue(u0...), grad_u, mag_u)
-        dτ = PorousNSSolver.compute_dtau_1_du(kin, med, VectorValue(du0...), 1e-2, 4.0, 2.0, 1e-8, false, law)
+        dτ = PorousNSSolver.compute_dtau_1_du(kin, med, VectorValue(du0...), 1e-2, 4.0, 2.0, 1e-8, false, law, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR)
         dτ_fd = directional_fd(f, u0, du0)
 
         @test isapprox(dτ, dτ_fd; rtol=1e-5, atol=1e-7)
@@ -68,7 +68,7 @@ using LinearAlgebra
 
         mag_u = sqrt(sum(abs2, u0) + 1e-8)
         kin = PorousNSSolver.KinematicState(VectorValue(u0...), grad_u, mag_u)
-        dτ = PorousNSSolver.compute_dtau_1_du(kin, med, VectorValue(du0...), 1e-2, 4.0, 2.0, 1e-8, false, law)
+        dτ = PorousNSSolver.compute_dtau_1_du(kin, med, VectorValue(du0...), 1e-2, 4.0, 2.0, 1e-8, false, law, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR)
         dτ_fd = directional_fd(f, u0, du0)
 
         @test isapprox(dτ, dτ_fd; rtol=1e-5, atol=1e-7)
@@ -89,7 +89,7 @@ using LinearAlgebra
 
         mag_u = sqrt(sum(abs2, u0) + 1e-8)
         kin = PorousNSSolver.KinematicState(VectorValue(u0...), grad_u, mag_u)
-        dτ = PorousNSSolver.compute_dtau_2_du(kin, med, VectorValue(du0...), 1e-2, 4.0, 2.0, 1e-8, false)
+        dτ = PorousNSSolver.compute_dtau_2_du(kin, med, VectorValue(du0...), 1e-2, 4.0, 2.0, 1e-8, false, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR)
         dτ_fd = directional_fd(f, u0, du0)
 
         @test isapprox(dτ, dτ_fd; rtol=1e-5, atol=1e-7)
@@ -99,8 +99,8 @@ using LinearAlgebra
         kin, med, du = make_local_states()
         law = PorousNSSolver.ConstantSigmaLaw(1.0)
 
-        @test PorousNSSolver.compute_dtau_1_du(kin, med, du, 1e-2, 4.0, 2.0, 1e-8, true, law) == 0.0 * (kin.u ⋅ du)
-        @test PorousNSSolver.compute_dtau_2_du(kin, med, du, 1e-2, 4.0, 2.0, 1e-8, true) == 0.0 * (kin.u ⋅ du)
+        @test PorousNSSolver.compute_dtau_1_du(kin, med, du, 1e-2, 4.0, 2.0, 1e-8, true, law, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR) == 0.0 * (kin.u ⋅ du)
+        @test PorousNSSolver.compute_dtau_2_du(kin, med, du, 1e-2, 4.0, 2.0, 1e-8, true, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR) == 0.0 * (kin.u ⋅ du)
     end
 
     @testset "Tau1/Tau2 simplified paper form is intentional [P-001, P-008]" begin

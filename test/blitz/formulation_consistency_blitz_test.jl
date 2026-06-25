@@ -29,7 +29,7 @@ using LinearAlgebra
             PorousNSSolver.DeviatoricSymmetricViscosity(),
             PorousNSSolver.ConstantSigmaLaw(1.0),
             PorousNSSolver.ProjectFullResidual(),
-            PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8),
+            PorousNSSolver.SmoothVelocityFloor(1e-3, 0.5, 1e-8, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR),
             1e-2,
             1e-3
         )

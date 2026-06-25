@@ -48,7 +48,7 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
     # 2. Velocity-floor regularization. The Forchheimer term |u| is non-differentiable at u = 0,
     #    which would make the Jacobian singular there; this smooths |u| near zero so Newton stays
     #    well-posed. The floor scale combines a reference magnitude, an h-weight, and an ε offset.
-    reg = SmoothVelocityFloor(phys.u_base_floor_ref, phys.h_floor_weight, phys.epsilon_floor)
+    reg = SmoothVelocityFloor(phys.u_base_floor_ref, phys.h_floor_weight, phys.epsilon_floor, phys.velocity_magnitude_derivative_floor)
 
     # 3. Choose the OSGS subgrid projection policy. The default projects the full strong
     #    residual. For constant σ in "standard" mode the reaction term is dropped from the

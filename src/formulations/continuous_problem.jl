@@ -69,7 +69,7 @@ end
     # `SigOp` (not `effective_speed`); otherwise the Jacobian no longer matches the
     # residual and ExactNewton loses its quadratic convergence.
     mag = reaction_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
-    return dsigma_du(op.law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag, du_v)
+    return dsigma_du(op.law, KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), mag, du_v, velocity_magnitude_derivative_floor(op.reg))
 end
 
 # τ₁ (`eq:Tau1`): the momentum stabilization parameter scaling the subgrid
@@ -118,7 +118,7 @@ struct DTau1Op{R<:AbstractReactionLaw, Reg<:AbstractVelocityRegularization} <: F
 end
 @inline function (op::DTau1Op)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
     mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
-    return compute_dtau_1_du(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), du_v, op.ν, op.c_1, op.c_2, op.tau_reg_lim, op.freeze_cusp, op.law)
+    return compute_dtau_1_du(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), du_v, op.ν, op.c_1, op.c_2, op.tau_reg_lim, op.freeze_cusp, op.law, velocity_magnitude_derivative_floor(op.reg))
 end
 
 # ∂τ₂/∂u · du: directional derivative of τ₂, the ExactNewton counterpart for the
@@ -133,7 +133,7 @@ struct DTau2Op{Reg<:AbstractVelocityRegularization} <: Function
 end
 @inline function (op::DTau2Op)(u_v, grad_v, a_v, grad_a_v, h_v, du_v)
     mag = effective_speed(op.reg, u_v, op.ν, h_v, op.c_1, op.c_2)
-    return compute_dtau_2_du(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), du_v, op.ν, op.c_1, op.c_2, op.tau_reg_lim, op.freeze_cusp)
+    return compute_dtau_2_du(KinematicState(u_v, grad_v, mag), MediumState(a_v, grad_a_v, h_v), du_v, op.ν, op.c_1, op.c_2, op.tau_reg_lim, op.freeze_cusp, velocity_magnitude_derivative_floor(op.reg))
 end
 
 # The canonical formulation. Bundles the four pluggable physics/numerics policies
@@ -252,6 +252,35 @@ _get_proj_pi_u(::Nothing, u) = 0.0 * u
 _get_proj_pi_p(pi_p) = pi_p
 _get_proj_pi_p(::Nothing) = 0.0
 
+# [FORM-05] Build the per-cell coefficient CellFields (σ, τ₁, τ₂) and unpack the setup/formulation scalars
+# that the residual and BOTH Jacobian modes share verbatim. Centralizing it here is the single source of
+# truth for HOW σ/τ are constructed from the typed operators, so the three builders can never drift in
+# their coefficient definitions. `u` is the velocity field (unpacked from X by the caller). Returns a
+# NamedTuple the callers destructure with `(; …) = _build_coeffs(…)`.
+function _build_coeffs(u, setup, formulation, phys_cfg)
+    form = formulation.form
+    ν = form.ν
+    eps_val = form.eps_val
+    c_1 = formulation.c_1
+    c_2 = formulation.c_2
+    tau_reg_lim = phys_cfg.tau_regularization_limit
+    α = setup.alpha_cf
+    h = setup.h_cf
+    grad_u_dummy = ∇(u)
+
+    # Pointwise coefficients σ, τ₁, τ₂ as CellFields built from the typed operators.
+    sig_op = SigOp(form.reaction_law, form.regularization, ν, c_1, c_2)
+    tau1_op = Tau1Op(form.reaction_law, form.regularization, ν, c_1, c_2, tau_reg_lim)
+    tau2_op = Tau2Op(form.regularization, ν, c_1, c_2, tau_reg_lim)
+    σ = Operation(sig_op)(u, grad_u_dummy, α, ∇(α), h)
+    τ_1 = Operation(tau1_op)(u, grad_u_dummy, α, ∇(α), h)
+    τ_2 = Operation(tau2_op)(u, grad_u_dummy, α, ∇(α), h)
+
+    return (; form, ν, eps_val, c_1, c_2, tau_reg_lim,
+              α, f=setup.f_cf, g_mass=setup.g_cf, h, dΩ=setup.dΩ,
+              σ, τ_1, τ_2)
+end
+
 # Strong (pointwise) momentum residual R_u = α(u·∇)u + α∇p + σu − ∇·(2μ∇ˢu) − f,
 # i.e. the left side of `eq:StrongMomentumEquation` minus the forcing. This is the
 # quantity the stabilization weights against the momentum adjoint. `σ` and the
@@ -296,30 +325,9 @@ end
 # stabilization blocks (used for homotopy dilution).
 function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
     u, p = X; v, q = Y
-    α = setup.alpha_cf
-    f = setup.f_cf
-    g_mass = setup.g_cf
-    h = setup.h_cf
-    dΩ = setup.dΩ
-
-    form = formulation.form
-    ν = form.ν
-    eps_val = form.eps_val
-    c_1 = formulation.c_1
-    c_2 = formulation.c_2
-
-    tau_reg_lim = phys_cfg.tau_regularization_limit
-
-    grad_u_dummy = ∇(u)
-
-    # Pointwise coefficients σ, τ₁, τ₂ as CellFields built from the typed operators.
-    sig_op = SigOp(form.reaction_law, form.regularization, ν, c_1, c_2)
-    tau1_op = Tau1Op(form.reaction_law, form.regularization, ν, c_1, c_2, tau_reg_lim)
-    tau2_op = Tau2Op(form.regularization, ν, c_1, c_2, tau_reg_lim)
-
-    σ = Operation(sig_op)(u, grad_u_dummy, α, ∇(α), h)
-    τ_1 = Operation(tau1_op)(u, grad_u_dummy, α, ∇(α), h)
-    τ_2 = Operation(tau2_op)(u, grad_u_dummy, α, ∇(α), h)
+    # [FORM-05] σ/τ₁/τ₂ + the setup/formulation scalars come from the shared coefficient helper.
+    (; form, ν, eps_val, c_1, c_2, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
+        _build_coeffs(u, setup, formulation, phys_cfg)
 
     # Standard Galerkin terms tested against (v, q): convection, viscous stress,
     # pressure (integrated by parts, hence the −p ∇·(αv) form), Forchheimer
@@ -362,85 +370,18 @@ function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg;
     return ∫( conv_term + visc_term + pres_term + res_term + mass_term - src_term + stab_mom + stab_mass )dΩ
 end
 
-# Builds the Picard (frozen-coefficient) Jacobian integrand: the bilinear form in
-# the increment `dX = (du, dp)` tested against `Y = (v, q)`, with σ, τ₁, τ₂ and
-# the convective adjoint all frozen at the current iterate (u, p). Because those
-# coefficients are constant, none of the ∂σ/∂u, ∂τ/∂u or dL*/∂u cross-terms
-# appear — yielding a smaller, more robust (linear-only) tangent than ExactNewton.
-# Same argument roles as build_stabilized_weak_form_residual.
+# The Picard (frozen-coefficient) Jacobian integrand: the bilinear form in the increment `dX = (du, dp)`
+# tested against `Y = (v, q)`, with σ, τ₁, τ₂ and the convective adjoint frozen at the current iterate
+# (u, p) — a smaller, more robust (linear-only) tangent than ExactNewton.
 #
-# [FORM-01] This is byte-equivalent to `build_stabilized_weak_form_jacobian(…, false, PicardMode())`:
-# in PicardMode the dσ/dτ/dL* terms collapse to structural zeros (×0.0), so the assembled matrices match
-# bit-for-bit (traced term-by-term in docs/formulation-audit-2026-06-24.md §D). Collapsing this to a
-# one-line wrapper over that builder — guarded by a byte-equality test — is a deferred follow-up (kept
-# separate here to avoid touching the hot assembly path in this behavior-preserving cleanup). Until then,
-# keep the two in lockstep: any edit here must be mirrored in the PicardMode branch of the general builder.
+# [FORM-01] This is exactly the general builder in `PicardMode()`: there the ∂σ/∂u, ∂τ/∂u and dL*/∂u
+# cross-terms collapse to structural zeros (×0.0), so the assembled matrices are byte-for-byte identical
+# (guarded by test/blitz/picard_jacobian_equivalence_blitz_test.jl). It is kept as a named entry point for
+# the OSGS Picard fallback / Stage-I boot. `freeze_cusp=false` is irrelevant: PicardMode zeroes the dτ
+# terms regardless of it. (docs/formulation-audit-2026-06-24.md §D, FORM-01.)
 function build_picard_jacobian(X, dX, Y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
-    u, p = X; du, dp = dX; v, q = Y
-    α = setup.alpha_cf
-    f = setup.f_cf
-    g_mass = setup.g_cf
-    h = setup.h_cf
-    dΩ = setup.dΩ
-
-    form = formulation.form
-    ν = form.ν
-    eps_val = form.eps_val
-    c_1 = formulation.c_1
-    c_2 = formulation.c_2
-
-    tau_reg_lim = phys_cfg.tau_regularization_limit
-
-    grad_u_dummy = ∇(u)
-
-    sig_op = SigOp(form.reaction_law, form.regularization, ν, c_1, c_2)
-    tau1_op = Tau1Op(form.reaction_law, form.regularization, ν, c_1, c_2, tau_reg_lim)
-    tau2_op = Tau2Op(form.regularization, ν, c_1, c_2, tau_reg_lim)
-
-    σ = Operation(sig_op)(u, grad_u_dummy, α, ∇(α), h)
-    τ_1 = Operation(tau1_op)(u, grad_u_dummy, α, ∇(α), h)
-    τ_2 = Operation(tau2_op)(u, grad_u_dummy, α, ∇(α), h)
-
-    # Picard freezes the convection: only the transport-of-increment term α(u·∇)du,
-    # dropping the reactive α(du·∇)u that ExactNewton would keep.
-    conv_du = α * (∇(du)' ⋅ u)
-
-    visc_term_jac = weak_viscous_jacobian(form.viscous_operator, du, v, α, ν)
-    pres_term_jac = - dp * ( α * (∇⋅v) + ∇(α) ⋅ v )
-    res_term_jac  = v ⋅ ( σ * du )
-
-    div_alpha_du = α * (∇⋅du) + du ⋅ ∇(α)
-    # ε_num (Codina iterative penalty): lagging ε_num·p to the iterate cancels it in the residual and
-    # leaves ε_num·dp ONLY here, a pressure-block regularization that vanishes at convergence. The VMS
-    # subscale (R_dp, L_q_star) stays at ε_phys so it remains residual-consistent (no consistency error).
-    mass_term_jac = q * ((eps_val + form.numerical_epsilon) * dp + div_alpha_du)
-
-    conv_term_jac = v ⋅ conv_du
-
-    # Strong residual of the increment (the linearized R applied to du, dp), the
-    # quantity the stabilization weights in the tangent.
-    div_visc_du = strong_viscous_operator(form.viscous_operator, du, α, ν)
-    R_du = conv_du + α * ∇(dp) + σ * du - div_visc_du
-    R_dp = eps_val * dp + div_alpha_du
-
-    # Adjoints at the frozen iterate (same sign conventions as the residual builder).
-    L_u_star_v = strong_adjoint_momentum(form, u, v, q, α) - (σ * v)
-    L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - eps_val * q
-
-    proj_pi_u = _get_proj_pi_u(pi_u, u)
-    proj_pi_p = _get_proj_pi_p(pi_p)
-    is_osgs = pi_u !== nothing
-
-    # Project the increment residual (the `0.0` slot is the frozen dσ/∂u, absent in Picard).
-    stab_R_du = apply_jacobian_projection_u(form.projection_policy, R_du, σ, 0.0, u, du, is_osgs)
-    stab_R_dp = apply_jacobian_projection_p(form.projection_policy, R_dp, eps_val, dp, is_osgs)
-
-    # With dτ = 0 and dL*/∂u = 0 the stabilization tangent is just adjoint ⋅ (τ · R(increment)),
-    # which keeps the generated integrand AST small and avoids the cross-term blow-up.
-    stab_mom_jac = mult_mom * (L_u_star_v ⋅ (τ_1 * stab_R_du))
-    stab_mass_jac = mult_mass * (L_q_star * (τ_2 * stab_R_dp))
-
-    return ∫( conv_term_jac + visc_term_jac + pres_term_jac + res_term_jac + mass_term_jac + stab_mom_jac + stab_mass_jac )dΩ
+    return build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_cfg, false, PicardMode();
+                                               pi_u=pi_u, pi_p=pi_p, mult_mom=mult_mom, mult_mass=mult_mass)
 end
 
 # Builds the general stabilized Jacobian integrand. With `lin_mode = ExactNewtonMode()`
@@ -452,29 +393,9 @@ end
 # residual/Picard builders; `dX = (du, dp)` is the increment.
 function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_cfg, freeze_cusp, lin_mode::AbstractLinearizationMode=ExactNewtonMode(); pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
     u, p = X; du, dp = dX; v, q = Y
-    α = setup.alpha_cf
-    f = setup.f_cf
-    g_mass = setup.g_cf
-    h = setup.h_cf
-    dΩ = setup.dΩ
-
-    form = formulation.form
-    ν = form.ν
-    eps_val = form.eps_val
-    c_1 = formulation.c_1
-    c_2 = formulation.c_2
-
-    tau_reg_lim = phys_cfg.tau_regularization_limit
-
-    grad_u_dummy = ∇(u)
-
-    sig_op = SigOp(form.reaction_law, form.regularization, ν, c_1, c_2)
-    tau1_op = Tau1Op(form.reaction_law, form.regularization, ν, c_1, c_2, tau_reg_lim)
-    tau2_op = Tau2Op(form.regularization, ν, c_1, c_2, tau_reg_lim)
-
-    σ = Operation(sig_op)(u, grad_u_dummy, α, ∇(α), h)
-    τ_1 = Operation(tau1_op)(u, grad_u_dummy, α, ∇(α), h)
-    τ_2 = Operation(tau2_op)(u, grad_u_dummy, α, ∇(α), h)
+    # [FORM-05] σ/τ₁/τ₂ + the setup/formulation scalars come from the shared coefficient helper.
+    (; form, ν, eps_val, c_1, c_2, tau_reg_lim, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
+        _build_coeffs(u, setup, formulation, phys_cfg)
 
     # Mode-dependent coefficient derivatives: nonzero CellFields in ExactNewton,
     # dimension-correct zeros in Picard.

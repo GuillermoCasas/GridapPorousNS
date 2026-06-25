@@ -26,13 +26,11 @@ include("models/regularization.jl")
 include("models/reaction.jl")
 
 # Formulations: the continuous VMS weak form, expressed in Gridap terms.
-#   gridap_extensions  — local helpers/patches on top of Gridap's operator algebra.
 #   viscous_operators  — the viscous term ∇·(2μ∇^s u): DeviatoricSymmetric (canonical),
 #                        SymmetricGradient, LaplacianPseudoTraction (legacy variants).
 #   projection         — the L² projection π_h of the strong residual onto the FE space
 #                        (the orthogonal-subscale machinery; identity for ASGS).
 #   continuous_problem — assembles the PaperGeneralFormulation from the above pieces.
-include("formulations/gridap_extensions.jl")
 include("formulations/viscous_operators.jl")
 include("stabilization/projection.jl")
 include("formulations/continuous_problem.jl")

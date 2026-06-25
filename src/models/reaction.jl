@@ -82,7 +82,7 @@ end
 # σ does not depend on u, so its derivative vanishes. Multiplying the zero by
 # (u ⋅ du) preserves the operand type so the Exact-Newton Jacobian assembles
 # uniformly across reaction laws.
-function dsigma_du(law::ConstantSigmaLaw, kin::KinematicState, med::MediumState, mag_u, du)
+function dsigma_du(law::ConstantSigmaLaw, kin::KinematicState, med::MediumState, mag_u, du, deriv_floor)
     return 0.0 * (kin.u ⋅ du)
 end
 
@@ -118,12 +118,13 @@ function sigma(law::ForchheimerErgunLaw, kin::KinematicState, med::MediumState, 
 end
 
 # Directional derivative of σ wrt u (the Exact-Newton ∂σ/∂u contribution): only
-# b(α)|u| depends on u, and d|u| = (u·du)/|u|. `mag_u_reg` adds a tiny floor to
-# the denominator so the kink in |u| at u=0 cannot divide by zero.
-function dsigma_du(law::ForchheimerErgunLaw, kin::KinematicState, med::MediumState, mag_u, du)
+# b(α)|u| depends on u, and d|u| = (u·du)/|u|. `deriv_floor` (ε_d, the config-driven
+# velocity_magnitude_derivative_floor) adds a tiny floor to the denominator so the kink in |u| at u=0
+# cannot divide by zero. See theory/velocity_floor_regularization/.
+function dsigma_du(law::ForchheimerErgunLaw, kin::KinematicState, med::MediumState, mag_u, du, deriv_floor)
     α = med.alpha
     u = kin.u
     b_term = law.sigma_nonlinear * (1.0 - α) / α
-    mag_u_reg = mag_u + VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR
+    mag_u_reg = mag_u + deriv_floor
     return b_term * (u ⋅ du) / mag_u_reg
 end

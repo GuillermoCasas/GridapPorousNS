@@ -73,7 +73,7 @@ end
     rxn = PorousNSSolver.ConstantSigmaLaw(1.0)
     visc = PorousNSSolver.DeviatoricSymmetricViscosity()
     proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
-    reg = PorousNSSolver.SmoothVelocityFloor(0.0, 0.0, 1e-8)
+    reg = PorousNSSolver.SmoothVelocityFloor(0.0, 0.0, 1e-8, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR)
     form = PorousNSSolver.PaperGeneralFormulation(visc, rxn, proj, reg, 1.0, 1e-8)
 
     alpha_field_L1 = _build_uniform_alpha_field(alpha_const, 1.0)
@@ -125,7 +125,7 @@ end
     rxn = PorousNSSolver.ConstantSigmaLaw(1.0)
     visc = PorousNSSolver.DeviatoricSymmetricViscosity()
     proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
-    reg = PorousNSSolver.SmoothVelocityFloor(0.0, 0.0, 1e-8)
+    reg = PorousNSSolver.SmoothVelocityFloor(0.0, 0.0, 1e-8, PorousNSSolver.VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR)
     form = PorousNSSolver.PaperGeneralFormulation(visc, rxn, proj, reg, 1.0, 1e-8)
 
     # L=1 reference field and MMS

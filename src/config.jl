@@ -27,6 +27,10 @@ Physical inputs to the porous Navier-Stokes problem.
 - `sigma_nonlinear`  Forchheimer-Ergun coefficient of the inertial term b(α) = sigma_nonlinear·(1-α)/α (the |u| coefficient).
 - `u_base_floor_ref`, `h_floor_weight`, `epsilon_floor`  parameters of the SmoothVelocityFloor
   regularization: a small lower bound on |u| so |u|-dependent reaction and τ terms stay finite as u→0.
+- `velocity_magnitude_derivative_floor`  additive floor ε_d on |u| in the Exact-Newton derivative terms
+  (dσ/du, dτ/du), regularizing ∂|u|/∂u = u/|u| at a stagnation point (|u|=0). Jacobian-only — zeroed in
+  Picard and absent from the residual — so it cannot move the converged solution. See
+  theory/velocity_floor_regularization/.
 - `tau_regularization_limit`  cap that keeps the stabilization parameters τ₁/τ₂ from blowing up in
   the vanishing-velocity / vanishing-resistance limit.
 """
@@ -48,6 +52,11 @@ Base.@kwdef struct PhysicalProperties
     u_base_floor_ref::Float64
     h_floor_weight::Float64
     epsilon_floor::Float64
+    velocity_magnitude_derivative_floor::Float64   # ε_d: additive floor on |u| regularizing ∂|u|/∂u = u/|u|
+                                                   # in the Exact-Newton dσ/du, dτ/du terms. Jacobian-only
+                                                   # (zeroed in Picard, absent from the residual) ⇒ cannot
+                                                   # move the converged solution. See
+                                                   # theory/velocity_floor_regularization/.
     tau_regularization_limit::Float64
 end
 
@@ -288,6 +297,7 @@ function validate!(cfg::PorousNSConfig)
     @assert cfg.physical_properties.u_base_floor_ref >= 0 "u_base_floor_ref must be >= 0"
     @assert cfg.physical_properties.h_floor_weight >= 0 "h_floor_weight must be >= 0"
     @assert cfg.physical_properties.epsilon_floor > 0 "epsilon_floor must be > 0 (velocity-floor denominator guard)"
+    @assert cfg.physical_properties.velocity_magnitude_derivative_floor > 0 "velocity_magnitude_derivative_floor must be > 0 (regularizes u/|u| in the Exact-Newton dσ/du, dτ/du terms)"
     @assert cfg.physical_properties.u_base_floor_ref > 0 || cfg.physical_properties.h_floor_weight > 0 "velocity floor must be strictly positive (u_base_floor_ref > 0 or h_floor_weight > 0) so SmoothVelocityFloor stays C¹"
 
     # Domain / porosity field (previously unvalidated): α ∈ (0,1] keeps σ finite and the MMS u_ex = α⁻¹·S

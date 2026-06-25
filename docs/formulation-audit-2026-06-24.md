@@ -46,10 +46,10 @@ produces them, and (iii) hygiene/validation/fragility gaps.** In order of import
 | **B-2** | **The committed "3D-P2 divergence" tables conflate the real B-5 defect with `success=False` solves plotted as if valid.** The reporting tool does not gate on `success`, overstating the divergence (the genuine signal is the growing error on *converged* fine pairs). | High | reporting |
 | **B-3 / B-6** | At every shared-failed level ASGS and OSGS report **byte-identical** errors. **Mechanism (control-confirmed): a failed OSGS solve silently reports the ASGS Stage-I boot state under the OSGS label** — so a sweep can record an ASGS error in an OSGS column. | Med | reporting/harness |
 | **A-1** | ✅ **RESOLVED 2026-06-25.** `dynamic_*` Re/Da budget knobs were declared & validated in `config.jl` but had ZERO `src/` consumers. Relocated to the harness-frame `test/extended/harness_dynamic_budget.jl`; `SolverConfig`/schema/`base_config.json` no longer carry them. Behavior-preserving (2D MMS bit-identical). See F1. | High | doc↔code |
-| **A-2** | **The scale-free ε_M/ε_C convergence gate is unconditionally force-attached by `solve_system` as THE production success test**, while `PorousNSSolver.jl:45` still says it is "not yet wired in" and its own docstring says "diagnostic only / too costly for production." | High | doc↔code / perf |
+| **A-2** | ✅ **RESOLVED 2026-06-25 (Batch 1, `2f50d6d`).** The scale-free ε_M/ε_C gate is unconditionally attached by `solve_system` as THE production success test; the three comments that mislabeled it "diagnostic / not yet wired in" were corrected to state it is authoritative, the per-iteration cost is documented as intentional (with a `[future]` opt-out note), and `eps_tol_momentum`/`eps_tol_mass` now fail loud at load (C.2). | High | doc↔code / perf |
 | **B-4** | Provenance gap: the most recent committed 3D result files cannot be reproduced from the current (uncommitted-modified) harness; their `mesh_algorithm`/level-set match no function now in `smoke3d.jl`. | Med | reproducibility |
-| **C-x** | Fragility: silent ILU→identity preconditioner fallback + no GMRES convergence check; missing load-time validation (σ≥0/SPSD, α∈(0,1], τ-gate>0, velocity-floor>0); a `1e-12` `|u|`-floor magic number copy-pasted in 4 sites; a very loose 3D mass gate `eps_tol_mass=0.8`. | Med/Low | fragility |
-| **D-x** | Simplification: `build_picard_jacobian` is a byte-equivalent duplicate of the general Jacobian in `PicardMode`; `gridap_extensions.jl`, `accelerators.jl`, `diagnostics_helpers.jl` are dead (the dynamic-budget knobs ✅ relocated 2026-06-25, F1); τ/coefficient setup is triplicated. | Low | cleanup |
+| **C-x** | Fragility: silent ILU→identity preconditioner fallback + no GMRES convergence check (F3, open); missing load-time validation (Batch 1); **✅ the `1e-12` `|u|`-floor magic number → config input `velocity_magnitude_derivative_floor` (C.4, done 2026-06-25)**; a very loose 3D mass gate `eps_tol_mass=0.8` (F4, open). | Med/Low | fragility |
+| **D-x** | Simplification: **✅ `build_picard_jacobian` now a wrapper (FORM-01); `_build_coeffs`/`_tau_ns_inv`/`_grad_div` helpers dedup the setup/τ/grad-div (FORM-05, TAU-05, VISC-01); dead `gridap_extensions.jl` deleted (VISC-02); dynamic-budget knobs relocated (F1) — all 2026-06-25.** Remaining dead code: `accelerators.jl` (NONL-03), `diagnostics_helpers.jl` removed in Batch 1. | Low | cleanup |
 
 The rest of this document expands each part with `file:line` evidence, the recommended action, and (for
 fragility items) a viable alternative.
@@ -83,12 +83,13 @@ configs and defaults elsewhere, fail-loud guard fires, 3D smoke clean, Blitz 194
   `src/solvers` (the frame-independent analogue) — changes production behavior, needs its own baselines.
 
 ### F2 — FORM-01: collapse `build_picard_jacobian` to a wrapper → §D
-- `build_picard_jacobian` (`src/formulations/continuous_problem.jl`) is byte-equivalent to
-  `build_stabilized_weak_form_jacobian(…, false, PicardMode())` (all differences are ×0.0 structural zeros).
-- **Recipe:** (1) add a Blitz/Quick test that assembles BOTH Jacobians on a tiny mesh at a non-trivial
-  iterate and asserts the matrices are byte-identical; (2) only if it passes, replace the body with a
-  one-line wrapper. The lockstep comment already in the function points here.
-- **Verify:** the new equality test + a 2D OSGS run (exercises the Picard fallback path).
+✅ **Landed 2026-06-25** (with the C.4 + D-x cleanup, behavior-preserving). Following the recipe exactly:
+(1) added `test/blitz/picard_jacobian_equivalence_blitz_test.jl`, which assembles BOTH Jacobians on a tiny
+mesh at a non-trivial Forchheimer iterate and asserts the ASGS *and* OSGS matrices are byte-identical
+(`Array(A_picard) == Array(A_general)`); (2) once it passed, replaced `build_picard_jacobian`'s body with a
+one-line wrapper over `build_stabilized_weak_form_jacobian(…, false, PicardMode())`. Verified by the new
+equality test + a 2D Re=1e6 ASGS/OSGS run (bit-identical errors; OSGS exercises the Picard fallback) +
+Blitz 196/196 + Quick 54/54.
 
 ### F3 — Batch 2 / C.1: ILU-GMRES honesty (behavior-CHANGING, 3D-only) → §C.1
 - `src/solvers/linear_solvers.jl`: call `gmres!(…; log=true)`, inspect `ch.isconverged`; on non-convergence
@@ -205,7 +206,18 @@ knobs that nothing in `src/` reads.
 > 13 live configs and defaults elsewhere, a fail-loud guard rejects a stray legacy key, and 3D smoke +
 > Blitz 194/194 + Quick 57/57 are clean. See F1 in the deferred-follow-ups checklist for the full record.
 
-### A.2 [HIGH] The scale-free convergence gate's "diagnostic only / not yet wired in" contract is false
+### A.2 [HIGH] ✅ RESOLVED — The scale-free convergence gate's "diagnostic only / not yet wired in" contract was false
+
+> **Resolved 2026-06-25 (Batch 1, commit `2f50d6d`).** All three stale comments were corrected: the
+> scale-free ε_M/ε_C criterion is now documented everywhere as the **authoritative** production success
+> gate (not a diagnostic) — [PorousNSSolver.jl:47](src/PorousNSSolver.jl#L47), the
+> [build_convergence_probe](src/solvers/solver_core.jl#L121) docstring, and the `[authoritative gate]`
+> label at [nonlinear.jl:74](src/solvers/nonlinear.jl#L74) / [:654](src/solvers/nonlinear.jl#L654). The
+> per-iteration field-assembly cost is documented as **intentional**, with a `[future]` opt-out
+> config-flag note ([solver_core.jl:123-125](src/solvers/solver_core.jl#L123)) rather than implemented (a
+> flag would silently downgrade production to the weaker scalar-ftol fallback). The SOLV-04 elevation is
+> covered: the `eps_tol_momentum`/`eps_tol_mass` gate tolerances now fail loud at load
+> ([config.jl:307-308](src/config.jl#L307), C.2). The original finding, as audited, follows.
 
 [PorousNSSolver.jl:45](src/PorousNSSolver.jl#L45) still says the criterion is *"not yet wired into
 solve_system."* [build_convergence_probe](src/solvers/solver_core.jl#L121)'s docstring says attach it
@@ -312,17 +324,19 @@ the P2 pressure block?) rather than accept 0.8 as a fixed constant; if it genuin
 add a separate, tighter check on the pure-divergence ratio `‖∇·(αu)‖/‖∇(αu)‖` (already computed as the
 √d self-check) so continuity is still gated.
 
-### C.4 [Low] A `1e-12` `|u|`-floor magic number is copy-pasted across four formulation sites
+### C.4 [Low] ✅ RESOLVED — A `1e-12` `|u|`-floor magic number was copy-pasted across formulation sites
 
-`mag_u_reg = mag_u + 1e-12` appears in [reaction.jl:114](src/models/reaction.jl#L114) (dσ/du),
-[tau.jl:77](src/stabilization/tau.jl#L77) and [tau.jl:110](src/stabilization/tau.jl#L110) (dτ
-derivatives). This violates the repo's no-magic-numbers hard rule (the codebase already has a
-config-driven `epsilon_floor`/`u_base_floor_ref`), the four copies can drift, and there is a subtle
-double-flooring: the `mag_u` passed in is *already* `sqrt(u·u+u_base²)≥u_base_floor`, so the exact
-derivative of the floored σ should divide by `mag_u` itself, not `mag_u+1e-12`.
+`mag_u_reg = mag_u + 1e-12` appeared in `reaction.jl` (dσ/du) and `tau.jl` ×2 (dτ derivatives) — a
+no-magic-numbers violation; the copies could drift.
 
-**Alternative.** Thread a single config-driven derivative floor (or reuse the regularization's floor)
-through `DSigOp`/`DTau1Op`/`DTau2Op`, replacing the three literals with one source of truth.
+> **Resolved 2026-06-25.** Batch 1 first collapsed the literals to one named const
+> `VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR`; this change promotes it to a documented **config input**
+> `PhysicalProperties.velocity_magnitude_derivative_floor` (schema + `base_config.json` + fail-loud
+> `validate!`), carried on `SmoothVelocityFloor`, read via the `velocity_magnitude_derivative_floor(reg)`
+> accessor, and threaded through `DSigOp`/`DTau1Op`/`DTau2Op` into the three leaf sites — one source of
+> truth. Default `1e-12` ⇒ behavior-preserving (2D MMS bit-identical). Fully documented in
+> `theory/velocity_floor_regularization/` (including the double-flooring nuance: it is kept a *separate*,
+> independently-tunable parameter from `epsilon_floor`/`u_base_floor_ref`).
 
 ### C.5 [Low] `sanitize_projection_policy` guards the §4.4 trim by concrete type, not by a nonlinearity trait
 
@@ -336,6 +350,13 @@ through and silently corrupt the OSGS stabilization (the trim `(1−Π)(σu)=0` 
 ---
 
 ## Part D — Simplification / reorganisation
+
+> **✅ Landed 2026-06-25 (behavior-preserving, 2D MMS bit-identical; Blitz 196/196, Quick 54/54):**
+> FORM-01 (`build_picard_jacobian` → wrapper + byte-equality guard test), FORM-03 (already Batch 1),
+> FORM-05 (`_build_coeffs`), TAU-05 (`_tau_ns_inv`), VISC-01 + VISC-02 (`_grad_div` helper unifies the 4
+> inline grad-div copies; dead `gridap_extensions.jl` deleted). Still open below: `accelerators.jl`
+> (NONL-03, dead), the per-dimension grad-div coefficient note (VISC-01 coefficient `0.5−1/D`), and
+> `mms_paper_2d.jl`'s inline `p_ex` (DRIV-07).
 
 - **`build_picard_jacobian` is a byte-equivalent duplicate** of
   `build_stabilized_weak_form_jacobian(…, PicardMode())` — every term coincides (traced). Both are live

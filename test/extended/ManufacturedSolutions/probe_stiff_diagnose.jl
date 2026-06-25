@@ -138,6 +138,7 @@ function build_cell(label::String; Re, Da, alpha_0, kv=1, n=10, element_type="QU
             config.physical_properties.u_base_floor_ref,
             0.0,
             config.physical_properties.epsilon_floor,
+            config.physical_properties.velocity_magnitude_derivative_floor,
         ),
         U_amp * L / Float64(Re),
         config.physical_properties.eps_val,
