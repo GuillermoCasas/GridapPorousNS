@@ -110,8 +110,25 @@ tests. The items below were intentionally deferred; each is self-contained and o
 - Add a config-driven `c1_multiplier` (or a per-`(element, order)` table), explicitly `[code-actual]`, so
   P2 tetrahedra use a larger c₁ (the control showed **c₁×4 fixes P2-3D**); 2D/quad stays paper-faithful at
   `4k⁴`. Also reconcile `docs/mms/3d-p2-convergence-investigation.md`'s TL;DR (still says "mesh quality")
-  with its README pointer (says falsified) using the B.5 c₁×1-vs-c₁×4 numbers. (That doc currently has
-  uncommitted edits from a prior session — coordinate.)
+  with its README pointer (says falsified) using the B.5 c₁×1-vs-c₁×4 numbers (the doc itself is committed,
+  but its TL;DR predates the structured-Kuhn control).
+
+### F6 — make the 3D MMS test config-driven + add an official 3D-MMS test
+- **Why:** `test/extended/ManufacturedSolutions3D/smoke3d.jl` is a manual sweep driver with hard-coded
+  study params (`RE`/`DA`/`ALPHA0`/`R1`/`R2`/`L`, the `mesh_sequence`, `c1_mult`, the `kv`/`method` loops),
+  the 3D analogue of the 2D `run_test.jl` — but unlike the 2D side it has **no committed config JSON and no
+  automated guard**, so every 3D study is a hand-edited driver (the source of the deleted one-off scrap).
+- **Recipe:** (1) lift the hard-coded study knobs into a JSON config (mirror the 2D
+  `ManufacturedSolutions/data/*.json` shape, plus the 3D-specific `mesh_sequence` / `c1_mult` / domain slab
+  z-extent); (2) add a `config <path>` entry mode to `smoke3d.jl` that reads it and drives the existing
+  `solve_one`/`run_sweep*` machinery (reuses `mesh3d.jl`'s `structured_kuhn_model` / `build_sequence`);
+  (3) commit a lean smoke config (`data/smoke3d_p1.json`: §5.2, structured-Kuhn, 2-3 coarse levels, k=1,
+  ASGS+OSGS, paper c₁); (4) wire a lean **official** extended test into `test/run_extended_tests.jl` that
+  runs that config and asserts the solve succeeds and the P1 rate is within tolerance of optimal — making
+  the 3D MMS path the official debug reference, with the bigger studies (structured control, c₁×4) as
+  committed configs instead of ad-hoc drivers.
+- **Verify:** the new extended test (a 3D solve — minutes of compile+solve), plus a manual config run
+  reproducing one cell of the committed §5.2 numbers.
 
 ### Minor / opportunistic
 - `_inv_centered.json` latent fragility: the official `test/quick/encoding_invariance_quick_test.jl` reads

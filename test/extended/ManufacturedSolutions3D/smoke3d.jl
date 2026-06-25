@@ -70,11 +70,16 @@ end
 # via the shared tools/trajectory_viz renderer. The 3D solve is a single direct exact-guess solve, so
 # there is ONE attempt with eps_pert = 0 whose stages are the orchestrator's diag["trajectory"]. N is
 # the effective resolution round(1/h) (analogous to the 2D partition N=1/h). Best-effort: a write
-# failure must never abort a sweep. Traces land under <outroot>/k<kv>/TET/traces/ (mirroring 2D).
+# failure must never abort a sweep. Traces land under <outroot>/k<kv>/TET/<mesh_sequence>/traces/ — the
+# mesh_sequence (e.g. "structured", "nested_red") is the LEAF folder under the element type, so each element
+# type keeps a separate folder per mesh sequence and results from different sequences are conserved side-by-side.
+# mesh_sequence="" falls back to the legacy <outroot>/k<kv>/TET/traces/ layout.
 function _write_trajectory_sidecar(; outroot, run_name, kv, method, h_mean, ncells, success,
-                                   trajectory, res_init, res_final, tol_M, tol_C)
+                                   trajectory, res_init, res_final, tol_M, tol_C, mesh_sequence::String="")
     try
-        traces_dir = joinpath(outroot, "k$(Int(kv))", "TET", "traces")
+        cell_rel = isempty(mesh_sequence) ? joinpath("k$(Int(kv))", "TET") :
+                                            joinpath("k$(Int(kv))", "TET", mesh_sequence)
+        traces_dir = joinpath(outroot, cell_rel, "traces")
         isdir(traces_dir) || mkpath(traces_dir)
         nlabel = max(1, round(Int, 1.0 / h_mean))
         trace_name = @sprintf("traj_Re%.0e_Da%.0e_a%.2f_kv%d_kp%d_TET_%s_N%d.json",
@@ -91,7 +96,7 @@ function _write_trajectory_sidecar(; outroot, run_name, kv, method, h_mean, ncel
         open(joinpath(traces_dir, trace_name), "w") do io
             JSON3.write(io, trace_obj; allow_inf=true)   # allow_inf: stage records may default residuals to NaN
         end
-        @printf("    [trace] %s\n", joinpath("k$(Int(kv))", "TET", "traces", trace_name)); flush(stdout)
+        @printf("    [trace] %s\n", joinpath(cell_rel, "traces", trace_name)); flush(stdout)
     catch e
         @warn "Trajectory trace write failed (non-fatal)" exception=e
     end
@@ -100,9 +105,16 @@ end
 function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", eps_mult::Float64=1.0,
                    linsolver::String="auto", trace_dir::Union{Nothing,String}=nothing, run_name::String="",
                    c1_mult::Float64=1.0, eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
-                   eps_phys::Float64=0.0)
+                   eps_phys::Float64=0.0, mesh_sequence::String="")
     nu = U_AMP * L / RE
-    eps_num = eps_mult * 1e-4 * ALPHA0 / (nu * (1.0 + RE + DA))   # NUMERICAL penalty ε_num (paper ε = 1e-4·ε_ref)
+    # ε_num = the NUMERICAL penalty (Codina ITERATIVE penalty, paper ε = 1e-4·ε_ref). The equation is
+    # INCOMPRESSIBLE: there is NO physical compressibility, so eps_phys MUST default to 0. ε_num lives ONLY
+    # in the Jacobian pressure block (lagged εpⁿ⁻¹ on the RHS), so it CANCELS at convergence and does not
+    # alter the manufactured (incompressible) solution — article.tex §2 (eq:StrongMassEquation, "mainly
+    # include for numerical reasons … iterative penalty") and §5.2 (eq:EpsilonRef + the iterative-penalty
+    # remark). A non-zero eps_phys would instead solve a genuinely COMPRESSIBLE problem (εp in the residual
+    # AND εp_ex in the oracle g). Only override eps_phys for a deliberate compressible experiment.
+    eps_num = eps_mult * 1e-4 * ALPHA0 / (nu * (1.0 + RE + DA))
     config = build_config(kv, method; numerical_epsilon=eps_num,
                           eps_tol_m_over=eps_tol_m_over, ftol_over=ftol_over, eps_tol_mass_over=eps_tol_mass_over)
     sol = config.numerical_method.solver
@@ -123,7 +135,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                                        PNS.ConstantSigmaLaw(sigma_c), proj, reg, nu, eps_phys;
                                        numerical_epsilon=eps_num)
 
-    mms = Paper3DMMS(form, U_AMP, alpha_field, L, ALPHAINF, eps_phys)   # oracle g uses ε_phys (not ε_num)
+    mms = Paper3DMMS(form, U_AMP, alpha_field, L, ALPHAINF, eps_phys)   # oracle g uses ε_phys (0 ⇒ incompressible source)
     U_c, P_c = characteristic_scales3d(mms)
     u_ex = get_u_ex3d(mms); p_ex = get_p_ex3d(mms)
 
@@ -202,7 +214,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
         _write_trajectory_sidecar(; outroot=trace_dir, run_name=run_name, kv=kv, method=method,
                                   h_mean=h_mean, ncells=num_cells(model), success=success,
                                   trajectory=traj, res_init=res_init, res_final=res_final,
-                                  tol_M=sol.eps_tol_momentum, tol_C=sol.eps_tol_mass)
+                                  tol_M=sol.eps_tol_momentum, tol_C=sol.eps_tol_mass, mesh_sequence=mesh_sequence)
     end
     return (success=success, ncells=num_cells(model), iters=iters, h_mean=h_mean,
             el2_u=el2_u, el2_p=el2_p, eh1_u=eh1_u, eh1_p=eh1_p, n_ns=n_ns, n_pic=n_pic)

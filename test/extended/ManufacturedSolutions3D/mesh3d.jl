@@ -26,7 +26,8 @@ tagged "boundary" (all 6 faces) and the volume "domain". `algorithm` is the gmsh
 (1=Delaunay, 4=Frontal, 10=HXT); 1 (Delaunay) gives genuinely unstructured, symmetry-breaking tets.
 """
 function build_box_tet_model(lc::Float64; domain=(0.0,1.0, 0.0,1.0, 0.0,0.3),
-                             algorithm::Int=1, save_msh::String="")
+                             algorithm::Int=1, save_msh::String="",
+                             optimize_passes::Int=0, optimize_threshold::Float64=0.5)
     x0, x1, y0, y1, z0, z1 = domain
     dx, dy, dz = x1 - x0, y1 - y0, z1 - z0
 
@@ -53,7 +54,7 @@ function build_box_tet_model(lc::Float64; domain=(0.0,1.0, 0.0,1.0, 0.0,0.3),
         # through red refinement, so a clean base lifts the whole nested family toward optimal rates.
         gmsh.option.setNumber("Mesh.Optimize", 1)
         gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
-        gmsh.option.setNumber("Mesh.OptimizeThreshold", 0.5)
+        gmsh.option.setNumber("Mesh.OptimizeThreshold", optimize_threshold)
         gmsh.model.add("box3d")
 
         # This gmsh build has no OpenCASCADE, so the box is assembled with the built-in `geo`
@@ -85,6 +86,14 @@ function build_box_tet_model(lc::Float64; domain=(0.0,1.0, 0.0,1.0, 0.0,0.3),
         g_dom = gmsh.model.addPhysicalGroup(3, [vol]); gmsh.model.setPhysicalName(3, g_dom, "domain")
 
         gmsh.model.mesh.generate(3)
+        # [quality] Extra UNSTRUCTURED-quality smoothing (Netgen tet-quality + Relocate3D vertex
+        # smoothing), to lift the worst-tet quality without changing the mesh's unstructured character.
+        # optimize_passes=0 ⇒ legacy behaviour. (Frontal `algorithm=4` + these passes is the recipe that
+        # recovers optimal 3D-P1 convergence — see docs.)
+        for _ in 1:optimize_passes
+            try; gmsh.model.mesh.optimize("Netgen");     catch e; @warn "gmsh optimize(Netgen) failed (skipped)"     exception=e; end
+            try; gmsh.model.mesh.optimize("Relocate3D"); catch e; @warn "gmsh optimize(Relocate3D) failed (skipped)" exception=e; end
+        end
 
         dir = mktempdir()
         mshfile = joinpath(dir, "box3d.msh")
@@ -102,14 +111,23 @@ function build_box_tet_model(lc::Float64; domain=(0.0,1.0, 0.0,1.0, 0.0,0.3),
 end
 
 # ==============================================================================================
-# NESTED REFINEMENT FAMILY (the convergence-study mesh strategy)
+# NESTED REFINEMENT FAMILY (a convergence-study mesh strategy)
 # Build ONE coarse, NON-UNIFORM unstructured tet mesh, then refine RECURSIVELY by uniform red
 # (1->8) tetrahedral subdivision (Gridap.Adaptivity.refine, "red_green"). Each level halves h
-# EXACTLY, PRESERVES the "boundary"/"domain" FaceLabeling tags (refine_face_labeling inherits the
-# parent-face entity), and keeps element quality STABLE (Bey/Freudenthal red refinement -> bounded
-# congruence classes). This is the nested, quality-preserving, cleanly-halving family the paper's
-# convergence study needs — strictly better than independent gmsh remeshes (non-nested, sliver-prone,
-# and they do not halve cleanly on the thin box).
+# EXACTLY and PRESERVES the "boundary"/"domain" FaceLabeling tags (refine_face_labeling inherits the
+# parent-face entity).
+#
+# [known-fragility] CAUTION: red refinement does NOT preserve the worst-case element quality on tets.
+# Bey/Freudenthal red refinement bounds the number of congruence classes ASYMPTOTICALLY, but the
+# octahedral sub-tets DEGRADE the minimum quality for the first couple of levels before it settles —
+# MEASURED (2026-06-24, Frontal+optimize base lc=0.137): qmin 0.466 -> 0.247 -> 0.151 (L0->L1->L2).
+# So this family is NOT quality-preserving in the regime the convergence study actually samples; the
+# min-quality TAIL falls under refinement and adds rate noise. (Earlier comments here claimed the
+# opposite — that was wrong; see docs/mms/3d-p2-convergence-investigation.md §"mesh-quality mechanics".)
+# Independent gmsh remeshes are the other extreme: each level is a fresh, differently-flawed realization
+# whose error level is set by its own quality, so per-segment "rates" are realization SCATTER, not
+# h-convergence. The only refinement-INVARIANT-quality option is a STRUCTURED Kuhn tet family
+# (simplexify of a Cartesian grid, `structured_kuhn_model`) — used as the clean control.
 # ==============================================================================================
 
 "The single initial NON-UNIFORM unstructured tet mesh (coarse root of the nested family)."
@@ -173,6 +191,48 @@ function export_mesh_h5(model, path::String)
     return path
 end
 
+# ==============================================================================================
+# MESH SEQUENCES for the convergence studies. Each named sequence's meshes are exported to
+# results/meshes/<sequence>/mesh_level{k}.h5 (geometry only) and rendered as a mosaic by
+# plot_mesh3d.py. "meshes" is the LIBRARY of mesh sequences; the convergence RESULTS for each
+# sequence live separately under results/k<kv>/TET/<sequence>/.
+# ==============================================================================================
+
+"Structured Kuhn tet mesh: simplexify of a Cartesian grid — UNIFORM, refinement-invariant quality."
+structured_kuhn_model(partition; domain=(0.0,1.0, 0.0,1.0, 0.0,0.3)) =
+    simplexify(CartesianDiscreteModel(domain, partition))
+
+"Export a named mesh SEQUENCE's models to results/meshes/<seq>/mesh_level{k}.h5 (geometry only)."
+function export_mesh_sequence(seq::String, models; outroot=joinpath(@__DIR__, "results", "meshes"))
+    dir = joinpath(outroot, seq); mkpath(dir)
+    for (k, m) in enumerate(models)
+        export_mesh_h5(m, joinpath(dir, "mesh_level$(k-1).h5"))
+    end
+    println("[mesh3d] sequence \"$seq\": exported $(length(models)) level(s) -> $dir"); flush(stdout)
+    return dir
+end
+
+"""
+    build_sequence(seq; domain) -> Vector of models
+
+Build the meshes of a named convergence-study mesh sequence (coarse→mid levels, sized for legible,
+fast-rendering mosaics — the mosaic shows the sequence's CHARACTER and refinement, not the finest
+production meshes). Known sequences: "structured" (Kuhn), "nested_red" (red-refined gmsh family),
+"frontal" (independent gmsh Frontal-Delaunay remeshes).
+"""
+function build_sequence(seq::String; domain=(0.0,1.0, 0.0,1.0, 0.0,0.3))
+    if seq == "structured"
+        return [structured_kuhn_model(p; domain=domain) for p in [(8,8,2), (12,12,3), (16,16,4), (24,24,6)]]
+    elseif seq == "nested_red"
+        return build_nested_family(2; lc=0.2, domain=domain)                  # 3 levels (L0–L2)
+    elseif seq == "frontal"
+        return [build_box_tet_model(lc; domain=domain, algorithm=4, optimize_passes=5)
+                for lc in [0.137, 0.098, 0.070]]
+    else
+        error("unknown mesh sequence \"$seq\" (known: structured, nested_red, frontal)")
+    end
+end
+
 # ------------------------------------------------------------------------------------------------
 # Standalone validation + export when run directly: julia --project=../../.. mesh3d.jl [nlevels] [lc]
 #   - proves tag survival + clean ~8x cell / ~2x h-halving across the nested family
@@ -200,7 +260,12 @@ function _run_mesh_validation(nlevels::Int, lc0::Float64, outdir::String)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    nlevels = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 3
-    lc0 = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 0.2
-    _run_mesh_validation(nlevels, lc0, joinpath(@__DIR__, "results", "mesh"))
+    # julia --project=../../.. mesh3d.jl [seq ...]   -> build + export each sequence's meshes to
+    #   results/meshes/<seq>/mesh_level*.h5  (default: all standard sequences). Then make mosaics with
+    #   `python plot_mesh3d.py` (every sequence) or `python plot_mesh3d.py <seq>`.
+    seqs = isempty(ARGS) ? ["structured", "nested_red", "frontal"] : ARGS
+    for seq in seqs
+        export_mesh_sequence(seq, build_sequence(seq))
+    end
+    println("[mesh3d] done — meshes under results/meshes/<seq>/. Plot mosaics: python plot_mesh3d.py"); flush(stdout)
 end
