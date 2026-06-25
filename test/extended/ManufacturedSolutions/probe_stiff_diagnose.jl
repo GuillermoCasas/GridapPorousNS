@@ -20,6 +20,9 @@ using Gridap.FESpaces
 using LinearAlgebra
 using Printf
 
+# [harness-frame] Re/Da iteration-budget knobs (relocated out of production SolverConfig — audit §A.1/F1).
+@isdefined(read_mms_dynamic_budget) || include(joinpath(@__DIR__, "..", "harness_dynamic_budget.jl"))
+
 # ==============================================================================
 # Cell construction — one self-contained struct + function mirroring run_test.jl
 # ==============================================================================
@@ -157,8 +160,9 @@ function build_cell(label::String; Re, Da, alpha_0, kv=1, n=10, element_type="QU
     spatial_err_est = h_scale^(kv + 1)
     ar_c1 = config.numerical_method.solver.armijo_c1
     div_fac = config.numerical_method.solver.divergence_merit_factor
-    c_ceil = config.numerical_method.solver.dynamic_ftol_ceiling
-    c_sf = config.numerical_method.solver.dynamic_ftol_spatial_safety_factor
+    budget = read_mms_dynamic_budget()   # [harness-frame] programmatic cell: inherits the defaults
+    c_ceil = budget.ftol_ceiling
+    c_sf = budget.ftol_spatial_safety_factor
     dynamic_ftol = max(config.numerical_method.solver.ftol, min(c_ceil, c_sf * spatial_err_est))
     condition_scaling = Float64(n)^2 * max(1.0, Float64(Re))
     n_base = config.numerical_method.solver.condition_noise_floor_baseline
@@ -175,11 +179,11 @@ function build_cell(label::String; Re, Da, alpha_0, kv=1, n=10, element_type="QU
     solver_picard_it = config.numerical_method.solver.picard_iterations
 
     local_picard_it = solver_picard_it
-    if Re >= config.numerical_method.solver.dynamic_picard_re_threshold
-        local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_re_iterations)
+    if Re >= budget.picard_re_threshold
+        local_picard_it = max(local_picard_it, budget.picard_re_iterations)
     end
-    if Da >= config.numerical_method.solver.dynamic_picard_da_threshold
-        local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_da_iterations)
+    if Da >= budget.picard_da_threshold
+        local_picard_it = max(local_picard_it, budget.picard_da_iterations)
     end
 
     nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard)

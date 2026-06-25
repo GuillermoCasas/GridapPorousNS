@@ -35,6 +35,9 @@ using Printf
 using Random
 using LinearAlgebra
 
+# [harness-frame] Re/Da iteration-budget knobs (relocated out of production SolverConfig — audit §A.1/F1).
+@isdefined(read_mms_dynamic_budget) || include(joinpath(@__DIR__, "..", "harness_dynamic_budget.jl"))
+
 # ==============================================================================
 # Helper Constructors
 # ==============================================================================
@@ -374,7 +377,8 @@ end
 function run_mms(config_file="test_config.json")
     config_path = joinpath(@__DIR__, "data", config_file)
     test_dict = JSON3.read(read(config_path, String), Dict{String, Any})
-    
+    budget = read_mms_dynamic_budget(test_dict)   # [harness-frame] Re/Da iteration-budget knobs (audit §A.1/F1)
+
     as_list(x) = x isa Vector ? x : [x]
     
     Re_list = as_list(test_dict["physical_properties"]["Re"])
@@ -628,10 +632,10 @@ function run_mms(config_file="test_config.json")
                                 h_scale = 1.0 / n
                                 spatial_err_est = h_scale^(kv + 1)
                                 # Target an algebraic residual strictly bounded physically scaling by spatial discretization tolerances
-                                c_ceil = config.numerical_method.solver.dynamic_ftol_ceiling
-                                c_sf = config.numerical_method.solver.dynamic_ftol_spatial_safety_factor
+                                c_ceil = budget.ftol_ceiling
+                                c_sf = budget.ftol_spatial_safety_factor
                                 dynamic_ftol = max(config.numerical_method.solver.ftol, min(c_ceil, c_sf * spatial_err_est))
-                                
+
                                 # Extrapolate dynamic noise scaling bounded against topological condition limits
                                 condition_scaling = Float64(n)^2 * max(1.0, Float64(Re))
                                 n_base = config.numerical_method.solver.condition_noise_floor_baseline
@@ -645,13 +649,13 @@ function run_mms(config_file="test_config.json")
                                 
                                 # Extract dynamic algebraic complexity scaling for Picard limits
                                 local_picard_it = solver_picard_it
-                                if Re >= config.numerical_method.solver.dynamic_picard_re_threshold
+                                if Re >= budget.picard_re_threshold
                                     # Convection-dominated fine boundaries fundamentally demand increased smoothing allocations
-                                    local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_re_iterations)
+                                    local_picard_it = max(local_picard_it, budget.picard_re_iterations)
                                 end
-                                if Da >= config.numerical_method.solver.dynamic_picard_da_threshold
+                                if Da >= budget.picard_da_threshold
                                     # Massive reaction-dominated geometries natively force boundary constraints requiring homogenization
-                                    local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_da_iterations)
+                                    local_picard_it = max(local_picard_it, budget.picard_da_iterations)
                                 end
 
                                 # Newton budget bumped in high-Re convection-dominated regimes — the Armijo line
@@ -662,8 +666,8 @@ function run_mms(config_file="test_config.json")
                                 # Re=1e6, Da=1, α=0.05 case that motivates this. The schema default leaves
                                 # well-resolved (low-Re) regimes bit-identical.
                                 local_newton_it = solver_newton_it
-                                if Re >= config.numerical_method.solver.dynamic_newton_re_threshold
-                                    local_newton_it = max(local_newton_it, config.numerical_method.solver.dynamic_newton_re_iterations)
+                                if Re >= budget.newton_re_threshold
+                                    local_newton_it = max(local_newton_it, budget.newton_re_iterations)
                                 end
 
                                 nls_picard = PorousNSSolver.SafeNewtonSolver(LUSolver(), local_picard_it, max_inc, xtol, dynamic_ftol, ls_alpha_min, ar_c1, div_fac, dynamic_noise_floor, max_ls_iters, ls_contract; mode=:picard)

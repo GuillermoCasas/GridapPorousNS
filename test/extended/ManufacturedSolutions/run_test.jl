@@ -35,6 +35,9 @@ using FileWatching.Pidfile: mkpidlock  # cross-process write lock for one shared
 # NOTE: SHA / FileWatching are stdlibs loaded via the default LOAD_PATH fallback, matching how
 # this harness already uses Printf / Random / DelimitedFiles (none are listed in Project.toml).
 
+# [harness-frame] Re/Da iteration-budget knobs (relocated out of production SolverConfig — audit §A.1/F1).
+@isdefined(read_mms_dynamic_budget) || include(joinpath(@__DIR__, "..", "harness_dynamic_budget.jl"))
+
 # ==============================================================================
 # Helper Constructors
 # ==============================================================================
@@ -421,6 +424,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                  cli_h5=nothing, cli_max_n=nothing)
     config_path = joinpath(@__DIR__, "data", config_file)
     test_dict = JSON3.read(read(config_path, String), Dict{String, Any})
+    budget = read_mms_dynamic_budget(test_dict)   # [harness-frame] Re/Da iteration-budget knobs (audit §A.1/F1)
 
     # [trajectory diagnostic] When true, attach the scale-free convergence probe to the inner solvers so
     # the per-iteration ε_M (momentum) and ε_C (mass) normalized norms are recorded in each trace's
@@ -866,8 +870,8 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 h_scale = 1.0 / n
                                 spatial_err_est = h_scale^(kv + 1)
                                 # Target an algebraic residual strictly bounded physically scaling by spatial discretization tolerances
-                                c_ceil = config.numerical_method.solver.dynamic_ftol_ceiling
-                                c_sf = config.numerical_method.solver.dynamic_ftol_spatial_safety_factor
+                                c_ceil = budget.ftol_ceiling
+                                c_sf = budget.ftol_spatial_safety_factor
                                 dynamic_ftol = max(config.numerical_method.solver.ftol, min(c_ceil, c_sf * spatial_err_est))
 
                                 # Extrapolate dynamic noise scaling bounded against topological condition limits
@@ -889,13 +893,13 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
 
                                 # Extract dynamic algebraic complexity scaling for Picard limits
                                 local_picard_it = solver_picard_it
-                                if Re >= config.numerical_method.solver.dynamic_picard_re_threshold
+                                if Re >= budget.picard_re_threshold
                                     # Convection-dominated fine boundaries fundamentally demand increased smoothing allocations
-                                    local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_re_iterations)
+                                    local_picard_it = max(local_picard_it, budget.picard_re_iterations)
                                 end
-                                if Da >= config.numerical_method.solver.dynamic_picard_da_threshold
+                                if Da >= budget.picard_da_threshold
                                     # Massive reaction-dominated geometries natively force boundary constraints requiring homogenization
-                                    local_picard_it = max(local_picard_it, config.numerical_method.solver.dynamic_picard_da_iterations)
+                                    local_picard_it = max(local_picard_it, budget.picard_da_iterations)
                                 end
 
                                 # Newton budget bumped in high-Re convection-dominated regimes — the Armijo line
@@ -906,8 +910,8 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 # motivates this. The schema default leaves
                                 # well-resolved (low-Re) regimes bit-identical.
                                 local_newton_it = solver_newton_it
-                                if Re >= config.numerical_method.solver.dynamic_newton_re_threshold
-                                    local_newton_it = max(local_newton_it, config.numerical_method.solver.dynamic_newton_re_iterations)
+                                if Re >= budget.newton_re_threshold
+                                    local_newton_it = max(local_newton_it, budget.newton_re_iterations)
                                 end
 
                                 # [honest-exit] gate: a noise-floor stop counts as converged only if

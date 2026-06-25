@@ -23,6 +23,9 @@ using LinearAlgebra
 using Printf
 using Dates
 
+# [harness-frame] Re/Da iteration-budget knobs (relocated out of production SolverConfig — audit §A.1/F1).
+@isdefined(read_mms_dynamic_budget) || include(joinpath(@__DIR__, "..", "..", "harness_dynamic_budget.jl"))
+
 function setup_cell(; Re::Float64, Da::Float64, alpha_0::Float64, n::Int,
                     U_amp::Float64, L::Float64,
                     kv::Int=1, element_type::String="QUAD")
@@ -95,8 +98,9 @@ function setup_cell(; Re::Float64, Da::Float64, alpha_0::Float64, n::Int,
 
     h_scale = L / n
     spatial_err_est = (h_scale)^(kv + 1)
-    c_ceil = config.numerical_method.solver.dynamic_ftol_ceiling
-    c_sf   = config.numerical_method.solver.dynamic_ftol_spatial_safety_factor
+    budget = read_mms_dynamic_budget()   # [harness-frame] programmatic cell: inherits the defaults
+    c_ceil = budget.ftol_ceiling
+    c_sf   = budget.ftol_spatial_safety_factor
     dynamic_ftol = max(config.numerical_method.solver.ftol, min(c_ceil, c_sf * spatial_err_est))
     condition_scaling = Float64(n)^2 * max(1.0, Float64(Re))
     n_base = config.numerical_method.solver.condition_noise_floor_baseline

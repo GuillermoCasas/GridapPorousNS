@@ -134,32 +134,25 @@ end
 """
 All knobs for the safeguarded nonlinear solver in `src/solvers/`.
 
-The solver orchestrates Exact-Newton ↔ Picard fallbacks, an Armijo line search, and homotopy. Iteration
-budgets adapt to flow regime: `dynamic_*_re/da_*` widen the budget when the effective Reynolds (Re) or
-Darcy (Da) number crosses a threshold, where the equations get stiffer. Fields below are grouped by
-role: iteration budgets, convergence tolerances, line-search / robustness guards, and diagnostics.
+The solver orchestrates Exact-Newton ↔ Picard fallbacks, an Armijo line search, and homotopy. Fields
+below are grouped by role: iteration budgets, convergence tolerances, line-search / robustness guards,
+and diagnostics. (The regime-adaptive Re/Da iteration budgets are a HARNESS-frame feature — see
+test/extended/harness_dynamic_budget.jl — not part of the production solver.)
 """
 Base.@kwdef struct SolverConfig
-    # --- Iteration budgets (regime-adaptive) ---
-    # [harness-frame] The `dynamic_*` Re/Da knobs below are consumed ONLY by the MMS/Cocquet harnesses
-    # (test/extended/*/run_test.jl), NOT by the production `solve_system` (`src/solvers/` never reads
-    # them). Re/Da are GLOBAL dimensionless numbers — they need characteristic scales U, L that only a
-    # benchmark fixes — so they are test-frame quantities; a production adaptive budget would instead key
-    # on an element-wise cell-Péclet |u|h_K/ν (already embodied by τ_{1,NS}). Relocating these to a
-    # harness-only config is a documented follow-up (docs/formulation-audit-2026-06-24.md §A.1).
+    # --- Iteration budgets ---
+    # [harness-frame] The regime-adaptive Re/Da budget knobs (`dynamic_picard_*` / `dynamic_newton_*` /
+    # `dynamic_ftol_*`) were RELOCATED out of this production struct: nothing in `src/` ever read them —
+    # they are consumed only by the MMS/Cocquet harnesses, which now own the defaults in
+    # test/extended/harness_dynamic_budget.jl. Re/Da are GLOBAL dimensionless numbers (they need
+    # characteristic scales U, L that only a benchmark fixes), so they are test-frame quantities; a
+    # production adaptive budget would instead key on an element-wise cell-Péclet |u|h_K/ν (already
+    # embodied by τ_{1,NS}). See docs/formulation-audit-2026-06-24.md §A.1.
     picard_iterations::Int                         # base Picard sweep count (frozen-coefficient globalizer)
-    dynamic_picard_re_threshold::Float64           # [harness] Re above which Picard's budget is widened
-    dynamic_picard_re_iterations::Int              # [harness] Picard iterations to use past the Re threshold
-    dynamic_picard_da_threshold::Float64           # [harness] Da above which Picard's budget is widened
-    dynamic_picard_da_iterations::Int              # [harness] Picard iterations to use past the Da threshold
     newton_iterations::Int                         # base Exact-Newton iteration cap
-    dynamic_newton_re_threshold::Float64           # [harness] Re above which Newton's budget is widened
-    dynamic_newton_re_iterations::Int              # [harness] Newton iterations to use past the Re threshold
     # --- Convergence tolerances ---
     ftol::Float64                                  # residual-norm tolerance ‖R‖ for declaring convergence
     picard_ftol::Float64                           # absolute ‖R‖ ftol for the Picard solver (looser than Newton's; the ping-pong handoff itself fires via pingpong_picard_gain_orders)
-    dynamic_ftol_ceiling::Float64                  # [harness] upper clamp on the mesh-scaled ABSOLUTE ftol O(h^{kv+1}) (not the removed per-segment relative gate)
-    dynamic_ftol_spatial_safety_factor::Float64    # [harness] margin (0,1] applied to that O(h^{kv+1}) discretization-error ftol
     xtol::Float64                                  # step-size tolerance ‖Δu‖ for stagnation/convergence
     # --- Scale-free convergence gate (convergence_criterion.jl; the authoritative success test) ---
     # The nonlinear solve stops when two DIMENSIONLESS, segment-independent measures fall below these:
@@ -308,8 +301,6 @@ function validate!(cfg::PorousNSConfig)
     sol = cfg.numerical_method.solver
     @assert sol.ftol > 0 "Solver ftol must be > 0"
     @assert sol.picard_ftol >= sol.ftol "Solver picard_ftol must be >= ftol (Picard is a smoother, not a precise solver)"
-    @assert sol.dynamic_ftol_ceiling >= sol.ftol "Solver dynamic_ftol_ceiling must be strictly >= base ftol"
-    @assert 0.0 < sol.dynamic_ftol_spatial_safety_factor <= 1.0 "Solver dynamic_ftol_spatial_safety_factor must be in (0, 1]"
     @assert sol.xtol > 0 "Solver xtol must be > 0"
     # Scale-free convergence gate (the AUTHORITATIVE production success test, injected by solve_system):
     # converged ⇔ ε_M ≤ eps_tol_momentum ∧ ε_C ≤ eps_tol_mass. Both must be strictly positive.
@@ -325,8 +316,6 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.pingpong_max_swaps >= 0 "pingpong_max_swaps must be >= 0 (0 disables Newton↔Picard ping-pong)"
     @assert sol.pingpong_picard_gain_orders > 0.0 "pingpong_picard_gain_orders must be > 0"
     @assert sol.newton_iterations >= 1 "Newton iterations must be >= 1"
-    @assert sol.dynamic_newton_re_threshold >= 1.0 "dynamic_newton_re_threshold must be >= 1"
-    @assert sol.dynamic_newton_re_iterations >= 1 "dynamic_newton_re_iterations must be >= 1"
     @assert sol.max_linesearch_iterations >= 1 "Linesearch iterations must be strictly bounded >= 1"
     @assert 0.0 < sol.linesearch_contraction_factor < 1.0 "Linesearch contraction map alpha must strictly be in (0, 1)"
 

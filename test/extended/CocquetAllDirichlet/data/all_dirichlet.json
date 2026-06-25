@@ -66,8 +66,6 @@
             "newton_iterations": 10,
             "xtol": 1e-11,
             "ftol": 1e-11,
-            "dynamic_ftol_ceiling": 1e-4,
-            "dynamic_ftol_spatial_safety_factor": 1e-2,
             "stagnation_noise_floor": 1e-5,
             "max_increases": 3,
             "linesearch_alpha_min": 1e-10,

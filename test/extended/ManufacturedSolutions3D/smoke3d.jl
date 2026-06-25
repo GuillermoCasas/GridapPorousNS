@@ -13,6 +13,8 @@ using PorousNSSolver
 const PNS = PorousNSSolver
 include("mesh3d.jl")
 include("mms3d.jl")
+# [harness-frame] Re/Da iteration-budget knobs (relocated out of production SolverConfig — audit §A.1/F1).
+@isdefined(read_mms_dynamic_budget) || include(joinpath(@__DIR__, "..", "harness_dynamic_budget.jl"))
 
 # ---- fixed paper §5.2 parameters ----
 const DOMAIN = (0.0,1.0, 0.0,1.0, 0.0,0.3)
@@ -180,7 +182,8 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
 
     h_scale = h_mean   # key tolerances off the ACHIEVED mesh size (nested family halves h exactly)
     spatial_err_est = h_scale^(kv + 1)
-    dynamic_ftol = max(sol.ftol, min(sol.dynamic_ftol_ceiling, sol.dynamic_ftol_spatial_safety_factor * spatial_err_est))
+    budget = read_mms_dynamic_budget()   # [harness-frame] programmatic cell: inherits the defaults
+    dynamic_ftol = max(sol.ftol, min(budget.ftol_ceiling, budget.ftol_spatial_safety_factor * spatial_err_est))
     condition_scaling = (1.0/h_mean)^2 * max(1.0, RE)
     dnf = min(sol.stagnation_noise_floor, max(sol.condition_noise_floor_absolute_min,
                                               sol.condition_noise_floor_baseline * condition_scaling))

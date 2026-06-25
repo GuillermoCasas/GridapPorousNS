@@ -45,11 +45,11 @@ produces them, and (iii) hygiene/validation/fragility gaps.** In order of import
 | **B-5** | **P2-3D has a genuine under-stabilization defect at the paper's c₁=4k⁴, confirmed on a perfect uniform mesh** (converged fine pairs show errors *growing*). It is **not mesh quality** — c₁=4k⁴ is structurally too small for P2 tetrahedra; **c₁×4 fixes it** (optimal rates, ≈40× smaller errors). The solver line-search failures at paper c₁ are a *symptom* of this. | High | results/theory |
 | **B-2** | **The committed "3D-P2 divergence" tables conflate the real B-5 defect with `success=False` solves plotted as if valid.** The reporting tool does not gate on `success`, overstating the divergence (the genuine signal is the growing error on *converged* fine pairs). | High | reporting |
 | **B-3 / B-6** | At every shared-failed level ASGS and OSGS report **byte-identical** errors. **Mechanism (control-confirmed): a failed OSGS solve silently reports the ASGS Stage-I boot state under the OSGS label** — so a sweep can record an ASGS error in an OSGS column. | Med | reporting/harness |
-| **A-1** | **`dynamic_picard_re_threshold` / `dynamic_*` Re/Da budget knobs are declared & validated in `config.jl` but have ZERO consumers in `src/`.** CLAUDE.md and the config docstrings describe production behaviour that lives only in the test harnesses. | High | doc↔code |
+| **A-1** | ✅ **RESOLVED 2026-06-25.** `dynamic_*` Re/Da budget knobs were declared & validated in `config.jl` but had ZERO `src/` consumers. Relocated to the harness-frame `test/extended/harness_dynamic_budget.jl`; `SolverConfig`/schema/`base_config.json` no longer carry them. Behavior-preserving (2D MMS bit-identical). See F1. | High | doc↔code |
 | **A-2** | **The scale-free ε_M/ε_C convergence gate is unconditionally force-attached by `solve_system` as THE production success test**, while `PorousNSSolver.jl:45` still says it is "not yet wired in" and its own docstring says "diagnostic only / too costly for production." | High | doc↔code / perf |
 | **B-4** | Provenance gap: the most recent committed 3D result files cannot be reproduced from the current (uncommitted-modified) harness; their `mesh_algorithm`/level-set match no function now in `smoke3d.jl`. | Med | reproducibility |
 | **C-x** | Fragility: silent ILU→identity preconditioner fallback + no GMRES convergence check; missing load-time validation (σ≥0/SPSD, α∈(0,1], τ-gate>0, velocity-floor>0); a `1e-12` `|u|`-floor magic number copy-pasted in 4 sites; a very loose 3D mass gate `eps_tol_mass=0.8`. | Med/Low | fragility |
-| **D-x** | Simplification: `build_picard_jacobian` is a byte-equivalent duplicate of the general Jacobian in `PicardMode`; `gridap_extensions.jl`, `accelerators.jl`, `diagnostics_helpers.jl` and the dynamic-budget knobs are dead; τ/coefficient setup is triplicated. | Low | cleanup |
+| **D-x** | Simplification: `build_picard_jacobian` is a byte-equivalent duplicate of the general Jacobian in `PicardMode`; `gridap_extensions.jl`, `accelerators.jl`, `diagnostics_helpers.jl` are dead (the dynamic-budget knobs ✅ relocated 2026-06-25, F1); τ/coefficient setup is triplicated. | Low | cleanup |
 
 The rest of this document expands each part with `file:line` evidence, the recommended action, and (for
 fragility items) a viable alternative.
@@ -66,22 +66,20 @@ C.5 (`is_sigma_constant` trait), NONL-05 (ILU ctor defaults removed), the dead-c
 tests. The items below were intentionally deferred; each is self-contained and ordered roughly by value.
 
 ### F1 — A.1 field relocation: move the `dynamic_*` Re/Da knobs out of production `SolverConfig` → §A.1
-- **Why deferred:** behavior-preserving in principle but **38 config files** set these keys (every
-  `test/extended/Cocquet*/data/*.json`, `CocquetFormMMS/data/*.json`, `ManufacturedSolutions/data/*.json`),
-  inheriting the `base_config.json` defaults; and `dynamic_ftol_ceiling`/`dynamic_ftol_spatial_safety_factor`
-  set **every** cell's stopping ftol (bit-identity sensitive). Too wide to bundle into a bit-identical PR.
-- **Recipe:** (1) delete the 8 fields from `SolverConfig` (`src/config.jl` ~L145-156) + their `validate!`
-  asserts (the `dynamic_ftol_*` and `dynamic_newton_re_*` ones); (2) delete the 8 properties from
-  `config/porous_ns.schema.json`; (3) delete them from `config/base_config.json`'s `solver` block;
-  (4) change the harness read sites to read from the raw `test_dict` (not `config.numerical_method.solver`):
-  `test/extended/ManufacturedSolutions/run_test.jl` ~L869-911, `CocquetFormMMS/run_test.jl` ~L631-667,
-  `ManufacturedSolutions/probe_stiff_diagnose.jl` ~L160-182 — use `get(test_dict, "dynamic_X", <default>)`
-  with the current `base_config` values as the defaults; (5) in every harness JSON that overrides a
-  `dynamic_*` key under `numerical_method.solver`, move it to a top-level `mms_dynamic_budget` object.
-- **Verify:** re-run one ManufacturedSolutions cell **and** one Cocquet cell **and** one CocquetFormMMS
-  cell — bit-identical errors and clean config loads on all three (the 2D check alone does NOT cover the
-  Cocquet harnesses).
-- **Alternative (bigger):** instead build a production element-wise **cell-Péclet** adaptive budget in
+✅ **Landed 2026-06-25** (branch `cleanup/contract-drift-and-fragility`), behavior-preserving. The 8 knobs
+were removed from `SolverConfig` (`src/config.jl`) + their 4 `validate!` asserts, from
+`config/porous_ns.schema.json`, and from `config/base_config.json`. Their defaults now live in the new
+harness-frame helper `test/extended/harness_dynamic_budget.jl` (the single source of truth +
+`read_mms_dynamic_budget`, which reads an optional top-level `mms_dynamic_budget` block and **fails loud**
+if a legacy `dynamic_*` key is still under `numerical_method.solver`, so a forgotten migration can't
+silently fall back to a default). All 6 harness read sites (the two `run_test.jl`, `probe_stiff_diagnose`,
+the two diagnostics probes, `smoke3d.jl`) consume the reader. The only ever-overridden value
+(`dynamic_newton_re_iterations: 150`, in **13** configs — not 38) moved to a top-level `mms_dynamic_budget`
+block; the inert base-valued `dynamic_ftol_*` keys were dropped from the other 21 (incl. the
+Cocquet-EXPERIMENT configs whose harness never read them — provenance-safe, they were never on a read
+path). **Verified:** 2D MMS bit-identical (every solution dataset), reader returns 150 for all 13 live
+configs and defaults elsewhere, fail-loud guard fires, 3D smoke clean, Blitz 194/194, Quick 57/57.
+- **Alternative (still open, bigger):** a production element-wise **cell-Péclet** adaptive budget in
   `src/solvers` (the frame-independent analogue) — changes production behavior, needs its own baselines.
 
 ### F2 — FORM-01: collapse `build_picard_jacobian` to a wrapper → §D
@@ -194,16 +192,18 @@ of the production `SolverConfig` and into a harness-only config block, and corre
 the config docstrings to say the dynamic budgeting is a harness feature. Do not leave required production
 knobs that nothing in `src/` reads.
 
-> **Implementation status (2026-06-25, branch `cleanup/contract-drift-and-fragility`).** The
-> **documentation correction landed** — option (b)'s doc half: CLAUDE.md, the `SolverConfig` field
-> comments, and the element-wise cell-Péclet note now state these knobs are harness-frame and unread by
-> `solve_system`. The **field relocation is deferred to its own PR**: the 8 knobs are set in **38 config
-> files** (every Cocquet experiment + CocquetFormMMS variant + the ManufacturedSolutions configs) and
-> their defaults in `base_config.json` are inherited by all of them, and the values are bit-identity
-> sensitive (`dynamic_ftol_ceiling`/`dynamic_ftol_spatial_safety_factor` set every cell's stopping ftol).
-> Relocating them touches all 38 JSONs + the schema + 3 harness read sites, where a single miss silently
-> breaks a whole experiment harness the 2D check does not cover — too wide/risky to bundle into a
-> behavior-preserving cleanup.
+> **Implementation status (2026-06-25, branch `cleanup/contract-drift-and-fragility`).** ✅ **Fully
+> landed** (option (b) in full). Both halves are done: (a) the documentation correction (CLAUDE.md, the
+> `SolverConfig` field comments, the cell-Péclet note) and (b) the field relocation. The 8 knobs were
+> removed from `SolverConfig` (+ their 4 `validate!` asserts), `config/porous_ns.schema.json`, and
+> `config/base_config.json`; their defaults + reader now live in the harness-frame
+> `test/extended/harness_dynamic_budget.jl`, consumed by all 6 harness read sites. The one
+> ever-overridden value (`dynamic_newton_re_iterations: 150`, **13** configs — the audit's earlier "38"
+> counted every file carrying the inert base-valued `dynamic_ftol_*` keys, none of which override
+> anything) moved to a top-level `mms_dynamic_budget` block; the inert keys were dropped from the other
+> 21. Behavior-preserving: 2D MMS bit-identical (every solution dataset), the reader returns 150 for all
+> 13 live configs and defaults elsewhere, a fail-loud guard rejects a stray legacy key, and 3D smoke +
+> Blitz 194/194 + Quick 57/57 are clean. See F1 in the deferred-follow-ups checklist for the full record.
 
 ### A.2 [HIGH] The scale-free convergence gate's "diagnostic only / not yet wired in" contract is false
 
@@ -358,7 +358,7 @@ through and silently corrupt the OSGS stabilization (the trim `(1−Π)(σu)=0` 
   - `diagnostics_helpers.jl` — references the removed `config.phys.*` / `ThermodynamicState` /
     `build_reaction_model` / 7-arg `compute_tau_1` API; it cannot run. Delete or rewrite + test.
     (**DRIV-02**)
-  - The dynamic Re/Da budget knobs (A.1) if they stay harness-only.
+  - ✅ The dynamic Re/Da budget knobs (A.1) — relocated 2026-06-25 to `test/extended/harness_dynamic_budget.jl` (F1); no longer in `src/`.
 - **`EvalDivDevSymOp`/`EvalStrongViscSymOp` hand-transcribe the grad-div coefficient per dimension**
   (`0.0` for 2D, `0.5-1/3` for 3D). Compute `0.5 − 1/D` from the tensor's `D` and reuse the single
   `grad_div_op` contraction so a new dimension can't drift. (**VISC-01/VISC-02**)

@@ -1,4 +1,7 @@
 {
+  "mms_dynamic_budget": {
+    "newton_re_iterations": 150
+  },
   "_comment": "k=2-ONLY shard of cocquet_form_mms_vms.json (P2/P2 equal-order, ASGS+OSGS). Launched in parallel with the k=1 run to land k=2 results without waiting behind the k=1 N=160 tail. Writes to its OWN h5 (cocquet_form_mms_vms_k2.h5) so there is zero lock contention with the live cocquet_form_mms_vms.h5; plot_combined_all.py merges both via --h5. Identical grid/solver/physics to the parent; only the element order is restricted to k=2.",
   "erase_past_results": true,
   "epsilon_pert": [
@@ -72,13 +75,10 @@
     "solver": {
       "picard_iterations": 15,
       "newton_iterations": 150,
-      "dynamic_newton_re_iterations": 150,
       "noise_floor_success_max_ftol_multiple": 10.0,
       "xtol": 1e-12,
       "ftol": 1e-12,
       "eps_tol_momentum": 1e-09,
-      "dynamic_ftol_ceiling": 0.0001,
-      "dynamic_ftol_spatial_safety_factor": 0.01,
       "stagnation_noise_floor": 1e-05,
       "linesearch_alpha_min": 0.0001,
       "max_linesearch_iterations": 25,

@@ -1,4 +1,7 @@
 {
+  "mms_dynamic_budget": {
+    "newton_re_iterations": 150
+  },
   "_comment": "Manufactured-solution sweep whose FORMULATION is identical to the Cocquet benchmark (SymmetricGradient viscous operator + nonlinear Forchheimer-Ergun reaction, Taylor-Hood P2/P1, ASGS), but with a known smooth exact solution and the standard radial porosity. Discriminator: if this converges optimally the Cocquet suboptimality is physical/pre-asymptotic; if it degrades, a real formulation bug is isolated. The Cocquet experiment itself is untouched. alpha_0=1.0 is the pure-NS control (sigma=0); alpha_0<1 activates the Forchheimer drag (sigma_linear/sigma_nonlinear match Cocquet).",
   "erase_past_results": true,
   "epsilon_pert": [
@@ -75,13 +78,10 @@
     "solver": {
       "picard_iterations": 15,
       "newton_iterations": 150,
-      "dynamic_newton_re_iterations": 150,
       "noise_floor_success_max_ftol_multiple": 10.0,
       "xtol": 1e-12,
       "ftol": 1e-12,
       "eps_tol_momentum": 1e-09,
-      "dynamic_ftol_ceiling": 0.0001,
-      "dynamic_ftol_spatial_safety_factor": 0.01,
       "stagnation_noise_floor": 1e-05,
       "linesearch_alpha_min": 0.0001,
       "max_linesearch_iterations": 25,

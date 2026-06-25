@@ -227,53 +227,11 @@
                 5
               ]
             },
-            "dynamic_picard_re_threshold": {
-              "type": "number",
-              "description": "Re threshold above which Picard's iteration budget is widened to dynamic_picard_re_iterations.",
-              "examples": [
-                10000.0
-              ]
-            },
-            "dynamic_picard_re_iterations": {
-              "type": "integer",
-              "description": "Picard iteration budget used at high Re (>= dynamic_picard_re_threshold).",
-              "examples": [
-                10
-              ]
-            },
-            "dynamic_picard_da_threshold": {
-              "type": "number",
-              "description": "Da threshold above which Picard's iteration budget is widened to dynamic_picard_da_iterations.",
-              "examples": [
-                10000.0
-              ]
-            },
-            "dynamic_picard_da_iterations": {
-              "type": "integer",
-              "description": "Picard iteration budget used at high Da (>= dynamic_picard_da_threshold).",
-              "examples": [
-                10
-              ]
-            },
             "newton_iterations": {
               "type": "integer",
               "description": "Maximum allowed exact Newton iterations.",
               "examples": [
                 20
-              ]
-            },
-            "dynamic_newton_re_threshold": {
-              "type": "number",
-              "description": "Re threshold above which Newton's iteration budget is widened to dynamic_newton_re_iterations (Phase 6 §2.1 stiff-cell fix).",
-              "examples": [
-                10000.0
-              ]
-            },
-            "dynamic_newton_re_iterations": {
-              "type": "integer",
-              "description": "Newton iteration budget used at high Re (>= dynamic_newton_re_threshold). Defaults to 60 to cover both the smoothing-out phase and the quadratic tail.",
-              "examples": [
-                60
               ]
             },
             "xtol": {
@@ -295,20 +253,6 @@
               "description": "Residual tolerance for the Picard smoother to declare 'good enough' and hand off to Newton. Should be looser than ftol since Picard is a globalization aid, not a precise solver. Must be >= ftol.",
               "examples": [
                 1e-3
-              ]
-            },
-            "dynamic_ftol_ceiling": {
-              "type": "number",
-              "description": "Upper clamp on the mesh-scaled ABSOLUTE ftol that couples residual tolerance to discretization error O(h^(kv+1)). Not the (removed) per-segment relative gate.",
-              "examples": [
-                1e-4
-              ]
-            },
-            "dynamic_ftol_spatial_safety_factor": {
-              "type": "number",
-              "description": "Safety factor in (0, 1] applied to the spatially-scaled ftol.",
-              "examples": [
-                0.5
               ]
             },
             "eps_tol_momentum": {
