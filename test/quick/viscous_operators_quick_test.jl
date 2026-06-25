@@ -87,6 +87,33 @@ using LinearAlgebra
         @test norm(val_gridap - val_exact) < 1e-12
     end
 
+    @testset "strong/adjoint deviatoric viscous: 3D grad-div coefficient 1/6 [VISC-03]" begin
+        # The canonical operator's load-bearing, dimension-dependent piece is the 3D grad-div coefficient
+        # (½ − 1/d) = 1/6 in `EvalDivDevSymOp`. Previously only the 2D SymmetricGradient strong op was
+        # covered analytically (where that coefficient is 0). Pick u = (x₁², x₂², x₃²): Δu = (2,2,2),
+        # ∇(∇·u) = (2,2,2). With CONSTANT porosity A (∇A = 0) the porosity-gradient term drops and
+        #   ∇·(2Aν ∇ᵈu) = 2Aν(½Δu + (½−1/3)∇(∇·u)) = 2Aν((1,1,1) + ⅓(1,1,1)) = (8Aν/3)(1,1,1).
+        # A wrong coefficient (e.g. the 2D value 0) would give 2Aν(1,1,1) instead — this distinguishes them.
+        # Self-adjoint operator ⇒ the adjoint reuses the same ∇·ε^d form, so it must give the same value.
+        model = CartesianDiscreteModel((0, 1, 0, 1, 0, 1), (2, 2, 2))
+        refe_u = ReferenceFE(lagrangian, VectorValue{3,Float64}, 2)
+        V = TestFESpace(model, refe_u, conformity=:H1); U = TrialFESpace(V)
+        refe_A = ReferenceFE(lagrangian, Float64, 1); V_A = TestFESpace(model, refe_A, conformity=:H1)
+
+        u_h = interpolate(x -> VectorValue(x[1]^2, x[2]^2, x[3]^2), U)
+        A = 2.0; nu = 0.5
+        A_h = interpolate(x -> A, V_A)
+
+        expected = VectorValue(8A*nu/3, 8A*nu/3, 8A*nu/3)
+        pt = Point(0.5, 0.5, 0.5)
+
+        op_strong = PorousNSSolver.strong_viscous_operator(PorousNSSolver.DeviatoricSymmetricViscosity(), u_h, A_h, nu)
+        op_adj    = PorousNSSolver.adjoint_viscous_operator(PorousNSSolver.DeviatoricSymmetricViscosity(), u_h, A_h, nu)
+
+        @test norm(op_strong(pt) - expected) < 1e-10
+        @test norm(op_adj(pt) - expected) < 1e-10
+    end
+
     @testset "adjoint viscous operators return finite values on smooth fields" begin
         model = tiny_model_2d()
         Ω, dΩ, h = tiny_measure(model; degree=6)

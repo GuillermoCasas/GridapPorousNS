@@ -35,6 +35,16 @@ stays below the leading FE consistency error.
 """
 min_quadrature_degree(::AbstractReactionLaw, ::Int) = 0
 
+"""
+    is_sigma_constant(law::AbstractReactionLaw) -> Bool
+
+True iff σ does NOT depend on u (constant in velocity). Gates the OSGS §4.4 reaction trim
+(`ProjectResidualWithoutReactionWhenConstantSigma`), whose correctness rests on `(1−Π)(σu)=0` — valid
+only when σ is constant in u. Conservative default `false`, so any future nonlinear law is rejected by
+the trim guard until it explicitly opts in (rather than silently corrupting the OSGS stabilization).
+"""
+is_sigma_constant(::AbstractReactionLaw) = false
+
 # Bundle of the local solution quantities a reaction law / τ may need at one
 # quadrature point. Type-parameterized so it works whether the entries are plain
 # numbers (pointwise evaluation) or Gridap CellField operands (lazy assembly).
@@ -76,6 +86,9 @@ function dsigma_du(law::ConstantSigmaLaw, kin::KinematicState, med::MediumState,
     return 0.0 * (kin.u ⋅ du)
 end
 
+# σ ≡ sigma_val is constant in u, so the §4.4 reaction-trim projection is exact for this law.
+is_sigma_constant(::ConstantSigmaLaw) = true
+
 # Forchheimer-Ergun drag: σ(α, u) = a(α) + b(α)|u| (paper eq:DBFResistanceTerm),
 # with the porosity dependence given the Ergun closure
 #   a(α) = sigma_linear   · ((1-α)/α)²   (linear/viscous term),
@@ -111,6 +124,6 @@ function dsigma_du(law::ForchheimerErgunLaw, kin::KinematicState, med::MediumSta
     α = med.alpha
     u = kin.u
     b_term = law.sigma_nonlinear * (1.0 - α) / α
-    mag_u_reg = mag_u + 1e-12
+    mag_u_reg = mag_u + VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR
     return b_term * (u ⋅ du) / mag_u_reg
 end

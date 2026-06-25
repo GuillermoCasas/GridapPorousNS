@@ -42,8 +42,10 @@ include("formulations/continuous_problem.jl")
 include("stabilization/tau.jl")
 
 # Scale-free outer-iteration stopping criterion (eps_M term-envelope + eps_C flux-gradient ratio),
-# kept separate from the iteration machinery. Depends only on the weak forms above; not yet wired
-# into solve_system. See docs/solver/nonlinear-convergence-criterion-prompt.md.
+# kept separate from the iteration machinery. Depends only on the weak forms above. solve_system wires
+# it in UNCONDITIONALLY as the AUTHORITATIVE success gate (build_convergence_probe → both stage solvers),
+# so it is the production convergence test, not merely a diagnostic. See
+# docs/solver/nonlinear-convergence-criterion-prompt.md.
 include("solvers/convergence_criterion.jl")
 
 # Solvers: the nested nonlinear solve and its orchestration.

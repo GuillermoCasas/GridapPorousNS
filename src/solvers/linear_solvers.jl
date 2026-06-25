@@ -69,7 +69,10 @@ struct ILUGMRESSolver <: LinearSolver
     maxiter::Int
 end
 
-function ILUGMRESSolver(; m::Int=30, drop_tolerance::Float64=1e-4, rel_tol::Float64=1e-11, maxiter::Int=300)
+# Keyword constructor with NO defaults (the kwargs are required): every control must be supplied
+# explicitly from `LinearSolverConfig` via `instantiate_linear_solver` — no magic-number fallbacks
+# (repo hard rule). `ILUGMRESSolver()` with no args is therefore a (loud) MethodError, by design.
+function ILUGMRESSolver(; m::Int, drop_tolerance::Float64, rel_tol::Float64, maxiter::Int)
     return ILUGMRESSolver(m, drop_tolerance, rel_tol, maxiter)
 end
 

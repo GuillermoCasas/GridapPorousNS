@@ -1,4 +1,10 @@
 # src/formulations/gridap_extensions.jl
+#
+# [unused — kept for possible future use] `ContractGradDivOp` / `grad_div_op` compute ∇(∇·u) by
+# contracting the element Hessian. As of 2026-06 they have NO callers: viscous_operators.jl
+# re-implements the same contraction inline (EvalDivDevSymOp / EvalStrongViscSymOp). Retained as a
+# single-purpose, dimension-generic building block a future refactor of those operators could call
+# (docs/formulation-audit-2026-06-24.md §D / VISC-02). The include is harmless — it only defines names.
 using Gridap
 using Gridap.TensorValues
 

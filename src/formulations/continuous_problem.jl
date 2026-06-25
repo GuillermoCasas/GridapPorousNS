@@ -368,6 +368,13 @@ end
 # coefficients are constant, none of the ∂σ/∂u, ∂τ/∂u or dL*/∂u cross-terms
 # appear — yielding a smaller, more robust (linear-only) tangent than ExactNewton.
 # Same argument roles as build_stabilized_weak_form_residual.
+#
+# [FORM-01] This is byte-equivalent to `build_stabilized_weak_form_jacobian(…, false, PicardMode())`:
+# in PicardMode the dσ/dτ/dL* terms collapse to structural zeros (×0.0), so the assembled matrices match
+# bit-for-bit (traced term-by-term in docs/formulation-audit-2026-06-24.md §D). Collapsing this to a
+# one-line wrapper over that builder — guarded by a byte-equality test — is a deferred follow-up (kept
+# separate here to avoid touching the hot assembly path in this behavior-preserving cleanup). Until then,
+# keep the two in lockstep: any edit here must be mirrored in the PicardMode branch of the general builder.
 function build_picard_jacobian(X, dX, Y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
     u, p = X; du, dp = dX; v, q = Y
     α = setup.alpha_cf
@@ -503,10 +510,10 @@ function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_
     R_u_old = eval_strong_residual_u(form, u, p, h, α, f, c_1, c_2; σ=σ)
     R_p_old = eval_strong_residual_p(form, u, p, α, g_mass)
 
-    # Adjoint of the test functions and the derivative-of-adjoint term (the latter
-    # is zero in Picard). Same sign discipline as the residual builder.
+    # Adjoint of the test functions. Same sign discipline as the residual builder.
+    # (dL_du_star_v — the derivative-of-adjoint term, zero in Picard — was already built above right
+    # after dsigma_du_val; it is reused at the stabilization tangent below, no need to recompute it.)
     L_u_star_v = strong_adjoint_momentum(form, u, v, q, α) - (σ * v)
-    dL_du_star_v = _get_dL_du_star_v(lin_mode, form, α, v, du, dsigma_du_val)
 
     L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - eps_val * q
 

@@ -141,19 +141,25 @@ role: iteration budgets, convergence tolerances, line-search / robustness guards
 """
 Base.@kwdef struct SolverConfig
     # --- Iteration budgets (regime-adaptive) ---
+    # [harness-frame] The `dynamic_*` Re/Da knobs below are consumed ONLY by the MMS/Cocquet harnesses
+    # (test/extended/*/run_test.jl), NOT by the production `solve_system` (`src/solvers/` never reads
+    # them). Re/Da are GLOBAL dimensionless numbers — they need characteristic scales U, L that only a
+    # benchmark fixes — so they are test-frame quantities; a production adaptive budget would instead key
+    # on an element-wise cell-Péclet |u|h_K/ν (already embodied by τ_{1,NS}). Relocating these to a
+    # harness-only config is a documented follow-up (docs/formulation-audit-2026-06-24.md §A.1).
     picard_iterations::Int                         # base Picard sweep count (frozen-coefficient globalizer)
-    dynamic_picard_re_threshold::Float64           # Re above which Picard's budget is widened
-    dynamic_picard_re_iterations::Int              # Picard iterations to use past the Re threshold
-    dynamic_picard_da_threshold::Float64           # Da above which Picard's budget is widened
-    dynamic_picard_da_iterations::Int              # Picard iterations to use past the Da threshold
+    dynamic_picard_re_threshold::Float64           # [harness] Re above which Picard's budget is widened
+    dynamic_picard_re_iterations::Int              # [harness] Picard iterations to use past the Re threshold
+    dynamic_picard_da_threshold::Float64           # [harness] Da above which Picard's budget is widened
+    dynamic_picard_da_iterations::Int              # [harness] Picard iterations to use past the Da threshold
     newton_iterations::Int                         # base Exact-Newton iteration cap
-    dynamic_newton_re_threshold::Float64           # Re above which Newton's budget is widened
-    dynamic_newton_re_iterations::Int              # Newton iterations to use past the Re threshold
+    dynamic_newton_re_threshold::Float64           # [harness] Re above which Newton's budget is widened
+    dynamic_newton_re_iterations::Int              # [harness] Newton iterations to use past the Re threshold
     # --- Convergence tolerances ---
     ftol::Float64                                  # residual-norm tolerance ‖R‖ for declaring convergence
     picard_ftol::Float64                           # absolute ‖R‖ ftol for the Picard solver (looser than Newton's; the ping-pong handoff itself fires via pingpong_picard_gain_orders)
-    dynamic_ftol_ceiling::Float64                  # upper clamp on the mesh-scaled ABSOLUTE ftol O(h^{kv+1}) (not the removed per-segment relative gate)
-    dynamic_ftol_spatial_safety_factor::Float64    # margin (0,1] applied to that O(h^{kv+1}) discretization-error ftol
+    dynamic_ftol_ceiling::Float64                  # [harness] upper clamp on the mesh-scaled ABSOLUTE ftol O(h^{kv+1}) (not the removed per-segment relative gate)
+    dynamic_ftol_spatial_safety_factor::Float64    # [harness] margin (0,1] applied to that O(h^{kv+1}) discretization-error ftol
     xtol::Float64                                  # step-size tolerance ‖Δu‖ for stagnation/convergence
     # --- Scale-free convergence gate (convergence_criterion.jl; the authoritative success test) ---
     # The nonlinear solve stops when two DIMENSIONLESS, segment-independent measures fall below these:
@@ -164,7 +170,13 @@ Base.@kwdef struct SolverConfig
     # what removes the re-anchoring pathology (a fresh segment no longer demands another ×(1/ftol) drop
     # below wherever the previous one stopped). See docs/solver/nonlinear-convergence-criterion-prompt.md.
     eps_tol_momentum::Float64                      # tol_M: ε_M ≤ tol_M (ε_M ∈ [0,1], → 0 at the discrete solution)
-    eps_tol_mass::Float64                          # tol_C: ε_C ≤ tol_C (ε_C floors at O(h^{kv}); set above that floor, ≤ √d)
+    # tol_C: ε_C ≤ tol_C (ε_C floors at O(h^{kv}); set above that floor, ≤ √d).
+    # [known-looseness] The 3D k=2 sweeps run this at 0.8 — deliberately loose, for the mass-residual
+    # scale sensitivity documented in the k=2-gate lesson, but it accepts an iterate whose mass residual
+    # is up to 80% of the flux-gradient envelope and is the ONLY gate on the continuity balance (tol_M is
+    # tight at 1e-9). Flagged for future tightening / a separate pure-divergence (‖∇·(αu)‖/‖∇(αu)‖ ≤ √d)
+    # check; not changed here. See docs/formulation-audit-2026-06-24.md §C.3.
+    eps_tol_mass::Float64
     # --- Line search & robustness guards ---
     max_increases::Int                             # how many merit-function increases are tolerated before bailing
     freeze_jacobian_cusp::Bool                     # hold the Jacobian fixed across an ill-conditioned cusp step
@@ -269,7 +281,29 @@ function validate!(cfg::PorousNSConfig)
     # all-Dirichlet incompressible problem needs ε_phys + ε_num > 0 (or a pinned pressure), left to the caller.
     @assert cfg.physical_properties.eps_val >= 0 "eps_val (physical ε) must be >= 0"
     @assert cfg.physical_properties.numerical_epsilon >= 0 "numerical_epsilon (penalty ε) must be >= 0"
-    
+    # Reaction coefficients must be nonnegative so σ stays symmetric positive-semidefinite (the paper's
+    # standing assumption, eq:DBFResistanceTerm): a(α)=σ_linear·((1-α)/α)² ≥ 0 and b(α)=σ_nonlinear·(1-α)/α
+    # ≥ 0 for α ∈ (0,1], and the constant law σ ≡ σ_constant. A negative coefficient makes σ an energy
+    # source rather than a sink and breaks coercivity.
+    @assert cfg.physical_properties.sigma_constant >= 0 "sigma_constant must be >= 0 (σ SPSD)"
+    @assert cfg.physical_properties.sigma_linear >= 0 "sigma_linear must be >= 0 (σ SPSD)"
+    @assert cfg.physical_properties.sigma_nonlinear >= 0 "sigma_nonlinear must be >= 0 (σ SPSD)"
+    # Velocity-magnitude floor (SmoothVelocityFloor): the floored speed sqrt(u·u + u_floor²) is C∞ only
+    # when u_floor > 0, which the Newton differentiability of the |u|-dependent reaction/τ terms requires.
+    # With h_floor_weight = 0 (the MMS/Cocquet setting) the floor rests entirely on u_base_floor_ref, so
+    # demand at least one of them strictly positive; epsilon_floor is the denominator guard and must be > 0.
+    @assert cfg.physical_properties.u_base_floor_ref >= 0 "u_base_floor_ref must be >= 0"
+    @assert cfg.physical_properties.h_floor_weight >= 0 "h_floor_weight must be >= 0"
+    @assert cfg.physical_properties.epsilon_floor > 0 "epsilon_floor must be > 0 (velocity-floor denominator guard)"
+    @assert cfg.physical_properties.u_base_floor_ref > 0 || cfg.physical_properties.h_floor_weight > 0 "velocity floor must be strictly positive (u_base_floor_ref > 0 or h_floor_weight > 0) so SmoothVelocityFloor stays C¹"
+
+    # Domain / porosity field (previously unvalidated): α ∈ (0,1] keeps σ finite and the MMS u_ex = α⁻¹·S
+    # bounded; the radial transition needs r_1 < r_2; bounding_box is [xmin,xmax,ymin,ymax,(zmin,zmax)].
+    dom = cfg.domain
+    @assert 0.0 < dom.alpha_0 <= 1.0 "domain.alpha_0 (porosity) must be in (0, 1]"
+    @assert dom.r_1 < dom.r_2 "domain.r_1 must be < domain.r_2 (porosity transition annulus)"
+    @assert length(dom.bounding_box) >= 4 && iseven(length(dom.bounding_box)) "domain.bounding_box must have an even length >= 4 ([xmin,xmax,ymin,ymax,...])"
+
     # Solver
     sol = cfg.numerical_method.solver
     @assert sol.ftol > 0 "Solver ftol must be > 0"
@@ -277,6 +311,10 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.dynamic_ftol_ceiling >= sol.ftol "Solver dynamic_ftol_ceiling must be strictly >= base ftol"
     @assert 0.0 < sol.dynamic_ftol_spatial_safety_factor <= 1.0 "Solver dynamic_ftol_spatial_safety_factor must be in (0, 1]"
     @assert sol.xtol > 0 "Solver xtol must be > 0"
+    # Scale-free convergence gate (the AUTHORITATIVE production success test, injected by solve_system):
+    # converged ⇔ ε_M ≤ eps_tol_momentum ∧ ε_C ≤ eps_tol_mass. Both must be strictly positive.
+    @assert sol.eps_tol_momentum > 0 "Solver eps_tol_momentum (ε_M gate) must be > 0"
+    @assert sol.eps_tol_mass > 0 "Solver eps_tol_mass (ε_C gate) must be > 0"
     @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"
     @assert sol.divergence_merit_factor >= 1.0 "Divergence merit factor must be >= 1.0"
     @assert sol.noise_floor_success_max_ftol_multiple >= 1.0 "noise_floor_success_max_ftol_multiple must be >= 1.0 (use a large value / Inf to disable the honest-exit gate)"

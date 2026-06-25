@@ -117,9 +117,12 @@ end
 # (`field_blocks[1]`) — free. The closure reconstructs (uh, ph) from `x`, rebuilds the reaction field
 # σ(α, u) exactly as the OSGS solve does, then evaluates the dynamic momentum envelope D_M and the mass
 # ratio ε_C at THIS iterate (so the normalisation tracks the iterate, never frozen per stage). It is a
-# pure observer: it allocates its own scratch and mutates nothing the solver owns. Attach it (via
-# `build_iter_solvers(...; conv_probe=...)`) only for trajectory diagnostics — the per-iteration field
-# assembly is too costly for production.
+# read-only observer of the iterate (it allocates its own scratch and mutates nothing the solver owns),
+# but it IS the authoritative success decision: `solve_system` attaches it UNCONDITIONALLY to both stage
+# solvers (see ~L462), so in production AND the harness the converged verdict is ε_M ≤ tol_M ∧ ε_C ≤ tol_C,
+# and the per-iteration field assembly (the D_M load vectors + the σ rebuild) is paid on every accepted
+# iterate. [future] If that cost matters, gate the attachment behind a config flag (opt-out); the
+# `conv_probe === nothing` path then reverts to the scalar-ftol fallback gate.
 function build_convergence_probe(setup::FETopology, formulation::VMSFormulation,
                                  tol_M::Float64, tol_C::Float64)
     X        = setup.X

@@ -19,6 +19,15 @@ using Gridap
 using Gridap.Algebra
 using LinearAlgebra
 
+# Denominator guard for the `d|u|/du = u/|u|` factor in the Exact-Newton reaction/τ derivatives
+# (`dsigma_du`, `compute_dtau_1_du`, `compute_dtau_2_du`): |u| can be exactly 0 at a perfect Dirichlet
+# stagnation point, where that factor is singular. A tiny additive floor keeps it finite. This is the
+# single source of truth for the value previously copy-pasted as an inline `1e-12` across `reaction.jl`
+# and `tau.jl`; it equals the default `PhysicalProperties.epsilon_floor`, and could be threaded from
+# config if a tunable is ever needed. It enters ONLY the Jacobian (these derivatives are zeroed in Picard
+# and never appear in the residual), so it cannot move a converged solution.
+const VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR = 1e-12
+
 # Common interface for the floor policies below. A policy is a small struct holding
 # the floor parameters; dispatch on its type selects how `effective_speed` /
 # `reaction_speed` regularize the raw velocity magnitude.

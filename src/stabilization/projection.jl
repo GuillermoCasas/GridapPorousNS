@@ -152,13 +152,16 @@ function sanitize_projection_policy(policy, reaction_law; autocorrect=false)
     return policy
 end
 
-# The σ·u-trimming policy is INVALID with a nonlinear reaction law: (1 - Π)(σ(u)·u) ≠ 0 when σ depends
-# on u, so dropping that term silently corrupts the OSGS stabilization. [known-fragility]
-function sanitize_projection_policy(policy::ProjectResidualWithoutReactionWhenConstantSigma, reaction_law::ForchheimerErgunLaw; autocorrect=false)
+# The σ·u-trimming policy is INVALID unless σ is constant in u: (1 - Π)(σ(u)·u) ≠ 0 when σ depends on u,
+# so dropping that term silently corrupts the OSGS stabilization. [known-fragility] Gated on the
+# `is_sigma_constant` TRAIT (reaction.jl), not a concrete law type, so any future nonlinear reaction law
+# is rejected by default (conservative `is_sigma_constant = false`) instead of slipping through.
+function sanitize_projection_policy(policy::ProjectResidualWithoutReactionWhenConstantSigma, reaction_law; autocorrect=false)
+    is_sigma_constant(reaction_law) && return policy
     if autocorrect
-        @info "ProjectResidualWithoutReactionWhenConstantSigma is invalid with nonlinear reaction laws. Auto-correcting to ProjectFullResidual."
+        @info "ProjectResidualWithoutReactionWhenConstantSigma is invalid with a velocity-dependent reaction law. Auto-correcting to ProjectFullResidual."
         return ProjectFullResidual()
     else
-        error("ProjectResidualWithoutReactionWhenConstantSigma cannot be paired with a nonlinear reaction law (e.g. ForchheimerErgunLaw). Expected a ConstantSigmaLaw.")
+        error("ProjectResidualWithoutReactionWhenConstantSigma requires a constant-σ reaction law (is_sigma_constant(law) == true); got $(typeof(reaction_law)).")
     end
 end

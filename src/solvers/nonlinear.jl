@@ -71,13 +71,16 @@ struct SafeNewtonSolver <: NonlinearSolver
     # residual ‖R‖∞ is climbing. When `> 0`, abort (→ Picard via the cascade) after this many consecutive
     # ‖R‖∞ increases beyond `divergence_merit_factor`. `0` ⇒ disabled (Newton runs its full budget).
     newton_residual_divergence_patience::Int
-    # [diagnostic, read-only] Optional convergence probe `(x, b, field_blocks) -> (eps_M, eps_C, degenerate)`
-    # implementing the scale-free criterion (convergence_criterion.jl). When set, `_safe_solve_inner!`
-    # calls it once per ACCEPTED iteration and records ε_M/ε_C in the iteration history. It is a PURE
-    # OBSERVER: it never mutates the iterate, residual, step, or stopping logic (and is wrapped in a
-    # try/catch), so the solve is byte-identical whether it is set or `nothing`. `nothing` ⇒ no
-    # convergence-norm tracing — the default, and zero cost. Gated on by the harness only for trajectory
-    # diagnostics, never in production (per-iteration field assembly is too costly for the sweep).
+    # [authoritative gate, read-only on state] Optional convergence probe
+    # `(x, b, field_blocks) -> ConvergenceMeasure` implementing the scale-free criterion
+    # (convergence_criterion.jl). When set — the production/harness case, since `solve_system` injects it
+    # into both stage solvers — it is the AUTHORITATIVE success test: `_safe_solve_inner!` calls it once
+    # per ACCEPTED iteration, records ε_M/ε_C, and accepts convergence iff ε_M ≤ tol_M ∧ ε_C ≤ tol_C (the
+    # per-field scalar-ftol success branch is then DISABLED, see `scale_free`). It never mutates the
+    # iterate/residual/step (wrapped in try/catch — a probe failure degrades to NaN and cannot perturb the
+    # iterate), but it DOES decide stopping, so the solve is NOT byte-identical to the `nothing` path.
+    # `nothing` ⇒ the fallback scalar-ftol gate (the Cocquet Galerkin runs + kernel unit tests that bypass
+    # solve_system's injection); zero extra cost there.
     conv_probe::Union{Nothing,Function}
 end
 
@@ -735,10 +738,12 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         # f_norm = maxₖ(‖R[block_k]‖_∞ / effective_ftol_per_field[k]) is the scalar compared to 1.
         f_norm = maximum(state.norm_b_new_per_field ./ state.effective_ftol_per_field)
         last_f_norm = f_norm
-        # [diagnostic] Scale-free convergence norms ε_M, ε_C at this iterate (see `conv_probe`). A PURE
-        # read-only observer: evaluated only on an ACCEPTED step, where `b = residual(x)` so the
-        # (iterate, residual) pair the probe reads is self-consistent; wrapped in try/catch so a probe
-        # failure degrades to NaN and can never break or perturb the solve. NaN ⇒ not traced this step.
+        # Scale-free convergence norms ε_M, ε_C at this iterate (see `conv_probe`). `cm` is DUAL-USE: it is
+        # both traced into iteration_history (below) AND the authoritative success verdict the gate at
+        # ~L766 reads. Read-only on solver STATE (it never mutates the iterate/residual/step) and evaluated
+        # only on an ACCEPTED step where `b = residual(x)` (self-consistent pair); wrapped in try/catch so a
+        # probe failure degrades to NaN — it cannot perturb the iterate, though it does decide stopping.
+        # NaN ⇒ not traced this step.
         eps_M_it, eps_C_it = NaN, NaN
         cm = nothing
         if solver.conv_probe !== nothing && state.ls_success
