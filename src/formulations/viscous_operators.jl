@@ -101,14 +101,10 @@ end
 # Symmetric Gradient Viscosity
 # =======================
 # [code-actual] Pointwise callable that maps the velocity Hessian to ∇·ε(u). For the symmetric
-# gradient, ∇·ε(u) = 0.5·Δu + 0.5·∇(∇·u); this struct returns exactly that linear combination,
-# dimension-specialized below for 2D and 3D. Used by both the strong and adjoint operators.
+# gradient, ∇·ε(u) = 0.5·Δu + 0.5·∇(∇·u); the grad-div coefficient is 0.5 in EVERY dimension (no
+# trace removal), so one D-generic method covers 2D and 3D. Used by both the strong and adjoint operators.
 struct EvalStrongViscSymOp <: Function end
-@inline function (::EvalStrongViscSymOp)(Δu::VectorValue{2, T1}, ∇∇u::ThirdOrderTensorValue{2,2,2,T2}) where {T1, T2}
-    grad_div_u = _grad_div(∇∇u)
-    return 0.5 * Δu + 0.5 * grad_div_u
-end
-@inline function (::EvalStrongViscSymOp)(Δu::VectorValue{3, T1}, ∇∇u::ThirdOrderTensorValue{3,3,3,T2}) where {T1, T2}
+@inline function (::EvalStrongViscSymOp)(Δu::VectorValue{D, T1}, ∇∇u::ThirdOrderTensorValue{D,D,D,T2}) where {D, T1, T2}
     grad_div_u = _grad_div(∇∇u)
     return 0.5 * Δu + 0.5 * grad_div_u
 end
@@ -157,17 +153,17 @@ struct EvalDevSymOp <: Function end
     return eps_u - (1.0 / D) * tr(∇u) * one(∇u)
 end
 
-# Maps (Δu, ∇∇u) -> ∇·ε^d(u). The deviatoric divergence expands to
-# 0.5·Δu + (0.5 − 1/D)·∇(∇·u): the trace removal changes the grad-div coefficient (0 in 2D,
-# +1/6 in 3D), unlike the plain symmetric case where that coefficient is 0.5. Dimension-specialized below.
+# Maps (Δu, ∇∇u) -> ∇·ε^d(u). The deviatoric divergence expands to 0.5·Δu + (0.5 − 1/D)·∇(∇·u): the
+# trace removal makes the grad-div coefficient DIMENSION-DEPENDENT (0 in 2D, +1/6 in 3D), unlike the
+# plain symmetric case where it is uniformly 0.5.
+# [VISC-01] The coefficient is computed as `0.5 − 1/D` from the Hessian's type parameter D — a
+# compile-time constant, so it constant-folds — rather than hand-transcribed per dimension (`0.0` for 2D,
+# `0.5 − 1/3` for 3D, byte-identical to those). One D-generic method ⇒ a new dimension cannot silently
+# drift the coefficient; `_grad_div` still gates the actually-supported D ∈ {2, 3}.
 struct EvalDivDevSymOp <: Function end
-@inline function (::EvalDivDevSymOp)(Δu::VectorValue{2, T1}, ∇∇u::ThirdOrderTensorValue{2,2,2,T2}) where {T1, T2}
+@inline function (::EvalDivDevSymOp)(Δu::VectorValue{D, T1}, ∇∇u::ThirdOrderTensorValue{D,D,D,T2}) where {D, T1, T2}
     grad_div_u = _grad_div(∇∇u)
-    return 0.5 * Δu + 0.0 * grad_div_u
-end
-@inline function (::EvalDivDevSymOp)(Δu::VectorValue{3, T1}, ∇∇u::ThirdOrderTensorValue{3,3,3,T2}) where {T1, T2}
-    grad_div_u = _grad_div(∇∇u)
-    return 0.5 * Δu + (0.5 - 1.0/3.0) * grad_div_u
+    return 0.5 * Δu + (0.5 - 1.0/D) * grad_div_u
 end
 
 # [paper-faithful] Strong form 2*∇⋅(α*ν*\DPi\SPi\nabla u), with the deviatoric symmetric strain

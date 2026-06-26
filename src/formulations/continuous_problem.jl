@@ -252,12 +252,12 @@ _get_proj_pi_u(::Nothing, u) = 0.0 * u
 _get_proj_pi_p(pi_p) = pi_p
 _get_proj_pi_p(::Nothing) = 0.0
 
-# [FORM-05] Build the per-cell coefficient CellFields (σ, τ₁, τ₂) and unpack the setup/formulation scalars
-# that the residual and BOTH Jacobian modes share verbatim. Centralizing it here is the single source of
-# truth for HOW σ/τ are constructed from the typed operators, so the three builders can never drift in
-# their coefficient definitions. `u` is the velocity field (unpacked from X by the caller). Returns a
-# NamedTuple the callers destructure with `(; …) = _build_coeffs(…)`.
-function _build_coeffs(u, setup, formulation, phys_cfg)
+# [FORM-05] Build the per-cell VMS stabilization coefficient CellFields (σ, τ₁, τ₂) and unpack the
+# setup/formulation scalars that the residual and BOTH Jacobian modes share verbatim. Centralizing it here
+# is the single source of truth for HOW σ/τ are constructed from the typed operators, so the three builders
+# can never drift in their coefficient definitions. `u` is the velocity field (unpacked from X by the
+# caller). Returns a NamedTuple the callers destructure with `(; …) = _build_stabilization_coefficients(…)`.
+function _build_stabilization_coefficients(u, setup, formulation, phys_cfg)
     form = formulation.form
     ν = form.ν
     eps_val = form.eps_val
@@ -327,7 +327,7 @@ function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg;
     u, p = X; v, q = Y
     # [FORM-05] σ/τ₁/τ₂ + the setup/formulation scalars come from the shared coefficient helper.
     (; form, ν, eps_val, c_1, c_2, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
-        _build_coeffs(u, setup, formulation, phys_cfg)
+        _build_stabilization_coefficients(u, setup, formulation, phys_cfg)
 
     # Standard Galerkin terms tested against (v, q): convection, viscous stress,
     # pressure (integrated by parts, hence the −p ∇·(αv) form), Forchheimer
@@ -395,7 +395,7 @@ function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_
     u, p = X; du, dp = dX; v, q = Y
     # [FORM-05] σ/τ₁/τ₂ + the setup/formulation scalars come from the shared coefficient helper.
     (; form, ν, eps_val, c_1, c_2, tau_reg_lim, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
-        _build_coeffs(u, setup, formulation, phys_cfg)
+        _build_stabilization_coefficients(u, setup, formulation, phys_cfg)
 
     # Mode-dependent coefficient derivatives: nonzero CellFields in ExactNewton,
     # dimension-correct zeros in Picard.
