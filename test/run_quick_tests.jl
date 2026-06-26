@@ -15,6 +15,7 @@ files = [
     "formulation_smoke_quick_test.jl",
     "interpolation_projection_quick_test.jl",
     "osgs_orthogonality_quick_test.jl",
+    "osgs_frozen_pi_jacobian_quick_test.jl",
     "production_schedule_smoke_quick_test.jl",
     "viscous_operators_quick_test.jl"
 ]

@@ -1323,11 +1323,26 @@ of \eqref{eq:osgs-coupled}, with the orthogonal residual
 $\widetilde{\mathcal{R}} = (I - \Pi)\mathcal{R}$, so the discrete errors
 match---but only at a linear/superlinear rate, since the compact coupling
 term is absent from the tangent. (Section~\ref{sec:jfnk} recovers the
-dropped action without forming it.) Passing a literal zero for
-$\boldsymbol{\pi}_h$ when assembling the Jacobian is intentional: the
-projection \emph{value} does not enter the frozen-$\boldsymbol{\pi}_h$
-tangent at all (it selects only the $\code{is\_osgs} = \mathrm{true}$
-branch), so a zero placeholder is the correct argument.
+dropped action without forming it.) The frozen-$\boldsymbol{\pi}_h$ tangent
+is assembled with the \emph{live} projection $\boldsymbol{\pi}_h(U_h)$---the
+same value the residual uses at that iterate---not a zero placeholder. The
+projection value \emph{does} enter the Exact-Newton product-rule terms
+$\mathrm{d}\tau_1\cdot(\mathcal{R}-\boldsymbol{\pi}_h)$ and
+$\mathrm{d}\mathcal{L}^{*}\cdot(\mathcal{R}-\boldsymbol{\pi}_h)$; passing a
+literal zero there silently replaces $(\mathcal{R}-\boldsymbol{\pi}_h)$ by
+$\mathcal{R}$, an inexactness \emph{beyond} the intended
+$\partial\boldsymbol{\pi}_h/\partial U_h$ drop. With the live
+$\boldsymbol{\pi}_h$ the assembled matrix is the \emph{exact}
+frozen-$\boldsymbol{\pi}_h$ tangent---it reproduces a finite-difference of the
+frozen-$\boldsymbol{\pi}_h$ residual to machine precision, whereas the
+zero-placeholder tangent carries an $O(\boldsymbol{\pi}_h)$ relative error
+($\sim\!3\%$ on a convective test)---so the only remaining approximation is
+the deliberate, sparsity-preserving $\partial\boldsymbol{\pi}_h/\partial U_h$
+drop. Because $\mathcal{R}-\boldsymbol{\pi}_h\to 0$ at the fixed point, the
+$\mathrm{d}\tau\,/\,\mathrm{d}\mathcal{L}^{*}$ terms vanish there: the
+converged solution is unchanged and only the Newton path is refined. The
+projection is computed once per iterate and shared by the residual and the
+Jacobian (a DOF-keyed cache), so the exact tangent costs no extra projection.
 
 \paragraph{Bootstrap.}  The coupled solve is seeded at the converged
 Stage~I state $U_h^0 \gets U_h^{\mathrm{ASGS}}$, which is the algebraic

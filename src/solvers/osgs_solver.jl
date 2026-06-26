@@ -218,20 +218,47 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
         diag_cache["inner_osgs_diagnostics"] = []
         diag_cache["outer_osgs_diagnostics"] = []
 
-        # Residual: recompute π from the CURRENT iterate every evaluation (no lag).
+        # ── OSGS coupled tangent: the EXACT frozen-π Newton Jacobian [A.3] ────────────────────────────
+        # This is an INEXACT Newton on the fixed point F(U)=0 where F embeds π(U)=Π(R(U)), recomputed from
+        # the CURRENT iterate at every residual evaluation (no lag). The full Jacobian would be
+        #   dF/dU = ∂F/∂U|_{π frozen}  −  ∫ L*(V)·τ·Π(dR·dU) dΩ      (the 2nd term is ∂F/∂π · dπ/dU),
+        # but Π(dR·dU) is a GLOBAL L²-projection (a dense M⁻¹ coupling of every DOF), so assembling it would
+        # destroy the sparse local tangent and the direct/ILU solve. We deliberately drop ∂π/∂u (→ a
+        # linear/superlinear rate; the matrix-free recovery is the JFNK section of the algorithm note) and
+        # keep the EXACT frozen-π tangent ∂F/∂U|_{π frozen} — the most accurate Jacobian available without
+        # going matrix-free. [A.3] Correctness of THAT tangent requires the live π: it enters the
+        # ExactNewton product-rule terms dτ_1·(R−π) and dL*·(R−π) (continuous_problem.jl). The previous code
+        # passed a literal ZERO π there, silently using (R) instead of (R−π) — an extra inexactness beyond
+        # the intended ∂π/∂u drop. We now pass the live π (matching the Anderson path), so the ONLY remaining
+        # approximation is the sparsity-preserving ∂π/∂u drop. The converged solution is unchanged
+        # (R−π → 0 at the fixed point ⇒ the dτ/dL* terms vanish there); only the Newton path/rate moves.
+        #
+        # π is computed ONCE per iterate and shared by the residual and BOTH Jacobians (all are evaluated at
+        # the same U within a Newton step). The cache is keyed on the (u,p) free-DOF vector and recomputes on
+        # any mismatch, so correctness never depends on the residual/Jacobian call order — only efficiency
+        # does (the common path is a hit, so the exact tangent costs no extra projection vs the old code).
+        _pi_dofs = Ref{Union{Nothing, Vector{Float64}}}(nothing)
+        _pi_u_ref = Ref{Any}(nothing); _pi_p_ref = Ref{Any}(nothing)
+        live_pi! = (x) -> begin
+            dofs = get_free_dof_values(x)
+            if _pi_dofs[] === nothing || _pi_dofs[] != dofs
+                u_x, p_x = x
+                _pi_u_ref[] = discrete_l2_projection(inner_projection_u(u_x, p_x, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2), U_proj, V_proj, dΩ, M_u, num_u_fac)
+                _pi_p_ref[] = discrete_l2_projection(inner_projection_p(u_x, p_x, form, dΩ, h_cf, alpha_cf, g_cf), P_proj, Q_proj, dΩ, M_p, num_p_fac)
+                _pi_dofs[] = copy(dofs)
+            end
+            return _pi_u_ref[], _pi_p_ref[]
+        end
+
         res_fn_coupled = (x, y) -> begin
-            u_x, p_x = x
-            R_u_cf = inner_projection_u(u_x, p_x, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
-            R_p_cf = inner_projection_p(u_x, p_x, form, dΩ, h_cf, alpha_cf, g_cf)
-            pi_u_x = discrete_l2_projection(R_u_cf, U_proj, V_proj, dΩ, M_u, num_u_fac)
-            pi_p_x = discrete_l2_projection(R_p_cf, P_proj, Q_proj, dΩ, M_p, num_p_fac)
+            pi_u_x, pi_p_x = live_pi!(x)
             build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u_x, pi_p=pi_p_x)
         end
-        # Jacobian: local frozen-π form. The π VALUE is irrelevant to the Jacobian (ProjectFullResidual
-        # ignores it; the reaction-trim uses σ/∂σ); a zero π just selects the OSGS (is_osgs=true) branch.
-        _zu = allocate_in_domain(M_u); fill!(_zu, 0.0); _pi_u0 = FEFunction(U_proj, _zu)
-        _zp = allocate_in_domain(M_p); fill!(_zp, 0.0); _pi_p0 = FEFunction(P_proj, _zp)
-        jac_fn_coupled = (x, dx, y) -> build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=_pi_u0, pi_p=_pi_p0)
+        # [A.3] EXACT frozen-π Newton tangent: pass the SAME live π the residual used (was a zero placeholder).
+        jac_fn_coupled = (x, dx, y) -> begin
+            pi_u_x, pi_p_x = live_pi!(x)
+            build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u_x, pi_p=pi_p_x)
+        end
 
         if sol_cfg.osgs_anderson_enabled
             # Opt-in staggered Anderson path (off by default ⇒ the existing path below runs, bit-identical).
@@ -254,9 +281,14 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             # linearisation, wider convergence basin) → back to Newton once Picard has cleared
             # `picard_gain_orders`. Well-conditioned cells run Newton straight to ftol with Picard inert;
             # hard cells (steep under-resolved porosity layers, where Newton's line search fails) lean on the
-            # Picard fallback. The Picard Jacobian uses the same zero-π placeholder (the π value is irrelevant
-            # to the local frozen-π tangent — only the is_osgs branch selection matters).
-            jac_picard_coupled = (x, dx, y) -> build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=_pi_u0, pi_p=_pi_p0, mult_mom=1.0, mult_mass=1.0)
+            # Picard fallback. The Picard tangent ZEROES the dτ/dL* product-rule terms, so π does not enter it
+            # at all (byte-identical whether π is the live value or a zero placeholder — unlike the ExactNewton
+            # tangent above, where [A.3] it does). We still route it through the shared `live_pi!` cache for
+            # uniformity: the cache hit means no extra projection, and there is no zero-π special case to drift.
+            jac_picard_coupled = (x, dx, y) -> begin
+                pi_u_x, pi_p_x = live_pi!(x)
+                build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=pi_u_x, pi_p=pi_p_x, mult_mom=1.0, mult_mass=1.0)
+            end
             op_picard_coupled  = FEOperator(res_fn_coupled, jac_picard_coupled, X, Y)
             solver_picard_gain_c = FESolver(_with_overrides(coupled_nls; ftol=sol_cfg.picard_ftol, mode=:picard, picard_gain_target=sol_cfg.pingpong_picard_gain_orders))
             v_c = _pingpong_cascade!(final_x0, x_backup, op_coupled, op_picard_coupled,
