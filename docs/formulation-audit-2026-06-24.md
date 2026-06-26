@@ -24,81 +24,111 @@ of the 3D rate anomalies.
 
 ---
 
-## 0. Executive summary
+## 0. Status & what remains
 
-**The continuous VMS formulation is faithfully transcribed.** The strong residual, both Jacobians, the
-adjoint operators and their sign conventions, the deviatoric/symmetric viscous expansions (2D & 3D), the
-τ₁/τ₂ definitions, the OSGS projection policies, the Forchheimer-Ergun σ(α,u), the porosity field and
-*all four* of its analytic derivatives, and both MMS oracles (2D and 3D) were each re-derived and match
-the paper. The previously-catalogued divergences in `docs/solver/paper-code-divergences.md` (adjoint
-sign, the omitted `(1/α)∇·(αa)v` term, the simplified τ forms, the unconstrained projection space, the
-ε_num Jacobian-only penalty) hold up under re-scrutiny. **No correctness bug was found in the weak-form
-assembly.**
+> **This is the trimmed working copy (2026-06-26).** Resolved findings have been condensed into the
+> "Resolved ledger" below (one line + commit each — provenance preserved); the body now holds **only the
+> still-open items**. The full original audit (executive summary, all 34-finding write-ups, the complete
+> resolved detail) is preserved verbatim at commit `a31f191` and its follow-up commits.
 
-**The substantive findings are not in the equations — they are in (i) a few documentation↔code
-contracts that no longer match the code, (ii) the convergence *results* and the harness/reporting that
-produces them, and (iii) hygiene/validation/fragility gaps.** In order of importance:
+**Headline that still stands.** The continuous VMS formulation is faithfully transcribed — the strong
+residual, both Jacobians, the adjoint sign conventions, the deviatoric/symmetric viscous expansions
+(2D & 3D), τ₁/τ₂, the OSGS projection policies, σ(α,u), the porosity field + all four derivatives, and
+both MMS oracles each match the paper. **No correctness bug was found in the weak-form assembly.** The
+remaining work is in (i) a couple of doc↔code contracts, (ii) the convergence *results* and their
+harness/reporting, and (iii) hygiene/fragility gaps.
+
+### Open items at a glance
 
 | # | Finding | Severity | Kind |
 |---|---|---|---|
-| **B-1** | **3D P1-ASGS is genuinely sub-optimal (L²u rate ≈ 1.2, not 2) even on a perfect uniform mesh** — reproduced on the structured Kuhn control. It is **method-intrinsic, not mesh quality.** OSGS recovers accuracy on the same mesh. | High | results/theory |
-| **B-5** | **P2-3D has a genuine under-stabilization defect at the paper's c₁=4k⁴, confirmed on a perfect uniform mesh** (converged fine pairs show errors *growing*). It is **not mesh quality** — c₁=4k⁴ is structurally too small for P2 tetrahedra; **c₁×4 fixes it** (optimal rates, ≈40× smaller errors). The solver line-search failures at paper c₁ are a *symptom* of this. | High | results/theory |
-| **B-2** | **The committed "3D-P2 divergence" tables conflate the real B-5 defect with `success=False` solves plotted as if valid.** The reporting tool does not gate on `success`, overstating the divergence (the genuine signal is the growing error on *converged* fine pairs). | High | reporting |
-| **B-3 / B-6** | At every shared-failed level ASGS and OSGS report **byte-identical** errors. **Mechanism (control-confirmed): a failed OSGS solve silently reports the ASGS Stage-I boot state under the OSGS label** — so a sweep can record an ASGS error in an OSGS column. | Med | reporting/harness |
-| **A-1** | ✅ **RESOLVED 2026-06-25.** `dynamic_*` Re/Da budget knobs were declared & validated in `config.jl` but had ZERO `src/` consumers. Relocated to the harness-frame `test/extended/harness_dynamic_budget.jl`; `SolverConfig`/schema/`base_config.json` no longer carry them. Behavior-preserving (2D MMS bit-identical). See F1. | High | doc↔code |
-| **A-2** | ✅ **RESOLVED 2026-06-25 (Batch 1, `2f50d6d`).** The scale-free ε_M/ε_C gate is unconditionally attached by `solve_system` as THE production success test; the three comments that mislabeled it "diagnostic / not yet wired in" were corrected to state it is authoritative, the per-iteration cost is documented as intentional (with a `[future]` opt-out note), and `eps_tol_momentum`/`eps_tol_mass` now fail loud at load (C.2). | High | doc↔code / perf |
-| **B-4** | Provenance gap: the most recent committed 3D result files cannot be reproduced from the current (uncommitted-modified) harness; their `mesh_algorithm`/level-set match no function now in `smoke3d.jl`. | Med | reproducibility |
-| **C-x** | Fragility: silent ILU→identity preconditioner fallback + no GMRES convergence check (F3, open); missing load-time validation (Batch 1); **✅ the `1e-12` `|u|`-floor magic number → config input `velocity_magnitude_derivative_floor` (C.4, done 2026-06-25)**; a very loose 3D mass gate `eps_tol_mass=0.8` (F4, open). | Med/Low | fragility |
-| **D-x** | Simplification: **✅ `build_picard_jacobian` now a wrapper (FORM-01); `_build_coeffs`/`_tau_ns_inv`/`_grad_div` helpers dedup the setup/τ/grad-div (FORM-05, TAU-05, VISC-01); dead `gridap_extensions.jl` deleted (VISC-02); dynamic-budget knobs relocated (F1); `accelerators.jl` wired into OSGS (NONL-03); `p_ex` dedup'd (DRIV-07) — all 2026-06-25.** `diagnostics_helpers.jl` removed in Batch 1. | Low | cleanup |
+| **B-1** | 3D P1-**ASGS** is genuinely sub-optimal (L²u ≈ 1.2, not 2) even on a perfect uniform Kuhn mesh — method-intrinsic, not mesh quality; OSGS recovers it. **Action: document honestly** (still open). | High | results/theory |
+| **B-5 / F5** | P2-3D has a genuine under-stabilization defect at paper c₁=4k⁴ on a uniform mesh (converged fine pairs show errors *growing*); **c₁×4 fixes it**. **Action: element-type-aware c₁** (F5) + reconcile the canonical doc's TL;DR. | High | results/theory |
+| **B-2** | The committed "3D-P2 divergence" tables mix `success=False` solves into the rate table; the plotter doesn't gate on `success`. **Action: gate/flag failed levels.** | High | reporting |
+| **B-3 / B-6** | A failed OSGS solve silently reports the ASGS Stage-I boot state under the OSGS label (byte-identical error tuples at shared-failed levels). **Action: mark OSGS-degenerated-to-ASGS distinctly.** | Med | reporting/harness |
+| **B-4** | The most recent committed 3D result files can't be reproduced from the current harness (`mesh_algorithm`/ladder match no function in `smoke3d.jl`). **Action: restore/commit the exact driver** (overlaps F6). | Med | reproducibility |
+| **A-4** | Config-strictness gaps: no `required` arrays in the schema (except `linear_solver`), `base_config.json` omits `eps_val`, and the `eps_val` docstring still mislabels it "porosity ε (>0)". | Low | doc↔code |
+| **C-3 / F4** | The 3D k=2 mass gate `eps_tol_mass = 0.8` is extremely loose — the *only* check on the pressure/continuity balance. | Med | fragility |
+| **F6** | The 3D MMS harness (`smoke3d.jl`) is a hand-edited driver with no committed config JSON and no automated guard. | Med | cleanup/test |
 
-The rest of this document expands each part with `file:line` evidence, the recommended action, and (for
-fragility items) a viable alternative.
+### Resolved ledger (provenance — do not re-open without reading the cited commit)
+
+- **A-1 / F1** ✅ 2026-06-25 (`c010f98`) — `dynamic_*` Re/Da budget knobs relocated out of production
+  `SolverConfig`/schema/`base_config.json` into harness-frame `test/extended/harness_dynamic_budget.jl`.
+  Behavior-preserving (2D MMS bit-identical). CLAUDE.md + docstrings corrected.
+- **A-2** ✅ 2026-06-25 (`2f50d6d`) — the scale-free ε_M/ε_C gate is documented everywhere as the
+  authoritative production success test (was mislabeled "diagnostic / not yet wired in"); per-iteration
+  cost documented as intentional.
+- **C-2 / SOLV-04 / MODE-02 / MODE-03** ✅ 2026-06-25 — load-time `validate!` now fails loud on
+  `eps_tol_momentum/mass > 0`, σ SPSD (`sigma_constant/linear/nonlinear ≥ 0`), strictly-positive velocity
+  floor, `0 < alpha_0 ≤ 1`, `r_1 < r_2`, and `bounding_box` even-length parity.
+- **C-4 / FORM-02 / MODE-01 / TAU-01 / DRIV-08** ✅ 2026-06-25 (`e842de9`) — the copy-pasted `1e-12`
+  `|u|`-floor became the config input `velocity_magnitude_derivative_floor` (one source of truth, threaded
+  through `DSigOp`/`DTau1Op`/`DTau2Op`). Documented in `theory/velocity_floor_regularization/`.
+- **C-5 / PROJ-01** ✅ 2026-06-25 (Batch 1) — the §4.4 constant-σ trim now gates on an `is_sigma_constant`
+  trait (true only for `ConstantSigmaLaw`), not a concrete-type check, so a new nonlinear law is rejected
+  by default.
+- **NONL-05** ✅ 2026-06-25 (Batch 1) — `ILUGMRESSolver` keyword constructor no longer backfills
+  magic-number defaults.
+- **DRIV-02** ✅ Batch 1 — dead `diagnostics_helpers.jl` (referenced a removed API) deleted.
+- **Part D (all)** ✅ 2026-06-25 (`e842de9`, `7195581`, + 2026-06-26):
+  - **FORM-01** — `build_picard_jacobian` is now a one-line wrapper over the general builder in
+    `PicardMode()`, guarded by `test/blitz/picard_jacobian_equivalence_blitz_test.jl` (byte-equality).
+  - **FORM-03** — the duplicated `dL_du_star_v` recomputation deleted (built once, reused).
+  - **FORM-05** — the σ/τ₁/τ₂ + setup-scalar boilerplate extracted to
+    `_build_stabilization_coefficients` (shared by the residual and both Jacobians).
+  - **TAU-05** — the τ_{1,NS}⁻¹ denominator extracted to one `_tau_ns_inv` helper used by all four
+    τ functions (primal + derivatives) — math re-verified.
+  - **VISC-02** — the `∇(∇·u)` contraction unified into one `_grad_div` helper; dead
+    `gridap_extensions.jl` deleted.
+  - **VISC-01** — `EvalDivDevSymOp`/`EvalStrongViscSymOp` collapsed to single D-generic methods; the
+    deviatoric grad-div coefficient is computed as `0.5 − 1/D` from the Hessian's type parameter
+    (byte-identical to the old per-dimension `0.0`/`0.5−1/3`), so a new dimension cannot drift it.
+  - **VISC-03** — tracked analytic regression test for the 3D deviatoric grad-div coefficient (=1/6),
+    strong + adjoint, in `test/quick/viscous_operators_quick_test.jl`.
+  - **NONL-03** — `accelerators.jl` (`AndersonAccelerator`) wired into the OSGS stage behind the opt-in
+    `osgs_anderson_enabled` (OFF by default).
+  - **DRIV-07** — the MMS oracle's inline `p_ex`/`∇p_ex` unified into a `PExFunc` with a registered ∇.
+- **C-1 / F3 / NONL-01 / NONL-02** ✅ 2026-06-26 — ILU_GMRES honesty contract
+  (`src/solvers/linear_solvers.jl`): `solve!` runs `gmres!(…; log=true)` and throws `GMRESNotConvergedError`
+  if it does not reach `rel_tol` within `maxiter` (a non-converged step is never returned as exact); the
+  ILU→identity fallback is gated by the new required config `allow_unpreconditioned_fallback` (default
+  `false` ⇒ `ILUFactorizationFailure`, fail loud; `true` ⇒ identity `Pl` + loud warning). The cryptic
+  `println` fallback warning is replaced by an explicit trace line; `eval_linear_system_resolution!` traces
+  a distinct `[Linear Solve NOT CONVERGED]` vs `[Linear Solve Exception]`; `stop_reason` renamed
+  `linear_solve_nan` → `linear_solve_failed`; both route to honest cascade rollback → Picard. Deterministic
+  guard `test/blitz/linear_solver_honesty_blitz_test.jl` (6 cases). Verified Blitz 219/219, Quick 57/57.
+  The 2D harnesses use `LUSolver`, so the change is inert there (behavior-preserving); it affects only the
+  3D fine-mesh `ILU_GMRES` path — re-baselining the 3D structured-Kuhn control is the remaining *follow-up
+  measurement* (which fine-mesh OSGS solves now report honest failure), not open implementation.
+- **A-3** ✅ 2026-06-26 — OSGS coupled Newton tangent now uses the **live π** (`src/solvers/osgs_solver.jl`,
+  `live_pi!`): the `dτ_1·(R−π)` / `dL*·(R−π)` Exact-Newton product-rule terms previously got a literal ZERO
+  π (silently `R` instead of `R−π`). Passing the live π makes the assembled matrix the **exact frozen-π
+  tangent** (verified: it matches a finite-difference of the frozen-π residual to ~1e-11, vs a ~3% error
+  for the old zero-π tangent; `test/quick/osgs_frozen_pi_jacobian_quick_test.jl`). π is computed once per
+  iterate and shared by residual+Jacobian via a DOF-keyed cache, so the exact tangent costs no extra
+  projection. Converged solution unchanged (R−π→0 at the fixed point); convergence is no worse (same root,
+  residual ≤ zero-π after a fixed budget) — the rate stays linear because the **intentionally** dropped
+  `∂π/∂u` dominates it (that is the JFNK frontier, out of scope). The false tex claim ("a zero placeholder
+  is the correct argument") was corrected in `theory/osgs_algorithm/osgs_algorithm.tex`.
 
 ---
 
-## Deferred follow-ups — implementation checklist (post Batch-1)
+## Deferred follow-ups — implementation checklist (open)
 
-**Batch 1 landed 2026-06-25** (branch `cleanup/contract-drift-and-fragility`, commit `2f50d6d`,
-behavior-preserving — 2D MMS bit-identical, Blitz 194/194, Quick 57/57): A.2 (conv-gate comment
-corrections), C.2 (fail-loud `validate!` asserts), C.3 (loose-gate doc), C.4 (`1e-12`→named const),
-C.5 (`is_sigma_constant` trait), NONL-05 (ILU ctor defaults removed), the dead-code removals
-(`diagnostics_helpers.jl`, FORM-03 dup) + `[unused]` labels, the A.1 **documentation** fix, and two new
-tests. The items below were intentionally deferred; each is self-contained and ordered roughly by value.
+The **landed** items (Batch 1 `2f50d6d`; the dedup/config-ify batch `e842de9`; F1 `c010f98`; Anderson +
+DRIV-07 `7195581`; F2/FORM-01 + VISC-01 D-generic coefficient) are recorded in the **Resolved ledger** in
+§0. The items below remain open; each is self-contained and ordered roughly by value.
 
-### F1 — A.1 field relocation: move the `dynamic_*` Re/Da knobs out of production `SolverConfig` → §A.1
-✅ **Landed 2026-06-25** (branch `cleanup/contract-drift-and-fragility`), behavior-preserving. The 8 knobs
-were removed from `SolverConfig` (`src/config.jl`) + their 4 `validate!` asserts, from
-`config/porous_ns.schema.json`, and from `config/base_config.json`. Their defaults now live in the new
-harness-frame helper `test/extended/harness_dynamic_budget.jl` (the single source of truth +
-`read_mms_dynamic_budget`, which reads an optional top-level `mms_dynamic_budget` block and **fails loud**
-if a legacy `dynamic_*` key is still under `numerical_method.solver`, so a forgotten migration can't
-silently fall back to a default). All 6 harness read sites (the two `run_test.jl`, `probe_stiff_diagnose`,
-the two diagnostics probes, `smoke3d.jl`) consume the reader. The only ever-overridden value
-(`dynamic_newton_re_iterations: 150`, in **13** configs — not 38) moved to a top-level `mms_dynamic_budget`
-block; the inert base-valued `dynamic_ftol_*` keys were dropped from the other 21 (incl. the
-Cocquet-EXPERIMENT configs whose harness never read them — provenance-safe, they were never on a read
-path). **Verified:** 2D MMS bit-identical (every solution dataset), reader returns 150 for all 13 live
-configs and defaults elsewhere, fail-loud guard fires, 3D smoke clean, Blitz 194/194, Quick 57/57.
-- **Alternative (still open, bigger):** a production element-wise **cell-Péclet** adaptive budget in
-  `src/solvers` (the frame-independent analogue) — changes production behavior, needs its own baselines.
-
-### F2 — FORM-01: collapse `build_picard_jacobian` to a wrapper → §D
-✅ **Landed 2026-06-25** (with the C.4 + D-x cleanup, behavior-preserving). Following the recipe exactly:
-(1) added `test/blitz/picard_jacobian_equivalence_blitz_test.jl`, which assembles BOTH Jacobians on a tiny
-mesh at a non-trivial Forchheimer iterate and asserts the ASGS *and* OSGS matrices are byte-identical
-(`Array(A_picard) == Array(A_general)`); (2) once it passed, replaced `build_picard_jacobian`'s body with a
-one-line wrapper over `build_stabilized_weak_form_jacobian(…, false, PicardMode())`. Verified by the new
-equality test + a 2D Re=1e6 ASGS/OSGS run (bit-identical errors; OSGS exercises the Picard fallback) +
-Blitz 196/196 + Quick 54/54.
-
-### F3 — Batch 2 / C.1: ILU-GMRES honesty (behavior-CHANGING, 3D-only) → §C.1
-- `src/solvers/linear_solvers.jl`: call `gmres!(…; log=true)`, inspect `ch.isconverged`; on non-convergence
-  signal failure through `eval_linear_system_resolution!` (cascade → Picard) or loud-warn with the achieved
-  residual. Make the ILU→identity fallback an explicit config-gated `allow_unpreconditioned_fallback`
-  (schema + `LinearSolverConfig` + JSON).
-- **Scope:** only the `ILU_GMRES` path (3D meshes > `LU_DOF_LIMIT`); the 2D harnesses use `LUSolver`, so 2D
-  is unaffected. **Re-baseline the 3D structured-Kuhn control before/after** (it is *expected* to change
-  which fine-mesh OSGS solves report success — that is the point).
+### F3 — C.1: ILU-GMRES honesty (behavior-CHANGING, 3D-only) → §C.1
+✅ **Landed 2026-06-26** (see §0 Resolved ledger / §C.1): `gmres!(…; log=true)` + `isconverged` check →
+`GMRESNotConvergedError`; the ILU→identity fallback is gated by the required `allow_unpreconditioned_fallback`
+(schema + `LinearSolverConfig` + JSON), default `false` = fail-loud `ILUFactorizationFailure`; distinct
+non-convergence vs exception traces; deterministic blitz guard. Blitz 219/219, Quick 57/57.
+- **Remaining follow-up (measurement, not implementation):** re-baseline the 3D structured-Kuhn control
+  before/after — it is *expected* to flip which fine-mesh OSGS solves report success (that is the point).
+  The 2D harnesses use `LUSolver`, so they are unaffected by C.1; a post-C.1 k=2 QUAD MMS rerun is in
+  progress as the 2D behavior-preservation check (completed cells show the expected optimal k=2 rates).
 
 ### F4 — C.3: tighten / supplement the mass gate → §C.3
 - Investigate why `eps_tol_mass` cannot be < 0.8 for 3D k=2; if it genuinely must stay loose, add a
@@ -132,9 +162,12 @@ Blitz 196/196 + Quick 54/54.
 ### Minor / opportunistic
 - `_inv_centered.json` latent fragility: the official `test/quick/encoding_invariance_quick_test.jl` reads
   a config it must generate first — fine today, but a stale leftover can confuse a clean checkout.
-- NONL-01/NONL-04 (Anderson guards) only matter if `accelerators.jl` is ever wired in (currently `[unused]`).
+- **NONL-04** (Anderson `update!` has no zero/near-zero residual guard before the least-squares solve).
+  Now reachable: `accelerators.jl` is wired into the OSGS stage behind the opt-in `osgs_anderson_enabled`
+  (NONL-03, OFF by default), so this guard matters on that path when enabled. (NONL-01 — the ILU-GMRES
+  convergence check — is resolved under C.1; see §0 ledger.)
 
-**Bit-identity verification recipe (reused for F1/F2):** capture a clean pre-change baseline by
+**Bit-identity verification recipe (reused for the dedup/config-ify batches):** capture a clean pre-change baseline by
 `git stash push -- src/`, run a couple of 2D cells
 (`run_test.jl phase1_quad_k1.json --filter kv=1,kp=1,etype=QUAD,Re=1.0,Da=1.0,alpha0=0.5 --max-N 40 --h5 debug_results/baseline_pre.h5`),
 `git checkout -- src/` to restore edits, re-run to `baseline_post.h5`, and compare the `err_*` arrays for
@@ -170,96 +203,16 @@ exact equality.
 - **ε_num** is Jacobian-pressure-block only in *both* Jacobian builders and absent from the residual and
   the VMS subscale — cancels in the residual, vanishes at convergence, as documented.
 
-### A.1 [HIGH] Dynamic Re/Da iteration-budget knobs are documented as production behaviour but have no `src/` consumer
+> **A.1 [HIGH] and A.2 [HIGH] are ✅ RESOLVED** — see the Resolved ledger in §0 (A.1: `dynamic_*` knob
+> relocation, `c010f98`; A.2: scale-free ε_M/ε_C gate documented as authoritative, `2f50d6d`).
 
-CLAUDE.md states: *"`dynamic_picard_re_threshold` / `dynamic_picard_da_threshold` automatically widen
-Picard's iteration budget at high Re / Da. `dynamic_ftol_ceiling` couples the residual tolerance to mesh
-resolution."* These fields are declared and `validate!`'d in [config.jl](src/config.jl), but:
-
-```
-grep -rn 'dynamic_picard_re_threshold|dynamic_picard_da_threshold|dynamic_newton_re_threshold' src/
-   → only src/config.jl (declaration). NO consumer in src/solvers/ or run_simulation.jl.
-   Consumers are test/extended/*/run_test.jl (the MMS/Cocquet harnesses).
-```
-
-So the dynamic-budget *logic* lives in the harnesses, which build their own solvers; the production
-`solve_system` path never reads these knobs. A production user must nonetheless supply them (mandatory,
-no-default struct fields) where they are provably inert, and the CLAUDE.md/​docstring description of live
-solver behaviour does not exist in `src/`.
-
-**Recommended action.** Decide the intended home. Either (a) lift the dynamic-budget logic into
-`src/solvers` (so the documented behaviour is real on the production path), or (b) move these fields out
-of the production `SolverConfig` and into a harness-only config block, and correct CLAUDE.md +
-the config docstrings to say the dynamic budgeting is a harness feature. Do not leave required production
-knobs that nothing in `src/` reads.
-
-> **Implementation status (2026-06-25, branch `cleanup/contract-drift-and-fragility`).** ✅ **Fully
-> landed** (option (b) in full). Both halves are done: (a) the documentation correction (CLAUDE.md, the
-> `SolverConfig` field comments, the cell-Péclet note) and (b) the field relocation. The 8 knobs were
-> removed from `SolverConfig` (+ their 4 `validate!` asserts), `config/porous_ns.schema.json`, and
-> `config/base_config.json`; their defaults + reader now live in the harness-frame
-> `test/extended/harness_dynamic_budget.jl`, consumed by all 6 harness read sites. The one
-> ever-overridden value (`dynamic_newton_re_iterations: 150`, **13** configs — the audit's earlier "38"
-> counted every file carrying the inert base-valued `dynamic_ftol_*` keys, none of which override
-> anything) moved to a top-level `mms_dynamic_budget` block; the inert keys were dropped from the other
-> 21. Behavior-preserving: 2D MMS bit-identical (every solution dataset), the reader returns 150 for all
-> 13 live configs and defaults elsewhere, a fail-loud guard rejects a stray legacy key, and 3D smoke +
-> Blitz 194/194 + Quick 57/57 are clean. See F1 in the deferred-follow-ups checklist for the full record.
-
-### A.2 [HIGH] ✅ RESOLVED — The scale-free convergence gate's "diagnostic only / not yet wired in" contract was false
-
-> **Resolved 2026-06-25 (Batch 1, commit `2f50d6d`).** All three stale comments were corrected: the
-> scale-free ε_M/ε_C criterion is now documented everywhere as the **authoritative** production success
-> gate (not a diagnostic) — [PorousNSSolver.jl:47](src/PorousNSSolver.jl#L47), the
-> [build_convergence_probe](src/solvers/solver_core.jl#L121) docstring, and the `[authoritative gate]`
-> label at [nonlinear.jl:74](src/solvers/nonlinear.jl#L74) / [:654](src/solvers/nonlinear.jl#L654). The
-> per-iteration field-assembly cost is documented as **intentional**, with a `[future]` opt-out
-> config-flag note ([solver_core.jl:123-125](src/solvers/solver_core.jl#L123)) rather than implemented (a
-> flag would silently downgrade production to the weaker scalar-ftol fallback). The SOLV-04 elevation is
-> covered: the `eps_tol_momentum`/`eps_tol_mass` gate tolerances now fail loud at load
-> ([config.jl:307-308](src/config.jl#L307), C.2). The original finding, as audited, follows.
-
-[PorousNSSolver.jl:45](src/PorousNSSolver.jl#L45) still says the criterion is *"not yet wired into
-solve_system."* [build_convergence_probe](src/solvers/solver_core.jl#L121)'s docstring says attach it
-*"only for trajectory diagnostics — the per-iteration field assembly is too costly for production,"* and
-[nonlinear.jl:738](src/solvers/nonlinear.jl#L738) labels ε_M/ε_C `[diagnostic]`. **But**
-[solver_core.jl:462-464](src/solvers/solver_core.jl#L462) unconditionally builds `conv_eval` and injects
-it into *both* stage solvers, where [nonlinear.jl](src/solvers/nonlinear.jl) makes it the **authoritative
-success gate** (`scale_free = solver.conv_probe !== nothing` → ε_M/ε_C decide every accept). So in both
-production *and* the harness it is THE gate, not a diagnostic — and the per-iteration field re-assembly
-(`momentum_force_envelope` builds five load vectors + rebuilds σ each accepted iterate) is paid on every
-run.
-
-Two real consequences: (1) the documentation is actively misleading about how convergence is decided;
-(2) it elevates **SOLV-04** below from "a fallback" to "the only gate," so the unvalidated
-`eps_tol_momentum`/`eps_tol_mass` deserve hard validation.
-
-**Recommended action.** Update the three stale comments to state that the scale-free criterion *is* the
-authoritative gate. If the per-iteration cost is unwanted in production, gate the attachment behind a
-config flag; otherwise document the cost as intentional. Then add the validation in C.2.
-
-### A.3 [LOW] The OSGS ExactNewton Jacobian's `dτ·R_old` / `dL*·R_old` terms use `R`, not `R−π` (and the theory note's wording is imprecise)
-
-`theory/osgs_algorithm/osgs_algorithm.tex` (≈L1330) states: *"Passing a literal zero for π_h when
-assembling the Jacobian is intentional: the projection value does not enter the frozen-π_h tangent at
-all."* This is true for the **leading** term — `apply_jacobian_projection_u(ProjectFullResidual,…)`
-returns `R_du` and ignores π ([projection.jl:59](src/stabilization/projection.jl#L59)). It is **not**
-true for the ExactNewton product-rule terms: at
-[continuous_problem.jl:520](src/formulations/continuous_problem.jl#L520),
-`stab_R_old_u = apply_projection_u(ProjectFullResidual, R_u_old, …, proj_pi_u, is_osgs)` returns
-`R_u_old − proj_pi_u`, and with the zero placeholder `proj_pi_u = 0` this is `R_u_old`. That quantity
-feeds `dτ_1·R_old` and `dL*·R_old` at [continuous_problem.jl:528](src/formulations/continuous_problem.jl#L528).
-The exact frozen-π tangent wants `(R−π)` there, not `R`.
-
-This is **not a correctness bug** — the residual uses the live π, so the converged solution is correct,
-and the tangent is *already* deliberately inexact (∂π/∂u is dropped; the doc acknowledges a
-linear/superlinear rate). It is a precision-of-claim issue plus a small extra inexactness in the dτ/dL*
-terms that can only affect the Newton *rate*.
-
-**Recommended action.** Fix the wording in the tex note and the inline comment
-([osgs_solver.jl:155-156](src/solvers/osgs_solver.jl#L155)) to say the projection value *does* enter the
-`dτ`/`dL*` terms and is being deliberately approximated by zero. Optionally pass the live frozen π into
-the Jacobian builder for a slightly tighter tangent (cheap; π is already computed for the residual).
+> **A.3 [LOW] is ✅ RESOLVED 2026-06-26** — the OSGS coupled Newton Jacobian now passes the **live π**
+> (`osgs_solver.jl` `live_pi!`), so the `dτ_1·(R−π)` / `dL*·(R−π)` terms use `(R−π)` instead of the old
+> zero-placeholder `R`. The assembled matrix is now the **exact frozen-π tangent** (FD-verified to ~1e-11;
+> the old zero-π tangent had a ~3% error) at no extra projection cost (DOF-keyed per-iterate π cache). The
+> converged solution is unchanged and convergence does not degrade; the rate stays linear because the
+> *intentionally* dropped `∂π/∂u` dominates it (the JFNK frontier). The false tex claim was corrected.
+> See §0 ledger, `test/quick/osgs_frozen_pi_jacobian_quick_test.jl`, and `theory/osgs_algorithm/`.
 
 ### A.4 [LOW] Config-strictness gaps relative to the repo's own hard rule
 
@@ -277,38 +230,18 @@ the Jacobian builder for a slightly tighter tangent (cheap; π is already comput
 
 ## Part C — Fragility / inaccuracy, with viable alternatives
 
-### C.1 [Med] ILU-GMRES silently degrades to unpreconditioned, and never checks GMRES convergence
+> **C.1 [Med] is ✅ RESOLVED 2026-06-26** (with NONL-01 / NONL-02 / F3) — `ILU_GMRES.solve!` now verifies
+> GMRES convergence (`gmres!(…; log=true)` → `isconverged`) and throws `GMRESNotConvergedError` rather than
+> returning a non-converged step as exact; the ILU→identity fallback is gated by the required config
+> `allow_unpreconditioned_fallback` (default `false` ⇒ fail-loud `ILUFactorizationFailure`), replacing the
+> silent `println`. Traces distinguish `[Linear Solve NOT CONVERGED]` from `[Linear Solve Exception]`; both
+> roll the cascade back to Picard. See §0 ledger + `src/solvers/linear_solvers.jl` +
+> `test/blitz/linear_solver_honesty_blitz_test.jl`. The 3D structured-Kuhn re-baseline is a remaining
+> *measurement* follow-up (§F3), not open implementation.
 
-[linear_solvers.jl:90-114](src/solvers/linear_solvers.jl#L90) catches any ILU factorization exception and
-substitutes the **identity** preconditioner with only a `println` warning; the saddle-point (u,p)
-Jacobian then very likely will not converge under plain GMRES. [linear_solvers.jl:118-123](src/solvers/linear_solvers.jl#L118)
-calls `gmres!(…; log=false)` and returns `x` **without inspecting convergence**, so a non-converged
-linear solve is handed back as if exact. This is directly relevant to the **3D fine-mesh OSGS** path,
-which auto-switches to ILU-GMRES above 80k DOF ([smoke3d.jl:160](test/extended/ManufacturedSolutions3D/smoke3d.jl#L160))
-— exactly where a poor ILU is most likely.
-
-**Alternative.** Pass `log=true`, capture the convergence history, and on `!converged` signal failure
-back through `eval_linear_system_resolution!` (so the nonlinear cascade rolls back / falls to Picard)
-or at minimum emit a loud warning with the achieved relative residual. Make the identity fallback an
-explicit config-gated policy (`allow_unpreconditioned_fallback`) rather than a silent default.
-
-### C.2 [Med] Missing load-time validation lets physically/numerically invalid configs through
-
-`validate!` ([config.jl](src/config.jl)) checks the solver tolerances but **`DomainConfig` is entirely
-unvalidated** and the reaction coefficients are unchecked:
-
-- No `sigma_linear ≥ 0`, `sigma_nonlinear ≥ 0`, `sigma_constant ≥ 0` ⇒ σ can be made negative,
-  violating the paper's SPSD assumption ([reaction.jl:100-104](src/models/reaction.jl#L100)). **MODE-03.**
-- No `0 < alpha_0 ≤ 1`, no `r_1 < r_2`, no `bounding_box` length/parity check ⇒ `α≤0` makes `((1−α)/α)²`
-  and the MMS `u_ex = α⁻¹·S` blow up; `check_mms_parameters` guards this in the harness only.
-- No `eps_tol_momentum > 0`, no `0 < eps_tol_mass` on the **authoritative** production gate (A.2).
-  **SOLV-04.**
-- No positivity guarantee on the velocity floor: `SmoothVelocityFloor` is C∞ only when `u_floor>0`; at
-  `u_base_floor_ref=0` (with `h_floor_weight=0`, as the harness forces) it degenerates to `sqrt(u·u)`,
-  non-differentiable at 0 — the very failure the floor exists to prevent. **MODE-02.**
-
-**Alternative.** Add these asserts to `validate!` so a malformed config fails loudly at load, mirroring
-the existing `ftol`/`xtol` checks and the no-silent-defaults policy.
+> **C.2 [Med] is ✅ RESOLVED** (MODE-03 / MODE-02 / SOLV-04 + domain bounds) — `validate!` now fails loud
+> on σ SPSD (`sigma_constant/linear/nonlinear ≥ 0`), strictly-positive velocity floor, `eps_tol_momentum/
+> mass > 0`, `0 < alpha_0 ≤ 1`, `r_1 < r_2`, and `bounding_box` even-length parity. See §0 ledger.
 
 ### C.3 [Med] The 3D k=2 mass-convergence gate `eps_tol_mass = 0.8` is extremely loose
 
@@ -324,77 +257,22 @@ the P2 pressure block?) rather than accept 0.8 as a fixed constant; if it genuin
 add a separate, tighter check on the pure-divergence ratio `‖∇·(αu)‖/‖∇(αu)‖` (already computed as the
 √d self-check) so continuity is still gated.
 
-### C.4 [Low] ✅ RESOLVED — A `1e-12` `|u|`-floor magic number was copy-pasted across formulation sites
-
-`mag_u_reg = mag_u + 1e-12` appeared in `reaction.jl` (dσ/du) and `tau.jl` ×2 (dτ derivatives) — a
-no-magic-numbers violation; the copies could drift.
-
-> **Resolved 2026-06-25.** Batch 1 first collapsed the literals to one named const
-> `VELOCITY_MAGNITUDE_DERIVATIVE_FLOOR`; this change promotes it to a documented **config input**
-> `PhysicalProperties.velocity_magnitude_derivative_floor` (schema + `base_config.json` + fail-loud
-> `validate!`), carried on `SmoothVelocityFloor`, read via the `velocity_magnitude_derivative_floor(reg)`
-> accessor, and threaded through `DSigOp`/`DTau1Op`/`DTau2Op` into the three leaf sites — one source of
-> truth. Default `1e-12` ⇒ behavior-preserving (2D MMS bit-identical). Fully documented in
-> `theory/velocity_floor_regularization/` (including the double-flooring nuance: it is kept a *separate*,
-> independently-tunable parameter from `epsilon_floor`/`u_base_floor_ref`).
-
-### C.5 [Low] `sanitize_projection_policy` guards the §4.4 trim by concrete type, not by a nonlinearity trait
-
-[projection.jl:157](src/stabilization/projection.jl#L157) rejects the constant-σ trim only for the
-concrete `ForchheimerErgunLaw`, with a permissive default. A future nonlinear reaction law would slip
-through and silently corrupt the OSGS stabilization (the trim `(1−Π)(σu)=0` only holds for constant σ).
-
-**Alternative.** Define `is_sigma_constant(::AbstractReactionLaw)=false` (true only for
-`ConstantSigmaLaw`) and gate the trim on that trait, so any new nonlinear law is rejected by default.
+> **C.4 [Low] and C.5 [Low] are ✅ RESOLVED** — C.4: the `1e-12` `|u|`-floor became the config input
+> `velocity_magnitude_derivative_floor` (`e842de9`); C.5: the §4.4 constant-σ trim now gates on an
+> `is_sigma_constant` trait. See §0 ledger.
 
 ---
 
-## Part D — Simplification / reorganisation
+## Part D — Simplification / reorganisation — ✅ ALL RESOLVED
 
-> **✅ Landed 2026-06-25 (behavior-preserving, 2D MMS bit-identical; Blitz 196/196, Quick 54/54):**
-> FORM-01 (`build_picard_jacobian` → wrapper + byte-equality guard test), FORM-03 (already Batch 1),
-> FORM-05 (`_build_coeffs`), TAU-05 (`_tau_ns_inv`), VISC-01 + VISC-02 (`_grad_div` helper unifies the 4
-> inline grad-div copies; dead `gridap_extensions.jl` deleted). Also 2026-06-25: ✅ NONL-03
-> (`AndersonAccelerator` wired into OSGS behind `osgs_anderson_enabled`, OFF by default — verified to
-> accelerate, docs/solver/osgs-anderson-acceleration.md) and ✅ DRIV-07 (`PExFunc` with registered ∇).
-> Still open: only the per-dimension grad-div *coefficient* note (VISC-01 `0.5−1/D`; the contraction
-> itself is already unified in `_grad_div`).
-
-- **`build_picard_jacobian` is a byte-equivalent duplicate** of
-  `build_stabilized_weak_form_jacobian(…, PicardMode())` — every term coincides (traced). Both are live
-  in the OSGS coupled solve ([osgs_solver.jl:159](src/solvers/osgs_solver.jl#L159) Newton vs
-  [osgs_solver.jl:178](src/solvers/osgs_solver.jl#L178) Picard), so a future edit to one path silently
-  desyncs the Newton/Picard pair. **Make `build_picard_jacobian` a one-line wrapper** over the general
-  builder in `PicardMode()`. (**FORM-01**)
-- **`dL_du_star_v` is computed twice** with identical args at
-  [continuous_problem.jl:479](src/formulations/continuous_problem.jl#L479) and
-  [:509](src/formulations/continuous_problem.jl#L509). Delete the second. (**FORM-03**)
-- **The σ/τ₁/τ₂ + α/f/g/h/dΩ setup block is triplicated** across the residual and both Jacobian builders
-  (~20 lines each). Extract one `_build_coeffs(...)` helper. (**FORM-05**)
-- **τ_NS inverse-denominator is hand-written in four `tau.jl` functions**; extract `_tau_ns_inv` /
-  `_tau1_inv` so the primal and its derivative share one source of truth. (**TAU-05**)
-- **Dead code to remove or label:**
-  - `gridap_extensions.jl` (`ContractGradDivOp`/`grad_div_op`) — no caller; `∇(∇·u)` is re-implemented
-    inline in `viscous_operators.jl`. (**VISC-02**)
-  - ✅ `accelerators.jl` (`AndersonAccelerator`) — 2026-06-25 wired into the OSGS stage
-    (`_osgs_anderson_outer!`) behind the opt-in `osgs_anderson_enabled` (OFF by default), with
-    depth/relaxation/safety/max-outer config + a unit test; verified to cut the staggered outer-iteration
-    count ≈1.4–2.2× (docs/solver/osgs-anderson-acceleration.md). (**NONL-03**)
-  - `diagnostics_helpers.jl` — references the removed `config.phys.*` / `ThermodynamicState` /
-    `build_reaction_model` / 7-arg `compute_tau_1` API; it cannot run. Delete or rewrite + test.
-    (**DRIV-02**)
-  - ✅ The dynamic Re/Da budget knobs (A.1) — relocated 2026-06-25 to `test/extended/harness_dynamic_budget.jl` (F1); no longer in `src/`.
-- **`EvalDivDevSymOp`/`EvalStrongViscSymOp` hand-transcribe the grad-div coefficient per dimension**
-  (`0.0` for 2D, `0.5-1/3` for 3D). Compute `0.5 − 1/D` from the tensor's `D` and reuse the single
-  `grad_div_op` contraction so a new dimension can't drift. (**VISC-01/VISC-02**)
-- ✅ **DRIV-07 (done 2026-06-25):** `mms_paper_2d.jl`'s three inline copies of `p_ex`/`∇p_ex` are unified
-  into a `PExFunc` with a registered analytic `∇` (mirroring `UExFunc`). Solution bit-identical; the only
-  change is the harness H1-pressure error metric, which shifts ≤2 ULP because it now uses the exact
-  analytic `∇p_ex` rather than Gridap's ForwardDiff autodiff of the former closure — consistent with how
-  the velocity H1 error already used `UExFunc`'s analytic ∇. (**DRIV-07**)
-- **No tracked analytic regression test** for the canonical deviatoric strong/adjoint operator's 3D
-  grad-div coefficient (the only such check is an untracked debug script). Promote it to a blitz/quick
-  test. (**VISC-03**)
+> Every Part-D item has landed (see the §0 Resolved ledger for commits): FORM-01 (`build_picard_jacobian`
+> → one-line wrapper + byte-equality guard test), FORM-03 (duplicate `dL_du_star_v` deleted), FORM-05
+> (`_build_stabilization_coefficients` helper), TAU-05 (`_tau_ns_inv` helper, math re-verified), VISC-01
+> (deviatoric grad-div coefficient computed as `0.5 − 1/D` from the Hessian's type parameter — single
+> D-generic method, byte-identical to the old per-dimension constants), VISC-02 (`_grad_div` unifies the
+> contraction; dead `gridap_extensions.jl` deleted), VISC-03 (tracked 3D grad-div analytic regression test
+> in `viscous_operators_quick_test.jl`), NONL-03 (`AndersonAccelerator` wired into OSGS, opt-in/off),
+> DRIV-07 (`PExFunc` with registered ∇), and DRIV-02 (dead `diagnostics_helpers.jl` deleted).
 
 ---
 
@@ -647,64 +525,40 @@ Headline reads: P1 ASGS sub-optimal vs P1 OSGS optimal on the *same* mesh (B.1);
 genuine coercivity defect on a *uniform* mesh, fixed by c₁×4 (B.5); a failed OSGS solve reports the ASGS
 state (B.6).
 
-## Appendix 2 — Index of the 34 upheld code findings (by domain)
+## Appendix 2 — Index of the still-open code findings (by domain)
 
-Each was confirmed by an independent code-grounding skeptic and re-checked against the theory. Full
-descriptions + recommended actions are in the audit-run record; the high-value ones are written up in
-Parts A/C/D above.
-
+Each was confirmed by an independent code-grounding skeptic and re-checked against the theory. The
+**resolved** findings (FORM-01/02/03/05, TAU-01/05, VISC-01/02/03, MODE-01/02/03, DRIV-02/07/08,
+NONL-01/02/03/05, PROJ-01, SOLV-04) have moved to the §0 Resolved ledger; only the open ones remain below.
 
 **convergence-criterion**
-- `CONV-05` (fragility, medium): MMS verifier numerical parameters (tau_err, eps_*, max_extra_cycles, require_consecutive_passes, rate_check_factor) are  — `test/extended/CocquetFormMMS/run_test.jl:401-412`
-- `CONV-02` (inconsistency, low): Inline literal `1e-2` √d self-check margin in evaluate_convergence violates the repo no-magic-numbers / config-strictnes — `src/solvers/convergence_criterion.jl:211`
-- `CONV-04` (fragility, low): Sub-optimal-rate budget uses a bare power of h with NO reference-error / leading-constant normalization, so the rate_che — `src/solvers/mms_verification.jl:130-131`
+- `CONV-05` (fragility, medium): MMS verifier numerical parameters (tau_err, eps_*, max_extra_cycles, require_consecutive_passes, rate_check_factor) are hard-coded — `test/extended/CocquetFormMMS/run_test.jl:401-412`
+- `CONV-02` (inconsistency, low): Inline literal `1e-2` √d self-check margin in evaluate_convergence violates the repo no-magic-numbers / config-strictness rule — `src/solvers/convergence_criterion.jl:211`
+- `CONV-04` (fragility, low): Sub-optimal-rate budget uses a bare power of h with NO reference-error / leading-constant normalization, so the rate-check is scale-dependent — `src/solvers/mms_verification.jl:130-131`
 
 **driver-mms-io**
-- `DRIV-02` (inconsistency, low): diagnostics_helpers.jl references config.phys and a removed reaction/tau API; it cannot run — `src/diagnostics_helpers.jl:46,51,56,94,96,97,99`
-- `DRIV-03` (inconsistency, low): JSON schema declares no `required` fields for physical_properties/solver/etc., so it does not enforce the no-implicit-de — `config/porous_ns.schema.json`
+- `DRIV-03` (inconsistency, low): JSON schema declares no `required` fields for physical_properties/solver/etc., so it does not enforce the no-implicit-defaults rule (= A.4) — `config/porous_ns.schema.json`
 - `DRIV-05` (inconsistency, low): Production export_results writes no provenance (Re/Da/α₀/params) into or alongside the VTK output — `src/io.jl:28-51`
-- `DRIV-07` (simplification, low): MMS oracle re-derives p_ex and ∇p_ex inline instead of reusing the exact-field overloads, risking drift — `src/problems/mms_paper_2d.jl:294-295`
-- `DRIV-08` (fragility, low): ForchheimerErgunLaw.dsigma_du uses an inline 1e-12 velocity-floor literal (magic number) in formulation/model code — `src/models/reaction.jl:114`
 
 **formulation-core**
-- `FORM-01` (simplification, low): build_picard_jacobian is a full byte-for-byte duplicate of build_stabilized_weak_form_jacobian(..., PicardMode()) and ca — `src/formulations/continuous_problem.jl:371-437`
-- `FORM-02` (fragility, low): dsigma_du regularization floor 1e-12 is a hard-coded magic number in the Exact-Newton reaction derivative — `src/models/reaction.jl:114`
-- `FORM-03` (simplification, low): dL_du_star_v is computed twice in build_stabilized_weak_form_jacobian (redundant recomputation) — `src/formulations/continuous_problem.jl:479`
-- `FORM-04` (fragility, low): τ rational/Forchheimer |u| nonlinearity is under-integrated by the polynomial quadrature rule (inexact, not just inexact — `src/formulations/continuous_problem.jl:196-218`
-- `FORM-05` (simplification, low): Residual and both Jacobians repeat ~20 lines of identical setup boilerplate (α/f/g/h/dΩ unpack, σ/τ₁/τ₂ operator constru — `src/formulations/continuous_problem.jl:297-322,`
+- `FORM-04` (fragility, low): τ rational/Forchheimer |u| nonlinearity is under-integrated by the polynomial quadrature rule (inexact) — `src/formulations/continuous_problem.jl` (quadrature-degree helpers)
 
 **models**
-- `MODE-03` (fragility, medium): No SPSD / range validation on reaction coefficients and porosity bounds — σ can be made non-positive-semidefinite, viola — `src/config.jl:45-65`
-- `MODE-01` (inconsistency, low): Hard-coded 1e-12 magic number in Forchheimer dsigma_du denominator (no-magic-numbers rule violation + double-flooring) — `src/models/reaction.jl:114`
-- `MODE-02` (fragility, low): No validation that the velocity floor is strictly positive — SmoothVelocityFloor is only C¹ when u_floor>0; u_base_floor — `src/models/regularization.jl:55-58;`
-- `MODE-04` (fragility, low): Porosity logistic saturation guard uses hard-coded ±100 thresholds (magic numbers) and α is silently 2D-only — `src/models/porosity.jl:70-74,`
+- `MODE-04` (fragility, low): Porosity logistic saturation guard uses hard-coded ±100 thresholds (magic numbers) and α is silently 2D-only — `src/models/porosity.jl:70-74`
 
 **nonlinear-safeguards**
-- `NONL-01` (fragility, low): ILU-GMRES silently returns a possibly-unconverged solution: no convergence check after gmres! — `src/solvers/linear_solvers.jl:118-123`
-- `NONL-02` (fragility, low): ILU factorization failure silently falls back to identity preconditioner (unpreconditioned GMRES) with only a println — `src/solvers/linear_solvers.jl:90-114`
-- `NONL-03` (simplification, low): AndersonAccelerator is fully implemented and exported but has zero consumers and zero config — dead code — `src/solvers/accelerators.jl:1-127`
-- `NONL-04` (fragility, low): Anderson update! has no zero/near-zero residual guard before solving the least-squares system — `src/solvers/accelerators.jl:53-127`
-- `NONL-05` (inconsistency, low): Hard-rule violation: ILUGMRESSolver keyword constructor backfills magic-number defaults (m=30, τ=1e-4, rel_tol=1e-11, ma — `src/solvers/linear_solvers.jl:72-74`
-- `NONL-06` (fragility, low): Picard line-search reuses Armijo c1 as a multiplicative residual-reduction factor (1 - c1·α), a different mathematical r — `src/solvers/nonlinear.jl:434-438`
+- `NONL-04` (fragility, low): Anderson update! has no zero/near-zero residual guard before solving the least-squares system (now live behind the opt-in `osgs_anderson_enabled`) — `src/solvers/accelerators.jl:53-127`
+- `NONL-06` (fragility, low): Picard line-search reuses Armijo c1 as a multiplicative residual-reduction factor (1 - c1·α), a different mathematical role — `src/solvers/nonlinear.jl:434-438`
 
 **projection**
-- `PROJ-01` (fragility, low): sanitize_projection_policy guards the constant-σ trim by concrete law type, not by a nonlinearity trait — a future nonli — `src/stabilization/projection.jl:151-164`
 - `PROJ-02` (simplification, low): ProjectResidualWithoutPressurePenalty is never instantiated in production code — dead policy reachable only from tests — `src/stabilization/projection.jl:34,121-143`
 
 **solver-orchestration**
-- `SOLV-04` (fragility, medium): Production convergence-gate tolerances eps_tol_momentum / eps_tol_mass are never validated (no fail-loud), violating the — `src/config.jl:166-167`
-- `SOLV-03` (inconsistency, low): One-way ASGS Picard success uses scalar ℓ∞ ftol, not the scale-free cascade_step_outcome the ping-pong path and Newton s — `src/solvers/asgs_solver.jl:144`
-- `SOLV-05` (fragility, low): discrete_l2_projection re-solves a fresh allocate_in_domain RHS each residual eval; b_vec/x_solve scratch is re-allocate — `src/solvers/osgs_solver.jl:59-64`
+- `SOLV-03` (inconsistency, low): One-way ASGS Picard success uses scalar ℓ∞ ftol, not the scale-free cascade_step_outcome the ping-pong path and Newton stage use — `src/solvers/asgs_solver.jl:144`
+- `SOLV-05` (fragility, low): discrete_l2_projection re-solves a fresh allocate_in_domain RHS each residual eval; b_vec/x_solve scratch is re-allocated — `src/solvers/osgs_solver.jl:59-64`
 
 **tau**
-- `TAU-01` (inconsistency, low): Hard-coded 1e-12 |u|-floor in dτ derivatives violates the no-magic-numbers rule (and duplicates/contradicts tau_reg_lim' — `src/stabilization/tau.jl:77`
-- `TAU-02` (fragility, low): σ inside τ₁ is evaluated at effective_speed (mesh-dependent diffusive floor), not at the physical reaction_speed used in — `src/stabilization/tau.jl:37`
-- `TAU-05` (simplification, low): τ_NS (A_NS) inverse-denominator is recomputed inline in four functions instead of a shared helper — `src/stabilization/tau.jl:36,`
-
-**viscous**
-- `VISC-03` (fragility, medium): No committed analytic regression test for the canonical (deviatoric) strong/adjoint operator's 3D grad-div coefficient;  — `test/quick/viscous_operators_quick_test.jl:52-88`
-- `VISC-01` (fragility, low): 3D deviatoric grad-div coefficient (1/6) hard-codes d=3 instead of computing 0.5 − 1/D, and the per-dimension dispatch d — `src/formulations/viscous_operators.jl:159-170`
-- `VISC-02` (simplification, low): gridap_extensions.jl (ContractGradDivOp / grad_div_op) is entirely dead code; the same ∇(∇·u) contraction is re-implemen — `src/formulations/gridap_extensions.jl:17-37`
+- `TAU-02` (fragility, low): σ inside τ₁ is evaluated at effective_speed (mesh-dependent diffusive floor), not at the physical reaction_speed used in the residual — `src/stabilization/tau.jl` (Tau1Op). NOTE: re-check vs `docs/solver/paper-code-divergences.md` — the σ-in-τ₁ choice may be intentional.
 
 **Refuted / trivial (19, not carried):** the second-pass verifiers rejected, among others: "all-Dirichlet
 pressure block is singular" (refuted — the τ₂/εp stabilisation regularises it), "homotopy dilution changes
