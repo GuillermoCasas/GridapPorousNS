@@ -163,7 +163,8 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     use_ilu = linsolver == "ILU_GMRES" || (linsolver == "auto" && ndof > LU_DOF_LIMIT)
     linear_solver = use_ilu ?
         PNS.ILUGMRESSolver(m=lsc.gmres_restart, drop_tolerance=lsc.ilu_drop_tolerance,
-                           rel_tol=lsc.gmres_rel_tol, maxiter=lsc.gmres_maxiter) :
+                           rel_tol=lsc.gmres_rel_tol, maxiter=lsc.gmres_maxiter,
+                           allow_unpreconditioned_fallback=lsc.allow_unpreconditioned_fallback) :
         LUSolver()
     @printf("    [linsolver] ndof=%d -> %s\n", ndof, use_ilu ? "ILU_GMRES" : "LU"); flush(stdout)
 

@@ -44,7 +44,7 @@ _mkres(state; stop_reason = "") = (state = state, stop_reason = stop_reason)
     end
 
     # Structural failures: rejected under every policy.
-    for p in (SI, SI2, OS), sr in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_nan")
+    for p in (SI, SI2, OS), sr in ("linesearch_failed", "merit_divergence_escaped", "linear_solve_failed")
         @test out(_mkres(:ok; stop_reason = sr), p) == :reject
     end
 

@@ -24,6 +24,7 @@ files = [
     "config_strict_loader_blitz_test.jl",
     "config_validation_blitz_test.jl",
     "cascade_policy_symmetry_blitz_test.jl",
+    "linear_solver_honesty_blitz_test.jl",
     "stall_guard_blitz_test.jl",
     "pingpong_schedule_blitz_test.jl",
     "cocquet_modified_corner_topology_blitz_test.jl"

@@ -131,6 +131,13 @@ trades robustness/speed against peak memory:
 The `ilu_*`/`gmres_*` fields are the ILU drop tolerance and GMRES restart/rel-tol/iteration cap; they are
 consumed only when `method == "ILU_GMRES"` but are ALWAYS required (no silent default), per the
 no-implicit-defaults rule.
+
+`allow_unpreconditioned_fallback` is the [C.1] honesty policy for the ILU_GMRES path: when the ILU
+factorization fails, `false` (the safe default) makes the linear solve fail loudly (so the nonlinear
+cascade rolls back / falls to Picard rather than silently running a near-hopeless unpreconditioned solve),
+while `true` lets GMRES attempt the solve UNPRECONDITIONED with a loud warning. Either way a GMRES that
+does not reach `gmres_rel_tol` within `gmres_maxiter` is reported as a FAILED step, never accepted as
+exact — see `src/solvers/linear_solvers.jl` and docs/formulation-audit-2026-06-24.md §C.1.
 """
 Base.@kwdef struct LinearSolverConfig
     method::String                 # "LU" (direct, exact) or "ILU_GMRES" (low-memory iterative)
@@ -138,6 +145,7 @@ Base.@kwdef struct LinearSolverConfig
     gmres_restart::Int             # GMRES Krylov subspace size before restart
     gmres_rel_tol::Float64         # relative residual tolerance for GMRES convergence
     gmres_maxiter::Int             # cap on GMRES iterations
+    allow_unpreconditioned_fallback::Bool  # [C.1] ILU-failure policy: false ⇒ fail loud; true ⇒ identity Pl + warn
 end
 
 """

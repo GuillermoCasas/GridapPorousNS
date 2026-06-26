@@ -252,10 +252,18 @@ function eval_linear_system_resolution!(dx, A, b, solver::SafeNewtonSolver, ls_c
         ns = numerical_setup(ls_cache, A)
         solve!(dx, ns, b)
     catch e
-        println("  [Linear Solve Exception] ", e)
+        # [C.1] Distinguish a CONTROLLED, expected linear-solver failure (iterative non-convergence, or a
+        # disallowed unpreconditioned fallback — see linear_solvers.jl) from an unexpected crash. Both mark
+        # the solve failed so the cascade rolls back; the distinct, explicit label leaves a reader no room
+        # to misread either one as a NaN, a crash, or — crucially — a converged step.
+        if e isa GMRESNotConvergedError || e isa ILUFactorizationFailure
+            println("  [Linear Solve NOT CONVERGED] ", sprint(showerror, e))
+        else
+            println("  [Linear Solve Exception] ", e)
+        end
         solve_failed = true
     end
-    
+
     if solve_failed || any(isnan, dx)
         return true, ls_cache # Failed
     end
@@ -715,10 +723,13 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         solve_failed, ls_cache = eval_linear_system_resolution!(dx, A, b, solver, ls_cache)
         
         if solve_failed
-            println("  [Fatal] Linear solve failed or yielded NaNs. Aborting safely.")
+            # Umbrella for any linear-solve failure: an exception, a NaN step, or a controlled
+            # iterative non-convergence (C.1; the specific cause was printed just above). Roll back to
+            # the best-so-far iterate; the cascade treats this segment as a rejected failure.
+            println("  [Fatal] Linear solve did not yield a usable step (see cause above); rolling back to best iterate.")
             x .= best_x
             state.norm_b_inf = best_b_inf
-            stop_reason = "linear_solve_nan"
+            stop_reason = "linear_solve_failed"
             break
         end
         

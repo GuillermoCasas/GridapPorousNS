@@ -505,9 +505,14 @@
                   "type": "integer",
                   "description": "Cap on GMRES iterations. Used only for ILU_GMRES.",
                   "examples": [300]
+                },
+                "allow_unpreconditioned_fallback": {
+                  "type": "boolean",
+                  "description": "[C.1] Policy when the ILU factorization fails (ILU_GMRES only). false (safe default): the linear solve fails loudly so the nonlinear cascade rolls back / falls to Picard. true: GMRES runs UNPRECONDITIONED (identity preconditioner) after a loud warning. Either way a GMRES that does not reach gmres_rel_tol within gmres_maxiter is reported as a FAILED step, never accepted as exact. Required even for LU (consumed only by ILU_GMRES).",
+                  "examples": [false]
                 }
               },
-              "required": ["method", "ilu_drop_tolerance", "gmres_restart", "gmres_rel_tol", "gmres_maxiter"],
+              "required": ["method", "ilu_drop_tolerance", "gmres_restart", "gmres_rel_tol", "gmres_maxiter", "allow_unpreconditioned_fallback"],
               "additionalProperties": false
             }
           },

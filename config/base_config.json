@@ -74,7 +74,8 @@
                 "ilu_drop_tolerance": 1e-4,
                 "gmres_restart": 30,
                 "gmres_rel_tol": 1e-11,
-                "gmres_maxiter": 300
+                "gmres_maxiter": 300,
+                "allow_unpreconditioned_fallback": false
             }
         },
         "mesh": {
