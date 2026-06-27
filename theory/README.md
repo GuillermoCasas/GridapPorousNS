@@ -28,6 +28,9 @@ The `\Guillermo{}` / `\Joaquin{}` author-review macros are defined in `article.t
 - [`osgs_algorithm/osgs_algorithm.tex`](osgs_algorithm/osgs_algorithm.tex) — OSGS algorithm derivation and pseudocode driving the solver.
 - [`centered_encoding/centered_encoding.tex`](centered_encoding/centered_encoding.tex) — verification working note, **pending merge** into `paper/article.tex` (mechanics in [`../docs/paper/errata.md`](../docs/paper/errata.md)).
 - [`osgs_reaction_note/osgs_reaction_note.tex`](osgs_reaction_note/osgs_reaction_note.tex) — OSGS reaction-dominated convergence analysis note.
+- [`tau_saturation_note/tau_saturation_note.tex`](tau_saturation_note/tau_saturation_note.tex) — τ-saturation / stabilization-parameter analysis note.
+- [`velocity_floor_regularization/velocity_floor_regularization.tex`](velocity_floor_regularization/velocity_floor_regularization.tex) — smooth velocity-floor regularization of the Forchheimer `|u|` term.
+- [`continuity appendix/continuity_appendix.tex`](continuity%20appendix/continuity_appendix.tex) — continuity-equation appendix note.
 
 ## Where the meta-docs went
 

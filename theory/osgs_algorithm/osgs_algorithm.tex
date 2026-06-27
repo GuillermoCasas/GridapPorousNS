@@ -80,7 +80,10 @@ solvers), each of which in turn invokes a shared Newton kernel
 (Algorithms A.1, A.2, A.3). A graphical map of this hierarchy is given
 in Section~\ref{sec:tree}. Each algorithm is documented in two parts:
 a brief \emph{interface card} listing its callers, callees, inputs and
-outputs; and a procedural pseudocode box.
+outputs; and a procedural pseudocode box. The presentation is
+\emph{equation-first}: Section~\ref{sec:algebraic-systems} fixes the exact
+algebraic system solved at each stage, and every algorithm box that
+follows is read as a task against those equations.
 
 The presentation is organised in two strict tiers. Part~\ref{part:core}
 describes the \emph{core algorithm}. Part~\ref{part:ext} documents two
@@ -231,219 +234,28 @@ A.1--A.3 are pure procedures with no further dependencies.}
 \end{figure}
 
 \paragraph{Code map.}  The source mirrors this tree:
-Algorithm~\ref{alg:A} (the shared Newton kernel) is \code{src/solvers/nonlinear.jl};
-Algorithms~\ref{alg:B} and~\ref{alg:O} (the Stage-I ASGS boot and the orchestrator) are
-\code{src/solvers/asgs\_solver.jl}; Algorithm~\ref{alg:C} (the coupled OSGS solve,
+Algorithm~\ref{alg:O} (the orchestrator, \code{solve\_system}) is \code{src/solvers/solver\_core.jl};
+Algorithm~\ref{alg:B} (the Stage-I ASGS boot, \code{\_initialize\_asgs\_state!}) is
+\code{src/solvers/asgs\_solver.jl}; Algorithm~\ref{alg:A} (the shared Newton kernel) is
+\code{src/solvers/nonlinear.jl}; Algorithm~\ref{alg:C} (the coupled OSGS solve,
 \code{solve\_osgs\_stage!}) is \code{src/solvers/osgs\_solver.jl}; and the optional Algorithm~\ref{alg:D}
 (\code{VerifyMMSPlateau}) is \code{src/solvers/mms\_verification.jl}, plugged in behind the
 \code{SolutionVerifier} seam (\code{on\_asgs\_converged!} / \code{on\_osgs\_converged!}) so the production
 path runs a no-op \code{NoVerification}.
 
-\paragraph{Reading order.}  This document presents the modules
-top-down: first the orchestrator (§\ref{sec:orchestration}), then the
-two stage solvers (§\ref{sec:picard}, §\ref{sec:osgs}), then the shared
-Newton kernel and its leaves (§\ref{sec:newton}). Each algorithm is
-introduced by a short \emph{interface card} that summarises its
-position in the tree---callers, callees, inputs, outputs---before the
-procedural box. Mathematical preliminaries shared by several algorithms
-(the diagonally equilibrated merit function and its directional
-derivative identity) are gathered in §\ref{sec:math-prelim}.
-
-% ============================================================
-\section{Parameter Taxonomy and Code Equivalence}
-\label{sec:params}
-
-\subsection{Numerical parameters of the core algorithm}
-
-Table~\ref{tab:params} enumerates every numerical parameter consumed by
-the algorithms of Part~\ref{part:core}, grouped by role. Parameters
-that belong to the optional extensions of Part~\ref{part:ext} are
-tabulated separately in the corresponding sections.
-
-\begin{table}[h]
-\centering
-\caption{Numerical parameters of the core nonlinear-solver pipeline.
-Throughout the table, $\code{sol} = \code{config.numerical\_method.solver}$
-(a flat \code{SolverConfig} \code{@kwdef} struct) and
-$\code{stab} = \code{config.numerical\_method.stabilization}$. The
-\code{SafeNewtonSolver} struct that runs the inner cascade is built from
-these fields by \code{SafeNewtonSolver(::LinearSolver, ::SolverConfig)};
-its post-construction field names (e.g.\ \code{c1}, \code{max\_iters})
-are shorter aliases of the config field names. Code-side references in
-this table are written against the config struct, not the built solver.}
-\label{tab:params}
-\footnotesize
-\begin{tabularx}{\textwidth}{@{} l l X @{}}
-\toprule
-\textbf{Symbol} & \textbf{Field in code} & \textbf{Role / effect} \\
-\midrule
-\multicolumn{3}{l}{\emph{Inner Newton iteration controls}} \\
-$N_{\mathrm{N}}$         & \code{sol.newton\_iterations}           & Cap on inner Newton iterations. \\
-$N_{\mathrm{P}}$         & \code{sol.picard\_iterations}           & Cap on Picard fallback iterations. \\
-$N_{\mathrm{inc}}$       & \code{sol.max\_increases}               & Consecutive merit-function expansions tolerated before declaring divergence. \\
-$\textftol$              & \code{sol.ftol}                          & Absolute $\ell^\infty$ residual floor; the \code{conv\_probe===nothing} fallback gate (Cocquet/unit tests). Superseded in production by the scale-free criterion below. \\
-$\mathrm{tol}_M$         & \code{sol.eps\_tol\_momentum}            & Scale-free momentum tolerance: converged when $\varepsilon_M\le\mathrm{tol}_M$ (§\ref{sec:convergence-criterion}). \\
-$\mathrm{tol}_C$         & \code{sol.eps\_tol\_mass}                & Scale-free mass tolerance: converged when $\varepsilon_C\le\mathrm{tol}_C$. \\
-$\textxtol$              & \code{sol.xtol}                          & Lower bound on the accepted step norm $\|\alpha\delta\boldsymbol{x}\|$ before declaring coordinate stagnation. \\
-$\textstag$              & \code{sol.stagnation\_noise\_floor}      & Noise-floor residual; a non-converged exit below this may still be classified as success (Sec.~\ref{sec:falseEquiv}). \\
-$\alpha_{\min}$          & \code{sol.linesearch\_alpha\_min}        & Smallest line-search step before giving up. \\
-$c_1$                    & \code{sol.armijo\_c1}                    & Armijo / monotone-residual descent constant. \\
-$\gamma$                 & \code{sol.linesearch\_contraction\_factor} & Backtracking factor: $\alpha \leftarrow \gamma\alpha$. \\
-$N_{\mathrm{ls}}$        & \code{sol.max\_linesearch\_iterations}   & Bound on line-search inner iterations. \\
-$F_{\mathrm{div}}$       & \code{sol.divergence\_merit\_factor}     & Threshold by which the merit must expand to count as one ``increase''. \\
-$\mathfrak{m}$           & (built into the \code{SafeNewtonSolver} as \code{.mode})  & Cascade mode: \code{:newton} (merit-Armijo) or \code{:picard} (monotone residual reduction); cf.\ §\ref{sec:dir-deriv} and Alg.~\ref{alg:A2}. \\
-\code{freeze\_cusp} & \code{sol.freeze\_jacobian\_cusp}   & Boolean: skip Jacobian recomputation at Forchheimer cusps to avoid singular updates. \\
-\midrule
-\multicolumn{3}{l}{\emph{OSGS coupled solve}} \\
-$N_{\mathrm{OSGS}}$      & \code{stab.osgs\_iterations}             & Inner-Newton iteration cap for the single coupled OSGS solve (Alg.~\ref{alg:C}); the projection $\boldsymbol{\pi}_h$ is re-slaved every residual evaluation, so there is no separate outer-loop budget or drift criterion. \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-\subsection{Algorithm--to--code correspondence}
-
-\begin{table}[h]
-\centering
-\caption{Algorithm $\leftrightarrow$ code signature mapping (core algorithm).}
-\label{tab:functions}
-\small
-\begin{tabularx}{\textwidth}{@{} l X @{}}
-\toprule
-\textbf{Algorithm} & \textbf{Code entry point} \\
-\midrule
-$\mathrm{SimulationOrchestration}$ (Alg.~\ref{alg:O})   & \code{run\_simulation(path)} $\to$ \code{solve\_system(setup, form, solvers, cfg, x0)}. \\
-$\mathrm{RobustNonlinearCascade}$ (Alg.~\ref{alg:B})    & The Newton$\to$Picard$\to$Newton cascade inside \code{solve\_system}; used only by Stage~I, the ASGS algebraic boot (\code{\_initialize\_asgs\_state!}, with ASGS operators and the restore vector $\boldsymbol{x}^0_{\mathrm{backup}}$). \\
-$\mathrm{CoupledOSGSSolve}$ (Alg.~\ref{alg:C})  & The single coupled OSGS Newton solve inside \code{solve\_system}: one \code{safe\_fe\_solve!} call on Algorithm~\ref{alg:A} whose residual re-slaves $\boldsymbol{\pi}_h$ at every evaluation. \\
-$\mathrm{ExactNewtonPipeline}$ (Alg.~\ref{alg:A})       & \code{\_safe\_solve\_inner!} (\code{src/solvers/nonlinear.jl}), reused with either an exact-Newton or a Picard Jacobian. \\
-$\mathrm{SolveLinearSystem}$ (Alg.~\ref{alg:A1})        & \code{eval\_linear\_system\_resolution!(dx, A, b, solver, cache)}. \\
-$\mathrm{ArmijoLinesearch}$ (Alg.~\ref{alg:A2})         & \code{eval\_armijo\_linesearch\_pass!}. \\
-$\mathrm{EvaluateSafeguards}$ (Alg.~\ref{alg:A3})       & \code{eval\_safeguard\_termination\_bounds!}. \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-% ============================================================
-\section{Mathematical Preliminaries}
-\label{sec:math-prelim}
-
-Two mathematical objects are referenced repeatedly by several
-algorithm boxes below. We define them once here so that the boxes
-themselves remain procedural.
-
-\subsection{The diagonally equilibrated merit function}
-\label{sec:merit}
-
-Let $\boldsymbol{b}(\boldsymbol{x}) \in \mathbb{R}^N$ be the assembled
-residual of the (possibly stabilised) discrete weak form, and
-$\mathcal{J}(\boldsymbol{x}) = \partial \boldsymbol{b}/\partial \boldsymbol{x}$
-its Jacobian. The line-search merit function used throughout the
-cascade is the diagonally equilibrated quadratic
-\begin{equation}
-    \label{eq:merit}
-    \Phi_{\boldsymbol{w}}(\boldsymbol{x})
-        = \tfrac{1}{2} \sum_{k=1}^{N}
-            \left( \frac{b_k(\boldsymbol{x})}{w_k} \right)^{2}.
-\end{equation}
-The weights $w_k$ are recomputed at every Newton iteration from the
-diagonal of the current Jacobian. Their definition is mode-dependent:
-when the discrete trial space is a multi-field FE space with a
-$\mathrm{ConsecutiveMultiFieldStyle}$ DOF ordering (the only case used
-in this codebase: velocity $\oplus$ pressure), the equilibration is
-performed \emph{per block}. Let $\{\mathcal{B}_q\}_{q}$ denote the
-disjoint per-field DOF index ranges (so $\bigcup_q \mathcal{B}_q
-= \{1,\dots,N\}$). Then
-\begin{equation}
-    \label{eq:merit-weights}
-    w_k =
-    \begin{cases}
-        \max\!\bigl(|\mathcal{J}_{kk}|,\ \varepsilon_{\mathrm{mach}}\,
-            \max_{j \in \mathcal{B}_{q(k)}} |\mathcal{J}_{jj}|,\
-            \varepsilon_{\mathrm{mach}} \bigr)
-            & \text{multi-field, $k \in \mathcal{B}_{q(k)}$,} \\[1mm]
-        \max\!\bigl(|\mathcal{J}_{kk}|,\ \varepsilon_{\mathrm{mach}}\,
-            \|\mathrm{diag}(\mathcal{J})\|_\infty,\
-            \varepsilon_{\mathrm{mach}} \bigr)
-            & \text{single-field fallback.}
-    \end{cases}
-\end{equation}
-The first form is the production rule for the saddle-point system at
-issue; the second is the legacy global rule, retained only for the
-unrealistic single-field case in which $\mathcal{B}_q$ cannot be
-detected.
-
-\paragraph{Why equilibrate?}  The discrete residual mixes momentum-balance
-rows---measured in physical units of force per unit volume, and possibly
-amplified by a large Reynolds or Damk\"ohler number---with mass-balance
-rows, whose natural magnitude is dimensionally different. A raw unweighted
-merit $\tfrac{1}{2}\|\boldsymbol{b}\|^2$ would let the momentum rows
-dominate entirely, so the line search would be quietly indifferent to
-mass-conservation errors. Equilibrating by $w_k$ rescales every row to
-its own natural unit. The lower-bound floor
-$\varepsilon_{\mathrm{mach}}\,\max_{j \in \mathcal{B}_{q(k)}} |\mathcal{J}_{jj}|$
-prevents a genuinely small diagonal entry from triggering division by
-zero.
-
-\paragraph{Why per block?}  A global $\|\mathrm{diag}(\mathcal{J})\|_\infty$
-in the floor would be dominated by the momentum-block diagonal whenever
-the Reynolds or Darcy regime is severe; the pressure-block floor
-would then be so close to $\varepsilon_{\mathrm{mach}}\,$(momentum scale)
-that mass-residual rows would still be effectively un-weighted relative
-to momentum-residual rows, defeating the equilibration entirely. The
-per-block floor scales each field's residual against \emph{its own}
-diagonal magnitudes, which is the only choice that gives the line search
-a faithful view of mass-residual descent.
-
-\subsection{The Gauss--Newton directional-derivative identity}
-\label{sec:dir-deriv}
-
-For a Newton step $\delta\boldsymbol{x}$ satisfying
-$\mathcal{J}\delta\boldsymbol{x} = \boldsymbol{b}$, the directional
-derivative of $\Phi_{\boldsymbol{w}}$ along $-\delta\boldsymbol{x}$ at
-$\boldsymbol{x}$ is
-\begin{equation}
-    \label{eq:dir-deriv}
-    D \;=\; -\sum_k w_k^{-2}\, b_k\,(\mathcal{J}\delta\boldsymbol{x})_k
-        \;=\; -\sum_k w_k^{-2}\, b_k^2
-        \;=\; -2\,\Phi_{\boldsymbol{w}}(\boldsymbol{x}).
-\end{equation}
-The Newton-mode Armijo predicate of Algorithm~\ref{alg:A2} therefore
-reduces to $\hat\Phi \le \Phi(1 - 2 c_1 \alpha)$, which requires no extra
-gradient evaluation.
-
-\paragraph{Picard mode invalidates the identity.}  The identity~\eqref{eq:dir-deriv}
-holds \emph{only} because the search direction is the exact Newton step.
-The Picard Jacobian drops the linearised convective cross-term and the
-linearised Forchheimer term (cf.\ §\ref{sec:picard}), so the resulting
-$\delta\boldsymbol{x}$ does not satisfy $\mathcal{J}\delta\boldsymbol{x}
-= \boldsymbol{b}$ for the true $\mathcal{J}$; the cancellation in the
-second equality above breaks and $D$ is in general not $-2\Phi$. Forcing
-the merit-based Armijo predicate on a Picard step would either reject
-descent directions for the wrong reason or accept ascent directions
-spuriously. The implementation therefore branches the acceptance test by
-solver mode: Newton uses the merit-based Armijo above; Picard uses the
-monotone residual reduction
-$\|\hat{\boldsymbol{b}}\|_\infty \le (1 - c_1 \alpha)\|\boldsymbol{b}\|_\infty$,
-which is mode-agnostic because it depends only on the residuals at the
-two iterates. This branching is shown explicitly inside
-Algorithm~\ref{alg:A2}.
-
-The same mode-awareness extends to the \emph{divergence} safeguard in
-Algorithm~\ref{alg:A3}: in Newton mode we compare $\hat\Phi$ against
-$\Phi$, because the Armijo line search is itself driving $\Phi$ down
-between successive iterates and a sustained $\Phi$-growth signals a
-structural problem. In Picard mode we cannot use $\Phi$ for this purpose,
-because the merit weights $\boldsymbol{w} = \mathrm{diag}(\mathbf{J})$ are
-refreshed every iteration from a Picard Jacobian whose diagonal differs
-from Newton's, so $\Phi$ is not even monotone-comparable across iterations
-even when $\|\boldsymbol{b}\|_\infty$ is shrinking monotonically. Picard
-mode therefore compares $\|\hat{\boldsymbol{b}}\|_\infty$ against
-$\|\boldsymbol{b}\|_\infty$ directly. Empirically, applying the
-$\Phi$-based check unconditionally produced spurious
-$\mathsf{MeritDivergence}$ exits at high Reynolds whenever Picard
-fallbacks fired; the corrected mode-aware rule unblocked the
-$(\mathrm{Re} = 10^6,\, \mathrm{Da} = 1,\, \alpha_0 = 0.05)$ stiff cell
-without any continuation driver (see \code{probe\_stiff\_findings.md},
-2026-05-19).
+\paragraph{Reading order.}  The document is organised \emph{equation-first}:
+§\ref{sec:algebraic-systems} pins down the exact algebraic system solved at
+each stage, and the algorithm boxes that follow are read as tasks against
+those equations. Those boxes are presented top-down---the orchestrator
+(§\ref{sec:orchestration}), then the two stage solvers (§\ref{sec:picard},
+§\ref{sec:osgs}), then the shared Newton kernel and its leaves
+(§\ref{sec:newton})---each introduced by a short \emph{interface card}
+summarising its callers, callees, inputs and outputs before the procedural
+box. The mathematical machinery the kernel's line search needs (the
+diagonally equilibrated merit function and its directional-derivative
+identity) is collected in §\ref{sec:math-prelim}, immediately before that
+kernel; the full parameter taxonomy (§\ref{sec:params}) and the exit-reason
+map (Appendix~\ref{sec:appendix-codes}) are reference tables at the end.
 
 % ============================================================
 \section{Explicit Algebraic Systems Solved at Each Stage}
@@ -503,13 +315,25 @@ whose two components are exactly what the code assembles:
          - g .
 \end{align}
 Here $\sigma(\alpha,\boldsymbol{u}) = a(\alpha) + b(\alpha)|\boldsymbol{u}|$
-is the Darcy--Forchheimer drag, $\varepsilon$ the pressure penalty, and
+is the Darcy--Forchheimer drag; $\varepsilon$ is the
+physical-compressibility pressure penalty $\varepsilon_{\mathrm{phys}}$
+(config field \code{eps\_val}, the artificial compressibility that pins
+the constant-pressure mode, $\sim 10^{-4}$ in production); and
 the divergence has been expanded by the product rule,
 $\nabla\!\cdot\!(\alpha\boldsymbol{u}) = \alpha\,\nabla\!\cdot\!\boldsymbol{u}
 + \boldsymbol{u}\!\cdot\!\nabla\alpha$. Equations~\eqref{eq:alg-Ru}--\eqref{eq:alg-Rp}
-are the form realised in code; note that the plain strong
-form~\eqref{eq:strong} suppresses $\varepsilon p$, the porosity inside the
-divergence, and $g$, all of which are present here.
+are the form realised in code; the plain strong form~\eqref{eq:strong} is
+their unit-porosity, penalty-free, unforced reduction. It omits the
+porosity factor $\alpha$ that the porous-medium form carries on the
+convective, pressure-gradient, and viscous terms and inside the divergence
+($\alpha\,\nabla\!\cdot\!\boldsymbol{u} + \boldsymbol{u}\!\cdot\!\nabla\alpha$),
+the penalty $\varepsilon_{\mathrm{phys}} p$, and the mass source $g$ --- all
+present here. A \emph{second},
+numerical penalty enters the Jacobian alone: the Codina iterative penalty
+$\varepsilon_{\mathrm{num}}$ (config field \code{numerical\_epsilon},
+default $0$) adds $\varepsilon_{\mathrm{num}}\,\delta p$ to the pressure
+block, lags out of the residual, and so introduces no consistency error
+(its effect on the tangent is noted in §\ref{sec:alg-stage1}--§\ref{sec:alg-stage2}).
 
 % ------------------------------------------------------------
 \subsection{The discrete stabilised forms and the OSGS fixed point}
@@ -599,9 +423,9 @@ from the linearised system
 \begin{equation}
     \label{eq:alg-stage1-newton}
     \mathcal{J}^{\mathrm{ASGS}}(U_h^{\,j})\,\delta U^{\,j}
-        = -\,\boldsymbol{b}^{\mathrm{ASGS}}(U_h^{\,j}),
+        = \boldsymbol{b}^{\mathrm{ASGS}}(U_h^{\,j}),
     \qquad
-    U_h^{\,j+1} = U_h^{\,j} + \lambda^{\,j}\,\delta U^{\,j},
+    U_h^{\,j+1} = U_h^{\,j} - \lambda^{\,j}\,\delta U^{\,j},
 \end{equation}
 with step length $\lambda^{\,j}$ chosen by the Armijo line search of
 Algorithm~\ref{alg:A2}. In exact-Newton mode the tangent
@@ -610,7 +434,10 @@ convective linearisation $\alpha(\nabla\delta\boldsymbol{u})^{\!\top}\!\boldsymb
 + \alpha(\nabla\boldsymbol{u})^{\!\top}\!\delta\boldsymbol{u}$ and the
 derivative terms $\partial\sigma/\partial\boldsymbol{u}$,
 $\partial\tau_1/\partial\boldsymbol{u}$, $\partial\tau_2/\partial\boldsymbol{u}$,
-$\partial\mathcal{L}^{*}/\partial\boldsymbol{u}$. The Picard fallback of
+$\partial\mathcal{L}^{*}/\partial\boldsymbol{u}$; its pressure block
+multiplies $\delta p$ by $(\varepsilon_{\mathrm{phys}}+\varepsilon_{\mathrm{num}})$,
+the extra $\varepsilon_{\mathrm{num}}$ (default $0$) being the root-preserving,
+Jacobian-only Codina regulariser of §\ref{sec:alg-continuous}. The Picard fallback of
 the cascade freezes those derivative terms (advection frozen at
 $\boldsymbol{u}_h^{\,j}$), trading quadratic convergence for a wider basin.
 The converged $U_h^{\mathrm{ASGS}}$ is the output of Stage~I.
@@ -663,17 +490,18 @@ $(\boldsymbol{b}_{p})_i = \langle W_h^i, \mathcal{R}^{p}(U_h^{\,k})\rangle$.
 Both $M_{\boldsymbol{u}}$ and $M_p$ are symmetric positive definite and
 state-independent, so they are assembled once and Cholesky-factored once;
 each evaluation of~\eqref{eq:alg-stage2-mass} is a back-substitution. (When
-$\sigma$ is constant, the reaction term $\sigma\boldsymbol{u}_h$ lies in
-$X_h$, so $(I-\Pi)(\sigma\boldsymbol{u}_h) = 0$ exactly and the velocity
-load omits it; see §\ref{sec:proj-policy}.)
+$\sigma$ is constant and \code{experimental\_reaction\_mode = "standard"},
+the FE-exact terms $\sigma\boldsymbol{u}_h$ and $\varepsilon p_h$ satisfy
+$(I-\Pi)(\cdot) = 0$ exactly, so they are dropped from the velocity and
+pressure loads respectively; see §\ref{sec:proj-policy}.)
 
 The Newton update is
 \begin{equation}
     \label{eq:alg-stage2-newton}
     \mathcal{J}(U_h^{\,k})\,\delta U^{\,k}
-        = -\,\mathcal{F}(U_h^{\,k}),
+        = \mathcal{F}(U_h^{\,k}),
     \qquad
-    U_h^{\,k+1} = U_h^{\,k} + \lambda^{\,k}\,\delta U^{\,k},
+    U_h^{\,k+1} = U_h^{\,k} - \lambda^{\,k}\,\delta U^{\,k},
 \end{equation}
 where the residual $\mathcal{F}(U_h^{\,k})$ uses the freshly slaved
 $\boldsymbol{\pi}_h^{\,k}$ from~\eqref{eq:alg-stage2-mass}, but the tangent
@@ -681,7 +509,8 @@ $\mathcal{J}(U_h^{\,k})$ is the \emph{frozen-$\boldsymbol{\pi}$} Jacobian:
 it differentiates $B_S$ in $(\sigma, \tau_1, \tau_2, \text{convection})$
 exactly --- including $\partial\sigma/\partial\boldsymbol{u}$,
 $\partial\tau_i/\partial\boldsymbol{u}$ and the full convective linearisation,
-as in~\eqref{eq:alg-stage1-newton} --- but \emph{drops} the dense coupling
+as in the Stage-I tangent of §\ref{sec:alg-stage1} (with the same
+Jacobian-only $\varepsilon_{\mathrm{num}}\,\delta p$ pressure term) --- but \emph{drops} the dense coupling
 block $\partial\boldsymbol{\pi}_h/\partial U_h = M^{-1}\,\partial\boldsymbol{b}/\partial U_h$
 arising through~\eqref{eq:alg-stage2-mass}. Because that single block is
 omitted while the residual still re-slaves $\boldsymbol{\pi}_h$ at every
@@ -696,7 +525,13 @@ Jacobian-free recovery of §\ref{sec:jfnk} reinstates.
 \label{sec:alg-inner}
 
 Both~\eqref{eq:alg-stage1-newton} and~\eqref{eq:alg-stage2-newton} are
-driven by the same kernel (Algorithm~\ref{alg:A}). The step length
+driven by the same kernel (Algorithm~\ref{alg:A}). \emph{Sign convention.}
+Throughout this document the Newton step is written in the residual-as-RHS
+form $\mathcal{J}\,\delta U = \boldsymbol{b}$ with update
+$U \leftarrow U - \lambda\,\delta U$ --- the convention of the code and of
+every algorithm box below (equivalently the textbook
+$\mathcal{J}\,\delta U = -\boldsymbol{b}$, $U \leftarrow U + \lambda\,\delta U$).
+The step length
 $\lambda^{\,j}$ / $\lambda^{\,k}$ is selected by minimising the diagonally
 equilibrated merit $\Phi_{\boldsymbol{w}}$ of~\eqref{eq:merit} along
 $-\delta U$, using the Armijo predicate of Algorithm~\ref{alg:A2}
@@ -756,7 +591,6 @@ $(S, U_h^{\mathrm{ASGS}}) \gets \mathrm{RobustNonlinearCascade}(\boldsymbol{x}^0
     \Return $(U_h^{\mathrm{ASGS}}, \boldsymbol{\pi}_h \equiv 0)$\;
 }
 \If{$\Theta.\mathrm{method} = \mathrm{OSGS}$}{
-    pre-assemble and LU-factor $M_u = (V_{\mathrm{free}}, U_{\mathrm{free}})_{L^2}$, $M_p = (Q_{\mathrm{free}}, P_{\mathrm{free}})_{L^2}$ once\;
     \extline{\If{$\code{mms\_cfg.enabled}$}{
         $N_{\mathrm{OSGS}}^{\mathrm{eff}} \gets N_{\mathrm{OSGS}} + K_{\mathrm{extra}}$ \tcp*{inflate the coupled-solve Newton budget for plateau verification}
     }}
@@ -787,8 +621,8 @@ calls the Newton kernel (Algorithm~\ref{alg:A}) directly, not the
 cascade.
 
 \paragraph{Stage II.}  Either accept the ASGS state, or hand off to the
-coupled OSGS Newton solve. The mass matrices $M_u, M_p$ are pre-assembled
-and LU-factored exactly once before the coupled solve begins. Because the
+coupled OSGS Newton solve. The mass matrices $M_u, M_p$ are assembled
+and Cholesky-factored exactly once at the start of the coupled solve. Because the
 projection target spaces never change, these factorisations are reused at
 every residual evaluation, which converts every $L^2$ re-projection of
 $\boldsymbol{\pi}_h$ into a constant-cost forward/back substitution.
@@ -951,11 +785,137 @@ single coupled-solve exit of Algorithm~\ref{alg:C}. See
 \code{docs/solver/algorithm-code-mapping.md}.
 
 % ============================================================
+\section{Mathematical Preliminaries}
+\label{sec:math-prelim}
+
+Two mathematical objects are consumed by the Newton kernel's line search
+(§\ref{sec:newton}, immediately following) and referenced by several
+algorithm boxes. We define them once here so that the boxes themselves
+remain procedural.
+
+\subsection{The diagonally equilibrated merit function}
+\label{sec:merit}
+
+Let $\boldsymbol{b}(\boldsymbol{x}) \in \mathbb{R}^N$ be the assembled
+residual of the (possibly stabilised) discrete weak form, and
+$\mathcal{J}(\boldsymbol{x}) = \partial \boldsymbol{b}/\partial \boldsymbol{x}$
+its Jacobian. The line-search merit function used throughout the
+cascade is the diagonally equilibrated quadratic
+\begin{equation}
+    \label{eq:merit}
+    \Phi_{\boldsymbol{w}}(\boldsymbol{x})
+        = \tfrac{1}{2} \sum_{k=1}^{N}
+            \left( \frac{b_k(\boldsymbol{x})}{w_k} \right)^{2}.
+\end{equation}
+The weights $w_k$ are recomputed at every Newton iteration from the
+diagonal of the current Jacobian. Their definition is mode-dependent:
+when the discrete trial space is a multi-field FE space with a
+$\mathrm{ConsecutiveMultiFieldStyle}$ DOF ordering (the only case used
+in this codebase: velocity $\oplus$ pressure), the equilibration is
+performed \emph{per block}. Let $\{\mathcal{B}_q\}_{q}$ denote the
+disjoint per-field DOF index ranges (so $\bigcup_q \mathcal{B}_q
+= \{1,\dots,N\}$). Then
+\begin{equation}
+    \label{eq:merit-weights}
+    w_k =
+    \begin{cases}
+        \max\!\bigl(|\mathcal{J}_{kk}|,\ \varepsilon_{\mathrm{mach}}\,
+            \max_{j \in \mathcal{B}_{q(k)}} |\mathcal{J}_{jj}|,\
+            \varepsilon_{\mathrm{mach}} \bigr)
+            & \text{multi-field, $k \in \mathcal{B}_{q(k)}$,} \\[1mm]
+        \max\!\bigl(|\mathcal{J}_{kk}|,\ \varepsilon_{\mathrm{mach}}\,
+            \|\mathrm{diag}(\mathcal{J})\|_\infty,\
+            \varepsilon_{\mathrm{mach}} \bigr)
+            & \text{single-field fallback.}
+    \end{cases}
+\end{equation}
+The first form is the production rule for the saddle-point system at
+issue; the second is the legacy global rule, retained only for the
+unrealistic single-field case in which $\mathcal{B}_q$ cannot be
+detected.
+
+\paragraph{Why equilibrate?}  The discrete residual mixes momentum-balance
+rows---measured in physical units of force per unit volume, and possibly
+amplified by a large Reynolds or Damk\"ohler number---with mass-balance
+rows, whose natural magnitude is dimensionally different. A raw unweighted
+merit $\tfrac{1}{2}\|\boldsymbol{b}\|^2$ would let the momentum rows
+dominate entirely, so the line search would be quietly indifferent to
+mass-conservation errors. Equilibrating by $w_k$ rescales every row to
+its own natural unit. The lower-bound floor
+$\varepsilon_{\mathrm{mach}}\,\max_{j \in \mathcal{B}_{q(k)}} |\mathcal{J}_{jj}|$
+prevents a genuinely small diagonal entry from triggering division by
+zero.
+
+\paragraph{Why per block?}  A global $\|\mathrm{diag}(\mathcal{J})\|_\infty$
+in the floor would be dominated by the momentum-block diagonal whenever
+the Reynolds or Darcy regime is severe; the pressure-block floor
+would then be so close to $\varepsilon_{\mathrm{mach}}\,$(momentum scale)
+that mass-residual rows would still be effectively un-weighted relative
+to momentum-residual rows, defeating the equilibration entirely. The
+per-block floor scales each field's residual against \emph{its own}
+diagonal magnitudes, which is the only choice that gives the line search
+a faithful view of mass-residual descent.
+
+\subsection{The Gauss--Newton directional-derivative identity}
+\label{sec:dir-deriv}
+
+For a Newton step $\delta\boldsymbol{x}$ satisfying
+$\mathcal{J}\delta\boldsymbol{x} = \boldsymbol{b}$, the directional
+derivative of $\Phi_{\boldsymbol{w}}$ along $-\delta\boldsymbol{x}$ at
+$\boldsymbol{x}$ is
+\begin{equation}
+    \label{eq:dir-deriv}
+    D \;=\; -\sum_k w_k^{-2}\, b_k\,(\mathcal{J}\delta\boldsymbol{x})_k
+        \;=\; -\sum_k w_k^{-2}\, b_k^2
+        \;=\; -2\,\Phi_{\boldsymbol{w}}(\boldsymbol{x}).
+\end{equation}
+The Newton-mode Armijo predicate of Algorithm~\ref{alg:A2} therefore
+reduces to $\hat\Phi \le \Phi(1 - 2 c_1 \alpha)$, which requires no extra
+gradient evaluation.
+
+\paragraph{Picard mode invalidates the identity.}  The identity~\eqref{eq:dir-deriv}
+holds \emph{only} because the search direction is the exact Newton step.
+The Picard Jacobian drops the linearised convective cross-term and the
+linearised Forchheimer term (cf.\ §\ref{sec:picard}), so the resulting
+$\delta\boldsymbol{x}$ does not satisfy $\mathcal{J}\delta\boldsymbol{x}
+= \boldsymbol{b}$ for the true $\mathcal{J}$; the cancellation in the
+second equality above breaks and $D$ is in general not $-2\Phi$. Forcing
+the merit-based Armijo predicate on a Picard step would either reject
+descent directions for the wrong reason or accept ascent directions
+spuriously. The implementation therefore branches the acceptance test by
+solver mode: Newton uses the merit-based Armijo above; Picard uses the
+monotone residual reduction
+$\|\hat{\boldsymbol{b}}\|_\infty \le (1 - c_1 \alpha)\|\boldsymbol{b}\|_\infty$,
+which is mode-agnostic because it depends only on the residuals at the
+two iterates. This branching is shown explicitly inside
+Algorithm~\ref{alg:A2}.
+
+The same mode-awareness extends to the \emph{divergence} safeguard in
+Algorithm~\ref{alg:A3}: in Newton mode we compare $\hat\Phi$ against
+$\Phi$, because the Armijo line search is itself driving $\Phi$ down
+between successive iterates and a sustained $\Phi$-growth signals a
+structural problem. In Picard mode we cannot use $\Phi$ for this purpose,
+because the merit weights $\boldsymbol{w} = \mathrm{diag}(\mathbf{J})$ are
+refreshed every iteration from a Picard Jacobian whose diagonal differs
+from Newton's, so $\Phi$ is not even monotone-comparable across iterations
+even when $\|\boldsymbol{b}\|_\infty$ is shrinking monotonically. Picard
+mode therefore compares $\|\hat{\boldsymbol{b}}\|_\infty$ against
+$\|\boldsymbol{b}\|_\infty$ directly. Empirically, applying the
+$\Phi$-based check unconditionally produced spurious
+$\mathsf{MeritDivergence}$ exits at high Reynolds whenever Picard
+fallbacks fired; the corrected mode-aware rule unblocked the
+$(\mathrm{Re} = 10^6,\, \mathrm{Da} = 1,\, \alpha_0 = 0.05)$ stiff cell
+without any continuation driver (see \code{probe\_stiff\_findings.md},
+2026-05-19).
+
+% ============================================================
 \section{The Newton Kernel: Algorithm A and Its Leaves}
 \label{sec:newton}
 
 Both Algorithms~\ref{alg:B} and~\ref{alg:C} call into a single
-safeguarded Newton routine. Beneath this kernel sit three leaf
+safeguarded Newton routine, built on the merit function and
+directional-derivative identity of the preceding section
+(§\ref{sec:math-prelim}). Beneath this kernel sit three leaf
 primitives: a linear-solve helper (A.1), an Armijo backtracking line
 search (A.2), and a termination-safeguard arbiter (A.3). This section
 documents the kernel first, then its leaves.
@@ -992,7 +952,7 @@ $I_{\mathrm{up}} \gets 0$\;
     $(S_{\mathrm{LS}}^{\mathrm{lin}}, \delta\boldsymbol{x}) \gets \mathrm{SolveLinearSystem}(\mathcal{J}, \boldsymbol{b})$ \tcp*{Alg.~\ref{alg:A1}}
     \If{$S_{\mathrm{LS}}^{\mathrm{lin}} = \mathrm{Failed}$}{
         $\boldsymbol{x} \gets \boldsymbol{x}_{\mathrm{best}}$;\quad
-        \Return $(\boldsymbol{x},\ \mathrm{False},\ i,\ b_{\mathrm{best}},\ \mathsf{LinearSolveNaN})$\;
+        \Return $(\boldsymbol{x},\ \mathrm{False},\ i,\ b_{\mathrm{best}},\ \mathsf{LinearSolveFailed})$\;
     }
     set $D \gets -2\Phi$ via the identity~\eqref{eq:dir-deriv} (used by the Newton branch of A.2 only)\;
     $(S_{\mathrm{LS}}, \alpha, L, \hat b, \hat \Phi)
@@ -1144,7 +1104,7 @@ acceptance step; it should simply be retried at a smaller size.
 \caption{$\mathrm{EvaluateSafeguards}$: termination arbiter.}
 \label{alg:A3}
 \SetAlgoLined
-\textbf{Parameters:} $\textftol$, $\textstag$, $\textxtol$, $F_{\mathrm{div}}$, $N_{\mathrm{N}}$, $N_{\mathrm{inc}}$.\\
+\textbf{Parameters:} $\textftol$, $\textstag$, $\textxtol$, $F_{\mathrm{div}}$, $N_{\mathrm{N}}$, $N_{\mathrm{inc}}$, $N_{\mathrm{rdiv}}$.\\
 \KwIn{$i, S_{\mathrm{LS}}, L, \|\hat{\boldsymbol{b}}\|_\infty, \|\boldsymbol{b}\|_\infty, \hat\Phi, \Phi, I_{\mathrm{up}}, \mathfrak{m} \in \{\textsc{Newton}, \textsc{Picard}\}$.}
 \KwOut{$(r, S_{\mathrm{conv}}, S_{\mathrm{brk}}, I_{\mathrm{up}}')$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
@@ -1158,12 +1118,17 @@ acceptance step; it should simply be retried at a smaller size.
     \Return $(\mathsf{LinesearchFailed}, \mathrm{False}, \mathrm{True}, I_{\mathrm{up}})$\;
 }
 \tcp{Mode-aware divergence check: Newton compares the Armijo merit $\Phi$ (which the Newton line search itself drives down); Picard compares $\|\boldsymbol{b}\|_\infty$ directly, because the merit's weights $\boldsymbol{w} = \mathrm{diag}(\mathbf{J})$ are refreshed each iter from a Jacobian that differs structurally between Newton and Picard. $\Phi$ can grow across Picard iterations even when $\|\boldsymbol{b}\|_\infty$ shrinks monotonically; using $\Phi$ in Picard mode causes spurious $\mathsf{MeritDivergence}$ exits at high $\mathrm{Re}$ (settled in \code{probe\_stiff\_findings.md}, 2026-05-19).}
-\If{$\mathfrak{m} = \textsc{Newton}$ \textnormal{\textbf{and}} $\hat\Phi > F_{\mathrm{div}} \Phi$ \textnormal{\textbf{or}} $\mathfrak{m} = \textsc{Picard}$ \textnormal{\textbf{and}} $\|\hat{\boldsymbol{b}}\|_\infty > F_{\mathrm{div}} \|\boldsymbol{b}\|_\infty$}{
+\If{$(\mathfrak{m} = \textsc{Newton}$ \textnormal{\textbf{and}} $\hat\Phi > F_{\mathrm{div}} \Phi)$ \textnormal{\textbf{or}} $(\mathfrak{m} = \textsc{Picard}$ \textnormal{\textbf{and}} $\|\hat{\boldsymbol{b}}\|_\infty > F_{\mathrm{div}} \|\boldsymbol{b}\|_\infty)$}{
     $I_{\mathrm{up}} \gets I_{\mathrm{up}} + 1$;\quad
     \If{$I_{\mathrm{up}} \ge N_{\mathrm{inc}}$}{
         \Return $(\mathsf{MeritDivergence}, \mathrm{False}, \mathrm{True}, I_{\mathrm{up}})$\;
     }
 }\Else{ $I_{\mathrm{up}} \gets 0$\; }
+\tcp{Residual-divergence guard (\textsc{Newton} only, active iff $N_{\mathrm{rdiv}}>0$): the Armijo search drives $\Phi$ down, so a Newton solve whose $\|\hat{\boldsymbol{b}}\|_\infty$ is \emph{climbing} escapes the merit test above; count consecutive $\ell^\infty$-residual increases beyond $F_{\mathrm{div}}$ and hand off to Picard after $N_{\mathrm{rdiv}}$.}
+\If{$\mathfrak{m} = \textsc{Newton}$ \textnormal{\textbf{and}} $N_{\mathrm{rdiv}} > 0$}{
+    \lIf{$\|\hat{\boldsymbol{b}}\|_\infty > F_{\mathrm{div}}\,\|\boldsymbol{b}\|_\infty$}{$I_{\mathrm{rup}} \gets I_{\mathrm{rup}} + 1$}\lElse{$I_{\mathrm{rup}} \gets 0$}
+    \lIf{$I_{\mathrm{rup}} \ge N_{\mathrm{rdiv}}$}{\Return $(\mathsf{ResidualDivergence}, \mathrm{False}, \mathrm{True}, I_{\mathrm{up}})$}
+}
 \If{$L \le \textxtol$}{
     \If{$\|\hat{\boldsymbol{b}}\|_\infty \le \textstag$}{
         \Return $(\mathsf{NoiseFloor}, \mathrm{True}, \mathrm{True}, I_{\mathrm{up}})$\;
@@ -1179,12 +1144,13 @@ acceptance step; it should simply be retried at a smaller size.
 \Return $(\mathsf{InProgress}, \mathrm{False}, \mathrm{False}, I_{\mathrm{up}})$\;
 \end{algorithm}
 
-\noindent In the implementation $I_{\mathrm{up}}$ is carried in the
-\code{inc\_count} field of a mutable \code{SafeIterationState} struct
-that the routine updates in place; the box treats it as a returned
-value for mathematical clarity.
+\noindent In the implementation $I_{\mathrm{up}}$ and the residual-increase
+counter $I_{\mathrm{rup}}$ are carried in the \code{inc\_count} and
+\code{res\_inc\_count} fields of a mutable \code{SafeIterationState} struct
+that the routine updates in place; the box treats them as returned values
+for mathematical clarity.
 
-\paragraph{Why six exit reasons?}  The arbiter distinguishes states
+\paragraph{Why so many exit reasons?}  The arbiter distinguishes states
 that classical Newton implementations conflate, because the choice of
 reason changes what the caller does next.
 \begin{itemize}
@@ -1194,14 +1160,18 @@ successes.
 residual sits below $\textstag$, which is far above floating-point
 noise but well below physical interest. The caller treats this as
 success intentionally (§\ref{sec:falseEquiv}).
-\item $\mathsf{LinesearchFailed}$ and $\mathsf{MeritDivergence}$ both
-trigger the Picard fallback (Algorithm~\ref{alg:B}).
+\item $\mathsf{LinesearchFailed}$, $\mathsf{MeritDivergence}$, and the
+opt-in $\mathsf{ResidualDivergence}$ all trigger the Picard fallback
+(Algorithm~\ref{alg:B}).
 \item $\mathsf{Xtol}$ flags an iterate that has stopped moving even
 though the residual is non-trivial; failure unless the residual has
 slipped below $\textstag$ (in which case it is silently relabelled as
 $\mathsf{NoiseFloor}$).
-\item $\mathsf{IterationCap}$ is the budget-exhausted failure.
-\item $\mathsf{LinearSolveNaN}$ aborts the kernel unconditionally.
+\item $\mathsf{IterationCap}$ is the budget-exhausted failure;
+$\mathsf{NoProgressStall}$ is its opt-in early cousin (best residual
+flat over a window), disabled in the coupled/JFNK solve.
+\item $\mathsf{LinearSolveFailed}$ aborts the kernel (a linear-solver
+exception, a NaN step, or a C.1 iterative non-convergence).
 \end{itemize}
 
 \paragraph{The role of $F_{\mathrm{div}}$ and $N_{\mathrm{inc}}$ together.}
@@ -1292,18 +1262,23 @@ iteration'' variant the parent paper considered and rejected as ``too
 cumbersome and expensive''. What makes it affordable here is that the
 projection is a single $L^2$ mass solve whose operator never changes:
 the velocity and pressure mass matrices $M_u, M_p$ are assembled and
-Cholesky-factored \emph{once} in Algorithm~\ref{alg:O}, and every
+Cholesky-factored \emph{once} at the top of the coupled solve (Algorithm~\ref{alg:C}), and every
 re-projection is then a constant-cost forward/back substitution
 (§\ref{sec:proj-policy}). Consequently the staggered outer relaxation
 loop of the earlier design---freeze $\boldsymbol{\pi}_h$, run an inner
 Newton solve, re-project, test state/projection drift---is removed
-entirely. Algorithm~\ref{alg:C} issues a \emph{single} safeguarded
-Newton solve (Algorithm~\ref{alg:A}) on the primary unknown $U_h$, whose
-residual re-slaves $\boldsymbol{\pi}_h$ on every evaluation. Convergence
-is the scale-free $\varepsilon_M/\varepsilon_C$ gate of that inner Newton
-(§\ref{sec:convergence-criterion}), identical across ping-pong segments;
-there is no separate OSGS stopping criterion, no drift metric, no warmup
-schedule, and no Anderson acceleration.
+entirely. By default Algorithm~\ref{alg:C} issues a \emph{single}
+safeguarded Newton solve (Algorithm~\ref{alg:A}) on the primary unknown
+$U_h$, whose residual re-slaves $\boldsymbol{\pi}_h$ on every evaluation.
+(Two opt-in coupled-solve variants exist, both off by default and mutually
+exclusive: \code{pingpong\_enabled} runs a Newton$\leftrightarrow$Picard
+ping-pong of such inner solves, and \code{osgs\_anderson\_enabled} runs an
+Anderson-accelerated staggered iteration; the JFNK path of §\ref{sec:jfnk}
+is a third, also mutually exclusive.) Convergence is the scale-free
+$\varepsilon_M/\varepsilon_C$ gate of the inner Newton
+(§\ref{sec:convergence-criterion}), identical across any ping-pong
+segments; there is no separate OSGS stopping criterion, no drift metric,
+and no warmup schedule.
 
 \paragraph{Why the solve is inexact-Newton.}  The residual of
 \eqref{eq:osgs-coupled} carries the slaved $\boldsymbol{\pi}_h(U_h)$, but
@@ -1347,19 +1322,21 @@ Jacobian (a DOF-keyed cache), so the exact tangent costs no extra projection.
 \paragraph{Bootstrap.}  The coupled solve is seeded at the converged
 Stage~I state $U_h^0 \gets U_h^{\mathrm{ASGS}}$, which is the algebraic
 root of the ASGS system---exactly \eqref{eq:osgs-coupled} with
-$\boldsymbol{\pi}_h \equiv 0$. This is simultaneously the correct
-$\boldsymbol{\pi}_h^0 = 0$ bootstrap of the projection: starting the
-coupled solve from the ASGS state is starting from the iterate at which
-the slaved projection is the zero of the orthogonal complement. No
-separate pre-seeding of $\boldsymbol{\pi}_h^0$ with
-$\Pi(\mathcal{R}(U_h^{\mathrm{ASGS}}))$ is performed, and none is needed:
-the first residual evaluation produces the first non-trivial projection
-naturally.
+$\boldsymbol{\pi}_h \equiv 0$. Hence $\boldsymbol{\pi}_h^0 = 0$ is the
+projection value \emph{in force during the ASGS solve}---a bootstrap
+convention, not a claim that the slaved map vanishes at $U_h^{\mathrm{ASGS}}$:
+in general $\Pi(\mathcal{R}_{\boldsymbol{u}}U_h^{\mathrm{ASGS}}) \neq 0$,
+because the ASGS root satisfies the \emph{stabilised} weak form (with
+$\boldsymbol{\pi}_h$ modelled as $0$), not the projection equation. No
+separate pre-seeding of $\boldsymbol{\pi}_h^0$ is performed, and none is
+needed: the first OSGS residual evaluation re-projects
+$\boldsymbol{\pi}_h^1 = \Pi(\mathcal{R}_{\boldsymbol{u}}U_h^{\mathrm{ASGS}})$
+naturally, the first non-trivial projection of the run.
 
 \moduleinterface
     {Algorithm~\ref{alg:O} (Stage~II, OSGS mode only)}
     {Algorithm~\ref{alg:A} (one safeguarded Newton solve, $\mathrm{op}$ carrying the slaved-$\boldsymbol{\pi}_h$ residual and the frozen-$\boldsymbol{\pi}_h$ Jacobian)}
-    {Stage~I state $U_h^{\mathrm{ASGS}}$; Cholesky-factored mass solvers $(M_u, M_p)$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$ and projection spaces $(V_{\mathrm{free}}, Q_{\mathrm{free}})$}
+    {Stage~I state $U_h^{\mathrm{ASGS}}$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$ and projection spaces $(V_{\mathrm{free}}, Q_{\mathrm{free}})$, from which it assembles and Cholesky-factors the mass matrices $(M_u, M_p)$ once}
     {Success flag $S$; final self-consistent projection pair $(\boldsymbol{\pi}_{h,u}, \pi_{h,p})$}
 
 \begin{algorithm}[H]
@@ -1367,9 +1344,10 @@ naturally.
 \label{alg:C}
 \SetAlgoLined
 \textbf{Parameters:} $N_{\mathrm{OSGS}}$ (Newton budget), the inner-Newton parameters of Algorithm~\ref{alg:A}, and the inner-success policy $\mathcal{P}_{\mathrm{OSGS}}$ (\code{OSGS\_INNER\_POLICY}).\\
-\KwIn{$U_h^{\mathrm{ASGS}}$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$; Cholesky-factored mass solvers $(M_u, M_p)$; projection spaces $(V_{\mathrm{free}}, Q_{\mathrm{free}})$.}
+\KwIn{$U_h^{\mathrm{ASGS}}$; residual operators $(\mathcal{R}_u, \mathcal{R}_p)$; projection spaces $(V_{\mathrm{free}}, Q_{\mathrm{free}})$.}
 \KwOut{$(S, \boldsymbol{\pi}_{h,u}, \pi_{h,p})$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
+assemble $M_u, M_p$ on $(V_{\mathrm{free}}, Q_{\mathrm{free}})$ and Cholesky-factor once \tcp*{SPD, state-independent; reused by every re-projection}
 $U_h^{0} \gets U_h^{\mathrm{ASGS}}$ \tcp*{$\boldsymbol{\pi}_h^0 = 0$ implicitly (ASGS root)}
 \vspace{0.1cm}
 \tcc{Define the slaved-$\boldsymbol{\pi}_h$ residual operator and the frozen-$\boldsymbol{\pi}_h$ Jacobian.}
@@ -1384,7 +1362,7 @@ $U_h^{0} \gets U_h^{\mathrm{ASGS}}$ \tcp*{$\boldsymbol{\pi}_h^0 = 0$ implicitly 
     \Return frozen-$\boldsymbol{\pi}_h$ tangent (\code{ExactNewtonMode}: $\partial\sigma, \partial\tau_1, \partial\tau_2, \partial\mathrm{conv}$ kept; $\partial\boldsymbol{\pi}_h/\partial U_h$ dropped)\;
 \Indm
 \vspace{0.1cm}
-$(S^{\mathrm{inner}}, U_h^\star, \cdot) \gets \mathrm{ExactNewtonPipeline}(U_h^{0},\ \mathrm{op})$ \tcp*{Alg.~\ref{alg:A}; budget $N_{\mathrm{OSGS}}$, restore $\gets U_h^{\mathrm{ASGS}}$}
+$(S^{\mathrm{inner}}, U_h^\star, \cdot) \gets \mathrm{ExactNewtonPipeline}(U_h^{0},\ \mathrm{op})$ \tcp*{Alg.~\ref{alg:A}; budget $N_{\mathrm{OSGS}}$; on failure keep best-seen iterate, restore $U_h^{\mathrm{ASGS}}$ only if non-finite}
 $S \gets S^{\mathrm{Stage\,I}} \wedge \bigl(\mathrm{outcome}(S^{\mathrm{inner}}; \mathcal{P}_{\mathrm{OSGS}}) \in \{\code{success}, \code{one\_iter\_success}\}\bigr)$ \tcp*{see §\ref{sec:osgs-inner-failure}}
 \vspace{0.1cm}
 \tcc{Final self-consistent projection for export / diagnostics.}
@@ -1402,7 +1380,7 @@ it builds the operator pair $\mathrm{op}$ (a residual closure that
 re-projects $\boldsymbol{\pi}_h$ on every call, and a Jacobian closure
 that freezes it), hands them to a single $\mathrm{ExactNewtonPipeline}$
 call (Algorithm~\ref{alg:A}) seeded at the Stage~I state, and re-projects
-once at the converged iterate for diagnostics. There is no outer loop:
+once at the converged iterate for diagnostics. In the default mode there is no outer loop:
 the only iteration is the inner Newton's, and its scale-free
 $\varepsilon_M/\varepsilon_C$ gate (§\ref{sec:convergence-criterion}) is the sole convergence test. The inner-success policy
 $\mathcal{P}_{\mathrm{OSGS}}$ accepts either a clean convergence or a
@@ -1419,8 +1397,9 @@ $\mathrm{ExactNewtonPipeline}$ call, classified by the inner-success
 policy $\mathcal{P}_{\mathrm{OSGS}}$ (\code{OSGS\_INNER\_POLICY}). The
 solve is reported as failed when the safeguarded Newton returns with one
 of $\mathsf{LinesearchFailed}$ (\code{linesearch\_failed}),
-$\mathsf{MeritDivergence}$ (\code{merit\_divergence\_escaped}), or
-$\mathsf{LinearSolveNaN}$ (\code{linear\_solve\_nan}) (see Algorithm~\ref{alg:A3});
+$\mathsf{MeritDivergence}$ (\code{merit\_divergence\_escaped}),
+$\mathsf{ResidualDivergence}$ (\code{residual\_divergence\_escaped}), or
+$\mathsf{LinearSolveFailed}$ (\code{linear\_solve\_failed}) (see Algorithm~\ref{alg:A3});
 these are the genuine non-progress exits. A merely budget-exhausted exit
 ($\mathsf{IterationCap}$, i.e.\ \code{max\_iters\_stagnation}, after
 $N_{\mathrm{OSGS}}$ inner Newton steps) is
@@ -1443,16 +1422,17 @@ unconstrained spaces $V_{\mathrm{free}}, Q_{\mathrm{free}}$; the velocity
 and pressure blocks are projected \emph{separately}, each with its own
 mass matrix, so the two physics never mix. Because the projection target
 spaces never change, $M_u$ and $M_p$ together with their Cholesky
-factorisations are assembled once in Algorithm~\ref{alg:O} and reused:
+factorisations are assembled once at the top of Algorithm~\ref{alg:C} and reused:
 every re-projection inside the coupled residual is a constant-cost
 forward/back substitution.
 
 The default policy projects the full residual. When the reaction tensor
 $\sigma(\alpha, \boldsymbol{u})$ is a spatial constant
-($\code{reaction\_model = "Constant\_Sigma"}$ in
-\code{stabilization\_config}, paired with the
-\code{ProjectResidualWithoutReactionWhenConstantSigma} policy), the
-reaction term $\sigma \boldsymbol{u}_h$ is omitted from the residual
+(\code{reaction\_model = "Constant\_Sigma"} in \code{physical\_properties})
+\emph{and} \code{sol.experimental\_reaction\_mode = "standard"}, the solver
+selects the \code{ProjectResidualWithoutReactionWhenConstantSigma} policy
+(\code{run\_simulation.jl}), which omits the
+reaction term $\sigma \boldsymbol{u}_h$ from the residual
 \emph{before} projection. The justification is exactness: when $\sigma$
 is constant, $\sigma \boldsymbol{u}_h$ lies entirely in the FE velocity
 space (closed under multiplication by a scalar), so its $L^2$ projection
@@ -1461,7 +1441,11 @@ complement $(I - \Pi)(\sigma \boldsymbol{u}_h)$ is exactly zero.
 Including it in the projection would project and re-subtract an FE
 function---a no-op in exact arithmetic that only injects floating-point
 noise. Removing it from the projected residual eliminates that noise at
-no cost. This corresponds to Section~4.4 of the parent paper. Note that
+no cost. The same policy applies the symmetric trim on the pressure side:
+the linear penalty $\varepsilon\,p_h$ is likewise FE-exact for constant
+$\varepsilon$, so $(I-\Pi)(\varepsilon p_h) = 0$ and it too is dropped from
+the pressure residual before projection (\code{projection.jl}). This
+corresponds to Section~4.4 of the parent paper. Note that
 the $-\sigma\,\mathrm{d}\boldsymbol{u}$ contribution is \emph{not}
 trimmed from the Jacobian: it remains load-bearing for stability and is
 kept in the frozen-$\boldsymbol{\pi}_h$ tangent.
@@ -1475,15 +1459,30 @@ projecting the full residual.
 \section{Jacobian-Free Newton--Krylov Recovery of the Dropped Coupling}
 \label{sec:jfnk}
 
-\paragraph{Status.}  This section documents a \emph{planned} acceleration
-of the coupled OSGS solve of §\ref{sec:osgs}; it is \textbf{not yet
-implemented}. Everything below is a method/roadmap description, not a
-\code{[code-actual]} report. The current code path solves the coupled
-system with the frozen-$\boldsymbol{\pi}_h$ inexact Newton of
-Algorithm~\ref{alg:C}; this section explains how a matrix-free Krylov
-inner solve would recover the term that Algorithm~\ref{alg:C}
-deliberately drops, and what changes (and what does not) when it is
-switched on.
+\paragraph{Status.}  \textbf{Implemented} (2026-06-26), opt-in behind the
+config flag \code{osgs\_jfnk\_enabled} (OFF by default; when off the coupled
+solve is the frozen-$\boldsymbol{\pi}_h$ inexact Newton of
+Algorithm~\ref{alg:C}, bit-identical). It is \code{[code-actual]}:
+\code{JFNKLinearSolver} (src/solvers/linear\_solvers.jl) is a drop-in
+matrix-free \code{LinearSolver} plugged into the existing
+\code{SafeNewtonSolver} by \code{\_osgs\_jfnk\_solve!}
+(src/solvers/osgs\_solver.jl) --- realising literally the ``change exactly one
+thing: the inner linear solve'' of §\ref{sec:jfnk-change}, so the outer Newton,
+line search, safeguards, and the [C.1] honesty contract are inherited
+unchanged. A non-converged inner GMRES is surfaced as a typed
+\code{GMRESNotConvergedError} and rolled back; on a structural inner
+failure, \code{\_osgs\_jfnk\_solve!} re-runs the frozen-$\boldsymbol{\pi}_h$
+direct coupled solve of Algorithm~\ref{alg:C} from the best iterate, so the
+JFNK path is never worse than the direct one. The enabling Phase-0 measurement (the frozen-$\boldsymbol{\pi}_h$
+preconditioner is viable: $1$--$21$ inner Krylov vectors; $N_j\,{=}\,2$--$3$
+vs $N_c\,{=}\,60$) is in \code{docs/solver/jfnk-phase0-preconditioner-gate.md};
+the regression anchors are \code{test/quick/osgs\_jfnk\_quick\_test.jl} (the
+matrix-free action equals the true full tangent; the production solve converges
+to the same root as a full-Jacobian Newton; [C.1] starved-GMRES honesty) and
+\code{test/extended/jfnk\_equivalence\_extended\_test.jl} (same MMS root,
+JFNK iterations $\le$ frozen-$\boldsymbol{\pi}_h$, ASGS byte-identical). This
+section is the method description; the paragraphs below explain what the inner
+solve recovers and what changes (and what does not) when it is switched on.
 
 % --------------------------------------------------------------
 \subsection{The bottleneck: the dropped \texorpdfstring{$\partial\boldsymbol{\pi}_h/\partial U_h$}{dpi/dU} coupling}
@@ -1517,7 +1516,7 @@ i.e.\ the algebraic form of the orthogonal-subscale problem
 $B_S(u, U_h, V_h) = L_S(u, V_h, \boldsymbol{\pi}_h)$ of §\ref{sec:osgs}
 with the projection re-slaved to the \emph{current} iterate at every
 evaluation (no staggering lag; \code{res\_fn\_coupled},
-\code{porous\_solver.jl}).
+\code{src/solvers/osgs\_solver.jl}).
 Differentiating~\eqref{eq:jfnk-coupled-residual} exactly gives the true
 tangent
 \begin{equation}
@@ -1554,10 +1553,11 @@ retains the exact $\partial\sigma/\partial\boldsymbol{u}$,
 $\partial\tau_1/\partial\boldsymbol{u}$,
 $\partial\tau_2/\partial\boldsymbol{u}$, and convective derivatives, but
 holds $\boldsymbol{\pi}_h$ constant. Solving $\mathcal{J}_{\bar\pi}\,
-\delta U_h = -\boldsymbol{F}$ is therefore an \emph{inexact} Newton step,
-and the coupled iteration converges only linearly (super-linearly at
-best), with the contraction rate set by the spectral radius of
-$\mathcal{J}_{\bar\pi}^{-1}\mathcal{C}$.
+\delta U_h = \boldsymbol{F}$ (the residual-as-RHS box convention of
+§\ref{sec:newton}, with update $U_h \leftarrow U_h - \lambda\,\delta U_h$)
+is therefore an \emph{inexact} Newton step, and the coupled iteration
+converges only linearly (super-linearly at best), with the contraction
+rate set by the spectral radius of $\mathcal{J}_{\bar\pi}^{-1}\mathcal{C}$.
 
 \paragraph{Proof of the diagnosis (freeze-finish vs.\ coupled).}  The
 diagnosis that the missing $\mathcal{C}$ \emph{is} the convergence gap
@@ -1593,10 +1593,10 @@ warm-started near $U_h^\star$.)
 \label{sec:jfnk-change}
 
 JFNK changes \emph{exactly one} thing in the coupled Newton step: the
-inner linear solve $\mathcal{J}\,\delta U_h = -\boldsymbol{F}$ of
-Algorithm~\ref{alg:A1} is replaced by a matrix-free GMRES whose
-matrix--vector product is the directional finite difference of the
-\emph{full} coupled residual,
+inner linear solve $\mathcal{J}\,\delta U_h = \boldsymbol{F}$ of
+Algorithm~\ref{alg:A1} (residual-as-RHS, as in that box) is replaced by a
+matrix-free GMRES whose matrix--vector product is the directional finite
+difference of the \emph{full} coupled residual,
 \begin{equation}
     \label{eq:jfnk-matvec}
     \mathcal{J}_{\mathrm{full}}(U_h)\,\boldsymbol{v}
@@ -1605,9 +1605,15 @@ matrix--vector product is the directional finite difference of the
               - \boldsymbol{F}(U_h)}{\varepsilon},
     \qquad
     \varepsilon
-        = \frac{\sqrt{\varepsilon_{\mathrm{mach}}}\,
+        = \frac{b_{\mathrm{fd}}\,
                 \bigl(1 + \|U_h\|\bigr)}{\|\boldsymbol{v}\|}.
 \end{equation}
+Here $b_{\mathrm{fd}}$ is the Brown--Saad finite-difference base --- the
+config field \code{sol.osgs\_jfnk\_fd\_epsilon} (default
+$10^{-8}\approx\sqrt{\varepsilon_{\mathrm{mach}}}$, validated $>0$) --- and
+$U_h$ is the current Newton iterate, recorded by the Jacobian closure as
+the finite-difference base point (distinct from the line-search trial
+points at which $\boldsymbol{F}$ is also evaluated).
 The key point is that $\boldsymbol{F}$ in~\eqref{eq:jfnk-matvec} is the
 \emph{same} coupled residual~\eqref{eq:jfnk-coupled-residual} that
 re-projects $\boldsymbol{\pi}_h$ at its argument: evaluating
@@ -1620,35 +1626,41 @@ $\mathcal{C}$ block, \emph{without ever forming it}---each matvec costs
 one extra coupled residual evaluation, i.e.\ one cheap
 Cholesky-cached projection plus one weak-form assembly.
 
-The already-assembled, already-factored frozen-$\boldsymbol{\pi}_h$
-Jacobian~\eqref{eq:jfnk-frozen-jac} is reused as the GMRES
-\emph{preconditioner}: it is $\mathcal{J}_{\mathrm{full}}$ minus only the
-compact coupling term, so $\mathcal{J}_{\bar\pi}^{-1}
-\mathcal{J}_{\mathrm{full}} = I - \mathcal{J}_{\bar\pi}^{-1}\mathcal{C}$
+The frozen-$\boldsymbol{\pi}_h$ Jacobian~\eqref{eq:jfnk-frozen-jac} ---
+re-assembled and re-factored at the current iterate $U_h$, exactly as in
+the direct coupled step --- is reused as the GMRES \emph{preconditioner}
+across that step's Krylov vectors (no extra factorisation per matvec).
+Because it is $\mathcal{J}_{\mathrm{full}}$ minus only the compact coupling
+term, the \emph{left}-preconditioned operator
+$\mathcal{J}_{\bar\pi}^{-1}\mathcal{J}_{\mathrm{full}}
+ = I - \mathcal{J}_{\bar\pi}^{-1}\mathcal{C}$
 clusters its spectrum tightly around $1$ whenever
 $\|\mathcal{J}_{\bar\pi}^{-1}\mathcal{C}\| < 1$ (the same quantity that
 governed the linear contraction rate in §\ref{sec:jfnk-bottleneck}).
-Right-preconditioned GMRES then converges in a handful of Krylov
-vectors, and each preconditioner application is a single back/forward
-substitution on the existing factorisation.
+Left-preconditioned GMRES (the \code{Pl} argument to \code{gmres!},
+\code{linear\_solvers.jl}) then converges in a handful of Krylov vectors,
+each preconditioner application being a single solve against the existing
+factorisation --- a back/forward substitution under the default direct
+\code{LU} backend, or an inner ILU--GMRES sweep under the low-memory
+\code{ILU\_GMRES} backend.
 
 \moduleinterface
     {Coupled Newton step (the JFNK variant of Algorithm~\ref{alg:A})}
-    {Coupled residual $\boldsymbol{F}$ of~\eqref{eq:jfnk-coupled-residual} (re-projects $\boldsymbol{\pi}_h$); factored $\mathcal{J}_{\bar\pi}$ as right preconditioner}
-    {Current iterate $U_h$; residual $\boldsymbol{F}(U_h)$; assembled+factored $\mathcal{J}_{\bar\pi}(U_h)$; Krylov tolerance $\eta$, cap $N_{\mathrm{K}}$}
+    {Coupled residual $\boldsymbol{F}$ of~\eqref{eq:jfnk-coupled-residual} (re-projects $\boldsymbol{\pi}_h$); factored $\mathcal{J}_{\bar\pi}$ as left preconditioner}
+    {Current iterate $U_h$; residual $\boldsymbol{F}(U_h)$; assembled+factored $\mathcal{J}_{\bar\pi}(U_h)$; forcing tolerance $\eta$, Krylov cap $N_{\mathrm{K}}$, restart $\ell$}
     {Newton step $\delta U_h$ (full-tangent, matrix-free)}
 
 \begin{algorithm}[H]
-\caption{$\mathrm{JFNKStep}$ \emph{(planned)}: full-tangent Newton step via preconditioned matrix-free GMRES.}
+\caption{$\mathrm{JFNKStep}$ \emph{(implemented; opt-in \code{osgs\_jfnk\_enabled})}: full-tangent Newton step via preconditioned matrix-free GMRES.}
 \label{alg:jfnk}
 \SetAlgoLined
-\textbf{Parameters:} forcing tolerance $\eta$ (Eisenstat--Walker or fixed), Krylov cap $N_{\mathrm{K}}$, restart $\ell$.\\
+\textbf{Parameters:} fixed forcing tolerance $\eta = \code{sol.osgs\_jfnk\_gmres\_rel\_tol}$ (default $10^{-2}$; no Eisenstat--Walker adaptivity is implemented), Krylov cap $N_{\mathrm{K}} = \code{sol.osgs\_jfnk\_gmres\_maxiter}$, restart $\ell = \code{sol.osgs\_jfnk\_gmres\_restart}$.\\
 \KwIn{$U_h$; coupled residual operator $\boldsymbol{F}(\cdot)$; current value $\boldsymbol{F}(U_h)$; factored frozen-$\boldsymbol{\pi}_h$ Jacobian $\mathcal{J}_{\bar\pi}$.}
 \KwOut{Newton step $\delta U_h$.}
 \vspace{0.2cm}\hrule\vspace{0.2cm}
 define matvec $\mathcal{A}[\boldsymbol{v}] \gets \bigl(\boldsymbol{F}(U_h + \varepsilon\boldsymbol{v}) - \boldsymbol{F}(U_h)\bigr)/\varepsilon$, $\varepsilon$ as in~\eqref{eq:jfnk-matvec} \tcp*{re-projects $\boldsymbol{\pi}_h$ at $U_h + \varepsilon\boldsymbol{v}$: full tangent}
-define preconditioner apply $\mathcal{P}^{-1}[\boldsymbol{r}] \gets \mathcal{J}_{\bar\pi}^{-1}\boldsymbol{r}$ \tcp*{back/forward substitution on the existing factor}
-$\delta U_h \gets \mathrm{GMRES}\bigl(\mathcal{A},\, -\boldsymbol{F}(U_h);\ \text{precond.}\ \mathcal{P}^{-1},\ \text{tol}\ \eta,\ \text{cap}\ N_{\mathrm{K}},\ \text{restart}\ \ell\bigr)$\;
+define left preconditioner apply $\mathcal{P}^{-1}[\boldsymbol{r}] \gets \mathcal{J}_{\bar\pi}^{-1}\boldsymbol{r}$ \tcp*{one solve against the existing frozen-$\boldsymbol{\pi}_h$ factorisation}
+$\delta U_h \gets \mathrm{GMRES}\bigl(\mathcal{A},\, \boldsymbol{F}(U_h);\ \text{left precond.}\ \mathcal{P}^{-1},\ \text{tol}\ \eta,\ \text{cap}\ N_{\mathrm{K}},\ \text{restart}\ \ell\bigr)$ \tcp*{step then enters Alg.~\ref{alg:A2}: $U_h \leftarrow U_h - \alpha\,\delta U_h$}\;
 \Return $\delta U_h$\;
 \end{algorithm}
 
@@ -1658,11 +1670,16 @@ of Algorithm~\ref{alg:A}: the merit-based Armijo line search
 (Algorithm~\ref{alg:A3}) are applied verbatim. Note, however, that the
 directional-derivative identity~\eqref{eq:dir-deriv} ($D = -2\Phi$) is
 exact only for the \emph{exact} Newton step; an inexact (forcing-term
-$\eta > 0$) Krylov step satisfies it only up to the Krylov residual. A JFNK
-implementation should therefore relax the line-search slope test to the
-inexact-Newton form $D \le -2\Phi(1-\eta)$; the current direct-solve code uses
-the exact $D = -2\Phi$ (Algorithm~\ref{alg:A2}), valid because its step is the
-exact frozen-$\boldsymbol{\pi}_h$ Newton direction.
+$\eta > 0$) Krylov step satisfies it only up to the Krylov residual, so in
+principle the slope test relaxes to the inexact-Newton form
+$D \le -2\Phi(1-\eta)$. The implemented JFNK \emph{deliberately reuses the
+existing exact-slope line search} ($D = -2\Phi$, Algorithm~\ref{alg:A2})
+unchanged: at the production forcing tolerance $\eta \approx 10^{-2}$ the
+$(1-\eta)$ factor is a $1\%$ effect, and the stricter exact slope is
+conservative-but-safe --- it can only backtrack marginally more, never accept a
+non-descent step --- which keeps the safeguard stack and its behavior-preservation
+guarantee verbatim. (Should a much larger $\eta$ ever be configured, the relaxed
+slope would be the principled change.)
 
 % --------------------------------------------------------------
 \subsection{The logic: cost, convergence, and the unchanged fixed point}
@@ -1672,9 +1689,9 @@ The accounting is the entire case for JFNK:
 \begin{itemize}
 \item \emph{Per Krylov vector:} one extra coupled residual
 evaluation~\eqref{eq:jfnk-matvec} (one weak-form assembly plus one
-Cholesky-cached projection) and one preconditioner solve (one
-substitution on the cached factor). No new factorisation, no dense
-storage.
+Cholesky-cached projection) and one preconditioner solve (one solve
+against the cached frozen-$\boldsymbol{\pi}_h$ factorisation). No new
+factorisation, no dense storage.
 \item \emph{Per Newton step:} a few preconditioned Krylov vectors,
 because $\mathcal{J}_{\bar\pi}$ already captures everything in
 $\mathcal{J}_{\mathrm{full}}$ except the compact $\mathcal{C}$, so the
@@ -1699,6 +1716,33 @@ the MMS error plateau, must be identical to the plain coupled solve to
 within the nonlinear tolerance---which is exactly the regression invariant
 any future implementation must verify before the JFNK path is allowed to
 replace the direct inner solve.
+
+\paragraph{Phase-0 measurement (2026-06-26): the preconditioner is
+viable.} A clean re-measurement on equal-order P1/P1 cells (mild
+$\nu{=}1,\sigma{=}1$ and stiff/convective $\nu{=}0.01,\sigma{=}100$) confirms
+the accounting above. The full-tangent Newton converges in $N_j = 2$--$3$
+steps (quadratic) where the frozen-$\boldsymbol{\pi}_h$ inexact Newton fails
+to converge in $60$ (and \emph{diverges} on the stiff cells), and the dropped
+$\mathcal{C}$ is large ($\|\mathcal{C}\|/\|\mathcal{J}_{\mathrm{full}}\| =
+0.15$ mild, $0.90$--$0.97$ stiff), so it---not slow setup---is the rate
+limiter. The decisive metric: the factored frozen-$\boldsymbol{\pi}_h$
+Jacobian preconditions the matrix-free full-J GMRES to $1$--$4$ Krylov vectors
+(mild) and a $\le 16$--$21$ peak (stiff/convective) at an inexact-Newton inner
+tolerance, with the directional-FD matvec~\eqref{eq:jfnk-matvec} reproducing the
+counts exactly. Two refinements to the spectral argument
+of~\S\ref{sec:jfnk-change}: (i) the sufficient condition
+$\|\mathcal{J}_{\bar\pi}^{-1}\mathcal{C}\| < 1$ holds for the mild cells
+($\approx 0.88$) but is \emph{violated} for the stiff cells
+($\approx 30$--$67$); GMRES still converges in a handful of vectors because the
+super-unit eigenvalues are few and clustered, i.e.\ the Krylov polynomial beats
+the worst-case spectral-norm bound. (ii) The preconditioner must use the
+\emph{residual-consistent} tangent: adding the Codina penalty
+$\varepsilon_{\mathrm{num}}$ (Jacobian-only, root-preserving) to the
+preconditioner pulls it \emph{off} $\mathcal{J}_{\mathrm{full}}$ and
+\emph{degrades} the Krylov count, so JFNK preconditions with
+$\varepsilon_{\mathrm{num}}{=}0$ and relies on the physical
+$\varepsilon_{\mathrm{phys}}$ for the pressure-mode conditioning. Full data:
+\code{docs/solver/jfnk-phase0-preconditioner-gate.md}.
 
 % ============================================================
 \section{Scale-free convergence criterion}
@@ -1805,11 +1849,11 @@ defect.
 
 \subsection{Why it is scale-free, and what it is not}
 The mass ratio is the pressure-normalised relative mass error with the divergence$\to$pressure
-conversion factor \emph{measured from the iterate}: writing $\Phi/\alpha_\infty$ for the
-viscous+inertial+Darcy envelope, steady-state balance gives $\|p^k\|\sim(\Phi/\alpha_\infty)\,
+conversion factor \emph{measured from the iterate}: writing $\Lambda/\alpha_\infty$ for the
+viscous+inertial+Darcy envelope, steady-state balance gives $\|p^k\|\sim(\Lambda/\alpha_\infty)\,
 \|\nabla(\alpha\boldsymbol{u}^k)\|$, and substituting the measured
-$\Phi/\alpha_\infty=\|p^k\|/\|\nabla(\alpha\boldsymbol{u}^k)\|$ into
-$(\Phi/\alpha_\infty)\,\|\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$ cancels $\|p^k\|$
+$\Lambda/\alpha_\infty=\|p^k\|/\|\nabla(\alpha\boldsymbol{u}^k)\|$ into
+$(\Lambda/\alpha_\infty)\,\|\nabla\!\cdot\!(\alpha\boldsymbol{u}^k)\|/\|p^k\|$ cancels $\|p^k\|$
 identically and leaves the flux-gradient denominator of~\eqref{eq:cc-epsC}; the added $\|g\|$ is a
 known forcing field (material/problem data, not an a-priori characteristic scale), so it preserves
 scale-freeness. The conversion factor carries units---that is what a
@@ -1882,6 +1926,89 @@ to stop---$\boldsymbol{\pi}_h$ is re-projected from the current iterate
 at every residual evaluation rather than compared across outer steps.
 
 % ============================================================
+\section{Parameter Taxonomy and Code Equivalence}
+\label{sec:params}
+
+\subsection{Numerical parameters of the core algorithm}
+
+Table~\ref{tab:params} enumerates every numerical parameter consumed by
+the algorithms of Part~\ref{part:core}, grouped by role. Parameters
+that belong to the optional extensions of Part~\ref{part:ext} are
+tabulated separately in the corresponding sections.
+
+\begin{table}[h]
+\centering
+\caption{Numerical parameters of the core nonlinear-solver pipeline.
+Throughout the table, $\code{sol} = \code{config.numerical\_method.solver}$
+(a flat \code{SolverConfig} \code{@kwdef} struct). The
+\code{SafeNewtonSolver} struct that runs the inner cascade is built from
+these fields by \code{SafeNewtonSolver(::LinearSolver, ::SolverConfig)};
+its post-construction field names (e.g.\ \code{c1}, \code{max\_iters})
+are shorter aliases of the config field names. Code-side references in
+this table are written against the config struct, not the built solver.}
+\label{tab:params}
+\footnotesize
+\begin{tabularx}{\textwidth}{@{} l l X @{}}
+\toprule
+\textbf{Symbol} & \textbf{Field in code} & \textbf{Role / effect} \\
+\midrule
+\multicolumn{3}{l}{\emph{Inner Newton iteration controls}} \\
+$N_{\mathrm{N}}$         & \code{sol.newton\_iterations}           & Cap on inner Newton iterations. \\
+$N_{\mathrm{P}}$         & \code{sol.picard\_iterations}           & Cap on Picard fallback iterations. \\
+$N_{\mathrm{inc}}$       & \code{sol.max\_increases}               & Consecutive merit-function expansions tolerated before declaring divergence. \\
+$\textftol$              & \code{sol.ftol}                          & Absolute $\ell^\infty$ residual floor; the \code{conv\_probe===nothing} fallback gate (Cocquet/unit tests). Superseded in production by the scale-free criterion below. \\
+$\mathrm{tol}_M$         & \code{sol.eps\_tol\_momentum}            & Scale-free momentum tolerance: converged when $\varepsilon_M\le\mathrm{tol}_M$ (§\ref{sec:convergence-criterion}). \\
+$\mathrm{tol}_C$         & \code{sol.eps\_tol\_mass}                & Scale-free mass tolerance: converged when $\varepsilon_C\le\mathrm{tol}_C$. \\
+$\textxtol$              & \code{sol.xtol}                          & Lower bound on the accepted step norm $\|\alpha\delta\boldsymbol{x}\|$ before declaring coordinate stagnation. \\
+$\textstag$              & \code{sol.stagnation\_noise\_floor}      & Noise-floor residual; a non-converged exit below this may still be classified as success (Sec.~\ref{sec:falseEquiv}). \\
+$\alpha_{\min}$          & \code{sol.linesearch\_alpha\_min}        & Smallest line-search step before giving up. \\
+$c_1$                    & \code{sol.armijo\_c1}                    & Armijo / monotone-residual descent constant. \\
+$\gamma$                 & \code{sol.linesearch\_contraction\_factor} & Backtracking factor: $\alpha \leftarrow \gamma\alpha$. \\
+$N_{\mathrm{ls}}$        & \code{sol.max\_linesearch\_iterations}   & Bound on line-search inner iterations. \\
+$F_{\mathrm{div}}$       & \code{sol.divergence\_merit\_factor}     & Threshold by which the merit must expand to count as one ``increase''. \\
+$\mathfrak{m}$           & (built into the \code{SafeNewtonSolver} as \code{.mode})  & Cascade mode: \code{:newton} (merit-Armijo) or \code{:picard} (monotone residual reduction); cf.\ §\ref{sec:dir-deriv} and Alg.~\ref{alg:A2}. \\
+\code{freeze\_cusp} & \code{sol.freeze\_jacobian\_cusp}   & Boolean: skip Jacobian recomputation at Forchheimer cusps to avoid singular updates. \\
+$N_{\mathrm{rdiv}}$      & \code{sol.newton\_residual\_divergence\_patience} & Consecutive $\ell^\infty$-residual increases (beyond $F_{\mathrm{div}}$) tolerated in \textsc{Newton} mode before handing off to Picard; $0$ disables the guard (default). \\
+$N_{\mathrm{stall}}$     & \code{sol.newton\_stall\_window}         & Window for the no-progress stall guard; $0$ disables it (overridden to $0$ in the coupled/JFNK solve). \\
+$\delta_{\mathrm{stall}}$ & \code{sol.newton\_stall\_min\_rel\_improvement} & Relative $\|\boldsymbol{b}\|_\infty$ drop counting as progress within that window. \\
+\midrule
+\multicolumn{3}{l}{\emph{OSGS coupled solve}} \\
+$N_{\mathrm{OSGS}}$      & \code{sol.newton\_iterations} (shared)   & The coupled OSGS solve has no dedicated iteration knob: it reuses the shared inner-Newton budget $N_{\mathrm{N}}$ (only \code{stall\_window} is overridden to $0$). The projection $\boldsymbol{\pi}_h$ is re-slaved every residual evaluation, so there is no outer-loop budget or drift criterion. \\
+\midrule
+\multicolumn{3}{l}{\emph{OSGS JFNK inner solve} (opt-in, \code{sol.osgs\_jfnk\_enabled}; §\ref{sec:jfnk})} \\
+\code{jfnk}              & \code{sol.osgs\_jfnk\_enabled}           & Boolean: replace the frozen-$\boldsymbol{\pi}_h$ direct inner solve with the matrix-free full-tangent GMRES of §\ref{sec:jfnk}. Default \code{false}; mutually exclusive with \code{osgs\_anderson\_enabled}. \\
+$\eta$                   & \code{sol.osgs\_jfnk\_gmres\_rel\_tol}   & Fixed inner-GMRES forcing tolerance (no Eisenstat--Walker); default $10^{-2}$, validated $\in(0,1)$. \\
+$N_{\mathrm{K}}$         & \code{sol.osgs\_jfnk\_gmres\_maxiter}    & Inner-GMRES iteration cap per Newton step; default $100$, $\ge 1$. \\
+$\ell$                   & \code{sol.osgs\_jfnk\_gmres\_restart}    & GMRES restart length; default $50$, $\ge 1$. \\
+$b_{\mathrm{fd}}$        & \code{sol.osgs\_jfnk\_fd\_epsilon}       & Brown--Saad finite-difference base in $\varepsilon = b_{\mathrm{fd}}(1+\|U_h\|)/\|\boldsymbol{v}\|$; default $10^{-8}$, $>0$. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Algorithm--to--code correspondence}
+
+\begin{table}[h]
+\centering
+\caption{Algorithm $\leftrightarrow$ code signature mapping (core algorithm).}
+\label{tab:functions}
+\small
+\begin{tabularx}{\textwidth}{@{} l X @{}}
+\toprule
+\textbf{Algorithm} & \textbf{Code entry point} \\
+\midrule
+$\mathrm{SimulationOrchestration}$ (Alg.~\ref{alg:O})   & \code{run\_simulation(path)} $\to$ \code{solve\_system(setup, form, solvers, cfg, x0)}. \\
+$\mathrm{RobustNonlinearCascade}$ (Alg.~\ref{alg:B})    & The Newton$\to$Picard$\to$Newton cascade inside \code{solve\_system}; used only by Stage~I, the ASGS algebraic boot (\code{\_initialize\_asgs\_state!}, with ASGS operators and the restore vector $\boldsymbol{x}^0_{\mathrm{backup}}$). \\
+$\mathrm{CoupledOSGSSolve}$ (Alg.~\ref{alg:C})  & \code{solve\_osgs\_stage!} (\code{src/solvers/osgs\_solver.jl}), dispatched from \code{solve\_system}: one \code{safe\_fe\_solve!} call on Algorithm~\ref{alg:A} whose residual re-slaves $\boldsymbol{\pi}_h$ at every evaluation. \\
+$\mathrm{ExactNewtonPipeline}$ (Alg.~\ref{alg:A})       & \code{\_safe\_solve\_inner!} (\code{src/solvers/nonlinear.jl}), reused with either an exact-Newton or a Picard Jacobian. \\
+$\mathrm{SolveLinearSystem}$ (Alg.~\ref{alg:A1})        & \code{eval\_linear\_system\_resolution!(dx, A, b, solver, cache)}. \\
+$\mathrm{ArmijoLinesearch}$ (Alg.~\ref{alg:A2})         & \code{eval\_armijo\_linesearch\_pass!}. \\
+$\mathrm{EvaluateSafeguards}$ (Alg.~\ref{alg:A3})       & \code{eval\_safeguard\_termination\_bounds!}. \\
+$\mathrm{JFNKStep}$ (Alg.~\ref{alg:jfnk})               & \code{\_osgs\_jfnk\_solve!} (\code{osgs\_solver.jl}) wiring \code{JFNKLinearSolver} (\code{linear\_solvers.jl}) as a drop-in \code{LinearSolver} into the shared \code{SafeNewtonSolver}; active iff \code{sol.osgs\_jfnk\_enabled}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ============================================================
 \appendix
 \section{Code--Notation Correspondence}
 \label{sec:appendix-codes}
@@ -1902,10 +2029,12 @@ $\mathsf{Ftol}$               & \code{"ftol\_reached"}                 & $\|\bol
 $\mathsf{InitialFtol}$        & \code{"initial\_ftol"}                  & Initial guess already satisfies $\textftol$; no Newton step taken. \\
 $\mathsf{NoiseFloor}$         & \code{"stagnation\_noise\_floor\_reached"} & $\|\boldsymbol{b}\|_\infty \le \textstag$ on a non-converged exit. \\
 $\mathsf{LinesearchFailed}$   & \code{"linesearch\_failed"}             & Line-search step shrank to $\alpha \le \alpha_{\min}$ without descent. \\
-$\mathsf{MeritDivergence}$    & \code{"merit\_divergence\_escaped"}     & Merit function expanded by $\ge F_{\mathrm{div}}$ for $N_{\mathrm{inc}}$ consecutive steps. \\
+$\mathsf{MeritDivergence}$    & \code{"merit\_divergence\_escaped"}     & Merit $\Phi$ expanded by $\ge F_{\mathrm{div}}$ for $N_{\mathrm{inc}}$ consecutive steps (\textsc{Newton}); $\|\boldsymbol{b}\|_\infty$ likewise (\textsc{Picard}). \\
+$\mathsf{ResidualDivergence}$ & \code{"residual\_divergence\_escaped"}   & \textsc{Newton}, opt-in ($N_{\mathrm{rdiv}}>0$): $\|\boldsymbol{b}\|_\infty$ rose by $\ge F_{\mathrm{div}}$ for $N_{\mathrm{rdiv}}$ consecutive steps; hands off to Picard. \\
 $\mathsf{Xtol}$               & \code{"xtol\_stagnation"}               & Step norm $L \le \textxtol$ with residual still above $\textstag$. \\
 $\mathsf{IterationCap}$       & \code{"max\_iters\_stagnation"}         & Iteration budget exhausted with residual still above $\textstag$. \\
-$\mathsf{LinearSolveNaN}$     & \code{"linear\_solve\_nan"}             & Linear-solve exception or NaN in $\delta\boldsymbol{x}$. \\
+$\mathsf{NoProgressStall}$    & \code{"no\_progress\_stall"}            & Opt-in ($N_{\mathrm{stall}}>0$): best $\|\boldsymbol{b}\|_\infty$ failed to improve by the relative margin over the stall window; bails for caller fallback. Disabled in the coupled/JFNK solve ($N_{\mathrm{stall}}=0$). \\
+$\mathsf{LinearSolveFailed}$     & \code{"linear\_solve\_failed"}             & Linear-solver exception, NaN step, or controlled iterative non-convergence (C.1: \code{GMRESNotConvergedError} / \code{ILUFactorizationFailure}). \\
 $\mathsf{InProgress}$         & \code{""}                                & Sentinel for ``no break this iteration''. \\
 \bottomrule
 \end{tabularx}
@@ -2398,7 +2527,7 @@ the Picard iteration budget when a stiffness threshold is exceeded:}
 
 \begin{table}[h]
 \centering
-\caption{\extline{Numerical parameters of the parameter-sweep harness adaptations (extension-only).}}
+\caption{\extline{Numerical parameters of the parameter-sweep harness adaptations (extension-only). The \code{dynamic\_*} fields are harness-frame quantities defined in \code{test/extended/harness\_dynamic\_budget.jl} (relocated out of \code{SolverConfig} on 2026-06-25); \code{condition\_noise\_floor\_*} remains a \code{sol} field.}}
 \label{tab:harness-params}
 \footnotesize
 \textcolor{extcolor}{%
@@ -2406,13 +2535,13 @@ the Picard iteration budget when a stiffness threshold is exceeded:}
 \toprule
 \textbf{Symbol} & \textbf{Field in code} & \textbf{Role / effect} \\
 \midrule
-$C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{sol.dynamic\_ftol\_ceiling}, \code{\_spatial\_safety\_factor} & Clamps for the discretisation-coupled residual tolerance \eqref{eq:dynamic-ftol}, \S\ref{sec:harness-ftol}; $C_{\mathrm{sf}}$ also sets the per-field dimensionless rate \eqref{eq:per-field-rate}. \\
+$C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{dynamic\_ftol\_ceiling}, \code{dynamic\_ftol\_spatial\_safety\_factor} & Clamps for the discretisation-coupled residual tolerance \eqref{eq:dynamic-ftol}, \S\ref{sec:harness-ftol}; $C_{\mathrm{sf}}$ also sets the per-field dimensionless rate \eqref{eq:per-field-rate}. \\
 $\varepsilon_{k}$, $\varepsilon^{\mathrm{N}}_{k}$ & (built from $C_{\mathrm{sf}}$, $n^{\mathrm{sf}}$, $h$, $k_{v}$) & Dimensionless per-field convergence and noise-floor rates supplied to the inner Newton kernel as \code{relative\_ftol\_per\_field} and \code{relative\_stagnation\_noise\_floor\_per\_field}, \S\ref{sec:harness-perfield}. \\
 $\textftol^{\,\mathrm{static}}$ & (harness-set: $10\,\mathrm{eps}$) & Static machine-precision floor of~\eqref{eq:per-field-effective-ftol}; prevents per-field tolerances from descending below floating-point round-off. The corresponding noise-floor floor used in~\eqref{eq:per-field-noise} is $\textstag^{\,\mathrm{dyn}}$ from~\eqref{eq:dynamic-noise}. \\
 $n^{\mathrm{base}}, n^{\min}, n^{\mathrm{sf}}$ & \code{sol.condition\_noise\_floor\_*} & Adaptive noise-floor controls, \S\ref{sec:harness-noise}. \\
-$\mathrm{Re}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Re}}$ & \code{sol.dynamic\_picard\_re\_*} & Per-case Picard widening trigger and budget for high Reynolds. \\
-$\mathrm{Da}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Da}}$ & \code{sol.dynamic\_picard\_da\_*} & Per-case Picard widening trigger and budget for high Damk\"ohler. \\
-$\mathrm{Re}^{\mathrm{th,N}}, N_{\mathrm{N}}^{\mathrm{Re}}$ & \code{sol.dynamic\_newton\_re\_*} & Per-case Newton widening trigger and budget for high Reynolds. Mirrors the Picard pair; landed 2026-05-19 (\code{fa8aaec}) to absorb the transient smoothing phase the corrected mode-aware divergence safeguard exposes when Newton has to backtrack through residual-landscape spikes at $\mathrm{Re} \ge \mathrm{Re}^{\mathrm{th,N}}$. \\
+$\mathrm{Re}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Re}}$ & \code{dynamic\_picard\_re\_*} & Per-case Picard widening trigger and budget for high Reynolds. \\
+$\mathrm{Da}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Da}}$ & \code{dynamic\_picard\_da\_*} & Per-case Picard widening trigger and budget for high Damk\"ohler. \\
+$\mathrm{Re}^{\mathrm{th,N}}, N_{\mathrm{N}}^{\mathrm{Re}}$ & \code{dynamic\_newton\_re\_*} & Per-case Newton widening trigger and budget for high Reynolds. Mirrors the Picard pair; landed 2026-05-19 (\code{fa8aaec}) to absorb the transient smoothing phase the corrected mode-aware divergence safeguard exposes when Newton has to backtrack through residual-landscape spikes at $\mathrm{Re} \ge \mathrm{Re}^{\mathrm{th,N}}$. \\
 \bottomrule
 \end{tabularx}}
 \end{table}
