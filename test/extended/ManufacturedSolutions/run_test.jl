@@ -514,26 +514,31 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
 
     results_dir = joinpath(@__DIR__, "results")
     mkpath(results_dir)
+    # [layout 2026-06-27] Results live in per-(kv,etype) folders as a generically-named DB:
+    #   results/k<kv>/<etype>/results.h5   (debug runs: results/debug_results/k<kv>/<etype>/results.h5)
+    # co-located with that cell's convergence PNGs, traces/, and vtk/. The DB no longer carries a
+    # study-specific filename; instead the FULL config JSON(s) that produced the data are embedded INSIDE
+    # the DB (group "configs/<config-file>"), and every result group points to its config via the
+    # `config_file` attribute. Usually one config per DB, but a merged DB (e.g. a surgical re-run of a few
+    # cells under a second config) can hold several. `h5_filename` is retained ONLY to flag a debug run
+    # (its "debug_results/" prefix routes the whole tree under debug_results/); the DB name is always
+    # `results.h5`. The per-(kv,etype) `h5_path`/`h5_lock_path` are (re)computed at the top of the
+    # etype/kv/kp loop below via `_results_h5_path`/`_ensure_h5!`.
     h5_filename = get(test_dict, "h5_filename", "convergence_data.h5")
     if cli_h5 !== nothing
-        h5_filename = cli_h5   # CLI override: route this run's results to a chosen DB (per-study isolation)
+        h5_filename = cli_h5   # CLI override: route this run under debug_results/ (per-study isolation)
     end
-    h5_path = joinpath(results_dir, h5_filename)
-    # `h5_filename` may include a subdirectory (e.g. "debug_results/foo.h5" for ad-hoc/debug runs,
-    # to keep results/ clean); create its parent so any such path resolves.
-    mkpath(dirname(h5_path))
-    # Per-cell output base for VTK/traces: keep debug-run artifacts out of the main results/ tree.
-    _cell_out_base = startswith(h5_filename, "debug_results/") ? joinpath(results_dir, "debug_results") : results_dir
-    # Run identity = the results-DB basename (sans dir/extension), e.g. "k1_quad_freeze". Stamped into each
-    # trace so plot_trajectory.py can group a run's trajectory plots under plots/<run>/ automatically (no
-    # --run flag needed). Each (cell,method,N) trace is overwritten per run, so the stamp always reflects the
-    # run that last wrote it.
-    run_name = splitext(basename(h5_filename))[1]
+    _debug_run = startswith(h5_filename, "debug_results/")
+    # Per-cell output base for the whole tree (DB + VTK + traces): keep debug-run artifacts out of results/.
+    _cell_out_base = _debug_run ? joinpath(results_dir, "debug_results") : results_dir
+    # Run identity stamped into each trace so plot_trajectory.py groups a run's plots under plots/<run>/.
+    # Keyed on the CONFIG basename (the DB name is the generic "results"), e.g. "phase1_quad_k1".
+    run_name = splitext(basename(config_file))[1]
+    # Raw config text + basename, embedded into each per-(kv,etype) DB this run writes (provenance).
+    config_basename = basename(config_file)
+    config_raw = read(config_path, String)
 
     erase_past = get(test_dict, "erase_past_results", false)
-    h5_mode = erase_past ? "w" : "cw"
-
-    h5_lock_path = h5_path * ".lock"   # single sidecar shared by all concurrent launches
 
     # [concurrency] "erase then run concurrently" is contradictory: one shard would truncate the
     # file another shard is filling. Refuse it loudly.
@@ -541,11 +546,28 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
         error("erase_past_results=true is incompatible with --shard (a shard would wipe another shard's results). Set erase_past_results=false for sharded runs.")
     end
 
-    # Ensure the shared DB exists before the per-cell "r+" writes (create under the lock; truncate
-    # if erase_past). The per-cell group index is assigned deterministically from the full grid
-    # (global_cell_index, below), so no idx seeding from existing groups is needed here.
-    mkpidlock(h5_lock_path; wait=true) do
-        h5open(h5_path, h5_mode) do _io end
+    # DB path + first-touch initializer. The DB is created/truncated and the config JSON embedded EXACTLY
+    # ONCE per distinct path per run (tracked by `_initialized_h5`). `erase_past` ⇒ "w" (fresh); otherwise
+    # "cw" (create-if-needed, keep existing for resume/merge — the config is added/refreshed).
+    #   • OFFICIAL run (default) → the clean per-(kv,etype) generic DB: results/k<kv>/<etype>/results.h5.
+    #   • DEBUG/STUDY run (h5_filename under "debug_results/") → keep the EXPLICIT single-DB name for
+    #     per-study isolation (e.g. A/B harness tests writing _pp_off.h5 vs _pp_on.h5 then reading them
+    #     back); these go under results/debug_results/ and are not the canonical results.
+    _results_h5_path(kvv, ets) = _debug_run ?
+        joinpath(results_dir, h5_filename) :
+        joinpath(_cell_out_base, "k$(kvv)", String(ets), "results.h5")
+    _initialized_h5 = Set{String}()
+    function _ensure_h5!(p)
+        (p in _initialized_h5) && return
+        push!(_initialized_h5, p)
+        mkpath(dirname(p))
+        mkpidlock(p * ".lock"; wait=true) do
+            h5open(p, erase_past ? "w" : "cw") do io
+                cfgs = haskey(io, "configs") ? io["configs"] : create_group(io, "configs")
+                haskey(cfgs, config_basename) && delete_object(cfgs, config_basename)
+                cfgs[config_basename] = config_raw   # full config JSON embedded for provenance
+            end
+        end
     end
 
     conv_parts = mesh_dict["convergence_partitions"]
@@ -633,7 +655,13 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                 if equal_order_only && kv != kp
                     continue
                 end
-                
+
+                # [layout] This (kv,etype) writes to its own results/k<kv>/<etype>/results.h5; create +
+                # embed the config on first touch. The resume-preload and per-cell write below use these.
+                h5_path = _results_h5_path(kv, etype)
+                h5_lock_path = h5_path * ".lock"
+                _ensure_h5!(h5_path)
+
                 # Setup dictionary trackers for all physics configurations natively inside this geometry
                 for alpha_0 in alpha_list, Da in Da_list, Re in Re_list, method in methods
                     k_id = (etype, kv, kp, alpha_0, Da, Re, method)

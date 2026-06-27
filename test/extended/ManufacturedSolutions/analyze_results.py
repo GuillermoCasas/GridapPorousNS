@@ -789,13 +789,36 @@ def _write_summary_tables(table_data, out_file):
 # ======================================================================================
 # main
 # ======================================================================================
+def _materialize_embedded_config(h5_glob):
+    """[layout 2026-06-27] Configs are embedded in each results.h5 under group 'configs/<file>'. When no
+    --config is given on the CLI, extract the first embedded config from the first matching DB and write it
+    to a temp JSON file so the path-based helpers (load_solver_constants) work unchanged. Returns the path,
+    or None if nothing is embedded (then the caller falls back to the data/ default)."""
+    import glob as _glob, tempfile, h5py as _h5
+    for p in sorted(_glob.glob(h5_glob)):
+        try:
+            with _h5.File(p, 'r') as f:
+                if 'configs' in f and len(f['configs']) > 0:
+                    name = sorted(f['configs'].keys())[0]
+                    raw = f['configs'][name][()]
+                    raw = raw.decode() if isinstance(raw, bytes) else str(raw)
+                    tf = tempfile.NamedTemporaryFile('w', suffix='.json', delete=False)
+                    tf.write(raw); tf.close()
+                    return tf.name
+        except (OSError, KeyError):
+            continue
+    return None
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description="One-stop MMS sweep analysis: detect + merged table + plots + detailed table.")
-    ap.add_argument('--h5', default=os.path.join(here, 'results', '*.h5'),
-                    help="glob of result HDF5 DBs (default results/*.h5; pass one DB to analyze a single study)")
-    ap.add_argument('--config', default=os.path.join(here, 'data', 'test_config.json'),
-                    help="a sweep JSON config (for the dynamic_ftol / k_nf constants)")
+    # [layout 2026-06-27] DBs now live per-(kv,etype) as results/k<kv>/<etype>/results.h5 (configs embedded).
+    ap.add_argument('--h5', default=os.path.join(here, 'results', 'k*', '*', 'results.h5'),
+                    help="glob of result HDF5 DBs (default results/k*/*/results.h5; pass one DB to analyze a single study)")
+    ap.add_argument('--config', default=None,
+                    help="a sweep JSON config (for the dynamic_ftol / k_nf constants). "
+                         "Default: read the config embedded in the first matching DB (results.h5 'configs/' group).")
     ap.add_argument('--flagged', default=os.path.join(here, 'results', 'flagged_cells.json'),
                     help="output path for the detected flagged_cells.json (Phase-2 input)")
     ap.add_argument('--phase2', default=os.path.join(here, 'results', 'phase2_results.json'),
@@ -811,6 +834,11 @@ def main():
     ap.add_argument('--only', choices=['detect', 'merged', 'detailed', 'plots'], default=None,
                     help="run only one stage instead of everything")
     args = ap.parse_args()
+
+    # Resolve the config: explicit --config wins; otherwise read the config embedded in the DB(s).
+    if not args.config:
+        args.config = _materialize_embedded_config(args.h5) or os.path.join(here, 'data', 'test_config.json')
+        print(f"[config] using {'embedded config from DB' if args.config and 'tmp' in args.config.lower() else args.config}")
 
     do = args.only
     numbering = build_cell_numbering(args.h5)   # deterministic, shard-independent config numbers

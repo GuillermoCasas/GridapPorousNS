@@ -464,9 +464,10 @@ PREAMBLE = r"""\documentclass[11pt]{article}
 
 def build():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--tri-h5", default=os.path.join(RESULTS, "phase1_tri_k1.h5"),
+    # [layout 2026-06-27] DBs live per-(kv,etype) as results/k<kv>/<etype>/results.h5 (configs embedded).
+    ap.add_argument("--tri-h5", default=os.path.join(RESULTS, "k1", "TRI", "results.h5"),
                     help="P1 (TRI k=1) sweep HDF5")
-    ap.add_argument("--quad-h5", default=os.path.join(RESULTS, "phase1_quad_k2.h5"),
+    ap.add_argument("--quad-h5", default=os.path.join(RESULTS, "k2", "QUAD", "results.h5"),
                     help="Q2 (QUAD k=2) sweep HDF5")
     ap.add_argument("--threed-json",
                     default=os.path.join(HERE, "..", "ManufacturedSolutions3D", "results",

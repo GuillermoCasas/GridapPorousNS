@@ -38,7 +38,11 @@ julia --project=../../.. run_test.jl test_config.json
 julia --project=../../.. run_test.jl test_config.json --filter Re=1e6,etype=QUAD,kv=1
 # Multiple concurrent launches share ONE results DB (content-addressed keys + file lock):
 for k in 1 2 3 4; do julia --project=../../.. run_test.jl test_config.json --shard $k/4 & done; wait
-python analyze_results.py --h5 results/<db>.h5 --config data/test_config.json   # post-sweep analysis
+python analyze_results.py   # post-sweep analysis (reads the per-(kv,etype) DBs + their embedded configs)
+# Layout (2026-06-27): an official run writes results/k<kv>/<etype>/results.h5 with the FULL config JSON(s)
+# embedded inside (group "configs/"); each result group points to its config via the `config_file` attr, so
+# the DB is self-describing (analyze needs no --config). Debug/A-B runs keep an explicit single-DB name for
+# isolation: pass --h5 debug_results/<name>.h5 (whole tree routes under results/debug_results/).
 # (See test/extended/ManufacturedSolutions/README.md for the full harness guide.)
 
 # Cocquet reference experiment (convergence study; compares VMS P1/P1 & P2/P2 against the

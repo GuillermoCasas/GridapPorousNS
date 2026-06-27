@@ -12,6 +12,9 @@ results/
 **/results/
 # Per-cell solver trajectory dumps are run output, not source (e.g. archived sweep baselines)
 **/traces/
+# Ignore generated plots and figures
+*.png
+
 
 # Ignore specific Gridap and Julia files
 *.jl.cov

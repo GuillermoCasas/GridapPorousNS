@@ -33,35 +33,48 @@ own DB — no per-study config files.
 
 ```bash
 cd test/extended/ManufacturedSolutions
-julia --project=../../.. run_test.jl test_config.json --h5 mms_sweep.h5
-python analyze_results.py --h5 results/mms_sweep.h5 --config data/test_config.json
+julia --project=../../.. run_test.jl test_config.json
+python analyze_results.py          # reads the per-(kv,etype) DBs + their embedded configs automatically
 ```
 
-The output HDF5 group key is **content-addressed**: `config_<idx>_<tag>_<method>`, where `<tag>` hashes
-the physics cell `(Re, Da, α₀, kv, kp, etype)` identically across runs and `<idx>` is a deterministic,
-shard-independent label.
+**Results layout (2026-06-27).** An *official* run writes one generically-named DB per `(kv, etype)`,
+co-located with that family's plots/traces/vtk:
+
+```
+results/k<kv>/<etype>/results.h5      # the DB (no study-specific filename)
+results/k<kv>/<etype>/convergence_*.png, traces/, vtk/
+```
+
+The **full config JSON(s)** that produced the data are embedded *inside* each DB under the group
+`configs/<config-file>`, and every result group points to its config via the `config_file` attribute
+(usually one config per DB; a merged DB — e.g. a surgical re-run of a few cells under a second config —
+holds several). So a DB is self-describing: `analyze_results.py` reads the embedded config and needs no
+`--config`. The output HDF5 group key is **content-addressed**: `config_<idx>_<tag>_<method>`, where
+`<tag>` hashes the physics cell `(Re, Da, α₀, kv, kp, etype)` identically across runs and `<idx>` is a
+deterministic, shard-independent label.
 
 **Per-cell outputs (ParaView + traces).** VTK field snapshots are written **by default** so each cell
 can be inspected visually, under `results/k<kv>/<etype>/vtk/mms_<method>_Re…_Da…_a…_N….vtu`, alongside
-the `traces/` JSON sidecars and the convergence `.png` plots. Ad-hoc/debug runs (whose `h5_filename`
-lives under `debug_results/`, the convention for scratch output) mirror this under
-`results/debug_results/k<kv>/<etype>/…`. A full sweep can write many GBs of `.vtu`; set
-`"write_vtk": false` in the config to skip it for large production sweeps.
+the `traces/` JSON sidecars and the convergence `.png` plots. **Ad-hoc/debug or A/B study runs** keep the
+*old* explicit-DB-name behavior for per-study isolation: set `h5_filename` (or `--h5`) under
+`debug_results/` (e.g. `"debug_results/_ab_off.h5"`) and the whole tree — including that single
+explicitly-named DB — mirrors under `results/debug_results/…`, so two studies of the same `(kv,etype)`
+never collide. A full sweep can write many GBs of `.vtu`; set `"write_vtk": false` for large sweeps.
 
 ### CLI overrides — run any sub-combination without authoring a config
 
 | Flag | Effect |
 |---|---|
 | `--filter Re=…,Da=…,alpha0=…,kv=…,kp=…,etype=…,method=…` | Select a sub-grid. AND across keys, OR within a key's repeated values. `1e6` matches `1000000.0`. |
-| `--h5 <name>` | Route this run's results to a chosen DB — keeps studies isolated (e.g. k1 vs k2 in separate files). |
+| `--h5 debug_results/<name>.h5` | Route this run to an explicitly-named single DB under `debug_results/` — keeps A/B / scratch studies isolated (two studies of the same `(kv,etype)` won't collide). Omit for official runs, which auto-route to `results/k<kv>/<etype>/results.h5`. |
 | `--max-N <int>` | Cap the N-ladder (quick gates, without editing `convergence_partitions`). |
 | `--shard k/N` | Run shard k of N; concurrent launches share one DB (below). |
 
 ```bash
-# k=2 QUAD study into its own DB (≡ the retired phase1_quad_k2.json):
-julia --project=../../.. run_test.jl test_config.json --filter etype=QUAD,kv=2 --h5 quad_k2.h5
-# quick smoke (1 cell, short ladder):
-julia --project=../../.. run_test.jl test_config.json --filter Re=1.0,Da=1.0,etype=QUAD,kv=1 --max-N 40 --h5 smoke.h5
+# k=2 QUAD study (official) -> auto-routes to results/k2/QUAD/results.h5:
+julia --project=../../.. run_test.jl test_config.json --filter etype=QUAD,kv=2
+# quick smoke (1 cell, short ladder), isolated under debug_results/ so it can't touch official DBs:
+julia --project=../../.. run_test.jl test_config.json --filter Re=1.0,Da=1.0,etype=QUAD,kv=1 --max-N 40 --h5 debug_results/smoke.h5
 ```
 The **fold corner** (Re=1e6, α₀=0.05) is excluded from the sweep by `skip_cells` (it folds — no root —
 at N≤320). It is **reproduced** (P1/TRI, both methods) by a direct exact-guess solve at N≥512 via
@@ -78,11 +91,11 @@ files, no post-hoc merge step.
 
 ```bash
 for k in 1 2 3 4; do
-  julia --project=../../.. run_test.jl test_config.json --filter etype=QUAD,kv=2 --h5 quad_k2.h5 \
+  julia --project=../../.. run_test.jl test_config.json --filter etype=QUAD,kv=2 \
         --shard $k/4 > logs/shard_${k}.log 2>&1 &
 done
 wait
-python analyze_results.py --h5 results/quad_k2.h5 --config data/test_config.json
+python analyze_results.py --h5 results/k2/QUAD/results.h5   # one shared DB; embedded config read automatically
 ```
 
 Notes / limits:
@@ -119,10 +132,10 @@ a short ladder, into a scratch `--h5` DB. (The α₀=0.05 fold corner is already
 # Da=1 column × all Re × all α, QUAD k=1, ASGS+OSGS, N≤40, 2 shards into one scratch DB:
 for k in 1 2; do
   julia --project=../../.. run_test.jl test_config.json \
-        --filter Da=1.0,etype=QUAD,kv=1 --max-N 40 --shard $k/2 --h5 _robustness.h5 \
+        --filter Da=1.0,etype=QUAD,kv=1 --max-N 40 --shard $k/2 --h5 debug_results/_robustness.h5 \
         > logs/rob_$k.log 2>&1 &
 done; wait
-python analyze_results.py --h5 results/_robustness.h5 --config data/test_config.json --no-plots --outdir /tmp/rob
+python analyze_results.py --h5 results/debug_results/_robustness.h5 --no-plots --outdir /tmp/rob
 ```
 
 ### How to read it — two independent signals

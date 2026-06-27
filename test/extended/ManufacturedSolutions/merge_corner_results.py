@@ -113,15 +113,16 @@ def inject(h5_path, json_specs, kv, etype, idx_base=900):
 
 
 def main():
+    # [layout 2026-06-27] DBs live per-(kv,etype) as results/k<kv>/<etype>/results.h5.
     total = 0
     total += inject(
-        os.path.join(RESULTS, "phase1_tri_k1.h5"),
+        os.path.join(RESULTS, "k1", "TRI", "results.h5"),
         [(os.path.join(DEBUG, "corner_tri_k1_a005.json"), "ASGS"),
          (os.path.join(DEBUG, "corner_tri_k1_a005_osgs.json"), "OSGS"),
          (os.path.join(DEBUG, "corner_tri_k1_a005_osgs_da1e6.json"), "OSGS")],
         kv=1, etype="TRI")
     total += inject(
-        os.path.join(RESULTS, "phase1_quad_k2.h5"),
+        os.path.join(RESULTS, "k2", "QUAD", "results.h5"),
         [(os.path.join(DEBUG, "corner_quad_k2_a005.json"), "ASGS"),
          (os.path.join(DEBUG, "corner_quad_k2_a005_osgs.json"), "OSGS")],
         kv=2, etype="QUAD")
