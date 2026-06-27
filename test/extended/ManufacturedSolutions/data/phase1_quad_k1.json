@@ -94,8 +94,7 @@
         40,
         80,
         160,
-        320,
-        640
+        320
       ],
       "element_type": [
         "QUAD"
@@ -117,7 +116,8 @@
       "newton_residual_divergence_patience": 2,
       "pingpong_enabled": true,
       "pingpong_max_swaps": 4,
-      "pingpong_picard_gain_orders": 1.5
+      "pingpong_picard_gain_orders": 1.5,
+      "osgs_jfnk_enabled": true
     },
     "stabilization": {
       "method": [
