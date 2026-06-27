@@ -1,0 +1,920 @@
+[
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_10_64a17f0fed96_OSGS",
+    "config_idx": 2,
+    "Re": 1e-06,
+    "Da": 1e-06,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      40
+    ],
+    "finest_true_root": {
+      "N": 40,
+      "err_u_l2": 9.862144859885273e-05,
+      "err_u_h1": 0.027121180456727657,
+      "residual": 2.7540498648975786e-08
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 2.06799412326121e-07,
+      "err_u_h1": 0.00042842932217367893
+    },
+    "slope_L2": 3.0042,
+    "slope_H1": 1.9997
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_11_d8c54dc60dea_OSGS",
+    "config_idx": 11,
+    "Re": 1.0,
+    "Da": 1e-06,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      160
+    ],
+    "finest_true_root": {
+      "N": 160,
+      "err_u_l2": 1.6721399892423117e-06,
+      "err_u_h1": 0.001718374229119315,
+      "residual": 1.7765743839495197e-09
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 2.0755852718851432e-07,
+      "err_u_h1": 0.00042906955001457606
+    },
+    "slope_L2": 3.0101,
+    "slope_H1": 2.0018
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_12_cc4eae626ce5_ASGS",
+    "config_idx": 19,
+    "Re": 1000000.0,
+    "Da": 1e-06,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "ASGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320",
+      "slope_L2=2.34(<exp3)"
+    ],
+    "true_root_meshes": [
+      10,
+      20
+    ],
+    "finest_true_root": {
+      "N": 20,
+      "err_u_l2": 0.0010151350181068042,
+      "err_u_h1": 0.13744255634691535,
+      "residual": 4.6758883343045454e-07
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 6.438510515703785e-07,
+      "err_u_h1": 0.0011015144877355547
+    },
+    "slope_L2": 2.3426,
+    "slope_H1": 1.8123
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_12_cc4eae626ce5_OSGS",
+    "config_idx": 19,
+    "Re": 1000000.0,
+    "Da": 1e-06,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 4.573118828400202e-07,
+      "err_u_h1": 0.0011023576779950572
+    },
+    "slope_L2": 2.8278,
+    "slope_H1": 1.8148
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_13_63ae50295b53_OSGS",
+    "config_idx": 5,
+    "Re": 1e-06,
+    "Da": 1.0,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      160
+    ],
+    "finest_true_root": {
+      "N": 160,
+      "err_u_l2": 1.6721793174497509e-06,
+      "err_u_h1": 0.0017183919135940638,
+      "residual": 1.7841040690362206e-09
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 2.0756192349149463e-07,
+      "err_u_h1": 0.000429073196769254
+    },
+    "slope_L2": 3.0101,
+    "slope_H1": 2.0018
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_14_f66e65d4cf9c_OSGS",
+    "config_idx": 14,
+    "Re": 1.0,
+    "Da": 1.0,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      160
+    ],
+    "finest_true_root": {
+      "N": 160,
+      "err_u_l2": 1.6721647102061703e-06,
+      "err_u_h1": 0.0017183857958523957,
+      "residual": 1.7708555491267744e-09
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 2.0756177663019915e-07,
+      "err_u_h1": 0.00042907306972379166
+    },
+    "slope_L2": 3.0101,
+    "slope_H1": 2.0018
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_15_a8f4a29904e4_ASGS",
+    "config_idx": 21,
+    "Re": 1000000.0,
+    "Da": 1.0,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "ASGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320",
+      "slope_L2=2.34(<exp3)"
+    ],
+    "true_root_meshes": [
+      10,
+      20
+    ],
+    "finest_true_root": {
+      "N": 20,
+      "err_u_l2": 0.0010151498591010053,
+      "err_u_h1": 0.13744313547641096,
+      "residual": 4.6758771077293204e-07
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 6.438500146240073e-07,
+      "err_u_h1": 0.0011015168637610168
+    },
+    "slope_L2": 2.3426,
+    "slope_H1": 1.8123
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_15_a8f4a29904e4_OSGS",
+    "config_idx": 21,
+    "Re": 1000000.0,
+    "Da": 1.0,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 4.57312811653549e-07,
+      "err_u_h1": 0.0011023577299529412
+    },
+    "slope_L2": 2.8278,
+    "slope_H1": 1.8148
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_16_5a76ec9ef0a9_OSGS",
+    "config_idx": 8,
+    "Re": 1e-06,
+    "Da": 1000000.0,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 6.629137019145208e-07,
+      "err_u_h1": 0.0015161701641866262
+    },
+    "slope_L2": 3.518,
+    "slope_H1": 2.6199
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_17_44ca6d830eab_OSGS",
+    "config_idx": 17,
+    "Re": 1.0,
+    "Da": 1000000.0,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 6.628268990347144e-07,
+      "err_u_h1": 0.0015160137262939086
+    },
+    "slope_L2": 3.518,
+    "slope_H1": 2.6198
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_18_a6c6a8a80b7d_OSGS",
+    "config_idx": 23,
+    "Re": 1000000.0,
+    "Da": 1000000.0,
+    "alpha_0": 0.5,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 4.449969874122499e-07,
+      "err_u_h1": 0.001071056254815947
+    },
+    "slope_L2": 2.8003,
+    "slope_H1": 1.7953
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_19_283c3b5a5b75_OSGS",
+    "config_idx": 1,
+    "Re": 1e-06,
+    "Da": 1e-06,
+    "alpha_0": 0.05,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      10,
+      20,
+      40
+    ],
+    "finest_true_root": {
+      "N": 40,
+      "err_u_l2": 0.0012537128928199388,
+      "err_u_h1": 0.2550347096875966,
+      "residual": 3.257696926364166e-08
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 2.3866700146463677e-06,
+      "err_u_h1": 0.0049498086898660575
+    },
+    "slope_L2": 2.9783,
+    "slope_H1": 1.9945
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_1_bad6cdb1701c_ASGS",
+    "config_idx": 3,
+    "Re": 1e-06,
+    "Da": 1e-06,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "ASGS",
+    "category": "suboptimal_rate",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "slope_L2=1.69(<exp3)"
+    ],
+    "true_root_meshes": [
+      10,
+      20,
+      40,
+      80,
+      160,
+      320
+    ],
+    "finest_true_root": {
+      "N": 320,
+      "err_u_l2": 1.4053862533429719e-08,
+      "err_u_h1": 1.1286333498321427e-05,
+      "residual": 6.291509612003129e-11
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 1.4053862533429719e-08,
+      "err_u_h1": 1.1286333498321427e-05
+    },
+    "slope_L2": 1.6923,
+    "slope_H1": 1.9998
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_1_bad6cdb1701c_OSGS",
+    "config_idx": 3,
+    "Re": 1e-06,
+    "Da": 1e-06,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      10,
+      20,
+      40,
+      80,
+      160
+    ],
+    "finest_true_root": {
+      "N": 160,
+      "err_u_l2": 4.359006796554758e-08,
+      "err_u_h1": 4.517843422162733e-05,
+      "residual": 4.772776181216631e-09
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 5.444558453975964e-09,
+      "err_u_h1": 1.1288941203270355e-05
+    },
+    "slope_L2": 3.0011,
+    "slope_H1": 2.0007
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_23_08c6f9d166a3_OSGS",
+    "config_idx": 7,
+    "Re": 1e-06,
+    "Da": 1000000.0,
+    "alpha_0": 0.05,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 2.4397793858513384e-06,
+      "err_u_h1": 0.005103498357182826
+    },
+    "slope_L2": 2.9251,
+    "slope_H1": 2.1087
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_24_ec0e897c0d56_OSGS",
+    "config_idx": 16,
+    "Re": 1.0,
+    "Da": 1000000.0,
+    "alpha_0": 0.05,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 2.439766939953246e-06,
+      "err_u_h1": 0.00510349457618665
+    },
+    "slope_L2": 2.9251,
+    "slope_H1": 2.1087
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_2_75b47a571cdb_OSGS",
+    "config_idx": 12,
+    "Re": 1.0,
+    "Da": 1e-06,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      10,
+      20,
+      40,
+      80,
+      160
+    ],
+    "finest_true_root": {
+      "N": 160,
+      "err_u_l2": 4.3589958403851335e-08,
+      "err_u_h1": 4.517647261576335e-05,
+      "residual": 4.036152877195942e-09
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 5.444571649012169e-09,
+      "err_u_h1": 1.128861386574057e-05
+    },
+    "slope_L2": 3.0011,
+    "slope_H1": 2.0007
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_3_d6f21e072221_ASGS",
+    "config_idx": 20,
+    "Re": 1000000.0,
+    "Da": 1e-06,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "ASGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320",
+      "slope_L2=1.74(<exp3)",
+      "slope_H1=0.82(<exp2)"
+    ],
+    "true_root_meshes": [
+      10,
+      20
+    ],
+    "finest_true_root": {
+      "N": 20,
+      "err_u_l2": 6.732054928083947e-05,
+      "err_u_h1": 0.006644609377143741,
+      "residual": 0.00031683607976162875
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 7.021065701072287e-08,
+      "err_u_h1": 6.169563543937122e-05
+    },
+    "slope_L2": 1.7387,
+    "slope_H1": 0.8212
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_3_d6f21e072221_OSGS",
+    "config_idx": 20,
+    "Re": 1000000.0,
+    "Da": 1e-06,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320",
+      "slope_L2=1.74(<exp3)",
+      "slope_H1=0.82(<exp2)"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 7.021065701072287e-08,
+      "err_u_h1": 6.169563543937122e-05
+    },
+    "slope_L2": 1.7387,
+    "slope_H1": 0.8212
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_4_bfa348dda1b1_ASGS",
+    "config_idx": 6,
+    "Re": 1e-06,
+    "Da": 1.0,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "ASGS",
+    "category": "suboptimal_rate",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "slope_L2=1.7(<exp3)"
+    ],
+    "true_root_meshes": [
+      10,
+      20,
+      40,
+      80,
+      160,
+      320
+    ],
+    "finest_true_root": {
+      "N": 320,
+      "err_u_l2": 1.3989904563891822e-08,
+      "err_u_h1": 1.1286318209836119e-05,
+      "residual": 6.295363143285788e-11
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 1.3989904563891822e-08,
+      "err_u_h1": 1.1286318209836119e-05
+    },
+    "slope_L2": 1.6983,
+    "slope_H1": 1.9998
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_4_bfa348dda1b1_OSGS",
+    "config_idx": 6,
+    "Re": 1e-06,
+    "Da": 1.0,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      10,
+      20,
+      40,
+      80,
+      160
+    ],
+    "finest_true_root": {
+      "N": 160,
+      "err_u_l2": 4.358995637664774e-08,
+      "err_u_h1": 4.517646481580648e-05,
+      "residual": 4.038775931747285e-09
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 5.444570589716283e-09,
+      "err_u_h1": 1.1288610732762292e-05
+    },
+    "slope_L2": 3.0011,
+    "slope_H1": 2.0007
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_5_0115521973fc_OSGS",
+    "config_idx": 15,
+    "Re": 1.0,
+    "Da": 1.0,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@320"
+    ],
+    "true_root_meshes": [
+      10,
+      20,
+      40,
+      80,
+      160
+    ],
+    "finest_true_root": {
+      "N": 160,
+      "err_u_l2": 4.358996190336456e-08,
+      "err_u_h1": 4.517647617746466e-05,
+      "residual": 4.038989809274085e-09
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 5.444570758281341e-09,
+      "err_u_h1": 1.1288611392233865e-05
+    },
+    "slope_L2": 3.0011,
+    "slope_H1": 2.0007
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_6_f4cf1010669d_ASGS",
+    "config_idx": 22,
+    "Re": 1000000.0,
+    "Da": 1.0,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "ASGS",
+    "category": "fold",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320",
+      "slope_L2=1.74(<exp3)",
+      "slope_H1=0.82(<exp2)"
+    ],
+    "true_root_meshes": [
+      10,
+      20
+    ],
+    "finest_true_root": {
+      "N": 20,
+      "err_u_l2": 6.732094722473552e-05,
+      "err_u_h1": 0.006644593026054148,
+      "residual": 0.0003168746492683283
+    },
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 7.021049892337692e-08,
+      "err_u_h1": 6.169377617660992e-05
+    },
+    "slope_L2": 1.7387,
+    "slope_H1": 0.8211
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_6_f4cf1010669d_OSGS",
+    "config_idx": 22,
+    "Re": 1000000.0,
+    "Da": 1.0,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320",
+      "slope_L2=1.74(<exp3)",
+      "slope_H1=0.82(<exp2)"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 7.021049892337692e-08,
+      "err_u_h1": 6.169377617660992e-05
+    },
+    "slope_L2": 1.7387,
+    "slope_H1": 0.8211
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_7_8ee58651fedf_OSGS",
+    "config_idx": 9,
+    "Re": 1e-06,
+    "Da": 1000000.0,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 6.744239835804176e-07,
+      "err_u_h1": 0.001556922251020494
+    },
+    "slope_L2": 3.5689,
+    "slope_H1": 2.6667
+  },
+  {
+    "h5": "phase1_quad_k2.h5",
+    "group": "config_8_d2b228098c20_OSGS",
+    "config_idx": 18,
+    "Re": 1.0,
+    "Da": 1000000.0,
+    "alpha_0": 1.0,
+    "k_velocity": 2,
+    "k_pressure": 2,
+    "element_type": "QUAD",
+    "method": "OSGS",
+    "category": "total_failure",
+    "pair_checked": [
+      160,
+      320
+    ],
+    "why_flagged": [
+      "not_root@160",
+      "not_root@320"
+    ],
+    "true_root_meshes": [],
+    "finest_true_root": null,
+    "min_error_attained": {
+      "N": 320,
+      "err_u_l2": 6.742602674278637e-07,
+      "err_u_h1": 0.00155662208403544
+    },
+    "slope_L2": 3.5688,
+    "slope_H1": 2.6666
+  }
+]
