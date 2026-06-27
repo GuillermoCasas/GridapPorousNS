@@ -221,3 +221,121 @@ function instantiate_linear_solver(lsc::LinearSolverConfig)::LinearSolver
 end
 
 
+# =============================================================================
+# JFNKLinearSolver — matrix-free (Jacobian-Free) Newton–Krylov inner solve for the OSGS coupled step.
+#
+# [JFNK, Phase-1 — gate: docs/solver/jfnk-phase0-preconditioner-gate.md]
+# The OSGS coupled solve is an inexact Newton on F(U)=0 with F embedding π(U)=Π(R(U)). The exact frozen-π
+# tangent (A.3) drops the dense ∂π/∂u coupling `C = ∫L*τ·Π(dR·dU)`, which caps the rate (and DIVERGES on
+# stiff/convective cells). This solver recovers the FULL tangent without forming it: it solves
+# `J_full·dx = b` with GMRES whose mat-vec is the directional finite difference of the SAME re-projecting
+# residual F (so the FD samples ∂π/∂u for free), left-preconditioned by the assembled+factored frozen-π
+# Jacobian `A` that Gridap hands to `solve!`.
+#
+# It plugs into the existing SafeNewtonSolver as a drop-in `LinearSolver` (the theory's "JFNK changes
+# exactly ONE thing: the inner linear solve"): the outer Newton loop, Armijo/merit line search,
+# divergence/stall guards, per-field gate, trajectory, and the [C.1] honesty contract are ALL inherited
+# unchanged. Because Gridap calls `jacobian!(A, op, x)` at the iterate immediately before the linear
+# solve, `A` is exactly the frozen-π preconditioner and `b` is exactly F(x_k); the only extra datum the
+# mat-vec needs is the iterate x_k itself, threaded in via `iterate` (written by the OSGS jacobian
+# closure that wraps `jac_fn_coupled`). [C.1] On inner-GMRES non-convergence it raises
+# `GMRESNotConvergedError` (the same type the ILU path uses), which `eval_linear_system_resolution!`
+# (nonlinear.jl) catches → rolls back the step → the cascade falls back to the frozen-π / Picard path. A
+# non-converged inner solve is therefore never accepted as a step.
+#
+# Sign discipline: `J_full·dx = b` with b = F(x_k) (Gridap's residual convention), so dx = J⁻¹R and the
+# outer loop's `x ← x_old − α·dx` is a correct Newton step. No sign flip — the SAME residual closure
+# feeds both the FEOperator residual and the mat-vec, so the convention propagates automatically.
+#
+# Note on the inexact line search: SafeNewtonSolver's Armijo slope uses the exact-Newton identity D=−2Φ;
+# the inexact (η>0) Krylov step satisfies it only up to the inner residual (theory §sec:jfnk-change → the
+# relaxed form D≤−2Φ(1−η)). With the production η≈1e-2 the (1−η) factor is a 1% effect and using the
+# stricter exact slope is conservative-but-safe (it can only backtrack slightly more, never accept a
+# non-descent step), so the existing line search is reused verbatim.
+# =============================================================================
+
+# The matrix-free operator: `A_mf·v ≈ [F(x + ε·v) − F(x)]/ε` with Brown–Saad ε-scaling. `F0 = F(x)` is
+# cached once per linear solve (it is the residual `b` Gridap already assembled at the iterate).
+struct JFNKMatVec{Fn}
+    residual::Fn               # vec::Vector -> F(vec): the coupled residual (recomputes π) as a plain vector
+    x::Vector{Float64}         # the FD base point x_k (the current Newton iterate)
+    F0::Vector{Float64}        # F(x_k), cached
+    fd_base::Float64           # Brown–Saad base b in ε = b·(1+‖x‖)/‖v‖
+end
+Base.eltype(::JFNKMatVec) = Float64
+Base.size(A::JFNKMatVec) = (length(A.x), length(A.x))
+Base.size(A::JFNKMatVec, ::Integer) = length(A.x)
+function LinearAlgebra.mul!(y::AbstractVector, A::JFNKMatVec, v::AbstractVector)
+    nv = norm(v)
+    if iszero(nv)
+        fill!(y, 0.0)
+        return y
+    end
+    ε = A.fd_base * (1.0 + norm(A.x)) / nv
+    Fp = A.residual(A.x .+ ε .* v)
+    @. y = (Fp - A.F0) / ε
+    return y
+end
+Base.:*(A::JFNKMatVec, v::AbstractVector) = mul!(similar(v, Float64, length(A.x)), A, v)
+
+# Preconditioner apply `r ↦ A⁻¹ r` via the factored frozen-π Jacobian's Gridap NumericalSetup.
+struct JFNKPrecond{NS}
+    ns::NS                     # numerical setup of A (= J_frozen): LU factor, etc.
+    tmp::Vector{Float64}       # scratch for the in-place ldiv! form
+end
+LinearAlgebra.ldiv!(y::AbstractVector, P::JFNKPrecond, x::AbstractVector) = (solve!(y, P.ns, x); y)
+function LinearAlgebra.ldiv!(P::JFNKPrecond, x::AbstractVector)
+    solve!(P.tmp, P.ns, x)
+    copyto!(x, P.tmp)
+    return x
+end
+
+struct JFNKLinearSolver{LS<:LinearSolver, Fn} <: LinearSolver
+    precond_ls::LS             # backend that factorizes the preconditioner A (= frozen-π Jacobian)
+    residual::Fn               # vec -> F(vec): the coupled residual whose FD gives J_full·v
+    iterate::Base.RefValue{Vector{Float64}}   # current Newton iterate x_k (FD base point), set by the jac closure
+    rel_tol::Float64           # η: inner-GMRES forcing tolerance
+    maxiter::Int               # Krylov iteration cap
+    restart::Int               # GMRES restart length
+    fd_base::Float64           # Brown–Saad FD base b
+end
+
+struct JFNKSymbolicSetup{S} <: SymbolicSetup
+    solver::JFNKLinearSolver
+    precond_ss::S
+end
+function Gridap.Algebra.symbolic_setup(solver::JFNKLinearSolver, mat::AbstractMatrix)
+    return JFNKSymbolicSetup(solver, symbolic_setup(solver.precond_ls, mat))
+end
+
+mutable struct JFNKNumericalSetup{N} <: NumericalSetup
+    solver::JFNKLinearSolver
+    precond_ns::N
+end
+function Gridap.Algebra.numerical_setup(ss::JFNKSymbolicSetup, mat::AbstractMatrix)
+    return JFNKNumericalSetup(ss.solver, numerical_setup(ss.precond_ss, mat))
+end
+function Gridap.Algebra.numerical_setup!(ns::JFNKNumericalSetup, mat::AbstractMatrix)
+    numerical_setup!(ns.precond_ns, mat)
+    return ns
+end
+
+function Gridap.Algebra.solve!(dx::AbstractVector, ns::JFNKNumericalSetup, b::AbstractVector)
+    s = ns.solver
+    x_k = s.iterate[]                       # the iterate the jacobian closure recorded (already a copy)
+    F0 = copy(b)                            # b = F(x_k): the residual Gridap assembled at this iterate
+    A_mf = JFNKMatVec(s.residual, x_k, F0, s.fd_base)
+    Pl = JFNKPrecond(ns.precond_ns, similar(b, Float64, length(b)))
+    fill!(dx, 0.0)
+    # Left-preconditioned, restarted GMRES on the matrix-free full tangent. [C.1] `log=true` so we can
+    # VERIFY convergence and reject (throw) a step we did not actually compute to tolerance.
+    _, history = gmres!(dx, A_mf, b; Pl=Pl, reltol=s.rel_tol, maxiter=s.maxiter,
+                        restart=s.restart, log=true)
+    if !history.isconverged
+        throw(GMRESNotConvergedError(_final_rel_resnorm(history), s.rel_tol,
+                                     history.iters, s.maxiter, true))
+    end
+    return dx
+end
+
+

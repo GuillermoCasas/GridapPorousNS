@@ -69,6 +69,11 @@
             "osgs_anderson_relaxation": 1.0,
             "osgs_anderson_safety_factor": 10.0,
             "osgs_anderson_max_outer": 50,
+            "osgs_jfnk_enabled": false,
+            "osgs_jfnk_gmres_rel_tol": 1e-2,
+            "osgs_jfnk_gmres_maxiter": 100,
+            "osgs_jfnk_gmres_restart": 50,
+            "osgs_jfnk_fd_epsilon": 1e-8,
             "linear_solver": {
                 "method": "LU",
                 "ilu_drop_tolerance": 1e-4,

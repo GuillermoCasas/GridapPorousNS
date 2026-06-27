@@ -226,6 +226,20 @@ Base.@kwdef struct SolverConfig
     osgs_anderson_relaxation::Float64              # β: relaxation/mixing factor on the fixed-point residual
     osgs_anderson_safety_factor::Float64           # Powell-style restart threshold (too-large extrapolation → reset history)
     osgs_anderson_max_outer::Int                   # cap on the staggered outer iterations
+    # --- OSGS JFNK (Jacobian-Free Newton-Krylov) recovery of the dropped ∂π/∂u coupling (osgs_solver.jl) ---
+    # OFF by default. When disabled the OSGS coupled solve is the existing single inexact-Newton path
+    # (bit-identical); mutually exclusive with osgs_anderson_enabled (validate! rejects both on). When
+    # enabled, the coupled Newton step solves the FULL tangent matrix-free: J_full·v ≈ [F(U+εv)−F(U)]/ε
+    # (the residual re-projects π, so the FD captures ∂π/∂u), via inner GMRES preconditioned by the
+    # already-assembled+factored frozen-π Jacobian. Phase-0 gate (docs/solver/jfnk-phase0-preconditioner-gate.md)
+    # measured this preconditioner viable (1–21 inner iters); the frozen-π preconditioner uses the
+    # config's numerical_epsilon, which Phase-0 recommends keeping 0 for JFNK (a nonzero ε_num pulls the
+    # preconditioner off the residual tangent and degrades the Krylov count).
+    osgs_jfnk_enabled::Bool                        # opt in to matrix-free full-tangent (∂π/∂u) inner GMRES
+    osgs_jfnk_gmres_rel_tol::Float64               # η: inner-GMRES forcing tolerance (inexact-Newton; ~1e-2)
+    osgs_jfnk_gmres_maxiter::Int                   # cap on inner-GMRES iterations per Newton step
+    osgs_jfnk_gmres_restart::Int                   # GMRES restart (Krylov subspace size before restart)
+    osgs_jfnk_fd_epsilon::Float64                  # Brown–Saad FD base b in ε = b·(1+‖U‖)/‖v‖ (~√eps ≈ 1e-8)
     # --- Linear (inner) solver backend ---
     linear_solver::LinearSolverConfig              # LU (direct, exact) vs ILU_GMRES (low-memory iterative)
 end
@@ -350,6 +364,13 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.osgs_anderson_relaxation > 0.0 "osgs_anderson_relaxation must be > 0"
     @assert sol.osgs_anderson_safety_factor > 0.0 "osgs_anderson_safety_factor must be > 0"
     @assert sol.osgs_anderson_max_outer >= 1 "osgs_anderson_max_outer must be >= 1"
+    # OSGS JFNK knobs (required even when disabled — no silent default). The two opt-in OSGS paths are
+    # mutually exclusive: both on is a configuration error, not a precedence rule to guess.
+    @assert !(sol.osgs_jfnk_enabled && sol.osgs_anderson_enabled) "osgs_jfnk_enabled and osgs_anderson_enabled are mutually exclusive OSGS paths; enable at most one"
+    @assert 0.0 < sol.osgs_jfnk_gmres_rel_tol < 1.0 "osgs_jfnk_gmres_rel_tol (inner-GMRES forcing η) must be in (0, 1)"
+    @assert sol.osgs_jfnk_gmres_maxiter >= 1 "osgs_jfnk_gmres_maxiter must be >= 1"
+    @assert sol.osgs_jfnk_gmres_restart >= 1 "osgs_jfnk_gmres_restart must be >= 1"
+    @assert sol.osgs_jfnk_fd_epsilon > 0.0 "osgs_jfnk_fd_epsilon (Brown–Saad FD base) must be > 0"
 
     # Linear (inner) solver backend — the ilu_*/gmres_* knobs are required even for LU (no silent default),
     # but only constrained when ILU_GMRES is actually selected.

@@ -153,6 +153,93 @@ function _osgs_anderson_outer!(final_x0, setup::FETopology, formulation::VMSForm
 end
 
 # ==============================================================================
+# JFNK-accelerated OSGS coupled solve  (opt-in: sol_cfg.osgs_jfnk_enabled)
+# ==============================================================================
+# When `osgs_jfnk_enabled` is set, the OSGS coupled Newton solves the FULL tangent matrix-free, recovering
+# the dense ∂π/∂u coupling the frozen-π tangent drops (which caps the linear rate and DIVERGES on
+# stiff/convective cells — see docs/solver/jfnk-phase0-preconditioner-gate.md). The recovery is the JFNK
+# inner solve of `theory/osgs_algorithm/osgs_algorithm.tex` §sec:jfnk: GMRES on `J_full·dx = F(U)` whose
+# mat-vec is the directional finite difference of the SAME re-projecting residual `res_fn_coupled` (so the
+# FD samples ∂π/∂u for free), left-preconditioned by the assembled+factored frozen-π Jacobian.
+#
+# Structurally this is "change exactly ONE thing": we hand the EXISTING SafeNewtonSolver a drop-in
+# `JFNKLinearSolver` (linear_solvers.jl) in place of the direct LU/ILU solver. The outer Newton loop,
+# Armijo/merit line search, divergence/stall guards, per-field gate, trajectory, and the [C.1] honesty
+# contract are inherited unchanged — no re-implemented safeguards. The mat-vec needs the current iterate
+# x_k as its FD base point; we thread it in through a Ref written by a thin wrapper around
+# `jac_fn_coupled` (Gridap calls `jacobian!` at the iterate immediately before the inner solve, so the Ref
+# holds x_k when `JFNKLinearSolver.solve!` reads it; the residual `b` it receives is exactly F(x_k)).
+#
+# [C.1] If the inner GMRES does not reach its forcing tolerance, `JFNKLinearSolver.solve!` raises
+# `GMRESNotConvergedError`; `eval_linear_system_resolution!` catches it, rolls back, and this routine then
+# FALLS BACK to the standard frozen-π coupled solve from the best iterate — never accepting a
+# non-converged inner solve, never doing worse than the current solver. OFF by default ⇒ this routine is
+# not entered and `solve_osgs_stage!` runs the existing path bit-identically.
+function _osgs_jfnk_solve!(final_x0, setup::FETopology, formulation::VMSFormulation, config::PorousNSConfig,
+                           base_nls, res_fn_coupled, jac_fn_coupled, diag_cache, iter_count_ref, initial_success)
+    X, Y = setup.X, setup.Y
+    sol_cfg = config.numerical_method.solver
+
+    println("      [+] OSGS JFNK mode: matrix-free full-tangent (∂π/∂u recovered) inner GMRES, frozen-π preconditioner.")
+
+    # The FD base point x_k, written by the jacobian wrapper below and read by JFNKLinearSolver.solve!.
+    xref = Ref{Vector{Float64}}(copy(get_free_dof_values(final_x0)))
+
+    # F as a plain vector of a free-DOF vector: the SAME coupled residual (recomputes π ⇒ captures ∂π/∂u).
+    Fvec = (vec) -> assemble_vector(y -> res_fn_coupled(FEFunction(X, vec), y), Y)
+
+    # Frozen-π ExactNewton tangent (the preconditioner) PLUS a side effect: record the iterate the mat-vec
+    # differences around. Recording here (not in the residual) is correct because Gridap evaluates the
+    # jacobian at the iterate right before the linear solve, while the residual is also evaluated at
+    # line-search trial points.
+    jac_rec = (x, dx, y) -> begin
+        xref[] = copy(get_free_dof_values(x))
+        jac_fn_coupled(x, dx, y)
+    end
+
+    jfnk_ls = JFNKLinearSolver(base_nls.ls, Fvec, xref,
+                               sol_cfg.osgs_jfnk_gmres_rel_tol, sol_cfg.osgs_jfnk_gmres_maxiter,
+                               sol_cfg.osgs_jfnk_gmres_restart, sol_cfg.osgs_jfnk_fd_epsilon)
+    # stall_window=0 for the same reason as the direct coupled solve (slow-monotone ≠ stall).
+    jfnk_nls = _with_overrides(base_nls; ls=jfnk_ls, stall_window=0)
+    op_jfnk = FEOperator(res_fn_coupled, jac_rec, X, Y)
+
+    x_backup = copy(get_free_dof_values(final_x0))
+    res_j = safe_fe_solve!(final_x0, FESolver(jfnk_nls), op_jfnk; backup=x_backup)
+    _record_stage!(diag_cache, "C:OSGS:JFNK", res_j)
+    if res_j.state == :ok
+        iter_count_ref[] += res_j.iterations
+        diag_cache["final_residual_norm"] = res_j.residual_norm
+        get!(diag_cache, "initial_residual_norm", res_j.initial_residual_norm)
+    elseif res_j.state == :max_iters_caught
+        iter_count_ref[] += 1
+    end
+    outcome_j = cascade_step_outcome(res_j, OSGS_INNER_POLICY)
+    success = outcome_j == :success || outcome_j == :one_iter_success
+
+    if !success
+        # [C.1 fallback] JFNK did not converge structurally → run the standard frozen-π coupled solve from
+        # the best iterate. This guarantees JFNK never does worse than the current solver.
+        println("      [!] OSGS JFNK did not converge (state=$(res_j.state)); falling back to the frozen-π coupled solve.")
+        coupled_nls = _with_overrides(base_nls; stall_window=0)
+        op_coupled = FEOperator(res_fn_coupled, jac_fn_coupled, X, Y)
+        res_c = safe_fe_solve!(final_x0, FESolver(coupled_nls), op_coupled; backup=copy(get_free_dof_values(final_x0)))
+        _record_stage!(diag_cache, "C:OSGS:JFNK-fallback", res_c)
+        if res_c.state == :ok
+            iter_count_ref[] += res_c.iterations
+            diag_cache["final_residual_norm"] = res_c.residual_norm
+            get!(diag_cache, "initial_residual_norm", res_c.initial_residual_norm)
+        elseif res_c.state == :max_iters_caught
+            iter_count_ref[] += 1
+        end
+        outcome_c = cascade_step_outcome(res_c, OSGS_INNER_POLICY)
+        success = outcome_c == :success || outcome_c == :one_iter_success
+    end
+
+    return initial_success && success
+end
+
+# ==============================================================================
 # solve_osgs_stage!  (Algorithm C — the coupled OSGS solve)
 # ==============================================================================
 """
@@ -260,7 +347,14 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u_x, pi_p=pi_p_x)
         end
 
-        if sol_cfg.osgs_anderson_enabled
+        if sol_cfg.osgs_jfnk_enabled
+            # Opt-in JFNK path (off by default ⇒ the existing path below runs, bit-identical). Recovers the
+            # dropped ∂π/∂u via a matrix-free full-tangent inner GMRES preconditioned by the frozen-π
+            # Jacobian; falls back to the frozen-π coupled solve on inner non-convergence ([C.1]).
+            # Mutually exclusive with osgs_anderson_enabled (enforced by validate!).
+            success = _osgs_jfnk_solve!(final_x0, setup, formulation, config, base_nls,
+                                        res_fn_coupled, jac_fn_coupled, diag_cache, iter_count_ref, initial_success)
+        elseif sol_cfg.osgs_anderson_enabled
             # Opt-in staggered Anderson path (off by default ⇒ the existing path below runs, bit-identical).
             success = _osgs_anderson_outer!(final_x0, setup, formulation, config, base_nls,
                                             U_proj, V_proj, P_proj, Q_proj, M_u, num_u_fac, M_p, num_p_fac,
@@ -308,7 +402,7 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             outcome_c = cascade_step_outcome(res_c, OSGS_INNER_POLICY)
             success = initial_success && (outcome_c == :success || outcome_c == :one_iter_success)
         end
-        end  # if sol_cfg.osgs_anderson_enabled
+        end  # if sol_cfg.osgs_jfnk_enabled / elseif osgs_anderson_enabled / else (default coupled)
 
         # Final self-consistent projection (for π export / diagnostics).
         u_h, p_h = final_x0

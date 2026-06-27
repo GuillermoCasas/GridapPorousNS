@@ -159,6 +159,36 @@ non-convergence vs exception traces; deterministic blitz guard. Blitz 219/219, Q
 - **Verify:** the new extended test (a 3D solve — minutes of compile+solve), plus a manual config run
   reproducing one cell of the committed §5.2 numbers.
 
+### F7 — JFNK for the OSGS coupled solve (Phase-0 gate PASSED → GO; Phase-1 open) → §A.3
+- **Why:** the A.3 frozen-π tangent drops the dense `∂π/∂u = ∫L*τ·Π(dR·dU)` coupling, which sets a slow
+  *linear* rate that on stiff/convective cells makes the coupled inexact-Newton **diverge**. JFNK recovers it
+  matrix-free (`J·v ≈ [F(U+εv)−F(U)]/ε`, the residual already re-projects π) preconditioned by the
+  already-factored frozen-π Jacobian. See `theory/osgs_algorithm/osgs_algorithm.tex` §`sec:jfnk`.
+- ✅ **Phase-0 gate PASSED 2026-06-26 — decision GO** (full writeup + tables:
+  `docs/solver/jfnk-phase0-preconditioner-gate.md`). The throwaway `ρ_prec ≈ 1e5–1e9` was 100% the
+  constant-pressure null mode (`eps_val=0` contamination; worst-eigvec overlap 1.0, ρ_defl 0.74). Clean
+  re-measure (production `ε_phys`): the **free** frozen-π preconditioner (ε_num=0) drives the inner GMRES to
+  **1–4 iters (mild) / ≤16–21 peak (stiff)**; `N_j=2–3` (quadratic) vs `N_c=60` (non-converging/diverging);
+  beats Anderson (32–418 fact, non-converging on stiff). Two-ε finding: adding `ε_num` to the preconditioner
+  **hurts** — use ε_num=0, rely on residual-consistent `ε_phys`.
+- ✅ **Phase-1 LANDED 2026-06-26** — opt-in `osgs_jfnk_enabled` (default false; behavior bit-identical when
+  off), Krylov knobs (`osgs_jfnk_gmres_rel_tol`/`_maxiter`/`_restart`, `osgs_jfnk_fd_epsilon`) in
+  schema/`SolverConfig`/`base_config` with fail-loud `validate!` + a mutual-exclusion assert vs Anderson.
+  Realised NOT as a from-scratch outer loop but as a drop-in matrix-free `JFNKLinearSolver`
+  (`src/solvers/linear_solvers.jl`) plugged into the existing `SafeNewtonSolver` by `_osgs_jfnk_solve!`
+  (`src/solvers/osgs_solver.jl`) — the theory's "change exactly one thing: the inner linear solve" — so the
+  outer Newton, Armijo/merit line search, divergence/stall guards, and the **C.1 honesty** contract
+  (`GMRESNotConvergedError` → roll back → fall back to the frozen-π coupled solve) are all inherited
+  unchanged, with zero re-implemented safeguards. The FD base point x_k is threaded in via a Ref written by
+  a thin wrapper around `jac_fn_coupled` (Gridap evaluates the jacobian at the iterate right before the inner
+  solve). Verified: Blitz 240/240, Quick 76/76 (incl. `osgs_jfnk_quick_test.jl`: matrix-free action == true
+  full tangent; production solve → same root as a full-Jacobian Newton to 1e-6; starved-GMRES honesty), and
+  `jfnk_equivalence_extended_test.jl` (ASGS byte-identical; OSGS same MMS root; JFNK iters ≤ frozen-π).
+  Line-search note: reuses the exact-slope (D=−2Φ) test verbatim — at η≈1e-2 the inexact (1−η) relaxation is
+  a 1% conservative effect (safe). **3D watch item (open):** if the inner `G` blows up in 3D (C.1 will flag
+  it), that is the trigger to add a real saddle-point preconditioner (block/Schur — PCD/LSC/SIMPLE — or
+  Vanka/MG) — do not pre-build it.
+
 ### Minor / opportunistic
 - `_inv_centered.json` latent fragility: the official `test/quick/encoding_invariance_quick_test.jl` reads
   a config it must generate first — fine today, but a stale leftover can confuse a clean checkout.

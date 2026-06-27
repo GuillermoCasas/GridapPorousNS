@@ -121,9 +121,12 @@ end
 # for any kwarg means "keep `nls`'s value". Cloning through one helper guarantees no struct field
 # is silently dropped when a new safeguard is added.
 function _with_overrides(nls::SafeNewtonSolver; max_iters=nothing, ftol=nothing, mode=nothing,
-                         picard_gain_target=nothing, stall_window=nothing, conv_probe=nothing)
+                         picard_gain_target=nothing, stall_window=nothing, conv_probe=nothing,
+                         ls=nothing)
     return SafeNewtonSolver(
-        nls.ls,
+        # `ls` override: swap the inner linear solver (e.g. to the matrix-free JFNKLinearSolver for the
+        # OSGS coupled solve) while keeping every other safeguard field. nothing ⇒ keep nls.ls.
+        isnothing(ls) ? nls.ls : ls,
         isnothing(max_iters) ? nls.max_iters : max_iters,
         nls.max_increases,
         nls.xtol,

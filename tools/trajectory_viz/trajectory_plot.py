@@ -124,6 +124,7 @@ def _parse_stage(code):
       B:StageI:PP[k]:N | B:StageI:PP[k]:P             Stage-I Newton<->Picard ping-pong, swap k
       C:OSGS:Coupled                                  coupled OSGS solve (no ping-pong fallback)
       C:OSGS:PP[k]:N | C:OSGS:PP[k]:P                 coupled OSGS solve with the ping-pong fallback, swap k
+      C:OSGS:JFNK | C:OSGS:JFNK-fallback              opt-in matrix-free JFNK coupled solve (+ frozen-pi fallback)
       C:OSGS[k]:N1 | ...                              legacy staggered OSGS, outer iteration k
     In the ping-pong forms the swap index lives in the THIRD field (PP[k]) and the Newton/Picard role
     in the FOURTH (N/P); in every other form the step is the third field itself.
@@ -138,10 +139,14 @@ def _parse_stage(code):
 
     if algo == "B" and mid == "StageI":
         context = "Alg. B - Stage I (ASGS init)"
-    elif algo == "C" and mid.startswith("OSGS") and (third == "Coupled" or pp_swap is not None):
+    elif algo == "C" and mid.startswith("OSGS") and (third in ("Coupled", "JFNK", "JFNK-fallback") or pp_swap is not None):
         # The coupled OSGS solve is ONE Newton solve (pi recomputed each iter); the PP[k] segments are
-        # its Newton<->Picard ping-pong fallback, NOT a staggered outer loop.
-        context = "Alg. C - OSGS coupled (single Newton; pi recomputed each iter)"
+        # its Newton<->Picard ping-pong fallback (NOT a staggered outer loop), and JFNK is the opt-in
+        # matrix-free full-tangent variant of that single Newton (with a frozen-pi direct-solve fallback).
+        context = {
+            "JFNK": "Alg. C - OSGS coupled (matrix-free JFNK; full tangent, pi recomputed each iter)",
+            "JFNK-fallback": "Alg. C - OSGS coupled (frozen-pi direct-solve fallback after JFNK)",
+        }.get(third, "Alg. C - OSGS coupled (single Newton; pi recomputed each iter)")
     elif algo == "C" and mid.startswith("OSGS["):
         idx = mid[mid.find("[") + 1:mid.find("]")]
         context = "Alg. C - OSGS outer it. {} (-> Alg. B)".format(idx)

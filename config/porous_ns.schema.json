@@ -475,6 +475,41 @@
                 50
               ]
             },
+            "osgs_jfnk_enabled": {
+              "type": "boolean",
+              "description": "Opt in to Jacobian-Free Newton-Krylov for the OSGS coupled solve (osgs_solver.jl). OFF by default: when disabled the OSGS coupled solve is the existing single inexact-Newton path (bit-identical). Mutually exclusive with osgs_anderson_enabled. When enabled, the coupled Newton step solves the FULL tangent (recovering the dropped dpi/du coupling) via a matrix-free inner GMRES whose mat-vec is the directional finite difference of the re-projecting residual, preconditioned by the already-assembled+factored frozen-pi Jacobian. Phase-0 gate (docs/solver/jfnk-phase0-preconditioner-gate.md) measured this preconditioner viable.",
+              "examples": [
+                false
+              ]
+            },
+            "osgs_jfnk_gmres_rel_tol": {
+              "type": "number",
+              "description": "Inner-GMRES forcing tolerance eta (inexact Newton) for the matrix-free full-tangent solve. Must be in (0,1); ~1e-2 is the inexact-Newton inner tol. Used only when osgs_jfnk_enabled.",
+              "examples": [
+                1e-2
+              ]
+            },
+            "osgs_jfnk_gmres_maxiter": {
+              "type": "integer",
+              "description": "Cap on inner-GMRES iterations per JFNK Newton step. On non-convergence the step is rejected (C.1 honesty) and the solve falls back to the frozen-pi path. Used only when osgs_jfnk_enabled.",
+              "examples": [
+                100
+              ]
+            },
+            "osgs_jfnk_gmres_restart": {
+              "type": "integer",
+              "description": "GMRES restart length (Krylov subspace size before restart) for the JFNK inner solve. Used only when osgs_jfnk_enabled.",
+              "examples": [
+                50
+              ]
+            },
+            "osgs_jfnk_fd_epsilon": {
+              "type": "number",
+              "description": "Brown-Saad finite-difference base b in the directional-derivative step eps = b*(1+norm(U))/norm(v) used for the matrix-free mat-vec. ~sqrt(machine eps) approx 1e-8. Must be > 0. Used only when osgs_jfnk_enabled.",
+              "examples": [
+                1e-8
+              ]
+            },
             "linear_solver": {
               "type": "object",
               "title": "Linear (inner) solver backend",
