@@ -11,7 +11,7 @@
 # converged (cell, free-dofs) so all four are captured without threading them through the solver.
 #
 # RUN:  cd test/extended/ManufacturedSolutions && julia --project=../../.. run_corner_article.jl
-# OUT:  results/debug_results/corner_tri_k1_a005.json   (incremental — survives a partial run)
+# OUT:  data/corner/corner_tri_k1_a005.json   (tracked; incremental — survives a partial run)
 # ==============================================================================================
 
 include(joinpath(@__DIR__, "run_continuation.jl"))   # brings alpha_continuation, mesh_step, build_cell
@@ -115,7 +115,7 @@ function main()
     fine_ladder     = length(ARGS) >= 4 ? parse.(Int, split(ARGS[4], ",")) : [768]
     outname = length(ARGS) >= 5 ? ARGS[5] : "corner_tri_k1_a005.json"
     Das = length(ARGS) >= 6 ? parse.(Float64, split(ARGS[6], ",")) : [1e-6, 1.0, 1e6]
-    outpath = joinpath(@__DIR__, "results", "debug_results", outname)
+    outpath = joinpath(@__DIR__, "data", "corner", outname)   # TRACKED corner provenance (see data/corner/README.md)
     mkpath(dirname(outpath))
     println(@sprintf("[run_corner] etype=%s kv=%d base=%s fine=%s -> %s", etype, kv, string(base_candidates), string(fine_ladder), outname)); flush(stdout)
     results = Any[]

@@ -2,7 +2,7 @@
 """
 merge_corner_results.py — merge the direct-solve CORNER results (the Re=1e6/α₀=0.05 cells that the
 standard sweep `skip_cells` and that `run_corner_article.jl`/`run_corner_osgs.jl` produce as JSON in
-`results/debug_results/`) INTO the sweep HDF5 DBs, as proper content-addressed groups.
+the TRACKED `data/corner/` dir) INTO the sweep HDF5 DBs, as proper content-addressed groups.
 
 Why: `analyze_results.py` (per-cell convergence PNGs + reports) and any other h5 consumer read the
 sweep h5 only, so the corner cells — living in separate JSONs — get no plot/report. After this merge
@@ -22,6 +22,9 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(HERE, "results")
 DEBUG = os.path.join(RESULTS, "debug_results")
+# Corner direct-solve provenance lives in a TRACKED dir (these JSONs feed the official plots), not in the
+# gitignored results/debug_results/ scratch — see data/corner/README.md.
+CORNER = os.path.join(HERE, "data", "corner")
 
 # corner JSON l2u/l2p/h1u/h1p  ->  h5 err_u_l2/err_p_l2/err_u_h1/err_p_h1
 _NORM = {"err_u_l2": "l2u", "err_p_l2": "l2p", "err_u_h1": "h1u", "err_p_h1": "h1p"}
@@ -117,14 +120,14 @@ def main():
     total = 0
     total += inject(
         os.path.join(RESULTS, "k1", "TRI", "results.h5"),
-        [(os.path.join(DEBUG, "corner_tri_k1_a005.json"), "ASGS"),
-         (os.path.join(DEBUG, "corner_tri_k1_a005_osgs.json"), "OSGS"),
-         (os.path.join(DEBUG, "corner_tri_k1_a005_osgs_da1e6.json"), "OSGS")],
+        [(os.path.join(CORNER, "corner_tri_k1_a005.json"), "ASGS"),
+         (os.path.join(CORNER, "corner_tri_k1_a005_osgs.json"), "OSGS"),
+         (os.path.join(CORNER, "corner_tri_k1_a005_osgs_da1e6.json"), "OSGS")],
         kv=1, etype="TRI")
     total += inject(
         os.path.join(RESULTS, "k2", "QUAD", "results.h5"),
-        [(os.path.join(DEBUG, "corner_quad_k2_a005.json"), "ASGS"),
-         (os.path.join(DEBUG, "corner_quad_k2_a005_osgs.json"), "OSGS")],
+        [(os.path.join(CORNER, "corner_quad_k2_a005.json"), "ASGS"),
+         (os.path.join(CORNER, "corner_quad_k2_a005_osgs.json"), "OSGS")],
         kv=2, etype="QUAD")
     print(f"\n[merge] done — {total} corner groups merged. "
           f"Now run:  python analyze_results.py  (regenerates PNGs + reports with the corner cells).")

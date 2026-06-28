@@ -37,6 +37,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(HERE, "results")
 DEBUG = os.path.join(RESULTS, "debug_results")
+LATEX_DIR = os.path.join(RESULTS, "latex_compilation")  # paper_tables.tex + its build artifacts live here
 
 # ---- nominal parameter grid (matches the article tables) -----------------------------------
 RE_VALS = [1e-6, 1.0, 1e6]
@@ -473,8 +474,8 @@ def build():
                     default=os.path.join(HERE, "..", "ManufacturedSolutions3D", "results",
                                          "convergence3d_results.json"),
                     help="3D nested-family sweep JSON (smoke3d.jl sweep). Omit/absent -> 3D tables n.c.")
-    ap.add_argument("--out", default=os.path.join(RESULTS, "paper_tables.tex"),
-                    help="output LaTeX file")
+    ap.add_argument("--out", default=os.path.join(LATEX_DIR, "paper_tables.tex"),
+                    help="output LaTeX file (default: results/latex_compilation/paper_tables.tex)")
     ap.add_argument("--common-n", type=int, default=320,
                     help="common reference mesh N for the FME column (default 320); cells whose "
                          "finest mesh differs are extrapolated to this N and flagged")
@@ -595,6 +596,7 @@ def build():
         out_text = (header_note + PREAMBLE + note_tex + "\n\n" + body
                     + "\n\n" + r"\end{document}" + "\n")
 
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w") as fh:
         fh.write(out_text)
 

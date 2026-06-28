@@ -6,7 +6,7 @@
 # exact-solution guess (the fold has cleared by N≈512), then warm-starts the finer mesh from the
 # interpolated base OSGS root, and reports the four normalized norms (vel/prs × L²/H¹) + the
 # two-finest-mesh slopes. Production-like tolerances (stops at the dynamic noise floor where the
-# error is already converged) — NOT a 1e-8 grind. Writes results/debug_results/corner_tri_k1_a005_osgs.json.
+# error is already converged) — NOT a 1e-8 grind. Writes data/corner/corner_tri_k1_a005_osgs.json (tracked).
 #
 # RUN:  cd test/extended/ManufacturedSolutions && julia --project=../../.. run_corner_osgs.jl
 # ==============================================================================================
@@ -88,7 +88,7 @@ function main()
     fine_N = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : 768
     outname = length(ARGS) >= 5 ? ARGS[5] : "corner_tri_k1_a005_osgs_da1e6.json"
     Das = length(ARGS) >= 6 ? parse.(Float64, split(ARGS[6], ",")) : [1e6]
-    outpath = joinpath(@__DIR__, "results", "debug_results", outname)
+    outpath = joinpath(@__DIR__, "data", "corner", outname)   # TRACKED corner provenance (see data/corner/README.md)
     mkpath(dirname(outpath))
     println(@sprintf("[run_corner_osgs] etype=%s kv=%d N=%d→%d -> %s", etype, kv, base_N, fine_N, outname)); flush(stdout)
     results = Any[]

@@ -30,6 +30,22 @@ JFNK recovers the dense `∂π/∂u` coupling the frozen-π OSGS tangent drops (
   thing: the inner linear solve." Blitz 240/240, Quick 76/76, extended equivalence test pass.
 - **Full 2D MMS sweep:** k=1 TRI/QUAD optimal everywhere; k=2 QUAD optimal once the gate is fixed (below).
 
+### JFNK fallback behaviour (observed in the full sweep — benign, expected)
+
+Across the full 2D OSGS sweep **~5% of cells (14/288) fell back** from JFNK to the frozen-π coupled solve.
+These are **outer-Newton safeguards** firing (line-search depletion / residual-divergence guard) — **not**
+inner-GMRES or preconditioner failures (Phase-0 gated the inner solve; it converges in 1–4 outer steps on
+the other ~95%). Two regimes, both benign:
+- **Convective corner** (Re=1e6 × coarse `h` = max cell-Péclet): the full-tangent step is aggressive and
+  the re-projecting merit is too nonlinear, so Armijo depletes; frozen-π's gentler steps win. This is the
+  "OSGS Newton-vs-Picard is a wash" lesson at the extreme — the exact tangent is *not* universally better.
+- **Boot-already-converged cells** (low-Re): the ASGS boot already drove `‖R‖∞` to ~1e-9, so the matrix-free
+  mat-vec finite-differences a residual at the noise floor and the divergence guard correctly bails.
+Every fallback cell still produced the **validated optimal error** (the two N=320 fallbacks gave the same
+5.45e-9 L²u as their non-fallback neighbours). **Zero correctness cost** — C.1 honesty + frozen-π fallback.
+**For 3D:** expect the same on the convective corner; do not mistake it for a bug or chase 100% JFNK
+coverage — falling back there is the *correct* behaviour.
+
 ## The k=2 high-order gate regression (discovered by the full sweep)
 
 The 2D k=2 QUAD OSGS sweep showed the **high-Re (Re=1e6) cells** converging to a **5–10× worse** error at

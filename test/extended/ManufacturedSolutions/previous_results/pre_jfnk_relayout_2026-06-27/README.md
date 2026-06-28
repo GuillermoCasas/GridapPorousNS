@@ -9,3 +9,8 @@ Safety copy of the pre-relayout official results (the old `results/phase1_*.h5` 
 
 Contents: the H5 DBs (full data + provenance) and the convergence_*.png plots + reports.
 Excluded: traces/ and vtk/ (regenerable from the DBs). The DBs are the complete record.
+
+Pruned 2026-06-28 (cleanup): the two k2-gate A/B snapshots (`_phase1_quad_k2_{lowmidRe,tight}_provenance.h5`)
+and the `phase1_quad_k2.h5.bak{2,3}` duplicates — diagnostic cruft, not part of the official pre-relayout
+results; the A/B conclusion lives in `docs/mms/high-order-convergence-gate-and-jfnk.md`, and git history
+retains the files if ever needed.
