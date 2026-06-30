@@ -290,7 +290,8 @@ function execute_outer_homotopy_perturbation_loop!(
     iter_count_attempt = 0
     final_x0 = nothing
     final_residual_attempt = NaN
-    
+    osgs_short_circuited = false   # [OSGS-leak guard] did the accepted attempt's OSGS stage never advance off entry?
+
     for attempt in 0:(pert_cfg.max_n_pert + 1)
         # [design-intent] Same hard → easy ordering as `ManufacturedSolutions/run_test.jl`:
         # default to the largest perturbation; only fall back to milder ones if Newton fails.
@@ -361,6 +362,10 @@ function execute_outer_homotopy_perturbation_loop!(
             eval_time = sys_eval_time
             iter_count_attempt = sys_iter_count
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
+            # [OSGS-leak guard] the OSGS coupled stage surfaces this when it reported success without advancing
+            # off its entry iterate (a 0-iteration initial_ftol short-circuit). With the ASGS boot ON that entry
+            # is the ASGS root, so the "OSGS" state is byte-identical to ASGS — not a genuine OSGS datum.
+            osgs_short_circuited = get(local_diagnostics_cache, "osgs_short_circuited_on_entry", false)
             break
         else
             println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(dynamic_ftol)`) or system fully diverged.")
@@ -372,7 +377,7 @@ function execute_outer_homotopy_perturbation_loop!(
          println("    [WARNING] Completely failed to find root basin. Returning NaN.")
     end
 
-    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt
+    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, osgs_short_circuited
 end
 
 function run_mms(config_file="test_config.json")
@@ -481,7 +486,10 @@ function run_mms(config_file="test_config.json")
                         "eval_residuals" => Float64[],
                         "mms_plateau_success" => Union{Bool,Nothing}[],
                         "overall_verification_success" => Bool[],
-                        "fold" => Bool[]   # true ⇒ recorded at the achievable ε_M floor (gate not reached), not NaN
+                        "fold" => Bool[],   # true ⇒ recorded at the achievable ε_M floor (gate not reached), not NaN
+                        "osgs_no_advance" => Bool[]   # true ⇒ OSGS "succeeded" but never advanced off the ASGS
+                                                      # Stage-I boot state (initial_ftol short-circuit): a leaked
+                                                      # ASGS datum, recorded as NaN (not a genuine OSGS solve)
                     )
                 end
                 
@@ -713,7 +721,7 @@ function run_mms(config_file="test_config.json")
                                     # NONLINEAR CONVERGENCE LOOP
                                     # Incrementally shrink initial numerical perturbation forcing iterative validation
                                     # ==============================================================================
-                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt = execute_outer_homotopy_perturbation_loop!(
+                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, osgs_short_circuited = execute_outer_homotopy_perturbation_loop!(
                                         setup, formulation, iter_solvers, config_m, method, dynamic_ftol,
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
@@ -726,8 +734,19 @@ function run_mms(config_file="test_config.json")
                                     # the relaxed gate so the solver accepts the achievable ε_M floor and returns the
                                     # real (pre-asymptotic O(h^k)) solution — flagged 'fold' — instead of NaN. Mirrors
                                     # the regular ManufacturedSolutions harness recording its high-Re fold cells.
+                                    # [OSGS-leak guard] OSGS can report success while never advancing off the ASGS
+                                    # Stage-I boot state (the nonlinear.jl initial_ftol short-circuit). The recorded
+                                    # state is then byte-identical to ASGS — NOT a genuine OSGS datum for an
+                                    # ASGS-vs-OSGS study. Record it honestly as NaN (flagged osgs_no_advance) and do
+                                    # NOT fold-retry (the boot would short-circuit again). See docs/lessons_learned.md.
+                                    osgs_no_advance = osgs_short_circuited && uppercase(method) != "GALERKIN"
+                                    if osgs_no_advance
+                                        println("  [OSGS-leak guard] OSGS reported success but did NOT advance off the ASGS boot state (0 OSGS iterations) — recording NaN, not the leaked ASGS state.")
+                                        success = false
+                                    end
+
                                     is_fold = false
-                                    if !success
+                                    if !success && !osgs_no_advance
                                         println("  [fold] Tight ε_M gate not reached — retrying with relaxed gate $(eps_tol_momentum_fold) to record the achievable-floor solution (high-Re×low-α corner)...")
                                         succ_f, _, x0_f, it_f, t_f = PorousNSSolver.solve_system(setup, formulation, iter_solvers, config_fold_m, x0_exact)
                                         if succ_f && x0_f !== nothing && all(isfinite, get_free_dof_values(x0_f))
@@ -776,6 +795,7 @@ function run_mms(config_file="test_config.json")
                                     push!(results_cache[k_id]["mms_plateau_success"], mms_plateau_success)
                                     push!(results_cache[k_id]["overall_verification_success"], overall_verification_success)
                                     push!(results_cache[k_id]["fold"], is_fold)
+                                    push!(results_cache[k_id]["osgs_no_advance"], osgs_no_advance)
                                     
                                     println("  -> L2 u/p: ", round(el2_u, sigdigits=4), " / ", round(el2_p, sigdigits=4), " | H1 u/p: ", round(eh1_u, sigdigits=4), " / ", round(eh1_p, sigdigits=4), is_fold ? "  [FOLD — recorded at floor, gate not reached]" : (success ? "  [converged]" : "  [NaN]"))
                                     # =========================================================================================
@@ -809,6 +829,7 @@ function run_mms(config_file="test_config.json")
                                         g["eval_eps"] = res["eval_eps"]
                                         g["eval_residuals"] = res["eval_residuals"]
                                         g["fold"] = res["fold"]
+                                        g["osgs_no_advance"] = res["osgs_no_advance"]
 
                                         attributes(g)["total_time_s"] = sum(res["eval_times"])
                                         attributes(g)["total_iters"] = sum(res["eval_iters"])

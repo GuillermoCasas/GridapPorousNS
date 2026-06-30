@@ -348,6 +348,16 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u_x, pi_p=pi_p_x)
         end
 
+        # [honest-recording guard] Capture the entry iterate so we can tell whether the OSGS coupled stage
+        # actually ADVANCED off it. The `initial_ftol` short-circuit (nonlinear.jl:687) returns the entry
+        # UNCHANGED in zero iterations: when the entry is the ASGS Stage-I boot state (the default, non-boot-skip
+        # path) such a non-advancing "success" is byte-identical to ASGS — a misleading OSGS datum in an
+        # ASGS-vs-OSGS study (the documented "OSGS silently reports the ASGS state" leak). We surface it so a
+        # comparison harness records it honestly (NaN/fold) instead of as a genuine OSGS solve. ‖Δx‖ is EXACTLY
+        # zero on a true short-circuit, so the test is an exact DOF-vector inequality — no tolerance needed.
+        x_entry_dofs = copy(get_free_dof_values(final_x0))
+        iters_before_osgs = iter_count_ref[]
+
         if sol_cfg.osgs_jfnk_enabled
             # Opt-in JFNK path (off by default ⇒ the existing path below runs, bit-identical). Recovers the
             # dropped ∂π/∂u via a matrix-free full-tangent inner GMRES preconditioned by the frozen-π
@@ -404,6 +414,17 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             success = initial_success && (outcome_c == :success || outcome_c == :one_iter_success)
         end
         end  # if sol_cfg.osgs_jfnk_enabled / elseif osgs_anderson_enabled / else (default coupled)
+
+        # [honest-recording guard] Did the OSGS coupled stage advance off its entry iterate? (Path-agnostic:
+        # holds for the default coupled, ping-pong cascade, JFNK and Anderson routes alike.)
+        osgs_advanced = get_free_dof_values(final_x0) != x_entry_dofs
+        diag_cache["osgs_stage_iters"] = iter_count_ref[] - iters_before_osgs
+        diag_cache["osgs_advanced_off_entry"] = osgs_advanced
+        # The leak signature: OSGS reported success yet never moved off its entry. With the ASGS boot ON
+        # (osgs_skip_asgs_boot=false) that entry IS the ASGS root, so the recorded OSGS state == ASGS — a datum
+        # a comparison harness must NOT treat as a genuine OSGS solve. (With boot-skip the entry is the initial
+        # guess, not an ASGS root, but a non-advancing success is still not a real OSGS solve.)
+        diag_cache["osgs_short_circuited_on_entry"] = (success && !osgs_advanced)
 
         # Final self-consistent projection (for π export / diagnostics).
         u_h, p_h = final_x0
