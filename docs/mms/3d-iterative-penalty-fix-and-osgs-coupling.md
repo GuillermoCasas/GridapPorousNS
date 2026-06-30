@@ -20,11 +20,20 @@
    `(eps_val+numerical_epsilon)·dp`) and NOT in the residual (`mass_term` used `eps_val·p`, eps_val=0). The
    code comment "lagging ε_num·p cancels in the residual" conflated `pⁿ⁻¹` (previous iterate) with the Newton
    increment `dp` — they are not the same; the term only cancels AT convergence, not during iterations.
-3. **ASGS-3D is SOLVED** by the penalty: converges to the correct root at PAPER c₁ with optimal rate
-   (structured (12,12,3)→(16,16,4): L²u rate 5.25, ≥ optimal 3), and is robust through the eps_pert homotopy.
-4. **OSGS-3D is NOT fully solved.** The penalty is necessary but not sufficient: there is a separate, genuine
-   **∂π/∂u-coupling** solver problem (stronger in 3D than 2D) that prevents robust OSGS convergence from a
-   far initial guess. See §4. (2D k=2 OSGS already needs JFNK for the same ∂π/∂u reason.)
+3. **ASGS-3D is well-posed at PAPER c₁** by the penalty and robust through the eps_pert homotopy. **P1**:
+   `eps_used=1` (converges from the hardest start) on all 4 meshes, H¹u and L²p **optimal** (→1.0), L²u ~1.4
+   (the documented structured-tet P1 limitation, mesh-quality-bound). **P2**: converges, but the rate is **not
+   clean across the full ladder** — L0→L1 super-optimal (5.24/4.08/5.14) then L1→L2 the error *grows*
+   (non-monotone). That residual is the known **paper-c₁ P2 under-stabilization** (a τ·c₁ stabilization issue,
+   ORTHOGONAL to the penalty — the penalty fixes well-posedness, not stabilization). The earlier "rate 5.25"
+   verdict was the L0→L1 segment only; the third mesh exposes the non-monotonicity.
+4. **OSGS-3D: P1 SOLVED, P2 still open.** The combination **iterative penalty + boot-skip + JFNK +
+   reference-root homotopy** makes **OSGS P1 robust AND fully optimal** at paper c₁ (`eps_used=1` all 4 meshes;
+   L²u→2.0, H¹u→1.0, L²p→1.8; ~2–4× more accurate than ASGS) — this *resolves* the far-guess non-robustness
+   that earlier P2-centric experiments (§4) had generalized to all of OSGS-3D. **OSGS P2** remains the genuine
+   **∂π/∂u-coupling** problem: the *solution* is accurate and near-optimal (L²u rate ~2.4→2.9, H¹u ~1.6→1.7)
+   but the solver reports `ok=false` (the convergence GATE isn't met) — see §4. (2D k=2 OSGS needs JFNK for the
+   same ∂π/∂u reason.)
 
 ## 1. Symptom & the two false leads
 
@@ -82,11 +91,43 @@ robustness test: *how far from the exact solution can we start and still converg
 convergence by starting from the interpolant — that defeats the test. The point is robustness from an
 arbitrary start.)
 
-Observation: at `eps_pert=1` ASGS converges (deep ‖R‖) but can land in an ALTERNATE/spurious root
-(L²u=0.14 vs the correct 0.0493) — the same "noise-floor pseudo-root from a generic guess" the 2D harness
-documents; the correct root is at small eps_pert.
+Observation: at `eps_pert=1` ASGS P2 converges (deep ‖R‖) but can land in an ALTERNATE/spurious root
+(L²u=0.14, H¹u≈5.6 vs the correct ~0.05) — the same "noise-floor pseudo-root from a generic guess" the 2D
+harness documents.
 
-## 4. The OPEN problem: OSGS-3D ∂π/∂u coupling (far-guess non-robustness)
+**Fix (`smoke3d.jl`, commit `5ecc0ca`): reference-root matching.** "First solver-success wins" is unsafe in
+3D — it accepted that spurious root and recorded it. Now the exact-guess (`eps_pert=0`) start, which always
+lands in the TRUE root's basin, is solved FIRST as the reference; the perturbed starts are then descended
+hard→easy and the largest whose converged field matches the reference (relative-L² ≤ `ROOT_MATCH_TOL`=1e-3 —
+same-root agreement is ~solver-tol ≈1e-6, a spurious root is O(1)) sets `eps_used`. Errors are always reported
+from the reference. In the official sweep this rejected exactly one spurious root (ASGS P2 L0, eps_pert=1,
+rel=0.295 → fell back to eps_pert=0.1).
+
+## 3.5 Official structured sweep — full convergence map (2026-06-30)
+
+The official §5.2 sweep (`smoke3d.jl sweep_structured`, regular Kuhn-tet mesh, paper c₁, eps_pert homotopy +
+iterative penalty; ASGS = default coupled+boot, OSGS = boot-skip+JFNK; written self-describing to
+`results/k*/TET/structured/`). Rates are consecutive-segment slopes; `eps_used` = largest perturbation that
+still reached the true root (1 = hardest start).
+
+| method | P | robustness | L²u rates (opt) | H¹u rates (opt) | L²p rates (opt) | verdict |
+|---|---|---|---|---|---|---|
+| ASGS | P1 | `eps_used=1` all | 1.16 → 1.28 → 1.40 (2) | 0.82 → 0.84 → 0.92 (1) | 0.84 → 0.97 → 1.09 (1) | ✅ robust; H¹u/L²p optimal; L²u structured-tet-limited |
+| OSGS | P1 | `eps_used=1` all | **2.01 → 1.92 → 1.91** (2) | **0.95 → 0.92 → 0.96** (1) | 1.93 → 1.74 → 1.77 (1) | ✅✅ robust + **fully optimal**, ~2–4× more accurate than ASGS |
+| ASGS | P2 | 0.1, 1, 1 | 5.24 → **−0.82** (3) | 4.08 → **−1.95** (2) | 5.14 → **−1.13** (2) | ⚠️ converges but **non-monotone** at the fine mesh (paper-c₁ under-stabilization) |
+| OSGS | P2 | `eps_used=0`, `ok=false` | 2.39 → 2.92 (3) | 1.61 → 1.73 (2) | erratic (tiny) | ⚠️ **accurate** + near-optimal solution but solver GATE not met (∂π/∂u, §4) |
+
+**Reading it:** P1 is a clean win for both methods (OSGS optimal and robust — the headline). At P2, OSGS
+produces the accurate solution (small, near-optimal-rate errors) where ASGS under-stabilizes (non-monotone),
+but neither is "clean" at paper c₁: ASGS by the rate, OSGS by the convergence gate. The P2 cases are the two
+remaining open items (ASGS-P2 stabilization is the c₁ lever the author rejects as a fix; OSGS-P2 gate is §4).
+
+## 4. The OPEN problem: OSGS-3D P2 ∂π/∂u coupling (gate not met)
+
+> **Scope (updated 2026-06-30):** the official sweep shows this is now a **P2-only** problem — **OSGS P1 is
+> robust and optimal** at paper c₁ (§3.5). The far-guess non-robustness below was observed on P2 (12,12,3) and
+> does **not** generalize to P1. P1 is the easier case (lower order, milder ∂π/∂u coupling); the JFNK + boot-skip
+> + reference-homotopy recipe converges it from the hardest start.
 
 The OSGS coupled tangent drops the dense `∂π/∂u` coupling (frozen-π inexact Newton). This is benign-ish in 2D
 but **genuinely worse in 3D**. Findings:
