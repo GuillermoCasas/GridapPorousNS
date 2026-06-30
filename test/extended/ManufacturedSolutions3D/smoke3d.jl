@@ -32,6 +32,11 @@ const U_AMP = 1.0
 # OSGS systems OOM). solve_one's "auto" linsolver switches to the low-memory ILU-GMRES backend past this
 # threshold — "choose whatever method fits". [code-actual]
 const LU_DOF_LIMIT = 80_000
+# [eps_pert] relative-L² gate classifying "converged to the SAME discrete root as the exact-guess reference".
+# Same-root agreement is ~the solver's convergence tolerance (≈1e-6, the common discretization error cancels);
+# a different (spurious) root is O(1) away. 1e-3 sits in that 3-order gap, so it rejects spurious roots without
+# false-rejecting a genuine same-root start. Test-frame constant (not a production knob).
+const ROOT_MATCH_TOL = 1e-3
 
 function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
                      numerical_epsilon::Float64=0.0, jfnk::Bool=false, anderson::Bool=false,
@@ -248,21 +253,45 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     norm_h = sqrt(abs(sum(∫(h_pert_cf ⋅ h_pert_cf)dΩ)))
     norm_h > 0.0 || error("perturbation field norm must be > 0")
 
-    local success = false; local final_x0; local iters = 0; local etime = 0.0
-    local diag = Dict{String,Any}(); local eps_used = 0.0
-    for attempt in 0:(max_n_pert + 1)
-        eps_p = attempt <= max_n_pert ? eps_pert_base / (10.0^attempt) : 0.0
+    # A far perturbed start can let the solver "converge" (the residual gate passes) into a SPURIOUS discrete
+    # root — a different solution with O(1) MMS error, NOT the manufactured one (seen for P2 ASGS at eps_pert=1).
+    # The exact-guess (eps_pert=0) start, by contrast, always lands in the TRUE root's basin, so it is the
+    # reference (its error is the genuine O(h^{k+1}) discretization error). We solve the reference first, then
+    # descend perturbed starts HARD→EASY and accept the largest whose converged field MATCHES the reference root
+    # (relative-L² distance ≤ ROOT_MATCH_TOL). Errors are always reported from the reference; eps_used is the
+    # largest perturbation that still reached it (the honest robustness metric).
+    function _solve_from(eps_p)
         sc = eps_p * (u_ex_L2 / norm_h)
         u0_func = x -> u_ex(x) + sc * h_raw_func(x)
         x0 = interpolate_everywhere([u0_func, p_ex], X)
-        @printf("    [eps_pert attempt %d/%d] eps_pert=%.3g\n", attempt + 1, max_n_pert + 2, eps_p); flush(stdout)
-        diag = Dict{String,Any}()
-        success, _, final_x0, iters, etime = PNS.solve_system(setup, vmsform, iter_solvers, config, x0;
-                                                              diagnostics_cache=diag, verifier=PNS.NoVerification())
-        eps_used = eps_p
-        success && break
+        d = Dict{String,Any}()
+        s, _, fx, it, et = PNS.solve_system(setup, vmsform, iter_solvers, config, x0;
+                                            diagnostics_cache=d, verifier=PNS.NoVerification())
+        return (success=s, x=fx, iters=it, etime=et, diag=d)
     end
-    @printf("    [eps_pert] converged at eps_pert=%.3g (success=%s)\n", eps_used, success); flush(stdout)
+
+    @printf("    [eps_pert] reference solve (eps_pert=0, exact guess)\n"); flush(stdout)
+    ref = _solve_from(0.0)
+    success = ref.success; final_x0 = ref.x; iters = ref.iters; etime = ref.etime; diag = ref.diag
+    eps_used = 0.0
+    u_ref, _p_ref = ref.x
+    u_ref_L2 = sqrt(abs(sum(∫(u_ref ⋅ u_ref)dΩ)))
+    if ref.success
+        for attempt in 0:max_n_pert
+            eps_p = eps_pert_base / (10.0^attempt)   # HARD→EASY, perturbed starts only (eps_pert=0 is the reference)
+            @printf("    [eps_pert attempt eps_pert=%.3g]\n", eps_p); flush(stdout)
+            tr = _solve_from(eps_p)
+            tr.success || continue
+            u_try, _ = tr.x
+            rel = sqrt(abs(sum(∫((u_try - u_ref) ⋅ (u_try - u_ref))dΩ))) / max(u_ref_L2, eps(Float64))
+            if rel <= ROOT_MATCH_TOL
+                eps_used = eps_p   # largest perturbation that reached the TRUE root
+                break
+            end
+            @printf("      [rejected: spurious root, ‖u−u_ref‖/‖u_ref‖=%.3g > %.0e]\n", rel, ROOT_MATCH_TOL); flush(stdout)
+        end
+    end
+    @printf("    [eps_pert] reference success=%s, robustness eps_used=%.3g\n", success, eps_used); flush(stdout)
     u_h, p_h = final_x0
     el2_u, el2_p, eh1_u, eh1_p = calc_errors3d(u_h, p_h, u_ex, p_ex, U_c, P_c, dΩ)
     # Newton/Picard iteration split from the stage trajectory (stages tagged ":N"/":P"); the solve is
