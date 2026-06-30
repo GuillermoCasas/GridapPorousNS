@@ -90,7 +90,7 @@ end
 # OFF by default — when disabled, solve_osgs_stage! runs the existing path unchanged (bit-identical).
 function _osgs_anderson_outer!(final_x0, setup::FETopology, formulation::VMSFormulation, config::PorousNSConfig,
                                base_nls, U_proj, V_proj, P_proj, Q_proj, M_u, num_u_fac, M_p, num_p_fac,
-                               diag_cache, iter_count_ref, initial_success)
+                               diag_cache, iter_count_ref, initial_success; p_prev=nothing)
     X, Y = setup.X, setup.Y
     dΩ = setup.dΩ
     h_cf, f_cf, alpha_cf, g_cf = setup.h_cf, setup.f_cf, setup.alpha_cf, setup.g_cf
@@ -120,7 +120,7 @@ function _osgs_anderson_outer!(final_x0, setup::FETopology, formulation::VMSForm
         pi_p_k = discrete_l2_projection(inner_projection_p(u_k, p_k, form, dΩ, h_cf, alpha_cf, g_cf), P_proj, Q_proj, dΩ, M_p, num_p_fac)
 
         # g_k = G(x_k): solve the frozen-π nonlinear system (π held fixed in BOTH residual and Jacobian).
-        res_frozen = (x, y) -> build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u_k, pi_p=pi_p_k)
+        res_frozen = (x, y) -> build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u_k, pi_p=pi_p_k, p_prev=p_prev)
         jac_frozen = (x, dx, y) -> build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u_k, pi_p=pi_p_k)
         op_frozen = FEOperator(res_frozen, jac_frozen, X, Y)
         res_in = safe_fe_solve!(final_x0, inner_solver, op_frozen; backup=copy(x_k))
@@ -263,7 +263,8 @@ Returns the elapsed wall time of the timed coupled solve only; the mass-matrix a
 treated as setup and runs outside the `@elapsed` region.
 """
 function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VMSFormulation,
-                           config::PorousNSConfig, solver_newton, verifier, diag_cache, iter_count_ref)
+                           config::PorousNSConfig, solver_newton, verifier, diag_cache, iter_count_ref;
+                           p_prev=nothing)
     initial_success = success
 
     # Local unpacking (cheap pointer aliases for Gridap performance)
@@ -339,7 +340,7 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
 
         res_fn_coupled = (x, y) -> begin
             pi_u_x, pi_p_x = live_pi!(x)
-            build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u_x, pi_p=pi_p_x)
+            build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=pi_u_x, pi_p=pi_p_x, p_prev=p_prev)
         end
         # [A.3] EXACT frozen-π Newton tangent: pass the SAME live π the residual used (was a zero placeholder).
         jac_fn_coupled = (x, dx, y) -> begin
@@ -358,7 +359,7 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             # Opt-in staggered Anderson path (off by default ⇒ the existing path below runs, bit-identical).
             success = _osgs_anderson_outer!(final_x0, setup, formulation, config, base_nls,
                                             U_proj, V_proj, P_proj, Q_proj, M_u, num_u_fac, M_p, num_p_fac,
-                                            diag_cache, iter_count_ref, initial_success)
+                                            diag_cache, iter_count_ref, initial_success; p_prev=p_prev)
         else
         op_coupled = FEOperator(res_fn_coupled, jac_fn_coupled, X, Y)
         x_backup = copy(get_free_dof_values(final_x0))

@@ -510,6 +510,27 @@
                 1e-8
               ]
             },
+            "iterative_penalty_enabled": {
+              "type": "boolean",
+              "description": "Opt in to the Codina iterative-penalty method (article.tex section 5.2, codina1993iterative). OFF by default (bit-identical: the mass residual carries no epsilon term, only the legacy Jacobian numerical_epsilon*dp). When enabled AND numerical_epsilon > 0, the mass-equation residual carries numerical_epsilon*(p^n - p^{n-1}) (LHS numerical_epsilon*p^n plus lagged RHS numerical_epsilon*p^{n-1}), solved as an OUTER fixed-point loop that holds p^{n-1} fixed within each pass and updates it between passes. It pins the constant-pressure null mode (well-posedness; the 3D all-Dirichlet case is ill-posed at epsilon=0) and vanishes at convergence (p^n=p^{n-1}), so the converged solution is unaltered. The matching numerical_epsilon*dp is already in the Jacobian.",
+              "examples": [
+                false
+              ]
+            },
+            "iterative_penalty_max_iters": {
+              "type": "integer",
+              "description": "Cap on the outer iterative-penalty passes (each pass is a full nonlinear solve with p^{n-1} held fixed). The outer loop also stops early when the relative pressure drift falls below xtol. Used only when iterative_penalty_enabled.",
+              "examples": [
+                20
+              ]
+            },
+            "osgs_skip_asgs_boot": {
+              "type": "boolean",
+              "description": "Skip the ASGS Stage-I boot before the OSGS coupled/staggered solve. OFF by default (the boot runs, bit-identical). The boot is a code-side globalization safeguard, not part of the paper algorithm (which runs the OSGS staggered iteration directly from the initial guess). For a warm/exact guess it converges ASGS to the ASGS root first (a different fixed point) from which OSGS can be ill-conditioned. When an eps_pert homotopy provides cold-start globalization, skipping the boot (OSGS solves straight from the guess) is paper-faithful. No effect on ASGS-method runs.",
+              "examples": [
+                false
+              ]
+            },
             "linear_solver": {
               "type": "object",
               "title": "Linear (inner) solver backend",

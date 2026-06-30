@@ -240,6 +240,24 @@ Base.@kwdef struct SolverConfig
     osgs_jfnk_gmres_maxiter::Int                   # cap on inner-GMRES iterations per Newton step
     osgs_jfnk_gmres_restart::Int                   # GMRES restart (Krylov subspace size before restart)
     osgs_jfnk_fd_epsilon::Float64                  # Brown–Saad FD base b in ε = b·(1+‖U‖)/‖v‖ (~√eps ≈ 1e-8)
+    # --- Codina iterative-penalty method (article.tex §5.2 line ~1383, codina1993iterative) ---
+    # OFF by default (bit-identical: the mass residual carries no ε term, only the legacy Jacobian ε_num·dp).
+    # When enabled AND numerical_epsilon > 0, the mass-equation residual carries the iterative penalty
+    # ε_num·(pⁿ − pⁿ⁻¹) — LHS ε_num·pⁿ plus the lagged RHS ε_num·pⁿ⁻¹ — solved as an OUTER fixed-point loop
+    # that HOLDS pⁿ⁻¹ fixed within each pass and updates it between passes. It pins the constant-pressure null
+    # mode (well-posedness; the 3D all-Dirichlet case is ill-posed at ε=0, article.tex line 1375) and vanishes
+    # at convergence (pⁿ=pⁿ⁻¹), so the converged solution is NOT altered. The matching ε_num·dp is already in
+    # the Jacobian, so residual+Jacobian stay consistent. Outer-loop drift tolerance reuses `xtol`.
+    iterative_penalty_enabled::Bool
+    iterative_penalty_max_iters::Int               # cap on the outer iterative-penalty passes
+    # --- OSGS: skip the ASGS Stage-I boot (osgs_solver.jl / solver_core.jl) ---
+    # OFF by default (the boot runs, bit-identical legacy). The ASGS boot is a code-side globalization
+    # safeguard, NOT part of the paper algorithm (alg:StationarySystem runs the OSGS staggered iteration
+    # directly from the initial guess). For a warm/exact guess it converges ASGS to the ASGS root first — a
+    # DIFFERENT fixed point — from which the OSGS solve can be badly conditioned (the 3D overshoot). When the
+    # eps_pert homotopy provides the cold-start globalization the boot was for, skipping it (OSGS solves
+    # straight from the guess) is paper-faithful. No effect on ASGS-method runs.
+    osgs_skip_asgs_boot::Bool
     # --- Linear (inner) solver backend ---
     linear_solver::LinearSolverConfig              # LU (direct, exact) vs ILU_GMRES (low-memory iterative)
 end
@@ -371,6 +389,7 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.osgs_jfnk_gmres_maxiter >= 1 "osgs_jfnk_gmres_maxiter must be >= 1"
     @assert sol.osgs_jfnk_gmres_restart >= 1 "osgs_jfnk_gmres_restart must be >= 1"
     @assert sol.osgs_jfnk_fd_epsilon > 0.0 "osgs_jfnk_fd_epsilon (Brown–Saad FD base) must be > 0"
+    @assert sol.iterative_penalty_max_iters >= 1 "iterative_penalty_max_iters must be >= 1"
 
     # Linear (inner) solver backend — the ilu_*/gmres_* knobs are required even for LU (no silent default),
     # but only constrained when ILU_GMRES is actually selected.

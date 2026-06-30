@@ -323,7 +323,7 @@ end
 # OSGS projections π_h — passing them switches the stabilization from ASGS (their
 # default `nothing`) to OSGS. `mult_mom`/`mult_mass` scale the momentum/mass
 # stabilization blocks (used for homotopy dilution).
-function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
+function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0, p_prev=nothing)
     u, p = X; v, q = Y
     # [FORM-05] σ/τ₁/τ₂ + the setup/formulation scalars come from the shared coefficient helper.
     (; form, ν, eps_val, c_1, c_2, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
@@ -338,7 +338,15 @@ function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg;
     res_term  = v ⋅ ( σ * u )
 
     div_alpha_u = α * (∇⋅u) + u ⋅ ∇(α)
-    mass_term = q * (eps_val * p + div_alpha_u)
+    # ε_num (Codina ITERATIVE PENALTY, article.tex §5.2 line ~1383): the mass equation carries ε_num·pⁿ on
+    # the LHS and ε_num·pⁿ⁻¹ (the PREVIOUS nonlinear iterate's pressure, `p_prev`) lagged onto the RHS, so the
+    # net residual contribution is ε_num·(pⁿ − pⁿ⁻¹). It is NONZERO during the iterations (pinning the
+    # constant-pressure null mode → well-posedness, required for the 3D case where ε=0 is ill-posed) and
+    # vanishes at convergence (pⁿ = pⁿ⁻¹), so the manufactured/converged solution is NOT altered. Its exact
+    # linearization ε_num·dp is already in the Jacobian (build_stabilized_weak_form_jacobian, mass_term_jac),
+    # so residual+Jacobian are consistent. p_prev === nothing ⇒ no iterative penalty (byte-identical legacy).
+    iter_penalty = p_prev === nothing ? (0.0 * p) : (form.numerical_epsilon * (p - p_prev))
+    mass_term = q * (eps_val * p + div_alpha_u + iter_penalty)
     src_term  = v ⋅ f + q * g_mass
 
     # Strong residuals R_u, R_p that the stabilization weights — these measure how

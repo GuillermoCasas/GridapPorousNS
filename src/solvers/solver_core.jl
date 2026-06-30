@@ -482,7 +482,22 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     # Even for OSGS, we first boot the global PDE with the zero-projection (ASGS) formulation, to map
     # the nonlinear fields into the exact-Newton quadratic basin before the OSGS coupled solve runs.
     # ==============================================================================
-    res_fn_init(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing)
+    # [iterative-penalty] OFF by default ⇒ penalty_on=false ⇒ p_prev=nothing everywhere ⇒ byte-identical
+    # legacy path. When ON (and ε_num>0), the mass residual carries ε_num·(pⁿ − p_prev) with p_prev the
+    # previous-pass pressure held FIXED within the pass; an OUTER loop (below) updates p_prev between passes.
+    penalty_on = sol_cfg.iterative_penalty_enabled && phys_cfg.numerical_epsilon > 0.0
+    p_prev_ref = Ref{Any}(nothing)
+    function _pressure_copy(xh)
+        _u, _p = xh
+        return FEFunction(X.spaces[2], copy(get_free_dof_values(_p)))
+    end
+    function _pressure_rel_drift(p_new, p_old)
+        num = sqrt(abs(sum(∫((p_new - p_old) * (p_new - p_old))setup.dΩ)))
+        den = sqrt(abs(sum(∫(p_new * p_new)setup.dΩ)))
+        return num / max(den, 1e-30)
+    end
+
+    res_fn_init(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, p_prev=(penalty_on ? p_prev_ref[] : nothing))
     jac_picard_init(x, dx, y) = build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
     jac_newton_init(x, dx, y) = sol_cfg.ablation_mode == "picard_only" ?
         build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0) :
@@ -509,56 +524,87 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
         FESolver(_with_overrides(solver_picard.nls; picard_gain_target=sol_cfg.pingpong_picard_gain_orders)) :
         solver_picard
 
-    # Stage I — Algorithm B (RobustNonlinearCascade), ASGS operators, restore=x0_backup.
-    eval_time = @elapsed begin
-        success = _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
-                                          solver_newton_asgs, solver_picard, ftol,
-                                          diag_cache, iter_count_ref;
-                                          pingpong_enabled=pingpong_enabled,
-                                          pingpong_max_swaps=pingpong_max_swaps,
-                                          solver_picard_gain=solver_picard_gain)
-    end
+    # One full solve pass (Stage-I ASGS boot → method dispatch → verification), returning the
+    # solve_system 5-tuple. With penalty OFF this runs exactly ONCE (byte-identical legacy path); with
+    # penalty ON the outer loop below calls it repeatedly, holding p_prev fixed within each pass.
+    function _one_pass()
+        local pass_success
+        pass_backup = copy(get_free_dof_values(x0))
+        # Stage I — Algorithm B (RobustNonlinearCascade), ASGS operators, restore=pass_backup.
+        # [osgs_skip_asgs_boot] For OSGS with the boot skipped, run the OSGS staggered/coupled solve DIRECTLY
+        # from the (warm) guess x0 — paper-faithful (alg:StationarySystem has no ASGS pre-boot), avoiding the
+        # boot converging ASGS to its root (a different fixed point) and ill-conditioning the OSGS step. The
+        # eps_pert homotopy provides the cold-start globalization the boot otherwise gave. ASGS-method always boots.
+        skip_boot = (method == "OSGS") && sol_cfg.osgs_skip_asgs_boot
+        pass_time = @elapsed begin
+            pass_success = skip_boot ? true :
+                _initialize_asgs_state!(x0, pass_backup, op_newton_init, op_picard_init,
+                                              solver_newton_asgs, solver_picard, ftol,
+                                              diag_cache, iter_count_ref;
+                                              pingpong_enabled=pingpong_enabled,
+                                              pingpong_max_swaps=pingpong_max_swaps,
+                                              solver_picard_gain=solver_picard_gain)
+        end
+        skip_boot && println("\n      [+] OSGS: skipping ASGS Stage-I boot — solving directly from the initial guess.")
 
-    # The 2nd return element reports the verifier's outcome (`verification_result`): `nothing` for
-    # production (NoVerification), or the MMS plateau verdict for the MMS harness. It is independent
-    # of the inner-solver `success` flag, so callers can distinguish "solver converged but
-    # verification failed (budget exhausted)" from "solver failed".
-    if !success
-        diag_cache["pi_u"] = pi_u
-        diag_cache["pi_p"] = pi_p
-        return false, verification_result(verifier), x0, iter_count_ref[], eval_time
-    end
+        # The 2nd return element reports the verifier's outcome (`verification_result`): `nothing` for
+        # production (NoVerification), or the MMS plateau verdict for the MMS harness. It is independent
+        # of the inner-solver `success` flag, so callers can distinguish "solver converged but
+        # verification failed (budget exhausted)" from "solver failed".
+        if !pass_success
+            diag_cache["pi_u"] = pi_u
+            diag_cache["pi_p"] = pi_p
+            return (false, verification_result(verifier), x0, iter_count_ref[], pass_time)
+        end
 
-    final_x0 = x0
+        pass_final_x0 = x0
 
-    if method == "ASGS"
-        println("\n      [+] ASGS base convergence reached.")
-        # Post-convergence verification hook (Algorithm D). Production (NoVerification) is a no-op;
-        # the MMS harness runs the plateau loop. `step_once!` advances the converged state by one
-        # Newton iteration on the SAME ASGS operator the boot used — built here because operator
-        # construction lives in the core, but the verifier owns the loop.
-        local_solver = FESolver(_with_overrides(solver_newton.nls; max_iters=1))
-        step_once! = () -> _solve_one_step!(final_x0, local_solver, op_newton_init)
-        eval_time += @elapsed on_asgs_converged!(verifier, final_x0, step_once!, diag_cache, iter_count_ref)
-        diag_cache["base_convergence_reached"] = true   # core key (set regardless of verification)
-        diag_cache["pi_u"] = pi_u
-        diag_cache["pi_p"] = pi_p
-        return success, verification_result(verifier), final_x0, iter_count_ref[], eval_time
-    end
+        if method == "ASGS"
+            println("\n      [+] ASGS base convergence reached.")
+            # Post-convergence verification hook (Algorithm D). Production (NoVerification) is a no-op;
+            # the MMS harness runs the plateau loop. `step_once!` advances the converged state by one
+            # Newton iteration on the SAME ASGS operator the boot used — built here because operator
+            # construction lives in the core, but the verifier owns the loop.
+            local_solver = FESolver(_with_overrides(solver_newton.nls; max_iters=1))
+            step_once! = () -> _solve_one_step!(pass_final_x0, local_solver, op_newton_init)
+            pass_time += @elapsed on_asgs_converged!(verifier, pass_final_x0, step_once!, diag_cache, iter_count_ref)
+            diag_cache["base_convergence_reached"] = true   # core key (set regardless of verification)
+            diag_cache["pi_u"] = pi_u
+            diag_cache["pi_p"] = pi_p
+            return (pass_success, verification_result(verifier), pass_final_x0, iter_count_ref[], pass_time)
+        end
 
-    if method == "OSGS"
+        # method == "OSGS"
         # Algorithm C — the coupled OSGS solve. All OSGS-specific setup (unconstrained projection
         # spaces, factored L² mass matrices) and the solve itself live in `solve_osgs_stage!`
-        # (osgs_solver.jl); the orchestrator stays OSGS-agnostic apart from this dispatch. Stage I's
-        # `success` (always `true` here — Stage-I failure short-circuit-returned earlier) is threaded
-        # through so an OSGS solve that exhausts its budget without an explicit verdict keeps it.
-        (success, pi_u, pi_p, osgs_elapsed) = solve_osgs_stage!(
-            success, final_x0, setup, formulation, config, solver_newton, verifier,
-            diag_cache, iter_count_ref)
-
-        eval_time += osgs_elapsed
-
+        # (osgs_solver.jl); the orchestrator stays OSGS-agnostic apart from this dispatch. The
+        # iterative-penalty p_prev (fixed within this pass) is threaded through to its residual closures.
+        (osgs_success, _osgs_pi_u, _osgs_pi_p, osgs_elapsed) = solve_osgs_stage!(
+            pass_success, pass_final_x0, setup, formulation, config, solver_newton, verifier,
+            diag_cache, iter_count_ref; p_prev=(penalty_on ? p_prev_ref[] : nothing))
+        pass_time += osgs_elapsed
         # solve_osgs_stage! already wrote diag_cache["pi_u"] and diag_cache["pi_p"].
-        return success, verification_result(verifier), final_x0, iter_count_ref[], eval_time
+        return (osgs_success, verification_result(verifier), pass_final_x0, iter_count_ref[], pass_time)
     end
+
+    # Penalty OFF: the legacy single pass, byte-identical.
+    penalty_on || return _one_pass()
+
+    # [iterative-penalty] OUTER fixed-point loop (Codina, article.tex §5.2). Each pass solves the full
+    # system with pⁿ⁻¹ held fixed (via p_prev_ref); between passes we update pⁿ⁻¹ ← pⁿ and stop once the
+    # relative pressure drift < xtol, at which point ε_num·(pⁿ − pⁿ⁻¹) → 0 and the solution is unaltered.
+    p_prev_ref[] = _pressure_copy(x0)
+    local ip_result = (false, verification_result(verifier), x0, iter_count_ref[], 0.0)
+    local ip_time = 0.0
+    for ip_pass in 1:sol_cfg.iterative_penalty_max_iters
+        ip_result = _one_pass()
+        ip_time += ip_result[5]
+        ip_result[1] || break          # solve failed this pass → stop (keep the failed result)
+        p_new = _pressure_copy(ip_result[3])
+        drift = _pressure_rel_drift(p_new, p_prev_ref[])
+        p_prev_ref[] = p_new
+        println("      [iter-penalty] pass $(ip_pass): relative pressure drift = $(drift) (xtol=$(sol_cfg.xtol))"); flush(stdout)
+        drift < sol_cfg.xtol && break
+    end
+    return (ip_result[1], ip_result[2], ip_result[3], ip_result[4], ip_time)
 end

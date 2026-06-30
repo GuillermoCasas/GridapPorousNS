@@ -1,6 +1,15 @@
 # 3D ASGS sub-optimality (P₁ & P₂): a c₁/coercivity fixed point, not mesh quality
 
-> **Status:** Canonical for the 3D tetrahedral MMS convergence behaviour (paper §5.2) — ASGS vs OSGS,
+> **⚠️ SUPERSEDED (2026-06-30).** This doc's headline conclusion — *"paper c₁=4k⁴ under-budgets coercivity
+> for 3D tetrahedra; c₁ is the lever"* — was **WRONG**. It was masking a missing term: the **Codina
+> iterative penalty** (`ε_num·(pⁿ−pⁿ⁻¹)` in the mass residual, article.tex §5.2 line 1383) was never
+> implemented in the residual (only the Jacobian), so the all-Dirichlet 3D problem was ill-posed at ε=0.
+> Adding it makes **ASGS-3D converge at PAPER c₁ with optimal rate** (c₁×4 only shrank the error constant,
+> which masked this). Kratos solves this 3D case at paper c₁ — there is no dimensional c₁. The new canonical
+> doc is **[3d-iterative-penalty-fix-and-osgs-coupling.md](3d-iterative-penalty-fix-and-osgs-coupling.md)**;
+> read it first. The §4 "iteration/Jacobian exonerated" content here remains valid; the c₁ verdict does not.
+>
+> **Status (historical):** was canonical for 3D tetrahedral MMS (paper §5.2) — ASGS vs OSGS,
 > the c₁ lever, ε, and mesh quality. Companion to the 2D [convergence-status.md](convergence-status.md).
 > Last updated 2026-06-24. Harness: `test/extended/ManufacturedSolutions3D/` (`smoke3d.jl`, `mms3d.jl`,
 > `mesh3d.jl`). Convergence results: `results/k<kv>/TET/<mesh_sequence>/`; mesh sequences +
