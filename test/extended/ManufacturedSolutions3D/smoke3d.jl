@@ -34,11 +34,36 @@ const U_AMP = 1.0
 const LU_DOF_LIMIT = 80_000
 
 function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
-                     numerical_epsilon::Float64=0.0)
+                     numerical_epsilon::Float64=0.0, jfnk::Bool=false, anderson::Bool=false,
+                     jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing,
+                     iterative_penalty::Bool=true, osgs_skip_boot::Bool=false)
+    @assert !(jfnk && anderson) "jfnk and anderson are mutually-exclusive OSGS paths"
     eps_tol_m = something(eps_tol_m_over, kv == 2 ? 1e-9 : 1e-6)   # k=2 tightened gate (MEMORY lesson)
     ftol_v    = something(ftol_over, kv == 2 ? 1e-12 : 1e-10)
     solver_dict = Dict{String,Any}("eps_tol_momentum"=>eps_tol_m, "ftol"=>ftol_v)
     eps_tol_mass_over === nothing || (solver_dict["eps_tol_mass"] = eps_tol_mass_over)
+    # [iterative-penalty] Codina iterative penalty ε_num·(pⁿ−pⁿ⁻¹) in the mass residual (article.tex §5.2
+    # line 1383) — REQUIRED for the 3D all-Dirichlet case (ill-posed at ε=0). ON by default here; acts only
+    # because the harness sets numerical_epsilon = 1e-4·ε_ref > 0. Pass iterative_penalty=false for an A/B.
+    solver_dict["iterative_penalty_enabled"] = iterative_penalty
+    # [JFNK] opt in to the matrix-free full-tangent OSGS coupled solve (recovers the dropped ∂π/∂u
+    # coupling). This is what the 2D k=2 OSGS recipe uses (data/phase1_quad_k2.json); the rest of the
+    # osgs_jfnk_* params inherit from base_config.json via the deep-merge. No-op for ASGS.
+    # The inner-GMRES budget is overridable for 3D, where each mat-vec re-projects the OSGS residual (so a
+    # too-large maxiter is expensive) and the frozen-π preconditioner may need more Krylov vectors than 2D.
+    if jfnk
+        solver_dict["osgs_jfnk_enabled"] = true
+        jfnk_maxiter === nothing || (solver_dict["osgs_jfnk_gmres_maxiter"] = jfnk_maxiter)
+        jfnk_restart === nothing || (solver_dict["osgs_jfnk_gmres_restart"] = jfnk_restart)
+        jfnk_reltol  === nothing || (solver_dict["osgs_jfnk_gmres_rel_tol"] = jfnk_reltol)
+    end
+    # [Anderson] opt in to the STAGGERED OSGS outer fixed-point (freeze π → solve consistent frozen-π
+    # system → re-project, Anderson-mixed). Each inner solve has a CONSISTENT tangent (no coupled-Newton
+    # overshoot), and it is far cheaper than JFNK's matrix-free re-projecting GMRES at P2-3D scale. No-op for ASGS.
+    anderson && (solver_dict["osgs_anderson_enabled"] = true)
+    # [osgs_skip_asgs_boot] run OSGS directly from the (eps_pert) initial guess — no ASGS pre-boot (the boot
+    # is a code-side safeguard, not in the paper; the eps_pert homotopy provides cold-start globalization).
+    osgs_skip_boot && (solver_dict["osgs_skip_asgs_boot"] = true)
     cfg = Dict(
         "physical_properties" => Dict("nu"=>1.0, "eps_val"=>1e-8, "numerical_epsilon"=>numerical_epsilon,
                                       "reaction_model"=>"Constant_Sigma", "sigma_constant"=>1.0),
@@ -107,17 +132,22 @@ end
 function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", eps_mult::Float64=1.0,
                    linsolver::String="auto", trace_dir::Union{Nothing,String}=nothing, run_name::String="",
                    c1_mult::Float64=1.0, eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
-                   eps_phys::Float64=0.0, mesh_sequence::String="")
+                   eps_phys::Float64=0.0, mesh_sequence::String="", jfnk::Bool=false, anderson::Bool=false,
+                   jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, iterative_penalty::Bool=true,
+                   osgs_skip_boot::Bool=false, eps_pert_base::Float64=1.0, max_n_pert::Int=5)
     nu = U_AMP * L / RE
     # ε_num = the NUMERICAL penalty (Codina ITERATIVE penalty, paper ε = 1e-4·ε_ref). The equation is
-    # INCOMPRESSIBLE: there is NO physical compressibility, so eps_phys MUST default to 0. ε_num lives ONLY
-    # in the Jacobian pressure block (lagged εpⁿ⁻¹ on the RHS), so it CANCELS at convergence and does not
-    # alter the manufactured (incompressible) solution — article.tex §2 (eq:StrongMassEquation, "mainly
-    # include for numerical reasons … iterative penalty") and §5.2 (eq:EpsilonRef + the iterative-penalty
-    # remark). A non-zero eps_phys would instead solve a genuinely COMPRESSIBLE problem (εp in the residual
-    # AND εp_ex in the oracle g). Only override eps_phys for a deliberate compressible experiment.
+    # INCOMPRESSIBLE: there is NO physical compressibility, so eps_phys MUST default to 0. The iterative
+    # penalty adds ε_num·pⁿ to the mass-equation LHS and ε_num·pⁿ⁻¹ (previous nonlinear iterate) to the RHS,
+    # so the residual carries ε_num·(pⁿ−pⁿ⁻¹) (pinning the constant-pressure null mode — REQUIRED for the 3D
+    # all-Dirichlet case, ill-posed at ε=0) and it CANCELS at convergence (pⁿ=pⁿ⁻¹), leaving the manufactured
+    # (incompressible) solution UNALTERED — article.tex §5.2 line 1383. (Gated by iterative_penalty=true here;
+    # solve_system runs the OUTER penalty loop.) A non-zero eps_phys would instead solve a genuinely
+    # COMPRESSIBLE problem (εp in the residual AND εp_ex in the oracle g); only override for that experiment.
     eps_num = eps_mult * 1e-4 * ALPHA0 / (nu * (1.0 + RE + DA))
-    config = build_config(kv, method; numerical_epsilon=eps_num,
+    config = build_config(kv, method; numerical_epsilon=eps_num, jfnk=jfnk, anderson=anderson,
+                          jfnk_maxiter=jfnk_maxiter, jfnk_restart=jfnk_restart, jfnk_reltol=jfnk_reltol,
+                          iterative_penalty=iterative_penalty, osgs_skip_boot=osgs_skip_boot,
                           eps_tol_m_over=eps_tol_m_over, ftol_over=ftol_over, eps_tol_mass_over=eps_tol_mass_over)
     sol = config.numerical_method.solver
 
@@ -202,10 +232,37 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
 
     setup = PNS.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
     vmsform = PNS.VMSFormulation(form, c_1, c_2)
-    x0 = interpolate_everywhere([u_ex, p_ex], X)
-    diag = Dict{String,Any}()
-    success, _, final_x0, iters, etime = PNS.solve_system(setup, vmsform, iter_solvers, config, x0;
-                                                          diagnostics_cache=diag, verifier=PNS.NoVerification())
+
+    # [eps_pert homotopy] Port of the 2D run_test.jl Algorithm E (outer homotopy perturbation loop): try the
+    # initial guess u0 = u_ex + eps_p·(‖u_ex‖/‖h_pert‖)·h_pert with eps_p = eps_pert_base/10^attempt down to
+    # 0 (HARD→EASY), breaking at the first success. h_pert is a boundary-vanishing bubble × oscillatory field
+    # (so u0 = u_ex on ∂Ω, respecting the Dirichlet BC) normalized so ‖perturbation‖ = eps_p·‖u_ex‖. eps_p=0
+    # is the clean exact-guess. This mirrors how the 2D MMS sweep is run.
+    bx0,bx1,by0,by1,bz0,bz1 = DOMAIN
+    B_fn(x) = (x[1]-bx0)^2*(bx1-x[1])^2 * (x[2]-by0)^2*(by1-x[2])^2 * (x[3]-bz0)^2*(bz1-x[3])^2
+    kp = pi / L
+    h_raw_func(x) = B_fn(x) * VectorValue(sin(3*kp*x[1])*cos(2*kp*x[2]), -cos(3*kp*x[1])*sin(2*kp*x[2]), 0.0)
+    u_ex_cf = CellField(u_ex, Ω)
+    u_ex_L2 = sqrt(abs(sum(∫(u_ex_cf ⋅ u_ex_cf)dΩ)))
+    h_pert_cf = CellField(h_raw_func, Ω)
+    norm_h = sqrt(abs(sum(∫(h_pert_cf ⋅ h_pert_cf)dΩ)))
+    norm_h > 0.0 || error("perturbation field norm must be > 0")
+
+    local success = false; local final_x0; local iters = 0; local etime = 0.0
+    local diag = Dict{String,Any}(); local eps_used = 0.0
+    for attempt in 0:(max_n_pert + 1)
+        eps_p = attempt <= max_n_pert ? eps_pert_base / (10.0^attempt) : 0.0
+        sc = eps_p * (u_ex_L2 / norm_h)
+        u0_func = x -> u_ex(x) + sc * h_raw_func(x)
+        x0 = interpolate_everywhere([u0_func, p_ex], X)
+        @printf("    [eps_pert attempt %d/%d] eps_pert=%.3g\n", attempt + 1, max_n_pert + 2, eps_p); flush(stdout)
+        diag = Dict{String,Any}()
+        success, _, final_x0, iters, etime = PNS.solve_system(setup, vmsform, iter_solvers, config, x0;
+                                                              diagnostics_cache=diag, verifier=PNS.NoVerification())
+        eps_used = eps_p
+        success && break
+    end
+    @printf("    [eps_pert] converged at eps_pert=%.3g (success=%s)\n", eps_used, success); flush(stdout)
     u_h, p_h = final_x0
     el2_u, el2_p, eh1_u, eh1_p = calc_errors3d(u_h, p_h, u_ex, p_ex, U_c, P_c, dΩ)
     # Newton/Picard iteration split from the stage trajectory (stages tagged ":N"/":P"); the solve is
@@ -222,7 +279,8 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                                   tol_M=sol.eps_tol_momentum, tol_C=sol.eps_tol_mass, mesh_sequence=mesh_sequence)
     end
     return (success=success, ncells=num_cells(model), iters=iters, h_mean=h_mean,
-            el2_u=el2_u, el2_p=el2_p, eh1_u=eh1_u, eh1_p=eh1_p, n_ns=n_ns, n_pic=n_pic)
+            el2_u=el2_u, el2_p=el2_p, eh1_u=eh1_u, eh1_p=eh1_p, n_ns=n_ns, n_pic=n_pic,
+            eps_used=eps_used)   # [eps_pert] the largest perturbation from which this cell converged (robustness)
 end
 
 slope(e0,e1,h0,h1) = log(e0/e1)/log(h0/h1)
@@ -287,6 +345,63 @@ function run_sweep_and_save(; outpath, base_lc=0.2, geom="box", visc="Deviatoric
         end
     end
     println("\nDONE. 3D sweep results -> $outpath"); flush(stdout)
+end
+
+# Full §5.2 sweep on the STRUCTURED Kuhn family (the "regular mesh"), run LIKE 2D: each cell uses solve_one's
+# eps_pert HOMOTOPY (perturbed start, hard→easy) + the iterative penalty (default ON). Method-OUTER ordering:
+# ALL ASGS first (P1 then P2), THEN all OSGS — so the fast, validated ASGS results land before the slow OSGS
+# cells, per "run for ASGS and then for OSGS". ASGS uses the DEFAULT solver (coupled, ASGS boot ON — the honest
+# baseline). OSGS uses the 3D recipe (boot-skip + JFNK): solve directly from the eps_pert guess (no ASGS-root
+# detour) with the matrix-free JFNK inner solve that recovers ∂π/∂u — this also fast-fails doomed perturbations
+# so the homotopy descent stays practical (the default coupled+boot OSGS grinds ~15min per failing attempt).
+# Writes PER-kv to results/k<kv>/TET/structured/convergence3d_results.json (standard schema; mesh_sequence=
+# "structured"), archiving any prior JSON to previous_results/convergence3d/ first (reproducible-results rule).
+# Records the per-cell `eps_used` (largest perturbation it converged from) as the robustness map. Constant-aspect
+# (1.2) Kuhn ladders, all LU-feasible: P1 (8,8,2)→(16,16,4)→(24,24,6)→(32,32,8); P2 (12,12,3)→(16,16,4)→(20,20,5).
+function run_sweep_structured(; max_n_pert=3)
+    ladders = Dict(1 => [(8,8,2),(16,16,4),(24,24,6),(32,32,8)], 2 => [(12,12,3),(16,16,4),(20,20,5)])
+    archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
+    stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
+    outdirs  = Dict(kv => joinpath(@__DIR__, "results", "k$(kv)", "TET", "structured") for kv in (1, 2))
+    outpaths = Dict(kv => joinpath(outdirs[kv], "convergence3d_results.json") for kv in (1, 2))
+    for kv in (1, 2)
+        mkpath(outdirs[kv])
+        if isfile(outpaths[kv])   # archive the prior structured JSON before overwriting (provenance)
+            cp(outpaths[kv], joinpath(archdir, "convergence3d_results_k$(kv)_structured_pre_homotopy_$(stamp).json"); force=true)
+        end
+    end
+    results_by_kv = Dict(1 => Any[], 2 => Any[])   # accumulates each (method) block per kv across the outer loop
+    for method in ("ASGS", "OSGS")
+        osgs_recipe = method == "OSGS"
+        for kv in (1, 2)
+            @printf("\n=== STRUCTURED SWEEP method=%s kv=%d (%s) ===\n", method, kv, kv==1 ? "P1" : "P2"); flush(stdout)
+            hs=Float64[]; l2us=Float64[]; l2ps=Float64[]; h1us=Float64[]; h1ps=Float64[]; levels=Any[]
+            for (lvl, part) in enumerate(ladders[kv])
+                t0 = time()
+                model = structured_kuhn_model(part; domain=DOMAIN)
+                r = solve_one(kv, method, model; visc="Deviatoric", linsolver="LU", max_n_pert=max_n_pert,
+                              jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
+                              jfnk_maxiter=(osgs_recipe ? 30 : nothing), jfnk_restart=(osgs_recipe ? 30 : nothing),
+                              trace_dir=outdirs[kv], run_name="sweep_structured", mesh_sequence="structured")
+                push!(hs, r.h_mean); push!(l2us, r.el2_u); push!(l2ps, r.el2_p); push!(h1us, r.eh1_u); push!(h1ps, r.eh1_p)
+                push!(levels, Dict("level"=>lvl-1, "partition"=>collect(part), "h"=>r.h_mean, "ncells"=>r.ncells,
+                                   "success"=>r.success, "iters"=>r.iters, "eps_used"=>r.eps_used,
+                                   "l2u"=>r.el2_u, "l2p"=>r.el2_p, "h1u"=>r.eh1_u, "h1p"=>r.eh1_p))
+                @printf("  L%d part=%s h=%.4g cells=%d success=%s eps_used=%.3g | L2u=%.4g H1u=%.4g L2p=%.4g  (%.0fs)\n",
+                        lvl-1, string(part), r.h_mean, r.ncells, r.success, r.eps_used, r.el2_u, r.eh1_u, r.el2_p, time()-t0); flush(stdout)
+                GC.gc()
+            end
+            push!(results_by_kv[kv], Dict("kv"=>kv, "kp"=>kv, "method"=>method, "element_type"=>"TET",
+                                "mesh"=>"structured_kuhn", "mesh_sequence"=>"structured", "c1_mult"=>1.0,
+                                "alpha_0"=>ALPHA0, "Re"=>RE, "Da"=>DA,
+                                "hs"=>hs, "l2u"=>l2us, "l2p"=>l2ps, "h1u"=>h1us, "h1p"=>h1ps, "levels"=>levels))
+            open(outpaths[kv], "w") do io
+                JSON3.write(io, [Dict(k => (v isa AbstractFloat && !isfinite(v) ? nothing : v) for (k,v) in d) for d in results_by_kv[kv]])
+            end
+            println("  [wrote incremental -> $(outpaths[kv])]"); flush(stdout)
+        end
+    end
+    println("\nDONE. structured sweep -> results/k{1,2}/TET/structured/convergence3d_results.json"); flush(stdout)
 end
 
 # Memory-capped, RESUMABLE remainder sweep. ASGS keeps its full paper mesh count (P1=4, P2=3); OSGS
@@ -444,7 +559,12 @@ function run_sweep_cells(; outpath, cells::Vector{Tuple{Int,String,Int,Int}}, ba
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    if length(ARGS) >= 1 && ARGS[1] == "cells"
+    if length(ARGS) >= 1 && ARGS[1] == "sweep_structured"
+        # smoke3d.jl sweep_structured [max_n_pert]  — full §5.2 sweep on the STRUCTURED Kuhn family with the
+        # eps_pert homotopy + iterative penalty (default solver). Writes results/k{1,2}/TET/structured/.
+        mnp = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
+        run_sweep_structured(; max_n_pert=mnp)
+    elseif length(ARGS) >= 1 && ARGS[1] == "cells"
         # smoke3d.jl cells [outpath] "kv=2,method=ASGS,lo=2,n=4;..." [base_lc] [geom] [visc] [linsolver]
         #   each chunk runs nested-family levels lo..n-1 (lo default 0); lo>0 runs ONLY finer meshes.
         #   linsolver: "auto" (LU below LU_DOF_LIMIT, ILU above), "LU" (force direct), or "ILU_GMRES".
