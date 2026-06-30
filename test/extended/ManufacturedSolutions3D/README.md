@@ -35,6 +35,38 @@ with `solve_one(...; linsolver="ILU_GMRES")`.
 
 ## Running
 
+### Official sweep — regular (structured) mesh, run like the 2D harness
+
+`sweep_structured` is the **official** §5.2 sweep on the **regular structured Kuhn-tet mesh** (the
+"regular mesh"), driven exactly like the 2D harness: each cell uses the **eps_pert homotopy**
+(perturbed start, hard→easy `1 → 0.1 → 0.01 → 0`, first success wins) on top of the **Codina
+iterative penalty** (`ε_num·(pⁿ−pⁿ⁻¹)` in the mass residual — required for the 3D all-Dirichlet
+problem, ill-posed at `ε=0`; see [docs/mms/3d-iterative-penalty-fix-and-osgs-coupling.md](../../../docs/mms/3d-iterative-penalty-fix-and-osgs-coupling.md)).
+The headline robustness metric per cell is `eps_used` = the **largest** perturbation it still converged
+from (`eps_used=1` ⇒ converged from the hardest start, exactly the 2D behaviour).
+
+```bash
+cd test/extended/ManufacturedSolutions3D
+
+# Official sweep: ALL ASGS first (P1 then P2), THEN all OSGS, both at paper c₁. Writes per-(kv,etype)
+# to results/k{1,2}/TET/structured/convergence3d_results.json (each record self-describes its solver
+# recipe). The trailing 2 is max_n_pert (homotopy depth: eps_pert = 1, 0.1, 0.01, 0).
+julia --project=../../.. smoke3d.jl sweep_structured 2
+python plot_convergence3d.py structured     # -> results/k{1,2}/TET/structured/convergence3d_P{1,2}.png
+```
+
+Per-method **solver recipe** (recorded in each JSON record's `solver` block for reproducibility):
+| method | recipe | rationale |
+|---|---|---|
+| **ASGS** | default coupled solve + ASGS Stage-I boot | the honest production path; converges robustly at paper c₁ |
+| **OSGS** | boot-skip + matrix-free **JFNK** | recovers the dropped `∂π/∂u`; also fast-fails doomed perturbations so the homotopy descent stays practical (the default coupled+boot OSGS grinds ~15 min per failing attempt) |
+
+Both paths use the iterative penalty (`ε_num = 1e-4·α₀/(ν·(1+Re+Da)) ≈ 1.667e-5` here) and the
+`Deviatoric` viscous operator with the `Constant_Sigma` reaction. Prior structured runs are archived to
+`previous_results/convergence3d/` before each launch.
+
+### Legacy modes — nested red-refined family (aggregate JSON)
+
 ```bash
 cd test/extended/ManufacturedSolutions3D
 
