@@ -390,6 +390,10 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.osgs_jfnk_gmres_restart >= 1 "osgs_jfnk_gmres_restart must be >= 1"
     @assert sol.osgs_jfnk_fd_epsilon > 0.0 "osgs_jfnk_fd_epsilon (Brown–Saad FD base) must be > 0"
     @assert sol.iterative_penalty_max_iters >= 1 "iterative_penalty_max_iters must be >= 1"
+    # Fail loudly on a contradictory request rather than silently disabling: the iterative penalty is
+    # ε_num·(pⁿ − pⁿ⁻¹), which is identically zero at ε_num = 0. Asking for the penalty while leaving the
+    # numerical ε at zero is a configuration error (it would be a silent no-op), not a default to guess.
+    @assert !(sol.iterative_penalty_enabled && cfg.physical_properties.numerical_epsilon <= 0.0) "iterative_penalty_enabled=true requires physical_properties.numerical_epsilon > 0 (the penalty ε_num·(pⁿ−pⁿ⁻¹) vanishes at ε_num=0)"
 
     # Linear (inner) solver backend — the ilu_*/gmres_* knobs are required even for LU (no silent default),
     # but only constrained when ILU_GMRES is actually selected.

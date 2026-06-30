@@ -494,7 +494,10 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     function _pressure_rel_drift(p_new, p_old)
         num = sqrt(abs(sum(∫((p_new - p_old) * (p_new - p_old))setup.dΩ)))
         den = sqrt(abs(sum(∫(p_new * p_new)setup.dΩ)))
-        return num / max(den, 1e-30)
+        # eps(Float64) is a machine-epsilon underflow guard (the codebase convention for relative-norm
+        # denominators, cf. convergence_criterion.jl): it keeps the ratio finite when ‖pⁿ‖ → 0 WITHOUT
+        # injecting a problem scale. It never activates in a well-posed solve (pressure is O(1) here).
+        return num / max(den, eps(Float64))
     end
 
     res_fn_init(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, p_prev=(penalty_on ? p_prev_ref[] : nothing))
