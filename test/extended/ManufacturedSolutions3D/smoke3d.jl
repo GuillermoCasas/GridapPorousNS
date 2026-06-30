@@ -280,7 +280,8 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     end
     return (success=success, ncells=num_cells(model), iters=iters, h_mean=h_mean,
             el2_u=el2_u, el2_p=el2_p, eh1_u=eh1_u, eh1_p=eh1_p, n_ns=n_ns, n_pic=n_pic,
-            eps_used=eps_used)   # [eps_pert] the largest perturbation from which this cell converged (robustness)
+            eps_used=eps_used,           # [eps_pert] largest perturbation from which this cell converged (robustness)
+            numerical_epsilon=eps_num)   # the Codina iterative-penalty ε_num actually used (provenance)
 end
 
 slope(e0,e1,h0,h1) = log(e0/e1)/log(h0/h1)
@@ -376,6 +377,7 @@ function run_sweep_structured(; max_n_pert=3)
         for kv in (1, 2)
             @printf("\n=== STRUCTURED SWEEP method=%s kv=%d (%s) ===\n", method, kv, kv==1 ? "P1" : "P2"); flush(stdout)
             hs=Float64[]; l2us=Float64[]; l2ps=Float64[]; h1us=Float64[]; h1ps=Float64[]; levels=Any[]
+            eps_num_used = NaN   # the ε_num actually used (constant across levels here; captured for provenance)
             for (lvl, part) in enumerate(ladders[kv])
                 t0 = time()
                 model = structured_kuhn_model(part; domain=DOMAIN)
@@ -383,6 +385,7 @@ function run_sweep_structured(; max_n_pert=3)
                               jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
                               jfnk_maxiter=(osgs_recipe ? 30 : nothing), jfnk_restart=(osgs_recipe ? 30 : nothing),
                               trace_dir=outdirs[kv], run_name="sweep_structured", mesh_sequence="structured")
+                eps_num_used = r.numerical_epsilon
                 push!(hs, r.h_mean); push!(l2us, r.el2_u); push!(l2ps, r.el2_p); push!(h1us, r.eh1_u); push!(h1ps, r.eh1_p)
                 push!(levels, Dict("level"=>lvl-1, "partition"=>collect(part), "h"=>r.h_mean, "ncells"=>r.ncells,
                                    "success"=>r.success, "iters"=>r.iters, "eps_used"=>r.eps_used,
@@ -391,9 +394,19 @@ function run_sweep_structured(; max_n_pert=3)
                         lvl-1, string(part), r.h_mean, r.ncells, r.success, r.eps_used, r.el2_u, r.eh1_u, r.el2_p, time()-t0); flush(stdout)
                 GC.gc()
             end
+            # [provenance] self-describing solver recipe so an official result can be reconstructed to the exact
+            # configuration that produced it (reproducible-results rule): ASGS uses the default coupled solve with
+            # the ASGS Stage-I boot; OSGS uses the 3D recipe (boot-skip + matrix-free JFNK, recovering ∂π/∂u).
+            solver_prov = Dict("recipe"=>(osgs_recipe ? "boot_skip+JFNK" : "default_coupled+boot"),
+                               "jfnk"=>osgs_recipe, "osgs_skip_asgs_boot"=>osgs_recipe,
+                               "jfnk_maxiter"=>(osgs_recipe ? 30 : nothing), "jfnk_restart"=>(osgs_recipe ? 30 : nothing),
+                               "iterative_penalty"=>true, "numerical_epsilon"=>eps_num_used,
+                               "eps_pert_base"=>1.0, "max_n_pert"=>max_n_pert, "linsolver"=>"LU",
+                               "viscous_operator"=>"Deviatoric", "reaction"=>"Constant_Sigma")
             push!(results_by_kv[kv], Dict("kv"=>kv, "kp"=>kv, "method"=>method, "element_type"=>"TET",
                                 "mesh"=>"structured_kuhn", "mesh_sequence"=>"structured", "c1_mult"=>1.0,
-                                "alpha_0"=>ALPHA0, "Re"=>RE, "Da"=>DA,
+                                "alpha_0"=>ALPHA0, "Re"=>RE, "Da"=>DA, "numerical_epsilon"=>eps_num_used,
+                                "solver"=>solver_prov,
                                 "hs"=>hs, "l2u"=>l2us, "l2p"=>l2ps, "h1u"=>h1us, "h1p"=>h1ps, "levels"=>levels))
             open(outpaths[kv], "w") do io
                 JSON3.write(io, [Dict(k => (v isa AbstractFloat && !isfinite(v) ? nothing : v) for (k,v) in d) for d in results_by_kv[kv]])
