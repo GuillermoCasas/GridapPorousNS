@@ -122,6 +122,11 @@ produces the accurate solution (small, near-optimal-rate errors) where ASGS unde
 but neither is "clean" at paper c₁: ASGS by the rate, OSGS by the convergence gate. The P2 cases are the two
 remaining open items (ASGS-P2 stabilization is the c₁ lever the author rejects as a fix; OSGS-P2 gate is §4).
 
+> **UPDATE 2026-07-01:** the "ASGS-P2 = paper-c₁ under-stabilization" reading here was **not confirmed** by the
+> follow-up investigation. ASGS-P2-3D is **converged-but-wrong and config-independent** (fails on Frontal meshes,
+> Taylor-Hood, and all viscous operators; c₁/inf-sup/mesh-quality all refuted). See the canonical
+> [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md) — root cause still open.
+
 ## 4. The OPEN problem: OSGS-3D P2 ∂π/∂u coupling (gate not met)
 
 > **Scope (updated 2026-06-30):** the official sweep shows this is now a **P2-only** problem — **OSGS P1 is
