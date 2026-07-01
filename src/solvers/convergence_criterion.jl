@@ -34,35 +34,47 @@ the numerator, (b) needs no second derivatives and so works for P1/P1 with no sp
 floors at O(h^k)). The sum-of-norms is a deliberately CONSERVATIVE envelope (D_M ≥ ‖Σ terms‖), so it
 never under-estimates the scale and so cannot report convergence early through term cancellation.
 
-# ε_C — mass (residual over a term-magnitude envelope)
-    ε_C = ‖R_p‖ / (‖∇(α u)‖ + ‖g‖),   R_p = ε p + ∇·(α u) − g,   ∇(α u) = α ∇u + u ⊗ ∇α  (Frobenius),
-the genuine mass-equation residual R_p normalized by a term-magnitude envelope. NOTE the −g: the
-continuity source is SUBTRACTED, so ε_C → 0 at the discrete solution even for a forced/manufactured
-problem (without it ε_C would floor at ‖g‖/‖∇(αu)‖, measuring the source instead of the residual). The
-denominator mirrors the momentum envelope D_M (which carries the body force ‖f‖): the robust
-flux-variation scale ‖∇(α u)‖ PLUS the source magnitude ‖g‖, so a strongly-forced mass equation is
-measured against a scale that reflects its forcing. ‖∇(α u)‖ stands in for the divergence ‖∇·(α u)‖
-(which can collapse for a near-incompressible flow) because boundary-layer shear keeps it bounded away
-from zero. All norms are global L²(Ω), built only from `u`, `p`, and the known fields `α`, `g`. The `ε p`
-penalty is kept for strictness (negligible at production ε* ~ 1e-4). When ε=0, g=0, α constant it reduces
-to the textbook ‖∇·u‖/‖∇u‖. The PURE-divergence ratio ‖∇·(α u)‖/‖∇(α u)‖ carries the analytic ≤ √d bound
-((tr A)² ≤ d (A:A)) and is checked separately as a quadrature/assembly self-check.
+# ε_C — mass (Philosophy A, SYMMETRIC with ε_M — the GATE)
+    ε_C = ‖r_C‖ / D_C,
+where `r_C` is the Euclidean norm of the **pressure (q-test) block of the SAME assembled stabilized
+residual vector `b`** whose velocity block gives `r_M` (the caller passes it in, exactly like `r_M`),
+and `D_C` is the dynamic mass-term envelope
+    D_C = ‖∫ q (α∇·u + u·∇α)‖ + ‖∫ q (ε p)‖ + ‖∫ q g‖               (assembled over the pressure test space Q).
+This is the Philosophy-A analogue of ε_M (spec §3.1): the numerator is what the solver ACTUALLY drives
+to zero (the weak/algebraic continuity residual, subscales included) — so, unlike the old strong-form
+measure, ε_C → 0 at the discrete solution just like ε_M and can be gated at 1e-9. The mass equation is
+now treated IDENTICALLY to momentum: both residuals are brought down the same way. The envelope sums the
+Galerkin (physical) mass terms assembled through the weak form over Q — the porous-flux divergence
+∫q∇·(αu), the compressibility penalty ∫q(εp), and the mass source ∫qg — mirroring the Galerkin momentum
+terms in D_M (the VMS stabilization terms in the q-block, τ₂/OSGS-projection + iterative penalty, live in
+the numerator `r_C`, not the envelope — again exactly as for momentum). `ε_C ∈ [0,1]` up to the small
+stabilization excess.
+
+# ε_C^strong — mass (Philosophy B, DIAGNOSTIC ONLY — NOT the gate)
+    ε_C^strong = ‖R_p‖ / (‖∇(α u)‖ + ‖g‖),   R_p = ε p + ∇·(α u) − g,   ∇(α u) = α ∇u + u ⊗ ∇α  (Frobenius).
+This is the former gate quantity, retained purely as a physically-interpretable diagnostic ("how far from
+incompressible is the flow"). Its L² strong-residual numerator FLOORS at the discretization error O(h^{kv})
+(the FE velocity is only weakly divergence-free), so it CANNOT be driven to zero and must NOT gate the
+solve — that is precisely why the gate moved to the Philosophy-A `ε_C` above. The PURE-divergence ratio
+‖∇·(α u)‖/‖∇(α u)‖ carries the analytic ≤ √d bound ((tr A)² ≤ d (A:A)) and is checked separately as a
+quadrature/assembly self-check. Computed by `mass_criterion` (unchanged), reported as `eps_C_strong`.
 
 # Consistency requirements (read before wiring in)
-- **Philosophy-A envelope consistency.** The sent-in `r_M` MUST be the velocity block of the SAME
-  assembled residual whose terms `D_M` sums — same test space `V`, same measure `dΩ`, same sign
-  convention, same (Euclidean) vector norm. Then `‖r_M‖ ≤ Σ‖term‖ + ‖stab‖` is structural and
-  `ε_M ∈ [0,1]` up to the small stabilization excess (the numerator includes the VMS subscales, the
-  denominator is the Galerkin force terms; spec §5.10). A *persistent* `ε_M ≫ 1` does not mean the
-  flow is unconverged — it means the residual and the term decomposition have drifted apart (different
-  quadrature/space/sign). That is the bug to chase, not the criterion. Log `ε_M` on a known case for
-  the first few iterations and confirm it lands in `[0,1]`.
-- **Require ≥ 1 completed iteration (the k≥1 rule).** Do NOT evaluate or trust the verdict at the
-  trivial initial iterate. Both ratios are then roundoff/roundoff; `ε_C ≤ √d` holds analytically, but
-  the COMPUTED ε_C divides a *signed* divergence sum (subject to catastrophic cancellation) by an
-  all-positive sum-of-squares, so it can exceed √d numerically. The `degenerate` flag (a denominator
-  sitting at the underflow floor) marks exactly this state; the √d self-check warning is suppressed
-  when degenerate so it never trips on `0/0`-adjacent noise.
+- **Philosophy-A envelope consistency (BOTH blocks).** The sent-in `r_M`/`r_C` MUST be the velocity/
+  pressure block of the SAME assembled residual whose terms `D_M`/`D_C` sum — same test spaces `V`/`Q`,
+  same measure `dΩ`, same sign convention, same (Euclidean) vector norm. Then `‖r_M‖ ≤ Σ‖term‖ + ‖stab‖`
+  (and likewise for `r_C`) is structural and `ε_M, ε_C ∈ [0,1]` up to the small stabilization excess (the
+  numerator includes the VMS subscales, the denominator is the Galerkin force terms; spec §5.10). A
+  *persistent* `ε_M ≫ 1` (or `ε_C ≫ 1`) does not mean the flow is unconverged — it means the residual and
+  the term decomposition have drifted apart (different quadrature/space/sign). That is the bug to chase,
+  not the criterion. Log both on a known case for the first few iterations and confirm they land in `[0,1]`.
+- **Require ≥ 1 completed iteration (the k≥1 rule).** Do NOT evaluate or trust the verdict at the trivial
+  initial iterate. The gate ratios `ε_M = ‖r_M‖/D_M`, `ε_C = ‖r_C‖/D_C` are then roundoff/roundoff. The
+  `degenerate` flag (either GATE denominator `D_M`/`D_C` sitting at the underflow floor) marks exactly this
+  state and is never accepted as converged. Separately, the DIAGNOSTIC strong-form `ε_C^strong ≤ √d` holds
+  analytically, but the COMPUTED pure-divergence ratio divides a *signed* divergence sum (catastrophic
+  cancellation) by an all-positive sum-of-squares, so it can exceed √d numerically at the trivial iterate;
+  the √d self-check warning is suppressed when degenerate so it never trips on `0/0`-adjacent noise.
 
 # Scope / what this is NOT
 - It introduces NO a-priori scale (no U, L, P, Re, Da). The optional pressure-normalized fallback of
@@ -87,16 +99,22 @@ spec asks to report every iteration (ε_M, ε_C, and the per-term breakdown of t
 a stalled solve reveals which force balance is limiting it).
 
 Fields:
-- `eps_M`, `eps_C` — the dimensionless momentum / mass residual measures.
+- `eps_M`, `eps_C` — the dimensionless momentum / mass GATE measures (both Philosophy-A: `‖r_M‖/D_M`,
+                     `‖r_C‖/D_C`; both → 0 at the discrete solution). `converged` gates on these two.
 - `converged`      — `eps_M ≤ tol_M && eps_C ≤ tol_C`. Do not accept it when `degenerate` (see k≥1 rule).
-- `degenerate`     — a denominator sat at the underflow floor (the iterate carries ~no force / flux
-                     structure, e.g. the all-zero initial guess). The verdict is meaningless here.
-- `r_M`, `D_M`     — momentum numerator (sent-in residual norm) and denominator envelope.
+- `degenerate`     — a GATE denominator (`D_M` or `D_C`) sat at the underflow floor (the iterate carries
+                     ~no force / flux structure, e.g. the all-zero initial guess). Verdict meaningless.
+- `r_M`, `D_M`     — momentum numerator (velocity-block residual norm) and denominator envelope.
 - `terms`          — NamedTuple `(convection, viscous, pressure_grad, resistance, body_force)`: the five
                      ‖·‖ contributions whose sum is `D_M`.
-- `mass_num`, `mass_den` — ‖R_p‖ = ‖ε p + ∇·(α u) − g‖ and the envelope ‖∇(α u)‖_F + ‖g‖ (numerator /
-                     denominator of `eps_C`).
-- `sqrt_d`         — the √d ceiling for `eps_C` (self-check reference).
+- `r_C`, `D_C`     — mass numerator (pressure-block residual norm — the weak continuity residual the
+                     solver drives to zero) and denominator envelope (Galerkin mass-term magnitudes).
+- `mass_terms`     — NamedTuple `(divergence, penalty, source)`: the three ‖·‖ contributions summing to `D_C`.
+- `eps_C_strong`   — DIAGNOSTIC ONLY (not gated): the former strong-form ‖R_p‖/(‖∇(αu)‖+‖g‖), which floors
+                     at O(h^{kv}) and so must not gate the solve. A physical "how incompressible" reading.
+- `mass_num`, `mass_den`, `div_ratio` — the strong-form diagnostic's ‖R_p‖, its envelope ‖∇(αu)‖_F+‖g‖,
+                     and the pure-divergence ratio ‖∇·(αu)‖/‖∇(αu)‖ (the √d self-check quantity).
+- `sqrt_d`         — the √d ceiling for the strong-form self-check reference.
 """
 struct ConvergenceMeasure
     eps_M::Float64
@@ -106,8 +124,13 @@ struct ConvergenceMeasure
     r_M::Float64
     D_M::Float64
     terms::NamedTuple
+    r_C::Float64
+    D_C::Float64
+    mass_terms::NamedTuple
+    eps_C_strong::Float64
     mass_num::Float64
     mass_den::Float64
+    div_ratio::Float64
     sqrt_d::Float64
 end
 
@@ -142,9 +165,35 @@ function momentum_force_envelope(uh, ph, α, ν, viscous_op, σ, f, V, dΩ)
 end
 
 """
-    mass_criterion(uh, ph, α, eps_val, g, d, dΩ) -> (eps_C, mass_num, mass_den, div_ratio)
+    mass_force_envelope(uh, ph, α, eps_val, g, Q, dΩ) -> (D_C, mass_terms)
 
-The scale-free mass measure ε_C = ‖R_p‖ / (‖∇(α u)‖_F + ‖g‖)  (field L² norms).
+The dynamic mass-term envelope `D_C` (Philosophy A — the exact mass-side analogue of
+`momentum_force_envelope`): assemble each Galerkin (physical) continuity-equation term's pressure-block
+load vector through the SAME weak form the residual uses, and sum their Euclidean norms. `Q` is the
+pressure TEST space (the same one whose DOFs the numerator `r_C` lives on). The three terms mirror the
+q-tested Galerkin mass form `∫ q (ε p + ∇·(αu) − g) dΩ` (`continuous_problem.jl`,
+`build_stabilized_weak_form_residual`): the porous-flux divergence `∫ q (α∇·u + u·∇α)`, the
+compressibility penalty `∫ q (ε p)`, and the mass source `∫ q g`. The VMS stabilization terms in the
+q-block (τ₂/OSGS-projection coupling, the Codina iterative penalty) are DELIBERATELY excluded from the
+envelope — they live in the numerator `r_C = ‖b[pressure block]‖`, exactly as the momentum subscales live
+in `r_M` and not in `D_M`. Returns `D_C` and the per-term breakdown.
+"""
+function mass_force_envelope(uh, ph, α, eps_val, g, Q, dΩ)
+    divergence = norm(assemble_vector(q -> ∫( q * (α * (∇⋅uh) + uh ⋅ ∇(α)) )dΩ, Q))   # ∫ q ∇·(αu)
+    penalty    = norm(assemble_vector(q -> ∫( q * (eps_val * ph) )dΩ, Q))              # ∫ q (ε p)
+    source     = norm(assemble_vector(q -> ∫( q * g )dΩ, Q))                           # ∫ q g
+    D_C = divergence + penalty + source
+    return D_C, (divergence = divergence, penalty = penalty, source = source)
+end
+
+"""
+    mass_criterion(uh, ph, α, eps_val, g, d, dΩ) -> (eps_C_strong, mass_num, mass_den, div_ratio)
+
+DIAGNOSTIC ONLY (no longer the gate — see the module header). The strong-form mass measure
+ε_C^strong = ‖R_p‖ / (‖∇(α u)‖_F + ‖g‖)  (field L² norms). Retained as a physically-interpretable
+"how far from incompressible" reading and as the √d self-check host; the GATE is the Philosophy-A
+`‖r_C‖/D_C` (`mass_force_envelope` + the pressure block of the residual). This quantity FLOORS at the
+discretization error O(h^{kv}) and therefore cannot be driven to zero.
 
 NUMERATOR — the **genuine mass-equation residual** R_p = ε p + ∇·(α u) − g: it SUBTRACTS the mass source
 `g` (the continuity-equation forcing; `g ≡ 0` for the unforced physical problem, `g ≠ 0` for a
@@ -179,39 +228,47 @@ function mass_criterion(uh, ph, α, eps_val, g, d, dΩ)
 end
 
 """
-    evaluate_convergence(r_M, uh, ph, α, ν, viscous_op, σ, f, eps_val, g, V, dΩ, d; tol, tol_M, tol_C)
+    evaluate_convergence(r_M, r_C, uh, ph, α, ν, viscous_op, σ, f, eps_val, g, V, Q, dΩ, d; tol, tol_M, tol_C)
         -> ConvergenceMeasure
 
-Evaluate the scale-free criterion at the current iterate. `r_M` is the Euclidean norm of the assembled
-stabilized momentum residual's velocity block (Philosophy A numerator — what the solver drives to zero),
-supplied by the caller. The remaining arguments are the iterate (`uh`, `ph`), material/forcing data
-(`α`, `ν`, `viscous_op`, the reaction field `σ`, body force `f`, penalty `eps_val`, mass source `g`), the
-velocity test space `V`, the measure `dΩ`, and the spatial dimension `d`. Tolerances default to `tol`.
+Evaluate the scale-free criterion at the current iterate. BOTH residuals are treated identically
+(Philosophy A): `r_M` / `r_C` are the Euclidean norms of the assembled stabilized residual's velocity /
+pressure blocks — the momentum and continuity residuals the solver actually drives to zero — supplied by
+the caller (the same `b`, its two field blocks). The remaining arguments are the iterate (`uh`, `ph`),
+material/forcing data (`α`, `ν`, `viscous_op`, the reaction field `σ`, body force `f`, penalty `eps_val`,
+mass source `g`), the velocity/pressure TEST spaces `V`/`Q`, the measure `dΩ`, and the spatial dimension
+`d`. Tolerances default to `tol`.
 
-Computes ε_M = r_M / D_M (momentum) and ε_C = ‖R_p‖/(‖∇(αu)‖+‖g‖) (mass, with R_p = εp + ∇·(αu) − g),
-sets `converged`, and logs a warning if the pure-divergence ratio exceeds √d beyond a small numerical
-margin (a self-check, NOT a hard assert — quadrature round-off can nudge it slightly).
+Computes the two GATE measures ε_M = ‖r_M‖/D_M and ε_C = ‖r_C‖/D_C (both → 0 at the discrete solution),
+sets `converged = ε_M ≤ tol_M ∧ ε_C ≤ tol_C`, and ALSO evaluates the strong-form DIAGNOSTIC
+ε_C^strong = ‖R_p‖/(‖∇(αu)‖+‖g‖) (via `mass_criterion`) — reported but never gated — plus the √d
+self-check warning on the pure-divergence ratio (NOT a hard assert; quadrature round-off can nudge it).
 """
-function evaluate_convergence(r_M::Float64, uh, ph, α, ν, viscous_op, σ, f, eps_val, g, V, dΩ, d::Int;
+function evaluate_convergence(r_M::Float64, r_C::Float64, uh, ph, α, ν, viscous_op, σ, f, eps_val, g, V, Q, dΩ, d::Int;
                               tol::Float64, tol_M::Float64 = tol, tol_C::Float64 = tol)
+    # Momentum GATE (Philosophy A): weak velocity-block residual over the Galerkin force envelope.
     D_M, terms = momentum_force_envelope(uh, ph, α, ν, viscous_op, σ, f, V, dΩ)
     eps_M = r_M / _floor(D_M)
-    eps_C, mass_num, mass_den, div_ratio = mass_criterion(uh, ph, α, eps_val, g, d, dΩ)
+    # Mass GATE (Philosophy A, symmetric): weak pressure-block residual over the Galerkin mass envelope.
+    D_C, mass_terms = mass_force_envelope(uh, ph, α, eps_val, g, Q, dΩ)
+    eps_C = r_C / _floor(D_C)
+    # Strong-form DIAGNOSTIC (not gated): floors at O(h^{kv}); hosts the √d pure-divergence self-check.
+    eps_C_strong, mass_num, mass_den, div_ratio = mass_criterion(uh, ph, α, eps_val, g, d, dΩ)
 
-    # Degenerate state: a denominator at the underflow floor means the iterate carries no force / no
-    # flux structure (e.g. the all-zero initial guess). The ratios are then roundoff/roundoff and the
-    # verdict is meaningless — the caller must apply the k≥1 rule and not accept convergence here.
-    degenerate = (D_M < eps(Float64)) || (mass_den < eps(Float64))
+    # Degenerate state: a GATE denominator (D_M or D_C) at the underflow floor means the iterate carries
+    # no force / no flux structure (e.g. the all-zero initial guess). The gate ratios are then roundoff/
+    # roundoff and the verdict is meaningless — the caller applies the k≥1 rule and does not accept here.
+    degenerate = (D_M < eps(Float64)) || (D_C < eps(Float64))
 
-    # √d self-check on the PURE-divergence ratio ‖∇·(αu)‖/‖∇(αu)‖ (the analytically √d-bounded quantity —
-    # neither the g-subtracted numerator nor the g-augmented denominator of ε_C is √d-bounded). A genuine
-    # violation on a developed iterate signals a quadrature/assembly bug — warn, do not assert. Suppressed
-    # when degenerate, where a numerical √d violation is just roundoff/roundoff (signed cancellation).
+    # √d self-check on the PURE-divergence ratio ‖∇·(αu)‖/‖∇(αu)‖ (the analytically √d-bounded quantity).
+    # A genuine violation on a developed iterate signals a quadrature/assembly bug — warn, do not assert.
+    # Suppressed when degenerate, where a numerical √d violation is just roundoff/roundoff (cancellation).
     sqrt_d = sqrt(d)
     if !degenerate && div_ratio > sqrt_d * (1.0 + 1e-2)
         @warn "convergence_criterion: pure-divergence ratio exceeds the √d ceiling beyond numerical tolerance — check quadrature/assembly consistency" div_ratio sqrt_d
     end
 
     converged = (eps_M ≤ tol_M) && (eps_C ≤ tol_C)
-    return ConvergenceMeasure(eps_M, eps_C, converged, degenerate, r_M, D_M, terms, mass_num, mass_den, sqrt_d)
+    return ConvergenceMeasure(eps_M, eps_C, converged, degenerate, r_M, D_M, terms,
+                              r_C, D_C, mass_terms, eps_C_strong, mass_num, mass_den, div_ratio, sqrt_d)
 end

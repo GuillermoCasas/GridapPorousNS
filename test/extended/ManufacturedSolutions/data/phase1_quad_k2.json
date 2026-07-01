@@ -118,7 +118,8 @@
       "pingpong_max_swaps": 4,
       "pingpong_picard_gain_orders": 1.5,
       "osgs_jfnk_enabled": true,
-      "eps_tol_momentum": 1e-09
+      "eps_tol_momentum": 1e-09,
+      "eps_tol_mass": 1e-09
     },
     "stabilization": {
       "method": [

@@ -26,10 +26,15 @@ of the 3D rate anomalies.
 
 ## 0. Status & what remains
 
-> **This is the trimmed working copy (2026-06-26).** Resolved findings have been condensed into the
-> "Resolved ledger" below (one line + commit each — provenance preserved); the body now holds **only the
-> still-open items**. The full original audit (executive summary, all 34-finding write-ups, the complete
-> resolved detail) is preserved verbatim at commit `a31f191` and its follow-up commits.
+> **This is the trimmed working copy (last updated 2026-07-01).** Resolved findings have been condensed
+> into the "Resolved ledger" below (one line + commit each — provenance preserved); the body now holds
+> **only the still-open items**. The full original audit (executive summary, all 34-finding write-ups, the
+> complete resolved detail) is preserved verbatim at commit `a31f191` and its follow-up commits.
+>
+> **2026-07-01 update:** **C-3 / F4 RESOLVED** (Route B — the mass gate is now the Philosophy-A algebraic
+> measure, symmetric with the momentum gate; the strong-form measure is demoted to a diagnostic). See the
+> Resolved ledger, the F4 checklist item, and §C.3. A trace-grounded **correction** to the old C.3
+> hypothesis is recorded there (the 0.8 gate was NON-binding, not a cause of the P2 pressure errors).
 
 **Headline that still stands.** The continuous VMS formulation is faithfully transcribed — the strong
 residual, both Jacobians, the adjoint sign conventions, the deviatoric/symmetric viscous expansions
@@ -48,8 +53,9 @@ harness/reporting, and (iii) hygiene/fragility gaps.
 | **B-3 / B-6** | A failed OSGS solve silently reports the ASGS Stage-I boot state under the OSGS label (byte-identical error tuples at shared-failed levels). **Action: mark OSGS-degenerated-to-ASGS distinctly.** | Med | reporting/harness |
 | **B-4** | The most recent committed 3D result files can't be reproduced from the current harness (`mesh_algorithm`/ladder match no function in `smoke3d.jl`). **Action: restore/commit the exact driver** (overlaps F6). | Med | reproducibility |
 | **A-4** | Config-strictness gaps: no `required` arrays in the schema (except `linear_solver`), `base_config.json` omits `eps_val`, and the `eps_val` docstring still mislabels it "porosity ε (>0)". | Low | doc↔code |
-| **C-3 / F4** | The 3D k=2 mass gate `eps_tol_mass = 0.8` is extremely loose — the *only* check on the pressure/continuity balance. | Med | fragility |
 | **F6** | The 3D MMS harness (`smoke3d.jl`) is a hand-edited driver with no committed config JSON and no automated guard. | Med | cleanup/test |
+
+*(C-3 / F4 — the loose mass gate — was **RESOLVED 2026-07-01** via Route B; moved to the Resolved ledger.)*
 
 ### Resolved ledger (provenance — do not re-open without reading the cited commit)
 
@@ -111,6 +117,18 @@ harness/reporting, and (iii) hygiene/fragility gaps.
   residual ≤ zero-π after a fixed budget) — the rate stays linear because the **intentionally** dropped
   `∂π/∂u` dominates it (that is the JFNK frontier, out of scope). The false tex claim ("a zero placeholder
   is the correct argument") was corrected in `theory/osgs_algorithm/osgs_algorithm.tex`.
+- **C-3 / F4** ✅ 2026-07-01 (Route B) — the mass gate is now the **Philosophy-A algebraic** `ε_C = ‖r_C‖/D_C`
+  (pressure block of the same residual `b` that gives `r_M`, over a Galerkin mass envelope), SYMMETRIC with
+  `ε_M` and → 0 at the discrete solution, gated at `tol_C = eps_tol_momentum`. The strong-form
+  `‖εp+∇·(αu)−g‖/(‖∇(αu)‖+‖g‖)` — which FLOORS at O(h^{kv}) and forced the loose `0.8` — is demoted to the
+  DIAGNOSTIC `eps_C_strong` (traced, never gated). `convergence_criterion.jl` (`mass_force_envelope`, new
+  `ConvergenceMeasure` fields `r_C`/`D_C`/`eps_C_strong`), `solver_core.jl` probe, `nonlinear.jl` trace;
+  config `base_config.json` `0.8→1e-6` + symmetric `phase1_quad_k2.json`/`smoke3d.jl` + schema/`config.jl`.
+  No tangent change (the coupled/JFNK Jacobian was already the full momentum+mass tangent; only the
+  read-only stopping test changed). Verified Blitz 240/240, Quick convergence test 26/26; 2D A/B and 3D
+  ASGS behavior-preserving; traces show `ε_C` driven `1e-3→1e-12` while `eps_C_strong` floors at O(h). The
+  original C.3 "loose gate causes the P2 pressure errors" hypothesis is **refuted** by traces (§C.3). Full
+  3D-OSGS sweep is a measurement follow-up. See §C.3 + the F4 checklist item.
 
 ---
 
@@ -130,10 +148,20 @@ non-convergence vs exception traces; deterministic blitz guard. Blitz 219/219, Q
   The 2D harnesses use `LUSolver`, so they are unaffected by C.1; a post-C.1 k=2 QUAD MMS rerun is in
   progress as the 2D behavior-preservation check (completed cells show the expected optimal k=2 rates).
 
-### F4 — C.3: tighten / supplement the mass gate → §C.3
-- Investigate why `eps_tol_mass` cannot be < 0.8 for 3D k=2; if it genuinely must stay loose, add a
-  separate tighter check on the pure-divergence ratio `‖∇·(αu)‖/‖∇(αu)‖ ≤ √d` (already computed in
-  `convergence_criterion.jl` as the self-check) so continuity is still gated. No behavior change landed.
+### F4 — C.3: the mass gate → §C.3
+✅ **Landed 2026-07-01 (Route B)** — resolved not by tuning `eps_tol_mass` down but by **replacing the
+gated quantity**. The investigation ("why can't `eps_tol_mass` be < 0.8") answered itself: the old gate's
+strong-form L² mass residual FLOORS at O(h^{kv}) (empirically ~0.11 P1 / ~0.2–0.5 coarse-3D), so *no*
+fixed tolerance below that floor is satisfiable — the `0.8` was "safely above every mesh's floor," i.e. a
+non-binding rubber-stamp. Fix: gate the **Philosophy-A algebraic** mass residual `ε_C = ‖r_C‖/D_C` (the
+pressure block of the same assembled residual `b` the momentum gate reads, already passed into the probe
+as `field_blocks[2]`), which → 0 at the discrete solution and is gate-able at `tol_C = eps_tol_momentum`,
+symmetric with `ε_M`. The strong-form measure + the `‖∇·(αu)‖/‖∇(αu)‖ ≤ √d` self-check are retained as the
+DIAGNOSTIC `eps_C_strong` (traced, never gated). See §0 Resolved ledger / §C.3.
+- **Remaining follow-up (measurement, not implementation):** the full 3D-OSGS structured-Kuhn sweep is
+  re-running to confirm the honest mass-gate convergence at each cell (first OSGS-P1 cell: `ε_C 0.97→6e-9`
+  via JFNK, honest `success`, pressure error L²p 0.44108→0.4374 ≈ −0.83% — the under-convergence tail the
+  old soft-stall left, now drained). The 2D `LUSolver` harnesses are behavior-preserving (A/B to the root).
 
 ### F5 — element-type-aware c₁ for P2 tets (the B.5 fix) → §B.5
 - Add a config-driven `c1_multiplier` (or a per-`(element, order)` table), explicitly `[code-actual]`, so
@@ -188,10 +216,42 @@ non-convergence vs exception traces; deterministic blitz guard. Blitz 219/219, Q
   a 1% conservative effect (safe). **3D watch item (open):** if the inner `G` blows up in 3D (C.1 will flag
   it), that is the trigger to add a real saddle-point preconditioner (block/Schur — PCD/LSC/SIMPLE — or
   Vanka/MG) — do not pre-build it.
+- **[TRIGGERED 2026-07-01 — the 3D watch item just fired, and it is P2-OSGS.]** The Route-B structured-Kuhn
+  P2-OSGS sweep isolates the P2-3D failure to **exactly this inner-solve frontier**, not the mass gate or c₁:
+  - **Mechanism (traced, `…_TET_OSGS_N10.json`):** at `eps_pert=0` the JFNK inner GMRES **does not converge**
+    — full GMRES(30) reaches rel residual **0.0102 > rel_tol 0.01** (a 2% near-miss) → C.1 rejects the step
+    (`stop=linear_solve_failed`); the **frozen-π fallback then depletes its line search** (`linesearch_failed`
+    after 1 step, `ε_M` stuck at 7.9e-2); homotopy is already at `eps_pert=0` ⇒ solve fails. Reproduced on
+    BOTH coarse levels (12,12,3 ndof≈12.3k and 16,16,4 ndof≈30k; `linsolver=LU` outer, so this is the JFNK
+    *inner* Krylov solve with the frozen-π/ILU preconditioner, not the outer factorization).
+  - **Route B is orthogonal here:** the P2-OSGS results are **byte-identical to the committed baseline**
+    (success=False, eps_used=0, same errors to ≥4 figs) — the solve never reaches the convergence gate, so
+    the mass-gate change cannot and does not affect it. This *rules the gate/criterion out* of the P2-OSGS-3D
+    problem and confirms F7's prediction: the bottleneck is the **preconditioner**.
+  - **Cheap-lead probe — RESOLVED: it STAGNATES (budget is not the fix).** Re-running the coarsest cell
+    with full GMRES(80): the *first* Newton step's inner GMRES now converges (< 0.01) and a step is accepted,
+    but the **second** step's GMRES **stagnates at rel residual 0.24 after all 80 iterations** → rejected →
+    frozen-π fallback → `linesearch_failed` → same byte-identical failure (success=False, eps_used=0). A 24%
+    residual from an 80-vector Krylov space is classic saddle-point stagnation: the 2% "near-miss" at
+    maxiter=30 was only the *easiest* iterate (the exact-guess start); once the iterate develops, the
+    frozen-π preconditioner barely dents the residual regardless of budget. **Verdict: F7 go — a real
+    saddle-point preconditioner (block/Schur — PCD/LSC/SIMPLE — or Vanka/MG) is REQUIRED for P2-OSGS-3D; more
+    Krylov vectors will not scale.** (Probe: `routeb_3d_p2osgs_maxiter.jl`; trace `…_p2mi/…OSGS_N10.json`.)
+  - **Contrast (same sweep):** 3D ASGS-P2 is behavior-preserving under Route B (matches baseline to 3–4 figs)
+    and *succeeds* via the eps_pert homotopy — so the P2-3D *ASGS* story stays the c₁/B.5 track, while the
+    P2-3D *OSGS* story is this inner-solve/preconditioner track. Two distinct P2-3D problems, now separated.
 
 ### Minor / opportunistic
 - `_inv_centered.json` latent fragility: the official `test/quick/encoding_invariance_quick_test.jl` reads
   a config it must generate first — fine today, but a stale leftover can confuse a clean checkout.
+- **[NEW 2026-07-01] `encoding_invariance_quick_test.jl` fails marginally on HEAD (pre-existing, not a
+  Route-B regression).** A worktree A/B (HEAD vs Route B) run on 2026-07-01 shows the test's **OSGS
+  `err_u_l2`** cross-encoding covariance at **reldiff ≈ 1.378e-8 > the `_INV_RTOL = 1e-8` threshold** —
+  failing identically on HEAD (Route B is byte-comparable, 1.372e-8; the other 5 metrics pass at ~1e-10).
+  So the single "1 failed" in the current Quick suite is this pre-existing marginal OSGS-covariance issue,
+  independent of Route B. Action: either tighten the OSGS encoding covariance (real work) or, if it is
+  genuinely at the roundoff floor for this cell, revisit whether `1e-8` is the right OSGS threshold —
+  **do not** relax it merely to go green (repo rule); diagnose first.
 - **NONL-04** (Anderson `update!` has no zero/near-zero residual guard before the least-squares solve).
   Now reachable: `accelerators.jl` is wired into the OSGS stage behind the opt-in `osgs_anderson_enabled`
   (NONL-03, OFF by default), so this guard matters on that path when enabled. (NONL-01 — the ILU-GMRES
@@ -273,7 +333,29 @@ exact equality.
 > on σ SPSD (`sigma_constant/linear/nonlinear ≥ 0`), strictly-positive velocity floor, `eps_tol_momentum/
 > mass > 0`, `0 < alpha_0 ≤ 1`, `r_1 < r_2`, and `bounding_box` even-length parity. See §0 ledger.
 
-### C.3 [Med] The 3D k=2 mass-convergence gate `eps_tol_mass = 0.8` is extremely loose
+### C.3 [Med] The mass-convergence gate — ✅ RESOLVED 2026-07-01 (Route B)
+
+> **Resolution (Route B).** The gate no longer measures the strong-form residual at all. `ε_C` is now the
+> **Philosophy-A algebraic** measure `‖r_C‖/D_C` (pressure block of the assembled residual `b`, over the
+> Galerkin mass envelope), symmetric with `ε_M`, → 0 at the discrete solution, gated at
+> `tol_C = eps_tol_momentum`. The strong-form quantity below is kept as the diagnostic `eps_C_strong`.
+> See the §0 Resolved ledger and the F4 checklist item for the full write-up and verification.
+>
+> **Trace-grounded correction to the original finding.** Two claims in the original text (kept below for
+> provenance) are **refuted by measurement**:
+> 1. *"0.8 … plausibly contributes to the large converged P2 pressure errors."* **False.** At accepted 3D
+>    k=2 iterates the strong-form `ε_C` sits at ~0.2–0.5 — well **below** 0.8 — so the 0.8 gate was
+>    **non-binding**; the momentum gate (1e-9) was the sole operative constraint. The large P2 pressure
+>    errors belong to the **B.5 c₁/under-stabilization** track, not the mass gate.
+> 2. *"add a separate tighter check on `‖∇·(αu)‖/‖∇(αu)‖ ≤ √d`."* That ratio is an analytic identity that
+>    holds for *any* field and → `‖g‖/‖∇(αu)‖ ≠ 0` under a forced MMS, so it is **not** a convergence
+>    check. The correct fix was to gate a quantity that genuinely → 0 — the weak/algebraic pressure-block
+>    residual — which the momentum gate already had in hand and was discarding.
+>
+> The real defect the 0.8 hid was that continuity was **un-gated** (a rubber-stamp), and that
+> `eps_C_strong` FLOORS at O(h^{kv}) (empirically ~0.11 P1 / ~0.2–0.5 coarse-3D) so *no* fixed sub-floor
+> tolerance is satisfiable — which is why it had to be loose. Route B removes the magic number and makes
+> continuity an honest gate. Original finding preserved verbatim below.
 
 ε_C = ‖εp+∇·(αu)−g‖ / (‖∇(αu)‖+‖g‖). A tolerance of **0.8** accepts an iterate whose mass-equation
 residual is 80% of the flux-gradient envelope. The momentum gate `eps_tol_momentum=1e-9` is tight; the
@@ -379,6 +461,15 @@ consistency term), worth a paper footnote — not a c₁ tuning.
 > "budget-exhausted soft stall accepted," not "ε-converged." This is the documented OSGS linear-rate
 > coupling (the JFNK motivation), but it means the OSGS success flag is weaker than it looks and the
 > iteration cap (a config value) is silently load-bearing for OSGS accuracy.
+>
+> **[Update 2026-07-01 — Route B + JFNK make this success honest, preliminary.]** The 2026-06-24 control
+> above predates both the JFNK recipe and Route B. Re-running the structured-Kuhn sweep with `osgs_jfnk`
+> **and** the Route-B algebraic mass gate, the first 3D OSGS-P1 cell reaches `success=true` via
+> `ftol_reached` on **both** gates (`ε_M 1.8e-2→3e-10`, `ε_C 0.97→6.2e-9`) — i.e. genuinely ε-converged,
+> **not** a budget-exhausted soft stall. So the "success flag is weaker than it looks" concern is being
+> retired for the JFNK+Route-B path: the mass gate now forces an honest verdict (converge the pressure
+> block or fail), and the same cell's L²p error dropped ≈0.83% (the soft-stall under-convergence tail,
+> now drained). Full-sweep confirmation is the F4 measurement follow-up.
 
 ### B.2 [HIGH] The committed "3D-P2 divergence" is dominated by `success=False` solves plotted as valid data
 
@@ -563,7 +654,7 @@ NONL-01/02/03/05, PROJ-01, SOLV-04) have moved to the §0 Resolved ledger; only 
 
 **convergence-criterion**
 - `CONV-05` (fragility, medium): MMS verifier numerical parameters (tau_err, eps_*, max_extra_cycles, require_consecutive_passes, rate_check_factor) are hard-coded — `test/extended/CocquetFormMMS/run_test.jl:401-412`
-- `CONV-02` (inconsistency, low): Inline literal `1e-2` √d self-check margin in evaluate_convergence violates the repo no-magic-numbers / config-strictness rule — `src/solvers/convergence_criterion.jl:211`
+- `CONV-02` (inconsistency, low): Inline literal `1e-2` √d self-check margin in evaluate_convergence violates the repo no-magic-numbers / config-strictness rule — `src/solvers/convergence_criterion.jl:267` (moved by the Route-B rewrite; now on the `eps_C_strong`/`div_ratio` DIAGNOSTIC path, not the gate)
 - `CONV-04` (fragility, low): Sub-optimal-rate budget uses a bare power of h with NO reference-error / leading-constant normalization, so the rate-check is scale-dependent — `src/solvers/mms_verification.jl:130-131`
 
 **driver-mms-io**

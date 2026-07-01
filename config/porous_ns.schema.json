@@ -271,9 +271,9 @@
             },
             "eps_tol_mass": {
               "type": "number",
-              "description": "Scale-free mass tolerance tol_C: converged when eps_C = ||eps*p + div(alpha u) - g||/(||grad(alpha u)|| + ||g||) <= tol_C, the genuine mass residual (source g subtracted) over a flux-gradient+source envelope. eps_C floors at O(h^kv) (the discrete mass-residual floor); set tol_C above that floor. The pure-divergence ratio ||div(alpha u)||/||grad(alpha u)|| is bounded by sqrt(d) and is checked separately.",
+              "description": "Scale-free mass tolerance tol_C (Philosophy A, SYMMETRIC with eps_tol_momentum): converged when eps_C = ||r_C||/D_C <= tol_C, where r_C is the pressure-block of the assembled stabilized residual (the weak continuity residual the solver drives to zero) and D_C is the Galerkin mass-term envelope (convergence_criterion.jl). eps_C -> 0 at the discrete solution just like eps_M, so set tol_C as tight as eps_tol_momentum (the mass equation is now brought down the same way as momentum). The former strong-form measure ||eps*p + div(alpha u) - g||/(||grad(alpha u)|| + ||g||), which floors at O(h^kv), is kept as the DIAGNOSTIC eps_C_strong only (NOT gated); the pure-divergence ratio ||div(alpha u)||/||grad(alpha u)|| <= sqrt(d) remains a separate self-check.",
               "examples": [
-                0.2
+                1e-6
               ]
             },
             "max_increases": {

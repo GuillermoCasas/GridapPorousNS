@@ -180,12 +180,12 @@ Base.@kwdef struct SolverConfig
     # what removes the re-anchoring pathology (a fresh segment no longer demands another ×(1/ftol) drop
     # below wherever the previous one stopped). See docs/solver/nonlinear-convergence-criterion-prompt.md.
     eps_tol_momentum::Float64                      # tol_M: ε_M ≤ tol_M (ε_M ∈ [0,1], → 0 at the discrete solution)
-    # tol_C: ε_C ≤ tol_C (ε_C floors at O(h^{kv}); set above that floor, ≤ √d).
-    # [known-looseness] The 3D k=2 sweeps run this at 0.8 — deliberately loose, for the mass-residual
-    # scale sensitivity documented in the k=2-gate lesson, but it accepts an iterate whose mass residual
-    # is up to 80% of the flux-gradient envelope and is the ONLY gate on the continuity balance (tol_M is
-    # tight at 1e-9). Flagged for future tightening / a separate pure-divergence (‖∇·(αu)‖/‖∇(αu)‖ ≤ √d)
-    # check; not changed here. See docs/formulation-audit-2026-06-24.md §C.3.
+    # tol_C: ε_C ≤ tol_C. [Route B — 2026-07-01] ε_C is now the Philosophy-A ALGEBRAIC mass measure
+    # ‖r_C‖/D_C (pressure block of the assembled residual over the Galerkin mass envelope), SYMMETRIC with
+    # ε_M: it → 0 at the discrete solution, so set tol_C as tight as eps_tol_momentum (both residuals are
+    # brought down the same way). This REPLACES the former strong-form gate (‖∇·(αu)−g‖/…) that floored at
+    # O(h^{kv}) and forced the loose 0.8 rubber-stamp — that quantity is now the diagnostic eps_C_strong
+    # only. See docs/formulation-audit-2026-06-24.md §C.3 / §F4 and convergence_criterion.jl.
     eps_tol_mass::Float64
     # --- Line search & robustness guards ---
     max_increases::Int                             # how many merit-function increases are tolerated before bailing
@@ -363,7 +363,8 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.picard_ftol >= sol.ftol "Solver picard_ftol must be >= ftol (Picard is a smoother, not a precise solver)"
     @assert sol.xtol > 0 "Solver xtol must be > 0"
     # Scale-free convergence gate (the AUTHORITATIVE production success test, injected by solve_system):
-    # converged ⇔ ε_M ≤ eps_tol_momentum ∧ ε_C ≤ eps_tol_mass. Both must be strictly positive.
+    # converged ⇔ ε_M ≤ eps_tol_momentum ∧ ε_C ≤ eps_tol_mass. Both are Philosophy-A ‖r‖/D ratios that
+    # → 0 at the discrete solution (symmetric momentum/mass); both must be strictly positive.
     @assert sol.eps_tol_momentum > 0 "Solver eps_tol_momentum (ε_M gate) must be > 0"
     @assert sol.eps_tol_mass > 0 "Solver eps_tol_mass (ε_C gate) must be > 0"
     @assert 0.0 < sol.armijo_c1 < 1.0 "Armijo c1 must be strictly between 0 and 1"

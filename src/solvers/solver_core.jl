@@ -127,6 +127,7 @@ function build_convergence_probe(setup::FETopology, formulation::VMSFormulation,
                                  tol_M::Float64, tol_C::Float64)
     X        = setup.X
     Vvel     = setup.Y[1]                 # velocity TEST space — same DOFs as b's velocity block
+    Qpre     = setup.Y[2]                 # pressure TEST space — same DOFs as b's pressure block (r_C envelope)
     dΩ       = setup.dΩ
     α        = setup.alpha_cf
     f        = setup.f_cf                 # momentum body force (D_M envelope term)
@@ -143,16 +144,21 @@ function build_convergence_probe(setup::FETopology, formulation::VMSFormulation,
     d        = num_cell_dims(setup.model)
     sig_op   = SigOp(rxn_law, reg, ν, c_1, c_2)
     # The closure is the AUTHORITATIVE convergence evaluator the kernel gates on (not merely a
-    # diagnostic): it re-assembles the genuine nonlinear residual's velocity block `r_M` at the
-    # current iterate and defers the whole verdict (ε_M, ε_C, converged, degenerate) to the criterion
-    # module — keeping the convergence RULES (convergence_criterion.jl) separate from the iteration
-    # ALGORITHM (nonlinear.jl). Returns the full `ConvergenceMeasure`.
+    # diagnostic): it reads BOTH blocks of the genuine nonlinear residual `b` at the current iterate —
+    # the velocity block `r_M` (momentum) and the pressure block `r_C` (continuity) — and defers the
+    # whole verdict (ε_M, ε_C, converged, degenerate) to the criterion module, keeping the convergence
+    # RULES (convergence_criterion.jl) separate from the iteration ALGORITHM (nonlinear.jl). Both blocks
+    # are Philosophy-A numerators (what the solver drives to zero); the mass side is now treated exactly
+    # like momentum. Returns the full `ConvergenceMeasure`.
     return function (x, b, field_blocks)
         vblock = field_blocks === nothing ? (firstindex(b):lastindex(b)) : field_blocks[1]
-        r_M = norm(view(b, vblock))                       # ‖r_M‖ — velocity block (Philosophy A numerator)
+        r_M = norm(view(b, vblock))                       # ‖r_M‖ — velocity block (Philosophy A momentum numerator)
+        # ‖r_C‖ — pressure block (Philosophy A mass numerator: the weak continuity residual → 0). The
+        # monolithic (u,p) system always has a second field block; guard defensively for a single-field op.
+        r_C = (field_blocks === nothing || length(field_blocks) < 2) ? NaN : norm(view(b, field_blocks[2]))
         uh, ph = FEFunction(X, x)
         σ = Operation(sig_op)(uh, ∇(uh), α, grad_α, h)    # σ(α, u) at this iterate
-        return evaluate_convergence(r_M, uh, ph, α, ν, visc_op, σ, f, eps_val, g, Vvel, dΩ, d;
+        return evaluate_convergence(r_M, r_C, uh, ph, α, ν, visc_op, σ, f, eps_val, g, Vvel, Qpre, dΩ, d;
                                     tol = tol_M, tol_C = tol_C)
     end
 end

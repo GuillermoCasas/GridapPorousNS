@@ -43,10 +43,12 @@ function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over
                      jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing,
                      iterative_penalty::Bool=true, osgs_skip_boot::Bool=false)
     @assert !(jfnk && anderson) "jfnk and anderson are mutually-exclusive OSGS paths"
-    eps_tol_m = something(eps_tol_m_over, kv == 2 ? 1e-9 : 1e-6)   # k=2 tightened gate (MEMORY lesson)
-    ftol_v    = something(ftol_over, kv == 2 ? 1e-12 : 1e-10)
-    solver_dict = Dict{String,Any}("eps_tol_momentum"=>eps_tol_m, "ftol"=>ftol_v)
-    eps_tol_mass_over === nothing || (solver_dict["eps_tol_mass"] = eps_tol_mass_over)
+    eps_tol_m    = something(eps_tol_m_over, kv == 2 ? 1e-9 : 1e-6)   # k=2 tightened gate (MEMORY lesson)
+    # [Route B 2026-07-01] mass gate is now the Philosophy-A algebraic ‖r_C‖/D_C → 0, so default it
+    # SYMMETRIC with the momentum gate (both residuals brought down the same way); overridable for A/B.
+    eps_tol_mass = something(eps_tol_mass_over, eps_tol_m)
+    ftol_v       = something(ftol_over, kv == 2 ? 1e-12 : 1e-10)
+    solver_dict = Dict{String,Any}("eps_tol_momentum"=>eps_tol_m, "eps_tol_mass"=>eps_tol_mass, "ftol"=>ftol_v)
     # [iterative-penalty] Codina iterative penalty ε_num·(pⁿ−pⁿ⁻¹) in the mass residual (article.tex §5.2
     # line 1383) — REQUIRED for the 3D all-Dirichlet case (ill-posed at ε=0). ON by default here; acts only
     # because the harness sets numerical_epsilon = 1e-4·ε_ref > 0. Pass iterative_penalty=false for an A/B.

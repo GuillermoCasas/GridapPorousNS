@@ -758,19 +758,22 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         # only on an ACCEPTED step where `b = residual(x)` (self-consistent pair); wrapped in try/catch so a
         # probe failure degrades to NaN — it cannot perturb the iterate, though it does decide stopping.
         # NaN ⇒ not traced this step.
-        eps_M_it, eps_C_it = NaN, NaN
+        # `eps_C` is the GATE value we drive to zero (Philosophy-A ‖r_C‖/D_C, the weak continuity residual);
+        # `eps_C_strong` is the strong-form diagnostic (‖∇·(αu)−g‖/…, floors at O(h^{kv}), NOT gated) — both
+        # traced so a plot can show what we bring down vs. the physical incompressibility measure.
+        eps_M_it, eps_C_it, eps_C_strong_it = NaN, NaN, NaN
         cm = nothing
         if solver.conv_probe !== nothing && state.ls_success
             try
                 cm = solver.conv_probe(x, b, field_blocks)
-                eps_M_it, eps_C_it = cm.eps_M, cm.eps_C
+                eps_M_it, eps_C_it, eps_C_strong_it = cm.eps_M, cm.eps_C, cm.eps_C_strong
             catch
                 cm = nothing
-                eps_M_it, eps_C_it = NaN, NaN
+                eps_M_it, eps_C_it, eps_C_strong_it = NaN, NaN, NaN
             end
         end
         push!(iteration_history, (i = i, f_inf = state.norm_b_new_inf, f_norm = f_norm,
-                                  eps_M = eps_M_it, eps_C = eps_C_it,
+                                  eps_M = eps_M_it, eps_C = eps_C_it, eps_C_strong = eps_C_strong_it,
                                   merit = state.phi_x_new, step_inf = state.step_norm,
                                   alpha = state.alpha, accepted = state.ls_success))
 
