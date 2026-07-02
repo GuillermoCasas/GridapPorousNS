@@ -186,6 +186,8 @@ function _initialize_asgs_state!(x0, x0_backup, op_newton_init, op_picard_init,
                 if cascade_step_outcome(res2, STAGE_I_N2_POLICY) == :success
                     if stop_reason == "ftol_reached" || stop_reason == "initial_ftol"
                         println("      -> ASGS Initializer: Newton Homotopy Pass achieved exact theoretical tolerance ($ftol).")
+                    elseif stop_reason == "residual_floor_reached"
+                        println("      -> ASGS Initializer: Newton Homotopy Pass converged at the residual floor ($final_res) — momentum scale-free-converged, mass gate envelope collapsed. Approving.")
                     else  # stagnation_noise_floor_reached (the only other :success under STAGE_I_N2_POLICY)
                         println("      -> ASGS Initializer: Newton Homotopy Pass cleanly saturated at numerical noise floor ($final_res). Approving.")
                     end

@@ -24,8 +24,11 @@ _mkres(state; stop_reason = "") = (state = state, stop_reason = stop_reason)
     OS  = _PNS.OSGS_INNER_POLICY
     out = _PNS.cascade_step_outcome
 
-    # Converged finishes (ftol / initial_ftol): success under every policy.
-    for p in (SI, SI2, OS), sr in ("ftol_reached", "initial_ftol")
+    # Converged finishes (ftol / initial_ftol / residual_floor): success under every policy.
+    # "residual_floor_reached" is the scale-free residual-floor valve (momentum scale-free-converged +
+    # residual at the machine floor); it is authoritative like "ftol_reached", NOT policy-dependent like
+    # the noise-floor stop below.
+    for p in (SI, SI2, OS), sr in ("ftol_reached", "initial_ftol", "residual_floor_reached")
         @test out(_mkres(:ok; stop_reason = sr), p) == :success
     end
 

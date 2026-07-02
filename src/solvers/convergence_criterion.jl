@@ -115,6 +115,11 @@ Fields:
 - `mass_num`, `mass_den`, `div_ratio` — the strong-form diagnostic's ‖R_p‖, its envelope ‖∇(αu)‖_F+‖g‖,
                      and the pure-divergence ratio ‖∇·(αu)‖/‖∇(αu)‖ (the √d self-check quantity).
 - `sqrt_d`         — the √d ceiling for the strong-form self-check reference.
+- `tol_M`, `tol_C` — the gate tolerances this verdict was measured against (`converged = eps_M ≤ tol_M ∧
+                     eps_C ≤ tol_C`). Exposed so a caller can test the momentum leg alone (`eps_M ≤ tol_M`)
+                     — used by the scale-free residual-floor accept (nonlinear.jl), which certifies a solve
+                     whose momentum is converged but whose mass gate `eps_C` cannot reach `tol_C` because its
+                     Philosophy-A envelope `D_C` collapses for a (near-)divergence-free flow.
 """
 struct ConvergenceMeasure
     eps_M::Float64
@@ -132,6 +137,8 @@ struct ConvergenceMeasure
     mass_den::Float64
     div_ratio::Float64
     sqrt_d::Float64
+    tol_M::Float64
+    tol_C::Float64
 end
 
 # Pure machine-eps underflow floor (spec edge case 1): keeps a denominator strictly positive WITHOUT
@@ -270,5 +277,6 @@ function evaluate_convergence(r_M::Float64, r_C::Float64, uh, ph, α, ν, viscou
 
     converged = (eps_M ≤ tol_M) && (eps_C ≤ tol_C)
     return ConvergenceMeasure(eps_M, eps_C, converged, degenerate, r_M, D_M, terms,
-                              r_C, D_C, mass_terms, eps_C_strong, mass_num, mass_den, div_ratio, sqrt_d)
+                              r_C, D_C, mass_terms, eps_C_strong, mass_num, mass_den, div_ratio, sqrt_d,
+                              tol_M, tol_C)
 end

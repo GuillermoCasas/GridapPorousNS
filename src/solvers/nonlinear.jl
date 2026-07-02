@@ -401,6 +401,40 @@ function _residual_meets_per_field_honest_exit_gate(per_field_norms::Vector{Floa
     return true
 end
 
+"""
+    _scale_free_residual_floor_converged(cm, per_field_norms, eff_ftols, eff_noise_floors, k_nf)
+
+Residual-floor success valve UNDER the scale-free gate. The authoritative scale-free verdict is
+`eps_M ≤ tol_M ∧ eps_C ≤ tol_C`; but the Philosophy-A mass envelope `D_C` collapses for a
+(near-)divergence-free flow, so at high Re / fine meshes `eps_C` can floor a decade above `tol_C`
+even though the assembled residual has been driven to the machine/roundoff floor and cannot go lower.
+Such a solve is CONVERGED as far as float64 allows, yet the pure `eps_C` gate rejects it — which then
+burns the whole homotopy-perturbation fallback on the largest, most expensive cells.
+
+This valve accepts exactly that state, and ONLY that state:
+  (1) `!degenerate`                       — the k≥1 rule; never certify the trivial roundoff entry.
+  (2) `eps_M ≤ tol_M`                      — momentum is genuinely scale-free-converged (this is what
+                                            distinguishes a machine-floor convergence from a high-Re
+                                            fold stall, whose `eps_M ≫ tol_M`), so only the mass leg is
+                                            stuck on its collapsed envelope.
+  (3) the SAME honest-exit gate the `conv_probe===nothing` path uses — `‖R_k‖∞ ≤ noise_floor` AND
+      `≤ k_nf·ftol` per field — which is disabled elsewhere under scale-free (`eval_safeguard_…`) only
+      because that path's per-segment thresholds were once re-anchored; they are now uniform ABSOLUTE
+      `dynamic_ftol` (`_initialize_effective_thresholds`), so honoring it here is sound. With the
+      harness `k_nf = 10`, the binding bound is `k_nf·ftol ≈ 3·10⁻⁹`: a genuine ~10⁻¹² floor clears it,
+      a ~10⁻⁵ fold stall does not.
+Not a loosening of the gate: it fires only when momentum has converged and the residual is at the floor.
+"""
+function _scale_free_residual_floor_converged(cm, per_field_norms::Vector{Float64},
+                                              eff_ftols::Vector{Float64},
+                                              eff_noise_floors::Vector{Float64}, k_nf::Float64)
+    cm === nothing && return false
+    cm.degenerate && return false
+    cm.eps_M <= cm.tol_M || return false
+    return _residual_meets_per_field_noise_floor(per_field_norms, eff_noise_floors) &&
+           _residual_meets_per_field_honest_exit_gate(per_field_norms, eff_ftols, k_nf)
+end
+
 # Block-equilibrated merit Φ(b) = ½ Σ (b_i / w_i)², the scalar the Armijo line search drives down.
 # The weights `w` equilibrate the per-field-block row scales (so a saddle-point pressure block's
 # near-zero diagonal can't dominate the velocity rows); they come from `_update_merit_weights!`,
@@ -684,8 +718,15 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         catch
             cm0 = nothing
         end
-        if cm0 !== nothing && !cm0.degenerate && cm0.converged
-            res = SafeSolverResult(0, norm_b_inf, norm_b_inf, 0.0, "initial_ftol", NamedTuple[], f_norm0, f_norm0)
+        # Accept the entry iterate on the scale-free ε gate OR the residual-floor valve (a warm OSGS entry
+        # already at the machine floor with converged momentum but a collapsed-D_C `eps_C`); the latter
+        # reports "residual_floor_reached" so the trace distinguishes it from a true `eps` convergence.
+        if cm0 !== nothing && !cm0.degenerate &&
+           (cm0.converged || _scale_free_residual_floor_converged(cm0, norm_b_new_per_field,
+                                effective_ftol_per_field, effective_noise_floor_per_field,
+                                solver.noise_floor_success_max_ftol_multiple))
+            sr0 = cm0.converged ? "initial_ftol" : "residual_floor_reached"
+            res = SafeSolverResult(0, norm_b_inf, norm_b_inf, 0.0, sr0, NamedTuple[], f_norm0, f_norm0)
             return x, SafeSolverCache(b, A, dx, ls_cache, res)
         end
     elseif _residual_meets_per_field_ftol(norm_b_new_per_field, effective_ftol_per_field)
@@ -782,9 +823,16 @@ function _safe_solve_inner!(x::AbstractVector, solver::SafeNewtonSolver, op::Non
         # improvements fall below the stall threshold (i.e. it has reached the floor). The just-accepted
         # trial iterate `x` is the answer; a degenerate verdict (denominator at the underflow floor) is
         # never accepted. The cascade detects this `ftol_reached` exit as success.
-        if scale_free && cm !== nothing && !cm.degenerate && cm.converged
+        # Success on the scale-free ε gate OR the residual-floor valve (momentum converged, residual at the
+        # machine floor, but `eps_C` stuck on its collapsed envelope — see `_scale_free_residual_floor_converged`).
+        # The valve reports a distinct "residual_floor_reached" so the trace stays honest; `cascade_step_outcome`
+        # maps it to `:success` under every policy, exactly like "ftol_reached".
+        if scale_free && cm !== nothing && !cm.degenerate &&
+           (cm.converged || _scale_free_residual_floor_converged(cm, state.norm_b_new_per_field,
+                                state.effective_ftol_per_field, state.effective_noise_floor_per_field,
+                                solver.noise_floor_success_max_ftol_multiple))
             state.norm_b_inf = state.norm_b_new_inf
-            stop_reason = "ftol_reached"
+            stop_reason = cm.converged ? "ftol_reached" : "residual_floor_reached"
             break
         end
 

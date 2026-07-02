@@ -325,7 +325,11 @@ function cascade_step_outcome(res, policy::CascadePolicy)
         return policy.max_iters_caught_is_failure ? :reject : :one_iter_success
     else  # :ok — branch on the per-field solver verdict
         sr = res.stop_reason
-        if sr == "ftol_reached" || sr == "initial_ftol"
+        # "residual_floor_reached" is the scale-free residual-floor valve (nonlinear.jl): momentum
+        # scale-free-converged AND the residual at the machine floor (‖R‖ ≤ k_nf·ftol), so — like
+        # "ftol_reached" — it is an authoritative convergence independent of policy (never a fold stall,
+        # which the eps_M ≤ tol_M guard rejects). It must NOT fall through to the soft-stall branch.
+        if sr == "ftol_reached" || sr == "initial_ftol" || sr == "residual_floor_reached"
             return :success
         elseif sr == "stagnation_noise_floor_reached"
             return policy.accept_noise_floor ? :success : :reject
@@ -401,6 +405,7 @@ function _pingpong_cascade!(final_x0, restore_vec, op_newton, op_picard, solver_
         # re-anchoring failure mode). [known-fragility]
         if res_p.state == :ok && (res_p.stop_reason == "ftol_reached" ||
                                   res_p.stop_reason == "initial_ftol" ||
+                                  res_p.stop_reason == "residual_floor_reached" ||
                                   res_p.stop_reason == "stagnation_noise_floor_reached")
             return :success
         end
