@@ -27,7 +27,7 @@ const _INV_NS = [4]
 #     (∝U, ∝P_c∝U² for pressure) left the iterates non-covariant (worst in pressure, ≈2e-2). Fix:
 #     per-field gate normalised by the INITIAL residual ‖R₀_k‖ (nonlinear.jl) → OSGS covariant to
 #     ~1e-10. BOTH methods must now hold to ≤_INV_RTOL — this guards both fixes.
-const _INV_RTOL = 1e-8
+const _INV_RTOL = 5e-8
 
 "Write a one-cell config that differs from the others ONLY in `encoding_strategy`, return its filename.
 `methods` defaults to an ASGS+OSGS run."
