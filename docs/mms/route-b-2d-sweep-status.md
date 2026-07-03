@@ -1,83 +1,68 @@
-# Route B — 2D MMS official sweep: status & resume note
+# Route B — 2D MMS official sweep: verification record
 
-**Date:** 2026-07-02. **State:** ⏸ **PAUSED** (k2 QUAD partial) — stopped mid-k2 to pack the machine for
-travel. Everything needed to resume is below. Branch: `feat/route-b-algebraic-mass-gate`.
+**Completed:** 2026-07-03. **Verdict: Route B — with the `residual_floor_reached` fix (`3b76864`) — is
+behavior-preserving across the full 2D sweep.** Branch: `fix/scale-free-residual-floor-accept` (built on
+`feat/route-b-algebraic-mass-gate`). (This file began as a pause/resume note on 2026-07-02; it is now the
+completion record. An earlier version of it mis-attributed the k2 failures to an OOM alone — corrected below.)
 
 ## What Route B is (one line)
 
-The mass convergence gate is now the Philosophy-A **algebraic** measure `ε_C = ‖r_C‖/D_C` (pressure block
-of the assembled residual, symmetric with the momentum gate `ε_M`), replacing the strong-form measure that
-floored at O(h^{kv}) and forced the loose `eps_tol_mass = 0.8` rubber-stamp. The strong-form value is kept
-as the diagnostic `eps_C_strong`. Code committed in `e455f36`; full write-up in
+The mass convergence gate is the Philosophy-A **algebraic** measure `ε_C = ‖r_C‖/D_C` (pressure block of the
+assembled residual, symmetric with the momentum gate), replacing the strong-form measure that floored at
+O(h^{kv}) and forced the loose `eps_tol_mass = 0.8` rubber-stamp. Strong-form kept as the diagnostic
+`eps_C_strong`. Core: `e455f36`; the essential companion fix: `3b76864` (below). Write-up:
 [docs/formulation-audit-2026-06-24.md](../formulation-audit-2026-06-24.md) §C.3 / F4.
 
-## Sweep state
+## The k2 root cause (a GENUINE Route B gate limitation) and its fix — `3b76864`
 
-Run via the **canonical harness → canonical locations** (`run_test.jl` auto-routes each single-family
-config to `results/k<kv>/<etype>/results.h5`; `write_vtk=false`, `trace_convergence_norms=true`, MMS
-plateau verification on; BLAS pinned to 1 thread/shard).
+Route B as first committed (`e455f36`) had a real flaw the sweep exposed at k2 fine meshes:
 
-| family | config | official DB | status |
-|---|---|---|---|
-| k1 QUAD | `phase1_quad_k1.json` | `results/k1/QUAD/results.h5` | ✅ 48/48 (done ~03:24) |
-| k1 TRI  | `phase1_tri_k1.json`  | `results/k1/TRI/results.h5`  | ✅ 48/48 (done ~10:04) |
-| k2 QUAD | `phase1_quad_k2.json` | `results/k2/QUAD/results.h5` | ⏸ **39/48 — PAUSED** |
+- For a **near-divergence-free** converged flow, the mass envelope `D_C = ‖∫q ∇·(αu)‖ + ‖∫q εp‖ + ‖∫q g‖`
+  **collapses** (its dominant `∇·(αu)` term → 0). So `ε_C = ‖r_C‖/D_C` **floors ~1e-8**, a decade above
+  `tol_C = 1e-9`, *even though the solution is fully converged* (`ε_M ~ 1e-14`, residual at the ~3e-12
+  machine floor). The pure `ε_C` gate then **rejects a converged solution** and burns the entire
+  homotopy-perturbation fallback (`eps_pert 1.0 → 0.1 → 0.0`, each a full ~1.2M-DOF solve) on the largest,
+  most expensive cells — slow, and prone to fold-stalls/divergence at the extremes.
+- **Fix `3b76864` (`residual_floor_reached`):** honor the existing honest-exit valve
+  (`noise_floor_success_max_ftol_multiple`) under the scale-free branch — accept iff (1) not degenerate,
+  (2) `ε_M ≤ tol_M` (momentum genuinely converged — rejects high-Re fold stalls), and (3) the per-field
+  residual is at the machine/noise floor. No new magic number, no gate loosening; it fires only when
+  momentum has converged and the residual cannot be reduced further. In the clean k2 sweep this valve
+  **fired 263×** (the most common stop reason; every high-Re k2 cell ends on it) — it is what makes the
+  symmetric tight `eps_tol_mass = 1e-9` viable at k2.
 
-The k2 DB was verified **readable** after the pause (no corruption, no stale `.lock`), so resume continues
-cleanly from 39.
+**Correction to the earlier note:** the k2 NaN was **not** "just a zombie-shard OOM." The primary cause was
+this `ε_C` envelope collapse (a genuine Route B design issue), which caused the homotopy-burning; a
+**secondary** aggravator was that leftover **zombie shards** from earlier pause/resume cycles (~13GB) piled
+onto the already-expensive fine-N P2 solves and exhausted 32GB → OOM (a shard was `Terminated: 15`). The
+clean re-run fixed *both*: it ran on the branch that includes `3b76864`, and with 2 shards / no zombies.
 
-## Behavior-preservation so far (k1 — verified)
+## Final verdict — all three families (canonical `results/k<kv>/<etype>/results.h5`)
 
-- **0 NaN**; every finest-pair L²u rate ≈ 2.0 (optimal). The tight symmetric mass gate did **not** break
-  any k1 cell.
-- vs the gold reference `previous_results/validated_k1_quad_N640` at N=320 (k1 QUAD): **median relative
-  Δe_u = 6.5e-7**, **40/48 cells within 1%**.
-- The 8 outliers (~6%) are all **Da=1e6 OSGS** cells — the known reaction-dominated OSGS regime (the
-  ∂π/∂u linear-rate sensitivity), **not** a Route B defect.
-- **⚠ Comparison caveat:** the archived pre-Route-B DBs are **merges** of `phase1_*` + `phase1_*_preJFNK`
-  (24 + 24 cells). A merge-blind per-cell diff spuriously shows ~4× (it reads the worse preJFNK cells).
-  Always filter by the `config_file` attr, or compare against `validated_k1_quad_N640` (the clean gold).
+| family | cells | NaN | median L2u rate | behavior-preservation |
+|---|---|---|---|---|
+| k1 QUAD | 48 | 0 | 2.00 (optimal) | median rel Δe_u **6.5e-7** vs gold `validated_k1_quad_N640` @N=320; 40/48 within 1% |
+| k1 TRI  | 48 | **2** (pre-existing) | 2.00 (optimal) | the 2 NaN (Re=1,Da=1,α=0.05) were **also NaN in the baseline**; Route B **fixed 2** other α=0.05 cells the baseline had NaN (4 → 2) |
+| k2 QUAD | 48 | 0 | 3.00 (optimal), min 2.79 | vs pre-Route-B baseline @N=160: median rel Δe_u **1.97e-11** (byte-identical), 48/48 within 1% |
 
-## Backup (pre-Route-B baseline)
+The α=0.05 NaN cells are the known curved-interface-on-structured-mesh difficulty
+([convergence-status.md](convergence-status.md)), not a Route B effect.
 
-`previous_results/pre_route_b_2026-07-01/` — the pre-Route-B official DBs (k1/QUAD, k1/TRI, k2/QUAD) +
-their reports, **committed** (traces gitignored). Each DB embeds the config that produced it under its
-`configs/` group. See that folder's `README.md`.
+## Guardrails for future k2 (P2) sweeps on this 32GB machine
 
-## HOW TO RESUME k2 (on return)
+- **k2 QUAD: use ≤ 2 shards** (P2 N=320 LU is multi-GB; 4+ concurrent OOMs). k1 (P1) tolerates 6.
+- **Before launching, `pgrep -f run_test.jl` and kill stragglers** — pause/resume can orphan shards.
+- **Reproduce a suspected regression single-process before alarming** — a sweep-execution failure (OOM,
+  orphaned process) can masquerade as, or pile onto, a numerical one. (I raised a false "tight-gate
+  regression" alarm here by reading the corrupted sweep at face value; the isolation run + `3b76864`'s
+  own commit message were the corrections.)
 
-Resume is **automatic** — the harness skips completed `(cell, N)` entries, so re-running only fills the ~9
-remaining k2 cells. **Do NOT `rm` the k2 DB** (it is intact at 39/48). `erase_past_results=false` in the
-config, so it accumulates.
+## Backup, and regenerating plots
 
-```bash
-cd test/extended/ManufacturedSolutions
-export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1     # avoid BLAS oversubscription across shards
-for k in 1 2 3 4; do
-  julia --project=../../.. run_test.jl phase1_quad_k2.json --shard $k/4 > /tmp/k2_shard_$k.log 2>&1 &
-done; wait
-```
+- Backup: `previous_results/pre_route_b_2026-07-01/` (committed; see its README for the phase1/preJFNK merge
+  caveat — compare same-config, or use the gold `validated_k1_quad_N640` for k1).
+- `python analyze_results.py` → convergence PNGs + reports (auto-discovers `results/k*/*/results.h5`).
+- `python plot_trajectory.py --sweep k2/QUAD` (also `k1/QUAD`, `k1/TRI`) → per-cell trajectory plots.
 
-(The overnight launcher `run_official_2d_sweep.sh` was a **scratch** file — not committed, not in the repo.
-The command above is the self-contained resume; it needs nothing from that launcher.)
-
-## Regenerate the latest traces & plots (standard pythons — latest by default)
-
-```bash
-python analyze_results.py                     # convergence PNGs + reports; auto-discovers results/k*/*/results.h5
-python plot_trajectory.py --sweep k2/QUAD     # per-cell solver-path plots from traces/  (also k1/QUAD, k1/TRI)
-```
-
-The k1 convergence PNGs + reports are **already generated** (`results/k1/{QUAD,TRI}/convergence_*.png`,
-`results/convergence_report.md`, `results/summary_tables.txt`). k2 output is partial until resumed; re-run
-`analyze_results.py` after resume to refresh it.
-
-## Remaining verification once k2 completes (TODO)
-
-1. **Full per-cell Route-B-vs-baseline comparison** for all three families — use `validated_k1_quad_N640`
-   as the clean gold for k1; for k2, compare against the archived pre-Route-B k2 (noting it was the
-   failing-OSGS-P2 baseline: OSGS-P2 was `success=False`/`eps_used=0` there).
-2. **k2 high-Re cells** — confirm they reach optimal O(h³)/O(h²) under the tight symmetric mass gate; this
-   is the sensitive regime (the k=2-gate lesson) and the main thing the overnight run was meant to prove.
-3. The 3D **OSGS-P2 F7 preconditioner** frontier is a *separate* track (audit §F7) — not part of this 2D
-   gate verification.
+All three families' PNGs + reports + trajectory plots are generated; results live in the canonical
+(gitignored, on-disk) `results/k*/*/`, so the standard pythons show the latest by default.
