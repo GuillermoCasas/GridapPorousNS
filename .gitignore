@@ -7,6 +7,9 @@ FETCH_HEAD
 .vscode/
 .claude/
 
+# Redundant archive: the diffable extracted sources live in files/; keep the opaque zip out of git.
+docs/convergence_problems_audit/files.zip
+
 # Ignore compiled artifacts and test result output directories entirely
 results/
 **/results/

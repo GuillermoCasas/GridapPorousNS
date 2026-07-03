@@ -7,6 +7,16 @@
 > (the penalty fix + the OSGS ∂π/∂u solver problem). Harness: `test/extended/ManufacturedSolutions3D/`
 > (`smoke3d.jl`). Every experiment + its numbers are in the §3 table; the ad-hoc probe scripts were cleaned
 > after the investigation (see §7 to reproduce).
+>
+> **⚠ Contested (2026-07-03).** An independent clean-room reimplementation (pure NumPy/SciPy, no Gridap)
+> now argues the failure **IS** an element-family **c₁ coercivity deficit** — paper `4k⁴` sub-critical on
+> Kuhn tets, knee at `c₁×1.5–2`, reconciling the "Kratos runs paper c₁" fact via reduced high-order
+> subscale assembly — **directly contradicting TL;DR #2's "not c₁" refutation** below. See
+> [../convergence_problems_audit/files/p2_3d_diagnosis_report.md](../convergence_problems_audit/files/p2_3d_diagnosis_report.md).
+> It is **UNconfirmed in this stack**: the deciding test is its §5.1 (`smoke3d.jl c1_mult ∈ {1,1.5,2,4}`
+> at ASGS-P2 (12,12,3) — expect L²u collapse ≈0.049→0.0012 with the knee between 1.5 and 2, ratio-to-
+> interpolant pinned ~1 across meshes). **This doc's verdict stands until that sweep runs**; if it
+> reproduces, revise TL;DR #2 and Hypothesis A (§3) accordingly.
 
 ## TL;DR
 
