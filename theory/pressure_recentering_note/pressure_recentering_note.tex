@@ -1,0 +1,306 @@
+%==============================================================================
+%  Standalone note: Pressure-mean drift under the iterated (Codina) penalty
+%  in the all-Dirichlet setting, and a re-centering PROPOSAL.
+%
+%  Notation is kept compatible with the manuscript
+%  "A stabilized finite element method for incompressible, inertial flows
+%   in inhomogeneous porous media" (Casas, Gonzalez-Usua, Codina, de-Pouplana).
+%
+%  STATUS: exploratory. The re-centering step described in Section 6 is a
+%  PROPOSAL of this note, NOT part of Codina's published iterated-penalty
+%  method and NOT (yet) implemented in the solver. See Section 7 (Provenance).
+%==============================================================================
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\usepackage{cleveref}
+
+% Theorem environments
+\theoremstyle{plain}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+% Shorthands local to this note
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\bn}{\boldsymbol{n}}
+\newcommand{\bx}{\boldsymbol{x}}
+\newcommand{\uh}{\boldsymbol{u}_h}
+\newcommand{\ph}{p_h}
+\newcommand{\qh}{q_h}
+\newcommand{\Om}{\Omega}
+\newcommand{\dOm}{\partial\Omega}
+\newcommand{\meas}{\lvert\Omega\rvert}
+\newcommand{\enum}{\varepsilon_{\mathrm{num}}}
+\newcommand{\ephys}{\varepsilon_{\mathrm{phys}}}
+\newcommand{\pbar}{\overline{p}}
+\newcommand{\norm}[1]{\left\Vert #1\right\Vert}
+\newcommand{\abs}[1]{\left\lvert #1\right\rvert}
+\newcommand{\dx}{\,\mathrm{d}\Omega}
+\newcommand{\ds}{\,\mathrm{d}s}
+\newcommand{\Ltwo}{L^2(\Omega)}
+
+\title{Pressure-mean drift under the iterated penalty,\\[2pt]
+and a re-centering proposal (exploratory)}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The all-Dirichlet velocity boundary condition leaves the discrete pressure determined only up to an
+additive constant. In the solver this gauge is fixed \emph{weakly} by the Codina iterated
+(``numerical'') penalty $\enum(p^{n}-p^{n-1})$ in the continuity equation, which pins the constant to
+the \emph{previous} outer iterate rather than to zero mean. We show that, because the discrete boundary
+flux $\rho=\oint_{\dOm}\alpha\,\uh\cdot\bn\ds$ is a fixed nonzero residue at the interpolation/quadrature
+level, each outer penalty pass shifts the pressure mean by a fixed amount
+$-\rho/(\enum\meas)$, so the mean drifts linearly in the pass count while the usual relative-drift
+stopping test converges \emph{spuriously} through a growing denominator. We then describe a
+\textbf{re-centering proposal}: subtract the domain mean of $p$ between passes. Because the constant is
+pure gauge, this is exact and changes no mean-removed quantity, while it bounds the mean and makes the
+stopping test honest. We are careful to separate what is established from what is proposed
+(\cref{sec:provenance}): the iterated penalty is Codina's / the manuscript's; the \emph{re-centering}
+is a proposal of this note, which we have \emph{not} found in Codina's work and which is not implemented.
+Empirically the drift is presently \emph{dormant} (\cref{sec:empirical}): in the well-resolved,
+divergence-free method-of-manufactured-solutions (MMS) runs the penalty loop reaches a genuine fixed
+point in two passes with $\rho\approx0$, so nothing accumulates. The note is therefore hardening and
+error-analysis, not a fix for an observed failure.
+\end{abstract}
+
+\section{Setting}
+\label{sec:setting}
+
+On a bounded polyhedral domain $\Om\subset\mathbb{R}^{d}$ we consider the stabilized porous
+Navier--Stokes system of the manuscript, with velocity $\uh\in V_h$ and pressure $\ph\in Q_h$ on an
+equal-order Lagrangian pair. The physics is \emph{incompressible}: there is no genuine compressibility,
+so the physical penalty $\ephys=0$. The velocity is prescribed on the \emph{entire} boundary,
+$\uh=\bu_{\mathrm{ex}}$ on $\dOm$ (all-Dirichlet, as in the manuscript's \S5.2 three-dimensional MMS).
+
+\begin{lemma}[Pressure gauge freedom]
+\label{lem:gauge}
+Under all-Dirichlet velocity data the pressure enters the momentum balance only through the pairing
+$-\bigl(p,\ \alpha\,\nabla\!\cdot\bv+\bv\cdot\nabla\alpha\bigr)=-\bigl(p,\ \nabla\!\cdot(\alpha\bv)\bigr)$,
+which for any admissible test field $\bv$ vanishing on $\dOm$ annihilates constants:
+$\int_{\Om}\nabla\!\cdot(\alpha\bv)\dx=\oint_{\dOm}\alpha\,\bv\cdot\bn\ds=0$. Hence a constant added to
+$p$ leaves the momentum residual unchanged, and the continuous solution is unique only up to that
+constant.
+\end{lemma}
+
+The variational continuity equation used by the solver, tested against $q\in Q_h$, is
+\begin{equation}
+\label{eq:mass}
+\bigl(q,\ \ephys\,p^{n}+\nabla\!\cdot(\alpha\,\bu^{n})\bigr)
+\;+\;\underbrace{\enum\,\bigl(q,\ p^{n}-p^{n-1}\bigr)}_{\text{iterated penalty}}
+\;+\;S_q(q;\bu^{n},p^{n})
+\;=\;\bigl(q,\ g\bigr),
+\end{equation}
+where $g$ is the (manufactured) mass source, $S_q$ collects the VMS subscale contributions of the
+pressure-test block ($\tau_2$/orthogonal-projection couplings), and $\nabla\!\cdot(\alpha\bu)
+=\alpha\,\nabla\!\cdot\bu+\bu\cdot\nabla\alpha$. The superscript $n$ is the outer penalty-pass index:
+$p^{n-1}$ is held \emph{fixed} within pass $n$, and updated $p^{n-1}\leftarrow p^{n}$ between passes.
+
+\section{What the iterated penalty pins}
+\label{sec:penalty}
+
+Equation~\eqref{eq:mass} carries $\enum p^{n}$ on the left and $\enum p^{n-1}$ lagged to the right, so the
+net residual contribution is $\enum(p^{n}-p^{n-1})$. This is the classical \emph{iterated-penalty}
+(equivalently augmented-Lagrangian / Uzawa) device for the incompressibility constraint: it regularizes
+the otherwise singular pressure block \emph{without} driving a penalty parameter to zero, and it
+vanishes at convergence ($p^{n}=p^{n-1}$), so the incompressible solution is recovered unaltered. In the
+present, gauge-free setting its second role is to render the discrete system nonsingular by pinning the
+constant-pressure null mode of \cref{lem:gauge}.
+
+\begin{remark}[The pin is to $p^{n-1}$, not to zero mean]
+\label{rem:pin}
+Crucially, $\enum(p^{n}-p^{n-1})$ pins $p^{n}$ toward the constant carried by $p^{n-1}$. It does
+\emph{not} impose $\int_{\Om}p^{n}\dx=0$. Zero-mean is applied only in post-processing, when the error
+norm $\norm{p-p_{\mathrm{ex}}}_{\Ltwo}$ is evaluated with the mean removed. The solved/stored pressure
+field itself is never re-centered.
+\end{remark}
+
+\section{The mean-drift mechanism}
+\label{sec:drift}
+
+\begin{proposition}[Per-pass mean shift]
+\label{prop:drift}
+Let $\ephys=0$ and let the constant mode $q\equiv1$ be admissible in $Q_h$. Assume the pressure-test
+subscale form is orthogonal to constants, $S_q(1;\cdot,\cdot)=0$ \textup{(}exact for OSGS, where the
+projected residual is $L^2$-orthogonal to $Q_h\ni\mathrm{const}$; higher order for
+ASGS\textup{)}. Then the pass-$n$ pressure mean $\pbar^{\,n}:=\meas^{-1}\int_{\Om}p^{n}\dx$ satisfies
+\begin{equation}
+\label{eq:shift}
+\pbar^{\,n}-\pbar^{\,n-1} \;=\; -\,\frac{\rho^{n}-\int_{\Om} g\dx}{\enum\,\meas},
+\qquad
+\rho^{n}:=\oint_{\dOm}\alpha\,\bu^{n}\cdot\bn\ds .
+\end{equation}
+In particular, for a solenoidal manufactured field \textup{(}$\nabla\!\cdot(\alpha\,\bu_{\mathrm{ex}})=0$,
+hence $\int_\Om g\dx=0$\textup{)} with a converged velocity, $\rho^{n}\to\rho$ is a fixed constant and the
+mean advances by the same increment $-\rho/(\enum\meas)$ \emph{every} pass:
+$\pbar^{\,n}=\pbar^{\,0}-n\,\rho/(\enum\meas)$.
+\end{proposition}
+
+\begin{proof}
+Test \eqref{eq:mass} with $q\equiv1$. The penalty term gives
+$\enum\int_{\Om}(p^{n}-p^{n-1})\dx=\enum\meas(\pbar^{\,n}-\pbar^{\,n-1})$. With $\ephys=0$ and
+$S_q(1;\cdot,\cdot)=0$, the Galerkin term is
+$\int_{\Om}\nabla\!\cdot(\alpha\bu^{n})\dx=\oint_{\dOm}\alpha\bu^{n}\cdot\bn\ds=\rho^{n}$ by the
+divergence theorem, and the right-hand side is $\int_\Om g\dx$. Solving for the mean increment gives
+\eqref{eq:shift}.
+\end{proof}
+
+The residue $\rho$ is nonzero only because $\bu^{n}$ is the discrete (interpolant-level) velocity: the
+exact field satisfies $\oint_{\dOm}\alpha\,\bu_{\mathrm{ex}}\cdot\bn\ds=\int_\Om\nabla\!\cdot(\alpha
+\bu_{\mathrm{ex}})\dx=0$ identically, so $\rho$ lives at the interpolation/quadrature error level. It is
+small, but it is \emph{fixed and generically nonzero}, which is exactly what produces an unbounded,
+h-\emph{independent} accumulation of the mean.
+
+\section{Spurious convergence of the relative-drift stopping test}
+\label{sec:stop}
+
+The outer loop stops on the relative pressure drift
+\begin{equation}
+\label{eq:driftstop}
+\delta^{n} \;=\; \frac{\norm{p^{n}-p^{n-1}}_{\Ltwo}}{\norm{p^{n}}_{\Ltwo}} \;<\; \mathrm{xtol}.
+\end{equation}
+Once the pressure \emph{shape} has stabilized, the numerator is dominated by the constant shift,
+$\norm{p^{n}-p^{n-1}}_{\Ltwo}\approx\meas^{1/2}\abs{\rho}/(\enum\meas)$, a constant, while the
+denominator grows with the running mean, $\norm{p^{n}}_{\Ltwo}\gtrsim\meas^{1/2}\abs{\pbar^{\,n}}
+\sim\meas^{1/2}\,n\,\abs{\rho}/(\enum\meas)$. Hence
+\begin{equation}
+\delta^{n}\;\sim\;\frac{1}{n}\;\xrightarrow[n\to\infty]{}\;0 ,
+\end{equation}
+so \eqref{eq:driftstop} is eventually satisfied \emph{not} because the pressure has converged but
+because the denominator diverges. Tightening $\mathrm{xtol}$ makes this \emph{worse}: it forces more
+passes and hence a larger accumulated mean.
+
+\section{Consequences}
+\label{sec:consequences}
+
+\begin{enumerate}
+\item[(i)] \textbf{Loss of relative precision in $p$.} Once $\abs{\pbar}\gg\abs{p-\pbar}$, the physically
+meaningful fluctuation is stored in the low-order digits of a large floating-point number; the
+mean-removed error metric is immune, but any downstream use of the raw field degrades.
+\item[(ii)] \textbf{Quadrature-level momentum contamination.} By \cref{lem:gauge} a constant $p_0$
+cancels from momentum \emph{analytically}, $\int_{\Om}p_0\,\nabla\!\cdot(\alpha\bv)\dx=0$. Discretely
+this cancellation is only as exact as the quadrature of $\nabla\!\cdot(\alpha\bv_h)$ for variable
+$\alpha$, so a large $p_0$ injects a spurious body force $\mathcal{O}\!\bigl(p_0\times\text{(quadrature
+error)}\bigr)$ into the velocity equation.
+\item[(iii)] \textbf{A dishonest stopping test} (\cref{sec:stop}).
+\end{enumerate}
+
+\section{The re-centering proposal}
+\label{sec:fix}
+
+\begin{quote}
+\emph{Proposal.} Between outer passes, subtract the domain mean before storing the lagged pressure:
+$\;p^{n-1}\leftarrow p^{n}-\pbar^{\,n}$ (equivalently, re-center $p^{n}$ to zero mean).
+\end{quote}
+
+By \cref{lem:gauge} the additive constant is pure gauge, so this leaves the velocity, the pressure
+\emph{shape}, and every mean-removed quantity exactly unchanged. Its effects are precisely to cure
+\crefrange{sec:drift}{sec:consequences}:
+
+\begin{proposition}[Bounded mean and an honest test]
+\label{prop:bounded}
+With re-centering, $\pbar^{\,n-1}=0$ entering each pass, so by \eqref{eq:shift} the mean never
+accumulates: $\abs{\pbar^{\,n}}\le\abs{\rho}/(\enum\meas)$ for all $n$. Moreover the drift numerator in
+\eqref{eq:driftstop} then measures the genuine change of the pressure \emph{shape} (the constant having
+been removed from both operands), so $\delta^{n}\to0$ reflects convergence rather than denominator
+growth.
+\end{proposition}
+
+\Cref{prop:bounded} also upgrades the stopping test from a heuristic that passes for the wrong reason to
+one that certifies the quantity of interest.
+
+\section{Provenance: what is Codina's and what is proposed here}
+\label{sec:provenance}
+
+This section is deliberately explicit, because the two ingredients have very different pedigrees.
+
+\begin{itemize}
+\item \textbf{The iterated penalty $\enum(p^{n}-p^{n-1})$ is established.} It is the device used in the
+manuscript (\S5.2) and belongs to the classical iterated-penalty / augmented-Lagrangian family for the
+incompressibility constraint (e.g.\ Fortin \& Glowinski, \emph{Augmented Lagrangian Methods}, 1983; and
+the stabilized-FEM line associated with Codina). Its convergence-as-$p^{n}\!\to\!p^{n-1}$ and its role in
+regularizing the pressure block are standard.
+
+\item \textbf{The re-centering of \cref{sec:fix} is a proposal of this note, and we do \emph{not}
+attribute it to Codina.} We have not located a between-pass mean-subtraction step in Codina's
+iterated-penalty presentations, and it should be read as an original hardening pending a literature
+check. Two points make its absence unsurprising rather than suspicious:
+\begin{enumerate}
+\item[(a)] The mean-drift pathology is specific to the \emph{pure-Dirichlet-velocity} gauge-free setting
+(\cref{lem:gauge}). Applications that carry a pressure/traction boundary condition, or that impose the
+zero-mean constraint directly (a Lagrange multiplier, a fixed pressure DOF, or a null-space projection),
+never expose the drift, so the question of re-centering the \emph{lag} does not arise there.
+\item[(b)] Where the constant is fixed by other means, the iterated penalty is applied to a pressure that
+is \emph{already} gauge-fixed each pass; re-centering the lag is then the natural transcription of that
+practice to a solver whose \emph{only} gauge control is the penalty itself. In other words, the proposal
+is arguably what one \emph{implicitly} assumes when the constant is otherwise pinned --- but that
+assumption is not part of the bare iterated-penalty recipe, and asserting it as ``Codina's'' would be
+incorrect.
+\end{enumerate}
+\end{itemize}
+
+\noindent
+The honest status is therefore: \emph{iterated penalty --- established and in use; between-pass
+re-centering --- our proposal, unverified against the source literature, not implemented.}
+
+\section{Empirical status: presently dormant}
+\label{sec:empirical}
+
+In the current MMS runs the drift does \emph{not} manifest. The manufactured field is solenoidal to
+machine precision ($\nabla\!\cdot(\alpha\bu_{\mathrm{ex}})=0$ to $\mathcal{O}(10^{-16})$) and
+well-resolved, so $\rho\approx0$ and the per-pass increment \eqref{eq:shift} is negligible. Concretely,
+the outer loop reaches a genuine fixed point in two passes,
+\[
+\text{pass 1: } \delta^{1}\approx0.98,\qquad \text{pass 2: } \delta^{2}=0.0 ,
+\]
+i.e.\ $p^{2}=p^{1}$ exactly (the penalty term vanishes), so the mean shifts \emph{once} at most and never
+accumulates. The re-centering proposal would leave these runs bit-for-bit unchanged on every reported
+(mean-removed) quantity.
+
+Where it \emph{would} earn its keep: coarser meshes or lower-order elements (larger $\rho$), genuinely
+non-solenoidal target flows ($\int_\Om g\neq0$ handled through the boundary), regimes that require many
+penalty passes, or any future use of the raw (non-mean-removed) pressure field. It is thus
+\emph{defense-in-depth} plus a correctness improvement to the stopping criterion, not a remedy for an
+observed failure.
+
+\section{Drawbacks and where NOT to apply it}
+\label{sec:drawbacks}
+
+The proposal has no drawback \emph{within its hypotheses}, but those hypotheses matter:
+
+\begin{itemize}
+\item \textbf{Re-center only when the constant is genuinely free.} Under \cref{lem:gauge} (all-Dirichlet
+velocity, $\ephys=0$) the mean is arbitrary and removing it is exact. If instead the problem carries a
+Neumann/traction boundary, an open outlet, or a genuine net mass exchange, the pressure level is
+\emph{physical}; subtracting its mean each pass would then silently annihilate a real quantity and could
+mask a true mass imbalance. Any implementation must therefore be gated on the pure-Dirichlet,
+gauge-free case, not applied unconditionally.
+\item \textbf{It does not touch accuracy.} By construction it changes no mean-removed error; it must not
+be oversold as improving convergence rates or fixing any discretization defect (in particular it is
+unrelated to the P2 element-family coercivity question).
+\item \textbf{It is not the only cure.} A hard zero-mean constraint (Lagrange multiplier / pinned DOF /
+null-space deflation) achieves the same gauge fixing more directly; the iterated penalty exists precisely
+to \emph{avoid} such a hard constraint, and re-centering is the lightweight transcription consistent with
+that choice. Capping the number of passes is a cruder alternative that bounds but does not eliminate the
+accumulation.
+\end{itemize}
+
+\section*{Decision status}
+\emph{Pending.} This note documents the mechanism, the proposed fix, and --- explicitly --- the
+distinction between the established iterated penalty and the unverified re-centering proposal. No solver
+code has been changed. If adopted, a minimal implementation would re-center the lagged pressure in the
+outer penalty loop behind a config flag (defaulting off), with an A/B check that every mean-removed error
+is byte-identical while the stored pressure mean stays bounded.
+
+\end{document}
