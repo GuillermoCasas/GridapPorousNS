@@ -24,14 +24,14 @@ already-assembled, already-factored `J_frozen`.
 
 **Decisive open question:** is `J_frozen` (the *free* preconditioner) good enough to precondition the inner
 GMRES for `J_full`? A throwaway measurement gave `ρ_prec = max|eig(J_frozen⁻¹·C)| ≈ 1e5–1e9 ≫ 1`, which
-would make `J_frozen` useless — but that run used `eps_val=0` and no pressure-level constraint, leaving
+would make `J_frozen` useless — but that run used `physical_epsilon=0` and no pressure-level constraint, leaving
 `J_frozen` **singular on the constant-pressure mode**. This re-measures cleanly.
 
 ## Harness
 
 Extends the committed [test/quick/osgs_frozen_pi_jacobian_quick_test.jl](../../test/quick/osgs_frozen_pi_jacobian_quick_test.jl)
 machinery (`_a3_problem`: spaces, formulation, `live_pi`, `res_vec`, `jac_mat`), threading a configurable
-`eps_val` and velocity amplitude. Equal-order P1/P1 QUAD (where OSGS pressure stabilization matters),
+`physical_epsilon` and velocity amplitude. Equal-order P1/P1 QUAD (where OSGS pressure stabilization matters),
 `SymmetricGradient + ConstantSigma`, the same setup as the original cost-model measurement. Scripts (throwaway):
 `scratchpad/phase0_jfnk_precond.jl`, `phase0_anderson_baseline.jl`, `phase0_coldstart_robustness.jl`.
 
@@ -39,8 +39,8 @@ machinery (`_a3_problem`: spaces, formulation, `live_pi`, `res_vec`, `jac_mat`),
 
 | | symbol | where it lives | role |
 |---|---|---|---|
-| physical | `eps_val` (ε_phys) | **both** residual & Jacobian mass-LHS (`eps_val·p`) | residual-consistent; pins the constant-pressure mode |
-| numerical | `numerical_epsilon` (ε_num) | **only** the Jacobian (2,2) Galerkin block (`(eps_val+ε_num)·dp`); cancels in the residual | Codina iterative penalty; root-preserving Newton-step regularizer |
+| physical | `physical_epsilon` (ε_phys) | **both** residual & Jacobian mass-LHS (`physical_epsilon·p`) | residual-consistent; pins the constant-pressure mode |
+| numerical | `numerical_epsilon` (ε_num) | **only** the Jacobian (2,2) Galerkin block (`(physical_epsilon+ε_num)·dp`); cancels in the residual | Codina iterative penalty; root-preserving Newton-step regularizer |
 
 Consequences exploited in the measurement:
 - The residual `F` (hence the matrix-free `J_full` action, which FD's the residual) depends **only on ε_phys**.

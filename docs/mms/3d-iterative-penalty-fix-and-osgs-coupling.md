@@ -1,23 +1,29 @@
 # 3D MMS (§5.2): the iterative-penalty fix, and the OSGS ∂π/∂u coupling problem
 
-> **Status: CANONICAL for the 3D tetrahedral MMS convergence behaviour (paper §5.2).** Supersedes the
-> c₁/coercivity verdict of [3d-p2-convergence-investigation.md](3d-p2-convergence-investigation.md) — that
-> doc's "paper c₁ under-budgets coercivity for 3D tets" conclusion was **wrong**; it was masking a missing
-> term. Investigation dates 2026-06-28 → 2026-06-30. Harness: `test/extended/ManufacturedSolutions3D/`
-> (`smoke3d.jl`). Author steer: the paper's author (Casas), who pointed directly at the iterative penalty
-> and confirmed the 3D case runs fine at paper c₁ in Kratos.
+> **Status: CANONICAL for the 3D iterative-penalty (well-posedness) fix + the OSGS ∂π/∂u coupling problem.**
+> ⚠️ **Scope correction (2026-07-03).** The iterative-penalty fix below is real and canonical — it restores
+> 3D all-Dirichlet **well-posedness** (ε=0 is ill-posed). But this doc's further claim that the penalty (and
+> "not c₁") is the root cause of the **P2 converged-but-wrong** failure was **wrong**: the 2026-07-03 in-stack
+> `c1_mult` mesh-family sweep CONFIRMS the P2 *accuracy* defect is an **element-family c₁ coercivity deficit**
+> (c₁×4 fixes, ratio-to-interpolant pins ~1; c₁×2 masks). Two distinct issues were conflated (well-posedness
+> vs accuracy). **Root-cause canonical doc: [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md).**
+> Investigation dates 2026-06-28 → 2026-06-30. Harness: `test/extended/ManufacturedSolutions3D/` (`smoke3d.jl`).
 
 ## TL;DR
 
-1. **Root cause of the 3D P2 failure = the missing Codina ITERATIVE PENALTY in the mass residual.** NOT a
-   dimension-aware c₁ (there is no such thing — c₁=4k⁴ is dimension-independent; Kratos solves this 3D case
-   at paper c₁). The paper (article.tex §5.2, **line ~1383**) uses ε>0 as the iterative penalty for the 3D
+1. **The iterative penalty fixes 3D WELL-POSEDNESS — NOT the P2 accuracy defect.** The missing Codina
+   ITERATIVE PENALTY in the mass residual made the 3D all-Dirichlet problem ill-posed at ε=0; adding it is a
+   real, necessary fix (this doc's core contribution). ⚠️ **REVERSED (2026-07-03):** it does *not* fix the P2
+   converged-but-wrong *accuracy* defect — that is an element-family **c₁** coercivity deficit (CONFIRMED:
+   c₁×4 fixes, c₁×2 masks; see [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md)). The
+   "NOT c₁ / no dimensional c₁" claim originally here is withdrawn ("Kratos runs paper c₁" reconciles via a
+   reduced high-order subscale + smaller quad/hex `C_inv`). The paper (article.tex §5.2, **line ~1383**) uses ε>0 as the iterative penalty for the 3D
    case because at ε=0 the discrete problem is ill-posed (constant-pressure indeterminacy + BC/mass
    incompatibility). The penalty adds `ε_num·pⁿ` to the mass-eq LHS and `ε_num·pⁿ⁻¹` (PREVIOUS nonlinear
    iterate's pressure) to the RHS, so the residual carries `ε_num·(pⁿ − pⁿ⁻¹)`: nonzero during iterations
    (pins the pressure mode), vanishing at convergence (`pⁿ=pⁿ⁻¹`) so the **converged solution is unaltered**.
 2. **The bug:** `continuous_problem.jl` had `ε_num` ONLY in the Jacobian (`mass_term_jac`,
-   `(eps_val+numerical_epsilon)·dp`) and NOT in the residual (`mass_term` used `eps_val·p`, eps_val=0). The
+   `(physical_epsilon+numerical_epsilon)·dp`) and NOT in the residual (`mass_term` used `physical_epsilon·p`, physical_epsilon=0). The
    code comment "lagging ε_num·p cancels in the residual" conflated `pⁿ⁻¹` (previous iterate) with the Newton
    increment `dp` — they are not the same; the term only cancels AT convergence, not during iterations.
 3. **ASGS-3D is well-posed at PAPER c₁** by the penalty and robust through the eps_pert homotopy. **P1**:
@@ -44,7 +50,12 @@ Kuhn tets, P2. At paper c₁:
 - **OSGS** the coupled Newton **overshoots** (step inf-norm ~268, merit ~1e4–1e6, line-search depletes) —
   *never converges*.
 
-**False lead #1 — c₁/coercivity** ([3d-p2-convergence-investigation.md](3d-p2-convergence-investigation.md)):
+**"False lead #1 — c₁/coercivity"** ([3d-p2-convergence-investigation.md](3d-p2-convergence-investigation.md))
+— ⚠️ **NOT a false lead; REVERSED 2026-07-03 (see status header).** The reasoning below reflects the superseded
+2026-06-30 view. The single-mesh test made c₁×4 look like it "only shrank the constant"; the **mesh-family**
+ratio-to-interpolant test is decisive and shows c₁×4 genuinely FIXES (ratio pins ~1 across meshes) while c₁×2
+MASKS. c₁ IS the confirmed element-family root cause of the P2 accuracy defect. ("Kratos runs paper c₁"
+reconciles via a reduced high-order subscale + smaller quad/hex `C_inv`.) — Superseded text follows:
 c₁×4 makes both converge, so that doc concluded paper c₁ under-budgets coercivity for 3D tets. But increasing
 c₁ and shrinking the τ-h are the SAME lever (both raise c₁ν/h²), and c₁×4 only shrank the error *constant*,
 not the rate — it MASKED the real defect. Kratos works at paper c₁ ⇒ no dimensional c₁.

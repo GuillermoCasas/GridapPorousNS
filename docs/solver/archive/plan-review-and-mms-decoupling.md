@@ -1,5 +1,11 @@
 # Plan review + MMS-decoupling design (addendum to the solver-simplification plan)
 
+> **STATUS: IMPLEMENTED as of 2026-07-04 — retained for history, being archived.** The
+> `SolutionVerifier` seam (`NoVerification` / `MMSPlateauVerifier`, `on_asgs_converged!` /
+> `on_osgs_converged!`, `mms_verification.jl`) and the file split **shipped**; the realized design is
+> documented in [`docs/solver/algorithm-code-mapping.md`](algorithm-code-mapping.md). File-path refs to
+> `porous_solver.jl` below are stale (now `asgs_solver.jl` / `osgs_solver.jl` / `solver_core.jl`).
+
 This addendum (1) confirms/critiques the execution plan and (2) specifies the MMS-decoupling the
 author asked for (take the MMS-specific logic out of the main solver body). It assumes the plan
 in front of it. Everything here was re-verified against the live code; the load-bearing facts are

@@ -1,10 +1,12 @@
 # OSGS solver leaning → single `coupled` route, and the JFNK speed plan
 
 **Status:** CANONICAL. Records (1) the 2026-06-07 decision to collapse the OSGS nonlinear
-solver to a single route (`coupled`) and the evidence that forced it, and (2) the deferred
-**JFNK** enhancement that recovers near-quadratic speed for that route (to be implemented in a
-separate session, per user). Supersedes the "keep `freeze_after_k`" recommendation in the
-clean-slate redesign synthesis — see "Why not freeze_after_k" below.
+solver to a single route (`coupled`) and the evidence that forced it, and (2) the
+**JFNK** enhancement that recovers near-quadratic speed for that route — **proposed here, now
+LANDED** (opt-in `osgs_jfnk_enabled`); the executed version and its Phase-0 gate are the canonical
+[`docs/solver/jfnk-phase0-preconditioner-gate.md`](jfnk-phase0-preconditioner-gate.md). Supersedes
+the "keep `freeze_after_k`" recommendation in the clean-slate redesign synthesis — see "Why not
+freeze_after_k" below.
 
 ---
 
@@ -18,7 +20,7 @@ that cadence (and whether they end with a frozen-π polish). We keep exactly one
 > **`coupled`** — a single Newton solve whose residual recomputes `π = Π(R(u))` at **every**
 > evaluation (no staggering lag); the Jacobian stays the local frozen-π form (sparse, non-monolithic).
 > The per-eval projection is the Cholesky-cached mass solve. Implemented at
-> [`porous_solver.jl` `_run_osgs_relaxation!`](../../src/solvers/porous_solver.jl) (the function is now
+> [`osgs_solver.jl` `solve_osgs_stage!`](../../src/solvers/osgs_solver.jl) (the function is now
 > coupled-only; the dispatch and the other two branches were deleted).
 
 **Why `coupled`:** it is the **fewest-parts** route (no warm-up loop, no freeze, no `k`, no freeze
@@ -29,7 +31,7 @@ Re** (see §3), which the JFNK plan (§4) addresses without re-growing the machi
 ### 1a. Two refinements to the coupled solve (2026-06-08)
 
 The "single Newton solve" above gained two safeguards after hands-on review of the production traces.
-Both live in the coupled branch of `_run_osgs_relaxation!`:
+Both live in the coupled branch of `solve_osgs_stage!`:
 
 1. **Picard fallback (gated on `pingpong_enabled`).** The coupled solve is now wrapped in the same
    `_pingpong_cascade!` as the Stage-I boot: if the coupled Newton's line search fails or it diverges,
@@ -76,8 +78,8 @@ become a coupled-vs-coupled tautology; its evidence lives on in this section and
 
 ## 3. What was deleted (the leaning)
 
-[`src/solvers/porous_solver.jl`](../../src/solvers/porous_solver.jl): **1,590 → 954 LOC (−636)**.
-- The `staggered` outer-relaxation branch and the `freeze_after_k` branch of `_run_osgs_relaxation!`
+[`src/solvers/osgs_solver.jl`](../../src/solvers/osgs_solver.jl) (pre-split: `porous_solver.jl`): **1,590 → 954 LOC (−636)**.
+- The `staggered` outer-relaxation branch and the `freeze_after_k` branch of `solve_osgs_stage!`
   (the dispatch collapsed to coupled-only).
 - The now-orphaned helpers `_compute_state_drift` (H4), `_update_and_project!` (H5),
   `_decide_osgs_convergence` (H6), `_run_osgs_inner_cascade!` (H3).
@@ -93,60 +95,11 @@ reaction-projection trim. Verified: Blitz 189/189 after each stage.
 knobs, `ablation_mode`, the inert off-switches — all now ignored by the coupled path. They remain in the
 schema / `StabilizationConfig` / configs (so nothing breaks) and can be retired in a follow-up.
 
-## 4. JFNK plan (deferred to a separate session)
+## 4. JFNK — proposed here, LANDED
 
-**Diagnosis — `coupled`'s only weakness is exactly the dropped `∂π/∂U`.** The exact tangent of
-`F(U) = R(U; π(U))` with `π(U)=Π(R(U))` is `J = J_frozen + (∂R/∂π)(∂π/∂U)`, and `∂π/∂U = M⁻¹(∂B/∂U)` is
-**dense** (the `M⁻¹`). `coupled` drops that second term → inexact Newton → **linear** convergence.
-Proof it is the bottleneck: `freeze`'s finish uses the **same** frozen-π Jacobian but with `π` *frozen*,
-so its tangent is exact → **quadratic** (12–27 iters incl. warm-up), while `coupled` re-projects `π`
-→ inexact → **44–69 iters at high Re**. The *only* difference is whether `π` moves. Recover the action
-of `∂π/∂U` and `coupled` becomes as fast as the frozen finish — simple **and** fast **and** robust.
-
-**Note:** the `ExactNewtonMode` "∂Π/∂u" terms already in the code (`_get_dsigma_du`, `_get_dtau_1_du`,
-…) are the τ/σ/convection derivatives inside the *frozen-π* stabilization — **not** the projection
-coupling `∂π/∂U`. There is no existing term for it.
-
-**Options, best first:**
-1. **JFNK (Jacobian-free Newton–Krylov) — recommended.** Solve the Newton system with GMRES where the
-   matvec is `J·v ≈ [F(U+εv) − F(U)]/ε`. Because `F` **re-projects π** at `U+εv`, the finite difference
-   captures the *full* tangent — including `∂π/∂U` — **exactly** (to FD accuracy), for one extra
-   residual eval per Krylov vector (each eval = one cheap Cholesky-cached projection). **Precondition
-   GMRES with the frozen-π Jacobian we already assemble and factor** (`jac_fn_coupled`); since it is
-   `J` minus the compact coupling term, GMRES converges in a handful of vectors. Net: near-quadratic
-   Newton, a few extra residual evals/step, **one clean mechanism** consistent with the lean. (Knoll &
-   Keyes 2004.) Julia: Krylov.jl / IterativeSolvers GMRES, matrix-free operator wrapping `res_fn_coupled`.
-2. **Lumped-mass sparse approximation.** Approximate `M⁻¹ ≈ diag(M)⁻¹` (M is diagonally dominant) so
-   `∂π/∂U ≈ diag(M)⁻¹(∂B/∂U)` becomes **sparse and addable** to the Jacobian — stays in the direct-solve
-   world, no Krylov. Cost: assembling `∂B/∂U` (the strong-residual-projection linearization).
-3. **Anderson acceleration.** `AcceleratorConfig` infra still exists; depth-m Anderson on the coupled
-   iterates → low-rank history-based curvature approximation → superlinear-ish. Cheap; instability risk.
-4. **Broyden** rank-1 secant updates from `(ΔF, ΔU)` → superlinear; middle-ground effort.
-
-**Before implementing:** run the leaned `coupled` k=1 sweep first and record the **actual** high-Re
-iteration counts as the baseline — that quantifies how much of the 44–69 iters is the π-coupling
-(JFNK-addressable) vs the convection nonlinearity, and gives a clean before/after for JFNK.
-
-**Acceptance test for JFNK:** identical converged MMS errors to plain `coupled` (same fixed point — JFNK
-only changes the path), with materially fewer nonlinear iterations at high Re, on the reaction-dominated
-and healthy Da=10⁶ cells (Re∈{1, 10⁶}, α=1, N=10/20/40) and the high-Re fold cells.
-
-### 4a. Verification methodology already executed (2026-06-24) — and a second motivation
-
-The Jacobian-consistency / fixed-point part of this plan's diagnostic toolkit was run on **ASGS-P₁ 3D**
-(structured (16,16,4), a one-off diagnostic; see
-[`mms/3d-p2-convergence-investigation.md`](../mms/3d-p2-convergence-investigation.md) §4). Results that
-bear on the JFNK plan:
-
-- **The analytic `ExactNewtonMode` Jacobian is the exact ∂R** — a Taylor test `‖R(U+εδU) − R(U) − εJδU‖`
-  drops as O(ε²) (~100×/decade) to round-off. So for **ASGS** there is no inexactness to recover (π ≡ 0,
-  no `∂π/∂U`); the dropped-coupling problem is **OSGS-specific**, exactly as §4's diagnosis says.
-- **Bare Newton (analytic J, plain LU, zero orchestration) reaches production's fixed point** (velocity
-  DOFs ~3e-6, MMS errors identical). This validates the JFNK acceptance criterion's premise — the iteration
-  picks the *path*, not the *fixed point* — on a real cell.
-
-**Second motivation for JFNK (new): the P₂-3D memory wall.** Beyond OSGS speed, JFNK (matrix-free GMRES
-preconditioned by the assembled frozen-π / ASGS Jacobian) is the natural route to clear the
-**ILU-saddle-point trap** that blocks the 104k-DOF P₂ meshes (`known_issues.md`): it avoids both the dense
-`∂π/∂U` *and* the direct-LU fill-in that OOMs, so a matrix-free Krylov is the path to the finer P₂ cells the
-direct solver cannot reach.
+The JFNK enhancement diagnosed and proposed in this section (recover the dropped dense `∂π/∂U` coupling
+matrix-free via GMRES on `J·v ≈ [F(U+εv) − F(U)]/ε`, preconditioned by the already-factored frozen-π
+Jacobian) was **implemented and shipped** behind the opt-in `osgs_jfnk_enabled` flag. The Phase-0
+preconditioner gate, the executed design, and the A/B results are the canonical
+[`docs/solver/jfnk-phase0-preconditioner-gate.md`](jfnk-phase0-preconditioner-gate.md) — read that for
+the shipped version.

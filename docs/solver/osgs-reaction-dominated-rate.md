@@ -162,7 +162,8 @@ The earlier recommendation here ("make `freeze_after_k` the default OSGS couplin
 falsified**: against the coupling-equivalence oracle, `freeze_after_k` diverged / gave a negative rate in
 the reaction corner — it does *not* land on the coupled fixed point there — so it was rejected and, with
 `staggered`, **deleted** in the 2026-06-08 leaning. The OSGS solver now has the single `coupled` route.
-For the coupling rationale and the iteration-cost fix (JFNK, deferred), see
+For the coupling rationale and the iteration-cost fix (JFNK — landed; see
+[`jfnk-phase0-preconditioner-gate.md`](jfnk-phase0-preconditioner-gate.md)), see
 [`coupled-only-leaning-and-jfnk-plan.md`](coupled-only-leaning-and-jfnk-plan.md) §2. The rate cure itself
 is the deferred **split / term-by-term OSGS** of §4B / §8.5 — a formulation change, not a coupling choice.
 

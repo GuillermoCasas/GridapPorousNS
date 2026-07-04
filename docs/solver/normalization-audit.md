@@ -4,8 +4,10 @@
 > and honest-exit (#3) gates analyzed below are NO LONGER the authoritative inner convergence gate in
 > production. The solver now stops on a **scale-free `ε_M`/`ε_C` criterion**:
 > converged ⇔ `ε_M ≤ tol_M` **and** `ε_C ≤ tol_C`, where `ε_M = ‖r_M‖/D_M` (momentum residual over the
-> dynamic force-magnitude envelope) and `ε_C = ‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖ + ‖g‖)` (source-subtracted
-> mass residual over a flux-gradient+source envelope). It is implemented in
+> dynamic force-magnitude envelope) and `ε_C = ‖r_C‖/D_C` — the Route-B "Philosophy-A" algebraic mass
+> gate, symmetric with `ε_M` (see [`docs/mms/route-b-2d-sweep-status.md`](../mms/route-b-2d-sweep-status.md);
+> the earlier strong-form `‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖ + ‖g‖)` is now the diagnostic `eps_C_strong`,
+> not the gate). It is implemented in
 > [`src/solvers/convergence_criterion.jl`](../../src/solvers/convergence_criterion.jl) and specified in
 > [`docs/solver/nonlinear-convergence-criterion-prompt.md`](nonlinear-convergence-criterion-prompt.md).
 > It is injected by `solve_system` (`src/solvers/solver_core.jl`) as `conv_probe` and is the authoritative
@@ -35,7 +37,7 @@ Convention reminders for the MMS encoding sweep (`run_test.jl`): velocity residu
 | 4 | Divergence safeguard | `eval_safeguard_termination_bounds!` | Newton: `Φ_new > Φ_old·f`; Picard: `‖b‖∞,new > ‖b‖∞,old·f` | ratio → dimensionless | **OK** |
 | 5 | ~~OSGS outer state-drift~~ | ~~`_compute_state_drift` + `_decide_osgs_convergence`~~ | — | — | **REMOVED** (gate deleted with the staggered loop, 2026-06-07 leaning; no longer applicable) |
 | 6 | ~~OSGS projection-drift~~ | ~~`pi_u_drift`/`pi_p_drift` in `_update_and_project!` + `_decide_osgs_convergence`~~ | — | — | **REMOVED** (gate deleted with the staggered loop, 2026-06-07 leaning; no longer applicable) |
-| 7 | MMS plateau ratios | `_run_*_mms_extension!` / `_run_osgs_relaxation!` | `\|E_k−E_{k-1}\| / max(E_k,E_{k-1},ε·h^p) < τ_err` | ratio → dimensionless | **OK** |
+| 7 | MMS plateau ratios | `_run_*_mms_extension!` / `_run_osgs_relaxation!` *(dead symbol — now `solve_osgs_stage!`)* | `\|E_k−E_{k-1}\| / max(E_k,E_{k-1},ε·h^p) < τ_err` | ratio → dimensionless | **OK** |
 
 ## Gate-by-gate notes
 

@@ -1,5 +1,12 @@
 # Solver simplification proposal (`src/solvers/`)
 
+> **STATUS: MOSTLY IMPLEMENTED as of 2026-07-04 — retained for history, being archived.** The
+> ASGS/OSGS file split (Part A) is **DONE** (`asgs_solver.jl` / `osgs_solver.jl` / `solver_core.jl`;
+> `porous_solver.jl` removed); the MMS-decoupling shipped; JFNK (Part F.5) and Anderson **SHIPPED**.
+> ⚠ **§B.1 "delete the Anderson subsystem / `accelerators.jl`" is OBSOLETE and WRONG** — Anderson is
+> **LIVE** behind `osgs_anderson_enabled`; do **NOT** delete `accelerators.jl`. The body below is the
+> original pre-implementation spec, kept as a record; read it against this header.
+
 **Status:** specification for an implementing AI. Nothing here is applied yet.
 **Scope:** primarily `src/solvers/`, with the unavoidable spillover into `src/config.jl`,
 `src/PorousNSSolver.jl`, the JSON config/schema, and `theory/osgs_algorithm.tex`.

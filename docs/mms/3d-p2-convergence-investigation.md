@@ -1,13 +1,15 @@
 # 3D ASGS sub-optimality (P₁ & P₂): a c₁/coercivity fixed point, not mesh quality
 
-> **⚠️ SUPERSEDED (2026-06-30).** This doc's headline conclusion — *"paper c₁=4k⁴ under-budgets coercivity
-> for 3D tetrahedra; c₁ is the lever"* — was **WRONG**. It was masking a missing term: the **Codina
-> iterative penalty** (`ε_num·(pⁿ−pⁿ⁻¹)` in the mass residual, article.tex §5.2 line 1383) was never
-> implemented in the residual (only the Jacobian), so the all-Dirichlet 3D problem was ill-posed at ε=0.
-> Adding it makes **ASGS-3D converge at PAPER c₁ with optimal rate** (c₁×4 only shrank the error constant,
-> which masked this). Kratos solves this 3D case at paper c₁ — there is no dimensional c₁. The new canonical
-> doc is **[3d-iterative-penalty-fix-and-osgs-coupling.md](3d-iterative-penalty-fix-and-osgs-coupling.md)**;
-> read it first. The §4 "iteration/Jacobian exonerated" content here remains valid; the c₁ verdict does not.
+> **⚠️ STATUS — this doc's original c₁ verdict was RE-CONFIRMED (2026-07-03); superseded only as the canonical
+> home.** The headline — *"paper c₁=4k⁴ under-budgets coercivity for P2 tetrahedra; c₁ is the lever"* — is
+> **correct after all.** It was briefly overturned on 2026-06-30 ("it's the missing iterative penalty, not
+> c₁"), but the 2026-07-03 in-stack `c1_mult` **mesh-family** sweep CONFIRMS the element-family c₁ coercivity
+> deficit: **c₁×4 fixes** (ratio-to-interpolant pins ~1, ASGS & OSGS), **c₁×2 masks** (ratio drifts). Two
+> things were conflated: the **iterative penalty** is a separate, real fix — it restores 3D all-Dirichlet
+> **well-posedness** (ε=0 is ill-posed) — but does **not** fix the P2 converged-but-wrong **accuracy** defect
+> (that is c₁). **Canonical root-cause doc: [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md)**;
+> penalty/well-posedness fix + OSGS ∂π/∂u in [3d-iterative-penalty-fix-and-osgs-coupling.md](3d-iterative-penalty-fix-and-osgs-coupling.md).
+> This doc's §4 (iteration/Jacobian exonerated) + §6 (OSGS regime reconciliation) remain valid unique content.
 >
 > **Status (historical):** was canonical for 3D tetrahedral MMS (paper §5.2) — ASGS vs OSGS,
 > the c₁ lever, ε, and mesh quality. Companion to the 2D [convergence-status.md](convergence-status.md).
@@ -180,7 +182,7 @@ Jacobian pressure block, which **vanishes at convergence** — article.tex `eq:S
 the "mainly numerical reasons / iterative penalty" remark (line 241), and the 3D-MMS remark (lines
 1375–1383). The 2D examples use ε=0 outright (line 1098).
 
-- **The physical compressibility `eps_phys` (formulation `eps_val`) must be 0.** A transient *working-tree*
+- **The physical compressibility `eps_phys` (formulation `physical_epsilon`) must be 0.** A transient *working-tree*
   bug (2026-06-24) had set `solve_one`'s `eps_phys` default to a non-zero `1e-4·α₀/(ν(1+Re+Da)) ≈ 1.67e-5`,
   putting `ε·p` in the residual **and** `ε·p_ex` in the oracle `g` — i.e. solving a genuinely *compressible*
   problem. Reverted to `0.0` (committed-correct). See the `lessons_learned` entry.
@@ -280,7 +282,7 @@ grids. Not yet resolved.
 ## Appendix A: the numerical-ε implementation
 
 The Codina iterative penalty (`numerical_epsilon`, ε_num) is **Jacobian-only**, not an outer loop. Lagging
-`ε_num·p` to the iterate gives `ε_num·pᵏ⁺¹ − ε_num·pᵏ = ε_num·dp`, so the **residual** uses `eps_val`
+`ε_num·p` to the iterate gives `ε_num·pᵏ⁺¹ − ε_num·pᵏ = ε_num·dp`, so the **residual** uses `physical_epsilon`
 (=`eps_phys`, which **must be 0** for the incompressible MMS) and the **Jacobian** mass term uses
 `eps_phys + ε_num` (`continuous_problem.jl`, both Jacobian builders). It is a pressure-block Newton-step
 regularization that **vanishes at convergence** — no consistency error, no manufactured-source change,

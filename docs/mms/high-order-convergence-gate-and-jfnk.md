@@ -10,9 +10,12 @@ convergence": the most likely cause is the *convergence gate*, not the discretiz
    criterion stops on `ε_M = ‖momentum residual‖/D_M ≤ tol_M` (`tol_M = eps_tol_momentum`). At the k=1
    default `eps_tol_momentum = 1e-6`, high-order / high-Re cells **stop early at a 5–10× worse solution**,
    collapsing the last-segment rate (e.g. k=2 L²u 160→320 rate 3.3 → 1.7). Setting
-   **`eps_tol_momentum = 1e-9`** (sweep-wide for k=2) recovers optimal O(h³). Leave `eps_tol_mass = 0.8`;
-   do **not** over-tighten (1e-12 → NaN). This is the `k2-needs-tighter-convergence-gate` lesson, now
-   reproduced and pinned.
+   **`eps_tol_momentum = 1e-9`** (sweep-wide for k=2) recovers optimal O(h³); do **not** over-tighten
+   (1e-12 → NaN). This is the `k2-needs-tighter-convergence-gate` lesson, now reproduced and pinned.
+   *(Mass gate — 2026-07-04: the loose `eps_tol_mass = 0.8` gate has since been REPLACED by the Route-B
+   Philosophy-A algebraic ε_C = ‖r_C‖/D_C at ~1e-9, symmetric with this momentum gate; the 0.8 value is
+   demoted to a diagnostic. See [`route-b-2d-sweep-status.md`](route-b-2d-sweep-status.md). The momentum
+   lesson below is unchanged.)*
 2. **JFNK is correct.** The opt-in `osgs_jfnk_enabled` matrix-free full-tangent OSGS solve reproduces the
    frozen-π root *exactly* — it is **not** the cause of any convergence-rate change (proven below). Use it.
 3. **A reusable diagnostic recipe** (gate vs solver vs inner-tolerance) is at the end — apply it verbatim
@@ -94,8 +97,10 @@ is left at the default — it already reaches optimal at the looser gate.
   quality, or the solver. (Cross-ref the `numerical-epsilon` / `3d-p1-eps` / `k2-gate` lessons.)
 - **Watch for the signature:** few iterations + fine-mesh error several × above optimal + last-segment
   rate collapse. If you see it, suspect the gate first.
-- **Keep `eps_tol_mass = 0.8`** (the mass gate floors at O(h^{kv}); tightening it risks the
-  finest-segment loss / NaN documented in the k2-gate lesson). The momentum gate is the operative lever.
+- **Mass gate (updated 2026-07-04):** the loose `eps_tol_mass = 0.8` gate has been REPLACED by the
+  Route-B Philosophy-A algebraic **ε_C = ‖r_C‖/D_C at ~1e-9**, symmetric with the momentum gate
+  (see [`route-b-2d-sweep-status.md`](route-b-2d-sweep-status.md)). The momentum gate remains the
+  lever that first exposed the k=2 under-convergence; the mass gate is now its algebraic mirror.
 - **JFNK is safe to use in 3D** for OSGS — it reproduces the frozen-π root and cuts Newton steps where the
   dropped ∂π/∂u sets the rate. The C.1 fallback + frozen-π fallback mean it never does worse. (Watch the
   3D inner-GMRES count: the frozen-π preconditioner may need a real saddle-point/MG preconditioner if `G`

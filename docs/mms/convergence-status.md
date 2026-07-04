@@ -15,6 +15,13 @@ The earlier dated caveat block (2026-05-26 → 06-05, dispatch-bug / encoding-co
 the high-Da coercivity-gap "open defect") is now **resolved or superseded** — preserved in git history
 and [`lessons_learned.md`](../lessons_learned.md); the live conclusions are folded into the box below.
 
+> **Mass-gate update (2026-07-04).** The convergence mass gate is now the Route-B **Philosophy-A
+> algebraic ε_C = ‖r_C‖/D_C**, gated ~1e-9 and symmetric with the momentum gate ε_M; the old loose
+> `eps_tol_mass = 0.8` gate is demoted to a diagnostic (`eps_C_strong`). See
+> [`route-b-2d-sweep-status.md`](route-b-2d-sweep-status.md) for the current gate and the completed
+> k1/k2 QUAD sweeps. The success box and §7 below describe the older ε_M/ε_C-with-0.8 regime and are
+> kept for the narrative; the Route-B doc is authoritative on the gate.
+
 > ## ✅ 2026-06-10 — k=1 QUAD sweep COMPLETE (N=10→640): success
 >
 > The full `(Re, Da, α₀)` × {ASGS, OSGS} sweep at k=1 P1/P1 QUAD is finished on the scale-free-gate
@@ -38,7 +45,8 @@ and [`lessons_learned.md`](../lessons_learned.md); the live conclusions are fold
 >   [`../../theory/osgs_reaction_note/osgs_reaction_note.tex`](../../theory/osgs_reaction_note/osgs_reaction_note.tex)
 >   degrades the coercivity *constant* (σ_a), not the convergence *rate*, and closes like Da_h ∝ 1/N².
 > - **OSGS is ≈ 2× more accurate than ASGS** at the same rate (finest-mesh-error ratio 0.50 velocity,
->   0.41 pressure) — the orthogonal projection buys accuracy, at higher iteration cost (the JFNK target).
+>   0.41 pressure) — the orthogonal projection buys accuracy, at higher iteration cost (now cut by the
+>   landed JFNK solve; see [`high-order-convergence-gate-and-jfnk.md`](high-order-convergence-gate-and-jfnk.md)).
 > - **Behaviour-preserving:** errors are byte-identical to the pre-scale-free-gate archive on every
 >   overlapping mesh — the ε_M/ε_C gate changed *when* the solver stops, not *where*.
 > - **Expected caveats (not defects):** Re=1e6 @ N=10 is `NaN` (boundary layers ∼ Re^{-1/2}=1e-3 ≪ h=0.1,
@@ -274,56 +282,21 @@ will *inform* the Cocquet interpretation, per the project decision — not the r
 
 ---
 
-## 8. Launch plan — per-region handling + documentation workflow
+## 8. Sweep status — DONE (see route-b-2d-sweep-status.md)
 
-The two-phase pipeline (committed on `feat/mms-honest-exit-two-phase`) already routes each region to
-its proper treatment; the steps below note the **small refinements** the C24 evidence shows are
-needed before launch.
+**The k1 and k2 QUAD sweeps completed 2026-07-03** under the Route-B algebraic mass gate; the current
+per-cell status, rates, and fold/rescue outcomes live in
+[`route-b-2d-sweep-status.md`](route-b-2d-sweep-status.md). The earlier "not yet launched / user-
+triggered / multi-day" framing is retired.
 
-All Python analysis is the single tool **`analyze_results.py`** (it replaced `plot_results.py` +
-`merged_report.py` + `detect_flagged_cells.py` + `mms_convergence_lib.py`): one run does true-root
-detection (→ `flagged_cells.json`), the annotated merged paper table, the per-config plots, and a
-detailed per-config table with an honest true-root `Converged` column.
-
-**Per batch** (`phase1_{quad,tri}_k{1,2}.json`; background, resumable, separate `h5`):
-
-1. **Phase-1 blanket sweep to `N=320`** (`run_test.jl`), fail-fast (`max_n_pert=1`,
-   `linesearch_alpha_min=1e-4`, `osgs_iterations=5`), honest-exit on (`k_nf=10`). → Region A
-   verifies here; region B fails honestly; region C converges with an eroded slope. True per-mesh `‖R‖`.
-2. **Analyze → detect & categorize** (`analyze_results.py`): writes `flagged_cells.json`
-   (`fold` / `suboptimal_rate` / `total_failure`) for Phase-2, plus a first table + plots.
-3. **Phase-2 rescue, by category** (`run_continuation.jl phase2`):
-   - **fold** → α-continuation past the fold + mesh ladder `[320,512,768,1024(→1536)]`; report the
-     slope over the finest 2 consecutive true roots (this is how C24 was measured).
-   - **suboptimal_rate** → the root already exists, so Phase-2 **solves directly at the base mesh
-     (no α-ramp) and mesh-continues up the fine ladder** (`subopt_base_candidates`,
-     `subopt_fine_ladder`), reporting the **per-pair trajectory** (climb vs plateau = the §4
-     decisive test). *(Routing is by detected `category`, hardest across the two methods.)*
-4. **Re-analyze with the rescue** (`analyze_results.py --phase2 …`): the same tool joins the Phase-2
-   results into the paper table — error at `N=320` for verified cells, finest **true-root** error
-   (asterisked, mesh noted) otherwise. Marks: verified / `*` recovered-at-fine / `‡` genuine
-   sub-optimal / `ˢ` super-convergent (confirm asymptotics) / `**` fold-best-root / `N/A`. Refreshes
-   plots + the detailed honest-`Converged` table too.
-5. **Document:** append a dated "Run findings" section *to this file* — which cells fell in A/B/C,
-   the region-C rate trajectories (the answer to §4/§7-1), the fold boundary, anything surprising.
-
-**Pre-launch refinements (DONE — small, justified by the C24 data):**
-
-- **One-sided slope acceptance + super-convergence caveat.** C24's `L²` rate is `≈3.0`
-  (super-convergent, `k=1`); the old two-sided check would have mislabelled it sub-optimal.
-  `analyze_results.py` accepts one-sided (`slope ≥ target − tol`),
-  so super-convergence is **not** a failure. *But* a rate above nominal is marked `ˢ` in the report
-  and counted separately — a high rate can itself signal the **asymptotic regime is not yet
-  established**, so it is surfaced for confirmation (one further refinement) rather than silently
-  passed. (The true-root gate already guards the machine-floor case.)
-- **Category-aware Phase-2 routing** — done (§8.3): `suboptimal_rate` cells take the cheap direct
-  base solve; folds keep the α-continuation root search.
-
-*Validation status:* refinement 1 unit-tested + re-run on the smoke (clean); refinement 2
-syntax-checked and defaults wired. End-to-end Phase-2 dry-run re-validation of the new direct-base
-path is **deferred to launch time** so it does not compete with the Cocquet runs in flight.
-
-**Order & cost.** `k=1 QUAD` first (cheapest finest mesh, contains the corner — doubles as timing
-calibration), then `k=1 TRI`, then the two `k=2` batches. The corner cells (region B) are the
-expensive tail; everything else is fast. The full grid is plausibly multi-day — launch is
-**user-triggered** (run on AC power; resumable so a power blip loses nothing).
+**Analysis workflow (still current).** All Python analysis is the single tool **`analyze_results.py`**
+(it replaced `plot_results.py` + `merged_report.py` + `detect_flagged_cells.py` +
+`mms_convergence_lib.py`): one run does true-root detection (→ `flagged_cells.json`), the annotated
+merged paper table, the per-config plots, and a detailed per-config table with an honest true-root
+`Converged` column. Cell categories (`fold` / `suboptimal_rate` / `total_failure`) route Phase-2
+rescue: **fold** → α-continuation past the fold + mesh ladder `[320,512,768,1024(→1536)]` (the finest
+2 consecutive true-root slope, how C24 was measured); **suboptimal_rate** → direct base solve + fine
+ladder (`subopt_base_candidates` / `subopt_fine_ladder`), reporting the per-pair trajectory (the §4
+decisive test). Report marks: verified / `*` recovered-at-fine / `‡` genuine sub-optimal / `ˢ`
+super-convergent / `**` fold-best-root / `N/A`. One-sided slope acceptance (`slope ≥ target − tol`)
+keeps super-convergence from being mislabelled sub-optimal.

@@ -5,9 +5,10 @@ correctness bug — these are efficiency and observability refinements to the no
 Implement in a dedicated session; each item below names the exact code site and the validation it
 needs before being adopted.
 
-**Scope:** `src/solvers/nonlinear.jl` (Algorithm A — the safeguarded Newton inner solve) and
-`src/solvers/porous_solver.jl` (the VMS orchestrator: Exact-Newton → Picard → Newton cascade and the
-OSGS staggered loop). See [`lessons_learned.md`](../lessons_learned.md) before editing either — the
+**Scope:** `src/solvers/nonlinear.jl` (Algorithm A — the safeguarded Newton inner solve) and the VMS
+orchestrator `src/solvers/solver_core.jl` (Exact-Newton → Picard → Newton cascade) plus the OSGS coupled
+solve `src/solvers/osgs_solver.jl` (`solve_osgs_stage!`) (pre-split both lived in `porous_solver.jl`). See
+[`lessons_learned.md`](../lessons_learned.md) before editing either — the
 solver safeguards are intentional design (CLAUDE.md: *"do not weaken them in pursuit of speed"*).
 
 ---
@@ -23,8 +24,12 @@ and injected onto the inner solver. When the probe is attached it is the **autho
 ```
 converged  ⇔  ε_M ≤ tol_M  AND  ε_C ≤ tol_C     # eps_tol_momentum / eps_tol_mass
 ε_M = ‖r_M‖ / D_M                               # momentum residual / dynamic force-magnitude envelope
-ε_C = ‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖ + ‖g‖)    # source-subtracted mass residual / flux-grad+source envelope
+ε_C = ‖r_C‖ / D_C                               # Route-B "Philosophy-A" algebraic mass gate (symmetric with ε_M)
 ```
+
+The mass gate is now the Route-B algebraic `ε_C = ‖r_C‖ / D_C` (see
+[`docs/mms/route-b-2d-sweep-status.md`](../mms/route-b-2d-sweep-status.md)); the earlier strong-form
+measure `‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖ + ‖g‖)` is now the diagnostic `eps_C_strong`, not the gate.
 
 Both `D_M` and the mass envelope are **measured from the current iterate and known material data** — not
 from a frozen `‖R₀‖` or any a-priori `U/L/P/Re/Da` — so the gate is the SAME across ping-pong segments
@@ -113,7 +118,7 @@ fast descent — and is well-established practice for stabilized incompressible-
 2. **Full ping-pong (real change): a new orchestrator mode.** Returning to Newton after Picard gains
    1–2 orders, and repeating, is a genuine new loop, because Exact-Newton and Picard are *different*
    `FEOperator`s (different Jacobian closures — `jac_newton_*` vs `jac_picard_*`). The swap therefore
-   lives at the `porous_solver.jl` orchestrator level, not inside Algorithm A. New numerical controls
+   lives at the `solver_core.jl` orchestrator level (pre-split `porous_solver.jl`), not inside Algorithm A. New numerical controls
    (stagnation window, Picard-gain-to-return-to-Newton threshold, max swap count) must go through the
    schema → config struct → JSON → consumer chain per the no-hard-coded-parameters rule.
 
@@ -148,7 +153,7 @@ is no longer an inner-step budget to raise first.
 
 **Status: superseded by the 2026-06-08 coupled-only leaning** — see
 [`coupled-only-leaning-and-jfnk-plan.md`](coupled-only-leaning-and-jfnk-plan.md). This idea optimized the
-*staggered outer loop* (`_run_osgs_relaxation!`) and its plateau-verification cycles, all of which were
+*staggered outer loop* (`solve_osgs_stage!`, pre-split `_run_osgs_relaxation!`) and its plateau-verification cycles, all of which were
 **deleted** in that leaning: the staggered loop, the `_decide_osgs_convergence` gate, the
 `projection_drift`/`both` stopping modes, and the multi-cycle plateau re-confirmation are all gone. The
 coupled solve now performs **one** Newton solve and sets `mms_plateau_reached` in a single shot, so there
@@ -174,7 +179,7 @@ shape; do not act on it.
 
 **Status: reverted** — see [`coupled-only-leaning-and-jfnk-plan.md`](coupled-only-leaning-and-jfnk-plan.md)
 section 2. The `osgs_projection_coupling = "freeze_after_k"` mode (and the `osgs_freeze_after_k` knob,
-its `_run_osgs_relaxation!` warm-up-then-freeze machinery, and its blitz/encoding tests) was removed in
+its `solve_osgs_stage!` (pre-split `_run_osgs_relaxation!`) warm-up-then-freeze machinery, and its blitz/encoding tests) was removed in
 the 2026-06-08 coupled-only leaning. OSGS is now a single coupled Newton solve that re-projects
 `π = Π(R(u))` at every residual evaluation, so there is no warm-up phase to freeze after. Retained as a
 record of the explored design only; the mode no longer exists.

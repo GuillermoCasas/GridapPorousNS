@@ -11,14 +11,11 @@ Each is verified against the working tree. Severity is the author's call.
   `cfg.physical_properties.f_x` / `.f_y`; the production path is now exercised by
   `test/quick/production_schedule_smoke_quick_test.jl`.
 
-- **`config/base_config.json` is missing the required `eps_val`** — `PhysicalProperties` declares
-  `eps_val::Float64` with **no default** ([config.jl:10](../src/config.jl#L10)) and asserts `eps_val > 0`
-  ([config.jl:125](../src/config.jl#L125)); `config/base_config.json` carries only `epsilon_floor` (a *different*
-  field). So `load_frozen_config("config/base_config.json")` — and the `run_simulation("config/base_config.json")`
-  example in the README/CLAUDE.md — fails at struct construction. (Note: `eps_val` was deliberately removed
-  from `config/base_config.json` so it can't be silently inherited; see `lessons_learned.md` 2026-05-26. The
-  consequence is that the "canonical example" config is no longer directly loadable.) Fix: add an explicit
-  `eps_val` to `config/base_config.json`, or update the docs to point at a complete example config.
+- ~~**`config/base_config.json` is missing the required `eps_val`**~~ — **✅ RESOLVED (2026-07-04).** The
+  field was renamed (from the old `eps_val`) to **`physical_epsilon`** and `config/base_config.json` now carries
+  `"physical_epsilon": 0.0`, so `load_frozen_config("config/base_config.json")` (and the
+  `run_simulation("config/base_config.json")` example) loads cleanly. `validate!` asserts `physical_epsilon >= 0`
+  (it may be 0 — it is ε_phys, not the porosity). See `docs/formulation-audit-2026-06-24.md` §A.4.
 
 - **Schema `method` enum vs loader mismatch** — `porous_ns.schema.json` allows
   `method ∈ {ASGS, OSGS, VMS, Galerkin}` (lines ~195-199), but [config.jl:148](../src/config.jl#L148) asserts
@@ -45,13 +42,15 @@ Each is verified against the working tree. Severity is the author's call.
   indefinite (u,p) saddle point** (>3 h, no convergence — ILU is a weak preconditioner there). So the 3D P₂
   convergence study is confined to a narrow LU-feasible h-window and the OSGS finest meshes are unreachable.
   Separately, at the **paper's uniform c₁ = 4k⁴**, P₂-3D errors **grow / are non-monotone under refinement
-  even on perfect structured (Kuhn) meshes** (L²u 0.022→0.049→0.056→0.011; occasional `ok=false` — the solver
-  reaches the scale-free gate on a refinement-worsening branch). This is a **coercivity** deficit (c₁
-  under-budgets `2ξ C_inv²` for 3D tets), NOT mesh quality and NOT a nonlinear-solver bug — both are ruled
-  out in [`mms/3d-p2-convergence-investigation.md`](mms/3d-p2-convergence-investigation.md). c₁×4 tames the
-  divergence but does not reach optimal on accessible meshes. Hardware/linear-solver limit + an open
-  coercivity question; the memory wall motivates the deferred JFNK plan
-  ([`solver/coupled-only-leaning-and-jfnk-plan.md`](solver/coupled-only-leaning-and-jfnk-plan.md) §4).
+  even on perfect structured (Kuhn) meshes** (L²u 0.022→0.049→0.056→0.011; occasional `ok=false`). This is a
+  **CONFIRMED (2026-07-03) element-family c₁ coercivity deficit** — `4k⁴` under-budgets `2ξ·C_inv²` for P2
+  **Kuhn tets**; the mesh-family ratio-to-interpolant test shows **c₁×4 fixes** (ratio pins ~1, ASGS & OSGS)
+  while **c₁×2 masks**. NOT mesh quality, NOT a solver bug. Canonical:
+  [`mms/3d-p2-instability-investigation.md`](mms/3d-p2-instability-investigation.md) (verdict); evidence in
+  `docs/formulation-audit-2026-06-24.md` §B.5 + NumPy clean-room `docs/convergence_problems_audit/`. The c₁
+  multiplier is confirmed effective but **not adopted** (root-cause fix preferred, e.g. reduced high-order
+  subscale). The MEMORY-wall half remains a real hardware limit (JFNK for OSGS has since landed —
+  [`solver/jfnk-phase0-preconditioner-gate.md`](solver/jfnk-phase0-preconditioner-gate.md)).
 
 ## Minor / cleanup
 
@@ -59,7 +58,7 @@ Each is verified against the working tree. Severity is the author's call.
   buffer were no longer called (the gate uses the frozen initial-residual scale `‖R₀‖` directly).~~
   **RESOLVED 2026-06-04 (P5):** both removed; see [`solver/normalization-audit.md`](solver/normalization-audit.md) gate #1.
 
-- **Single-run path uses a fixed `eps_val`** — `run_simulation` injects a fixed dimensional `eps_val` rather than
+- **Single-run path uses a fixed `physical_epsilon`** — `run_simulation` injects a fixed dimensional `physical_epsilon` rather than
   the per-encoding covariant value the MMS harness now derives (`lessons_learned.md` 2026-06-02). Harmless for a
   single run (no encoding sweep), but inconsistent with the harness.
 
@@ -82,7 +81,7 @@ Each is verified against the working tree. Severity is the author's call.
 - **OSGS rate-stagnation in the reaction-dominated corner (high Da, low/moderate Re).** A convergence-*rate*
   issue, distinct from the (now-fixed) scale-covariance bug. **Confirmed with complete data 2026-06-04** — the
   full k=1 sweep (288/288, N=10→320) on fully-covariant code (covariant inner gate `‖R₀‖` + relative warmup +
-  covariant `eps_val`; snapshot in `test/extended/ManufacturedSolutions/previous_results/_archive_postFix_covariant_complete/`).
+  covariant `physical_epsilon`; snapshot in `test/extended/ManufacturedSolutions/previous_results/_archive_postFix_covariant_complete/`).
   Findings, now definitive:
   - **Scope:** OSGS velocity rates collapse only at **Da=1e6 with Re ∈ {1e-6, 1}** — H¹ rate **0.62–0.83**
     (vs ASGS ~1.1–2.1), L² **1.59–1.78** (vs ASGS ~1.9–2.65) in this pre-leaning snapshot. At **Re=1e6,

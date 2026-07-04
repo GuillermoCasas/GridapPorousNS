@@ -31,7 +31,7 @@ The `\Guillermo{}` / `\Joaquin{}` author-review macros are defined in `article.t
 - [`tau_saturation_note/tau_saturation_note.tex`](tau_saturation_note/tau_saturation_note.tex) — τ-saturation / stabilization-parameter analysis note.
 - [`velocity_floor_regularization/velocity_floor_regularization.tex`](velocity_floor_regularization/velocity_floor_regularization.tex) — smooth velocity-floor regularization of the Forchheimer `|u|` term.
 - [`continuity appendix/continuity_appendix.tex`](continuity%20appendix/continuity_appendix.tex) — continuity-equation appendix note.
-- [`pressure_recentering_note/pressure_recentering_note.tex`](pressure_recentering_note/pressure_recentering_note.tex) — pressure-mean drift under the iterated (Codina) penalty in the all-Dirichlet setting, and a **re-centering proposal**. **Exploratory / decision pending**: the iterated penalty is Codina's, the re-centering is *this note's* proposal (not attributed to Codina, not implemented).
+- [`pressure_recentering_note/pressure_recentering_note.tex`](pressure_recentering_note/pressure_recentering_note.tex) — pressure-mean drift under the iterated (Codina) penalty in the all-Dirichlet setting, and a **re-centering** hardening. **Implemented** behind the default-off config flag `recenter_pressure_between_penalty_passes` (A/B-verified behavior-preserving); *adoption-by-default* still pending. Provenance: the iterated penalty is Codina's, the re-centering is *this note's* proposal (not attributed to Codina).
 
 ## Where the meta-docs went
 

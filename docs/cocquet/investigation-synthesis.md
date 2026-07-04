@@ -1,16 +1,34 @@
 # Cocquet absolute-magnitude investigation — synthesis snapshot (2026-05-26)
 
-> **CANONICAL Cocquet reference.** Start here for the Cocquet benchmark. The chronological hypothesis ledger is now folded in as the **Appendix** of this file. Companions in this folder: the phased slope investigation [convergence-analysis.md](convergence-analysis.md), the (unsent) [email-questions.md](email-questions.md), and the raw transcripts [replicating-cocquet-transcript.md](replicating-cocquet-transcript.md) / [corner-singularity-transcript.md](corner-singularity-transcript.md).
->
-> **One update post-dates this snapshot:** a later pass (see [cocquet_convergence_analysis.md](convergence-analysis.md) Phases 11–12) **narrowed the magnitude gap to ~2×** using *literal* FreeFem meshes with the corrected `h=√2/N` recipe. The 320×–845× figures below are from the earlier `freefem-divs` unstructured comparison and should be read with that in mind.
+> **CANONICAL Cocquet reference — start here.** This is the single canonical doc for the Cocquet benchmark. The chronological hypothesis ledger is folded in as the **Appendix** of this file. Companions in this folder: the phased slope investigation [convergence-analysis.md](convergence-analysis.md), the (unsent) [email-questions.md](email-questions.md), and the archived raw transcripts [replicating-cocquet-transcript.md](archive/replicating-cocquet-transcript.md) / [corner-singularity-transcript.md](archive/corner-singularity-transcript.md).
 
-This file is a **point-in-time synthesis** of the Cocquet investigation (the former chronological growth ledger is folded in as the Appendix below; the convergence-slope sibling is [convergence-analysis.md](convergence-analysis.md)). This snapshot was generated after a second-pass logical-soundness audit of every conclusion against code, math, and result files.
+## 1 — Executive summary — SETTLED conclusion
+
+**The convergence cap is MESH-TOPOLOGY.** The sub-optimal Cocquet convergence rate on our runs is a **structured-mesh artifact**: a structured Cartesian-simplexified mesh with edges aligned to the 90° no-slip/traction outlet corner **locks in the corner singularity**, capping the velocity-L² slope. An **unstructured Delaunay mesh (FreeFem `buildmesh` paradigm) recovers $O(h^2)$**, matching Cocquet's Fig. 2. This settles the *slope* question and **withdraws** the earlier Phase 9 "proven mesh- and method-independent corner singularity" and Phase 10 "the paper's $H^3{\times}H^2$ claim is incorrect" verdicts — both rested on the structured mesh (see [convergence-analysis.md](convergence-analysis.md) Phase 11).
+
+**The residual is a MAGNITUDE gap of ~30× (coarse) to ~300× (fine).** After Phase 11–12's literal-FreeFem-mesh reproduction and the corrected figure reading (the [replicating-cocquet](archive/replicating-cocquet-transcript.md) session), the honest gap on the Cocquet Galerkin P2/P1 row is **~30× at N=10 and ~300× at N=100** — i.e. our slope is right but the curve sits on a different baseline. This **corrects two stale readings**: the "~2×" that an earlier Phase 11–12 header claimed (an order-of-magnitude misread of Fig. 2's N=10 point — it is ~3×10⁻⁵, not ~3×10⁻⁴), and the older "320×–845×" `freefem-divs` figures in the body below (a slope-aligned but not magnitude-best mesh; kept for provenance, but read them through the ~30–300× correction). The magnitude gap is most plausibly a *measurement* difference in what Cocquet plots (see the lateral-hypothesis subsection below), not a bug in our code.
+
+**Cocquet's reported numbers** (Fig 2 right, Re=500, c_in=0.5, N=200 self-reference): L²(u) ≈ 3×10⁻⁵ at N=10, ≈ 2×10⁻⁷ at N=100. Our best Galerkin P2/P1 (freefem-divs unstructured mesh) gives 9.68×10⁻³ at N=10 and 1.69×10⁻⁴ at N=100. Finest-segment slope matches: ours ‑2.05 (N=40→80), paper ‑2.18.
 
 ---
 
-## 1 — Executive summary
+## 1a — Lateral-hypothesis verdicts (merged from the 2026-05-24 replicating-cocquet session)
 
-**The gap.** Cocquet et al. 2021 (Fig 2 right, Re=500, c_in=0.5) report L²(u) ≈ 3×10⁻⁵ at N=10 and 2×10⁻⁷ at N=100 against an N=200 self-reference. Our best Galerkin P2/P1 (freefem-divs unstructured mesh) gives 9.68×10⁻³ at N=10 and 1.69×10⁻⁴ at N=100 — a **ratio that grows with refinement from ~320× to ~845×**. Finest-segment slope, however, matches: ours ‑2.05 (N=40→80), paper ‑2.18.
+Five lateral hypotheses were raised to explain the ~30–300× magnitude gap on the freefem-divs mesh. Four were tested and discarded *from inside the repo*; one is parked pending external code. See the archived [replicating-cocquet-transcript.md](archive/replicating-cocquet-transcript.md) for the full working.
+
+- **H-A (paper plots SQUARED L² norms).** DISCARDED. Plotting `‖e_u‖²` crosses the paper curve between N=20 and N=40 (above at coarse N, below at fine N) and gives slope −3.52 vs the paper's −2.30 — neither the ratios nor the slope match. Squaring is not the explanation.
+- **H-B (Cocquet's Picard stopped short of the discrete fixed point at Re=500, c_in=0.5).** DISCARDED. A literal pure-Picard sibling (`CocquetExperimentLiteralPicard`, itmax=10, tol=1e-10, no Newton) lands on the true discrete fixed point in 7–10 iterations; its L²(u) is bit-identical (≤0.018%) to the converged-Galerkin solution at every N. Cocquet's stopping rule applied literally closes none of the gap. (Also corrects the earlier "squared-norm" reading of the paper's `‖·‖_{L²(Ω)²}` stopping-rule notation: it is the vector-valued L², not a squared norm.)
+- **H-C (they measure `‖I_h u_ref − u_h‖`, a trial-space best-approximation projection, not `‖u_ref − u_h‖`).** DISCARDED. A trial-space-projection metric agrees with the free-DOF metric to ≤1.4% on the load-bearing Galerkin P2/P1 case (the P2-exact inlet + zero walls bound the difference to cross-mesh boundary-node noise). It cannot close even 1% of the gap.
+- **H-D (their FreeFem solver iterates on the lifting `w = u − V` and reports the error in `w`, not `u`).** PARKED — unfalsifiable from inside the repo (only the mesh-generation `.edp` is available, not Cocquet's solver `.edp`). Requires external action (corresponding-author email / supplementary-code hunt). Note `V` is P2-exact for the quadratic inlet, so a *divergence-free* lifting would leave the error unchanged; only an h-dependent approximate lifting could matter.
+- **H-E (a factor-of-2 in `S(u)` ⇒ effective ν doubled ⇒ smoother solution).** DISCARDED by code reading. `viscous_operators.jl` uses `2·α·ν·(ε(u)⊙ε(v))` with `ε(u)=½(∇u+∇uᵀ)`, matching the paper's `2Re⁻¹ S(u)` with `S(u)=½(∇u+∇uᵀ)`. Effective ν is genuinely `1/Re`, not `2/Re`. No mismatch.
+
+**Net:** nothing we can change in our code, solver, metric, or viscosity convention closes any meaningful part of the ~30–300× magnitude gap. The remaining viable explanation is a *measurement* difference in what Cocquet's (unavailable) solver plots (H-D or something beyond the original five), not a defect in our discretization.
+
+---
+
+## 1b — Supporting findings (pre-settlement synthesis)
+
+> These paragraphs pre-date the mesh-topology settlement (§1) and the ~30–300× correction (§1a). They remain accurate as **sub-findings** — the S5 sibling audit and the CocquetFormMMS exculpation are real — but note that "Dominant cap mechanism" below is now understood as *the structured-mesh manifestation* of the corner singularity: on an unstructured mesh the slope cap disappears (see §1). The paragraphs are kept for provenance and as the supporting evidence for §1.
 
 **What we know.** The code is a term-by-term faithful transcription of Cocquet's weak form (verified — §4 below). The Newton solve converges to machine-precision residual (3.7×10⁻¹⁵). On a manufactured solution with the **same** Forchheimer/porosity operators **and the same unstabilized Taylor-Hood P2/P1 Galerkin formulation** ([CocquetFormMMS three-way comparison](../../test/extended/CocquetFormMMS/)) we hit L²(u) = 2.85×10⁻⁷ at h=1/320 with slope 2.87 (optimal P2) — i.e., the code **can** reach paper magnitudes on smooth problems, **on the exact same Galerkin pathway used by Cocquet**. The remaining Cocquet-benchmark gap is therefore a **non-smoothness × discretization interaction**, not a solver bug or a stabilization-vs-Galerkin artifact.
 
@@ -22,13 +40,15 @@ This file is a **point-in-time synthesis** of the Cocquet investigation (the for
 
 → The convergence cap is driven by the **mixed-BC outlet corner singularity** at `(2,0)` and `(2,1)`, where Dirichlet walls meet the Neumann outlet. This also explains the localize_err finding (71% of structured-mesh L²(u)² lives at the outlet corner).
 
-**The remaining gap.** Even AllDirichlet's best run (P2/P2 N=80, L²(u) = 4.7×10⁻⁶) is still **~12× the paper's ~4×10⁻⁷** at N=80. So eliminating the corner singularity peels off the slope component of the gap, but a residual ~10× magnitude factor persists — almost certainly the **L²(u)/H¹(u) low-frequency mode anomaly** flagged in §5.4 (not yet diagnosed; S3 is the highest-priority remaining check). All currently-tested specific mechanisms (H1–H12, O1–O8) and S5 have been falsified or confirmed paper-faithful. **One pre-existing open hypothesis (O6, pressure gauge) and three new candidates from this audit (S1, S2, S3) remain to be tested.**
+**The remaining gap.** Even AllDirichlet's best run (P2/P2 N=80, L²(u) = 4.7×10⁻⁶) is still **~12× the paper's ~4×10⁻⁷** at N=80. So eliminating the corner singularity peels off the slope component of the gap, but a residual magnitude factor persists. All currently-tested specific mechanisms (H1–H12, O1–O8, S2–S5) and the five lateral hypotheses (H-A…H-E, §1a) have been falsified, confirmed paper-faithful, or closed by the mesh-topology settlement. **The only genuinely-open thread is external:** the ~30–300× magnitude gap is now attributed to a *measurement* difference in Cocquet's unavailable solver (H-D / beyond-the-five, §1a), not to any knob in our code. The earlier "L²(u)/H¹(u) low-frequency global mode" candidate (§5.4) was ruled out by S3a (χ_Ω ≲5%).
 
-**Housekeeping correction (2026-05-26).** A previous version of this synthesis claimed H8 (`pressure penalty η = 1e-7`) was falsified because the canonical [test/extended/CocquetExperiment/data/paper_comparison.json](../../test/extended/CocquetExperiment/data/paper_comparison.json) did not override the (now-removed) `1e-8` default in `base_config.json`. The fix landed on 2026-05-26: every Cocquet paper-comparison config now **explicitly sets `eps_val = 1e-7`** to match the paper, and `eps_val` was removed from `base_config.json` so it can no longer leak in silently (consistent with the CLAUDE.md rule that `load_config_with_*` must not invent values). The freefem-divs result that produced the headline numbers above was already running with `eps_val=1e-7` (it had its own override), so the headline ratios are unaffected by this fix.
+**Housekeeping correction (2026-05-26).** A previous version of this synthesis claimed H8 (`pressure penalty η = 1e-7`) was falsified because the canonical [test/extended/CocquetExperiment/data/paper_comparison.json](../../test/extended/CocquetExperiment/data/paper_comparison.json) did not override the (now-removed) `1e-8` default in `base_config.json`. The fix landed on 2026-05-26: every Cocquet paper-comparison config now **explicitly sets `physical_epsilon = 1e-7`** to match the paper, and `physical_epsilon` was removed from `base_config.json` so it can no longer leak in silently (consistent with the CLAUDE.md rule that `load_config_with_*` must not invent values). The freefem-divs result that produced the headline numbers above was already running with `physical_epsilon=1e-7` (it had its own override), so the headline ratios are unaffected by this fix.
 
 ---
 
 ## 2 — Headline numbers
+
+> **Read through the §1 correction.** The "320×–845×" ratios in this section are from the `freefem-divs` mesh — slope-aligned but not magnitude-best. The **settled** magnitude gap is **~30× (coarse) → ~300× (fine)** (§1). These rows are kept for provenance.
 
 ### Galerkin P2/P1, freefem-divs unstructured mesh (our best comparison) vs Cocquet Fig 2
 
@@ -88,8 +108,8 @@ These are not "hypotheses" in the experimental sense — they are claims about w
 | H4  | Forchheimer α(ε), β(ε) closure                                        | CONFIRMED           | [src/models/reaction.jl:57-62](../../src/models/reaction.jl#L57-L62) + [paper_comparison.json:25-26](../../test/extended/CocquetExperiment/data/paper_comparison.json#L25-L26) | `a_term = 0.30 · ((1‑ε)/ε)²`, `b_term = 1.75 · (1‑ε)/ε`. 0.30 = 150/500. ε=0.45 ⇒ a=0.448, b=2.139. Exact.                                                  |
 | H5  | Outlet BC ε-weighted traction-free (natural)                          | CONFIRMED           | [src/formulations/continuous_problem.jl:241](../../src/formulations/continuous_problem.jl#L241)                                                                       | `pres_term = -p·(α·∇·v + ∇α·v)` integrates by parts ⇒ natural BC `εσ·n = 0` on Γ_out. No explicit boundary integral.                                          |
 | H6  | Convective form ε(u·∇)u                                               | CONFIRMED           | [src/formulations/continuous_problem.jl:239](../../src/formulations/continuous_problem.jl#L239)                                                                       | `conv_term = v · (α · (∇(u)' · u))` = v · ε(u·∇)u. Exact.                                                                                                     |
-| H7  | Mass / pressure-divergence form                                       | CONFIRMED           | [src/formulations/continuous_problem.jl:241,244-245](../../src/formulations/continuous_problem.jl#L241)                                                                | `mass_term = q · (eps_val·p + α·∇·u + u·∇α) = q · (eps_val·p + div(εu))`. Exact.                                                                              |
-| H8 | Pressure penalty η = 1e-7 matches paper | CONFIRMED (after 2026-05-26 retrofit) | [paper_comparison.json:25](../../test/extended/CocquetExperiment/data/paper_comparison.json#L25) explicitly sets `"eps_val": 1e-7`. All Cocquet paper-comparison and sibling configs now do the same; `eps_val` was removed from [base_config.json](../../config/base_config.json) so it can no longer silently inherit. | Before the retrofit, several configs silently inherited the now-removed `1e-8` default. The freefem-divs headline run had its own `1e-7` override so the headline ratios in §2 are unaffected. The structured baseline + several sibling diagnostics ran at `1e-8` before the retrofit; they should be re-run against `1e-7` for a clean apples-to-apples (see §6 S1). |
+| H7  | Mass / pressure-divergence form                                       | CONFIRMED           | [src/formulations/continuous_problem.jl:241,244-245](../../src/formulations/continuous_problem.jl#L241)                                                                | `mass_term = q · (physical_epsilon·p + α·∇·u + u·∇α) = q · (physical_epsilon·p + div(εu))`. Exact.                                                                              |
+| H8 | Pressure penalty η = 1e-7 matches paper | CONFIRMED (after 2026-05-26 retrofit) | [paper_comparison.json:25](../../test/extended/CocquetExperiment/data/paper_comparison.json#L25) explicitly sets `"physical_epsilon": 1e-7`. All Cocquet paper-comparison and sibling configs now do the same; `physical_epsilon` was removed from [base_config.json](../../config/base_config.json) so it can no longer silently inherit. | Before the retrofit, several configs silently inherited the now-removed `1e-8` default. The freefem-divs headline run had its own `1e-7` override so the headline ratios in §2 are unaffected. The structured baseline + several sibling diagnostics ran at `1e-8` before the retrofit; they should be re-run against `1e-7` for a clean apples-to-apples (see §6 S1). |
 | H9  | P1 porosity interpolant for the Galerkin row                          | CONFIRMED           | [paper_comparison.json:11](../../test/extended/CocquetExperiment/data/paper_comparison.json#L11)                                                                       | `"porosity_order": 1` set explicitly on the Galerkin row.                                                                                                       |
 | H10 | Domain, inlet profile, porosity profile                               | CONFIRMED           | [run_convergence.jl:9-10](../../test/extended/CocquetExperiment/run_convergence.jl#L9-L10) + [paper_comparison.json:31-41](../../test/extended/CocquetExperiment/data/paper_comparison.json#L31-L41) | `alpha_func(x) = 0.45 + 0.55·exp(x[2]-1.0)`, box `[0,2]×[0,1]`, c_in=0.5. Exact.                                                                              |
 | H11 | N_ref=200 self-reference (same methodology as paper)                  | CONFIRMED           | [paper_comparison.json:62-67](../../test/extended/CocquetExperiment/data/paper_comparison.json#L62-L67) (convergence_partitions) + driver                              | Paper p.32 uses N=200 reference; our driver does too.                                                                                                          |
@@ -123,16 +143,16 @@ This section walks every previously-recorded conclusion and tests it against the
 
 ### §5.1 — H8 retrofit (2026-05-26) — silent default removed; ledger now consistent
 
-**Audit finding.** A prior version of this synthesis (and the long-running ledger) recorded H8 (`pressure penalty η = 1e-7`) as CONFIRMED, but a code audit showed the canonical [test/extended/CocquetExperiment/data/paper_comparison.json](../../test/extended/CocquetExperiment/data/paper_comparison.json) did **not** override the `eps_val=1e-8` default in `base_config.json`. So the structured baseline + the H1 ModifiedCorner experiment + the Alpha1 / Deviatoric / LinearReaction / AllDirichlet sibling diagnostics were all running with `eps_val=1e-8`, a 10× *smaller* penalty than the paper's `η = 1e-7`. The IrregularMeshFreefemDivs config that produced the headline numbers in §2 had its own `1e-7` override, so those headline ratios are unaffected.
+**Audit finding.** A prior version of this synthesis (and the long-running ledger) recorded H8 (`pressure penalty η = 1e-7`) as CONFIRMED, but a code audit showed the canonical [test/extended/CocquetExperiment/data/paper_comparison.json](../../test/extended/CocquetExperiment/data/paper_comparison.json) did **not** override the `physical_epsilon=1e-8` default in `base_config.json`. So the structured baseline + the H1 ModifiedCorner experiment + the Alpha1 / Deviatoric / LinearReaction / AllDirichlet sibling diagnostics were all running with `physical_epsilon=1e-8`, a 10× *smaller* penalty than the paper's `η = 1e-7`. The IrregularMeshFreefemDivs config that produced the headline numbers in §2 had its own `1e-7` override, so those headline ratios are unaffected.
 
 **Fix (2026-05-26):**
-- (a) `eps_val=1e-7` now set explicitly in all seven affected configs ([CocquetExperiment](../../test/extended/CocquetExperiment/data/paper_comparison.json), [ModifiedCorner main](../../test/extended/CocquetExperimentModifiedCorner/data/paper_comparison_modified_corner.json) and [smoke](../../test/extended/CocquetExperimentModifiedCorner/data/paper_comparison_modified_corner_smoke.json), [Alpha1](../../test/extended/CocquetAlpha1/data/alpha1.json), [Deviatoric](../../test/extended/CocquetDeviatoric/data/deviatoric.json), [LinearReaction](../../test/extended/CocquetLinearReaction/data/linear_reaction.json), [AllDirichlet](../../test/extended/CocquetAllDirichlet/data/all_dirichlet.json)).
-- (b) `eps_val` removed from [base_config.json](../../config/base_config.json) so silent inheritance through `load_config_with_*` is impossible (every test config must now declare its own `eps_val` or the strict struct constructor will fail loudly — consistent with the CLAUDE.md "no implicit defaults — fail loudly on missing input" rule).
+- (a) `physical_epsilon=1e-7` now set explicitly in all seven affected configs ([CocquetExperiment](../../test/extended/CocquetExperiment/data/paper_comparison.json), [ModifiedCorner main](../../test/extended/CocquetExperimentModifiedCorner/data/paper_comparison_modified_corner.json) and [smoke](../../test/extended/CocquetExperimentModifiedCorner/data/paper_comparison_modified_corner_smoke.json), [Alpha1](../../test/extended/CocquetAlpha1/data/alpha1.json), [Deviatoric](../../test/extended/CocquetDeviatoric/data/deviatoric.json), [LinearReaction](../../test/extended/CocquetLinearReaction/data/linear_reaction.json), [AllDirichlet](../../test/extended/CocquetAllDirichlet/data/all_dirichlet.json)).
+- (b) `physical_epsilon` removed from [base_config.json](../../config/base_config.json) so silent inheritance through `load_config_with_*` is impossible (every test config must now declare its own `physical_epsilon` or the strict struct constructor will fail loudly — consistent with the CLAUDE.md "no implicit defaults — fail loudly on missing input" rule).
 - Blitz tests (83 / 83) pass post-fix.
 
 **Why this doesn't close the magnitude gap.** Direction analysis: the penalty term is `+ η·p·q`. A smaller η means a *tighter* constraint on `div(εu) ≈ 0` — more faithful to the true incompressibility constraint, not less. The previous `1e-8` versus paper-faithful `1e-7` could not have moved velocity error by orders of magnitude. The pre-retrofit sweeps should be regenerated for audit-trail consistency (S1 in §6), but Δ on L²(u) is predicted ≪ 1e‑6, far below the 1e‑4 error level.
 
-**Sensitivity confirmed empirically (2026-05-26).** The canonical structured-mesh CocquetExperiment was re-run post-retrofit with `eps_val=1e-7` explicit. The ASGS P1/P1 L²(u) numbers are **bit-identical to 4 significant figures** to the pre-retrofit (1e-8) run: N=10: 3.919×10⁻³, N=20: 1.187×10⁻³, N=40: 3.433×10⁻⁴, N=80: 8.840×10⁻⁵. The eps_val change is empirically invisible at the present error scale, as predicted by the direction analysis. The retrofit's value is methodological (paper-faithful + no silent defaults), not numerical.
+**Sensitivity confirmed empirically (2026-05-26).** The canonical structured-mesh CocquetExperiment was re-run post-retrofit with `physical_epsilon=1e-7` explicit. The ASGS P1/P1 L²(u) numbers are **bit-identical to 4 significant figures** to the pre-retrofit (1e-8) run: N=10: 3.919×10⁻³, N=20: 1.187×10⁻³, N=40: 3.433×10⁻⁴, N=80: 8.840×10⁻⁵. The physical_epsilon change is empirically invisible at the present error scale, as predicted by the direction analysis. The retrofit's value is methodological (paper-faithful + no silent defaults), not numerical.
 
 ### §5.2 — O1's symmetry argument is sound, with one open thread
 
@@ -157,9 +177,11 @@ What this says, decomposed:
 
 Cocquet's reported 3×10⁻⁵ at N=10 is **6× below** even the structured-bulk-only error (1.72e‑4 = 3.19e‑4 × √0.253 ≈ 1.6e‑4, of the right order). So Cocquet has *both*: a more accurate bulk AND no corner singularity. The unusual combination suggests their mesh is corner-refined (BAMG adaptive) rather than uniform Delaunay.
 
-**Action (S2):** check Cocquet's Section 5 mesh recipe in the paper PDF for adaptive flags. If they use `adaptmesh` or post-uniform-refinement adaptation, that single fact would change all of this analysis.
+**Action (S2): CLOSED.** Superseded by the mesh-topology settlement (§1): a *plain* unstructured Delaunay mesh (no adaptivity) already recovers the paper's $O(h^2)$ slope (Phase 11), so whether Cocquet additionally used BAMG adaptmesh is no longer load-bearing for the settled slope conclusion.
 
-### §5.4 — The L²/H¹ cross-norm anomaly is the most actionable observation in the ledger
+### §5.4 — The L²/H¹ cross-norm anomaly (global-mode candidate — CLOSED by S3a)
+
+> **CLOSED 2026-07-04.** The global-mode reading below was **ruled out**: S3a's domain-mean share χ_Ω is ≲5% for the load-bearing Galerkin P2/P1 and ASGS P2/P2 rows (see the S3a detail in the Appendix). The magnitude gap is *not* a rigid/global mode surviving self-reference. Kept for provenance and because the cross-norm numbers themselves are still valid observations.
 
 Numbers from the ledger:
 
@@ -173,7 +195,7 @@ Candidate mechanisms for such a mode:
 - Wall layer at y=0: porosity minimum (0.45) ⇒ Forchheimer drag at its peak. A thin, slowly-resolved boundary layer would add low-frequency mass.
 - Forchheimer term activation threshold: drag term `β(ε)|u|u` is non-smooth at |u|=0. The cross-stream zero-line of u_y could create a kink.
 
-**Action (S3):** project u_h − u_ref onto P0 (cell-mean) and onto low-degree polynomials. If the P0 projection captures most of the energy, the gap *is* a global mode and the candidate mechanisms above become testable. This is the most informative diagnostic not yet run.
+**Action (S3): DONE — global mode ruled out.** The P0 / domain-mean projection was run (S3a): χ_Ω ≲5% on the load-bearing cases, so the gap is *not* a global mode. No candidate mechanism above survives; the residual magnitude gap is a measurement question (§1a).
 
 ### §5.5 — O3 "we're solving the same PDE" relies on a single coarse-grained probe
 
@@ -199,7 +221,7 @@ The remaining open question (S3 below) is what specific feature of the Cocquet b
 
 ### §5.7 — S5 sibling audit (CLOSED 2026-05-26): mixed-BC outlet corner is the dominant cap mechanism
 
-Each sibling is a deliberate one-knob flip of the canonical [paper_comparison.json](../../test/extended/CocquetExperiment/data/paper_comparison.json). All results below were produced 2026-05-22 with `h_floor_weight=0` (post τ-floor regression fix) but pre-eps_val retrofit (i.e., they ran at `eps_val=1e-8` rather than the now-explicit `1e-7`). The expected Δ on L²(u) from that 10× penalty change is ≪ 1e-6 — well below the magnitudes reported here — so the verdicts below stand. A clean re-sweep is queued as S1.
+Each sibling is a deliberate one-knob flip of the canonical [paper_comparison.json](../../test/extended/CocquetExperiment/data/paper_comparison.json). All results below were produced 2026-05-22 with `h_floor_weight=0` (post τ-floor regression fix) but pre-physical_epsilon retrofit (i.e., they ran at `physical_epsilon=1e-8` rather than the now-explicit `1e-7`). The expected Δ on L²(u) from that 10× penalty change is ≪ 1e-6 — well below the magnitudes reported here — so the verdicts below stand. A clean re-sweep is queued as S1.
 
 **Sibling L²(u) at N=80, slope across N∈{10,20,40,80}, vs paper N=80 reference (~4×10⁻⁷):**
 
@@ -227,7 +249,7 @@ Each sibling is a deliberate one-knob flip of the canonical [paper_comparison.js
 | AllDirichlet structured (no mixed-BC corner) — ASGS P2/P2 | 4.70×10⁻⁶ | 12× | Only outlet BC changed |
 | ↳ ratio | 1.95× improvement | | |
 
-Removing the corner singularity buys a **~2× magnitude improvement** in the ASGS P2/P2 row (and almost all of the slope cap, from 1.64 → 2.46). The residual **~12× factor to the paper persists even with the corner gone** — almost certainly the global / low-frequency mode flagged in §5.4 (L²/H¹ anomaly). Caveat: AllDirichlet changes the physical problem (no traction-free outlet), so this is the structured-mesh apples-to-apples within OUR experiments, not against Cocquet's reported Re=500 c_in=0.5 case directly. But the SLOPE comparison is methodology-invariant and is the meaningful diagnostic.
+Removing the corner singularity buys a **~2× magnitude improvement** in the ASGS P2/P2 row (and almost all of the slope cap, from 1.64 → 2.46). The residual **~12× factor to the paper persists even with the corner gone** — originally attributed to the global / low-frequency mode flagged in §5.4, but that global-mode reading was later ruled out (S3a, χ_Ω ≲5%); the residual magnitude gap is now understood as a measurement difference in Cocquet's unavailable solver (§1a). Caveat: AllDirichlet changes the physical problem (no traction-free outlet), so this is the structured-mesh apples-to-apples within OUR experiments, not against Cocquet's reported Re=500 c_in=0.5 case directly. But the SLOPE comparison is methodology-invariant and is the meaningful diagnostic.
 
 For the Galerkin P2/P1 row (the actual Cocquet pathway) on the structured mesh, the canonical post-retrofit numbers are: L²(u) = 2.31×10⁻⁵ at N=80 → **58× paper**, slope ‑1.22. The freefem-divs Delaunay mesh gives 2.67×10⁻⁴ at N=80 (670× paper) with the better slope ‑2.05 — the structured mesh is in fact 12× *more accurate* in absolute terms at N=80 despite the worse slope (the structured mesh's lower coarse-N bulk error wins until h is small enough for the slope advantage to flip). This crossover is why the §2 headline numbers (freefem-divs) overstate the magnitude gap at finite N — they reflect the SLOPE-aligned mesh, not the absolute-magnitude-best one.
 
@@ -244,12 +266,12 @@ For the Galerkin P2/P1 row (the actual Cocquet pathway) on the structured mesh, 
 | ID  | Claim                                                                                          | Currently exists?                                                                                                                                                | Status  | Estimated cost |
 |-----|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|----------------|
 | ~~O4~~ | ~~Cocquet reports relative L²(u), not absolute~~ | **FALSIFIED 2026-05-26.** Cocquet et al. 2021 page 32 explicitly defines `Err_tot := ‖ũ_h − ũ‖_X + ‖p_h − p‖_L²(Ω)` (absolute), and the Figure 2 / 3 right panels plot the same absolute L²(u). No relative normalization anywhere. | CLOSED | — |
-| O6  | Cocquet uses Lagrange-multiplier or zero-mean pressure gauge instead of η-penalty               | None                                                                                                                                                              | OPEN    | Medium         |
+| ~~O6~~  | ~~Cocquet uses Lagrange-multiplier or zero-mean pressure gauge instead of η-penalty~~               | **PARKED 2026-07-04.** Subsumed by the mesh-topology settlement (§1) + the ~30–300× magnitude reading (§1a): the residual gap this hypothesis was meant to explain is now attributed to a measurement difference in Cocquet's *unavailable* solver (H-D / beyond-the-five), not to a pressure-gauge global mode. Untestable without their `.edp`. | PARKED  | — (external)   |
 | ~~O7~~ | ~~Newton stalls short of machine precision in some runs~~ | **FALSIFIED 2026-05-26.** [test/extended/CocquetExperimentIrregularMesh/results/run_freefem_uniform.log](../../test/extended/CocquetExperimentIrregularMesh/results/run_freefem_uniform.log) shows every Galerkin solve at N∈{10,20,30,…,100} reaches iter-4 residual inf-norm between 1.7×10⁻¹⁵ and 1.0×10⁻¹³ (machine precision). The N=200 reference solve goes 7 iterations, stops at 6.0×10⁻¹² — still well below the configured `ftol=1e-11`. | CLOSED | — |
 | ~~O8~~ | ~~Anderson acceleration interferes with the Galerkin runs~~ | **FALSIFIED 2026-05-26.** [galerkin_driver.jl:48-49](../../test/extended/CocquetExperiment/galerkin_driver.jl#L48-L49) constructs `SafeNewtonSolver` for both Picard and Newton modes — neither takes the Anderson accelerator. The Anderson config block in [paper_comparison.json:84-88](../../test/extended/CocquetExperiment/data/paper_comparison.json#L84-L88) only enters `solve_system`'s ASGS/OSGS pathway (used for the P1/P1 and P2/P2 ASGS rows), not the Galerkin pathway. Newton from a zero initial guess; line-search Armijo with full step size α=1.0 throughout. | CLOSED | — |
-| **S1** | **Re-run the configs that previously inherited eps_val=1e‑8 against the now-explicit 1e‑7** | **CocquetExperiment canonical: DONE 2026-05-26** — ASGS P1/P1 numbers bit-identical to 4 sig figs (Δ at N=80 is < 1e‑10 — empirically invisible). Still pre-retrofit: ModifiedCorner, Alpha1, Deviatoric, LinearReaction, AllDirichlet. Freefem-divs / FreeFem-mesh / LiteralPicard always had 1e‑7. | PARTIALLY CLOSED | Low — the canonical confirms the change is invisible. The 5 remaining sweeps are bookkeeping only. |
-| **S2** | **Cocquet uses BAMG-adaptive corner-refined mesh, not uniform Delaunay**                    | Inspect [theory/Cocquet et al. - 2021 ...pdf](../../theory/) Section 5 mesh recipe for `adaptmesh`/`hsize` adaptation flags                                          | NEW     | Trivial (read) |
-| **S3** | **Low-frequency / global mode contaminates L²(u) but not H¹(u). Project u_h − u_ref onto P0** | None                                                                                                                                                              | NEW     | Low (write probe script) |
+| **S1** | **Re-run the configs that previously inherited physical_epsilon=1e‑8 against the now-explicit 1e‑7** | **CocquetExperiment canonical: DONE 2026-05-26** — ASGS P1/P1 numbers bit-identical to 4 sig figs (Δ at N=80 is < 1e‑10 — empirically invisible). Still pre-retrofit: ModifiedCorner, Alpha1, Deviatoric, LinearReaction, AllDirichlet. Freefem-divs / FreeFem-mesh / LiteralPicard always had 1e‑7. | PARTIALLY CLOSED | Low — the canonical confirms the change is invisible. The 5 remaining sweeps are bookkeeping only. |
+| ~~S2~~ | ~~Cocquet uses BAMG-adaptive corner-refined mesh, not uniform Delaunay~~                    | **CLOSED 2026-07-04.** Superseded by the mesh-topology settlement (§1): Phase 11 showed a *plain* unstructured Delaunay mesh (no adaptivity) already recovers $O(h^2)$, matching the paper's slope. Whether Cocquet additionally used BAMG adaptivity is no longer load-bearing for the settled *slope* conclusion; the residual *magnitude* gap is a measurement question (§1a), not a mesh-adaptivity one. | CLOSED  | —              |
+| ~~S3~~ | ~~Low-frequency / global mode contaminates L²(u) but not H¹(u). Project u_h − u_ref onto P0~~ | **CLOSED 2026-07-04.** The global-mode hypothesis was ruled out for the load-bearing cases: S3a's domain-mean share χ_Ω is ≲5% for Galerkin P2/P1 and ASGS P2/P2 (§5.4a / the S3a detail below). With the slope explained by mesh-topology (§1) and the magnitude gap attributed to a measurement difference (§1a), there is no residual global mode left to diagnose. | CLOSED  | —              |
 | ~~**S5**~~ | ~~Audit untouched Cocquet siblings~~ | **CLOSED 2026-05-26.** See §5.7. Three siblings (Alpha1 / Deviatoric / LinearReaction) exonerate all porous-physics knobs as cap sources. AllDirichlet implicates the **mixed-BC outlet corner**: P2/P2 slope jumps from ~1.3 to 2.46 when the corner is eliminated. LiteralPicard exonerates linearization choice. | CLOSED  | — |
 
 ~~**S4** (Galerkin-mode MMS to confirm unstabilized pathway is correct on smooth fields)~~ — **CLOSED**. The CocquetFormMMS test already includes a Galerkin P2/P1 leg as part of the three-way comparison. Result: L²(u) = 2.85×10⁻⁷ at h=1/320, slope ‑2.87 (optimal P2). See §5.6.
@@ -258,21 +280,24 @@ For the Galerkin P2/P1 row (the actual Cocquet pathway) on the structured mesh, 
 
 ## 7 — What we have NOT yet verified (the frontier)
 
+> **Mostly settled (2026-07-04).** With the slope explained as a structured-mesh artifact (§1) and the magnitude gap attributed to a measurement difference in Cocquet's unavailable solver (§1a), the only genuinely-open item is the external one (H-D, below). S2 and S3 are now CLOSED (see §6); their entries are kept here struck-through for provenance.
+
 Organized by likely diagnostic value:
 
-### Most likely to yield a diagnosis
-- **S3 — Spatial L²(u) decomposition of u_h − u_ref.** The 120× L²/H¹ anomaly (§5.4) is *the* fingerprint. After the S5 audit (§5.7) we know the mixed-BC corner is the **slope** cap, but a residual ~10× magnitude gap remains even after the corner is removed (AllDirichlet P2/P2 still 12× the paper). A P0 cell-mean / low-degree polynomial projection of `u_h − u_ref` would tell us whether that residual is a global-mode contamination — and if so, which mechanism (pressure gauge O6, wall layer near porosity-min y=0, etc.).
+### The one genuinely-open item — requires external action
+- **H-D — Cocquet's solver may iterate on the lifting `w = u − V` and plot the error in `w`.** Unfalsifiable from inside the repo (only the mesh-generation `.edp` is available). This — or "something beyond the original five" (a different reported functional, mislabelled figure axis, etc.) — is the residual explanation for the ~30–300× *magnitude* gap. Resolution needs Cocquet's actual solver source (corresponding-author email at hal-02561058 / supplementary-materials hunt). See §1a.
+
+### CLOSED — folded into the mesh-topology settlement (2026-07-04)
+- ~~**S3 — Spatial L²(u) decomposition of u_h − u_ref.**~~ CLOSED. The global-mode hypothesis was ruled out (S3a χ_Ω ≲5% on the load-bearing cases); no residual global mode remains once the slope is mesh-topology (§1) and the magnitude gap is a measurement question (§1a).
+- ~~**S2 — Cocquet's mesh is BAMG-adaptive / corner-refined.**~~ CLOSED. A *plain* unstructured Delaunay mesh already recovers $O(h^2)$ (Phase 11); adaptivity is not load-bearing for the settled slope conclusion.
 
 ### Cheapest to settle — ALL CLOSED 2026-05-26
 - ~~**O4**~~ — Cocquet plots absolute L²(u) (paper p. 32 `Err_tot` definition explicit).
 - ~~**O7**~~ — All Galerkin Newton solves reach iter-4 residual ≤ 1.0×10⁻¹³, well past `ftol=1e-11`.
 - ~~**O8**~~ — Galerkin path uses `SafeNewtonSolver` only; Anderson never fires on the Galerkin row.
 
-### Highest impact if true
-- **S2 — Cocquet's mesh is BAMG-adaptive / corner-refined.** Now reinforced by S5: we know (i) the mixed-BC outlet corner is the slope cap, and (ii) a residual magnitude gap of ~10× persists even after the corner is removed. If Cocquet's mesh refines the corner adaptively, that would (i) explain why their slope is paper-level on the *same* mixed-BC problem, and (ii) the residual gap could plausibly be a global mode (S3) that BAMG also dampens. Read-only check of the paper PDF Section 5; no compute.
-
 ### Bookkeeping (after the canonical re-run confirmed Δ is invisible)
-- **S1 (partially closed) — Re-sweep the 5 remaining pre-retrofit siblings** (ModifiedCorner, Alpha1, Deviatoric, LinearReaction, AllDirichlet) for audit-trail consistency. The canonical CocquetExperiment was re-run 2026-05-26 with `eps_val=1e-7` explicit and gave numbers bit-identical to 4 significant figures vs the pre-retrofit `1e-8` run — so the empirical effect is below 1e-10 on L²(u). The 5 remaining sweeps are pure bookkeeping; defer until the user wants AC-powered overnight compute.
+- **S1 (partially closed) — Re-sweep the 5 remaining pre-retrofit siblings** (ModifiedCorner, Alpha1, Deviatoric, LinearReaction, AllDirichlet) for audit-trail consistency. The canonical CocquetExperiment was re-run 2026-05-26 with `physical_epsilon=1e-7` explicit and gave numbers bit-identical to 4 significant figures vs the pre-retrofit `1e-8` run — so the empirical effect is below 1e-10 on L²(u). The 5 remaining sweeps are pure bookkeeping; defer until the user wants AC-powered overnight compute.
 
 ### Hypotheses suggested by the audit but probably not worth testing
 - **Inlet quadratic profile + P2 representation.** With c_in=0.5 the inlet is *exactly* representable by P2; no projection error.
@@ -285,11 +310,11 @@ Organized by likely diagnostic value:
 
 ## 8 — Document relationships and update protocol
 
-- [docs/cocquet/investigation-synthesis.md](investigation-synthesis.md) — **chronological ledger.** Append-only record of every diagnostic.
-- [docs/cocquet/convergence-analysis.md](convergence-analysis.md) — **slope-phenomenology sibling.**
-- **This file (cocquet_investigation_synthesis.md)** — **point-in-time snapshot, replaceable.** Update whenever a hypothesis crosses the open→closed boundary or a new candidate is surfaced. Keep the ledger appendable; keep this file replaceable.
+- **This file** — **CANONICAL Cocquet reference; start here.** The single canonical doc: the settled conclusion (§1), the merged lateral-hypothesis verdicts (§1a), the supporting synthesis (§1b onward), and the folded-in hypothesis ledger (Appendix). Update it in place when a hypothesis crosses the open→closed boundary. (The earlier framings of this file as an "append-only ledger" and as a "replaceable point-in-time snapshot" are retired — those were two conflicting self-descriptions; the resolved role is the one canonical reference.)
+- [docs/cocquet/convergence-analysis.md](convergence-analysis.md) — **historical phased-slope diary** (Phases 1–12; some early verdicts withdrawn — read via this synthesis).
+- [docs/cocquet/replicating-cocquet-transcript.md](archive/replicating-cocquet-transcript.md) / [docs/cocquet/corner-singularity-transcript.md](archive/corner-singularity-transcript.md) — **archived raw transcripts** (provenance only; conclusions merged here).
 
-**Open action items**, in order of recommended attack: S3, S2, S1, O6. (O4, O7, O8, S5 all closed 2026-05-26.)
+**Open action items:** only H-D remains, and it is external (obtain Cocquet's solver `.edp`; see §1a / §7). All in-repo threads (O1–O8, S1–S5, S3a/S3b, H-A…H-E) are closed, parked, or confirmed paper-faithful.
 
 
 ---
@@ -316,6 +341,8 @@ bend in the right direction.
   smooth flow than Cocquet's.
 
 ### Hypotheses ruled out (no further work needed)
+
+> The paper-faithfulness hypotheses **H3–H12** below are the detailed growth-log prose; the same claims are summarised in compact table form in **§4.1**. The two are not redundant (table = quick reference, this = per-hypothesis provenance). H1 (FALSIFIED — ModifiedCorner made structured convergence ~3× worse) is the load-bearing experimental record and is kept in full here.
 
 #### H1: Outlet-corner Dirichlet pin causes the convergence cap
 - **Status:** FALSIFIED.
@@ -375,12 +402,12 @@ bend in the right direction.
 - **Paper:** `b(ε; v, q) = -∫ q · div(εv) dx`, and mass eq `div(εu) = 0`.
 - **Our code:**
   - `pres_term = -p * (α*(∇·v) + ∇(α)·v) = -p·div(εv)`
-  - `mass_term = q * (eps_val*p + α*(∇·u) + u·∇(α)) = q · (eps_val·p + div(εu))`
-  - `eps_val=1e-7 = paper's η`.
+  - `mass_term = q * (physical_epsilon*p + α*(∇·u) + u·∇(α)) = q · (physical_epsilon·p + div(εu))`
+  - `physical_epsilon=1e-7 = paper's η`.
 
 #### H8: Pressure penalty η
 - **Status:** CONFIRMED.
-- **Paper (p. 30):** `η = 1e-7`. Our config: `eps_val = 1e-7`.
+- **Paper (p. 30):** `η = 1e-7`. Our config: `physical_epsilon = 1e-7`.
 
 #### H9: P₁ porosity interpolant for Galerkin
 - **Status:** CONFIRMED for the Galerkin comparison row.
@@ -480,7 +507,8 @@ bend in the right direction.
 - **Probe was stopped after this diagnosis** to free CPU; no need to wait
   for the full solve.
 
-#### O6: Pressure mean-zero gauge / hydrostatic constant
+#### O6: Pressure mean-zero gauge / hydrostatic constant — PARKED (2026-07-04)
+> **PARKED** by the mesh-topology settlement (§1) + the ~30–300× reading (§1a): the residual gap O6 was meant to explain is now attributed to a measurement difference in Cocquet's unavailable solver (H-D / beyond-the-five), and the global-mode pathway a gauge offset would drive was ruled out by S3a (χ_Ω ≲5%). Untestable without their `.edp`.
 - **Why suspect:** Pressure is only defined up to a constant under the natural-BC
   outlet. We add `η p` penalty to fix it. Cocquet may use a different gauge
   (Lagrange multiplier, zero-mean projection, fix-a-point). This affects p
@@ -575,7 +603,8 @@ bend in the right direction.
   - Intermediate (0.05–0.5): partial contribution; report and pair with the
     corner-excluded decomposition in S3b.
 
-#### S3b: Corner-localised error decomposition (corner-excluded L² norm)
+#### S3b: Corner-localised error decomposition (corner-excluded L² norm) — CLOSED (2026-07-04)
+> **CLOSED / parked** by the mesh-topology settlement (§1): the corner-localisation is the *structured-mesh* manifestation of the cap; on an unstructured Delaunay mesh the corner content drops to ~1% and the slope recovers to $O(h^2)$. The residual magnitude gap is a measurement question (§1a), not a corner-decomposition one. Probe definition kept for provenance.
 - **Why suspect:** The earlier localised analysis (item 3 in the queue, line 240)
   found that on the structured Cartesian-simplexified mesh **71 %** of the
   squared error is concentrated within 0.1 of the two outlet–wall corners

@@ -96,14 +96,14 @@ $$\frac{h\,|\nabla\alpha|}{\alpha} \approx \frac{h \cdot (1-\alpha_0)/\Delta r}{
 At the coarsest mesh (`h = 0.1`, `α₀ = 0.5`) this gives `~0.5`; at the finest (`h = 0.003`, `α₀ = 0.5`) it gives `~0.015`. The Cocquet experiment uses `α ≡ 1` so `|∇α| = 0` trivially. The assumption holds across the entire current sweep.
 
 **Regression anchor**: [test/blitz/tau_blitz_test.jl](../../test/blitz/tau_blitz_test.jl) `@testset "Tau1/Tau2 simplified paper form is intentional [P-001, P-008]"` locks in both simplifications:
-1. `compute_tau_2` does not take `eps_val` and produces values exactly matching the closed-form `h²/(c₁ α τ_NS + reg)`.
+1. `compute_tau_2` does not take `physical_epsilon` and produces values exactly matching the closed-form `h²/(c₁ α τ_NS + reg)`.
 2. `compute_tau_1` is bit-identical when `med.grad_alpha` varies by orders of magnitude while local `α` is held fixed.
 
 A future audit that re-raises P-001 ("τ₂ missing ε·h²") or P-008 ("τ₁ missing C_α") should reach this section first and then fail the anchor test rather than file a regression.
 
 ### Re-evaluation triggers (when to switch to the full forms)
 
-- **Switch to `eq:Tau2` (with `ε h²`)** if a future config drives `ε` large enough that `ε h²` becomes comparable to `c₁ α τ_NS`. The `eps_val` field already flows through `phys_cfg`; the switch is a local change in `compute_tau_2` and its derivative `compute_dtau_2_du`.
+- **Switch to `eq:Tau2` (with `ε h²`)** if a future config drives `ε` large enough that `ε h²` becomes comparable to `c₁ α τ_NS`. The `physical_epsilon` field already flows through `phys_cfg`; the switch is a local change in `compute_tau_2` and its derivative `compute_dtau_2_du`.
 - **Switch to `eq:Tau1` (with `C_α`)** if a future config has `h|∇α|/α ≳ 1` (steep porosity gradient under-resolved). `grad_alpha` is already plumbed through `MediumState`, so the implementation is unblocked when triggered.
 
 ## 5. OSGS Preconditioning \u0026 Linearization Architecture
@@ -171,7 +171,7 @@ Three independent concerns, all flagged during the planning discussion that prec
 
 3. **The continuous gauge is fixed by the iterative penalty $\varepsilon > 0$.** The mass equation carries an $\varepsilon \cdot p$ term whose lagged previous-iterate form (the Codina iterative penalty) drives $p$ toward zero-mean. The §3.6 patch therefore addresses **intermediate-iteration pollution** of the convergence diagnostic, not a steady-state correctness issue. The expected MMS-rate improvement is in the noise floor of the measurement, not in the converged solution.
 
-   > **Clarification (2026-06-24 — `eps_phys` vs `eps_num`).** The gauge-fixing $\varepsilon$ is the **numerical iterative penalty** (`numerical_epsilon` / `eps_num`), implemented **Jacobian-only** (lagging $\varepsilon\,p^{n-1}$ to the RHS, so it cancels at convergence) — *not* a physical compressibility. The physical $\varepsilon_\text{phys}$ (formulation `eps_val`) is **0** for the incompressible problem (article.tex `eq:StrongMassEquation` L239, "mainly for numerical reasons"; the 2D examples take $\varepsilon=0$, L1098). A 2026-06-24 working-tree bug that set a non-zero `eps_phys` default in the 3D MMS harness (silently solving a *compressible* problem, with $\varepsilon p_\text{ex}$ injected into the oracle source) was reverted — see `lessons_learned.md` and [`mms/3d-p2-convergence-investigation.md`](../mms/3d-p2-convergence-investigation.md) §5. The canonical spec for the gate's incompressible ε handling is [`nonlinear-convergence-criterion-prompt.md`](nonlinear-convergence-criterion-prompt.md) §4.1.
+   > **Clarification (2026-06-24 — `eps_phys` vs `eps_num`).** The gauge-fixing $\varepsilon$ is the **numerical iterative penalty** (`numerical_epsilon` / `eps_num`), implemented **Jacobian-only** (lagging $\varepsilon\,p^{n-1}$ to the RHS, so it cancels at convergence) — *not* a physical compressibility. The physical $\varepsilon_\text{phys}$ (formulation `physical_epsilon`) is **0** for the incompressible problem (article.tex `eq:StrongMassEquation` L239, "mainly for numerical reasons"; the 2D examples take $\varepsilon=0$, L1098). A 2026-06-24 working-tree bug that set a non-zero `eps_phys` default in the 3D MMS harness (silently solving a *compressible* problem, with $\varepsilon p_\text{ex}$ injected into the oracle source) was reverted — see `lessons_learned.md` and [`mms/3d-p2-convergence-investigation.md`](../mms/3d-p2-convergence-investigation.md) §5. The canonical spec for the gate's incompressible ε handling is [`nonlinear-convergence-criterion-prompt.md`](nonlinear-convergence-criterion-prompt.md) §4.1.
 
 ### Re-evaluation triggers
 
@@ -258,7 +258,7 @@ Crucially, `eval_time` **excludes**:
 **Implementation Reality**: `[code-actual]` — The authoritative success gate is **scale-free**: the iterate is converged iff `ε_M ≤ tol_M` **and** `ε_C ≤ tol_C`, where
 
 - `ε_M = ‖r_M‖ / D_M` — the assembled stabilized momentum residual (velocity block) over a *dynamic* force-magnitude envelope `D_M = ‖α u·∇u‖ + ‖2∇·(α ν Πˢ∇u)‖ + ‖α ∇p‖ + ‖σ(α,u) u‖ + ‖f‖` (Philosophy A: every term assembled through the same weak form, same Euclidean norm as the numerator);
-- `ε_C = ‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖_F + ‖g‖)` — the genuine, source-subtracted mass residual over a flux-gradient-plus-source envelope. The `−g` makes `ε_C → 0` at the discrete solution even for a manufactured/forced problem; the pure-divergence ratio `‖∇·(α u)‖/‖∇(α u)‖ ≤ √d` is checked separately as a quadrature self-check.
+- `ε_C = ‖r_C‖ / D_C` — the Route-B **"Philosophy-A" algebraic** mass gate: the assembled stabilized mass residual over a term-magnitude envelope, **symmetric with `ε_M`** and gated at the same `~1e-9` level. The earlier strong-form / flux-gradient measure `‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖_F + ‖g‖)` (with the pure-divergence ratio `‖∇·(α u)‖/‖∇(α u)‖ ≤ √d` self-check) is now the **diagnostic `eps_C_strong`**, no longer the gate. A **`residual_floor_reached` scale-free accept** accepts machine-floor-converged cells whose `ε_C` cannot reach `tol` because `D_C` collapses for near-divergence-free flow. See [`docs/mms/route-b-2d-sweep-status.md`](../mms/route-b-2d-sweep-status.md).
 
 Because `D_M` (and the mass envelope) are *measured from the current iterate and known material data*, the gate carries **no a-priori scale** (no `U`, `L`, `P`, `Re`, `Da`) and is the SAME threshold across ping-pong cascade segments. This deliberately supersedes the OLD per-field **re-anchored** relative-ftol gate (`effective_ftol = relative_ftol·‖R₀‖`, `f_norm = ‖R‖/effective_ftol`), whose re-anchoring forced each segment to demand another `×(1/ftol)` residual drop. **That relative gate was then REMOVED (commit `d1fac8e`): `relative_ftol_per_field` is gone, so the `conv_probe===nothing` fallback now uses the uniform scalar `ftol` per field.**
 

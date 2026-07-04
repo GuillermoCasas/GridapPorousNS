@@ -147,6 +147,9 @@ relative-residual `is_true_root` test. The Phase-1 sweep configs set `k_nf = 10.
 fold stalls so they are reported as flagged cells (then rescued via the continuation method above)
 rather than as wrong "successes."
 
+> Companion accept: the scale-free `residual_floor_reached` accept (commit `3b76864`) is the
+> dimensionless analogue of this ftol-multiple gate.
+
 ---
 
 ## The production method (2026-06-17): direct exact-guess solve

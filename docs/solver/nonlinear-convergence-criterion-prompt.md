@@ -1,5 +1,16 @@
 # Prompt: scale-free convergence criterion for the porous Navier–Stokes nonlinear solver
 
+> **STATUS (2026-07-04) — the MASS measure in this spec has evolved.** Production now uses the
+> **Route-B "Philosophy-A" algebraic** mass gate `ε_C = ‖r_C‖ / D_C` — the norm of the assembled
+> stabilized mass residual over a term-magnitude envelope, **symmetric with `ε_M`** and gated at the
+> same `~1e-9` level. The strong-form / flux-gradient measure specified below
+> (`ε_C = ‖∇·(α u)‖ / ‖∇(α u)‖`, and the `−g`-subtracted variant) is now the **diagnostic
+> `eps_C_strong`**, no longer the gate. A **`residual_floor_reached` scale-free accept** was also added:
+> it accepts machine-floor-converged cells whose `ε_C` cannot reach `tol` because `D_C` collapses for
+> near-divergence-free flow (the mass envelope → 0 when the flow is essentially incompressible). The
+> **momentum (Philosophy A) spec below is still current and unchanged.** See
+> [`docs/mms/route-b-2d-sweep-status.md`](../mms/route-b-2d-sweep-status.md).
+
 You are implementing the **stopping criterion for the outer nonlinear (Picard / Newton) iteration**
 of a stabilized finite element solver for the stationary generalized (porous) Navier–Stokes
 system. Read the whole spec before writing code. The rationale notes are there so that, when you

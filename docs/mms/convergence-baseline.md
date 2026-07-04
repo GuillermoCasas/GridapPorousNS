@@ -1,5 +1,11 @@
 # MMS convergence baseline — reference for tracking progress
 
+> **STATUS — FROZEN PROVENANCE SNAPSHOT (N≤320, k=1 QUAD, 2026-06-08/10).** Superseded by the Route-B
+> re-run of the sweep — see [`route-b-2d-sweep-status.md`](route-b-2d-sweep-status.md) for the current
+> algebraic mass gate (Philosophy-A ε_C) + the COMPLETED k1/k2 sweeps. JFNK is now LANDED (the "JFNK
+> target" language below is historical). Kept as the N≤320 reference; the per-cell numbers are the
+> provenance and are intentionally left unrewritten.
+
 > **Update 2026-06-10 — the N=640 tail is complete and the high-Da OSGS "formulation target" is met.**
 > The OSGS H¹ rates of **0.71–0.95** in the Da=1e6 rows below are the **N≤320 pre-asymptotic** values
 > (the original run never finished N=640 for the α≠1 OSGS cells). With the N=320→640 pair now in, the

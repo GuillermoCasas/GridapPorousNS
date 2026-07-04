@@ -39,7 +39,7 @@ velocity filled, pressure hollow; L² and H¹ split) → `results/combined/`.
 ### Harness design (all fixes are harness-level — `src/`, `config/`, schema untouched)
 - **(L,U) minmax encoding** (`compute_L_and_U`, strategy `forchheimer_minmax`): rescales the cell to
   keep the `{U,ν,σ}` dynamic range tame at high Re / low α (mesh, porosity field, perturbation and
-  error norms all L-scaled; `eps_val` made encoding-covariant). `"unit"` reproduces the legacy L=U=1.
+  error norms all L-scaled; `physical_epsilon` made encoding-covariant). `"unit"` reproduces the legacy L=U=1.
 - **Encoding-covariant reaction scaling** (`build_mms_formulation`): `a(α)=σ_lin·((1−α)/α)²·(ν/L²)`,
   `b(α)=σ_nl·((1−α)/α)·(ν/(U·L²))`, so `Da_eff` is **Re-independent** (matches `article.tex`
   `eq:DimensionlessParameters`). The old code passed `a,b` fixed ⇒ `Da_eff ∝ Re`.
