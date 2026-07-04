@@ -16,13 +16,13 @@ using Gridap
 const _CFG_DIR = joinpath(@__DIR__, "..", "..", "config")
 const _OUT_DIR = joinpath(@__DIR__, "..", "extended", "ManufacturedSolutions", "results", "debug_results")
 
-"Build a complete, self-contained config (base_config + the eps_val the strict loader requires + a tiny
+"Build a complete, self-contained config (base_config + the physical_epsilon the strict loader requires + a tiny
 mesh + schedule features) and write it to a temp path. Returns the path."
 function _write_production_config(; pingpong::Bool)
     cfg = JSON3.read(read(joinpath(_CFG_DIR, "base_config.json"), String), Dict{String,Any})
-    # base_config intentionally omits eps_val (so it can't be silently inherited; docs/known_issues.md);
+    # base_config intentionally omits physical_epsilon (so it can't be silently inherited; docs/known_issues.md);
     # the strict production loader requires it, so supply it explicitly for the smoke run.
-    cfg["physical_properties"]["eps_val"] = 1e-7
+    cfg["physical_properties"]["physical_epsilon"] = 1e-7
     cfg["numerical_method"]["mesh"]["partition"] = [4, 4]
     cfg["numerical_method"]["stabilization"]["method"] = "ASGS"
     sol = cfg["numerical_method"]["solver"]

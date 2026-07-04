@@ -7,7 +7,7 @@
 # encodings of one cell should agree to ~roundoff. (Literal bit-identity is only achievable for
 # power-of-two scalings; for the harness's √(Da)-style encodings we check a tight relative tolerance.)
 #
-# This guards scale-covariance. Both ASGS and OSGS now hold it (after the eps_val + inner-gate
+# This guards scale-covariance. Both ASGS and OSGS now hold it (after the physical_epsilon + inner-gate
 # covariance fixes, docs/lessons_learned.md 2026-06-02), so both are checked with a tight @test below.
 #
 # Cell chosen non-extreme but nontrivial: Re=10 (mild inertia), Da=2 (≠1 so the encodings give
@@ -21,8 +21,8 @@ include(joinpath(_MMS_DIR, "run_test.jl"))   # main-guarded; provides run_mms + 
 const _INV_RE, _INV_DA, _INV_A0 = 10.0, 2.0, 0.5
 const _INV_NS = [4]
 # Threshold near roundoff. Two covariance bugs were found and fixed (docs/lessons_learned.md 2026-06-02):
-#   • ASGS: the DIMENSIONAL pressure penalty `eps_val` was injected as a fixed 1e-8 for every encoding;
-#     scaling it covariantly (eps_val = ε̂·(U/L)/P_c in build_mms_formulation) → ASGS covariant to ~1e-10.
+#   • ASGS: the DIMENSIONAL pressure penalty `physical_epsilon` was injected as a fixed 1e-8 for every encoding;
+#     scaling it covariantly (physical_epsilon = ε̂·(U/L)/P_c in build_mms_formulation) → ASGS covariant to ~1e-10.
 #   • OSGS: the inner-Newton stop was encoding-dependent — the per-field gate normalised by ‖x_k‖
 #     (∝U, ∝P_c∝U² for pressure) left the iterates non-covariant (worst in pressure, ≈2e-2). Fix:
 #     per-field gate normalised by the INITIAL residual ‖R₀_k‖ (nonlinear.jl) → OSGS covariant to
@@ -90,7 +90,7 @@ end
             @test haskey(ec, method) && haskey(em, method)
             reldiff = maximum(abs.(ec[method] .- em[method]) ./ max.(abs.(em[method]), eps()))
             @info "scale-covariance check" field method reldiff centered=ec[method] minmax=em[method]
-            # Both ASGS and OSGS are now scale-covariant after the eps_val + inner-gate/warmup fixes.
+            # Both ASGS and OSGS are now scale-covariant after the physical_epsilon + inner-gate/warmup fixes.
             @test reldiff <= _INV_RTOL
         end
     end

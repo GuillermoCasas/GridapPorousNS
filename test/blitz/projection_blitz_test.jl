@@ -47,19 +47,19 @@ using LinearAlgebra
         R_p = 2.0
         p = 0.3
         pi_p = 0.4
-        eps_val = 0.1
-        @test PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma(), R_p, eps_val, p, pi_p, true) ==
-              R_p - eps_val*p - pi_p
+        physical_epsilon = 0.1
+        @test PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma(), R_p, physical_epsilon, p, pi_p, true) ==
+              R_p - physical_epsilon*p - pi_p
     end
 
     @testset "ProjectResidualWithoutPressurePenalty fallback behavior" begin
         R_p = 2.0
         p = 0.3
         pi_p = 0.4
-        eps_val = 0.1
+        physical_epsilon = 0.1
 
-        @test PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutPressurePenalty(), R_p, eps_val, p, pi_p, true) ==
-              PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma(), R_p, eps_val, p, pi_p, true)
+        @test PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutPressurePenalty(), R_p, physical_epsilon, p, pi_p, true) ==
+              PorousNSSolver.apply_projection_p(PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma(), R_p, physical_epsilon, p, pi_p, true)
     end
     
     @testset "Sanitize invalid bounds smoothly gracefully correctly" begin

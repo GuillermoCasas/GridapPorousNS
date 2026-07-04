@@ -22,7 +22,7 @@
     ],
     "physical_properties": {
         "nu": 0.002,
-        "eps_val": 1e-7,
+        "physical_epsilon": 1e-7,
         "sigma_linear": 0.30,
         "sigma_nonlinear": 1.75,
         "h_floor_weight": 0.0,

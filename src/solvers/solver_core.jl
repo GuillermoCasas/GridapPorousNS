@@ -136,7 +136,7 @@ function build_convergence_probe(setup::FETopology, formulation::VMSFormulation,
     grad_α   = ∇(α)                       # porosity gradient: fixed across iterations, captured once
     form     = formulation.form
     ν        = form.ν
-    eps_val  = form.eps_val
+    physical_epsilon  = form.physical_epsilon
     visc_op  = form.viscous_operator
     rxn_law  = form.reaction_law
     reg      = form.regularization
@@ -158,7 +158,7 @@ function build_convergence_probe(setup::FETopology, formulation::VMSFormulation,
         r_C = (field_blocks === nothing || length(field_blocks) < 2) ? NaN : norm(view(b, field_blocks[2]))
         uh, ph = FEFunction(X, x)
         σ = Operation(sig_op)(uh, ∇(uh), α, grad_α, h)    # σ(α, u) at this iterate
-        return evaluate_convergence(r_M, r_C, uh, ph, α, ν, visc_op, σ, f, eps_val, g, Vvel, Qpre, dΩ, d;
+        return evaluate_convergence(r_M, r_C, uh, ph, α, ν, visc_op, σ, f, physical_epsilon, g, Vvel, Qpre, dΩ, d;
                                     tol = tol_M, tol_C = tol_C)
     end
 end

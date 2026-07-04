@@ -120,7 +120,7 @@ using LinearAlgebra
         h = 0.25
         alpha = 0.7
 
-        # P-001: compute_tau_2 must NOT take eps_val. Varying the surrounding ε value
+        # P-001: compute_tau_2 must NOT take physical_epsilon. Varying the surrounding ε value
         # (passed at call sites unrelated to τ₂) cannot affect τ₂ because it's not a
         # parameter of the function — this is a structural lock.
         med = PorousNSSolver.MediumState(alpha, VectorValue(0.05, -0.02), h)

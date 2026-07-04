@@ -66,7 +66,7 @@ function build_cell(label::String; Re, Da, alpha_0, kv=1, n=10, element_type="QU
     kp = kv
 
     config_dict = Dict(
-        "physical_properties" => Dict("nu" => 1.0, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
+        "physical_properties" => Dict("nu" => 1.0, "physical_epsilon" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
         "domain" => Dict(
             "alpha_0" => alpha_0,
             "bounding_box" => [-0.5, 0.5, -0.5, 0.5],
@@ -141,7 +141,7 @@ function build_cell(label::String; Re, Da, alpha_0, kv=1, n=10, element_type="QU
             config.physical_properties.velocity_magnitude_derivative_floor,
         ),
         U_amp * L / Float64(Re),
-        config.physical_properties.eps_val,
+        config.physical_properties.physical_epsilon,
     )
     mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
     u_final = PorousNSSolver.get_u_ex(mms)

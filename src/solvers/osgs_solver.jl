@@ -40,11 +40,11 @@ function inner_projection_u(u, p, form, dΩ, h_cf, f_cf, alpha_cf, c_1, c_2)
 end
 
 # Pressure-equation analogue: the CellField that gets L²-projected to form π_p, the mass sub-scale. It is
-# the strong mass residual R_p = eps_val·p + α(∇·u) + u·∇α − g (eval_strong_residual_p), again filtered
-# through the projection policy; eps_val is the pressure stabilization floor consulted by the policy.
+# the strong mass residual R_p = physical_epsilon·p + α(∇·u) + u·∇α − g (eval_strong_residual_p), again filtered
+# through the projection policy; physical_epsilon is the pressure stabilization floor consulted by the policy.
 function inner_projection_p(u, p, form, dΩ, h_cf, alpha_cf, g_cf)
     R_p = eval_strong_residual_p(form, u, p, alpha_cf, g_cf)
-    return apply_projectable_residual_p(form.projection_policy, R_p, form.eps_val, p)
+    return apply_projectable_residual_p(form.projection_policy, R_p, form.physical_epsilon, p)
 end
 
 """

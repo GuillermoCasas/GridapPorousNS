@@ -33,7 +33,7 @@ Assembles the `PaperGeneralFormulation` — the continuous VMS weak form transcr
 `theory/paper/article.tex`. It bundles four interchangeable pieces selected from the config:
 the viscous stress operator, the porous-drag reaction law `σ` (constant or Forchheimer-Ergun),
 the OSGS subgrid projection policy, and the velocity-floor regularization, together with the
-viscosity `nu` and porosity-coupling parameter `eps_val`.
+viscosity `nu` and porosity-coupling parameter `physical_epsilon`.
 """
 function build_formulation(phys::PhysicalProperties, num_method::NumericalMethodConfig)
     # 1. Reaction law σ: the macroscopic drag the porous matrix exerts on the fluid.
@@ -58,11 +58,11 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
         proj = ProjectResidualWithoutReactionWhenConstantSigma()
     end
 
-    # eps_val is the PHYSICAL compressibility ε_phys — it enters BOTH the residual and the Jacobian
+    # physical_epsilon is the PHYSICAL compressibility ε_phys — it enters BOTH the residual and the Jacobian
     # (the mass-equation LHS and the manufactured source). The numerical penalty ε_num is carried
     # separately into the formulation; lagged to the iterate it survives ONLY in the Jacobian's
-    # pressure block (Codina iterative penalty), so it must NOT be folded into eps_val here.
-    eps_val = phys.eps_val
+    # pressure block (Codina iterative penalty), so it must NOT be folded into physical_epsilon here.
+    physical_epsilon = phys.physical_epsilon
     nu = phys.nu
 
     visc_type = num_method.viscous_operator_type
@@ -76,7 +76,7 @@ function build_formulation(phys::PhysicalProperties, num_method::NumericalMethod
 
     # 4. Assemble the chosen viscous operator, reaction law, projection policy and regularization
     #    into the PaperGeneralFormulation (the VMS weak form transcribed from article.tex).
-    form = PaperGeneralFormulation(visc_op, reaction_law, proj, reg, nu, eps_val;
+    form = PaperGeneralFormulation(visc_op, reaction_law, proj, reg, nu, physical_epsilon;
                                    numerical_epsilon=phys.numerical_epsilon)
     return form
 end

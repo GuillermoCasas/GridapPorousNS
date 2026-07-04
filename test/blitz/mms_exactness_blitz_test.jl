@@ -38,7 +38,7 @@ include("../extended/ManufacturedSolutions/run_test.jl")
     Da_bound = Float64(first(get(get(test_dict, "physical_properties", Dict()), "Da", [1.0e-6])))
     
     config_dict = Dict(
-        "physical_properties" => Dict("nu" => 1.0, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
+        "physical_properties" => Dict("nu" => 1.0, "physical_epsilon" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
         # Set r_1, r_2 explicitly from test_config (0.2 / 0.4) instead of falling back to
         # base_config.json (which has r_2 = 0.5 — borderline under L-scaling: r_2_scaled =
         # L · 0.5 = L/2 fails the strict `r_2 < L/2` check in `check_mms_parameters`).

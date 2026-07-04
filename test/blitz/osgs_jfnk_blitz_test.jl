@@ -20,11 +20,11 @@ using Gridap.Algebra
 using JSON3
 const _PNS = PorousNSSolver
 
-# A complete config dict = base_config + the eps_val the strict path needs, with a solver override applied.
+# A complete config dict = base_config + the physical_epsilon the strict path needs, with a solver override applied.
 function _cfg_with_solver_overrides(overrides::Dict)
     base = joinpath(dirname(pathof(_PNS)), "..", "config", "base_config.json")
     d = JSON3.read(read(base, String), Dict{String, Any})
-    d["physical_properties"]["eps_val"] = 1e-8
+    d["physical_properties"]["physical_epsilon"] = 1e-8
     for (k, v) in overrides
         d["numerical_method"]["solver"][k] = v
     end

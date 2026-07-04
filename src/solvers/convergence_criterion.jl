@@ -172,7 +172,7 @@ function momentum_force_envelope(uh, ph, α, ν, viscous_op, σ, f, V, dΩ)
 end
 
 """
-    mass_force_envelope(uh, ph, α, eps_val, g, Q, dΩ) -> (D_C, mass_terms)
+    mass_force_envelope(uh, ph, α, physical_epsilon, g, Q, dΩ) -> (D_C, mass_terms)
 
 The dynamic mass-term envelope `D_C` (Philosophy A — the exact mass-side analogue of
 `momentum_force_envelope`): assemble each Galerkin (physical) continuity-equation term's pressure-block
@@ -185,16 +185,16 @@ q-block (τ₂/OSGS-projection coupling, the Codina iterative penalty) are DELIB
 envelope — they live in the numerator `r_C = ‖b[pressure block]‖`, exactly as the momentum subscales live
 in `r_M` and not in `D_M`. Returns `D_C` and the per-term breakdown.
 """
-function mass_force_envelope(uh, ph, α, eps_val, g, Q, dΩ)
+function mass_force_envelope(uh, ph, α, physical_epsilon, g, Q, dΩ)
     divergence = norm(assemble_vector(q -> ∫( q * (α * (∇⋅uh) + uh ⋅ ∇(α)) )dΩ, Q))   # ∫ q ∇·(αu)
-    penalty    = norm(assemble_vector(q -> ∫( q * (eps_val * ph) )dΩ, Q))              # ∫ q (ε p)
+    penalty    = norm(assemble_vector(q -> ∫( q * (physical_epsilon * ph) )dΩ, Q))              # ∫ q (ε p)
     source     = norm(assemble_vector(q -> ∫( q * g )dΩ, Q))                           # ∫ q g
     D_C = divergence + penalty + source
     return D_C, (divergence = divergence, penalty = penalty, source = source)
 end
 
 """
-    mass_criterion(uh, ph, α, eps_val, g, d, dΩ) -> (eps_C_strong, mass_num, mass_den, div_ratio)
+    mass_criterion(uh, ph, α, physical_epsilon, g, d, dΩ) -> (eps_C_strong, mass_num, mass_den, div_ratio)
 
 DIAGNOSTIC ONLY (no longer the gate — see the module header). The strong-form mass measure
 ε_C^strong = ‖R_p‖ / (‖∇(α u)‖_F + ‖g‖)  (field L² norms). Retained as a physically-interpretable
@@ -221,9 +221,9 @@ Also returns `div_ratio = ‖∇·(α u)‖/‖∇(α u)‖`, the PURE-divergenc
 ≤ √d bound (the genuine √d self-check; neither the g-subtracted numerator nor the g-augmented denominator
 is √d-bounded). When g=0 and ε=0, ε_C and div_ratio coincide.
 """
-function mass_criterion(uh, ph, α, eps_val, g, d, dΩ)
+function mass_criterion(uh, ph, α, physical_epsilon, g, d, dΩ)
     div_flux  = α * (∇ ⋅ uh) + uh ⋅ ∇(α)            # ∇·(α u)
-    mass_res  = eps_val * ph + div_flux - g          # R_p = ε p + ∇·(α u) − g  (genuine mass residual → 0)
+    mass_res  = physical_epsilon * ph + div_flux - g          # R_p = ε p + ∇·(α u) − g  (genuine mass residual → 0)
     flux_grad = α * ∇(uh) + outer(uh, ∇(α))         # ∇(α u)  (second-order tensor)
     mass_num  = _l2(mass_res, dΩ)
     grad_norm = _l2(flux_grad, dΩ)                   # ‖∇(α u)‖_F — robust flux-variation scale
@@ -235,14 +235,14 @@ function mass_criterion(uh, ph, α, eps_val, g, d, dΩ)
 end
 
 """
-    evaluate_convergence(r_M, r_C, uh, ph, α, ν, viscous_op, σ, f, eps_val, g, V, Q, dΩ, d; tol, tol_M, tol_C)
+    evaluate_convergence(r_M, r_C, uh, ph, α, ν, viscous_op, σ, f, physical_epsilon, g, V, Q, dΩ, d; tol, tol_M, tol_C)
         -> ConvergenceMeasure
 
 Evaluate the scale-free criterion at the current iterate. BOTH residuals are treated identically
 (Philosophy A): `r_M` / `r_C` are the Euclidean norms of the assembled stabilized residual's velocity /
 pressure blocks — the momentum and continuity residuals the solver actually drives to zero — supplied by
 the caller (the same `b`, its two field blocks). The remaining arguments are the iterate (`uh`, `ph`),
-material/forcing data (`α`, `ν`, `viscous_op`, the reaction field `σ`, body force `f`, penalty `eps_val`,
+material/forcing data (`α`, `ν`, `viscous_op`, the reaction field `σ`, body force `f`, penalty `physical_epsilon`,
 mass source `g`), the velocity/pressure TEST spaces `V`/`Q`, the measure `dΩ`, and the spatial dimension
 `d`. Tolerances default to `tol`.
 
@@ -251,16 +251,16 @@ sets `converged = ε_M ≤ tol_M ∧ ε_C ≤ tol_C`, and ALSO evaluates the str
 ε_C^strong = ‖R_p‖/(‖∇(αu)‖+‖g‖) (via `mass_criterion`) — reported but never gated — plus the √d
 self-check warning on the pure-divergence ratio (NOT a hard assert; quadrature round-off can nudge it).
 """
-function evaluate_convergence(r_M::Float64, r_C::Float64, uh, ph, α, ν, viscous_op, σ, f, eps_val, g, V, Q, dΩ, d::Int;
+function evaluate_convergence(r_M::Float64, r_C::Float64, uh, ph, α, ν, viscous_op, σ, f, physical_epsilon, g, V, Q, dΩ, d::Int;
                               tol::Float64, tol_M::Float64 = tol, tol_C::Float64 = tol)
     # Momentum GATE (Philosophy A): weak velocity-block residual over the Galerkin force envelope.
     D_M, terms = momentum_force_envelope(uh, ph, α, ν, viscous_op, σ, f, V, dΩ)
     eps_M = r_M / _floor(D_M)
     # Mass GATE (Philosophy A, symmetric): weak pressure-block residual over the Galerkin mass envelope.
-    D_C, mass_terms = mass_force_envelope(uh, ph, α, eps_val, g, Q, dΩ)
+    D_C, mass_terms = mass_force_envelope(uh, ph, α, physical_epsilon, g, Q, dΩ)
     eps_C = r_C / _floor(D_C)
     # Strong-form DIAGNOSTIC (not gated): floors at O(h^{kv}); hosts the √d pure-divergence self-check.
-    eps_C_strong, mass_num, mass_den, div_ratio = mass_criterion(uh, ph, α, eps_val, g, d, dΩ)
+    eps_C_strong, mass_num, mass_den, div_ratio = mass_criterion(uh, ph, α, physical_epsilon, g, d, dΩ)
 
     # Degenerate state: a GATE denominator (D_M or D_C) at the underflow floor means the iterate carries
     # no force / no flux structure (e.g. the all-zero initial guess). The gate ratios are then roundoff/

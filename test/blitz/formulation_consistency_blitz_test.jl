@@ -34,7 +34,7 @@ using LinearAlgebra
             1e-3
         )
 
-        gmatch(x) = form.eps_val * p_poly(x) + alpha_lin(x)*(∇⋅u_poly)(x) + u_poly(x)⋅(∇(alpha_lin))(x)
+        gmatch(x) = form.physical_epsilon * p_poly(x) + alpha_lin(x)*(∇⋅u_poly)(x) + u_poly(x)⋅(∇(alpha_lin))(x)
         gf = CellField(gmatch, Ω)
         
         uf = CellField(u_poly, Ω)

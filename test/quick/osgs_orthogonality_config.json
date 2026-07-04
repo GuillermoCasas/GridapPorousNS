@@ -1,7 +1,7 @@
 {
     "physical_properties": {
         "nu": 1.0,
-        "eps_val": 1e-8,
+        "physical_epsilon": 1e-8,
         "reaction_model": "Constant_Sigma",
         "sigma_constant": 1.0,
         "tau_regularization_limit": 0.0

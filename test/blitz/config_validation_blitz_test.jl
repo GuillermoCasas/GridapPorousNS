@@ -6,7 +6,7 @@
 # tolerances (eps_tol_momentum/eps_tol_mass > 0). Each invalid value must fail LOUDLY at load.
 #
 # `load_config_from_dict` deep-merges the override onto `config/base_config.json`, then deserializes and
-# runs `validate!`. base_config intentionally omits `eps_val`, so every override below supplies it so the
+# runs `validate!`. base_config intentionally omits `physical_epsilon`, so every override below supplies it so the
 # config is COMPLETE (deserialization passes) and the throw comes from `validate!`, not a missing field.
 # ==============================================================================================
 
@@ -14,7 +14,7 @@ using Test
 using PorousNSSolver
 
 # physical_properties override that, merged onto base_config, yields a complete + valid config.
-_phys(extra...) = merge(Dict("eps_val" => 0.0), Dict(extra...))
+_phys(extra...) = merge(Dict("physical_epsilon" => 0.0), Dict(extra...))
 _load(override) = PorousNSSolver.load_config_from_dict(override)
 
 @testset "config validation: a valid config still loads (positive control)" begin

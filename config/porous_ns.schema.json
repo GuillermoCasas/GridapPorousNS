@@ -31,7 +31,7 @@
             0.0
           ]
         },
-        "eps_val": {
+        "physical_epsilon": {
           "type": "number",
           "description": "Physical compressibility epsilon (ε_phys), added to the mass-equation LHS only (ε_phys·p). May be 0 (no physical compressibility). Must be >= 0.",
           "examples": [
@@ -526,7 +526,7 @@
             },
             "recenter_pressure_between_penalty_passes": {
               "type": "boolean",
-              "description": "GAUGE-FREE HARDENING (theory/pressure_recentering_note). OFF by default (bit-identical: p^{n-1} stored verbatim). When ON, the outer iterative-penalty loop subtracts the domain mean int(p)/|Omega| from p^n before storing it as the lag p^{n-1}, bounding the pressure-mean drift -rho/(numerical_epsilon*|Omega|) that the all-Dirichlet gauge otherwise accumulates. Provenance: the iterated penalty is Codina's; the between-pass RE-CENTERING is a proposal of that note, NOT attributed to Codina and applied ONLY here. Changes no mean-removed quantity. Requires iterative_penalty_enabled=true and eps_val==0 (gauge-free; with physical epsilon>0 the pressure level is anchored and re-centering is not exact) — both enforced in validate!.",
+              "description": "GAUGE-FREE HARDENING (theory/pressure_recentering_note). OFF by default (bit-identical: p^{n-1} stored verbatim). When ON, the outer iterative-penalty loop subtracts the domain mean int(p)/|Omega| from p^n before storing it as the lag p^{n-1}, bounding the pressure-mean drift -rho/(numerical_epsilon*|Omega|) that the all-Dirichlet gauge otherwise accumulates. Provenance: the iterated penalty is Codina's; the between-pass RE-CENTERING is a proposal of that note, NOT attributed to Codina and applied ONLY here. Changes no mean-removed quantity. Requires iterative_penalty_enabled=true and physical_epsilon==0 (gauge-free; with physical epsilon>0 the pressure level is anchored and re-centering is not exact) — both enforced in validate!.",
               "examples": [
                 false
               ]

@@ -41,7 +41,7 @@ function apply_projectable_residual_u(::ProjectFullResidual, R_u, σ, u)
 end
 
 # Term fed into the mass L² projection: the whole strong residual R_p.
-function apply_projectable_residual_p(::ProjectFullResidual, R_p, eps_val, p)
+function apply_projectable_residual_p(::ProjectFullResidual, R_p, physical_epsilon, p)
     return R_p
 end
 
@@ -68,8 +68,8 @@ function apply_projectable_residual_u(::ProjectResidualWithoutReactionWhenConsta
 end
 
 # Remove the linear pressure-penalty ε·p before projecting (likewise FE-exact for constant ε).
-function apply_projectable_residual_p(::ProjectResidualWithoutReactionWhenConstantSigma, R_p, eps_val, p)
-    return R_p - (eps_val * p)
+function apply_projectable_residual_p(::ProjectResidualWithoutReactionWhenConstantSigma, R_p, physical_epsilon, p)
+    return R_p - (physical_epsilon * p)
 end
 
 # Momentum stabilization residual: trim σ·u and subtract π_h (OSGS only); ASGS passes R_u through.
@@ -92,28 +92,28 @@ end
 # --- Mass-residual counterparts (pi_p is the L²-projection of R_p). ---------------------------------
 
 # ProjectFullResidual: subtract π_h in OSGS, pass through in ASGS; π_h frozen, so the Jacobian is R_dp.
-function apply_projection_p(::ProjectFullResidual, R_p, eps_val, p, pi_p, is_osgs)
+function apply_projection_p(::ProjectFullResidual, R_p, physical_epsilon, p, pi_p, is_osgs)
     if is_osgs
         return R_p - pi_p
     end
     return R_p
 end
 
-function apply_jacobian_projection_p(::ProjectFullResidual, R_dp, eps_val, dp, is_osgs)
+function apply_jacobian_projection_p(::ProjectFullResidual, R_dp, physical_epsilon, dp, is_osgs)
     return R_dp
 end
 
 # WithoutReactionWhenConstantSigma: also trim the FE-exact ε·p term from the mass residual / Jacobian.
-function apply_projection_p(::ProjectResidualWithoutReactionWhenConstantSigma, R_p, eps_val, p, pi_p, is_osgs)
+function apply_projection_p(::ProjectResidualWithoutReactionWhenConstantSigma, R_p, physical_epsilon, p, pi_p, is_osgs)
     if is_osgs
-        return R_p - (eps_val * p) - pi_p
+        return R_p - (physical_epsilon * p) - pi_p
     end
     return R_p
 end
 
-function apply_jacobian_projection_p(::ProjectResidualWithoutReactionWhenConstantSigma, R_dp, eps_val, dp, is_osgs)
+function apply_jacobian_projection_p(::ProjectResidualWithoutReactionWhenConstantSigma, R_dp, physical_epsilon, dp, is_osgs)
     if is_osgs
-        return R_dp - (eps_val * dp)
+        return R_dp - (physical_epsilon * dp)
     end
     return R_dp
 end
@@ -125,8 +125,8 @@ end
 function apply_projectable_residual_u(::ProjectResidualWithoutPressurePenalty, R_u, σ, u)
     return apply_projectable_residual_u(ProjectFullResidual(), R_u, σ, u)
 end
-function apply_projectable_residual_p(::ProjectResidualWithoutPressurePenalty, R_p, eps_val, p)
-    return apply_projectable_residual_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_p, eps_val, p)
+function apply_projectable_residual_p(::ProjectResidualWithoutPressurePenalty, R_p, physical_epsilon, p)
+    return apply_projectable_residual_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_p, physical_epsilon, p)
 end
 
 function apply_projection_u(::ProjectResidualWithoutPressurePenalty, R_u, σ, u, pi_u, is_osgs)
@@ -135,11 +135,11 @@ end
 function apply_jacobian_projection_u(::ProjectResidualWithoutPressurePenalty, R_du, σ, dsigma_val, u, du, is_osgs)
     return apply_jacobian_projection_u(ProjectFullResidual(), R_du, σ, dsigma_val, u, du, is_osgs)
 end
-function apply_projection_p(::ProjectResidualWithoutPressurePenalty, R_p, eps_val, p, pi_p, is_osgs)
-    return apply_projection_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_p, eps_val, p, pi_p, is_osgs)
+function apply_projection_p(::ProjectResidualWithoutPressurePenalty, R_p, physical_epsilon, p, pi_p, is_osgs)
+    return apply_projection_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_p, physical_epsilon, p, pi_p, is_osgs)
 end
-function apply_jacobian_projection_p(::ProjectResidualWithoutPressurePenalty, R_dp, eps_val, dp, is_osgs)
-    return apply_jacobian_projection_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_dp, eps_val, dp, is_osgs)
+function apply_jacobian_projection_p(::ProjectResidualWithoutPressurePenalty, R_dp, physical_epsilon, dp, is_osgs)
+    return apply_jacobian_projection_p(ProjectResidualWithoutReactionWhenConstantSigma(), R_dp, physical_epsilon, dp, is_osgs)
 end
 
 # --- Policy/reaction-law compatibility check (run once at formulation construction). -----------------

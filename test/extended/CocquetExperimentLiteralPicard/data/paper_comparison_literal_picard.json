@@ -21,7 +21,7 @@
         "sigma_linear": 0.30,
         "sigma_nonlinear": 1.75,
         "h_floor_weight": 0.0,
-        "eps_val": 1e-7,
+        "physical_epsilon": 1e-7,
         "f_x": 0.0,
         "f_y": 0.0
     },

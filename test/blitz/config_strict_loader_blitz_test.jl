@@ -16,7 +16,7 @@ using JSON3
 
 @testset "load_frozen_config rejects incomplete configs [P-011 / Fix 7]" begin
     # Build a config dict that is intentionally missing required fields. The base
-    # config has nu/eps_val in physical_properties; omitting eps_val must fail.
+    # config has nu/physical_epsilon in physical_properties; omitting physical_epsilon must fail.
     incomplete = Dict(
         "physical_properties" => Dict(
             "nu" => 1.0,
@@ -30,7 +30,7 @@ using JSON3
             "h_floor_weight" => 0.1,
             "epsilon_floor" => 1e-12,
             "tau_regularization_limit" => 1e-12
-            # eps_val deliberately missing
+            # physical_epsilon deliberately missing
         )
     )
 

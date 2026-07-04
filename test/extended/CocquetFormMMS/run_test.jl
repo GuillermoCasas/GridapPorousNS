@@ -114,13 +114,13 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
 
     # Derive kinematic viscosity from the Reynolds sweep input.
     nu_calculated = U_amp * L / Float64(Re)
-    # [covariance] eps_val is DIMENSIONAL: in the continuity penalty `eps_val·p`, [eps_val] = (U/L)/P_c, so
+    # [covariance] physical_epsilon is DIMENSIONAL: in the continuity penalty `physical_epsilon·p`, [physical_epsilon] = (U/L)/P_c, so
     # it MUST scale with the (L,U) encoding. The config value is the DIMENSIONLESS penalty ε̂; eps_calculated
-    # is derived per cell so ε̂ = eps_calculated·P_c·L/U is encoding-invariant. A FIXED eps_val breaks
+    # is derived per cell so ε̂ = eps_calculated·P_c·L/U is encoding-invariant. A FIXED physical_epsilon breaks
     # scale-covariance (worst in the pressure / OSGS projection). Mirrors the regular ManufacturedSolutions
     # harness; P_c per get_characteristic_scales: P_c = (1+Re+Da)·U·ν/L.
     P_c_cell = (1.0 + Float64(Re) + Float64(Da)) * U_amp * nu_calculated / L
-    eps_calculated = config.physical_properties.eps_val * (U_amp / L) / P_c_cell
+    eps_calculated = config.physical_properties.physical_epsilon * (U_amp / L) / P_c_cell
 
     if config.physical_properties.reaction_model == "Constant_Sigma"
         sigma_c = Float64(Da) * alpha_infty * nu_calculated / (L^2)
@@ -509,7 +509,7 @@ function run_mms(config_file="test_config.json")
                     pp_in = get(test_dict, "physical_properties", Dict())
                     config_dict = Dict(
                         "physical_properties" => Dict(
-                            "nu" => 1.0, "eps_val" => 1e-8,
+                            "nu" => 1.0, "physical_epsilon" => 1e-8,
                             "reaction_model" => get(pp_in, "reaction_model", "Constant_Sigma"),
                             "sigma_constant" => get(pp_in, "sigma_constant", 1.0),
                             "sigma_linear" => get(pp_in, "sigma_linear", 0.0),

@@ -20,7 +20,8 @@ Physical inputs to the porous Navier-Stokes problem.
 
 - `nu`               kinematic viscosity ν (> 0); sets the viscous/Reynolds scale.
 - `f_x`, `f_y`       components of the prescribed body force f.
-- `eps_val`          porosity ε of the medium (> 0); appears in the inertial/reaction scaling.
+- `physical_epsilon`          physical compressibility ε_phys (the pressure-penalty ε in the mass equation);
+                     MAY be 0. NOT the porosity — α is the porosity. Enters both residual and Jacobian.
 - `reaction_model`   selects the reaction law σ(α,u): "Constant_Sigma" or the Forchheimer/Ergun form.
 - `sigma_constant`   scalar resistance σ for the "Constant_Sigma" reaction model (unused by Forchheimer-Ergun).
 - `sigma_linear`     Forchheimer-Ergun coefficient of the linear/viscous Darcy term a(α) = sigma_linear·((1-α)/α)².
@@ -38,7 +39,7 @@ Base.@kwdef struct PhysicalProperties
     nu::Float64
     f_x::Float64
     f_y::Float64
-    eps_val::Float64            # PHYSICAL compressibility ε_phys: enters BOTH residual and Jacobian (mass LHS
+    physical_epsilon::Float64            # PHYSICAL compressibility ε_phys: enters BOTH residual and Jacobian (mass LHS
                                 # and the manufactured source); may be 0.
     numerical_epsilon::Float64  # NUMERICAL penalty ε_num (Codina iterative penalty). Lagging ε_num·p to the
                                 # iterate cancels it in the RESIDUAL and leaves ε_num·dp ONLY in the JACOBIAN's
@@ -337,10 +338,10 @@ first violated invariant.
 function validate!(cfg::PorousNSConfig)
     # Physical
     @assert cfg.physical_properties.nu > 0 "Kinematic viscosity 'nu' must be > 0"
-    # eps_val is now the PHYSICAL compressibility ε_phys — it may be 0 (no physical compressibility); the
+    # physical_epsilon is now the PHYSICAL compressibility ε_phys — it may be 0 (no physical compressibility); the
     # NUMERICAL penalty ε_num provides stability separately. Both must be nonnegative; well-posedness for an
     # all-Dirichlet incompressible problem needs ε_phys + ε_num > 0 (or a pinned pressure), left to the caller.
-    @assert cfg.physical_properties.eps_val >= 0 "eps_val (physical ε) must be >= 0"
+    @assert cfg.physical_properties.physical_epsilon >= 0 "physical_epsilon (physical ε) must be >= 0"
     @assert cfg.physical_properties.numerical_epsilon >= 0 "numerical_epsilon (penalty ε) must be >= 0"
     # Reaction coefficients must be nonnegative so σ stays symmetric positive-semidefinite (the paper's
     # standing assumption, eq:DBFResistanceTerm): a(α)=σ_linear·((1-α)/α)² ≥ 0 and b(α)=σ_nonlinear·(1-α)/α
@@ -408,7 +409,7 @@ function validate!(cfg::PorousNSConfig)
     # is a GAUGE operation, exact only when the pressure constant is genuinely free. Fail loudly on the two
     # contradictory requests rather than silently no-op'ing or corrupting a physical pressure level.
     @assert !(sol.recenter_pressure_between_penalty_passes && !sol.iterative_penalty_enabled) "recenter_pressure_between_penalty_passes=true requires iterative_penalty_enabled=true (re-centering acts only in the outer iterative-penalty loop)"
-    @assert !(sol.recenter_pressure_between_penalty_passes && cfg.physical_properties.eps_val > 0.0) "recenter_pressure_between_penalty_passes=true requires physical_properties.eps_val == 0 (gauge-free: with ε_phys > 0 the pressure level is physically anchored, so subtracting its mean is not exact)"
+    @assert !(sol.recenter_pressure_between_penalty_passes && cfg.physical_properties.physical_epsilon > 0.0) "recenter_pressure_between_penalty_passes=true requires physical_properties.physical_epsilon == 0 (gauge-free: with ε_phys > 0 the pressure level is physically anchored, so subtracting its mean is not exact)"
 
     # Linear (inner) solver backend — the ilu_*/gmres_* knobs are required even for LU (no silent default),
     # but only constrained when ILU_GMRES is actually selected.

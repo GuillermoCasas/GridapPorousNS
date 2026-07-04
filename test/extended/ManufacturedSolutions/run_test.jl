@@ -203,14 +203,14 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     # Derive kinematic viscosity and exact constant sigma for the reaction operator 
     # to perfectly represent Darcy-scale bounds parameterized by Reynolds / Darcy inputs.
     nu_calculated = U_amp * L / Float64(Re)
-    # [covariance 2026-06-02] eps_val is DIMENSIONAL: in the continuity penalty `eps_val·p`,
-    # [eps_val] = (U/L)/P_c, so it MUST scale with the (L,U) encoding — exactly like ν=U·L/Re and
-    # σ=Da·α∞·ν/L². The config value is treated as the DIMENSIONLESS penalty ε̂; eps_val is derived
-    # per-cell so ε̂ = eps_val·P_c·L/U is encoding-invariant. P_c per get_characteristic_scales:
-    # P_c = (1+Re+Da)·U·ν/L. A FIXED eps_val (the previous 1e-8) makes ε̂ encoding-dependent and breaks
+    # [covariance 2026-06-02] physical_epsilon is DIMENSIONAL: in the continuity penalty `physical_epsilon·p`,
+    # [physical_epsilon] = (U/L)/P_c, so it MUST scale with the (L,U) encoding — exactly like ν=U·L/Re and
+    # σ=Da·α∞·ν/L². The config value is treated as the DIMENSIONLESS penalty ε̂; physical_epsilon is derived
+    # per-cell so ε̂ = physical_epsilon·P_c·L/U is encoding-invariant. P_c per get_characteristic_scales:
+    # P_c = (1+Re+Da)·U·ν/L. A FIXED physical_epsilon (the previous 1e-8) makes ε̂ encoding-dependent and breaks
     # scale-covariance (worst in the pressure / OSGS projection). See encoding_invariance_test.jl.
     P_c_cell = (1.0 + Float64(Re) + Float64(Da)) * U_amp * nu_calculated / L
-    eps_calculated = config.physical_properties.eps_val * (U_amp / L) / P_c_cell
+    eps_calculated = config.physical_properties.physical_epsilon * (U_amp / L) / P_c_cell
 
     sigma_c = Float64(Da) * alpha_infty * nu_calculated / (L^2)
     rxn = PorousNSSolver.ConstantSigmaLaw(sigma_c)
@@ -499,7 +499,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
     # The test-JSON keys are a harness convenience. Their default (0 / 0.0 = DISABLED) is exactly the
     # canonical `SolverConfig.newton_stall_window` / `newton_stall_min_rel_improvement` value shipped in
     # config/base_config.json — kept as an explicit literal here because base_config.json is not directly
-    # loadable into a full PorousNSConfig (it intentionally omits eps_val; see docs/known_issues.md). The
+    # loadable into a full PorousNSConfig (it intentionally omits physical_epsilon; see docs/known_issues.md). The
     # PRODUCTION path sources these from SolverConfig directly through the shared builder (P6); this is the
     # one harness-side place that mirrors that default.
     solver_stall_window = Int(get(test_dict, "solver_stall_window", 0))
@@ -794,7 +794,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 # the L=1 BASELINE values from JSON; _build_local_mesh and
                                 # build_porosity_field apply the L_cell scaling internally.
                                 config_dict = Dict(
-                                    "physical_properties" => Dict("nu" => 1.0, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
+                                    "physical_properties" => Dict("nu" => 1.0, "physical_epsilon" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1.0),
                                     "domain" => Dict(
                                         "alpha_0" => 0.4,
                                         "bounding_box" => test_dict["domain"]["bounding_box"],

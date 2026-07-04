@@ -69,7 +69,7 @@ using JSON3
     rxn = PorousNSSolver.ConstantSigmaLaw(cfg.physical_properties.sigma_constant)
     proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
     reg = PorousNSSolver.SmoothVelocityFloor(cfg.physical_properties.u_base_floor_ref, cfg.physical_properties.h_floor_weight, cfg.physical_properties.epsilon_floor, cfg.physical_properties.velocity_magnitude_derivative_floor)
-    form = PorousNSSolver.PaperGeneralFormulation(visc, rxn, proj, reg, cfg.physical_properties.nu, cfg.physical_properties.eps_val)
+    form = PorousNSSolver.PaperGeneralFormulation(visc, rxn, proj, reg, cfg.physical_properties.nu, cfg.physical_properties.physical_epsilon)
     alpha_field = PorousNSSolver.SmoothRadialPorosity(cfg.domain.alpha_0, 1.0, cfg.domain.r_1, cfg.domain.r_2)
     mms = PorousNSSolver.Paper2DMMS(form, 1.0, alpha_field; L=1.0, alpha_infty=1.0)
     

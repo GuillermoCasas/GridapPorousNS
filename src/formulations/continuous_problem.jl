@@ -144,9 +144,9 @@ end
 #   `projection_policy`  — ASGS (identity) vs OSGS (orthogonal projection) handling
 #                          of the strong residual in the stabilization term.
 #   `regularization`     — velocity floor for the |u| appearing in σ and τ.
-# `ν` is the kinematic viscosity; `eps_val ≥ 0` is the pressure-stabilization /
-# grad-div coefficient in the mass equation (eps_val·p). The constructor rejects
-# negative `eps_val` and runs `sanitize_projection_policy` so the projection
+# `ν` is the kinematic viscosity; `physical_epsilon ≥ 0` is the pressure-stabilization /
+# grad-div coefficient in the mass equation (physical_epsilon·p). The constructor rejects
+# negative `physical_epsilon` and runs `sanitize_projection_policy` so the projection
 # policy is consistent with the chosen reaction law.
 struct PaperGeneralFormulation{V<:AbstractViscousOperator, R<:AbstractReactionLaw, P<:AbstractProjectionPolicy, Reg<:AbstractVelocityRegularization} <: AbstractFormulation
     viscous_operator::V
@@ -154,18 +154,18 @@ struct PaperGeneralFormulation{V<:AbstractViscousOperator, R<:AbstractReactionLa
     projection_policy::P
     regularization::Reg
     ν::Float64
-    eps_val::Float64             # ε_phys: physical compressibility, in BOTH residual and Jacobian (mass LHS)
+    physical_epsilon::Float64             # ε_phys: physical compressibility, in BOTH residual and Jacobian (mass LHS)
     numerical_epsilon::Float64   # ε_num: Codina iterative penalty. Lagging ε_num·p to the iterate makes it
                                  # CANCEL in the residual and survive only as ε_num·dp in the JACOBIAN — a
                                  # pressure-block regularization that vanishes at convergence (no consistency
                                  # error, no outer loop). 0 ⇒ off (Jacobian == residual ε).
 
-    function PaperGeneralFormulation(v::V, r::R, p_in::P, reg::Reg, ν::Float64, eps_val::Float64;
+    function PaperGeneralFormulation(v::V, r::R, p_in::P, reg::Reg, ν::Float64, physical_epsilon::Float64;
                                      numerical_epsilon::Float64=0.0, autocorrect_policy=false) where {V, R, P, Reg}
-        eps_val >= 0.0 || throw(ArgumentError("eps_val must be nonnegative; got $eps_val"))
+        physical_epsilon >= 0.0 || throw(ArgumentError("physical_epsilon must be nonnegative; got $physical_epsilon"))
         numerical_epsilon >= 0.0 || throw(ArgumentError("numerical_epsilon must be nonnegative; got $numerical_epsilon"))
         valid_policy = sanitize_projection_policy(p_in, r; autocorrect=autocorrect_policy)
-        new{V, R, typeof(valid_policy), Reg}(v, r, valid_policy, reg, ν, eps_val, numerical_epsilon)
+        new{V, R, typeof(valid_policy), Reg}(v, r, valid_policy, reg, ν, physical_epsilon, numerical_epsilon)
     end
 end
 
@@ -260,7 +260,7 @@ _get_proj_pi_p(::Nothing) = 0.0
 function _build_stabilization_coefficients(u, setup, formulation, phys_cfg)
     form = formulation.form
     ν = form.ν
-    eps_val = form.eps_val
+    physical_epsilon = form.physical_epsilon
     c_1 = formulation.c_1
     c_2 = formulation.c_2
     tau_reg_lim = phys_cfg.tau_regularization_limit
@@ -276,7 +276,7 @@ function _build_stabilization_coefficients(u, setup, formulation, phys_cfg)
     τ_1 = Operation(tau1_op)(u, grad_u_dummy, α, ∇(α), h)
     τ_2 = Operation(tau2_op)(u, grad_u_dummy, α, ∇(α), h)
 
-    return (; form, ν, eps_val, c_1, c_2, tau_reg_lim,
+    return (; form, ν, physical_epsilon, c_1, c_2, tau_reg_lim,
               α, f=setup.f_cf, g_mass=setup.g_cf, h, dΩ=setup.dΩ,
               σ, τ_1, τ_2)
 end
@@ -303,13 +303,13 @@ function eval_strong_residual_u(form::AbstractFormulation, u, p, h, α, f_custom
     return conv_u + α * ∇(p) + σ * u - div_visc_u - f_custom
 end
 
-# Strong (pointwise) mass residual R_p = eps_val·p + ∇·(αu) − g, the left side of
-# `eq:StrongMassEquation` (with the eps_val·p pressure-stabilization term) minus
+# Strong (pointwise) mass residual R_p = physical_epsilon·p + ∇·(αu) − g, the left side of
+# `eq:StrongMassEquation` (with the physical_epsilon·p pressure-stabilization term) minus
 # the mass source. ∇·(αu) is expanded as α(∇·u) + u·∇α for variable porosity α.
 function eval_strong_residual_p(form::AbstractFormulation, u, p, α, g_custom)
-    eps_val = form.eps_val
+    physical_epsilon = form.physical_epsilon
     div_alpha_u = α * (∇⋅u) + u ⋅ ∇(α)
-    return eps_val * p + div_alpha_u - g_custom
+    return physical_epsilon * p + div_alpha_u - g_custom
 end
 
 # Builds the full stabilized weak residual integrand for the (u,p) system —
@@ -326,7 +326,7 @@ end
 function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0, p_prev=nothing)
     u, p = X; v, q = Y
     # [FORM-05] σ/τ₁/τ₂ + the setup/formulation scalars come from the shared coefficient helper.
-    (; form, ν, eps_val, c_1, c_2, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
+    (; form, ν, physical_epsilon, c_1, c_2, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
         _build_stabilization_coefficients(u, setup, formulation, phys_cfg)
 
     # Standard Galerkin terms tested against (v, q): convection, viscous stress,
@@ -346,7 +346,7 @@ function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg;
     # linearization ε_num·dp is already in the Jacobian (build_stabilized_weak_form_jacobian, mass_term_jac),
     # so residual+Jacobian are consistent. p_prev === nothing ⇒ no iterative penalty (byte-identical legacy).
     iter_penalty = p_prev === nothing ? (0.0 * p) : (form.numerical_epsilon * (p - p_prev))
-    mass_term = q * (eps_val * p + div_alpha_u + iter_penalty)
+    mass_term = q * (physical_epsilon * p + div_alpha_u + iter_penalty)
     src_term  = v ⋅ f + q * g_mass
 
     # Strong residuals R_u, R_p that the stabilization weights — these measure how
@@ -360,7 +360,7 @@ function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg;
     # [known-fragility] Flipping either sign produces anti-SUPG / anti-diffusion
     # and destroys coercivity at parameter extremes.
     L_u_star_v = strong_adjoint_momentum(form, u, v, q, α) - (σ * v)
-    L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - eps_val * q
+    L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - physical_epsilon * q
 
     # Resolve the projections: ASGS ⇒ dimension-correct zeros, OSGS ⇒ π_h.
     proj_pi_u = _get_proj_pi_u(pi_u, u)
@@ -369,7 +369,7 @@ function build_stabilized_weak_form_residual(X, Y, setup, formulation, phys_cfg;
     # OSGS stabilizes the ORTHOGONAL residual R − π_h(R); ASGS stabilizes R itself.
     # The final boolean tells the policy which branch it is in.
     stab_R_u = apply_projection_u(form.projection_policy, R_u, σ, u, proj_pi_u, pi_u !== nothing)
-    stab_R_p = apply_projection_p(form.projection_policy, R_p, eps_val, p, proj_pi_p, pi_p !== nothing)
+    stab_R_p = apply_projection_p(form.projection_policy, R_p, physical_epsilon, p, proj_pi_p, pi_p !== nothing)
 
     # The VMS stabilization terms: adjoint-of-test ⋅ (τ · projected strong residual).
     stab_mom = mult_mom * (L_u_star_v ⋅ (τ_1 * stab_R_u))
@@ -402,7 +402,7 @@ end
 function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_cfg, freeze_cusp, lin_mode::AbstractLinearizationMode=ExactNewtonMode(); pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
     u, p = X; du, dp = dX; v, q = Y
     # [FORM-05] σ/τ₁/τ₂ + the setup/formulation scalars come from the shared coefficient helper.
-    (; form, ν, eps_val, c_1, c_2, tau_reg_lim, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
+    (; form, ν, physical_epsilon, c_1, c_2, tau_reg_lim, α, f, g_mass, h, dΩ, σ, τ_1, τ_2) =
         _build_stabilization_coefficients(u, setup, formulation, phys_cfg)
 
     # Mode-dependent coefficient derivatives: nonzero CellFields in ExactNewton,
@@ -424,14 +424,14 @@ function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_
     # ε_num (Codina iterative penalty): lagging ε_num·p to the iterate cancels it in the residual and
     # leaves ε_num·dp ONLY here, a pressure-block regularization that vanishes at convergence. The VMS
     # subscale (R_dp, L_q_star) stays at ε_phys so it remains residual-consistent (no consistency error).
-    mass_term_jac = q * ((eps_val + form.numerical_epsilon) * dp + div_alpha_du)
+    mass_term_jac = q * ((physical_epsilon + form.numerical_epsilon) * dp + div_alpha_du)
 
     conv_term_jac = v ⋅ conv_du
 
     # Strong residual of the increment, including the dσ/∂u term for ExactNewton.
     div_visc_du = strong_viscous_operator(form.viscous_operator, du, α, ν)
     R_du = conv_du + α * ∇(dp) + σ * du + (dsigma_du_val * u) - div_visc_du
-    R_dp = eps_val * dp + div_alpha_du
+    R_dp = physical_epsilon * dp + div_alpha_du
 
     # The dτ stabilization tangent multiplies the residual at the CURRENT iterate,
     # so R(u_old) is needed too. `σ` is passed explicitly into the strong residual
@@ -444,7 +444,7 @@ function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_
     # after dsigma_du_val; it is reused at the stabilization tangent below, no need to recompute it.)
     L_u_star_v = strong_adjoint_momentum(form, u, v, q, α) - (σ * v)
 
-    L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - eps_val * q
+    L_q_star = α * (∇⋅v) + v ⋅ ∇(α) - physical_epsilon * q
 
     proj_pi_u = _get_proj_pi_u(pi_u, u)
     proj_pi_p = _get_proj_pi_p(pi_p)
@@ -455,8 +455,8 @@ function build_stabilized_weak_form_jacobian(X, dX, Y, setup, formulation, phys_
     stab_R_du = apply_jacobian_projection_u(form.projection_policy, R_du, σ, dsigma_du_val, u, du, is_osgs)
     stab_R_old_u = apply_projection_u(form.projection_policy, R_u_old, σ, u, proj_pi_u, is_osgs)
 
-    stab_R_dp = apply_jacobian_projection_p(form.projection_policy, R_dp, eps_val, dp, is_osgs)
-    stab_R_old_p = apply_projection_p(form.projection_policy, R_p_old, eps_val, p, proj_pi_p, is_osgs)
+    stab_R_dp = apply_jacobian_projection_p(form.projection_policy, R_dp, physical_epsilon, dp, is_osgs)
+    stab_R_old_p = apply_projection_p(form.projection_policy, R_p_old, physical_epsilon, p, proj_pi_p, is_osgs)
 
     # Full stabilization tangent (product rule over τ·R and L*·R):
     #   L* ⋅ (τ·R_du  +  dτ·R_old)   +   dL* ⋅ (τ·R_old).

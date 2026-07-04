@@ -28,8 +28,8 @@ using LinearAlgebra
 const _PNS = PorousNSSolver
 
 # Self-contained equal-order OSGS problem with a NON-zero ε_phys (the Phase-0 conditioning fix), plus the
-# L²-projection machinery. Mirrors _a3_problem from osgs_frozen_pi_jacobian_quick_test.jl but threads eps_val.
-function _jfnk_problem(; n, nu, sigma=1.0, eps_val=1e-6, amp=0.2, kv=1)
+# L²-projection machinery. Mirrors _a3_problem from osgs_frozen_pi_jacobian_quick_test.jl but threads physical_epsilon.
+function _jfnk_problem(; n, nu, sigma=1.0, physical_epsilon=1e-6, amp=0.2, kv=1)
     model = CartesianDiscreteModel((0.0,1.0,0.0,1.0), (n,n))
     Ω = Triangulation(model); dΩ = Measure(Ω, 4*kv)
     refe_u = ReferenceFE(lagrangian, VectorValue{2,Float64}, kv); refe_p = ReferenceFE(lagrangian, Float64, kv)
@@ -39,7 +39,7 @@ function _jfnk_problem(; n, nu, sigma=1.0, eps_val=1e-6, amp=0.2, kv=1)
     V_free = TestFESpace(model, refe_u, conformity=:H1); Q_free = TestFESpace(model, refe_p, conformity=:H1)
     U_proj = TrialFESpace(V_free); P_proj = TrialFESpace(Q_free)
     form = _PNS.PaperGeneralFormulation(_PNS.SymmetricGradientViscosity(), _PNS.ConstantSigmaLaw(sigma),
-              _PNS.ProjectFullResidual(), _PNS.SmoothVelocityFloor(1e-3, 0.0, 1e-10, 1e-12), nu, eps_val)
+              _PNS.ProjectFullResidual(), _PNS.SmoothVelocityFloor(1e-3, 0.0, 1e-10, 1e-12), nu, physical_epsilon)
     c_1, c_2 = _PNS.get_c1_c2(_PNS.PaperGeneralFormulation, kv)
     alpha_cf = CellField(0.7, Ω); h_cf = CellField(1.0/n, Ω); f_cf = CellField(VectorValue(0.1,-0.1), Ω); g_cf = CellField(0.0, Ω)
     setup = _PNS.FETopology(X, Y, model, Ω, dΩ, V_free, Q_free, h_cf, f_cf, alpha_cf, g_cf)
@@ -69,7 +69,7 @@ end
 
 @testset "quick: OSGS JFNK on the real coupled operator" begin
 
-    pb = _jfnk_problem(n=4, nu=0.05, sigma=1.0, eps_val=1e-6)
+    pb = _jfnk_problem(n=4, nu=0.05, sigma=1.0, physical_epsilon=1e-6)
     # a deterministic, developed iterate (no RNG)
     x0 = [0.02*sin(0.6*i) + 0.01*cos(0.25*i) for i in 1:pb.ndof]
 

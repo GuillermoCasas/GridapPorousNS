@@ -4,6 +4,7 @@
         "nu": 1.0,
         "f_x": 0.0,
         "f_y": 0.0,
+        "physical_epsilon": 0.0,
         "numerical_epsilon": 0.0,
         "reaction_model": "Forchheimer",
         "sigma_constant": 1.0,

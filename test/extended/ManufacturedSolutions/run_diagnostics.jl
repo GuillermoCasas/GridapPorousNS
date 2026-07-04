@@ -103,8 +103,8 @@ function g_ex(x, config::PorousNSSolver.PorousNSConfig)
         alpha_val = 1.0
     end
     
-    eps_val = config.physical_properties.eps_val
-    return eps_val * p_ex(x, config) + (u_ex(x, config) ⋅ grad_alpha_val)
+    physical_epsilon = config.physical_properties.physical_epsilon
+    return physical_epsilon * p_ex(x, config) + (u_ex(x, config) ⋅ grad_alpha_val)
 end
 
 function grad_u_ex(x, config)
@@ -207,7 +207,7 @@ function run_diagnostics()
     
     # We will test the MMS case with Re = 1e6, Da = 1e-6
     override_dict = Dict(
-        "physical_properties" => Dict("nu" => 1e-6, "eps_val" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1e6, "sigma_linear" => 150.0, "sigma_nonlinear" => 1.75),
+        "physical_properties" => Dict("nu" => 1e-6, "physical_epsilon" => 1e-8, "reaction_model" => "Constant_Sigma", "sigma_constant" => 1e6, "sigma_linear" => 150.0, "sigma_nonlinear" => 1.75),
         "domain" => Dict("alpha_0" => 0.5, "bounding_box" => [-0.5, 0.5, -0.5, 0.5]),
         "numerical_method" => Dict(
             "element_spaces" => Dict("k_velocity" => 1, "k_pressure" => 1),
@@ -413,7 +413,7 @@ function run_diagnostics()
     Da_list = [1.0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
     for da in Da_list
         loc_cfg = PorousNSSolver.PorousNSConfig(
-            physical_properties=PorousNSSolver.PhysicalProperties(nu=1e-6, eps_val=1e-8, numerical_epsilon=0.0, reaction_model="Constant_Sigma", sigma_constant=1.0/da, sigma_linear=150.0/(da*1e6), sigma_nonlinear=1.75),
+            physical_properties=PorousNSSolver.PhysicalProperties(nu=1e-6, physical_epsilon=1e-8, numerical_epsilon=0.0, reaction_model="Constant_Sigma", sigma_constant=1.0/da, sigma_linear=150.0/(da*1e6), sigma_nonlinear=1.75),
             domain=base_config.domain, numerical_method=base_config.numerical_method, output=base_config.output
         )
         run_experiment_block("DA SWEEP: Da = $da", loc_cfg, 0.0, false)

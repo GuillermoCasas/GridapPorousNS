@@ -402,7 +402,7 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
     f_ex_raw = CellField(f_ex_oracle, Ω)
 
     # Mass source g_ex for the continuity equation. The porosity-weighted divergence expands as
-    # ∇·(α u) = α (∇·u) + ∇α · u; the `eps_val * p` term is the pseudo-compressibility
+    # ∇·(α u) = α (∇·u) + ∇α · u; the `physical_epsilon * p` term is the pseudo-compressibility
     # stabilization the formulation adds to the mass equation, so g_ex matches it exactly.
     g_ex_oracle = function(x)
         u = u_f(x)
@@ -411,7 +411,7 @@ function evaluate_exactness_diagnostics(mms::Paper2DMMS, model, Ω, dΩ, h_cf, X
         grad_A = PorousNSSolver.grad_alpha(alpha_field, x)
 
         div_u_val = tr(grad_u)
-        return mms.formulation.eps_val * p_ex_func(x) + A * div_u_val + (grad_A ⋅ u)
+        return mms.formulation.physical_epsilon * p_ex_func(x) + A * div_u_val + (grad_A ⋅ u)
     end
 
     g_ex_raw = CellField(g_ex_oracle, Ω)

@@ -72,7 +72,7 @@ function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over
     # is a code-side safeguard, not in the paper; the eps_pert homotopy provides cold-start globalization).
     osgs_skip_boot && (solver_dict["osgs_skip_asgs_boot"] = true)
     cfg = Dict(
-        "physical_properties" => Dict("nu"=>1.0, "eps_val"=>1e-8, "numerical_epsilon"=>numerical_epsilon,
+        "physical_properties" => Dict("nu"=>1.0, "physical_epsilon"=>1e-8, "numerical_epsilon"=>numerical_epsilon,
                                       "reaction_model"=>"Constant_Sigma", "sigma_constant"=>1.0),
         "domain" => Dict("alpha_0"=>ALPHA0, "bounding_box"=>[0.0,1.0,0.0,1.0], "r_1"=>R1, "r_2"=>R2),
         "numerical_method" => Dict(
@@ -169,7 +169,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     visc_op = visc == "SymmetricGradient" ? PNS.SymmetricGradientViscosity() :
               visc == "Laplacian" ? PNS.LaplacianPseudoTractionViscosity() :
               PNS.DeviatoricSymmetricViscosity()
-    # eps_val = ε_phys (residual + Jacobian); ε_num is the Codina iterative penalty — it lives ONLY in the
+    # physical_epsilon = ε_phys (residual + Jacobian); ε_num is the Codina iterative penalty — it lives ONLY in the
     # Jacobian's pressure block (lagged to the iterate, it cancels in the residual) and vanishes at convergence.
     form = PNS.PaperGeneralFormulation(visc_op,
                                        PNS.ConstantSigmaLaw(sigma_c), proj, reg, nu, eps_phys;
