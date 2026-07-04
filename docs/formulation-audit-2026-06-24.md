@@ -485,6 +485,23 @@ Frontal mesh." That framing is correct **for OSGS** (a better mesh lifts OSGS to
 ASGS**: the ASGS L²-order loss is method-intrinsic and survives a perfect uniform mesh. Reports that
 present "3D P1 optimal" should qualify it as *OSGS-optimal, ASGS-suboptimal*.
 
+**Re-confirmation (2026-07-04, ratio-to-interpolant — the cleaner discriminator).** The ASGS-vs-OSGS
+comparison above is strengthened by measuring each against the *nodal interpolant* (the best the FE space
+allows) on the structured Kuhn ladder:
+
+| method | ratio→interp: (8,8,2)→(16,16,4)→(24,24,6) | L²u rate vs interp rate |
+|---|---|---|
+| **P1 ASGS** | 1.47 → 2.40 → **3.03** (grows) | 1.2 vs interp **1.85** |
+| **P1 OSGS** | 0.93 → 0.84 (pinned ~1) | tracks interp |
+
+This is decisive on two fronts. (i) The *interpolant itself* only reaches rate ≈1.85 (not 2) at these
+coarse meshes (the α-annulus preasymptotics — same effect as P2), so the raw ASGS <2 rate is **not all
+defect**; but (ii) ASGS lags *even the preasymptotic interpolant* and the gap **widens** (ratio 1.47→3.03),
+while OSGS *pins* at the interpolant (~0.9) on the **same mesh**. So the space demonstrably admits the
+optimal order (OSGS gets it) and ASGS specifically loses it — a genuine L²-order (Aubin–Nitsche) defect,
+not a mesh or preasymptotic artifact. (The earlier ASGS-vs-OSGS framing understated the preasymptotic
+share; ratio-to-interpolant separates the two cleanly.)
+
 **Recommended action.** (1) Document the ASGS 3D L²-order deficiency honestly as a method property, not a
 mesh defect. (2) Treat OSGS as the load-bearing 3D method (as the code already leans). (3) If ASGS 3D
 optimality is wanted, that is a genuine formulation research question (the orthogonal-projection
