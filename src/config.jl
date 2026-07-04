@@ -250,6 +250,15 @@ Base.@kwdef struct SolverConfig
     # the Jacobian, so residual+Jacobian stay consistent. Outer-loop drift tolerance reuses `xtol`.
     iterative_penalty_enabled::Bool
     iterative_penalty_max_iters::Int               # cap on the outer iterative-penalty passes
+    # --- [gauge-free hardening] re-center the lagged pressure to zero mean between penalty passes ---
+    # OFF by default (bit-identical: pⁿ⁻¹ stored verbatim). When ON, the outer iterative-penalty loop
+    # subtracts the domain mean ∫p dΩ/|Ω| from pⁿ before storing it as the lag pⁿ⁻¹, bounding the
+    # pressure-mean drift −ρ/(ε_num|Ω|) that the all-Dirichlet gauge otherwise accumulates
+    # (derivation + provenance: theory/pressure_recentering_note — the iterated penalty is Codina's, the
+    # re-centering is a PROPOSAL, not attributed to him). GAUGE-FIXING ONLY: exact iff the pressure
+    # constant is free (ε_phys = 0), asserted in validate!. It changes NO mean-removed quantity and must
+    # NOT be used where the pressure level is physical (Neumann/outlet). Requires iterative_penalty_enabled.
+    recenter_pressure_between_penalty_passes::Bool
     # --- OSGS: skip the ASGS Stage-I boot (osgs_solver.jl / solver_core.jl) ---
     # OFF by default (the boot runs, bit-identical legacy). The ASGS boot is a code-side globalization
     # safeguard, NOT part of the paper algorithm (alg:StationarySystem runs the OSGS staggered iteration
@@ -395,6 +404,11 @@ function validate!(cfg::PorousNSConfig)
     # ε_num·(pⁿ − pⁿ⁻¹), which is identically zero at ε_num = 0. Asking for the penalty while leaving the
     # numerical ε at zero is a configuration error (it would be a silent no-op), not a default to guess.
     @assert !(sol.iterative_penalty_enabled && cfg.physical_properties.numerical_epsilon <= 0.0) "iterative_penalty_enabled=true requires physical_properties.numerical_epsilon > 0 (the penalty ε_num·(pⁿ−pⁿ⁻¹) vanishes at ε_num=0)"
+    # Pressure re-centering (theory/pressure_recentering_note) acts ONLY inside the outer penalty loop and
+    # is a GAUGE operation, exact only when the pressure constant is genuinely free. Fail loudly on the two
+    # contradictory requests rather than silently no-op'ing or corrupting a physical pressure level.
+    @assert !(sol.recenter_pressure_between_penalty_passes && !sol.iterative_penalty_enabled) "recenter_pressure_between_penalty_passes=true requires iterative_penalty_enabled=true (re-centering acts only in the outer iterative-penalty loop)"
+    @assert !(sol.recenter_pressure_between_penalty_passes && cfg.physical_properties.eps_val > 0.0) "recenter_pressure_between_penalty_passes=true requires physical_properties.eps_val == 0 (gauge-free: with ε_phys > 0 the pressure level is physically anchored, so subtracting its mean is not exact)"
 
     # Linear (inner) solver backend — the ilu_*/gmres_* knobs are required even for LU (no silent default),
     # but only constrained when ILU_GMRES is actually selected.

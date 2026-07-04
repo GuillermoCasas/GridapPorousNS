@@ -510,6 +510,18 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
         # injecting a problem scale. It never activates in a well-posed solve (pressure is O(1) here).
         return num / max(den, eps(Float64))
     end
+    # [gauge-free re-centering] Subtract the domain mean ∫p dΩ/|Ω| from the pressure field IN PLACE, so it
+    # carries zero mean. For a Lagrangian space with partition of unity (Σφ_i = 1) and no pressure Dirichlet
+    # DOFs, subtracting the scalar mean from every free DOF value yields exactly the field p − mean(p). This
+    # is a pure GAUGE shift (Lemma in theory/pressure_recentering_note): valid only when the pressure constant
+    # is free (ε_phys = 0), which validate! enforces before this ever runs. Only invoked when the
+    # recenter flag is on; otherwise the lag is stored verbatim (bit-identical legacy).
+    function _recenter_pressure!(p_field)
+        vals = get_free_dof_values(p_field)
+        mean_p = sum(∫(p_field)setup.dΩ) / sum(∫(1.0)setup.dΩ)   # ∫(1.0)*dΩ = |Ω| (metrics.jl idiom)
+        vals .-= mean_p
+        return p_field
+    end
 
     res_fn_init(x, y) = build_stabilized_weak_form_residual(x, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, p_prev=(penalty_on ? p_prev_ref[] : nothing))
     jac_picard_init(x, dx, y) = build_picard_jacobian(x, dx, y, setup, formulation, phys_cfg; pi_u=nothing, pi_p=nothing, mult_mom=1.0, mult_mass=1.0)
@@ -607,7 +619,12 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     # [iterative-penalty] OUTER fixed-point loop (Codina, article.tex §5.2). Each pass solves the full
     # system with pⁿ⁻¹ held fixed (via p_prev_ref); between passes we update pⁿ⁻¹ ← pⁿ and stop once the
     # relative pressure drift < xtol, at which point ε_num·(pⁿ − pⁿ⁻¹) → 0 and the solution is unaltered.
+    # [gauge-free re-centering] Opt-in (default off ⇒ bit-identical). When on, zero-mean the lagged pressure
+    # each pass so the mean cannot drift (theory/pressure_recentering_note); validate! has already guaranteed
+    # ε_phys = 0 so the shift is pure gauge. The initial lag is re-centered too, so pass 1 starts gauge-fixed.
+    recenter = sol_cfg.recenter_pressure_between_penalty_passes
     p_prev_ref[] = _pressure_copy(x0)
+    recenter && _recenter_pressure!(p_prev_ref[])
     local ip_result = (false, verification_result(verifier), x0, iter_count_ref[], 0.0)
     local ip_time = 0.0
     for ip_pass in 1:sol_cfg.iterative_penalty_max_iters
@@ -615,10 +632,22 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
         ip_time += ip_result[5]
         ip_result[1] || break          # solve failed this pass → stop (keep the failed result)
         p_new = _pressure_copy(ip_result[3])
+        recenter && _recenter_pressure!(p_new)   # re-center BEFORE drift + storing, so drift measures shape change
         drift = _pressure_rel_drift(p_new, p_prev_ref[])
         p_prev_ref[] = p_new
         println("      [iter-penalty] pass $(ip_pass): relative pressure drift = $(drift) (xtol=$(sol_cfg.xtol))"); flush(stdout)
         drift < sol_cfg.xtol && break
+    end
+    # [gauge-free re-centering] Zero-mean the RETURNED pressure too, not only the lag. The lag re-centering
+    # prevents multi-pass ACCUMULATION, but the final stored/exported field still carries one pass's shift
+    # −ρ/(ε_num|Ω|), which can already dominate ‖p‖ (≈230 on a coarse P1 mesh). Re-centering the output cures
+    # the precision-loss (i) and momentum-leak (ii) consequences (theory/pressure_recentering_note §5). Pure
+    # gauge (ε_phys=0, asserted) ⇒ every mean-removed error is unchanged (verified byte-identical). Skipped on
+    # a failed solve (nothing to certify). The pressure block of the returned MultiField iterate is a view, so
+    # mutating its free values re-centers the field that is exported / measured downstream.
+    if recenter && ip_result[1]
+        _u_fin, _p_fin = ip_result[3]
+        get_free_dof_values(_p_fin) .-= (sum(∫(_p_fin)setup.dΩ) / sum(∫(1.0)setup.dΩ))
     end
     return (ip_result[1], ip_result[2], ip_result[3], ip_result[4], ip_time)
 end

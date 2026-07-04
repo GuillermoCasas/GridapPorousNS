@@ -76,6 +76,7 @@
             "osgs_jfnk_fd_epsilon": 1e-8,
             "iterative_penalty_enabled": false,
             "iterative_penalty_max_iters": 20,
+            "recenter_pressure_between_penalty_passes": false,
             "osgs_skip_asgs_boot": false,
             "linear_solver": {
                 "method": "LU",

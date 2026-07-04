@@ -524,6 +524,13 @@
                 20
               ]
             },
+            "recenter_pressure_between_penalty_passes": {
+              "type": "boolean",
+              "description": "GAUGE-FREE HARDENING (theory/pressure_recentering_note). OFF by default (bit-identical: p^{n-1} stored verbatim). When ON, the outer iterative-penalty loop subtracts the domain mean int(p)/|Omega| from p^n before storing it as the lag p^{n-1}, bounding the pressure-mean drift -rho/(numerical_epsilon*|Omega|) that the all-Dirichlet gauge otherwise accumulates. Provenance: the iterated penalty is Codina's; the between-pass RE-CENTERING is a proposal of that note, NOT attributed to Codina and applied ONLY here. Changes no mean-removed quantity. Requires iterative_penalty_enabled=true and eps_val==0 (gauge-free; with physical epsilon>0 the pressure level is anchored and re-centering is not exact) — both enforced in validate!.",
+              "examples": [
+                false
+              ]
+            },
             "osgs_skip_asgs_boot": {
               "type": "boolean",
               "description": "Skip the ASGS Stage-I boot before the OSGS coupled/staggered solve. OFF by default (the boot runs, bit-identical). The boot is a code-side globalization safeguard, not part of the paper algorithm (which runs the OSGS staggered iteration directly from the initial guess). For a warm/exact guess it converges ASGS to the ASGS root first (a different fixed point) from which OSGS can be ill-conditioned. When an eps_pert homotopy provides cold-start globalization, skipping the boot (OSGS solves straight from the guess) is paper-faithful. No effect on ASGS-method runs.",
