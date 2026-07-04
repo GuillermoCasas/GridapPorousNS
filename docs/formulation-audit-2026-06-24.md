@@ -35,6 +35,15 @@ of the 3D rate anomalies.
 > measure, symmetric with the momentum gate; the strong-form measure is demoted to a diagnostic). See the
 > Resolved ledger, the F4 checklist item, and §C.3. A trace-grounded **correction** to the old C.3
 > hypothesis is recorded there (the 0.8 gate was NON-binding, not a cause of the P2 pressure errors).
+>
+> **2026-07-04 update:** (1) **F4 companion `3b76864`** — a scale-free residual-floor accept fixed the
+> Route-B tight-gate false-failures on high-Re/fine cells; the **full 2D k2 sweep then completed**
+> behavior-preserving (`bf41727`; F4 ledger). (2) **B-5 / F5 measurement COMPLETE** — the mesh-family
+> control confirms c₁×2 *masks* / c₁×4 *fixes* (ratio-to-interpolant) for **both** ASGS and OSGS, clean-room
+> diagnosis committed (`b20cb78`); but the **c₁ fix is NOT adopted** (author prefers root-cause resolution
+> over a multiplier), so F5's *measurement* is closed while its *fix* stays open. (3) **New landed
+> hardening** — gauge-free pressure re-centering behind a default-off flag (`6551709`; Minor list), the
+> iterated penalty being Codina's but the re-centering **our** proposal.
 
 **Headline that still stands.** The continuous VMS formulation is faithfully transcribed — the strong
 residual, both Jacobians, the adjoint sign conventions, the deviatoric/symmetric viscous expansions
@@ -48,7 +57,7 @@ harness/reporting, and (iii) hygiene/fragility gaps.
 | # | Finding | Severity | Kind |
 |---|---|---|---|
 | **B-1** | 3D P1-**ASGS** is genuinely sub-optimal (L²u ≈ 1.2, not 2) even on a perfect uniform Kuhn mesh — method-intrinsic, not mesh quality; OSGS recovers it. **Action: document honestly** (still open). | High | results/theory |
-| **B-5 / F5** | P2-3D has a genuine under-stabilization defect at paper c₁=4k⁴ on a uniform mesh (converged fine pairs show errors *growing*); **c₁×4 fixes it**. **Action: element-type-aware c₁** (F5) + reconcile the canonical doc's TL;DR. | High | results/theory |
+| **B-5 / F5** | P2-3D under-stabilization at paper c₁=4k⁴ on a uniform mesh. **Measurement complete (2026-07-03):** c₁×2 *masks* (ratio-to-interpolant drifts, H¹u stalls), **c₁×4 *fixes*** (ratio pins →1, both ASGS & OSGS) ⇒ threshold c₁* ∈ ×(2,4); clean-room diagnosis committed (`b20cb78`). **Fix decision OPEN** — the c₁ multiplier is confirmed effective but **not adopted** (author prefers root-cause resolution over a multiplier). | High | results/theory |
 | **B-2** | The committed "3D-P2 divergence" tables mix `success=False` solves into the rate table; the plotter doesn't gate on `success`. **Action: gate/flag failed levels.** | High | reporting |
 | **B-3 / B-6** | A failed OSGS solve silently reports the ASGS Stage-I boot state under the OSGS label (byte-identical error tuples at shared-failed levels). **Action: mark OSGS-degenerated-to-ASGS distinctly.** | Med | reporting/harness |
 | **B-4** | The most recent committed 3D result files can't be reproduced from the current harness (`mesh_algorithm`/ladder match no function in `smoke3d.jl`). **Action: restore/commit the exact driver** (overlaps F6). | Med | reproducibility |
@@ -127,8 +136,17 @@ harness/reporting, and (iii) hygiene/fragility gaps.
   No tangent change (the coupled/JFNK Jacobian was already the full momentum+mass tangent; only the
   read-only stopping test changed). Verified Blitz 240/240, Quick convergence test 26/26; 2D A/B and 3D
   ASGS behavior-preserving; traces show `ε_C` driven `1e-3→1e-12` while `eps_C_strong` floors at O(h). The
-  original C.3 "loose gate causes the P2 pressure errors" hypothesis is **refuted** by traces (§C.3). Full
-  3D-OSGS sweep is a measurement follow-up. See §C.3 + the F4 checklist item.
+  original C.3 "loose gate causes the P2 pressure errors" hypothesis is **refuted** by traces (§C.3).
+  **Companion fix `3b76864` (2026-07-02):** the tight `tol_C=1e-9` gate false-failed high-Re / fine-mesh
+  cells whose residual is at the machine floor but whose Philosophy-A `ε_C` floors ~1e-8 (its `D_C`
+  envelope collapses for near-divergence-free flow), and each false failure burned the whole
+  eps_pert-homotopy fallback. A scale-free residual-floor accept (`residual_floor_reached`: `ε_M ≤ tol_M`
+  **and** the per-field residual ≤ `k_nf·ftol`, guarded by `!degenerate`; reuses the existing
+  `noise_floor_success_max_ftol_multiple`, no new magic number) accepts them. With it the **full 2D k2 QUAD
+  sweep completed behavior-preserving** (`bf41727`; ASGS+OSGS, N10→N320, 0 NaN, median L²u rate 3.00,
+  vs pre-Route-B baseline median rel Δe_u 1.97e-11) — see
+  [`docs/mms/route-b-2d-sweep-status.md`](docs/mms/route-b-2d-sweep-status.md). Full 3D-OSGS sweep remains
+  the measurement follow-up. See §C.3 + the F4 checklist item.
 
 ---
 
@@ -164,11 +182,20 @@ DIAGNOSTIC `eps_C_strong` (traced, never gated). See §0 Resolved ledger / §C.3
   old soft-stall left, now drained). The 2D `LUSolver` harnesses are behavior-preserving (A/B to the root).
 
 ### F5 — element-type-aware c₁ for P2 tets (the B.5 fix) → §B.5
-- Add a config-driven `c1_multiplier` (or a per-`(element, order)` table), explicitly `[code-actual]`, so
-  P2 tetrahedra use a larger c₁ (the control showed **c₁×4 fixes P2-3D**); 2D/quad stays paper-faithful at
-  `4k⁴`. Also reconcile `docs/mms/3d-p2-convergence-investigation.md`'s TL;DR (still says "mesh quality")
-  with its README pointer (says falsified) using the B.5 c₁×1-vs-c₁×4 numbers (the doc itself is committed,
-  but its TL;DR predates the structured-Kuhn control).
+- **Status (2026-07-03): MEASUREMENT COMPLETE; FIX DECISION OPEN.** The Gridap §5.1 mesh-family control
+  (§B.5) confirms the mechanism for BOTH methods: c₁×2 *masks* (ratio-to-interpolant drifts 1.34→1.94, H¹u
+  stalls), c₁×4 *fixes* (ratio pins 1.14→1.06, tracking the interpolant), so the h-robust threshold is
+  c₁* ∈ ×(2,4) — higher than the clean-room report's single-mesh ×(1.5,2). The clean-room diagnosis is
+  committed at [`docs/convergence_problems_audit/`](docs/convergence_problems_audit/) (`b20cb78`) and
+  cross-linked as **contested-pending-confirmation** to the canonical
+  [`docs/mms/3d-p2-instability-investigation.md`](docs/mms/3d-p2-instability-investigation.md) (⚠ note), which
+  the §5.1 sweep now supplies. **The c₁ multiplier is confirmed effective but NOT adopted** — the author
+  prefers resolving the root cause over shipping an ad-hoc multiplier (even an element-aware one). So the
+  item below is the *option on the table*, not a committed direction.
+- (Option, if adopted) Add a config-driven `c1_multiplier` (or a per-`(element, order)` table), explicitly
+  `[code-actual]`, so P2 tetrahedra use a larger c₁; 2D/quad stays paper-faithful at `4k⁴`. Reconcile the
+  canonical doc's TL;DR #2 ("not c₁") with the confirmed c₁-coercivity finding, and measure the actual
+  `C_inv` for P2 Kuhn vs gmsh tets to calibrate the multiplier.
 
 ### F6 — make the 3D MMS test config-driven + add an official 3D-MMS test
 - **Why:** `test/extended/ManufacturedSolutions3D/smoke3d.jl` is a manual sweep driver with hard-coded
@@ -256,6 +283,15 @@ DIAGNOSTIC `eps_C_strong` (traced, never gated). See §0 Resolved ledger / §C.3
   Now reachable: `accelerators.jl` is wired into the OSGS stage behind the opt-in `osgs_anderson_enabled`
   (NONL-03, OFF by default), so this guard matters on that path when enabled. (NONL-01 — the ILU-GMRES
   convergence check — is resolved under C.1; see §0 ledger.)
+- **[NEW 2026-07-04] Pressure-mean drift under the iterated penalty — hardening LANDED (`6551709`).** In the
+  all-Dirichlet gauge-free case the iterated penalty pins the pressure constant to the *previous* pass, not to
+  zero mean; a fixed boundary-flux residue `ρ` shifts the mean by `−ρ/(ε_num|Ω|)` per pass (A/B: raw mean 230
+  against a true `‖p‖≈0.7` on a coarse P1 mesh — it dominates). Fix: opt-in
+  `recenter_pressure_between_penalty_passes` (default OFF ⇒ bit-identical) re-centers both the lag and the
+  returned field; mean-removed errors A/B byte-identical, stored mean → machine zero. `validate!` guards it to
+  the gauge-free case (`iterative_penalty_enabled` + `eps_val==0`). **Provenance:** the iterated penalty is
+  Codina's; the re-centering is *our* proposal, **not** attributed to him — full derivation + provenance in
+  [`theory/pressure_recentering_note/`](theory/pressure_recentering_note/pressure_recentering_note.tex).
 
 **Bit-identity verification recipe (reused for the dedup/config-ify batches):** capture a clean pre-change baseline by
 `git stash push -- src/`, run a couple of 2D cells
@@ -572,6 +608,35 @@ P2-3D defect is **real**, not merely the B.2 reporting artifact.
 **L²u = +1.67, +2.67, +2.30** (climbing toward the optimal 3), H¹u → +1.26, L²p → +1.48 — and the
 **absolute errors are ≈ 40× smaller** than at paper c₁. The c₁ knob is exactly the coercivity lever
 (`c₁ > 2ξ C_inv²`, article.tex `eq:conditions_on_num_param`).
+
+**Masking vs fixing (2026-07-03 mesh-family control against the nodal interpolant).** A single-mesh knee is
+ambiguous — c₁×2 already looks healed at (12,12,3). Re-testing at *fixed* c₁ across the Kuhn ladder against
+the nodal-interpolant error (the best the FE space can do) separates a genuine coercivity fix (ratio-to-
+interpolant *pinned* at ~1) from a mere error-constant shrink (ratio *drifts*):
+
+| c₁ mult | ratio→interp across (12,12,3)→(16,16,4)→(20,20,5) | L²u rate | H¹u | verdict |
+|---|---|---|---|---|
+| **×2** | 1.34 → 1.51 → **1.94** (drifts up) | 2.19 → **1.13** (falls off) | **stalls** (≈0) | **MASKING** |
+| **×4** | 1.14 → 1.09 → 1.07 → **1.06** (→1) | tracks interp to 2 dp | converges | **FIXING** |
+
+So c₁×2 heals the coarse mesh then *re-diverges* under refinement; only c₁×4 pins. The h-robust coercivity
+threshold is therefore **c₁\* ∈ ×(2,4)** — higher than the clean-room report's single-mesh ×(1.5,2)
+estimate, which its own §5.3 discriminator (ratio-pinning across a family) now corrects.
+
+**OSGS at c₁×4 is method-independent.** The full k2 sweep also ran OSGS at c₁×4 (3D recipe: boot-skip +
+matrix-free JFNK). It converges (`ok=true`, `eps_used=1`) with ratio-to-interpolant 1.08 → 1.04 and rates
+matching ASGS. So the c₁ *discretisation* fix is method-independent — and OSGS-P2-3D's separate
+non-contractive-π solver issue manifests here as **cost** (~1–2 h/mesh of JFNK grinding), **not failure**,
+a materially more positive result than "OSGS-P2 unsolvable."
+
+**Clean-room corroboration (now committed).** An independent NumPy/SciPy reimplementation reproduces the
+same 40× collapse and the same knee and attributes it to the element-family inverse-inequality constant
+`C_inv` (paper `4k⁴` calibrated for quads/hexes, sub-critical on right-angle Kuhn tets). It is committed at
+[`docs/convergence_problems_audit/`](docs/convergence_problems_audit/) (`b20cb78`, report + NumPy
+reproducer) and cross-linked to the canonical
+[`docs/mms/3d-p2-instability-investigation.md`](docs/mms/3d-p2-instability-investigation.md) as
+**contested-pending-in-stack-confirmation** — which the §5.1 Gridap sweep above now provides, refuting that
+doc's TL;DR #2 "not c₁."
 
 **Verdict — what is right and wrong in the existing 3D-P2 narrative.**
 
