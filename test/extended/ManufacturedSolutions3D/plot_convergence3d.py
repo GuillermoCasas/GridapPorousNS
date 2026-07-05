@@ -10,10 +10,12 @@ Layout: results from each mesh sequence are conserved under their own folder INS
 so e.g. the structured P1 plot is results/k1/TET/structured/convergence3d_P1.png.
 
 Run:
+  python plot_convergence3d.py <path/to/any.json>       # plot ANY results JSON directly (PNG named after
+                                                        #   its stem, written beside it); a glob also works
   python plot_convergence3d.py <mesh_sequence>          # plot results/k<kv>/TET/<seq>/ for kv in 1,2
   python plot_convergence3d.py <mesh_sequence> <root>   # ...under a custom results root
   python plot_convergence3d.py <dir>                    # back-compat: a dir holding an aggregate JSON
-  python plot_convergence3d.py                          # back-compat: legacy results/convergence3d_results.json
+  python plot_convergence3d.py                          # plot every convergence3d_results.json under results/
 """
 import glob
 import json
@@ -35,20 +37,34 @@ def _seg_slope(h, e, i):
     return (math.log(e[i + 1]) - math.log(e[i])) / (math.log(h[i + 1]) - math.log(h[i]))
 
 
-def plot_cell(results_dir):
-    """Read results_dir/convergence3d_results.json and write a convergence3d_P<kv>.png per kv into it."""
-    json_path = os.path.join(results_dir, "convergence3d_results.json")
+def plot_json(json_path, out_dir=None, stem=None):
+    """Plot ANY convergence-results JSON (the aggregate list-of-records schema).
+
+    Writes `<stem>_P<kv>.png` per kv into `out_dir` (default: the JSON's own directory). `stem` defaults to
+    `convergence3d` for a canonical `convergence3d_results.json`, else the JSON's basename — so plotting e.g.
+    `convergence3d_results_c1x4.json` yields `convergence3d_results_c1x4_P2.png` right beside it, without
+    colliding with the canonical plot in the same folder.
+    """
     if not os.path.exists(json_path):
         return False
     recs = json.load(open(json_path))
+    out_dir = out_dir or os.path.dirname(os.path.abspath(json_path))
+    if stem is None:
+        base = os.path.splitext(os.path.basename(json_path))[0]
+        stem = "convergence3d" if base == "convergence3d_results" else base
     by_kv = {}
     for r in recs:
         by_kv.setdefault(int(r["kv"]), {})[str(r["method"]).upper()] = r
-    _plot_by_kv(by_kv, results_dir)
+    _plot_by_kv(by_kv, out_dir, stem)
     return True
 
 
-def _plot_by_kv(by_kv, out_dir):
+def plot_cell(results_dir):
+    """Read results_dir/convergence3d_results.json and write a convergence3d_P<kv>.png per kv into it."""
+    return plot_json(os.path.join(results_dir, "convergence3d_results.json"), results_dir, stem="convergence3d")
+
+
+def _plot_by_kv(by_kv, out_dir, stem="convergence3d"):
     for kv, methods in sorted(by_kv.items()):
         opt_u_l2, opt_u_h1, opt_p_l2 = kv + 1, kv, kv      # P_kv: L²u~h^{kv+1}, H¹u~h^{kv}, L²p~h^{kv}
         plt.figure(figsize=(10, 8))
@@ -79,7 +95,7 @@ def _plot_by_kv(by_kv, out_dir):
         if plt.gca().get_legend_handles_labels()[0]:
             plt.legend(handlelength=4.0)
         plt.grid(True, which="both", ls="--")
-        out = os.path.join(out_dir, f"convergence3d_P{kv}.png")
+        out = os.path.join(out_dir, f"{stem}_P{kv}.png")
         plt.savefig(out, dpi=140)
         plt.close()
         print(f"[plot] wrote {out}")
@@ -102,6 +118,14 @@ if __name__ == "__main__":
                 n += 1
         if n == 0:
             raise SystemExit(f"[plot] no convergence3d_results.json found anywhere under {root} — run a sweep first")
+    elif _resolve(arg).endswith(".json"):
+        # explicit JSON file path (or a glob of them) — plot each directly; PNG named after the JSON stem,
+        # written beside the JSON. e.g.  plot_convergence3d.py results/k2/TET/structured/convergence3d_results_c1x4.json
+        paths = sorted(glob.glob(_resolve(arg)))
+        if not paths:
+            raise SystemExit(f"[plot] no JSON matched {arg!r} (resolved to {_resolve(arg)!r})")
+        for jp in paths:
+            plot_json(jp)
     elif os.path.isdir(_resolve(arg)) and os.path.exists(os.path.join(_resolve(arg), "convergence3d_results.json")):
         # back-compat: an explicit dir holding an aggregate JSON (e.g. results/structured)
         plot_cell(_resolve(arg))
