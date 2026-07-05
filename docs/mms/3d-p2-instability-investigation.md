@@ -101,6 +101,33 @@ present, and with the sign/factor the paper/Kratos uses? — and (ii) the **τ�
 This is the target of the residual audit (diff vs `article.tex` `eq:StrongMomentumEquation` + the `B_S` adjoint
 under `eq:OSGSProblem`).
 
+**Discriminator — 2D-P2 on TRIANGLES is OPTIMAL ⇒ the bug is genuinely 3D-specific, NOT simplex-specific
+(2026-07-05).** The "2D-P2 works" evidence had all been on **quads**; the standing open lead was whether the
+instability is a **P2∩simplex** effect (which would reproduce cheaply in 2D-TRI). Tested directly:
+`data/phase1_tri_k2.json` (2D-TRI, ASGS-P2, the **same** cell as 3D: Re=1, Da=1, α=0.5, same harness/MMS as the
+known-good QUAD-P2 control), N=10→80:
+
+| N | 10 | 20 | 40 | 80 | rate → |
+|---|---|---|---|---|---|
+| TRI-P2 L²u | 5.77e-3 | 1.10e-3 | 1.48e-4 | 1.90e-5 | 2.39 → 2.90 → **2.97** (opt 3) |
+| TRI-P2 H¹u | 0.373 | 0.142 | 0.0400 | 0.0106 | 1.39 → 1.83 → **1.92** (opt 2) |
+| QUAD-P2 L²u (control) | 4.07e-3 | 8.31e-4 | 1.04e-4 | 1.32e-5 | 2.29 → 2.99 → 2.99 |
+
+TRI-P2 **converges optimally**, monotone, tracking QUAD-P2 to a ~1.3× constant (identical preasymptotic first
+step + same recovery to O(h³)/O(h²)) — **nothing like** 3D-TET-P2 (erratic, non-monotone, L²u~0.049, 20–95×
+interpolant). So the **P2 simplex basis, 2nd-derivative subscale, and the `√2` simplex-h convention all behave
+correctly in 2D**; whatever breaks P2 requires the **third dimension**. Remaining 3D-specific suspects:
+1. **The `h` convention for tets** — `smoke3d.jl:222` uses `h=(6√2·V)^(1/3)` (regular-tet edge length), while the
+   2D harness uses `(d!·V)^(1/d)` = `√(2·Area)` (→ h = grid spacing). The 3D formula carries an **extra `√2`**
+   (h ≈ 1.122× the 2D-consistent `(6V)^(1/3)`), mis-scaling `c₁ν/h²` in the same direction c₁×4 compensates —
+   but only ~1.26×, a contributing factor, not the whole ×2–4. **Cheap test:** 3D-P2 at paper c₁ with
+   `h=(6V)^(1/3)`.
+2. **Anisotropy** — the 3D domain is a thin slab `(0,1)×(0,1)×(0,0.3)` with 3 elements in z (h_z≈0.1 vs
+   h_xy≈0.083); 2D is isotropic. A scalar volume-based `h` smears that. **Cheap discriminator:** 3D-P2 on an
+   **isotropic cube `(0,1)³`** with equal spacing.
+3. The **z-component of the viscous 2nd-derivative** subscale on tets (exact field is z-extruded, but the
+   discrete P2 tet field carries genuine `∂²/∂z²`).
+
 ## 4. The OSGS-P2 solver problem (separate from §3, also open)
 
 Even granting the (wrong) discretization, OSGS-P2 cannot be *solved*:
