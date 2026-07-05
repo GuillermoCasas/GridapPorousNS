@@ -41,7 +41,7 @@ const ROOT_MATCH_TOL = 1e-3
 function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
                      numerical_epsilon::Float64=0.0, jfnk::Bool=false, anderson::Bool=false,
                      jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing,
-                     iterative_penalty::Bool=true, osgs_skip_boot::Bool=false)
+                     iterative_penalty::Bool=true, osgs_skip_boot::Bool=false, ablation::String="full")
     @assert !(jfnk && anderson) "jfnk and anderson are mutually-exclusive OSGS paths"
     eps_tol_m    = something(eps_tol_m_over, kv == 2 ? 1e-9 : 1e-6)   # k=2 tightened gate (MEMORY lesson)
     # [Route B 2026-07-01] mass gate is now the Philosophy-A algebraic ‖r_C‖/D_C → 0, so default it
@@ -53,6 +53,11 @@ function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over
     # line 1383) — REQUIRED for the 3D all-Dirichlet case (ill-posed at ε=0). ON by default here; acts only
     # because the harness sets numerical_epsilon = 1e-4·ε_ref > 0. Pass iterative_penalty=false for an A/B.
     solver_dict["iterative_penalty_enabled"] = iterative_penalty
+    # [ablation] diagnostic: "picard_only" forces the Picard/Oseen Jacobian in every Newton slot (solver_core.jl),
+    # so the CONVERGED solution is tested for solver-linearization independence. Default "full" = ExactNewton
+    # (byte-identical to before). Used to test whether P2-3D "converged-but-wrong" is a Newton root-selection
+    # artifact (paper used plain Picard) vs a discretization discrepancy (both Newton & Picard land on it).
+    solver_dict["ablation_mode"] = ablation
     # [JFNK] opt in to the matrix-free full-tangent OSGS coupled solve (recovers the dropped ∂π/∂u
     # coupling). This is what the 2D k=2 OSGS recipe uses (data/phase1_quad_k2.json); the rest of the
     # osgs_jfnk_* params inherit from base_config.json via the deep-merge. No-op for ASGS.
@@ -141,7 +146,8 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                    c1_mult::Float64=1.0, eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
                    eps_phys::Float64=0.0, mesh_sequence::String="", jfnk::Bool=false, anderson::Bool=false,
                    jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, iterative_penalty::Bool=true,
-                   osgs_skip_boot::Bool=false, eps_pert_base::Float64=1.0, max_n_pert::Int=5)
+                   osgs_skip_boot::Bool=false, eps_pert_base::Float64=1.0, max_n_pert::Int=5,
+                   ablation::String="full")
     nu = U_AMP * L / RE
     # ε_num = the NUMERICAL penalty (Codina ITERATIVE penalty, paper ε = 1e-4·ε_ref). The equation is
     # INCOMPRESSIBLE: there is NO physical compressibility, so eps_phys MUST default to 0. The iterative
@@ -155,7 +161,8 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     config = build_config(kv, method; numerical_epsilon=eps_num, jfnk=jfnk, anderson=anderson,
                           jfnk_maxiter=jfnk_maxiter, jfnk_restart=jfnk_restart, jfnk_reltol=jfnk_reltol,
                           iterative_penalty=iterative_penalty, osgs_skip_boot=osgs_skip_boot,
-                          eps_tol_m_over=eps_tol_m_over, ftol_over=ftol_over, eps_tol_mass_over=eps_tol_mass_over)
+                          eps_tol_m_over=eps_tol_m_over, ftol_over=ftol_over, eps_tol_mass_over=eps_tol_mass_over,
+                          ablation=ablation)
     sol = config.numerical_method.solver
 
     sigma_c = DA * ALPHAINF * nu / L^2

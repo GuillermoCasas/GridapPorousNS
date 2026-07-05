@@ -81,6 +81,7 @@ is degrading P2-3D, and the same mechanism destabilizes the OSGS π-iteration (�
 | G | **MMS oracle ≠ formulation (viscous)** | term-by-term compare `mms3d.jl` visc vs `strong_viscous_operator` | deviatoric forcing matches exactly (`νAΔu + (νA/3)∇(∇·u)` + porosity-grad term) | ❌ consistent |
 | H | **Mesh quality (Kuhn tets low-quality)** | ASGS-P2 on **Frontal+optimized** unstructured meshes vs interpolant | 9.5–25× interp, **also erratic** (finest worse) | ❌ mesh-independent (magnitude helped ~2–4×, a minor constant factor) |
 | I | **Equal-order inf-sup / pressure instability** | **Taylor-Hood** P2-P1 (inf-sup stable) vs P2-P2 | P2-P1 **also wrong** (L²u 57–95×, absolute L²p ~0.4 = same/worse); converges to 1.5e-14 (well-conditioned) | ❌ not inf-sup |
+| J | **Newton vs Picard linearization** (paper uses plain Picard; Gridap defaults to Exact-Newton) | `ablation_mode` A/B at (12,12,3), ASGS-P2, paper c₁, exact guess: Exact-Newton (`full`) vs Picard (`picard_only`) — same shared residual `F`, different tangent | **Identical wrong root to 8 sig figs** (L²u 0.049370051 vs 0.049370052; H¹u/L²p match). Genuinely different paths (Newton 3 iters quadratic → 2.8e-13; Picard 5 iters → 8.4e-11) → same destination | ❌ **RULED OUT (2026-07-05).** Newton and Picard share the residual `F` in the code (only the Jacobian differs), so both solve the same `F=0`; at Re=1/ConstantSigma the nearby root is unique → same solution. This also **empirically closes** the "spurious root adjacent to the exact solution" loophole (Picard's different path landed on the same root). **The defect is provably in the assembled residual `F`** — not the Jacobian, not the solver, not the linearization. "Paper used Picard" is not the resolution; Kratos assembles a *different* `F`. |
 
 Notes:
 - The huge L²p **ratio** for equal-order (700–2900×) is a red herring: it's large because the P2-pressure
@@ -88,6 +89,17 @@ Notes:
   (H-row), so it is **not** spurious pressure modes — the whole solution is simply wrong.
 - "Erratic/non-monotone" on a **regular** mesh with **constant** element quality cannot be a mesh-quality
   (constant-factor) effect — it is a formulation instability. (User's own observation; correct.)
+
+**Where this leaves the hunt (2026-07-05).** Row J proves the defect is in the assembled **residual `F`**, and
+paper c₁ is correct (banner), so it is a **Gridap↔paper discrepancy in `F`**, constrained to **P2-only** (P1
+has no 2nd derivatives) ∩ **3D-only** (2D-QUAD k2 works) = the **viscous 2nd-derivative subscale**. But rows D
+and G already verified the **strong viscous operator itself** — `∇·(2νεᵈu) = νΔu + (ν/3)∇(∇·u)` + the porosity-
+gradient term — matches the analytic/oracle value to ~1e-17. So the discrepancy is **not** in computing
+`R(u_h)`'s viscous term; the remaining P2∩3D-specific suspects in `F` are (i) the **viscous part of the adjoint**
+`L*(v) = …±∇·(2νεᵈv)` in the stabilization pairing `τ₁(R(u_h), L*(v))` — is that 2nd-derivative adjoint term
+present, and with the sign/factor the paper/Kratos uses? — and (ii) the **τ₁ weight** on the viscous subscale.
+This is the target of the residual audit (diff vs `article.tex` `eq:StrongMomentumEquation` + the `B_S` adjoint
+under `eq:OSGSProblem`).
 
 ## 4. The OSGS-P2 solver problem (separate from §3, also open)
 
