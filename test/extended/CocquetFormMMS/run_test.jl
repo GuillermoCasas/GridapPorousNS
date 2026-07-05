@@ -550,6 +550,12 @@ function run_mms(config_file="test_config.json")
                     # not once per N. Only the L-independent controls (c_1/c_2, solver tolerances) stay here.
 
                     c_1, c_2 = PorousNSSolver.get_c1_c2(PorousNSSolver.PaperGeneralFormulation, kv)
+                    # [diagnostic] C1_MULT env-var hook (default 1.0 = paper c₁=4k⁴, byte-identical). Mirrors
+                    # smoke3d.jl's c1_mult: scale the coercivity constants to probe whether the low-α/high-Re
+                    # fold is a c₁ under-stabilization (as the 3D-P2 Kuhn case was). NOT a committed feature.
+                    _c1m = parse(Float64, get(ENV, "C1_MULT", "1.0"))
+                    c_1 *= _c1m; c_2 *= _c1m
+                    _c1m == 1.0 || (@info "CocquetFormMMS: c₁/c₂ scaled by C1_MULT" C1_MULT=_c1m)
                     tau_reg_lim = config.physical_properties.tau_regularization_limit
                     solver_newton_it = config.numerical_method.solver.newton_iterations
                     solver_picard_it = config.numerical_method.solver.picard_iterations

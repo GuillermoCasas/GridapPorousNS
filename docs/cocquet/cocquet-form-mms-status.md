@@ -130,6 +130,23 @@ gate, so the difference is the *problem*, not the solver:
   the trim is OSGS-only, so the two ASGS runs were byte-identical (both fold). It isolated nothing.
 - **OSGS trim-vs-full A/B — inconclusive.** The valid version (OSGS, where the toggle is real) was
   started but **killed before completing** (OSGS low-α fold cells thrash for a long time).
+- **c₁×4 (raised coercivity constant) — PARTIAL help, NOT a fix (2026-07-05).** Motivated by the 3D-P2
+  result, where paper `c₁=4k⁴` under-budgets `2ξ·C_inv²` on Kuhn tets and **c₁×4 gives a fully optimal
+  convergent sweep**. Ran `isolation_alphasweep.json` (Re=1e5, k=1, ASGS) at **c₁×1 vs c₁×4** (via a new
+  `C1_MULT` env-var hook at the `get_c1_c2` site in `run_test.jl` — default `1.0` = byte-identical):
+  - **α=0.1** (folds at *all* N at paper c₁ — N=10/20/40 → NaN): c₁×4 converges **only N=10** (L²u≈0.428,
+    large) and **still folds at N=20 and N=40** — erratic (coarse converges, fine folds), i.e. **not a
+    convergent sweep**.
+  - **α=0.2** (solves only at N=40 at paper c₁): c₁×4 keeps the same convergence pattern but the N=40 error
+    is **~5× smaller** (L²u 0.0736 → 0.0151).
+  So raising c₁ helps *at the margin* (one extra cell converges; better accuracy where it already did) but
+  **does not rescue the fold**. This is UNLIKE 3D-P2, and expected: this probe is **k=1**, where the
+  viscous 2nd-derivative subscale (the term c₁ fixed for P2 tets) is *identically zero*, so c₁ acts only
+  through `τ_NS`. Still, the partial help is mild evidence that the fold has a **coercivity/stabilization
+  component** (consistent with the `σ̃_α` Layer-2 hypothesis), not purely reaction-magnitude.
+  **⏭ Open next step (deferred to a future session): the k=2 analog** (`cocquet_form_mms_vms_k2.json`),
+  where the viscous 2nd-derivative subscale exists — the faithful test of whether the 3D-P2 c₁ mechanism
+  transfers. The `C1_MULT` hook is committed (default-off, byte-identical) so that run is ready to go.
 
 **Bottom line:** the *exact* cause of the equal-order stabilized low-α fold (that Taylor–Hood avoids)
 is **open**. The `σ̃_α`/reaction-in-stabilization mechanism is the leading hypothesis but is
