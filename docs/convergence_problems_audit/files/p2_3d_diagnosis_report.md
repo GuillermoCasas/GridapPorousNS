@@ -1,15 +1,19 @@
 # 3D P2 MMS "converged-but-wrong": root cause isolated
 
-> **Status — external clean-room diagnosis (2026-07-02), NOT yet confirmed in the Gridap stack.**
-> This is a standalone NumPy/SciPy reimplementation's finding, committed here as the evidentiary bundle
-> (report + reproducer `files/{pns3d,assemble,verify,ckpt_run}.py`, see §8) for the 3D-P2 investigation.
-> Its central claim — the failure is an **element-family c₁ coercivity deficit** (paper `4k⁴` sub-critical
-> on Kuhn tets; fix `c₁×1.5–2`) — **directly contradicts** the current verdict of the canonical doc
-> [../../mms/3d-p2-instability-investigation.md](../../mms/3d-p2-instability-investigation.md)
-> (TL;DR #2: "**not** c₁ … all refuted"). The discriminating in-stack test is **§5.1** (the Gridap
-> `smoke3d.jl c1_mult ∈ {1,1.5,2,4}` sweep at ASGS-P2 (12,12,3), looking for the knee at 1.5–2 and a
-> ratio-to-interpolant pinned at ~1 across a mesh family). **Run that before treating either verdict as
-> settled** — neither this report nor the canonical doc is authoritative until it resolves the conflict.
+> **Status — external clean-room diagnosis (2026-07-02); its central VERDICT is REFUTED (2026-07-05).**
+> This is a standalone NumPy/SciPy reimplementation, committed as an evidentiary bundle (report + reproducer
+> `files/{pns3d,assemble,verify,ckpt_run}.py`, see §8). Its central claim below — the failure is an
+> **element-family c₁ coercivity deficit** (paper `4k⁴` sub-critical on Kuhn tets; raise c₁) — is
+> **REFUTED by the paper's first author**: Kratos assembles the **full subscale** (no terms removed) and
+> solves this exact 3D-P2 case **optimally at paper c₁ = 4k⁴ on tetrahedra**. So paper c₁ is correct and
+> `C_inv`-exceeds-`4k⁴` is not the mechanism. **This report's own reasoning is circular**: its weak form was
+> transcribed *term-by-term from the Gridap code* (`continuous_problem.jl`, per §1), so it **inherited** the
+> Gridap↔paper implementation discrepancy that actually causes the failure, then attributed the resulting
+> c₁-sensitivity to element-family coercivity. The real root cause is a **code↔paper discrepancy** (that c₁
+> masks), still **OPEN** — see the canonical
+> [../../mms/3d-p2-instability-investigation.md](../../mms/3d-p2-instability-investigation.md). Kept
+> verbatim for provenance and because its careful term-by-term transcription is a useful map of what the
+> Gridap assembly computes (i.e. where to hunt the discrepancy). Read the verdict below as REFUTED.
 
 **Verdict.** The failure is *formulation-level, not a Gridap or code defect*: at the paper's
 c₁ = 4k⁴ = 64, the ASGS coupling between the **viscous second-derivative terms in the subscale

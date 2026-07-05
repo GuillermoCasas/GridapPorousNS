@@ -131,8 +131,10 @@ gate, so the difference is the *problem*, not the solver:
 - **OSGS trim-vs-full A/B — inconclusive.** The valid version (OSGS, where the toggle is real) was
   started but **killed before completing** (OSGS low-α fold cells thrash for a long time).
 - **c₁×4 (raised coercivity constant) — PARTIAL help, NOT a fix (2026-07-05).** Motivated by the 3D-P2
-  result, where paper `c₁=4k⁴` under-budgets `2ξ·C_inv²` on Kuhn tets and **c₁×4 gives a fully optimal
-  convergent sweep**. Ran `isolation_alphasweep.json` (Re=1e5, k=1, ASGS) at **c₁×1 vs c₁×4** (via a new
+  result, where **c₁×4 gives a fully optimal convergent sweep in Gridap** (note: c₁ there is now understood to
+  *mask* a Gridap↔paper discrepancy, not fix a coercivity deficit — paper `c₁=4k⁴` is correct per the first
+  author / Kratos full-terms; see [`../mms/3d-p2-instability-investigation.md`](../mms/3d-p2-instability-investigation.md)).
+  Ran `isolation_alphasweep.json` (Re=1e5, k=1, ASGS) at **c₁×1 vs c₁×4** (via a new
   `C1_MULT` env-var hook at the `get_c1_c2` site in `run_test.jl` — default `1.0` = byte-identical):
   - **α=0.1** (folds at *all* N at paper c₁ — N=10/20/40 → NaN): c₁×4 converges **only N=10** (L²u≈0.428,
     large) and **still folds at N=20 and N=40** — erratic (coarse converges, fine folds), i.e. **not a

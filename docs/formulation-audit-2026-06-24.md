@@ -38,10 +38,14 @@ of the 3D rate anomalies.
 >
 > **2026-07-04 update:** (1) **F4 companion `3b76864`** — a scale-free residual-floor accept fixed the
 > Route-B tight-gate false-failures on high-Re/fine cells; the **full 2D k2 sweep then completed**
-> behavior-preserving (`bf41727`; F4 ledger). (2) **B-5 / F5 measurement COMPLETE** — the mesh-family
-> control confirms c₁×2 *masks* / c₁×4 *fixes* (ratio-to-interpolant) for **both** ASGS and OSGS, clean-room
-> diagnosis committed (`b20cb78`); but the **c₁ fix is NOT adopted** (author prefers root-cause resolution
-> over a multiplier), so F5's *measurement* is closed while its *fix* stays open. (3) **New landed
+> behavior-preserving (`bf41727`; F4 ledger). (2) **B-5 / F5 — c₁ verdict REVERSED (2026-07-05, authoritative).**
+> The mesh-family control's c₁×2-masks / c₁×4-fixes numbers are real Gridap measurements, but the *conclusion*
+> ("element-family c₁ coercivity deficit") is **REFUTED**: the paper's **first author** confirms **Kratos runs
+> the FULL subscale at paper c₁=4k⁴ on tetrahedra and solves 3D §5.2 P2 optimally** (ASGS & OSGS) ⇒ **paper c₁
+> is CORRECT**. c₁×4 merely MASKS a **Gridap↔paper implementation discrepancy** (root cause OPEN). The clean-room
+> (`b20cb78`) does not exonerate Gridap — it was transcribed term-by-term from `continuous_problem.jl` and
+> inherited the same discrepancy. **ACTION: find the P2-3D code↔paper discrepancy (most likely the viscous
+> 2nd-derivative subscale; possibly broader), NOT a c₁ multiplier.** (3) **New landed
 > hardening** — gauge-free pressure re-centering behind a default-off flag (`6551709`; Minor list), the
 > iterated penalty being Codina's but the re-centering **our** proposal.
 
@@ -57,7 +61,7 @@ harness/reporting, and (iii) hygiene/fragility gaps.
 | # | Finding | Severity | Kind |
 |---|---|---|---|
 | **B-1** | 3D P1-**ASGS** is genuinely sub-optimal (L²u ≈ 1.2, not 2) even on a perfect uniform Kuhn mesh — method-intrinsic, not mesh quality; OSGS recovers it. **Action: document honestly** (still open). | High | results/theory |
-| **B-5 / F5** | P2-3D under-stabilization at paper c₁=4k⁴ on a uniform mesh. **Measurement complete (2026-07-03):** c₁×2 *masks* (ratio-to-interpolant drifts, H¹u stalls), **c₁×4 *fixes*** (ratio pins →1, both ASGS & OSGS) ⇒ threshold c₁* ∈ ×(2,4); clean-room diagnosis committed (`b20cb78`). **Fix decision OPEN** — the c₁ multiplier is confirmed effective but **not adopted** (author prefers root-cause resolution over a multiplier). | High | results/theory |
+| **B-5 / F5** | P2-3D under-stabilization on a uniform mesh. The mesh-family control's numbers are real Gridap measurements: c₁×2 *masks* (ratio-to-interpolant drifts, H¹u stalls), **c₁×4 collapses L²u ~40×** (ratio pins →1, both ASGS & OSGS). **But c₁ is REFUTED as the cause (2026-07-05):** the paper's first author confirms Kratos runs the FULL subscale at **paper c₁=4k⁴** on tets and solves 3D §5.2 P2 **optimally** ⇒ paper c₁ is CORRECT; c₁×4 merely MASKS a **Gridap↔paper implementation discrepancy** (the clean-room `b20cb78` inherited it by transcribing `continuous_problem.jl`, so its C_inv argument is circular). **ACTION: find the P2-3D code↔paper discrepancy (most likely the viscous 2nd-derivative subscale; possibly broader) — NOT a c₁ multiplier.** Root cause OPEN. | High | results/theory |
 | **B-2** | The committed "3D-P2 divergence" tables mix `success=False` solves into the rate table; the plotter doesn't gate on `success`. **Action: gate/flag failed levels.** | High | reporting |
 | **B-3 / B-6** | A failed OSGS solve silently reports the ASGS Stage-I boot state under the OSGS label (byte-identical error tuples at shared-failed levels). **Action: mark OSGS-degenerated-to-ASGS distinctly.** | Med | reporting/harness |
 | **B-4** | The most recent committed 3D result files can't be reproduced from the current harness (`mesh_algorithm`/ladder match no function in `smoke3d.jl`). **Action: restore/commit the exact driver** (overlaps F6). | Med | reproducibility |
@@ -181,21 +185,24 @@ DIAGNOSTIC `eps_C_strong` (traced, never gated). See §0 Resolved ledger / §C.3
   via JFNK, honest `success`, pressure error L²p 0.44108→0.4374 ≈ −0.83% — the under-convergence tail the
   old soft-stall left, now drained). The 2D `LUSolver` harnesses are behavior-preserving (A/B to the root).
 
-### F5 — element-type-aware c₁ for P2 tets (the B.5 fix) → §B.5
-- **Status (2026-07-03): MEASUREMENT COMPLETE; FIX DECISION OPEN.** The Gridap §5.1 mesh-family control
-  (§B.5) confirms the mechanism for BOTH methods: c₁×2 *masks* (ratio-to-interpolant drifts 1.34→1.94, H¹u
-  stalls), c₁×4 *fixes* (ratio pins 1.14→1.06, tracking the interpolant), so the h-robust threshold is
-  c₁* ∈ ×(2,4) — higher than the clean-room report's single-mesh ×(1.5,2). The clean-room diagnosis is
-  committed at [`docs/convergence_problems_audit/`](docs/convergence_problems_audit/) (`b20cb78`) and
-  cross-linked as **contested-pending-confirmation** to the canonical
-  [`docs/mms/3d-p2-instability-investigation.md`](docs/mms/3d-p2-instability-investigation.md) (⚠ note), which
-  the §5.1 sweep now supplies. **The c₁ multiplier is confirmed effective but NOT adopted** — the author
-  prefers resolving the root cause over shipping an ad-hoc multiplier (even an element-aware one). So the
-  item below is the *option on the table*, not a committed direction.
-- (Option, if adopted) Add a config-driven `c1_multiplier` (or a per-`(element, order)` table), explicitly
-  `[code-actual]`, so P2 tetrahedra use a larger c₁; 2D/quad stays paper-faithful at `4k⁴`. Reconcile the
-  canonical doc's TL;DR #2 ("not c₁") with the confirmed c₁-coercivity finding, and measure the actual
-  `C_inv` for P2 Kuhn vs gmsh tets to calibrate the multiplier.
+### F5 — the P2-3D discrepancy is NOT c₁ (c₁ REFUTED as the cause) → §B.5
+- **Status (2026-07-05, authoritative): c₁ REFUTED; ROOT CAUSE OPEN.** The Gridap §5.1 mesh-family control
+  (§B.5) measured c₁×2 *masks* (ratio-to-interpolant drifts 1.34→1.94, H¹u stalls) and c₁×4 *pins* the ratio
+  (1.14→1.06, ~40× L²u collapse) for both methods — those numbers are REAL Gridap measurements. But the
+  *conclusion* is now overturned: the paper's **first author** confirms **Kratos assembles the FULL subscale
+  (no terms removed) and solves 3D §5.2 P2 OPTIMALLY at paper c₁=4k⁴ on tetrahedra**, for both ASGS and OSGS
+  ⇒ **paper c₁ is CORRECT** and there is no element-family coercivity deficit. c₁×4 merely **MASKS a
+  Gridap↔paper implementation discrepancy**. The clean-room at
+  [`docs/convergence_problems_audit/`](docs/convergence_problems_audit/) (`b20cb78`) does **not** exonerate
+  Gridap — it was transcribed term-by-term from `continuous_problem.jl`, so it inherited the same discrepancy
+  (its "C_inv exceeds 4k⁴" argument is circular); the canonical
+  [`docs/mms/3d-p2-instability-investigation.md`](docs/mms/3d-p2-instability-investigation.md) records the
+  reversal.
+- **ACTION (root cause, NOT a c₁ multiplier):** find the term-level P2-3D code↔paper discrepancy — most likely
+  (not certainly) the **P2-3D viscous 2nd-derivative subscale / grad-div coupling** `(½−1/d)∇(∇·u)`
+  (0 in 2D, 1/6 in 3D; the bug is constrained to P2-only ∩ 3D-only), but possibly broader (the author notes
+  there may be other overlooked differences). A `c1_multiplier` is explicitly **NOT** the direction — it would
+  ship a mask over paper-correct c₁.
 
 ### F6 — make the 3D MMS test config-driven + add an official 3D-MMS test
 - **Why:** `test/extended/ManufacturedSolutions3D/smoke3d.jl` is a manual sweep driver with hard-coded
@@ -602,7 +609,17 @@ that produced the committed 3D files, or re-run them with a committed, named fun
 config snapshot alongside, per `reproducible-results.md`. Make `build_config`'s `eps_val` and the
 formulation's `eps_phys` agree (or document why they differ).
 
-### B.5 [HIGH] P2-3D at paper c₁ has a genuine under-stabilization defect (confirmed on a clean uniform mesh) — and it is **not** mesh quality; c₁×4 fixes it
+### B.5 [HIGH] P2-3D under-stabilizes vs the paper — but c₁ is a SYMPTOM (paper c₁ is CORRECT), not the cause; root cause OPEN
+
+> **⚠️ CONCLUSION REVERSED (2026-07-05, authoritative).** The measurements below (c₁×1 fails/grows, c₁×4
+> collapses L²u ~40× and pins ratio-to-interpolant) are REAL Gridap data and are retained. But the
+> *interpretation* — "element-family c₁ coercivity deficit; c₁×4 is the fix" — is **REFUTED**: the paper's
+> **first author** confirms **Kratos assembles the FULL subscale (no terms removed) and solves 3D §5.2 P2
+> OPTIMALLY at paper c₁=4k⁴ on tetrahedra**, both ASGS and OSGS. So **paper c₁ is CORRECT**; Gridap
+> **under-stabilizes P2-3D relative to the paper**, and c₁×4 merely **MASKS a Gridap↔paper implementation
+> discrepancy**. **Root cause OPEN** — a term-level code↔paper discrepancy (most likely, not certainly, the
+> P2-3D viscous 2nd-derivative subscale; possibly broader). The verdict block and clean-room note below are
+> corrected accordingly; read the numbers as symptom measurements, not a coercivity proof.
 
 The structured-Kuhn control (uniform, refinement-invariant quality) ran P2 ASGS+OSGS at paper c₁ and
 ASGS at c₁×4. Results (paper §5.2 case, all on the same mesh ladder):
@@ -646,44 +663,42 @@ matching ASGS. So the c₁ *discretisation* fix is method-independent — and OS
 non-contractive-π solver issue manifests here as **cost** (~1–2 h/mesh of JFNK grinding), **not failure**,
 a materially more positive result than "OSGS-P2 unsolvable."
 
-**Clean-room corroboration (now committed).** An independent NumPy/SciPy reimplementation reproduces the
-same 40× collapse and the same knee and attributes it to the element-family inverse-inequality constant
-`C_inv` (paper `4k⁴` calibrated for quads/hexes, sub-critical on right-angle Kuhn tets). It is committed at
-[`docs/convergence_problems_audit/`](docs/convergence_problems_audit/) (`b20cb78`, report + NumPy
-reproducer) and cross-linked to the canonical
-[`docs/mms/3d-p2-instability-investigation.md`](docs/mms/3d-p2-instability-investigation.md) as
-**contested-pending-in-stack-confirmation** — which the §5.1 Gridap sweep above now provides, refuting that
-doc's TL;DR #2 "not c₁."
+**Clean-room does NOT corroborate (verdict refuted; kept for provenance).** An independent NumPy/SciPy
+reimplementation reproduces the same 40× collapse and the same knee and attributed it to the element-family
+inverse-inequality constant `C_inv` (paper `4k⁴` allegedly sub-critical on right-angle Kuhn tets). **That
+attribution is REFUTED (2026-07-05):** the clean-room was transcribed **term-by-term from
+`continuous_problem.jl`**, so it **inherited the same Gridap↔paper discrepancy** and reproduced the same c₁
+symptom — its "`C_inv` exceeds `4k⁴`" argument is therefore **circular** and does NOT exonerate the Gridap
+code. It is committed at [`docs/convergence_problems_audit/`](docs/convergence_problems_audit/) (`b20cb78`,
+report + NumPy reproducer) and kept for provenance + the code-transcription it encodes. The canonical
+[`docs/mms/3d-p2-instability-investigation.md`](docs/mms/3d-p2-instability-investigation.md) records the
+reversal (Kratos runs paper c₁ with full terms, optimally ⇒ paper c₁ correct; root cause OPEN).
 
-**Verdict — what is right and wrong in the existing 3D-P2 narrative.**
+**Verdict — what is right and wrong in the existing 3D-P2 narrative (corrected 2026-07-05).**
 
-1. ✅ **The c₁/coercivity hypothesis is correct.** Scaling c₁ up is the single lever that turns P2-3D from
-   diverging-and-failing to converging-and-optimal, exactly as `docs/mms/3d-p2-convergence-investigation.md`
-   claims, and it matches the paper's own remark that the effective c₁ is element-type dependent.
-2. ❌ **It is NOT "mesh quality" / a bad-element tail.** The structured Kuhn mesh has uniform,
-   refinement-invariant quality, yet P2 still fails / grows at paper c₁ and is fixed by c₁×4. So the
-   deficiency is that **c₁ = 4k⁴ is structurally too small for P2 tetrahedra in general** (the geometric
-   part of `C_inv` for tets — even uniform ones — exceeds the `4k⁴` budget at k=2 in 3D), *not* that the
-   gmsh generator produces an occasional sliver. The "Frontal-mesh fix" helps P1-OSGS, but it cannot be
-   the explanation for P2, which fails on a flawless mesh.
+1. ❌ **The c₁/coercivity hypothesis is REFUTED.** Scaling c₁ up IS the single lever that moves P2-3D from
+   diverging to converging in *Gridap* — but that is a **symptom**, not the cause. The paper's first author
+   confirms **Kratos runs the FULL subscale at paper c₁=4k⁴ on tets and solves 3D §5.2 P2 optimally** (both
+   methods) ⇒ **paper c₁ is CORRECT**; there is no element-family c₁ deficit. c₁×4 masks a Gridap↔paper
+   implementation discrepancy.
+2. ❌ **It is NOT "mesh quality" / a bad-element tail** — this part still holds. The structured Kuhn mesh has
+   uniform, refinement-invariant quality, yet P2 fails / grows at paper c₁ in Gridap. But the reason is NOT
+   that `4k⁴` is "structurally too small for P2 tets"; it is that **Gridap under-stabilizes P2-3D relative to
+   the paper** (a code↔paper term discrepancy), which the same c₁ knob happens to compensate.
 3. ⚠️ **The committed "divergence" tables conflate two things** (B.2): a genuine under-stabilization
    signal *and* failed-solve reporting contamination. The control separates them: the genuine signal is
    the growing error on *converged* fine pairs; the contamination is the `success=False` spikes.
-4. ⚠️ **The P2 solve failures at paper c₁ are a symptom, not a separate solver bug.** Under-stabilization
-   (too-small c₁) leaves the discrete operator poorly conditioned/near-non-coercive, so Newton's line
-   search depletes. Fixing c₁ fixes the solver failures too (every c₁×4 solve converges).
+4. ⚠️ **The P2 solve failures at paper c₁ are a symptom of the under-stabilization** (poorly
+   conditioned/near-non-coercive discrete operator, so Newton's line search depletes). c₁×4 compensates the
+   symptom (every c₁×4 solve converges), but the true fix is to remove the code↔paper discrepancy so paper c₁
+   works — as it does in Kratos.
 
-**Recommended action.** (1) Adopt an **element-type-aware c₁** for P2 tetrahedra — a config-driven
-`c1_multiplier` (or a per-(element, order) table), explicitly labelled `[code-actual]` as a deviation
-from the paper's uniform `4k⁴`, with 2D/quad staying paper-faithful. This is the principled fix the
-investigation doc already floats as option (3); the control shows it is *necessary*, not a band-aid.
-(2) **Reconcile the canonical doc with its own README pointer:** `docs/README.md` (line 24) already
-states the structured-Kuhn control *falsifies* the mesh-quality hypothesis, but
-`docs/mms/3d-p2-convergence-investigation.md` still leads with "mesh quality / `C_inv` tail" in its TL;DR
-(its 2026-06-21 body predates the control). Update that doc's TL;DR to the **c₁-budget-vs-tet-`C_inv`**
-verdict (reproduced on a uniform mesh, *not* a bad-element tail), with this run's clean P2 c₁×1-vs-c₁×4
-numbers as the evidence. (3) Measure the actual `C_inv` for P2 Kuhn vs P2 gmsh tets to calibrate the
-multiplier.
+**Recommended action (2026-07-05).** (1) **Do NOT adopt a `c1_multiplier`.** It would ship a mask over
+paper-correct c₁. (2) **Find the term-level P2-3D code↔paper discrepancy.** Constrained to **P2-only** (P1
+works) ∩ **3D-only** (2D-QUAD k=2 works), the most likely (not certain) locus is the **P2-3D viscous
+2nd-derivative subscale / grad-div coupling** `(½−1/d)∇(∇·u)` (0 in 2D, 1/6 in 3D); the author notes it may
+be broader. The single most decisive next probe is **2D-P2 on TRIANGLES** (simplex vs quad) — see the
+canonical doc's §6. (3) Keep the c₁×1-vs-c₁×4 numbers here as symptom measurements, not a coercivity proof.
 
 > **Run log:** `test/extended/ManufacturedSolutions3D/results/debug_results/audit_3d_structured.log`
 > (full P1/P2, ASGS/OSGS, c₁×1 and c₁×4; ~50 min wall). Driver: `/tmp/audit_3d_structured.jl`.
@@ -724,9 +739,9 @@ Paper §5.2 case (Deviatoric, Constant-σ, Re=Da=1, α₀=0.5), structured Kuhn 
 | P2 OSGS c₁×1 | same | all †† | all †† | all †† | all solves failed → reports ASGS state (B.6) |
 | P2 ASGS c₁×4 | same | 1.67, 2.67, 2.30 | 0.83, 1.76, 1.26 | 0.94, 1.73, 1.48 | **converges, climbing to optimal**; ≈40× smaller errors |
 
-Headline reads: P1 ASGS sub-optimal vs P1 OSGS optimal on the *same* mesh (B.1); P2 at paper c₁ has a
-genuine coercivity defect on a *uniform* mesh, fixed by c₁×4 (B.5); a failed OSGS solve reports the ASGS
-state (B.6).
+Headline reads: P1 ASGS sub-optimal vs P1 OSGS optimal on the *same* mesh (B.1); P2 at paper c₁
+under-stabilizes on a *uniform* mesh and c₁×4 *masks* it (B.5 — c₁ is a symptom-mover; paper c₁ is correct
+per the first author, root cause OPEN); a failed OSGS solve reports the ASGS state (B.6).
 
 ## Appendix 2 — Index of the still-open code findings (by domain)
 

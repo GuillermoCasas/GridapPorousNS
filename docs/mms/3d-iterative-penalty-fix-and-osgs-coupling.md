@@ -1,23 +1,31 @@
 # 3D MMS (§5.2): the iterative-penalty fix, and the OSGS ∂π/∂u coupling problem
 
 > **Status: CANONICAL for the 3D iterative-penalty (well-posedness) fix + the OSGS ∂π/∂u coupling problem.**
-> ⚠️ **Scope correction (2026-07-03).** The iterative-penalty fix below is real and canonical — it restores
-> 3D all-Dirichlet **well-posedness** (ε=0 is ill-posed). But this doc's further claim that the penalty (and
-> "not c₁") is the root cause of the **P2 converged-but-wrong** failure was **wrong**: the 2026-07-03 in-stack
-> `c1_mult` mesh-family sweep CONFIRMS the P2 *accuracy* defect is an **element-family c₁ coercivity deficit**
-> (c₁×4 fixes, ratio-to-interpolant pins ~1; c₁×2 masks). Two distinct issues were conflated (well-posedness
-> vs accuracy). **Root-cause canonical doc: [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md).**
+> ⚠️ **Scope correction (2026-07-05).** The iterative-penalty fix below is real and canonical — it restores
+> 3D all-Dirichlet **well-posedness** (ε=0 is ill-posed) — and was always a *separate* fix from the P2 accuracy
+> defect. This doc's original instinct that "c₁ is NOT the root cause" is now **VINDICATED**: the paper's
+> **first author** confirms **Kratos runs the FULL subscale at paper c₁ = 4k⁴ on tetrahedra and solves the 3D
+> §5.2 P2 case OPTIMALLY** (both ASGS and OSGS), so **paper c₁ is CORRECT** and the intervening (2026-07-03)
+> "element-family c₁ coercivity deficit" claim is **REFUTED**. The Gridap c₁×4-fixes behaviour is a **symptom**:
+> Gridap **under-stabilizes P2-3D relative to the paper**, and c₁×4 merely MASKS a **Gridap↔paper
+> implementation discrepancy**. **Root cause is OPEN** — a term-level code↔paper discrepancy (most likely, not
+> certainly, the P2-3D viscous 2nd-derivative subscale; possibly broader) — and it is **neither c₁ nor the
+> penalty** (the penalty fixed well-posedness, a distinct real fix). **Root-cause canonical doc:
+> [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md).**
 > Investigation dates 2026-06-28 → 2026-06-30. Harness: `test/extended/ManufacturedSolutions3D/` (`smoke3d.jl`).
 
 ## TL;DR
 
 1. **The iterative penalty fixes 3D WELL-POSEDNESS — NOT the P2 accuracy defect.** The missing Codina
    ITERATIVE PENALTY in the mass residual made the 3D all-Dirichlet problem ill-posed at ε=0; adding it is a
-   real, necessary fix (this doc's core contribution). ⚠️ **REVERSED (2026-07-03):** it does *not* fix the P2
-   converged-but-wrong *accuracy* defect — that is an element-family **c₁** coercivity deficit (CONFIRMED:
-   c₁×4 fixes, c₁×2 masks; see [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md)). The
-   "NOT c₁ / no dimensional c₁" claim originally here is withdrawn ("Kratos runs paper c₁" reconciles via a
-   reduced high-order subscale + smaller quad/hex `C_inv`). The paper (article.tex §5.2, **line ~1383**) uses ε>0 as the iterative penalty for the 3D
+   real, necessary fix (this doc's core contribution). It does *not* fix the P2 converged-but-wrong *accuracy*
+   defect — but neither does c₁. **(2026-07-05, authoritative)** The paper's first author confirms **Kratos
+   runs the FULL subscale at paper c₁ = 4k⁴ on tets and solves 3D §5.2 P2 optimally** ⇒ **paper c₁ is CORRECT**;
+   the intervening "element-family c₁ coercivity deficit" claim is **REFUTED**, and this doc's *original*
+   instinct ("NOT c₁ / no dimensional c₁ — Kratos runs paper c₁") is **VINDICATED**. The P2 accuracy defect is
+   an **OPEN Gridap↔paper implementation discrepancy** that c₁×4 merely MASKS (most likely, not certainly, the
+   P2-3D viscous 2nd-derivative subscale; possibly broader). See
+   [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md). The paper (article.tex §5.2, **line ~1383**) uses ε>0 as the iterative penalty for the 3D
    case because at ε=0 the discrete problem is ill-posed (constant-pressure indeterminacy + BC/mass
    incompatibility). The penalty adds `ε_num·pⁿ` to the mass-eq LHS and `ε_num·pⁿ⁻¹` (PREVIOUS nonlinear
    iterate's pressure) to the RHS, so the residual carries `ε_num·(pⁿ − pⁿ⁻¹)`: nonzero during iterations
@@ -51,14 +59,15 @@ Kuhn tets, P2. At paper c₁:
   *never converges*.
 
 **"False lead #1 — c₁/coercivity"** ([3d-p2-convergence-investigation.md](3d-p2-convergence-investigation.md))
-— ⚠️ **NOT a false lead; REVERSED 2026-07-03 (see status header).** The reasoning below reflects the superseded
-2026-06-30 view. The single-mesh test made c₁×4 look like it "only shrank the constant"; the **mesh-family**
-ratio-to-interpolant test is decisive and shows c₁×4 genuinely FIXES (ratio pins ~1 across meshes) while c₁×2
-MASKS. c₁ IS the confirmed element-family root cause of the P2 accuracy defect. ("Kratos runs paper c₁"
-reconciles via a reduced high-order subscale + smaller quad/hex `C_inv`.) — Superseded text follows:
-c₁×4 makes both converge, so that doc concluded paper c₁ under-budgets coercivity for 3D tets. But increasing
-c₁ and shrinking the τ-h are the SAME lever (both raise c₁ν/h²), and c₁×4 only shrank the error *constant*,
-not the rate — it MASKED the real defect. Kratos works at paper c₁ ⇒ no dimensional c₁.
+— ✅ **This framing STANDS (VINDICATED 2026-07-05).** c₁ is NOT the true cause of the P2 accuracy defect. The
+reasoning below is the correct instinct: c₁×4 makes both converge, so a superseded reading concluded paper c₁
+under-budgets coercivity for 3D tets. But increasing c₁ and shrinking the τ-h are the SAME lever (both raise
+c₁ν/h²), and c₁×4 only shrank the error *constant* — it MASKS the real defect. **Kratos works at paper c₁ with
+the full subscale (first author, 2026-07-05) ⇒ paper c₁ is CORRECT; no dimensional c₁.** The intervening
+2026-07-03 "element-family c₁ coercivity deficit" restatement is **REFUTED**. What c₁×4 masks is an **OPEN
+Gridap↔paper implementation discrepancy** in the P2-3D case (most likely, not certainly, the P2-3D viscous
+2nd-derivative subscale; possibly broader) — NOT c₁, and NOT the iterative penalty (which fixed a separate
+thing, well-posedness). See [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md).
 
 **False lead #2 — pressure null mode via `eps_num` (Jacobian-only)**: tested `eps_mult` 1→1000; never fixed
 the OSGS overshoot (and corrupted velocity, so not a pure pressure-gauge null mode). The Jacobian-only ε_num

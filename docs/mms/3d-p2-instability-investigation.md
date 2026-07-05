@@ -1,23 +1,23 @@
-# 3D P2 MMS: the converged-but-wrong instability — RESOLVED (element-family c₁ coercivity deficit)
+# 3D P2 MMS: the converged-but-wrong instability — OPEN (a Gridap↔paper discrepancy, MASKED by c₁)
 
-> **Status: ROOT CAUSE IDENTIFIED as of 2026-07-03** — the P2-3D "converged-but-wrong" failure is an
-> **element-family c₁ coercivity deficit**: the paper's `c₁ = 4k⁴` under-budgets the coercivity bound
-> `c₁ > 2ξ·C_inv²` for the inverse-inequality constant `C_inv` of P2 on **Kuhn tetrahedra** (larger than
-> the quads/hexes `4k⁴` was calibrated for). Canonical record of the 2026-06-30 → 07-03 investigation into
-> why the 3D §5.2 MMS **fails at k=2 (P2)** while **k=1 (P1) works** and the **2D harness works at k=2**.
-> Catalogs every hypothesis + its verdict. Companion: [3d-iterative-penalty-fix-and-osgs-coupling.md](3d-iterative-penalty-fix-and-osgs-coupling.md)
-> (the penalty fix + the OSGS ∂π/∂u solver problem). Harness: `test/extended/ManufacturedSolutions3D/`
-> (`smoke3d.jl`).
->
-> **✅ Resolved (2026-07-03) — TL;DR #2 and Hypothesis A below are hereby REVERSED.** The deciding in-stack
-> test (§5.1 `smoke3d.jl c1_mult ∈ {1,1.5,2,4}`) was run: **c₁×4 FIXES it** — L²u collapses ~40× and the
-> ratio-to-interpolant pins ~1 across the mesh family for **both ASGS and OSGS**, while paper c₁ and **c₁×2
-> mask** (ratio drifts 1.34→1.94). The h-robust threshold is `c₁* ∈ ×(2,4)`. This confirms the clean-room
-> NumPy diagnosis, committed at [../convergence_problems_audit/](../convergence_problems_audit/) (report +
-> reproducer). "Kratos runs paper c₁" reconciles: Kratos plausibly assembles a reduced high-order viscous
-> subscale, and its quads/hexes have a smaller `C_inv`. **The c₁ multiplier is confirmed effective but NOT
-> adopted** — the author prefers a root-cause fix (reduced high-order subscale, or element-family-aware c₁)
-> over an ad-hoc multiplier. Evidence: `docs/formulation-audit-2026-06-24.md` §B.5.
+> **Status: OPEN — root cause is a Gridap↔paper IMPLEMENTATION discrepancy in the P2-3D case; c₁ MASKS it
+> (updated 2026-07-05, authoritative).** The paper's **first author** confirms that **Kratos assembles the
+> FULL subscale (no terms removed) and solves this exact 3D §5.2 P2 case OPTIMALLY at paper `c₁ = 4k⁴` on
+> tetrahedra, for both ASGS and OSGS.** Therefore **paper c₁ is CORRECT**, and the "element-family c₁
+> coercivity deficit" reading below is **REFUTED**. The Gridap `c₁×4`-fixes behaviour (40× L²u collapse,
+> ratio-to-interpolant → 1, optimal asymptotic rates) is a **symptom**: the Gridap implementation
+> **under-stabilizes the P2-3D case relative to the paper**, and c₁×4 merely **compensates/masks** the gap —
+> it is NOT a real coercivity requirement and NOT the fix. The NumPy clean-room does **not** exonerate Gridap:
+> it was transcribed **term-by-term from `continuous_problem.jl`**, so it **inherited** the same discrepancy
+> and reproduced the same c₁ symptom. **Root cause remains OPEN** — a term-level discrepancy between the code
+> and the paper, most likely (but not certainly) in the **P2-3D viscous 2nd-derivative subscale**, since the
+> bug is constrained to **P2-only** (P1 works) ∩ **3D-only** (2D-QUAD k=2 works) = the 3D viscous
+> 2nd-derivative subscale / grad-div coupling `(½−1/d)∇(∇·u)` (0 in 2D, 1/6 in 3D). It may be broader — the
+> author notes there may be other overlooked differences. Canonical record of the 2026-06-30 → 07-05
+> investigation. Companion: [3d-iterative-penalty-fix-and-osgs-coupling.md](3d-iterative-penalty-fix-and-osgs-coupling.md)
+> (the penalty fix + OSGS ∂π/∂u). Harness: `test/extended/ManufacturedSolutions3D/` (`smoke3d.jl`). The
+> clean-room diagnosis at [../convergence_problems_audit/](../convergence_problems_audit/) has its verdict
+> refuted (it argued element-family c₁); kept for provenance + the code-transcription it encodes.
 
 ## TL;DR
 
@@ -25,16 +25,18 @@
    solution **20–95× the interpolant error**, and the error is **erratic / non-monotone** under refinement
    (SymmetricGradient even *diverges*). Tightening the gate to ε_M=1e-12 gives a **byte-identical** wrong answer
    ⇒ it is a genuine property of the discrete solution, not under-convergence.
-2. **Config-INDEPENDENT symptom → root cause is c₁ (element-family), CONFIRMED 2026-07-03.** The failure persists
-   across viscous operator, mesh (structured Kuhn *and* Frontal), pressure space (P2-P2 *and* Taylor-Hood P2-P1),
-   and method (ASGS *and* OSGS) — precisely because **none of those is the lever**. It is **not** mesh quality,
-   grad-div, inf-sup, tolerance, or a bad Jacobian (those *are* refuted — §3). It **IS c₁**: `4k⁴` under-budgets
-   `c₁ > 2ξ·C_inv²` for P2 Kuhn tets. This **reverses** the earlier "not c₁" reading (Hypothesis A) — the §5.1
-   c1_mult sweep shows c₁×4 FIXES it (ratio-to-interpolant pins ~1 across the family, ASGS & OSGS) while paper c₁
-   and c₁×2 do not (c₁×2 masks). Clean-room corroboration: [../convergence_problems_audit/](../convergence_problems_audit/).
-3. **Root cause IDENTIFIED = element-family c₁ coercivity deficit** (h-robust threshold `c₁* ∈ ×(2,4)`). The c₁
-   multiplier is confirmed effective but **not adopted** (author prefers root-cause resolution over a multiplier —
-   a reduced high-order viscous subscale, à la production VMS / Kratos, or an element-family-aware c₁).
+2. **Config-INDEPENDENT symptom; c₁ CONTROLS it but is NOT the cause (2026-07-05).** The failure persists across
+   viscous operator, mesh (structured Kuhn *and* Frontal), pressure space (P2-P2 *and* Taylor-Hood P2-P1), and
+   method (ASGS *and* OSGS). It is **not** mesh quality, grad-div, inf-sup, tolerance, or a bad Jacobian (refuted
+   — §3). In Gridap, **c₁ controls it** (c₁×4 collapses L²u ~40×, ratio-to-interpolant → 1; c₁×2 masks
+   partially) — but this is a **symptom, not the mechanism**: the first author confirms **Kratos, with the full
+   subscale at paper c₁ on tets, is optimal**, so paper c₁ is correct and the "element-family c₁" reading is
+   **refuted**. c₁×4 masks a **Gridap↔paper implementation discrepancy**.
+3. **Root cause: OPEN = a code↔paper discrepancy in the P2-3D case** (masked by c₁, NOT fixed by it). Most likely
+   the P2-3D **viscous 2nd-derivative subscale** (P2-only ∩ 3D-only), possibly broader. The c₁ multiplier is a
+   MASK, not a fix; the correct fix is to find and correct the discrepancy so paper c₁=4k⁴ works, as it does in
+   Kratos. (The clean-room's element-family-C_inv argument is refuted; it inherited the discrepancy by
+   transcribing from `continuous_problem.jl`.)
 4. **OSGS-P2 additionally can't be solved** (a *separate* solver problem on top of the discretization one): the
    staggered π fixed-point is **violently non-contractive** (ρ≈8–65, damping fails) and **JFNK is not
    budget-fixable** (noisy matrix-free Jᵥ from the re-projecting residual). See §4.
@@ -70,7 +72,7 @@ is degrading P2-3D, and the same mechanism destabilizes the OSGS π-iteration (�
 
 | # | Hypothesis | Experiment | Result | Verdict |
 |---|---|---|---|---|
-| A | **c₁ under-budgets coercivity for the element family** | c1_mult ∈ {1,1.5,2,4} across the Kuhn mesh family, ratio-to-interpolant (§5.1) | c₁×4 **pins** ratio→interp ~1 across meshes (ASGS & OSGS); c₁×2 **masks** (ratio drifts 1.34→1.94); ~40× L²u collapse | ✅ **CONFIRMED (2026-07-03)** — REVERSES the earlier "masks/author-steered" verdict. The prior refutation used a single mesh (where ×2 looks healed) + the "Kratos runs paper c₁" argument; the mesh-*family* ratio-to-interpolant test is decisive. `C_inv` for P2 Kuhn tets exceeds the `4k⁴` budget; Kratos reconciles via reduced high-order subscale / quad-hex `C_inv`. |
+| A | **c₁ under-budgets coercivity for the element family** | c1_mult ∈ {1,1.5,2,4} across the Kuhn mesh family, ratio-to-interpolant (§5.1) | c₁×4 **pins** ratio→interp ~1 (ASGS & OSGS), even optimal rates on the 4-mesh ladder; c₁×2 masks | ❌ **REFUTED (2026-07-05, authoritative).** The mesh-family data (c₁ controls the error, ×4 pins) is real, but the *interpretation* is wrong: the **first author** confirms **Kratos runs the full subscale at paper c₁ on tets, optimally** — so `4k⁴` is NOT under-budgeted and `C_inv` on tets is NOT the issue. c₁ merely **masks a Gridap↔paper implementation discrepancy** (the clean-room, transcribed from `continuous_problem.jl`, inherited it — so its "C_inv exceeds 4k⁴" argument is circular). c₁ is a symptom-mover, not the cause. |
 | B | **Tolerance / under-converged** | ASGS-P2 gate ε_M 1e-9 vs 1e-12 | **byte-identical** wrong answer (L²u=0.049370 both) | ❌ converged-but-wrong |
 | C | **Bad Jacobian / NR floor** | same as B + Newton trace | residual descends cleanly to 1e-8…1e-14; P2-P1 hits 1.5e-14 | ❌ not the Jacobian |
 | D | **grad-div term in the viscous op** | numeric check of `EvalDivDevSymOp` on an off-diagonal-Hessian field `u=(xy,yz,xz)` | matches analytic `(1/6,1/6,1/6)` to **4.8e-17** | ❌ operator is correct |

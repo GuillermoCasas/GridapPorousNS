@@ -1,13 +1,18 @@
-# 3D ASGS sub-optimality (P₁ & P₂): a c₁/coercivity fixed point, not mesh quality
+# 3D ASGS sub-optimality (P₁ & P₂): c₁ MASKS a Gridap↔paper discrepancy (root cause OPEN)
 
-> **⚠️ STATUS — this doc's original c₁ verdict was RE-CONFIRMED (2026-07-03); superseded only as the canonical
-> home.** The headline — *"paper c₁=4k⁴ under-budgets coercivity for P2 tetrahedra; c₁ is the lever"* — is
-> **correct after all.** It was briefly overturned on 2026-06-30 ("it's the missing iterative penalty, not
-> c₁"), but the 2026-07-03 in-stack `c1_mult` **mesh-family** sweep CONFIRMS the element-family c₁ coercivity
-> deficit: **c₁×4 fixes** (ratio-to-interpolant pins ~1, ASGS & OSGS), **c₁×2 masks** (ratio drifts). Two
-> things were conflated: the **iterative penalty** is a separate, real fix — it restores 3D all-Dirichlet
-> **well-posedness** (ε=0 is ill-posed) — but does **not** fix the P2 converged-but-wrong **accuracy** defect
-> (that is c₁). **Canonical root-cause doc: [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md)**;
+> **⚠️ STATUS — this doc's c₁ verdict is now REFUTED (2026-07-05, authoritative).** BOTH the original headline
+> (*"paper c₁=4k⁴ under-budgets coercivity for P2 tetrahedra; c₁ is the lever"*) AND its 2026-07-03
+> "RE-CONFIRMED" restatement are **overturned**. The paper's **first author** confirms that **Kratos assembles
+> the FULL subscale (no terms removed) and solves the exact 3D §5.2 P2 case OPTIMALLY at paper `c₁ = 4k⁴` on
+> tetrahedra, for both ASGS and OSGS** — so **paper c₁ is CORRECT** and there is no "element-family c₁
+> coercivity deficit." The Gridap `c₁×4`-fixes behaviour (ratio-to-interpolant → 1, optimal rates) is REAL data
+> but a **symptom**: the Gridap implementation **under-stabilizes the P2-3D case relative to the paper**, and
+> c₁×4 merely **MASKS a Gridap↔paper implementation discrepancy** — it is a symptom-mover, NOT the cause and
+> NOT the fix. **Root cause remains OPEN** — a term-level code↔paper discrepancy in the P2-3D case, most likely
+> (not certainly) in the P2-3D viscous 2nd-derivative subscale; may be broader (the author notes there may be
+> other overlooked differences). Two things stay distinct: the **iterative penalty** is a separate, real fix —
+> it restores 3D all-Dirichlet **well-posedness** (ε=0 is ill-posed) — but was never the P2 accuracy fix.
+> **Canonical root-cause doc: [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md)**;
 > penalty/well-posedness fix + OSGS ∂π/∂u in [3d-iterative-penalty-fix-and-osgs-coupling.md](3d-iterative-penalty-fix-and-osgs-coupling.md).
 > This doc's §4 (iteration/Jacobian exonerated) + §6 (OSGS regime reconciliation) remain valid unique content.
 >
@@ -21,10 +26,11 @@
 > exhausts the C_inv margin; regularize the mesh and convergence returns at the uniform paper c₁"* — was
 > **tested and falsified**. A **structured Kuhn** tet family (uniform, refinement-invariant quality,
 > qmin≈0.618) still gives **sub-optimal ASGS** at paper c₁ (P₁) and **erratic/diverging P₂**, while
-> **OSGS is optimal on the same meshes**. So the deficit is a **coercivity-limited discrete fixed point**
-> that the paper's `c₁ = 4k⁴` under-budgets for 3D tetrahedra *even at good quality*; mesh quality
-> *modulates* it but is not the root. The nonlinear iteration, the analytic Jacobian, and the solver
-> orchestration are all **rigorously exonerated** (§4).
+> **OSGS is optimal on the same meshes**. So the deficit is **not** mesh quality (that much stands). ⚠️ *(This
+> block's further conclusion — "a coercivity-limited fixed point that `c₁ = 4k⁴` under-budgets for 3D tets" —
+> is **REFUTED 2026-07-05**; paper c₁ is correct per the first author (Kratos, full subscale, optimal on tets),
+> so c₁ masks a Gridap↔paper discrepancy, it does not satisfy a coercivity bound. See top banner.)* The
+> nonlinear iteration, the analytic Jacobian, and the solver orchestration are all **rigorously exonerated** (§4).
 
 ## TL;DR (verdict)
 
@@ -35,11 +41,14 @@ For the §5.2 manufactured solution on tetrahedra:
   L²p super-convergent). The ASGS↔OSGS gap is the *only structural difference* — the OSGS orthogonal
   projection of the residual — so it is **not** a mesh-quality effect.
 - **P₂ DIVERGES / is erratic** at paper c₁ (errors grow under refinement) — on both gmsh-unstructured *and*
-  perfect structured meshes — confirming the same c₁/coercivity deficit, sharper at P₂.
-- **c₁ is the single lever.** On a *frozen* mesh, scaling c₁ up reduces the converged error and lifts the
-  rate (mesh-frozen A/B: ASGS L²u 1.21→1.70, L²p 0.58→1.31; the (16,16,4) point L²u 0.0113→0.0062 at
-  c₁×4). c₁ does **not** move H¹u (≈0.83→0.86) — H¹u is the genuinely quality-bound quantity on unstructured
-  meshes. This is exactly the paper's coercivity condition `c₁ > 2ξ C_inv²`.
+  perfect structured meshes. ⚠️ *(The original reading — "the same c₁/coercivity deficit, sharper at P₂" — is
+  **REFUTED 2026-07-05**; see banner. The divergence is real; its attribution to a c₁ coercivity deficit is not.)*
+- **c₁ moves the error, but is NOT the cause.** On a *frozen* mesh, scaling c₁ up reduces the converged error
+  and lifts the rate (mesh-frozen A/B: ASGS L²u 1.21→1.70, L²p 0.58→1.31; the (16,16,4) point L²u 0.0113→0.0062
+  at c₁×4). c₁ does **not** move H¹u (≈0.83→0.86). ⚠️ *(The original conclusion "this is exactly the paper's
+  coercivity condition `c₁ > 2ξ C_inv²`" is **REFUTED**: paper c₁=4k⁴ is correct — Kratos, full subscale, optimal
+  on tets, per the first author — so c₁ MASKS a Gridap↔paper discrepancy rather than satisfying a coercivity bound.
+  The A/B numbers above are real; only the interpretation is overturned.)*
 - **The nonlinear iteration is NOT the cause.** Verified directly (§4): the analytic ExactNewton Jacobian
   is the exact ∂R (Taylor test, O(ε²) to round-off); the logged residual is the true assembled residual; a
   bare Newton with zero orchestration lands on production's solution. The sub-optimal field is a genuine
@@ -223,7 +232,14 @@ regime-dependent.
 
 ---
 
-## 7. Hypothesis (refined): paper c₁ under-budgets coercivity for 3D tets
+## 7. Hypothesis (refined): paper c₁ under-budgets coercivity for 3D tets — ⚠️ REFUTED (2026-07-05)
+
+> ⚠️ **This entire hypothesis is REFUTED (2026-07-05, authoritative).** The paper's first author confirms
+> **Kratos runs the FULL subscale at paper c₁ = 4k⁴ on tetrahedra and solves this exact 3D §5.2 P2 case
+> optimally** (ASGS & OSGS). So `4k⁴` does **not** under-budget `2ξ C_inv²` on tets — `C_inv` is not the
+> issue. The c₁-sensitivity documented below is a **symptom of a Gridap↔paper implementation discrepancy that
+> c₁ masks**, not a coercivity deficit. Kept as the historical (superseded) reasoning; read as refuted. See
+> the top banner and [3d-p2-instability-investigation.md](3d-p2-instability-investigation.md).
 
 The paper's stability estimate (`lemma:Stability`, line ~916) needs the **coercivity condition**
 (`eq:conditions_on_num_param`, line ~905): `c₁ > 2ξ C_inv²`, where `C_inv` (inverse-estimate constant,

@@ -42,14 +42,18 @@ Each is verified against the working tree. Severity is the author's call.
   indefinite (u,p) saddle point** (>3 h, no convergence — ILU is a weak preconditioner there). So the 3D P₂
   convergence study is confined to a narrow LU-feasible h-window and the OSGS finest meshes are unreachable.
   Separately, at the **paper's uniform c₁ = 4k⁴**, P₂-3D errors **grow / are non-monotone under refinement
-  even on perfect structured (Kuhn) meshes** (L²u 0.022→0.049→0.056→0.011; occasional `ok=false`). This is a
-  **CONFIRMED (2026-07-03) element-family c₁ coercivity deficit** — `4k⁴` under-budgets `2ξ·C_inv²` for P2
-  **Kuhn tets**; the mesh-family ratio-to-interpolant test shows **c₁×4 fixes** (ratio pins ~1, ASGS & OSGS)
-  while **c₁×2 masks**. NOT mesh quality, NOT a solver bug. Canonical:
-  [`mms/3d-p2-instability-investigation.md`](mms/3d-p2-instability-investigation.md) (verdict); evidence in
-  `docs/formulation-audit-2026-06-24.md` §B.5 + NumPy clean-room `docs/convergence_problems_audit/`. The c₁
-  multiplier is confirmed effective but **not adopted** (root-cause fix preferred, e.g. reduced high-order
-  subscale). The MEMORY-wall half remains a real hardware limit (JFNK for OSGS has since landed —
+  even on perfect structured (Kuhn) meshes** (L²u 0.022→0.049→0.056→0.011; occasional `ok=false`), and c₁×4
+  collapses L²u ~40× (ratio-to-interpolant → 1). But **paper c₁=4k⁴ is CORRECT and c₁ is NOT the cause
+  (REFUTED 2026-07-05)**: the paper's first author confirms **Kratos runs the FULL subscale at paper c₁ on
+  tetrahedra and solves this exact 3D §5.2 P2 case optimally** (ASGS & OSGS). So the "element-family c₁
+  coercivity deficit" reading is refuted; c₁×4 merely **MASKS a Gridap↔paper implementation discrepancy**.
+  NOT mesh quality, NOT a solver bug either. **Root cause OPEN** — a term-level code↔paper discrepancy in the
+  P2-3D case (most likely, not certainly, the P2-3D viscous 2nd-derivative subscale; may be broader). Canonical:
+  [`mms/3d-p2-instability-investigation.md`](mms/3d-p2-instability-investigation.md) (verdict); measurements in
+  `docs/formulation-audit-2026-06-24.md` §B.5 + NumPy clean-room `docs/convergence_problems_audit/` (its c₁
+  verdict is refuted — it inherited the discrepancy by transcribing `continuous_problem.jl`). **A c₁ multiplier
+  is NOT the fix** (it would mask paper-correct c₁); the action is to find the discrepancy. The MEMORY-wall half
+  remains a real hardware limit (JFNK for OSGS has since landed —
   [`solver/jfnk-phase0-preconditioner-gate.md`](solver/jfnk-phase0-preconditioner-gate.md)).
 
 ## Minor / cleanup
