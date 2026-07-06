@@ -116,17 +116,28 @@ known-good QUAD-P2 control), N=10→80:
 TRI-P2 **converges optimally**, monotone, tracking QUAD-P2 to a ~1.3× constant (identical preasymptotic first
 step + same recovery to O(h³)/O(h²)) — **nothing like** 3D-TET-P2 (erratic, non-monotone, L²u~0.049, 20–95×
 interpolant). So the **P2 simplex basis, 2nd-derivative subscale, and the `√2` simplex-h convention all behave
-correctly in 2D**; whatever breaks P2 requires the **third dimension**. Remaining 3D-specific suspects:
-1. **The `h` convention for tets** — `smoke3d.jl:222` uses `h=(6√2·V)^(1/3)` (regular-tet edge length), while the
-   2D harness uses `(d!·V)^(1/d)` = `√(2·Area)` (→ h = grid spacing). The 3D formula carries an **extra `√2`**
-   (h ≈ 1.122× the 2D-consistent `(6V)^(1/3)`), mis-scaling `c₁ν/h²` in the same direction c₁×4 compensates —
-   but only ~1.26×, a contributing factor, not the whole ×2–4. **Cheap test:** 3D-P2 at paper c₁ with
-   `h=(6V)^(1/3)`.
-2. **Anisotropy** — the 3D domain is a thin slab `(0,1)×(0,1)×(0,0.3)` with 3 elements in z (h_z≈0.1 vs
-   h_xy≈0.083); 2D is isotropic. A scalar volume-based `h` smears that. **Cheap discriminator:** 3D-P2 on an
-   **isotropic cube `(0,1)³`** with equal spacing.
-3. The **z-component of the viscous 2nd-derivative** subscale on tets (exact field is z-extruded, but the
-   discrete P2 tet field carries genuine `∂²/∂z²`).
+correctly in 2D**; whatever breaks P2 requires the **third dimension**. Remaining 3D-specific suspects (two now tested, 2026-07-06 — driver reproducible from `smoke3d.jl`'s
+`h_conv`/`geom="cube"` hooks; ASGS-P2, paper c₁, exact-guess reference):
+1. **The `h` convention for tets — a real 2D/3D inconsistency + a STRONG lever, but NOT the root cause.**
+   `smoke3d.jl:222` uses `h=(6√2·V)^(1/3)` (regular-tet edge length), while the 2D harness uses `(d!·V)^(1/d)`
+   = `√(2·Area)` (→ h = grid spacing). The 3D formula carries an **extra `√2`** (h ≈ 1.122× the 2D-consistent
+   `(6V)^(1/3)`). **Tested** (`h_conv="d_fact"`, slab (12,12,3)): dropping the √2 (h 0.0994→0.0886) cut **L²u
+   0.04937 → 0.02192 (2.25×)** and H¹u 1.82→0.88 — *far* more than the 1.26× the naive `c₁ν/h²` scaling
+   predicts, so P2-3D is **extremely h/τ-sensitive** — **but it did NOT fix it** (still ~0.022 ≈ 10× interpolant,
+   and the solve **stalled** at ‖R‖~3e-5, Picard fallback). So the tet h-convention is a genuine inconsistency
+   and a strong lever (worth reconciling against Kratos's actual tet-h formula), but not the root cause.
+2. **Anisotropy — REFUTED (2026-07-06).** The 3D domain is a thin slab `(0,1)×(0,1)×(0,0.3)` (3 elements in z,
+   h_z≈0.1 vs h_xy≈0.083, aspect ~1.2), 2D is isotropic. **Tested** on an **isotropic cube `(0,1)³`**,
+   regular-tet h, ladder (6,6,6)/(8,8,8)/(10,10,10): L²u 0.0229 → **0.0351** → 0.0235 (rates −1.49, +1.80),
+   H¹u 0.83→1.73→1.42 — **just as erratic / converged-but-wrong as the slab.** So anisotropy is not the cause;
+   the instability is **3D-general** (present on isotropic cubes).
+3. **The z-component of the viscous 2nd-derivative subscale on tets — the prime standing suspect.** The exact
+   field is z-extruded (u_zz=0 analytically), but the discrete P2 tet field carries genuine `∂²/∂z²`, and the
+   3D Laplacian `Δu=u_xx+u_yy+u_zz` in `R_u`'s viscous term (and its self-adjoint in `L*(v)`) adds the z 2nd
+   derivatives that 2D-P2 (works) never sees. Hypothesis E (Laplacian, no grad-div, still erratic in 3D) points
+   here rather than at grad-div. Given rows D/G verify the strong operator pointwise, the target is how this
+   z-2nd-derivative subscale is weighted/paired in `F` vs the paper (`τ₁(R_u, L*(v))`, `B_S` under
+   `eq:OSGSProblem`).
 
 ## 4. The OSGS-P2 solver problem (separate from §3, also open)
 

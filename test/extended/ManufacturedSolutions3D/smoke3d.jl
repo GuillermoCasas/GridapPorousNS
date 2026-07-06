@@ -147,7 +147,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                    eps_phys::Float64=0.0, mesh_sequence::String="", jfnk::Bool=false, anderson::Bool=false,
                    jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, iterative_penalty::Bool=true,
                    osgs_skip_boot::Bool=false, eps_pert_base::Float64=1.0, max_n_pert::Int=5,
-                   ablation::String="full")
+                   ablation::String="full", h_conv::String="regular_tet")
     nu = U_AMP * L / RE
     # ε_num = the NUMERICAL penalty (Codina ITERATIVE penalty, paper ε = 1e-4·ε_ref). The equation is
     # INCOMPRESSIBLE: there is NO physical compressibility, so eps_phys MUST default to 0. The iterative
@@ -218,8 +218,12 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     c_1 *= c1_mult; c_2 *= c1_mult   # [diagnostic] scale stabilization constants — paper Remark (eq:conditions_on_num_param):
                                      # the coercivity bound needs c1 > 2ξ·C_inv², and the OPTIMAL c1 depends on element type.
 
-    # tet element size from cell VOLUME: regular-tet edge = (6√2·V)^{1/3}
-    h_array = collect(lazy_map(v -> (6.0*sqrt(2.0)*abs(v))^(1.0/3.0), get_cell_measure(Ω)))
+    # tet element size from cell VOLUME. [diagnostic h_conv] "regular_tet" = (6√2·V)^{1/3} (regular-tet edge,
+    # the shipped default); "d_fact" = (6·V)^{1/3} = (d!·V)^{1/d}, the dimension-consistent analog of the 2D
+    # harness's √(2·Area) (→ h = grid spacing), i.e. the 3D formula WITHOUT the extra √2. Tests whether the
+    # 2D/3D h-convention mismatch drives the P2-3D discrepancy (docs/mms/3d-p2-instability-investigation.md §3).
+    _h_of_v = h_conv == "d_fact" ? (v -> (6.0*abs(v))^(1.0/3.0)) : (v -> (6.0*sqrt(2.0)*abs(v))^(1.0/3.0))
+    h_array = collect(lazy_map(_h_of_v, get_cell_measure(Ω)))
     h_cf = CellField(h_array, Ω)
     h_mean = sum(h_array) / length(h_array)   # ACHIEVED mesh size — the correct convergence abscissa
     alpha_cf = CellField(x -> PNS.alpha(alpha_field, x), Ω)
