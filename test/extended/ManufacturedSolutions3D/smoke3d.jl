@@ -226,9 +226,10 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     #   "d_fact"      = (6·V)^{1/3} = (d!·V)^{1/d}, the dimension-consistent analog of the 2D harness's
     #                   √(2·Area) (→ h = grid spacing), i.e. the 3D volume formula WITHOUT the extra √2.
     # Tests whether the tet h-convention drives the P2-3D discrepancy (docs/mms/3d-p2-instability-investigation.md §3).
-    if h_conv == "diameter"
+    if h_conv == "diameter" || h_conv == "shortest_edge"
         cc = get_cell_coordinates(Ω)
-        h_array = [maximum(sqrt((v[i]-v[j])⋅(v[i]-v[j])) for i in 1:length(v) for j in (i+1):length(v)) for v in cc]
+        _redu = h_conv == "shortest_edge" ? minimum : maximum   # shortest edge (min ‖xᵢ−xⱼ‖) vs diameter (max)
+        h_array = [_redu(sqrt((v[i]-v[j])⋅(v[i]-v[j])) for i in 1:length(v) for j in (i+1):length(v)) for v in cc]
     else
         _h_of_v = h_conv == "d_fact" ? (v -> (6.0*abs(v))^(1.0/3.0)) : (v -> (6.0*sqrt(2.0)*abs(v))^(1.0/3.0))
         h_array = collect(lazy_map(_h_of_v, get_cell_measure(Ω)))

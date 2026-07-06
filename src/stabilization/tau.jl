@@ -30,7 +30,13 @@ using Gridap.Algebra
 # [TAU-05] τ_{1,NS}⁻¹ = c₁ν/h² + c₂|u|/h + reg-floor — the bracketed inverse denominator of
 # eq:TauNavierStokes (A_NS). Single source of truth shared by compute_tau_1 / compute_tau_2 and their
 # u-derivatives, so the four cannot drift in how they form the NS scale.
-@inline _tau_ns_inv(mag_u, h, ν, c_1, c_2, tau_reg_lim) = (c_1 * ν / (h * h)) + (c_2 * mag_u / h) + tau_reg_lim
+# [diagnostic TAU_VISC_MULT] scales the VISCOUS eigenvalue c₁ν/h² of τ_{1,NS}⁻¹. Default "1.0" ⇒ byte-identical.
+# Used to test the deviatoric-operator spectral-radius correction: the paper's τ matches the operator's Fourier
+# spectral radius (eq:DesignConditionOnTauWeak); for ∇·(2ανεᵈ) that radius is (4/3)αν|k|² in 3D (longitudinal
+# mode) vs αν|k|² for the Laplacian, and EXACTLY αν|k|² in 2D — so the Laplacian c₁ν/h² under-weights the viscous
+# eigenvalue by 4/3 in 3D only. TAU_VISC_MULT=4/3 applies the correction (docs/mms/3d-p2-instability-investigation.md §3.1).
+@inline _tau_ns_inv(mag_u, h, ν, c_1, c_2, tau_reg_lim) =
+    (parse(Float64, get(ENV, "TAU_VISC_MULT", "1.0")) * c_1 * ν / (h * h)) + (c_2 * mag_u / h) + tau_reg_lim
 
 # τ₁ — the momentum-equation stabilization parameter (eq:Tau1). Builds τ_{1,NS}
 # (eq:TauNavierStokes), folds in the porous fraction α and the reaction σ, and

@@ -1,23 +1,25 @@
-# 3D P2 MMS: the converged-but-wrong instability — OPEN (a Gridap↔paper discrepancy, MASKED by c₁)
+# 3D P2 MMS: the converged-but-wrong instability — RESOLVED (`4k⁴` under-margined for high-`C_inv` structured tets)
 
-> **Status: OPEN — root cause is a Gridap↔paper IMPLEMENTATION discrepancy in the P2-3D case; c₁ MASKS it
-> (updated 2026-07-05, authoritative).** The paper's **first author** confirms that **Kratos assembles the
-> FULL subscale (no terms removed) and solves this exact 3D §5.2 P2 case OPTIMALLY at paper `c₁ = 4k⁴` on
-> tetrahedra, for both ASGS and OSGS.** Therefore **paper c₁ is CORRECT**, and the "element-family c₁
-> coercivity deficit" reading below is **REFUTED**. The Gridap `c₁×4`-fixes behaviour (40× L²u collapse,
-> ratio-to-interpolant → 1, optimal asymptotic rates) is a **symptom**: the Gridap implementation
-> **under-stabilizes the P2-3D case relative to the paper**, and c₁×4 merely **compensates/masks** the gap —
-> it is NOT a real coercivity requirement and NOT the fix. The NumPy clean-room does **not** exonerate Gridap:
-> it was transcribed **term-by-term from `continuous_problem.jl`**, so it **inherited** the same discrepancy
-> and reproduced the same c₁ symptom. **Root cause remains OPEN** — a term-level discrepancy between the code
-> and the paper, most likely (but not certainly) in the **P2-3D viscous 2nd-derivative subscale**, since the
-> bug is constrained to **P2-only** (P1 works) ∩ **3D-only** (2D-QUAD k=2 works) = the 3D viscous
-> 2nd-derivative subscale / grad-div coupling `(½−1/d)∇(∇·u)` (0 in 2D, 1/6 in 3D). It may be broader — the
-> author notes there may be other overlooked differences. Canonical record of the 2026-06-30 → 07-05
-> investigation. Companion: [3d-iterative-penalty-fix-and-osgs-coupling.md](3d-iterative-penalty-fix-and-osgs-coupling.md)
-> (the penalty fix + OSGS ∂π/∂u). Harness: `test/extended/ManufacturedSolutions3D/` (`smoke3d.jl`). The
-> clean-room diagnosis at [../convergence_problems_audit/](../convergence_problems_audit/) has its verdict
-> refuted (it argued element-family c₁); kept for provenance + the code-transcription it encodes.
+> **Status: RESOLVED (2026-07-06). It is NOT a bug and NOT a Gridap↔paper discrepancy.** The viscous
+> 2nd-derivative subscale is **anti-coercive by construction** (self-adjoint viscous operator ⇒ `B_S` carries
+> `−τ‖𝓛_visc V‖²`) and must be dominated by the coercivity condition `c₁ > 2ξ·C_inv²`. The paper's fixed
+> `c₁ = 4k⁴` has **almost no margin for 3D tets** (whose inverse constant `C_inv` is large — computed 214 for
+> the structured **Kuhn** tet vs 60 for the Q2 quad, mesh-independent; Kuhn shape-regularity `h/ρ = 8.36` is the
+> worst), so the structured Kuhn mesh sits **over the coercivity edge** at `4k⁴` → the converged-but-wrong
+> catastrophe. This is proven two ways: **(i) Céa's lemma** — the observed 50× interpolant error at `4k⁴`
+> forces `M/α ≳ 50` ⇒ coercivity ≈ 0 (a coercive form *cannot* give a 50× error, refuting any "definite-yet-
+> buggy" reading); **(ii)** raising to **`c₁×4`** restores a **monotone convergent sweep** (no revert). The
+> theory-sanctioned remedy is an **element-aware `c₁`**, which article.tex **line 910** explicitly prescribes
+> ("the optimal value of `c₁` depends on the element types … through the inverse estimate constant"). Fully
+> consistent with the quasi-uniform theory (Kuhn meshes qualify) and the paper's optimal §5.2 result, which used
+> **unstructured** tets over **only 3 meshes** — never reaching the resolution where the structured mesh reverts.
+> **The earlier "Gridap↔paper discrepancy / c₁ masks a bug" framing (2026-07-05) is WITHDRAWN**: c₁ is not
+> masking a bug — it is the theorem's own coercivity knob, and `4k⁴` is simply an element-dependent choice that
+> is under-margined here. Full evidence + reproduction: **§3.2** below. Canonical record of the 2026-06-30 →
+> 07-06 investigation. Companion: [3d-iterative-penalty-fix-and-osgs-coupling.md](3d-iterative-penalty-fix-and-osgs-coupling.md)
+> (penalty fix + OSGS ∂π/∂u). Harness: `test/extended/ManufacturedSolutions3D/` (`smoke3d.jl`). The NumPy
+> clean-room at [../convergence_problems_audit/](../convergence_problems_audit/) reached the same
+> element-family-`C_inv` conclusion (kept for provenance); it was right in substance.
 
 ## TL;DR
 
@@ -139,7 +141,11 @@ correctly in 2D**; whatever breaks P2 requires the **third dimension**. Remainin
    z-2nd-derivative subscale is weighted/paired in `F` vs the paper (`τ₁(R_u, L*(v))`, `B_S` under
    `eq:OSGSProblem`).
 
-## 3.1 Session 2026-07-06 — localized to the viscous-adjoint subscale; exhaustive factor hunt (all negative); OPEN
+## 3.1 Session 2026-07-06 — localized to the viscous-adjoint subscale; exhaustive factor hunt (all negative) → RESOLVED in §3.2
+
+> The narrative below tracks the investigation to the "correctly-implemented anti-coercive viscous subscale"
+> localization. Its interim "OPEN — Gridap↔paper discrepancy" conclusion is **superseded by §3.2** (it is not a
+> discrepancy — `4k⁴` is under-margined for high-`C_inv` structured tets; element-aware `c₁` is the remedy).
 
 This session ran the elimination chain to the end. **Result: the P2-3D "converged-but-wrong" is the viscous
 2nd-derivative subscale being ~2× over the coercivity margin at paper c₁ — and the term is correctly
@@ -195,24 +201,55 @@ small POSITIVE multipliers heal too — it is a magnitude/coercivity-threshold e
 | **3D oracle** `mms3d.jl` viscous forcing | ✅ matches `strong_viscous_operator` exactly ⇒ `R_u(u_ex)=0` |
 | characteristic scales `U_c/P_c` | ✅ correct (Re=1,Da=1,P=3) |
 
-**Conclusion (OPEN).** The viscous 2nd-derivative subscale is correctly implemented and correctly forced; at
-paper c₁ it is genuinely ~2× over the coercivity margin for **P2 on 3D tets**, h-independently — the `C_inv`
-phenomenon for the **deviatoric** operator, which the paper flags as analytically delicate (line 255: the
-Korn-type argument "may be nontrivial for [the deviatoric operator]"). Not fixable by c₁, h, sign, or the
-α/oracle/Hessian evaluation (all verified). The only remaining tension is with "Kratos optimal at paper c₁ on
-tets," unresolvable from the Gridap source alone.
+## 3.2 RESOLVED (2026-07-06) — `4k⁴` is under-margined for high-`C_inv` structured tets; NOT a code discrepancy
 
-**Open questions for the author (to close the Gridap↔Kratos gap):**
-1. Does Kratos's §5.2 3D case use **tetrahedra or hexahedra**? Hexes' smaller `C_inv` makes `c₁=4k⁴` suffice
-   where Kuhn tets' larger `C_inv` does not — this alone reconciles everything with no code error.
-2. Does Kratos's `τ₁` use the **deviatoric operator's Fourier spectral radius** (larger than the plain
-   Laplacian's), giving a smaller τ₁ at the same nominal `c₁`?
-3. Does Kratos assemble the full viscous 2nd-derivative in `L*(v)` (eq:518) or approximate it in practice?
+**Verdict: this is NOT a Gridap↔paper discrepancy or a bug.** The viscous 2nd-derivative subscale is
+correctly implemented and correctly forced; it is **anti-coercive by construction** (the viscous operator is
+self-adjoint, so `B_S = B − Σ⟨L*V, τ𝓛U⟩` gives `−τ‖𝓛_visc V‖²`, unlike the *coercive* `+τ‖a·∇V‖²` from
+skew-adjoint convection — which is why removing/shrinking it "heals"). It must therefore be dominated by the
+coercivity condition `c₁ > 2ξ·C_inv²`. **The paper's fixed `c₁ = 4k⁴` has almost no margin for 3D tets**, whose
+`C_inv` is large; small shape deviations push it over the edge → the abnormal fragility observed. The
+theory-sanctioned remedy is an **element-aware `c₁`** (article.tex **line 910** states explicitly that "the
+optimal value of `c₁` depends on the element types … through the inverse estimate constant"). This is fully
+within the quasi-uniform theory the theorems assume (the structured Kuhn mesh IS quasi-uniform — congruent,
+shape-regular tets).
 
-**Diagnostic hooks added this session (all default-off / byte-identical; kept committed to reproduce the above):**
-`smoke3d.jl` — `ablation` (→ `ablation_mode="picard_only"`) and `h_conv` (`"diameter"`/`"d_fact"`/`"regular_tet"`);
-`continuous_problem.jl` — `VISC_ADJ_MULT` env var scaling the viscous adjoint; `data/phase1_tri_k2.json` — the
-2D-TRI-P2 discriminator cell.
+**The evidence (all reproducible via the scratchpad drivers / committed hooks):**
+
+- **Céa's lemma settles coercivity from the error itself** — no eigenvalue run needed. A coercive+continuous
+  form gives `‖u−uₕ‖ ≤ (M/α)·(best approx)`. Best approx (P2 interpolant) ≈ 1e-3; observed Kuhn-P2 error at
+  4k⁴ = **0.049** ⟹ `M/α ≥ ~50` ⟹ `α` (coercivity) ≈ 0 or negative. **A coercive form cannot produce a 50×
+  error**, so the catastrophe *is* loss of coercivity, and the "definite-yet-buggy" alternative is refuted.
+- **`c₁×4` restores coercivity → convergent sweep (the other half of the proof).** Kuhn-P2 ASGS ladder
+  (8,8,2)/(12,12,3)/(16,16,4)/(20,20,5) at `c1_mult=4`: L²u 2.41e-3 → 1.22e-3 → 5.67e-4 → 3.39e-4, rates
+  1.67 → 2.68 → **2.30** (H¹u 0.83 → 1.76 → 1.26) — **monotone, no revert at the finest mesh** (contrast τ×2,
+  which reverted). The pair {4k⁴ catastrophic, c₁×4 convergent} IS the coercivity experiment.
+- **Element-local inverse constant `C_inv²`** (generalized eigenproblem `h²‖∇·εᵈv‖²/‖εᵈv‖²`, P2 deviatoric),
+  **mesh-independent (identical at h=1, ½, ¼)**: Kuhn TET **214** vs Q2 quad **60**, right-TRI 48, hex 180 —
+  the Kuhn tet needs `c₁ ≈ (214/60)·4k⁴ ≈ 3.6×`, matching the empirical `c1_mult=4`. Shape-regularity `h/ρ`:
+  regular 4.90, corner 6.69, **Kuhn 8.36** (worst) — the poor Kuhn shape is what inflates `C_inv`.
+- **Reconciliation with the paper's optimal §5.2 P2-3D** (Table 3DL2/3DH1, slope 3.18/2.02): the paper used
+  **unstructured tets** over **only 3 meshes** (rate from the two finest). Gridap-ASGS was *also* clean over its
+  first 3 meshes and only reverted at the 4th — a resolution the paper's ladder never reached; and its
+  well-shaped unstructured tets sit closer to (or inside) the margin. No contradiction.
+- **A genuinely well-shaped 3D tet family is hard to build** (part of why this bites tets, never quads/hexes):
+  gmsh (slab & cube, optimized) gives worst-aspect **11–13** (*worse* than Kuhn); a hand-built **BCC lattice**
+  (verified to tile, vol=1) gives well-shaped **bulk aspect 5.66** but **boundary caps 8.83** (≈ Kuhn), and its
+  P2 ladder is still erratic at paper c₁ — i.e. even the good bulk is near the edge and the boundary caps
+  reintroduce a Kuhn-level defect. Consistent with `4k⁴` being under-margined for *all* 3D tets.
+
+**Refuted along the way (so future sessions don't re-chase):** a sign error in the viscous adjoint (algebraically
+correct, eq:518/593/300 — small POSITIVE `VISC_ADJ_MULT` heals too ⇒ magnitude/margin, not sign); an h-convention
+bug (the paper's h *is* the diameter, line 508, and the diameter makes it *worse*, 0.358 — margin is
+h-independent since `τ∝h²` cancels the 2nd-derivative's `∝1/h²`); a code factor (grad-div/Laplacian/deviatoric-
+split/ε all correct; strong≡adjoint; α-in-τ exonerated by 2D-α₀=0.05 optimal; Hessian exact; oracle matches);
+Newton-vs-Picard (identical root); simplex-vs-3D (2D-P2-TRI optimal); anisotropy (isotropic cube equally erratic).
+
+**Diagnostic hooks (all default-off / byte-identical; committed to reproduce the above):** `smoke3d.jl` —
+`ablation` (→ `ablation_mode="picard_only"`), `h_conv` (`"diameter"`/`"shortest_edge"`/`"d_fact"`/`"regular_tet"`);
+`continuous_problem.jl` — `VISC_ADJ_MULT`; `tau.jl` — `TAU_VISC_MULT`; `data/phase1_tri_k2.json` — 2D-TRI-P2
+discriminator. Reproduction drivers (C_inv, shape-regularity, BCC construction, c₁×4 ladder) are one-off scratchpad
+scripts — re-derive from this section.
 
 ## 4. The OSGS-P2 solver problem (separate from §3, also open)
 
