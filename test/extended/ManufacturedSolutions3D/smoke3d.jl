@@ -218,12 +218,21 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     c_1 *= c1_mult; c_2 *= c1_mult   # [diagnostic] scale stabilization constants — paper Remark (eq:conditions_on_num_param):
                                      # the coercivity bound needs c1 > 2ξ·C_inv², and the OPTIMAL c1 depends on element type.
 
-    # tet element size from cell VOLUME. [diagnostic h_conv] "regular_tet" = (6√2·V)^{1/3} (regular-tet edge,
-    # the shipped default); "d_fact" = (6·V)^{1/3} = (d!·V)^{1/d}, the dimension-consistent analog of the 2D
-    # harness's √(2·Area) (→ h = grid spacing), i.e. the 3D formula WITHOUT the extra √2. Tests whether the
-    # 2D/3D h-convention mismatch drives the P2-3D discrepancy (docs/mms/3d-p2-instability-investigation.md §3).
-    _h_of_v = h_conv == "d_fact" ? (v -> (6.0*abs(v))^(1.0/3.0)) : (v -> (6.0*sqrt(2.0)*abs(v))^(1.0/3.0))
-    h_array = collect(lazy_map(_h_of_v, get_cell_measure(Ω)))
+    # tet element size. [diagnostic h_conv]:
+    #   "diameter"    = the LITERAL element diameter h_K = max‖xᵢ−xⱼ‖ (longest edge) — the mathematically
+    #                   standard h_K the inverse inequality / interpolation theory (and the paper's C_inv, c₁)
+    #                   are stated with. Correctly captures shape-anisotropic Kuhn tets (edges 1:√2:√3).
+    #   "regular_tet" = (6√2·V)^{1/3} (regular-tet edge for volume V — the shipped default; a volume PROXY).
+    #   "d_fact"      = (6·V)^{1/3} = (d!·V)^{1/d}, the dimension-consistent analog of the 2D harness's
+    #                   √(2·Area) (→ h = grid spacing), i.e. the 3D volume formula WITHOUT the extra √2.
+    # Tests whether the tet h-convention drives the P2-3D discrepancy (docs/mms/3d-p2-instability-investigation.md §3).
+    if h_conv == "diameter"
+        cc = get_cell_coordinates(Ω)
+        h_array = [maximum(sqrt((v[i]-v[j])⋅(v[i]-v[j])) for i in 1:length(v) for j in (i+1):length(v)) for v in cc]
+    else
+        _h_of_v = h_conv == "d_fact" ? (v -> (6.0*abs(v))^(1.0/3.0)) : (v -> (6.0*sqrt(2.0)*abs(v))^(1.0/3.0))
+        h_array = collect(lazy_map(_h_of_v, get_cell_measure(Ω)))
+    end
     h_cf = CellField(h_array, Ω)
     h_mean = sum(h_array) / length(h_array)   # ACHIEVED mesh size — the correct convergence abscissa
     alpha_cf = CellField(x -> PNS.alpha(alpha_field, x), Ω)

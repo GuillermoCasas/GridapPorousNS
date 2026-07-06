@@ -480,7 +480,12 @@ function strong_adjoint_momentum(form::PaperGeneralFormulation, u, v, q, α)
     conv_adj = α * (∇(v)' ⋅ u)
     pres_adj = α * ∇(q)
     visc_adj = adjoint_viscous_operator(form.viscous_operator, v, α, ν)
-    return conv_adj + pres_adj + visc_adj
+    # [diagnostic] env-gated multiplier on the viscous adjoint L*_visc(v) in the stabilization pairing
+    # τ₁(R_u, L*(v)). Read ONCE per assembly (not per quad point). Default "1.0" ⇒ byte-identical. Set
+    # VISC_ADJ_MULT=0 to DROP the viscous adjoint, =-1 to FLIP its sign — tests whether the viscous
+    # 2nd-derivative subscale coupling is the P2-3D destabilizer (docs/mms/3d-p2-instability-investigation.md §3).
+    _vam = parse(Float64, get(ENV, "VISC_ADJ_MULT", "1.0"))
+    return conv_adj + pres_adj + _vam * visc_adj
 end
 
 # dL*/∂u · du: derivative of the momentum adjoint w.r.t. the linearization point.

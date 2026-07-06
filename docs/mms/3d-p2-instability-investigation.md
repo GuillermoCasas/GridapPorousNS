@@ -139,6 +139,81 @@ correctly in 2D**; whatever breaks P2 requires the **third dimension**. Remainin
    z-2nd-derivative subscale is weighted/paired in `F` vs the paper (`τ₁(R_u, L*(v))`, `B_S` under
    `eq:OSGSProblem`).
 
+## 3.1 Session 2026-07-06 — localized to the viscous-adjoint subscale; exhaustive factor hunt (all negative); OPEN
+
+This session ran the elimination chain to the end. **Result: the P2-3D "converged-but-wrong" is the viscous
+2nd-derivative subscale being ~2× over the coercivity margin at paper c₁ — and the term is correctly
+implemented (no code factor found anywhere).** In order:
+
+**A. `c₁` verdict REVERSED, AUTHORITATIVE (first author).** Kratos assembles the FULL subscale (no terms
+removed) and solves this exact §5.2 P2 case optimally at paper `c₁=4k⁴` on tetrahedra. Paper c₁ is correct;
+c₁×4 (and every "fix" below) only shrinks τ₁ to suppress the offending term.
+
+**B. Newton ≡ Picard ⇒ defect is in the assembled RESIDUAL `F`, not the linearization** (row J). `ablation_mode`
+A/B at (12,12,3): Exact-Newton and `picard_only` reach the **identical wrong root to 8 sig figs** (0.049370051
+vs 0.049370052) via different paths. Rules out Jacobian/solver + the spurious-adjacent-root loophole.
+
+**C. 2D-P2 on TRIANGLES is OPTIMAL ⇒ NOT simplex-specific.** `data/phase1_tri_k2.json` (same cell/harness as
+the good QUAD-P2 control), N=10→80: L²u rate 2.39→2.90→**2.97**, H¹u→**1.92**, tracking QUAD to ~1.3×. Bug is
+3D-general.
+
+**D. Anisotropy REFUTED.** Isotropic cube `(0,1)³`: L²u 0.0229→**0.0351**→0.0235, erratic — same as the slab.
+
+**E. `h`-convention: real 2D/3D inconsistency, but NOT the fix.** Code used `h=(6√2·V)^(1/3)` (volume proxy);
+the paper defines `h = mesh diameter` (line 508; τ Fourier design line 763 uses it). `h_conv` test: `d_fact`
+(6V)^(1/3) → 0.049→0.022 (stalled, not healed); the **literal diameter** (the proof's h) → **WORSE, 0.358**.
+The coercivity margin is **h-INDEPENDENT** (`τ₁∝h²` cancels the 2nd-derivative's `∝1/h²`). So h is not the
+reconciliation — though the diameter is still the correct definition to adopt for consistency.
+
+**F. Destabilizer = the VISCOUS ADJOINT `L*_visc(v)=∇·(2ανεᵈv)` in `⟨L*_visc(v), τ₁R_u⟩`.** Env-gated
+`VISC_ADJ_MULT` at (12,12,3) ASGS-P2 paper c₁:
+
+| mult | +1.0 | +0.5 | +0.25 | +0.1 | 0.0 | −0.1 | −0.5 | −1.0 |
+|---|---|---|---|---|---|---|---|---|
+| L²u | **0.0494** | 0.00180 | 0.00154 | 0.00149 | 0.00146 | 0.00144 | 0.00139 | 0.00136 |
+
+Only the full-strength +1.0 is catastrophic; anything ≤0.5 heals to interpolant level. The minimum is at
+**mult ≤ 0**, so the term is **net-harmful at any positive value** — an *uncontrolled* anti-coercive term, ~2×
+over `c₁ > 2ξC_inv²`.
+
+**G. The sign is ALGEBRAICALLY CORRECT — do NOT flip it.** eq:518 `L*V=−∂ᵢ(𝐊ⱼᵢᵀ∂ⱼV)−…`, eq:593
+`B_S=B−Σ⟨L*V,τ𝓛U⟩`, `𝐊ᵢⱼ=να·M` (eq:300, symmetric ⇒ deviatoric self-adjoint) ⇒ `L*_visc=−∇·(2ανεᵈV)=−div_visc_v`.
+Code returns `+div_visc_v` = `−L*_visc` under its `−L*` convention (consistent with the convective adjoint
+`+α(u·∇)v`). Correct; a flip changes the proven method. **The healing from `mult≤0.5` is NOT a sign fix —
+small POSITIVE multipliers heal too — it is a magnitude/coercivity-threshold effect.**
+
+**H. Exhaustive factor hunt — NO code factor found.** Every candidate for a spurious ~2×, one by one:
+
+| Site | Verdict |
+|---|---|
+| `_grad_div = Σₖ H[i,k,k] = ∂ᵢ(∇·u)` | ✅ correct (hyp D `u=(xy,yz,xz)`, Δu=0 ⇒ tests grad-div) |
+| Laplacian `Δ` coefficient | ✅ correct (hyp D `u=(y²,0,0)`, ∇·u=0 ⇒ tests Δ → `(2,0,0)`) |
+| `½Δ+(½−1/D)∇(∇·)` split; `εᵈ` ½-symmetrization | ✅ correct (re-derived) |
+| strong `div_visc_u` vs adjoint `visc_adj` | ✅ byte-identical |
+| **α in τ** (proof l.819 `α_∞` vs code pointwise α) | ✅ exonerated — 2D-QUAD-P2 keeps optimal RATE at α₀=0.05 (20× dev only inflates the constant) |
+| discrete Hessian `∇∇` (trial & test) | ✅ exact — P2 is quadratic per tet |
+| **3D oracle** `mms3d.jl` viscous forcing | ✅ matches `strong_viscous_operator` exactly ⇒ `R_u(u_ex)=0` |
+| characteristic scales `U_c/P_c` | ✅ correct (Re=1,Da=1,P=3) |
+
+**Conclusion (OPEN).** The viscous 2nd-derivative subscale is correctly implemented and correctly forced; at
+paper c₁ it is genuinely ~2× over the coercivity margin for **P2 on 3D tets**, h-independently — the `C_inv`
+phenomenon for the **deviatoric** operator, which the paper flags as analytically delicate (line 255: the
+Korn-type argument "may be nontrivial for [the deviatoric operator]"). Not fixable by c₁, h, sign, or the
+α/oracle/Hessian evaluation (all verified). The only remaining tension is with "Kratos optimal at paper c₁ on
+tets," unresolvable from the Gridap source alone.
+
+**Open questions for the author (to close the Gridap↔Kratos gap):**
+1. Does Kratos's §5.2 3D case use **tetrahedra or hexahedra**? Hexes' smaller `C_inv` makes `c₁=4k⁴` suffice
+   where Kuhn tets' larger `C_inv` does not — this alone reconciles everything with no code error.
+2. Does Kratos's `τ₁` use the **deviatoric operator's Fourier spectral radius** (larger than the plain
+   Laplacian's), giving a smaller τ₁ at the same nominal `c₁`?
+3. Does Kratos assemble the full viscous 2nd-derivative in `L*(v)` (eq:518) or approximate it in practice?
+
+**Diagnostic hooks added this session (all default-off / byte-identical; kept committed to reproduce the above):**
+`smoke3d.jl` — `ablation` (→ `ablation_mode="picard_only"`) and `h_conv` (`"diameter"`/`"d_fact"`/`"regular_tet"`);
+`continuous_problem.jl` — `VISC_ADJ_MULT` env var scaling the viscous adjoint; `data/phase1_tri_k2.json` — the
+2D-TRI-P2 discriminator cell.
+
 ## 4. The OSGS-P2 solver problem (separate from §3, also open)
 
 Even granting the (wrong) discretization, OSGS-P2 cannot be *solved*:
