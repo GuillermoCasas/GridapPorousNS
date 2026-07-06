@@ -203,6 +203,11 @@ small POSITIVE multipliers heal too — it is a magnitude/coercivity-threshold e
 
 ## 3.2 RESOLVED (2026-07-06) — `4k⁴` is under-margined for high-`C_inv` structured tets; NOT a code discrepancy
 
+> **Full detailed record for scrutiny** (every experiment + numbers, the argument, the refuted alternatives,
+> the reconciliation, and the honest caveats / what would overturn this):
+> [`3d-p2-coercivity-resolution-dossier.md`](3d-p2-coercivity-resolution-dossier.md). The summary below is the
+> short form.
+
 **Verdict: this is NOT a Gridap↔paper discrepancy or a bug.** The viscous 2nd-derivative subscale is
 correctly implemented and correctly forced; it is **anti-coercive by construction** (the viscous operator is
 self-adjoint, so `B_S = B − Σ⟨L*V, τ𝓛U⟩` gives `−τ‖𝓛_visc V‖²`, unlike the *coercive* `+τ‖a·∇V‖²` from
