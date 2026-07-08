@@ -239,10 +239,12 @@ unaffected and secure.
   still cannot** (res 3.1, L²u 0.40). VMS is the *better* method at the corner. (At Re=1, TH converges
   cleanly — rate 2.94 — confirming the corner failure is the high-Re convective instability.)
 
-- **Reaction-out-of-stabilization A/B — INCONCLUSIVE (σ̃_α not confirmed).** Implemented a gated
-  diagnostic (`STRIP_REACTION_FROM_STAB` env-var in `src/formulations/continuous_problem.jl`, default
-  off = byte-identical, Blitz 243/243 incl. exact `picard_jacobian_equivalence`; the *stripped*
-  formulation is itself self-consistent — J-vs-FD ~1e-11, quadratic) that removes σ from the
+- **Reaction-out-of-stabilization A/B — INCONCLUSIVE (σ̃_α not confirmed).** Via a temporary gated
+  diagnostic — `STRIP_REACTION_FROM_STAB`, since **REVERTED** (not paper-faithful, so it does not stay
+  in the core), but fully described here for reproducibility: an env-var in the coefficient/residual/
+  Jacobian builders of `src/formulations/continuous_problem.jl`, default off = byte-identical, Blitz
+  243/243 incl. exact `picard_jacobian_equivalence`; the *stripped* formulation was itself
+  self-consistent (J-vs-FD ~1e-11, quadratic) — that removes σ from the
   stabilization (τ₁, 𝓛U, 𝓛*V, and their derivatives) while the coercive Galerkin term `(v,σu)` keeps
   the real σ — i.e. TH-like full-σ velocity control but with VMS's convective stabilization. Ran the
   corner A/B (`data/cocquet_form_mms_strip_reaction_test.json`, N=[20,40,80,160], ASGS): stripping
@@ -265,8 +267,9 @@ consistent with every observation* (reaction-magnitude driven, low-α specific, 
 but was **not confirmed** by the direct strip test, which was confounded by the τ₁ entanglement. A
 cleaner isolation (strip σ from 𝓛U/𝓛*V only, holding τ₁ physical) is the natural next probe but is
 **deferred** — the practical deliverable (§4.1, convergence above the fold) does not depend on it. The
-`STRIP_REACTION_FROM_STAB` gate is retained (byte-identical diagnostic, like `C1_MULT`/`VISC_ADJ_MULT`)
-for that follow-up.
+`STRIP_REACTION_FROM_STAB` gate was **reverted** (a stabilization-reaction strip is not paper-faithful
+and does not belong in the core); the method above is complete enough to re-derive it if that clean
+follow-up is pursued.
 
 ---
 
