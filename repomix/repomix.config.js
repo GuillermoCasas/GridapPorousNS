@@ -31,7 +31,12 @@ module.exports = isRunFromRepomixFolder ? {
       "../**/*.h5",
       "../**/*.json",
       "../.agents/**/*",
-      "../**/siam/**/*"
+      "../**/siam/**/*",
+      "**/*.tex",
+      "../**/archive/**/*",
+      "../tools/**/*",
+      "../test/extended/ManufacturedSolutions/previous_results/**/*.md",
+      "../test/extended/ManufacturedSolutions/previous_results/**/*.txt"
     ]
   }
 } : {
@@ -63,7 +68,13 @@ module.exports = isRunFromRepomixFolder ? {
       "**/*.h5",
       "**/*.json",
       ".agents/**/*",
-      "**/siam/**/*"
+      "**/siam/**/*",
+      "**/*.tex",
+      "**/archive/**/*",
+      "tools/**/*",
+      "test/extended/ManufacturedSolutions/previous_results/**/*.md",
+      "test/extended/ManufacturedSolutions/previous_results/**/*.txt"
     ]
   }
 };
+
