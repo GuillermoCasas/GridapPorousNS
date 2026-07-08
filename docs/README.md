@@ -1,8 +1,29 @@
 # `docs/` — meta-documentation (observations, status, references)
 
-All non-LaTeX documentation lives here, organized by topic. The LaTeX sources are in
-[`../theory/`](../theory/) (see [`../theory/README.md`](../theory/README.md)). Each topic has **one
-canonical doc**; the rest are kept for traceability and carry a status header pointing to it.
+All non-LaTeX documentation lives here. The LaTeX sources are in [`../theory/`](../theory/) (see
+[`../theory/README.md`](../theory/README.md)).
+
+## ⭐ Living docs — START HERE (the current state, kept up to date)
+
+Consolidated 2026-07-08 into a small purpose-organized set. These four answer *what do we know? what's
+unresolved? what's next? how does the code map to the paper?* — read these first; the by-topic
+investigation records below are the **detailed evidence** behind them.
+
+- **[findings.md](findings.md)** — *Results & debugging conclusions*: the settled state per area (2D MMS,
+  the low-α fold, 3D-P2, OSGS reaction rate, JFNK/Anderson, CocquetFormMMS) with the canonical numbers.
+- **[open-questions.md](open-questions.md)** — *Open theoretical/numerical questions*: the α=0.1 fold
+  mechanism (σ̃_α), the Gridap↔Kratos magnitude offset, the 3D-P2 caveats, OSGS-P2 coupling, paper errata.
+- **[pending-tasks.md](pending-tasks.md)** — *Backlog*: sweeps to run, tests to promote, solver
+  efficiency ideas, open code-correctness issues.
+- **[theory-code-map.md](theory-code-map.md)** — *Theory↔code reference*: the paper↔code divergence
+  ledger, the algorithm→file map, the stabilization/τ design, the convergence-gate spec.
+
+Plus the two standing living ledgers: **[lessons_learned.md](lessons_learned.md)** (regression history,
+the authority on anything "fixed") and **[known_issues.md](known_issues.md)** (open code-correctness).
+
+> The by-topic docs below (`mms/`, `cocquet/`, `solver/`) remain as the **detailed investigation
+> records / evidence** the living docs consolidate and link into. (A follow-up pass may move them under
+> `docs/evidence/` or prune those fully subsumed — see the doc-consolidation note in the git log.)
 
 ## Top level — repo-wide ledgers
 

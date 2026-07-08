@@ -1,0 +1,802 @@
+# Theory ↔ Code Map
+
+The stable reference for how this `Gridap.jl` solver realizes the continuous VMS mathematics of
+[`theory/paper/article.tex`](../theory/paper/article.tex) — *"A stabilized finite element method for
+incompressible, inertial flows in inhomogeneous porous media"* (Casas, González-Usúa, Codina,
+de-Pouplana) — plus the algorithm boxes of
+[`theory/osgs_algorithm/osgs_algorithm.tex`](../theory/osgs_algorithm/osgs_algorithm.tex).
+
+When implementation appears to diverge from the paper, this doc is the ledger that classifies the
+divergence and justifies it. Update it whenever code and paper drift.
+
+This doc consolidates four former solver docs (paper-code divergences ledger, algorithm↔code mapping,
+the scale-free convergence-criterion spec, and the normalization/encoding-invariance audit). The
+`[paper-faithful]` / `[code-actual]` / `[code-divergent-superior]` / `[deferred]` labels and the
+`eq:`/`article.tex` references are preserved throughout. Detailed investigation evidence lives under
+[`docs/`](README.md); the LaTeX sources live under [`theory/`](../theory/).
+
+**Contents**
+
+1. [Algorithm-box → code map](#1-algorithm-box--code-map)
+2. [Divergence ledger (code vs paper)](#2-divergence-ledger-code-vs-paper)
+3. [Scale-free nonlinear convergence criterion (spec)](#3-scale-free-nonlinear-convergence-criterion-spec)
+4. [Normalization / encoding-invariance audit](#4-normalization--encoding-invariance-audit)
+
+---
+
+## 1. Algorithm-box → code map
+
+Each named algorithm box in
+[`osgs_algorithm.tex`](../theory/osgs_algorithm/osgs_algorithm.tex) maps **1:1** to a single Julia
+function. After the shared-core extraction (commonalities vs per-method differences split), the solver
+lives in four files:
+
+- [`src/solvers/solver_core.jl`](../src/solvers/solver_core.jl) — the **shared core + orchestrator**:
+  the FE containers (`FETopology` / `VMSFormulation` / `StageSolvers`), the `SolutionVerifier` seam, the
+  shared cascade machinery (`CascadePolicy` type + `cascade_step_outcome` + `_pingpong_cascade!`), the
+  FE-solve plumbing (`safe_fe_solve!` / `_solve_one_step!` / `_record_stage!`), and the orchestrator
+  `solve_system`. This is the only solver file that names **both** methods (it dispatches between them).
+- [`src/solvers/asgs_solver.jl`](../src/solvers/asgs_solver.jl) — **ASGS only**: the Stage-I boot
+  `_initialize_asgs_state!` and the `STAGE_I_POLICY` / `STAGE_I_N2_POLICY` cascade-policy values.
+- [`src/solvers/osgs_solver.jl`](../src/solvers/osgs_solver.jl) — **OSGS only**: the L²-projection
+  helpers (`discrete_l2_projection`), the coupled OSGS solve (`solve_osgs_stage!`), and the
+  `OSGS_INNER_POLICY` value.
+- [`src/solvers/mms_verification.jl`](../src/solvers/mms_verification.jl) — the optional Algorithm-D
+  MMS plateau verification (`MMSPlateauVerifier`), decoupled behind the `SolutionVerifier` seam.
+
+The shared Newton kernel (Algorithm A) is [`src/solvers/nonlinear.jl`](../src/solvers/nonlinear.jl).
+Helpers are file-local (leading-underscore convention) and not exported.
+
+> Reviewers should re-check this table whenever the solver files are touched. (Pre-split, all of these
+> lived in a single `src/solvers/porous_solver.jl`.)
+
+| Algorithm / section | Code symbol | Code file |
+|---|---|---|
+| Algorithm O — `SimulationOrchestration` | `solve_system` | `solver_core.jl` |
+| Algorithm A — `ExactNewtonPipeline` | `_safe_solve_inner!` (via `SafeNewtonSolver`) | `nonlinear.jl` |
+| Algorithm B — `RobustNonlinearCascade` (Stage I) | `_initialize_asgs_state!` | `asgs_solver.jl` |
+| Algorithm C — `CoupledOSGSSolve` (single Newton; per-eval re-projection of `π`; frozen-`π` Jacobian; Picard fallback gated on `pingpong_enabled`; `stall_window=0`) | `solve_osgs_stage!` | `osgs_solver.jl` |
+| Algorithm D — `VerifyMMSPlateau` (ASGS branch) | `on_asgs_converged!(::MMSPlateauVerifier, …)` | `mms_verification.jl` |
+| Algorithm D — `VerifyMMSPlateau` (OSGS branch) | `on_osgs_converged!(::MMSPlateauVerifier, …)` | `mms_verification.jl` |
+| Scale-free convergence criterion — the **authoritative** outer-iteration success gate (`ε_M ≤ tol_M ∧ ε_C ≤ tol_C`, momentum/mass dimensionless residual measures) | `evaluate_convergence` (momentum envelope `momentum_force_envelope`, mass measure `mass_criterion`); `solve_system` injects it via `build_convergence_probe` into each solver's `conv_probe` | `convergence_criterion.jl` (probe in `solver_core.jl`) |
+
+### The verification seam (Algorithm D)
+
+Algorithm D is **not** inlined in the solver. The core (`solve_system` / `solve_osgs_stage!`) is
+verification-blind: at each convergence point it invokes a hook on a `SolutionVerifier`
+(`on_asgs_converged!` / `on_osgs_converged!`). Production passes `NoVerification` (multiple dispatch
+resolves both hooks to no-ops), so it costs nothing and the core never names MMS, reads an oracle, or
+writes an `mms_*` key. The MMS harnesses pass an `MMSPlateauVerifier`, which owns the
+manufactured-solution oracle and the plateau loop.
+
+The asymmetry in the two hook signatures (`on_asgs_converged!` takes a `step_once!` closure;
+`on_osgs_converged!` does not) reflects the **real** asymmetry in the algorithm: the ASGS path plateaus
+by extra single-Newton cycles, while the OSGS coupled solve is a single solve evaluated once.
+
+### What is *not* in this mapping
+
+- `safe_fe_solve!` (the try/catch + tuple-unwrap wrapper in `solver_core.jl`) and `_solve_one_step!`
+  (the raw single-step variant the ASGS verifier drives) are Julia-side utilities, not paper boxes.
+- The `SafeNewtonSolver` constructor / `_with_overrides` (`nonlinear.jl`) is pure plumbing.
+
+### Iterator-scheduling helpers (no paper anchor — efficiency, default-off)
+
+Scheduling/plumbing, not paper algorithm boxes; every behavioural switch defaults OFF so the shipped
+config reproduces prior results bit-identically.
+
+- `build_iter_solvers` (`nonlinear.jl`) — single construction point for the `(picard, newton)`
+  `FESolver` pair, used by both `run_simulation.jl` (production) and `run_test.jl` (MMS harness).
+- `cascade_step_outcome` / `CascadePolicy` (`solver_core.jl`) — the shared Algorithm-B accept/reject
+  verdict (type + interpreter). Parameterized by one `CascadePolicy` value per method, each declared in
+  its own method file: `STAGE_I_POLICY` / `STAGE_I_N2_POLICY` (`asgs_solver.jl`) and `OSGS_INNER_POLICY`
+  (`osgs_solver.jl`), as `(accept_noise_floor, accept_soft_stall, max_iters_caught_is_failure)`. Truth
+  tables pinned by `test/blitz/cascade_policy_symmetry_blitz_test.jl`.
+- `_pingpong_cascade!` (`solver_core.jl`) — **opt-in** adaptive Newton↔Picard ping-pong (shared by the
+  Stage-I boot and the OSGS coupled solve) that replaces the one-way Newton→Picard→Newton cascade when
+  `pingpong_enabled`. Runs Newton until it stalls, a Picard segment that stops the moment `‖R‖∞` has
+  dropped `pingpong_picard_gain_orders` orders (stop_reason `picard_gain_reached`), then back to Newton,
+  bounded by `pingpong_max_swaps`. Each segment is tagged honestly via `_record_stage!`
+  (`…:PP[swap]:N` / `:P`).
+
+---
+
+## 2. Divergence ledger (code vs paper)
+
+The canonical map of every apparent mismatch between the literal mathematical theory in
+[`theory/paper/article.tex`](../theory/paper/article.tex) and the concrete `Gridap.jl` execution. Any
+discrepancy introduced by numerical-stability limits, algebraic bounds, discrete-compilation behaviors,
+or Julia/LLVM restrictions MUST be recorded here.
+
+### 2.1 Sub-grid mass-balancing approximation — `[paper-faithful]`
+
+**Location**: `src/formulations/continuous_problem.jl` — `convective_adjoint`.
+
+**Apparent divergence**: The strict integration-by-parts of the subgrid convective velocities forces the
+exact test-side adjoint mapping to include the scalar compressibility term
+`(1/α)∇·(α u) v`. In the code, `convective_adjoint` omits this term explicitly.
+
+**Alignment**: Not a divergence. [`article.tex` line 800](../theory/paper/article.tex#L800) explicitly
+justifies removing the `(1/α)∇·(α a) v_h` term across the whole theory:
+
+> *"Note that, strictly speaking, one has the term `(1/α)∇·(α a) v_h` in the expansion of `L* V_h`. The
+> inclusion of such term generates a number of crossed terms in (StabilityEstimate) that actually harm
+> stability. [...] Here, we have opted for simplifying the formulation by removing the aforementioned
+> term from `L* V_h`, leading to a simpler formulation with similar stability properties."*
+
+The code omitting it is a literal transcription of the simplified VMS operator specified in the theory.
+(Kept out to preserve the `A² − B²` symmetry in the stability estimate.)
+
+### 2.2 Viscous operator and its formal adjoint — `[paper-faithful]`
+
+**Location**: [`src/formulations/viscous_operators.jl`](../src/formulations/viscous_operators.jl).
+
+**Paper theory**: The strong viscous operator and its formal adjoint `L*V` per
+[`article.tex:479`](../theory/paper/article.tex#L479) both involve the divergence of the (deviatoric or
+full symmetric) strain tensor:
+
+- deviatoric: `∇·εᵈ(u) = ½Δu + (½ − 1/d)∇(∇·u)`
+- symmetric-gradient: `∇·ε(u) = ½Δu + ½∇(∇·u)`
+
+The `∇(∇·u)` contribution is dimension-dependent for the deviatoric variant (coefficient `0` in 2D,
+`+1/6` in 3D) and always present for the symmetric-gradient variant.
+
+**Code reality**: Both the strong operator and its formal adjoint use the same dimension-aware
+Hessian-evaluation operations:
+
+- [`strong_viscous_operator(::DeviatoricSymmetricViscosity, …)`](../src/formulations/viscous_operators.jl#L145) — `EvalDivDevSymOp(Δ(u), ∇∇(u))`
+- [`adjoint_viscous_operator(::DeviatoricSymmetricViscosity, …)`](../src/formulations/viscous_operators.jl#L163) — `EvalDivDevSymOp(Δ(v), ∇∇(v))`
+- [`strong_viscous_operator(::SymmetricGradientViscosity, …)`](../src/formulations/viscous_operators.jl#L93) — `EvalStrongViscSymOp(Δ(u), ∇∇(u))`
+- [`adjoint_viscous_operator(::SymmetricGradientViscosity, …)`](../src/formulations/viscous_operators.jl#L111) — `EvalStrongViscSymOp(Δ(v), ∇∇(v))`
+
+`EvalDivDevSymOp` and `EvalStrongViscSymOp` are dimension-dispatched callable structs (one method each for
+`d=2` and `d=3`) computing the exact divergence-of-strain expansion. Gridap evaluates `∇∇(u)` for trial
+and `∇∇(v)` for test fields cleanly on Lagrangian elements; for `k_v = 1` the Hessian is identically zero,
+so the `∇(∇·)` contribution vanishes regardless of dimension — exactly as the analytic operator demands.
+
+**Historical note (audit P-004)**: Before the Fix-4a commit, the adjoint dropped the `∇(∇·v)`
+contribution and returned only `0.5·Δ(v)`. In 2D deviatoric this was harmless (`½ − 1/d = 0`); in 3D
+deviatoric and in any dimension for symmetric-gradient it lost formal symmetry against `L*V`. The fix
+re-uses the strong-operator machinery on `v`, so the adjoint is now exact in any dimension. The
+orthogonality smoke test (`osgs_orthogonality_quick_test.jl`, `SymmetricGradientViscosity`) saw a small
+numerical shift (OSGS L2 `3.39545818e-02 → 3.33665493e-02`); orthogonality `‖Π_h(R_h(u))‖ ≈ 10⁻¹⁴` was
+unchanged. The MMS sweep (`DeviatoricSymmetricViscosity` per `base_config.json`) is bit-identical to the
+post-`fa8aaec` baseline.
+
+### 2.3 Adjoint streamline mapping positivity — `[paper-faithful]` `[known-fragility]`
+
+**Location**: `src/formulations/continuous_problem.jl` — `convective_adjoint`.
+
+**Apparent divergence**: Naively one expects `L*_conv = −α a·∇v`; the code evaluates `convective_adjoint`
+with a **positive** sign (`+α a·∇v`). Reversing it triggers catastrophic divergence at high Reynolds
+(the "Anti-SUPG" failure).
+
+**Alignment**: Not a divergence, but a mandatory requirement of the stability proof's coercivity.
+[`article.tex` Eq. 39 / line 554](../theory/paper/article.tex#L554) constructs the VMS stabilization
+bilinear form by **subtracting** the adjoint: `− Σ_K ⟨L* U_h, τ L U_h⟩`. For the velocity test function,
+`−L*_conv u_h = +α a·∇u_h = A`. Multiplied by the strong residual (same positive `A`) this forms the
+`(A − B)·(A + B) = A² − B²` symmetry ([`article.tex` Eq. 50 / line 797](../theory/paper/article.tex#L797)),
+giving the positive-definite bound `+‖τ₁^{1/2} α X(U_h)‖²_h`. So the positive code evaluation is
+structurally identical to evaluating `−L*` inside the paper's VMS inner product.
+
+### 2.4 Jacobian scalar-singularity regularizations — `[code-actual]`
+
+**Location**: `src/models/reaction.jl`, `src/solvers/nonlinear.jl`.
+
+**Paper theory**: Jacobian bounds over nonlinear-parameter expansions are treated as continuously
+differentiable across local phase transitions.
+
+**Code reality**: A numerical flooring coefficient injects a safe non-zero element bounded by `O(1e-15)`
+(via `SmoothVelocityFloor`), governing the continuous Jacobian limit precisely where analytical
+derivatives of `|u|` fracture as `|u| → 0`.
+
+### 2.5 Simplified stabilization parameters (`eq:Tau1Final` / `eq:Tau2Final`) — `[paper-faithful]`
+
+**Location**: [`src/stabilization/tau.jl`](../src/stabilization/tau.jl) — `compute_tau_1`, `compute_tau_2`.
+
+**Apparent divergence**: Relative to the full paper definitions, the code drops:
+
+1. The `ε h²` contribution from `τ₂`'s denominator (full: [`eq:Tau2`, article.tex:755](../theory/paper/article.tex#L755); simplified: [`eq:Tau2Final`, L778](../theory/paper/article.tex#L778)).
+2. The porosity-gradient `(h/|k₀|)|∇α|` term inside `C_α` for `τ₁` (full: [`eq:Tau1`, article.tex:754](../theory/paper/article.tex#L754); simplified: [`eq:Tau1Final`, L777](../theory/paper/article.tex#L777)).
+
+**Alignment**: Both omissions are explicitly justified in the paper:
+
+- For `τ₂`, [`article.tex` L762](../theory/paper/article.tex#L762): *"The second term in `eq:Tau2` is only strictly necessary for large `ε`."*
+- For `τ₁`, [`article.tex` L764–768](../theory/paper/article.tex#L764): *"the second term in the definition of `C_α` is in fact unnecessary if `(h/|k₀|)|∇α| ≲ α`. That is, if the porosity changes are well resolved by the mesh. We will assume this to hold in the following, leaving issues related to steep porosity gradients to future work."*
+
+The simplified §4.2 analysis uses `eq:Tau1Final` / `eq:Tau2Final` directly
+([`article.tex` L775](../theory/paper/article.tex#L775)); [`tau.jl:5–16`](../src/stabilization/tau.jl#L5)
+implements those final forms verbatim. (For equal-order interpolation the numeric constants are
+`c₁ = 4k⁴`, `c₂ = 2k²`, per the Remark after `eq:conditions_on_num_param`, returned by `get_c1_c2`.)
+
+**Empirical verification of the well-resolved-porosity assumption**: every current MMS sweep config uses
+`SmoothRadialPorosity` with `r₁=0.2, r₂=0.4` (transition width `Δr = 0.2`). Worst case
+`h|∇α|/α ≈ h·(1−α₀)/Δr / α₀`: at the coarsest mesh (`h=0.1`, `α₀=0.5`) `≈ 0.5`; at the finest
+(`h=0.003`, `α₀=0.5`) `≈ 0.015`. The Cocquet experiment uses `α ≡ 1` so `|∇α| = 0` trivially. The
+assumption holds across the entire sweep.
+
+**Regression anchor**: [`test/blitz/tau_blitz_test.jl`](../test/blitz/tau_blitz_test.jl) `@testset "Tau1/Tau2
+simplified paper form is intentional [P-001, P-008]"` locks in both simplifications: (1) `compute_tau_2`
+does not take `physical_epsilon` and matches the closed form `h²/(c₁ α τ_NS + reg)`; (2) `compute_tau_1`
+is bit-identical when `med.grad_alpha` varies by orders of magnitude while local `α` is fixed. A future
+audit re-raising **P-001** ("τ₂ missing ε·h²") or **P-008** ("τ₁ missing C_α") should reach this section
+first and then fail the anchor test rather than file a regression.
+
+**Re-evaluation triggers**:
+
+- Switch to `eq:Tau2` (with `ε h²`) if a future config drives `ε` large enough that `ε h²` becomes
+  comparable to `c₁ α τ_NS`. `physical_epsilon` already flows through `phys_cfg`; the switch is a local
+  change in `compute_tau_2` and its derivative `compute_dtau_2_du`.
+- Switch to `eq:Tau1` (with `C_α`) if a future config has `h|∇α|/α ≳ 1` (steep, under-resolved porosity
+  gradient). `grad_alpha` is already plumbed through `MediumState`.
+
+> **Related (not a ledger entry): the `4k⁴` = `c₁` constant for 3D structured tets.** The 3D-P2 MMS
+> investigation **RESOLVED (2026-07-06)** that `4k⁴` is *under-margined* (not wrong) for high-`C_inv`
+> structured Kuhn tets — the viscous 2nd-derivative subscale is anti-coercive by construction, and
+> `c₁ = 4k⁴` has ~zero coercivity margin there (`C_inv²` Kuhn 214 vs quad 60). The remedy is an
+> element-aware `c₁` per [`article.tex` line 910](../theory/paper/article.tex#L910), **not** a code
+> change; paper `c₁` is correct. Full detail in
+> [`docs/mms/3d-p2-coercivity-resolution-dossier.md`](mms/3d-p2-coercivity-resolution-dossier.md).
+
+### 2.6 OSGS preconditioning & linearization architecture — `[code-divergent-superior]`
+
+**Location**: [`src/solvers/osgs_solver.jl`](../src/solvers/osgs_solver.jl) — `solve_osgs_stage!` +
+`discrete_l2_projection`. The orchestrator (`solve_system` + the shared Newton→Picard→Newton cascade) is
+[`src/solvers/solver_core.jl`](../src/solvers/solver_core.jl).
+
+**Paper theory**: §6.2 (Eq. 107a–107c) presents a *staggered* iterative scheme for OSGS: an outer
+fixed-point freezing the projection `π_h^{m−1}`, a Picard (Oseen) momentum solve
+`B_S(u^{m−1}, U_h^m)`, then a `⟨W_h, π_h^m⟩` update. This implies two architectural boundaries: the
+global momentum linearization and the orthogonal tracking subspace.
+
+**Code reality**: The code does **not** implement the staggered outer loop. As of the 2026-06-08 leaning,
+OSGS has a **single coupling mode** — the *coupled* solve — the only route to the OSGS fixed point. It
+diverges from the staggered presentation in two ways, both reaching the same converged orthogonal
+residual `R̃ = R − Π(R)`:
+
+1. **Coupled single Newton solve (no staggering lag)**: Instead of freezing `π_h` across an outer
+   relaxation loop, one Newton solve runs whose **residual re-projects `π_h = Π(R(u))` from the current
+   iterate at every residual evaluation**. The Jacobian stays the **local frozen-`π` form** (sparse — not
+   the prohibitive monolithic `∂π/∂u` tangent), so this is a Picard-type coupling on the projection while
+   the rest of the tangent is the exact-Newton (`ExactNewtonMode()`) form. Removing the staggered freeze
+   eliminates the lag that made the outer map contract only linearly; the per-evaluation re-projection is
+   the cheap Cholesky-cached mass solve (`discrete_l2_projection`). Converges to the same OSGS fixed point,
+   targeting roughly ASGS iteration counts. (The per-eval projection cost motivates the JFNK
+   linear-convergence fix — see the JFNK canonical doc + `theory/osgs_algorithm/osgs_algorithm.tex`.)
+2. **Topologically unconstrained orthogonal projection**: The projection is computed on the
+   **unconstrained** spaces `V_free` / `Q_free` (no Dirichlet). Projecting on the Dirichlet-constrained
+   space forces boundary nodes to mirror extreme Dirichlet velocities, annihilating the exact `L²`
+   projection and introducing an unphysical `O(1)` boundary residual that breaks the `O(h^{k+1})` MMS
+   convergence. The free-space projection protects optimal interpolation, mathematically and empirically.
+
+### 2.7 OSGS pressure projection — constant-mode treatment — `[deferred]` (OPEN QUESTION)
+
+**Location**: [`src/solvers/osgs_solver.jl`](../src/solvers/osgs_solver.jl) — the `discrete_l2_projection`
+call site for the pressure projection `pi_p_x` inside `solve_osgs_stage!`'s coupled residual
+([line 152](../src/solvers/osgs_solver.jl#L152)); also the `Q_proj = Q_free` selection
+([line 126](../src/solvers/osgs_solver.jl#L126)). `Q_free` is the unconstrained `TestFESpace` built in
+[`src/run_simulation.jl`](../src/run_simulation.jl#L399).
+
+**Status**: Explicitly considered, intentionally **not** applied as of the Phase-5 batch. The companion
+plan item **Phase 5 §3.6** (pressure-mean-removal) is excluded but kept on the long-term ledger.
+
+**Operator the code uses today**: At every residual evaluation, the pressure-side projection `π_h^p` is an
+unweighted `L²` projection of the strong mass residual `R_p` onto the FE space `Q_h`, built from `Q_free`
+— a `TestFESpace` with **no Dirichlet and no zero-mean constraint**. So `π_h^p` in general carries a
+non-zero constant mode equal to the `L²`-mean of `R_p`.
+
+**What the paper says about the pressure gauge** ([`article.tex` L407](../theory/paper/article.tex#L407)):
+
+> The pressure belongs to `Q₀ := L²(Ω)` in general, and to `Q₀ := {q ∈ L²(Ω) | ∫_Ω q dΩ = 0}` when the
+> boundary conditions are all-Dirichlet (constraining to this subspace fixes the free constant when
+> `ε = 0`; for `ε > 0` this is met automatically).
+
+So in the **all-Dirichlet velocity** regime — every current MMS config (`small_test_config.json`,
+`test_config.json`, all `probe_k*.json`) — the continuous pressure space is `L²₀(Ω)` (mean-zero), gauge-
+fixed by the `ε > 0` penalty in the perturbed continuity equation, which "imposes that the average
+pressure is zero" ([`article.tex` L1333](../theory/paper/article.tex#L1333)). The OSGS projection `π_h`
+is defined in `eq:NonlinearResidualProjection` as the `L²` projection onto `X_{h0}` with **no** explicit
+mean-removal clause.
+
+**The candidate change (§3.6 of the plan)** — the cheap post-hoc form:
+
+```julia
+pi_p_next = discrete_l2_projection(R_p, ...)
+pi_p_next_mean = sum(∫(pi_p_next)dΩ) / sum(∫(1.0)dΩ)
+pi_p_next = pi_p_next - pi_p_next_mean
+```
+
+i.e. subtract the `L²` mean, restricting `π_h^p` to `Q_h ⊖ {1}`.
+
+**Why plausibly beneficial**: The constant mode in `π_h^p` is inert for the velocity-side stabilization
+gradient (the gradient annihilates constants), but it is carried along by the per-evaluation re-projection
+`π_h^p = Π(R_p(u))` — every residual evaluation re-derives it from the current iterate's mass residual.
+Mean removal would strip that constant-mode noise and is expected to slightly improve pressure-rate
+measurements in MMS sweeps at small `α₀`, where the constant-mode pollution scales unfavourably.
+
+**Why §3.6 is not in Phase 5** — three independent concerns:
+
+1. **Regime dependence.** All-Dirichlet velocity: `Q₀ = L²₀`, so mean removal is *more* paper-faithful
+   than the current unconstrained projection. Mixed BCs (open outlet, e.g. Cocquet): `Q₀ = L²`, no
+   constraint — mean removal would *remove a physically meaningful constant mode*, making the code *less*
+   faithful. A correct §3.6 must be conditional on the BC regime (from the configured Dirichlet tags at
+   config-load); the plan's recipe is unconditional.
+2. **Two distinct implementations.** *Option A* (cheap, plan's recipe): project on full `Q_free`, then
+   subtract the `L²` mean — one extra inner product per OSGS iteration, a post-hoc orthogonalization.
+   *Option B* (cleaner, more invasive): build the projection space as `Q_free ⊖ {1}` explicitly (Lagrange
+   multiplier on the Gram matrix, or a constrained `TestFESpace`), making the operator "projection onto a
+   closed subspace" — unambiguously paper-compatible. Option B is rigorous; Option A is defensible only if
+   accompanied by **this** divergence entry documenting the post-hoc mean removal as engineering hygiene,
+   not a redefinition of `π_h`.
+3. **The continuous gauge is already fixed by the iterative penalty `ε > 0`.** The mass equation carries an
+   `ε·p` term whose lagged previous-iterate form (the Codina iterative penalty) drives `p` toward
+   zero-mean. §3.6 addresses **intermediate-iteration pollution** of the convergence diagnostic, not a
+   steady-state correctness issue; the expected MMS-rate gain is in the measurement noise floor, not the
+   converged solution.
+
+   > **Clarification (2026-06-24 — `eps_phys` vs `eps_num`).** The gauge-fixing `ε` is the **numerical
+   > iterative penalty** (`numerical_epsilon` / `eps_num`), implemented **Jacobian-only** (lagging
+   > `ε p^{n−1}` to the RHS so it cancels at convergence) — *not* a physical compressibility. The physical
+   > `ε_phys` (`physical_epsilon`) is **0** for the incompressible problem
+   > ([`eq:StrongMassEquation`, article.tex L239](../theory/paper/article.tex#L239), "mainly for numerical
+   > reasons"; the 2D examples take `ε = 0`, L1098). A 2026-06-24 working-tree bug that set a non-zero
+   > `eps_phys` default in the 3D MMS harness (silently solving a *compressible* problem, with `ε p_ex`
+   > injected into the oracle source) was reverted — see `lessons_learned.md`. The canonical spec for the
+   > gate's incompressible ε handling is §3 below (§4.1 of the criterion spec).
+
+**Re-evaluation triggers** — reconsider §3.6 when any one becomes true:
+
+1. A **non-all-Dirichlet test config** is added (open-outlet MMS variant, traction BCs) — the regime
+   branch is unavoidable and is the right moment to land Option B with a `bc_regime`-aware switch.
+2. A **post-Phase-5 MMS sweep shows pressure-rate sub-optimality traceable to constant-mode noise** in
+   `π_h^p`. Symptom: coupled-solve pressure residual stagnates with a `π_h^p` whose `L²` decomposition is
+   dominated by the constant mode. Diagnostic: dump `sum(∫(pi_p_x)dΩ)` per residual evaluation vs the full
+   `‖π_h^p‖_{L²}` on a coarse mesh.
+3. **Phase 6 §2.1 continuation runs at `α₀ = 0.05`** (narrow channel) show corner-cell pressure-rate
+   degradation (constant-mode pollution scales unfavourably at small `α₀`).
+4. The ledger gains **another mass-side entry** interacting with the pressure-space definition — then the
+   pressure-space treatment becomes part of a larger formal review and §3.6 should be settled definitively.
+
+**What NOT to do** (captured for future sessions):
+
+- **Do not** apply mean removal to the pressure variable `p` itself (mutating `final_x0`). The `ε > 0`
+  gauge fixing is a soft feedback; slamming `p` to zero-mean every iteration fights it and destabilizes
+  Newton. §3.6 modifies only `π_h^p` (the projection used inside the stabilization term), not `p`.
+- **Do not** land Option A without also landing the BC-regime conditional. An unconditional mean removal at
+  a future open-outlet test would degrade rates silently.
+- **Do not** treat §3.6 as a prerequisite for Phase 6. Phase 6 §2.1 can proceed without it.
+
+**In scope for the current Phase 5 batch (without §3.6)**: §3.1, §3.5, §5.1, §5.2 only. Expected effect of
+omitting §3.6: pressure rates may not improve as much as theoretically possible; they are not expected to
+*regress*. The post-Phase-5 baseline is the reference against which a future §3.6 commit is judged.
+
+### 2.8 Two-way asymmetry in the legacy `max_iters_caught` exception path — `[code-actual]`
+
+**Location**: [`src/solvers/asgs_solver.jl`](../src/solvers/asgs_solver.jl) — `_initialize_asgs_state!`
+(Stage I). The MMS-extension site is the decoupled verifier hook `on_asgs_converged!` in
+[`src/solvers/mms_verification.jl`](../src/solvers/mms_verification.jl). The shared cascade and
+`safe_fe_solve!` they both call live in [`src/solvers/solver_core.jl`](../src/solvers/solver_core.jl).
+
+**Paper theory**: Algorithm B (`osgs_algorithm.tex` §"The shared cascade") describes a
+Newton→Picard→Newton cascade reused at these call sites, mode-agnostic about *how* a non-converged Newton
+exit is detected — only the success/failure binary matters.
+
+**Apparent divergence**: The legacy Gridap exception path (`"Reached maximum iterations"`, caught as
+`:max_iters_caught` by `safe_fe_solve!`) is treated *differently* at the two surviving sites:
+
+- Stage I: structural failure → Picard fallback fires (matches the "Stage I quadratic-basin guarantee").
+- ASGS-MMS extension: single-iteration partial success, `iter_count` increments, no fallback, **no** log
+  line.
+
+**Alignment**: `[code-actual]` — documented additions to Algorithm B, not divergences. The modern
+`SafeNewtonSolver` exits cleanly with `stop_reason = "max_iters_stagnation"` on the `:ok` path; the
+exception path is purely defensive against legacy / non-`SafeNewtonSolver` instances and is normally never
+taken. The paper enumerates all three policies in `osgs_algorithm.tex` §"The shared cascade" (paragraph
+"Legacy `max_iters_caught` exception path").
+
+**Re-evaluation trigger**: If a custom non-`SafeNewtonSolver` is plugged in, or Gridap's exception contract
+changes, re-audit which policy each site should apply.
+
+### 2.9 `eval_time` reporting convention — `[code-actual]`
+
+**Location**: [`src/solvers/solver_core.jl`](../src/solvers/solver_core.jl), the `eval_time`
+return-tuple slot of `solve_system` (accumulates `@elapsed` from each stage; the OSGS portion is
+`osgs_elapsed` from `solve_osgs_stage!`).
+
+**Paper theory**: Algorithm O describes the orchestration without committing to a wall-clock reporting
+boundary.
+
+**Implementation reality**: `eval_time` = cumulative wall time of three regions, accumulated in
+`solve_system`:
+
+1. Stage-I cascade (`@elapsed` around `_initialize_asgs_state!`, `asgs_solver.jl`).
+2. ASGS-MMS extension (`eval_time += @elapsed on_asgs_converged!(...)`, `mms_verification.jl`).
+3. OSGS coupled solve (`eval_time += osgs_elapsed`, `@elapsed` *inside* `solve_osgs_stage!` around the
+   single coupled `begin … end` block only).
+
+`eval_time` **excludes**: OSGS mass-matrix assembly + Cholesky factorisation (run-once setup, inside
+`solve_osgs_stage!` but outside its inner `@elapsed`); the ASGS-MMS extension setup (oracle call,
+local-solver construction); the post-coupled-block `pi_u`/`pi_p` diagnostic writes; all `diag_cache`
+writes after the timed regions.
+
+**Alignment**: `[code-actual]` — `eval_time` is the *iterative* wall time, not the *total* per-call wall
+time. Wrap the whole `solve_system` call in `@elapsed` for total cost; it will exceed `eval_time` by the
+OSGS setup cost (non-trivial on large meshes).
+
+**Re-evaluation trigger**: If a `setup_eval_time` field is added (or a diagnostics-cache refactor lands),
+update this entry.
+
+### 2.10 OSGS MMS stop reason reports solver success, not verification success — `[paper-faithful]` (post P-007 / Fix-6)
+
+**Location**: [`src/solvers/mms_verification.jl`](../src/solvers/mms_verification.jl),
+`on_osgs_converged!` (~lines 163–174) — the decoupled verifier hook the OSGS branch of `solve_system`
+calls after the coupled solve converges.
+
+**Paper theory**: `osgs_algorithm.tex` Algorithm C (OSGS branch with MMS hook) + Algorithm D (plateau
+verifier). The paragraph "Budget exhaustion is not a verification failure of the solver" in §"How
+Algorithm D hooks into the core" states the contract explicitly.
+
+**Implementation reality**: The coupled OSGS solve is a single Newton solve, not a staggered budget that
+can "exhaust." When MMS verification is active and the coupled solve converges, `on_osgs_converged!` sets
+`diag["mms_plateau_reached"] = true` with `diag["mms_stop_reason"] = "coupled_single_solve"`; if the
+converged `‖e_u‖_{L²}` exceeds `rate_check_factor · h^{kv+1}` (the pre-asymptotic high-Da coercivity gap),
+the reason is instead `"coupled_at_suboptimal_rate"` and the solver still returns success. Either way the
+*solver* succeeded (the OSGS fixed point was reached); the second flag carries whether the converged error
+met the optimal-rate budget. The legacy `"mms_budget_exhausted"` reason now belongs solely to the ASGS-MMS
+extension hook (`on_asgs_converged!`).
+
+**Alignment**: `[paper-faithful]` — the two-flag split (`solver_success`, `mms_plateau_success`) is the
+resolution of audit finding **P-007 / Fix-6** ("solver success conflated with verification success").
+Callers must read both flags.
+
+**Re-evaluation trigger**: If the Fix-6 caller migration changes the return-tuple shape or adds an
+`overall_verification_success` convenience flag, update this entry.
+
+### 2.11 Scale-free nonlinear convergence criterion — `[code-actual]`
+
+**Location**: [`src/solvers/convergence_criterion.jl`](../src/solvers/convergence_criterion.jl) (the pure
+criterion). Injected by `solve_system` via `build_convergence_probe`
+([`solver_core.jl:462`](../src/solvers/solver_core.jl#L462)) and consumed as `conv_probe` inside
+`_safe_solve_inner!` ([`nonlinear.jl`](../src/solvers/nonlinear.jl), the `scale_free = solver.conv_probe
+!== nothing` gate ~L742 and the authoritative-success break ~L849). Config: `eps_tol_momentum` /
+`eps_tol_mass` ([`config/base_config.json`](../config/base_config.json),
+[`src/config.jl:137`](../src/config.jl#L137)).
+
+**Paper theory**: The paper prescribes no discrete *stopping criterion* for the nonlinear iteration of
+`alg:StationarySystem` — the algorithm boxes describe the fixed-point map and assume an abstract "until
+converged" test. The continuous convergence statement is in the energy/stability norms of §4
+(`eq:StabilityEstimate`), not a per-iterate algebraic residual threshold.
+
+**Implementation reality**: The authoritative success gate is **scale-free**: converged iff `ε_M ≤ tol_M`
+**and** `ε_C ≤ tol_C`, where
+
+- `ε_M = ‖r_M‖ / D_M` — the assembled stabilized momentum residual (velocity block) over a *dynamic*
+  force-magnitude envelope `D_M = ‖α u·∇u‖ + ‖2∇·(α ν Πˢ∇u)‖ + ‖α ∇p‖ + ‖σ(α,u) u‖ + ‖f‖` (Philosophy A:
+  every term assembled through the same weak form, same Euclidean norm as the numerator);
+- `ε_C = ‖r_C‖ / D_C` — the Route-B **"Philosophy-A" algebraic** mass gate: the assembled stabilized mass
+  residual over a term-magnitude envelope, **symmetric with `ε_M`**, gated at the same `~1e-9` level. The
+  earlier strong-form / flux-gradient measure `‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖_F + ‖g‖)` (with the
+  pure-divergence self-check `‖∇·(α u)‖/‖∇(α u)‖ ≤ √d`) is now the **diagnostic `eps_C_strong`**, no longer
+  the gate. A **`residual_floor_reached` scale-free accept** accepts machine-floor-converged cells whose
+  `ε_C` cannot reach `tol` because `D_C` collapses for near-divergence-free flow.
+
+Because `D_M` (and the mass envelope) are *measured from the current iterate and known material data*, the
+gate carries **no a-priori scale** (no `U`, `L`, `P`, `Re`, `Da`) and is the SAME threshold across
+ping-pong cascade segments. This deliberately supersedes the OLD per-field **re-anchored** relative-ftol
+gate (`effective_ftol = relative_ftol·‖R₀‖`, `f_norm = ‖R‖/effective_ftol`), whose re-anchoring forced each
+segment to demand another `×(1/ftol)` residual drop. **That relative gate was then REMOVED (commit
+`d1fac8e`): `relative_ftol_per_field` is gone, so the `conv_probe===nothing` fallback now uses the uniform
+scalar `ftol` per field.**
+
+The old re-anchored gate survives ONLY (a) as the `conv_probe === nothing` fallback — the Cocquet
+unstabilized-Galerkin runs and the kernel unit tests, which use the scalar `ftol` — and (b) as the `f_norm`
+trace diagnostic (merit normalization + per-iteration history), which no longer decides success. The
+`degenerate` flag (a denominator at the machine-eps underflow floor) stands in for the spec's `k ≥ 1` rule,
+rejecting the trivial all-zero entry while accepting an already-converged developed iterate.
+
+**Alignment**: `[code-actual]` — an *addition* the paper leaves unspecified, not a contradiction. The
+criterion is decoupled by design (`convergence_criterion.jl` decides *whether* an iterate is converged;
+`nonlinear.jl` / `solver_core.jl` decide *how* to step) and is a pure read-only observer of a
+self-consistent `(iterate, residual)` pair — a probe failure degrades to `NaN` and can never perturb the
+solve. Full rationale (Philosophy A vs B, the `−g` subtraction, the `√d` self-check, why the §6
+pressure-normalized fallback is intentionally NOT implemented) is in §3 below.
+
+**Re-evaluation trigger**: If a future config drives the stabilization excess so `ε_M` persistently sits
+`≫ 1` on a *known-converged* case, that is NOT a loose tolerance — it means `r_M` and the `D_M` term
+decomposition have drifted apart (different quadrature/space/sign); chase the consistency bug, not the
+criterion. Also revisit if the `conv_probe === nothing` fallback set is migrated onto the scale-free gate,
+or if a pressure-scale (§6) fallback is ever genuinely needed for an open-outlet regime where `‖∇(α u)‖`
+is not robustly bounded.
+
+---
+
+## 3. Scale-free nonlinear convergence criterion (spec)
+
+The stopping criterion for the outer nonlinear (Picard / Newton) iteration of `alg:StationarySystem`.
+Implemented in [`src/solvers/convergence_criterion.jl`](../src/solvers/convergence_criterion.jl).
+
+> **STATUS (evolved from the original spec) — the MASS measure has changed.** Production now uses the
+> **Route-B "Philosophy-A" algebraic** mass gate `ε_C = ‖r_C‖ / D_C` — the norm of the assembled
+> stabilized mass residual over a term-magnitude envelope, **symmetric with `ε_M`** and gated at the same
+> `~1e-9` level. The strong-form / flux-gradient measure specified in §3.4 below
+> (`ε_C = ‖∇·(α u)‖ / ‖∇(α u)‖`, and the `−g`-subtracted variant) is now the **diagnostic
+> `eps_C_strong`**, no longer the gate. A **`residual_floor_reached` scale-free accept** was also added:
+> it accepts machine-floor-converged cells whose `ε_C` cannot reach `tol` because `D_C` collapses for
+> near-divergence-free flow (the mass envelope → 0 when the flow is essentially incompressible). The
+> **momentum (Philosophy A) spec below is still current and unchanged.** See
+> [`docs/mms/route-b-2d-sweep-status.md`](mms/route-b-2d-sweep-status.md).
+
+### 3.0 Summary
+
+Stop the outer loop when
+
+```
+converged  ⇔  max(ε_M, ε_C) ≤ tol            (or separate tol_M, tol_C)
+```
+
+with
+
+- **Momentum** `ε_M = ‖r_M^k‖ / D_M^k`, `D_M^k = ‖α u·∇u‖ + ‖2 ∇·(α ν Π u)‖ + ‖α ∇p‖ + ‖σ(u) u‖ + ‖f‖`
+- **Mass** `ε_C = ‖∇·(α u^k)‖ / ‖∇(α u^k)‖` with the guaranteed bound `ε_C ≤ √d` *(now the diagnostic
+  `eps_C_strong`; the gate uses the algebraic mass residual — see the status banner)*
+
+All norms are global `L²(Ω)` (`‖w‖ = sqrt(∫_Ω |w|² dΩ)`), accumulated by quadrature in a single assembly
+pass. `Π` is the deviatoric∘symmetric projector `Π^DS` used in the viscous term; `d ∈ {2,3}`. Report `ε_M`
+and `ε_C` separately every iteration.
+
+### 3.1 Hard constraint (do not violate)
+
+The criterion **must be computable from the current iterate `U^k = (u^k, p^k)` and known material/mesh
+data alone** (`α(x)`, `ν`, `σ = a(α) + b(α)|u|`, `f`, element size `h_K`).
+
+**Do NOT introduce, request, or hard-code any a-priori characteristic scale** — no characteristic velocity
+`U`, length `L`, pressure scale `P`, nor any global Reynolds `Re` or Damköhler `Da`. Those are bespoke to a
+manufactured-solution test where they happen to be known; a production criterion cannot assume them. If you
+find yourself needing such a scale, you have taken a wrong turn — the needed scale is *measured from the
+iterate* instead of supplied. (Element-level `Re_h`, `Da_h` built from `h_K` and the iterate are allowed —
+not a-priori scales; they appear only in the optional fallback, §3.6.)
+
+### 3.2 Governing equations and residuals
+
+Strong form (kinematic; density absorbed into `ν`, `p`, `σ`):
+
+```
+momentum:   α u·∇u − 2∇·(α ν Π∇u) + α ∇p + σ(α,u) u = f
+mass:       ε p + ∇·(α u) = 0
+```
+
+with `σ(α,u) = a(α) + b(α)|u|` (Darcy + Forchheimer), `ε ≥ 0` a small compressibility (iterative penalty),
+equal-order `P_k/P_k` velocity–pressure, ASGS or OSGS VMS stabilization.
+
+- **Momentum residual** `r_M^k` = momentum residual evaluated at `U^k`.
+- **Mass residual** `r_C^k = ∇·(α u^k)` (`+ ε p^k` if `ε > 0`; negligible — see §3.5 edge case 7).
+
+### 3.3 Momentum normalization
+
+**Numerator `‖r_M^k‖` — Philosophy A (algebraic, recommended, current).** Measure what the solver actually
+drives to zero: the norm of the assembled **stabilized** nonlinear residual *vector* (ASGS/OSGS, subscales
+included), velocity block. Use a fixed vector norm (Euclidean or mass-matrix-weighted) — same norm for every
+term in `D_M`. Build the denominator terms by assembling each physical term's velocity-block contribution
+**through the same weak form**: the viscous term is then the integrated-by-parts `⟨∇^S v, 2 α ν Π∇u^k⟩`, a
+first-derivative quantity — **no second derivatives, no special-casing by polynomial order**.
+
+**Philosophy B — pointwise force density (only if you want a force-balance picture).** Use `L²(Ω)` norms of
+the strong-form force-density fields directly; `r_M^k` is the strong residual field. Caveat: the strong
+residual of an FE solution does **not** vanish at the discrete solution — it floors at the truncation level
+`O(h^k)` in a negative norm — so set `tol` above that floor. The viscous term needs a second derivative.
+Prefer A.
+
+**Denominator `D_M^k` — dynamic term-magnitude envelope:**
+
+```
+D_M^k = ‖α u^k·∇u^k‖      (convection)
+      + ‖2 ∇·(α ν Π∇u^k)‖ (viscous)
+      + ‖α ∇p^k‖          (pressure gradient)
+      + ‖σ(u^k) u^k‖       (resistance: Darcy + Forchheimer)
+      + ‖f‖                (body force)
+```
+
+**Rationale.**
+
+- *Why a sum of term magnitudes is regime-robust.* At the solution the momentum terms do not vanish — they
+  *balance*. Whichever mechanism dominates (viscous as `Re,Da→0`, convection as `Re→∞`, resistance as
+  `Da→∞`) automatically enters the sum and sets the scale, no regime parameter to choose. (Offline check:
+  non-dimensionalizing sends the four operator terms to coefficients `Re, 1, (1+Re+Da), Da`, so `D_M ~
+  (1+Re+Da)·α∞νU/L²`. The pressure-gradient term alone has coefficient `1+Re+Da` and is leading-order in
+  *every* regime — so `‖α∇p^k‖` by itself is already a valid scale once `p^k` has developed.)
+- *Why dynamic (recomputed each iteration).* `σ` depends on `|u^k|` through Forchheimer and `α` varies in
+  space, so the true local resistance is *not* the nominal global `Da`. The dynamic sum reads the actual
+  local magnitudes; a frozen analytic prefactor cannot.
+- *Why include `‖f‖`.* In forced/manufactured problems `f` is one of the balanced forces and can dominate;
+  it prevents the scale collapsing if the operator terms cancel. When `f = 0` it contributes nothing.
+- *Why the viscous term is unproblematic under Philosophy A.* The weak form already integrated it by parts,
+  so it is first-order. Under Philosophy B with `P_1`, `∇·(ανΠ∇u_h) ≈ 0` element-wise; accept the ~0
+  contribution — the co-dominant pressure-gradient term supplies the viscous scale. Do **not** patch with
+  an inverse-estimate factor `C_inv/h`: it overestimates the viscous force on fine meshes and makes `ε_M`
+  over-optimistic.
+
+### 3.4 Mass normalization *(now the diagnostic `eps_C_strong` — see the status banner)*
+
+**Numerator `‖∇·(α u^k)‖`.** Use the divergence of the porous flux `q^k = α u^k` — the quantity that → 0
+at the fixed point (with the iterative penalty, the `ε p^{n−1}` term cancels at convergence, leaving the
+incompressibility residual). If `ε > 0`, the consistent numerator is `‖ε p^k + ∇·(α u^k)‖`, but `ε* ~ 1e−4`
+so `‖∇·(α u^k)‖` alone is equivalent and clearer.
+
+**Denominator `‖∇(α u^k)‖` — the flux-gradient (Frobenius) norm:**
+
+```
+∇(α u^k) = α ∇u^k + u^k ⊗ ∇α        (full second-order tensor; Frobenius norm)
+ε_C = ‖∇·(α u^k)‖ / ‖∇(α u^k)‖ ≤ √d
+```
+
+**Rationale.**
+
+- *Why it is the right scale-free measure.* It is the pressure-normalized "relative pressure error from
+  mass imbalance" with the divergence→pressure conversion factor *measured from the iterate instead of
+  supplied*. The conversion factor `Φ/α∞ = ‖p^k‖ / ‖∇(α u^k)‖` reproduces the full viscous+inertial+Darcy
+  envelope in every regime; substituting it into `ε_C = (Φ/α∞)·‖∇·(α u^k)‖/‖p^k‖` cancels `‖p^k‖`
+  identically, leaving the flux-gradient ratio. So the gradient ratio *is* the pressure idea with the
+  a-priori factor removed; it never requires `p`.
+- *Why genuinely scale-free.* Both norms built from `u^k` and the known field `α`. Dimensionless by
+  construction.
+- *Why the `√d` bound (a self-check).* `∇·q = tr(∇q)` and `(tr A)² ≤ d(A:A)` pointwise, so `‖∇·q‖² ≤ d
+  ‖∇q‖_F²`. Thus `ε_C ≤ √d` always; a computed value above `√d` signals a quadrature/projection/assembly
+  bug — assert or log.
+- *Why keep the `u ⊗ ∇α` term.* Real flux structure forced by the porosity gradient; the ratio then
+  measures dilatation against the *total* flux variation. When `α` is constant (incl. `α ≡ 1`, classical
+  Navier–Stokes) it vanishes and `ε_C → ‖∇·u‖/‖∇u‖` — graceful, no special-casing.
+- *Why global, not pointwise.* A pointwise ratio blows up wherever `∇(α u) → 0`. Use domain-integrated
+  `L²` norms. With no-slip walls + parabolic inlet there is always boundary-layer shear, so `‖∇(α u^k)‖` is
+  robustly bounded away from zero in practice.
+
+### 3.5 Edge cases (apply all)
+
+1. **Trivial initial guess `u^0 = 0`.** `D_M^0` and `‖∇(α u^0)‖` may be 0 → `0/0`. Guard every denominator
+   with a *pure underflow floor* `den = max(den, eps(eltype))` (machine epsilon, **not** a problem scale),
+   and do not declare convergence at `k = 0` — require at least one completed iteration. If `u ≡ 0`
+   genuinely solves it (zero BCs, `f = 0`), the numerators are also ~0 and the floor yields convergence
+   without inventing a scale.
+2. **BC-driven flow, `f = 0`.** The denominator must not rely on `f`; once nonzero the internal terms carry
+   `D_M`. `‖f‖ = 0` contributing nothing is correct.
+3. **Uniform porosity `α ≡ const` (incl. `α ≡ 1`).** `∇α = 0` ⇒ `‖∇(α u)‖ = α‖∇u‖`, `ε_C → ‖∇·u‖/‖∇u‖`.
+   Expected; do not special-case.
+4. **Locally near-uniform flux.** Never a pointwise ratio — always global `L²`.
+5. **`ε_C > √d`.** Analytically impossible ⇒ bug indicator (assert/log).
+6. **All-Dirichlet / pressure indeterminacy (`Γ_N = ∅`, `ε = 0`).** Pressure defined up to a constant
+   (fixed by the zero-mean condition). The flux-gradient ratio is immune — uses no `‖p‖`. Do **not** build
+   a pressure-normalized mass measure here.
+7. **Compressibility `ε > 0` (iterative penalty).** Strict numerator `‖ε p^k + ∇·(α u^k)‖`, but
+   `ε* ~ 1e−4`, so `‖∇·(α u^k)‖` is equivalent and preferred. The penalty's RHS term cancels at the fixed
+   point.
+8. **Newton vs Picard.** Always measure the **genuine nonlinear residual** evaluated at `U^k` (re-assemble
+   the operator), never the linearized / inner linear-solve residual — the latter → 0 *inside* each step
+   and does not reflect outer convergence. (Gating on the inner residual makes the outer loop stop too
+   early or behave erratically.)
+9. **Tolerance vs floor.** `ε_M` and `ε_C` cannot fall below the level set by the discretization (the
+   stabilized scheme permits a small nonzero `∇·(α u_h)`, `O(h^k)`) and by `ε`. Set `tol` **above** this
+   floor. Diagnostic: a fixed outer-iteration count independent of `tol` signals either `tol` below the
+   floor, or measuring a quantity that does not decrease (edge case 8) — check both.
+10. **Stabilization terms.** Numerator = the method's full residual (ASGS/OSGS, subscales included).
+    Denominator = the Galerkin physical force terms in §3.3; adding the stabilization terms to `D_M` is
+    optional and harmless (bounded by the Galerkin terms by design).
+11. **Element-wise vs global accumulation.** Accumulate `‖·‖²` per element, then sum and take the square
+    root (one assembly pass). The global ratio is the default. If a regime varies *strongly* across the
+    mesh, an element-wise envelope (ratio per element, reduce by `max` or `ℓ²`-over-elements) is the most
+    faithful variant; offer only if needed.
+
+### 3.6 Optional fallback (documented, NOT the default): pressure-normalized mass measure, still scale-free
+
+If a pressure-referenced mass measure is explicitly wanted (to read the criterion directly as a relative
+pressure error), replace global `Re, Da` by **element-level** `Re_h = |u^k|_K h_K / ν` and
+`Da_h = σ_K h_K² / (α_K ν)` — the same quantities already inside `τ_1`. Then
+
+```
+ε_C^alt = ‖ (h²/(α_K τ_{1,K})) · ∇·(α u^k) ‖ / ‖p^k‖
+        ~ ‖ (ν (1 + Re_h + Da_h)/α_K) · ∇·(α u^k) ‖ / ‖p^k‖
+```
+
+i.e. the divergence→pressure conversion factor expressed through your own stabilization parameter `τ_1`
+(so still no bespoke scales — only `h_K`, the iterate, and material data). It is mesh-coupled and fussier
+than the flux-gradient ratio and reduces to it in spirit. Use only if the explicit pressure reading is
+required; otherwise prefer §3.4. **This §6 fallback is intentionally NOT implemented in the code.**
+
+### 3.7 Implementation notes (Julia / Gridap)
+
+- Reuse the existing residual weak form for `r_M^k` (Philosophy A) so the stabilized residual and the
+  convergence measure stay consistent by construction.
+- `L²(Ω)` norm of a field `w`: `sqrt(sum(∫(w⋅w)dΩ))` (use `⊙`/`inner` and Frobenius for tensors).
+- `∇·(α u)` and `∇(α u)` via Gridap differential operators on the `α`-field interpolated in the same FE
+  space as the solution (consistent with the paper's nodal interpolation of `α`).
+- Guard denominators: `den = max(den, eps(Float64))`.
+- Log `ε_M`, `ε_C`, and each `D_M` term per iteration; the per-term breakdown tells you which balance is
+  limiting convergence when the loop stalls.
+- Assert `ε_C ≤ sqrt(d) * (1 + tol)` as a cheap correctness check.
+
+---
+
+## 4. Normalization / encoding-invariance audit
+
+*(P5, 2026-06-04.)* Classifies every convergence / drift / divergence / plateau gate in the nonlinear
+solver by whether **both sides of its inequality carry the same units** (dimensionless ratio =
+encoding-invariant) or one side is an **absolute** number compared to a scale-dependent quantity (the bug
+class fixed for the inner gate on 2026-06-02). Verdict legend: **OK** = dimensionally sound; **SUSPECT** =
+absolute-vs-scaled, but see notes; **BUG** = an unambiguous dimensional error.
+
+Convention (MMS encoding sweep, `run_test.jl`): velocity residual/iterate `∝ U`, pressure `∝ P_c ∝ U²`, so
+a gate comparing a residual or drift to an **absolute** constant is encoding-dependent.
+
+> **STATUS — SUPERSEDED for production (gates #1–#3).** The inner per-field ftol (#1), noise floor (#2),
+> and honest-exit (#3) gates below are NO LONGER the authoritative inner convergence gate. Production stops
+> on the **scale-free `ε_M`/`ε_C` criterion** (§3 above, §2.11).
+> **Post-`d1fac8e`:** the per-field RELATIVE re-anchoring (gate #1's `rel_k·‖R₀_k‖`) was removed; the
+> fallback gate #1 is now the uniform scalar `ftol` (the relative formulas below are historical). Gates
+> #1–#3 survive ONLY as the `conv_probe === nothing` fallback (Cocquet unstabilized-Galerkin + kernel unit
+> tests) and to feed the `f_norm` trace diagnostic.
+
+| # | Gate | Code | Inequality | LHS / RHS units | Verdict |
+|---|------|------|-----------|-----------------|---------|
+| 1 | Inner per-field ftol *(fallback-only; superseded by ε_M/ε_C)* | `_residual_meets_per_field_ftol` + `effective_ftol_per_field` (`nonlinear.jl`) | `‖R_k‖∞ ≤ max(ftol, rel_k·‖R₀_k‖∞)` | both ∝ residual (per field) | **OK** |
+| 2 | Inner per-field noise floor *(fallback-only; superseded)* | `effective_noise_floor_per_field` + `_residual_meets_per_field_noise_floor` | `‖R_k‖∞ ≤ max(nf, rel_nf_k·‖R₀_k‖∞)` | both ∝ residual | **OK** |
+| 3 | Honest-exit gate *(fallback-only; superseded)* | `noise_floor_success_max_ftol_multiple` + `_residual_meets_per_field_honest_exit_gate` | `‖R_k‖∞ ≤ k_nf·effective_ftol_k` | both ∝ residual (k_nf dimensionless) | **OK** |
+| 4 | Divergence safeguard | `eval_safeguard_termination_bounds!` | Newton: `Φ_new > Φ_old·f`; Picard: `‖b‖∞,new > ‖b‖∞,old·f` | ratio → dimensionless | **OK** |
+| 5 | ~~OSGS outer state-drift~~ | ~~`_compute_state_drift` + `_decide_osgs_convergence`~~ | — | — | **REMOVED** (deleted with the staggered loop, 2026-06-07 leaning) |
+| 6 | ~~OSGS projection-drift~~ | ~~`pi_u_drift`/`pi_p_drift` in `_update_and_project!`~~ | — | — | **REMOVED** (deleted with the staggered loop, 2026-06-07 leaning) |
+| 7 | MMS plateau ratios | `_run_*_mms_extension!` / `_run_osgs_relaxation!` *(dead symbol — now `solve_osgs_stage!`)* | `\|E_k−E_{k-1}\| / max(E_k,E_{k-1},ε·h^p) < τ_err` | ratio → dimensionless | **OK** |
+
+### Gate-by-gate notes
+
+**#1 Inner per-field ftol — OK (the 2026-06-02 fix).** `effective_ftol_per_field[k] = max(ftol,
+relative_ftol_per_field[k]·solution_scale_per_field[k])` with `solution_scale_per_field =
+copy(norm_b_per_field)` = the **frozen initial residual** `‖R₀_k‖∞`. So the working target is the
+dimensionless relative reduction `‖R_k‖∞ ≤ rel_k·‖R₀_k‖∞` — both sides per-field residual,
+encoding-invariant. Confirmed still `‖R₀‖`-based (not `‖x‖`). **The old `‖x‖`-fallback helper
+`_resolve_solution_scale_per_field` (Bernoulli/total-head zero proxy) was DEAD and was removed in P5** — it
+only made sense for a solution-magnitude-scaled gate that no longer exists. Guarded by
+`test/quick/encoding_invariance_quick_test.jl`.
+
+**#2 Noise-floor gate — OK.** Same `_initialize_effective_thresholds` family as #1, scaled by `‖R₀_k‖`.
+
+**#3 Honest-exit gate — OK.** `‖R_k‖∞ ≤ k_nf·effective_ftol_k`; both sides residual-scaled, `k_nf`
+(`noise_floor_success_max_ftol_multiple`) dimensionless.
+
+**#4 Divergence safeguard — OK; do not regress the Picard branch.** In `:newton` mode the test is a merit
+*ratio* `Φ_new/Φ_old > divergence_merit_factor`; in `:picard` mode a residual-inf-norm *ratio*. Both
+dimensionless. The mode split is load-bearing: a Φ-based test in Picard mode caused spurious
+`merit_divergence_escaped` exits (see
+`test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md`). Confirmed the `:picard` branch
+is taken in `:picard` mode.
+
+**#5 / #6 OSGS outer state-drift & projection-drift — REMOVED with the staggered loop (2026-06-07
+leaning).** Both gates, and their helpers (`_compute_state_drift`, `_update_and_project!`,
+`_decide_osgs_convergence`), were **deleted** when OSGS was leaned to a single "coupled" mode (one Newton
+solve that re-projects `π = Π(R(u))` at every residual evaluation). There is no longer an outer relaxation
+loop, so neither early-exit gate exists. The earlier dimensional analysis (absolute tolerance vs
+scale-dependent drift, and the recommended relative-form rewrite) is **moot** and was removed with the
+gates.
+
+**#7 MMS plateau ratios — OK.** `r = |E_k − E_{k-1}| / max(E_k, E_{k-1}, ε·h^p)` is a dimensionless relative
+change; the `h`-scaled `ε` only sets the denominator's noise floor (the §5.1 fix). Compared to the
+dimensionless `tau_err`.
+
+### Summary
+
+All five surviving gates (1–4, 7) are dimensionally sound. **Production gate note:** gates #1–#3 are no
+longer the authoritative inner stopping criterion — production uses the scale-free `ε_M`/`ε_C` gate
+(`convergence_criterion.jl`; spec §3 above), and #1–#3 now run only on the `conv_probe === nothing` fallback
+(Cocquet unstabilized-Galerkin + kernel tests). The two OSGS outer drift gates (5, 6) — dimensionally
+suspect (absolute tolerance vs scale-dependent drift) but empirically inert — no longer exist: deleted with
+the entire staggered outer loop in the 2026-06-07 leaning to the single coupled OSGS mode. The only P5 code
+change was the removal of the dead `_resolve_solution_scale_per_field` helper and its unused buffer.
+
+---
+
+## See also
+
+- [`docs/formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md) — the deep
+  theory↔code + results audit that corroborates the ledger entries above.
+- [`docs/mms/3d-p2-coercivity-resolution-dossier.md`](mms/3d-p2-coercivity-resolution-dossier.md)
+  — the for-scrutiny record behind the `4k⁴`/`c₁` note in §2.5.
+- [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md) — cross-topic
+  investigation synthesis.
+- [`theory/paper/article.tex`](../theory/paper/article.tex) — the SIAM article (authoritative).
+- [`theory/osgs_algorithm/osgs_algorithm.tex`](../theory/osgs_algorithm/osgs_algorithm.tex) — the
+  algorithm boxes mapped in §1.
