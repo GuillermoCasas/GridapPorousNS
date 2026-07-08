@@ -27,16 +27,18 @@ O(h^{kp})=O(h) order, super-optimal at 1.5–2.4×); high-Da OSGS H¹ recovers t
 Convergence plots regenerate from the `.h5`: `python3 analyze_results.py --h5
 previous_results/validated_k1_quad_N640/phase1_quad_k1.h5 --config data/phase1_quad_k1.json`. The 57 MB
 of per-iteration `traces/` and the 55 MB of trajectory PNGs are intentionally **not** snapshotted (live,
-regenerable, gitignored under `../results/`). **Supersedes** the N≤320 `_archive_postFix_covariant_complete/` below.
+regenerable, gitignored under `../results/`).
 
-## Snapshot archives (`_archive_*/`)
+## Other kept snapshot — `pre_route_b_2026-07-01/`
 
-Each holds a `phase1_quad_k1.h5` from a labelled point in the covariance investigation:
+The committed pre-Route-B baseline that [`../../../../docs/mms/route-b-2d-sweep-status.md`](../../../../docs/mms/route-b-2d-sweep-status.md)
+cites as the reference the current algebraic mass gate was measured against.
 
-- `_archive_preNorm/` (2026-06-02) — before the per-field residual-normalisation gate work.
-- `_archive_preFix/` (2026-06-02→03) — before the scale-covariance fixes landed.
-- `_archive_postFix_covariant_complete/` (**2026-06-04**) — **the definitive complete k=1 sweep**
-  (288/288, N=10→320) on the fully-covariant code: covariant inner gate (`‖R₀‖`) + covariant
-  relative warmup + covariant `eps_val`, `minmax` encoding. This is the dataset behind the
-  high-Da OSGS rate-stagnation conclusion — see [`../../../../docs/mms/convergence-status.md`](../../../../docs/mms/convergence-status.md)
-  caveat (2026-06-04) and [`../../../../docs/known_issues.md`](../../../../docs/known_issues.md).
+## Pruned 2026-07-08 (config-lifecycle cleanup)
+
+The superseded intermediate covariance-investigation snapshots (`_archive_{preNorm,preFix,postFix_covariant_complete}/`),
+the `pre_jfnk_relayout_2026-06-27/` pre-relayout backup, and the `_archive_pingpong_N80_AB/` iterator A/B were
+**removed** as fully subsumed by `validated_k1_quad_N640/`. Per
+[`../../../../.agents/rules/official-results-path.md`](../../../../.agents/rules/official-results-path.md), results
+embed their config, so any is reconstructable from an archived result if ever needed; the findings they backed
+remain in the docs cited above.

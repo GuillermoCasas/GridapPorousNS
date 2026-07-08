@@ -102,15 +102,18 @@ gate, so the difference is the *problem*, not the solver:
 
 ### 4.1 RESOLVED (2026-07-07, k=1): a coarse-mesh solution-branch fold; the corner is FE-optimal above it
 
-> **Provenance note (2026-07-08 cleanup).** The N=320 corner extension in this section and the
-> mechanism A/B runs in §4.3 were produced **off the official path** — via throwaway side-configs and
-> parallel side-DBs (`*_corner`, `*_strip_*`, `*_c1x64*`), since **removed** per the
-> `.agents/rules/official-results-path.md` rule (do not fork the results pipeline). The **findings
-> stand** as documented (the numbers were read off those runs), but the config/DB paths named below
-> refer to those removed throwaways and are kept only as a record of what was run. To reproduce the
-> corner rates as an *official* result, extend the official `data/cocquet_form_mms_vms.json` mesh ladder
-> (`convergence_partitions` → N=320) and re-run through the harness, archiving the prior N≤160 official
-> DB into `previous_results/` first.
+> **Provenance note (2026-07-08 cleanup) — applies to ALL of §4.** Every diagnostic *side-run* named
+> throughout §4 — the α-sweep / linear-reaction control (`isolation_alphasweep.json`,
+> `isolation_linctrl.json`), the N=320 corner extension (`*_corner`), the reaction-out-of-stabilization
+> and c₁ probes (`*_strip_*`, `*_c1x64*`) — was a **debug config/side-DB authored during the
+> investigation and has been REMOVED** per the `.agents/rules/official-results-path.md` rule (a test
+> keeps only its designed-mode configs; finished-debug scrap is deleted once documented). The harness's
+> designed modes remain: `cocquet_form_mms_{vms,vms_k2,taylorhood}.json`. **The findings below stand**
+> as documented — the numbers were read off those runs, and results embed their config, so any removed
+> run is reconstructable from its (archived) result. Config/DB paths named in §4 are a *record of what
+> was run*, not live files. To reproduce the corner rates as an *official* result, extend the designed
+> `data/cocquet_form_mms_vms.json` mesh ladder (`convergence_partitions` → N=320) and re-run through the
+> harness, archiving the prior official DB into `previous_results/` first.
 
 The α=0.1 × Re=1e5 "failure" is a **genuine coarse-mesh turning-point fold of the discrete solution
 branch** — on coarse meshes there is *no* root with ‖R‖≤tol to converge to — that **recedes with mesh
@@ -301,16 +304,16 @@ follow-up is pursued.
   continuation in reserve if a future push hits a mesh where the exact-guess basin narrows.
 - **Throwaway probes removed (2026-06-16):** the `diagnose_*.jl` probes, `data/_validate_*.json`, the
   superseded `plot_combined.py`, the stale `cocquet_form_mms.json.orig`, and the dead-end A/B configs
-  (`isolation_{trim,full,osgs_trim,osgs_full}.json`) were deleted. **Kept:** `data/isolation_alphasweep.json`
-  + `data/isolation_linctrl.json` (they back the §4 reaction-magnitude finding); `results/` h5 outputs are
-  gitignored.
-- **Historic-config prune (2026-07-08):** the pre-redesign scrap configs `cocquet_form_mms_comparison_C*.json`
-  (the 6 Cconv/Cmild/Creact × galerkin/stab files, refs=0) and `cocquet_form_mms_equalorder.json` were
-  **removed** (git rm), along with 5 orphaned result DBs whose configs were already gone
-  (`isolation_{osgs_full,trim,osgs_trim,full}.h5`, `_validate_osgs.h5`). `data/` is now the 8 live configs.
-  Still borderline (kept pending review): `cocquet_form_mms_comparison_{galerkin,stab}.json` (referenced in
-  `investigation-synthesis.md`) and the old `cocquet_form_mms.json` (still read by `plot_mesh.py`).
-  `cocquet_form_mms_vms_k2.json` is the **active** k=2 shard — keep.
+  (`isolation_{trim,full,osgs_trim,osgs_full}.json`) were deleted; `results/` h5 outputs are gitignored.
+- **Config prune to designed modes (2026-07-08)** — per [`.agents/rules/official-results-path.md`](../../.agents/rules/official-results-path.md)
+  (a test keeps only the configs its designed modes run; finished-debug scrap is removed once its finding
+  is documented). `data/` is now the **3 designed modes** `cocquet_form_mms_{vms,vms_k2,taylorhood}.json`
+  (the VMS k1/k2 vs Taylor–Hood comparison the harness is built to run). Removed as finished-debug scrap:
+  the pre-redesign `cocquet_form_mms.json` (`plot_mesh.py` repointed to `_vms`); the
+  `cocquet_form_mms_comparison_*` configs (`galerkin`/`stab` + the 6 `Cconv`/`Cmild`/`Creact` files);
+  `cocquet_form_mms_equalorder.json`; and the `isolation_{alphasweep,linctrl}.json` diagnostics (their
+  §4.2 reaction-magnitude finding stays fully documented above). Also removed 5 orphaned result DBs whose
+  configs were already gone (`isolation_{osgs_full,trim,osgs_trim,full}.h5`, `_validate_osgs.h5`).
 - **Diagnostic harness change left in place:** `run_test.jl` now gates the `Constant_Sigma` reaction
   trim on `experimental_reaction_mode` (mirroring `src/run_simulation.jl:57`); it does not affect the
   Forchheimer path the real sweep uses.

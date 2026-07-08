@@ -40,6 +40,27 @@ scripts. Every number that ends up in a doc, a plot, or a decision must come fro
   official file directly and run through it. "Trying something out in a sweep" is **not** such a case —
   do it through the official config (extend it or `--filter`/`--shard`).
 
+## Config lifecycle — a test keeps ONLY its designed-mode configs
+
+The **only** general reason to keep multiple configs in a test is that the **test is designed to run
+different modes on different configs** — e.g. a comparison harness whose intended modes are a `vms`
+sweep + a `taylorhood` sweep + a `k2` shard, or an MMS harness whose designed sweep spans
+`{quad,tri}×{k1,k2}`. Everything else is **debug scrap**: a config authored for a one-off probe, an
+isolation A/B, a `c1`/`strip`/`corner`/`smoke` experiment.
+
+**When a debugging task finishes, clean up — do not leave the scrap behind.** Either:
+- **promote** it to a permanent, registered test (with a kept config that a designed mode runs), or
+- **remove all traces** of the debug config + its side-DB, and — if the finding matters — **document
+  the result in detail** in the relevant doc.
+
+Deleting a scrap config does **not** sever provenance (cf. `reproducible-results.md`): **the results
+carry their config inside them** — the HDF5 groups store `Re/Da/alpha_0/k/method/…` and a
+`config_file` attribute, so the producing config is reconstructable a posteriori from an archived
+result. Safe sequence: if the numbers might be needed, **archive the result** (which embeds the config)
+to `previous_results/`, then delete the scrap config; if the result is not worth keeping, document the
+finding and delete both. The tree should carry, per test, only the configs its designed modes run —
+never an accreting pile of finished-debugging configs.
+
 ## The tell — STOP if you catch yourself doing any of these
 - writing merge / stitch / de-dup logic to recombine result series;
 - adding a second DB to a plotter's or analyzer's input list;
