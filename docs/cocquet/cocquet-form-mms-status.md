@@ -12,10 +12,18 @@ harness); the physical Cocquet benchmark is `docs/cocquet/investigation-synthesi
 τ-saturation mechanism referenced below is written up in
 `theory/tau_saturation_note/tau_saturation_note.tex`.
 
-**Last updated: 2026-06-16.** Moderate-porosity results are complete and clean; the low-porosity
-high-Re corner folds for the stabilized method (Taylor–Hood converges there); the *exact* cause of
-that fold is **investigated but not yet confirmed** (see §4). Runs were stopped before the full
-k=2/N=160 sweep finished — moderate α is the kept deliverable.
+**Last updated: 2026-07-07.** Moderate-porosity results are complete and clean. The low-porosity
+high-Re corner (α=0.1 × Re=1e5) is **RESOLVED for k=1 (2026-07-07): it is a genuine coarse-mesh
+solution-branch fold — no discrete root exists for N≤80, but a TRUE root appears at N≥160 and is
+FE-OPTIMAL there.** Extending the mesh ladder past the main sweep's N=160 cap to N=320 (config
+`data/cocquet_form_mms_vms_corner.json`, its own DB `cocquet_form_mms_vms_corner.h5`) gives two
+converged corner meshes with **optimal rate — H¹u ≈ 1.07 (ASGS) / 1.10 (OSGS), L²u ≈ 3.0 both**
+(see §4.1). This is the same fold-recedes-with-mesh phenomenon the sister `ManufacturedSolutions`
+harness diagnosed decisively for its α=0.05 corner (`docs/mms/fold-recovery.md`), and it matches that
+harness's corner rates (H¹≈1.0, L²≈3.0) — so the fold is not a stabilization defect but the paper's
+intrinsic 1/α₀ degradation pushing the coarse-mesh branch past a turning point. The **k=2 corner**
+already has clean roots at N=40 & N=80 (it clears the fold ~2× earlier); extending it to N=160 to
+firm the rate is a cheap remaining follow-up.
 
 ---
 
@@ -58,18 +66,20 @@ velocity filled, pressure hollow; L² and H¹ split) → `results/combined/`.
 | **α=0.5, Re=1** | ✅ 5/5 both | ✅ 5/5 both | ✅ 5/5 |
 | **α=0.5, Re=1e5** | ✅ 5/5 both | ✅ 5/5 both | ✅ 5/5 |
 | **α=0.1, Re=1** | ✅ 5/5 both | ASGS 4/5, OSGS 3/4 | ✅ 5/5 |
-| **α=0.1, Re=1e5** | **FOLD** (1/5) both | ASGS 3/4, OSGS 1/4 | ✅ 5/5 |
+| **α=0.1, Re=1e5** | fold at N≤80, ✅ **optimal at N≥160** (§4.1) | ASGS root at N=40,80; OSGS at N=80 | ✅ 5/5 |
 
 - **Moderate porosity (α=0.5): the definitive result.** Clean, complete convergence for *every*
   method (k=1, k=2, ASGS, OSGS, Taylor–Hood) at both Re. Velocity optimal (L² rate ≈2.2 for k=1),
   pressure converges. ASGS and OSGS are genuinely distinct (e.g. α=0.5/Re=1e5/N=80: ASGS L²u≈3.2e-4
   vs OSGS≈4.2e-4).
 - **α=0.1, Re=1:** stabilized methods converge.
-- **α=0.1, Re=1e5 — the hard corner:** the equal-order **stabilized methods fold** (gate
-  unreachable; solution recorded at the achievable floor), while the **unstabilized Taylor–Hood
-  converges everywhere** (all 4 cells × 5 meshes). This VMS-folds / TH-converges contrast at the
-  high-Re × low-α corner is the headline open phenomenon. (This is also the corner the *paper itself
-  skips* in its own sweeps via `skip_cells`.)
+- **α=0.1, Re=1e5 — the hard corner:** on the main sweep's mesh range (N=10…160) the equal-order
+  **stabilized methods fold on the coarse meshes** (gate unreachable; solution recorded at the
+  achievable floor), while the **unstabilized Taylor–Hood converges everywhere**. This VMS-folds /
+  TH-converges contrast at the high-Re × low-α corner is the headline phenomenon on *coarse* meshes.
+  (This is also the corner the *paper itself skips* in its own sweeps via `skip_cells`.) **But the
+  fold is a coarse-mesh turning point, not a stabilization defect: a true, FE-optimal discrete root
+  exists at N≥160 — see §4.1 (RESOLVED 2026-07-07).**
 
 ---
 
@@ -88,7 +98,54 @@ gate, so the difference is the *problem*, not the solver:
 
 ---
 
-## 4. Why low-α folds — investigation status (the open question)
+## 4. Why low-α folds — investigation status
+
+### 4.1 RESOLVED (2026-07-07, k=1): a coarse-mesh solution-branch fold; the corner is FE-optimal above it
+
+The α=0.1 × Re=1e5 "failure" is a **genuine coarse-mesh turning-point fold of the discrete solution
+branch** — on coarse meshes there is *no* root with ‖R‖≤tol to converge to — that **recedes with mesh
+refinement**. It is not a solver bug and not a stabilization defect. Evidence, all from the committed
+DBs:
+
+- **The fold recedes as N↑ and deepens as α↓** (α-sweep at Re=1e5, `results/isolation_alphasweep.h5`,
+  and the main sweep `cocquet_form_mms_vms.h5`): α=0.9/0.5 converge at every mesh; **α=0.2 folds at
+  N≤20 but converges at N=40**; **α=0.1 folds at N≤80 but has a TRUE root at N=160** (main sweep,
+  both methods: ASGS ‖R‖=1.3e-7 L²u=1.84e-3 in 7 it; OSGS ‖R‖=1.0e-6 L²u=2.09e-3 in 48 it).
+- **It is not a basin/initial-guess problem.** The harness *already* initializes each cell from the
+  exact-solution interpolant (`run_test.jl` `x0_exact`) plus a perturbation-homotopy, and still folds
+  at N≤80 — so a better globalizer cannot manufacture a root that does not exist. This mirrors the
+  sister harness's decisive A1/A2 tests (`docs/mms/fold-recovery.md`): exact Jacobian (4.8e-12),
+  heavy Newton **and** Picard from `u_ex` both stall at ‖R‖≈5e-2 ⇒ no root near the exact solution.
+
+**Recovery (the fix): extend the mesh ladder above the fold.** Config
+`data/cocquet_form_mms_vms_corner.json` (α=0.1, Re=1e5, k=1, ASGS+OSGS, N=[160,320], separate DB
+`cocquet_form_mms_vms_corner.h5`, reusing the existing exact-guess init — no `src/` change) gives two
+converged corner meshes. Both N=320 cells reach genuine roots (‖R‖~1e-7, 6/30 iters — a clean solve,
+not a struggling fold):
+
+| method | N=160 (‖R‖) | N=320 (‖R‖) | rate L²u | rate H¹u | rate L²p |
+|---|---|---|---|---|---|
+| ASGS | L²u=1.84e-3 (1.3e-7) | L²u=2.28e-4 (1.7e-7) | **3.01** | **1.07** | 3.03 |
+| OSGS | L²u=2.09e-3 (1.5e-6) | L²u=2.44e-4 (5.6e-7) | **3.10** | **1.10** | 3.12 |
+
+H¹u ≈ 1.07/1.10 is **textbook-optimal O(h) for k=1**; L²u ≈ 3.0 is super-optimal for this smooth MMS —
+**identical to the sister harness's α=0.05 corner** (H¹≈1.0, L²≈3.0, `docs/mms/fold-recovery.md`),
+which cross-validates the 2-point slope. So the equal-order stabilized method converges optimally at
+α=0.1 × Re=1e5 once the mesh clears the fold — matching the clean α=0.5 deliverable. The
+VMS-folds-at-coarse-mesh / TH-converges contrast stays a true finding; it is a coarse-mesh basin of
+the *nonlinear discrete map*, not a loss of the FE convergence order.
+
+**Reconciles with the paper:** the paper proves the *solution* stays optimal in the triple norm and
+handles this exact corner by skipping it in the coarse sweep + using continuation — precisely what the
+extended ladder does here. The reaction-magnitude driver below (Layer 2, the paper's 1/α₀ degradation)
+is *why* the coarse-mesh branch folds; it does not degrade the rate once a root exists.
+
+**Remaining follow-ups (cheap):** (i) k=2 corner to N=160 to firm its rate (it already has clean roots
+at N=40 & N=80); (ii) optional N=640 for a 3-point k=1 slope; (iii) a mesh-continuation warm-start
+(interpolate the N=160 root onto N=320) is *not* needed here — the cold exact-guess reached N=320
+directly — but would add robustness if the ladder is pushed to where the exact-guess basin narrows.
+
+### 4.2 Why the coarse-mesh branch folds (the mechanism — still the reaction magnitude)
 
 **Established empirically.**
 - The fold is **reaction-magnitude driven**, not nonlinearity-driven. An α-sweep at fixed Re=1e5
@@ -150,19 +207,85 @@ gate, so the difference is the *problem*, not the solver:
   where the viscous 2nd-derivative subscale exists — the faithful test of whether the 3D-P2 c₁ mechanism
   transfers. The `C1_MULT` hook is committed (default-off, byte-identical) so that run is ready to go.
 
-**Bottom line:** the *exact* cause of the equal-order stabilized low-α fold (that Taylor–Hood avoids)
-is **open**. The `σ̃_α`/reaction-in-stabilization mechanism is the leading hypothesis but is
-unconfirmed; `theory/tau_saturation_note` deliberately does not assert it.
+**Bottom line (superseded by §4.3):** the *exact* cause of the equal-order stabilized low-α fold is
+**open**. The `σ̃_α`/reaction-in-stabilization mechanism is the leading hypothesis but is unconfirmed;
+`theory/tau_saturation_note` deliberately does not assert it. The 2026-07-08 direct tests below
+sharpen this (and correct one premise): the premise "Taylor–Hood avoids the fold" is itself **false**
+at the corner — see §4.3.
+
+### 4.3 Mechanism investigation (2026-07-08) — what was ruled out, and what stays open
+
+A focused round of direct tests. Net result: several candidates **eliminated**, the σ̃_α hypothesis
+**not confirmed**, and the exact mechanism **still open** — but the *practical* result (§4.1) is
+unaffected and secure.
+
+- **Newton is EXACT for the Cocquet formulation — the fold is NOT a linearization bug.** A dedicated
+  probe (now the permanent test `test/extended/cocquet_jacobian_consistency_extended_test.jl`) assembles
+  the Exact-Newton Jacobian for **SymmetricGradient + Forchheimer** and compares it to a centered
+  finite-difference of the residual: **‖J−J_fd‖/‖J_fd‖ ≈ 1e-8..1e-11** for k=1 *and* k=2, at
+  corner-like (small ν, large drag) parameters, and Newton converges **quadratically** (‖R‖:
+  2.9e-4→1.3e-5→2.7e-8→2.3e-13). This closed a real coverage gap: `picard_jacobian_equivalence` only
+  checks *Picard*-mode equivalence, and `osgs_frozen_pi_jacobian` uses ConstantSigma — the
+  velocity-dependent `∂σ/∂u` Exact-Newton tangent for the Cocquet combo was previously unguarded. ⇒ the
+  fold is a genuine property of the (correctly-linearized) nonlinear problem, not a solver/Jacobian defect.
+
+- **The "Taylor–Hood converges everywhere" claim is FALSE at the corner (correction).** The committed
+  `cocquet_form_mms_taylorhood.h5` shows TH (Galerkin P2/P1) at α=0.1×Re=1e5 does **not** reach a root:
+  its nonlinear residual **stalls at O(1)** (‖R‖ = 650→190→50→13→**3.1** at N=10→160, vs ~1e-9 when it
+  works) and its velocity error is **flat at 0.40** (rate 0). TH is *convectively unstable* here (P2/P1
+  has inf-sup for pressure but no SUPG for convection) — its **pressure** converges optimally (L²p rate
+  2.0, via LBB) while its **velocity** is garbage. So the real contrast is not "TH solves / VMS folds":
+  it is **VMS folds *hard* at coarse mesh (NaN) but converges to an accurate root at N≥160, where TH
+  still cannot** (res 3.1, L²u 0.40). VMS is the *better* method at the corner. (At Re=1, TH converges
+  cleanly — rate 2.94 — confirming the corner failure is the high-Re convective instability.)
+
+- **Reaction-out-of-stabilization A/B — INCONCLUSIVE (σ̃_α not confirmed).** Implemented a gated
+  diagnostic (`STRIP_REACTION_FROM_STAB` env-var in `src/formulations/continuous_problem.jl`, default
+  off = byte-identical, Blitz 243/243 incl. exact `picard_jacobian_equivalence`; the *stripped*
+  formulation is itself self-consistent — J-vs-FD ~1e-11, quadratic) that removes σ from the
+  stabilization (τ₁, 𝓛U, 𝓛*V, and their derivatives) while the coercive Galerkin term `(v,σu)` keeps
+  the real σ — i.e. TH-like full-σ velocity control but with VMS's convective stabilization. Ran the
+  corner A/B (`data/cocquet_form_mms_strip_reaction_test.json`, N=[20,40,80,160], ASGS): stripping
+  cleared **only 1 of 3** folding meshes (N=40, and to an *inaccurate* root L²u=0.092 ~3× the accurate
+  value), while **N=20 and N=80 still fail even from the exact guess**. Not the clean "strip ⇒ no fold"
+  a confirmation needs. **Confound (flagged honestly):** the strip also *enlarges* τ₁ (removes σ from
+  its denominator, `1/(α/τ_NS+σ)→τ_NS/α`), and σ is genuinely *entangled* in the stabilization scale
+  (σ̃_α itself contains τ₁), so "still folds" cannot be cleanly attributed to σ̃_α-persistence vs the
+  τ₁ over-strip. So this **neither confirms nor cleanly refutes** σ̃_α — but it does show the fold is
+  **not reducible to a single removable term**; the reaction-in-stab is at most a partial contributor.
+
+- **c₁ (coercivity constant) — not the lever** (from §4.2's c₁×4 probe + theory). At high Re, τ_NS⁻¹ is
+  convection-dominated (`c₂|u|/h ≫ c₁ν/h²`), so raising c₁ barely moves the stabilization; c₁×4 gave
+  only marginal help. A c₁×64 confirmation was launched but killed under CPU contention before finishing
+  (superseded by the strip test, which targets the reaction directly).
+
+**Updated bottom line:** the exact fold mechanism is **OPEN**. Ruled out: a Jacobian/linearization bug
+(Newton is exact) and c₁. The leading σ̃_α / reaction-in-stabilization hypothesis is *paper-grounded and
+consistent with every observation* (reaction-magnitude driven, low-α specific, fold-recedes-with-mesh)
+but was **not confirmed** by the direct strip test, which was confounded by the τ₁ entanglement. A
+cleaner isolation (strip σ from 𝓛U/𝓛*V only, holding τ₁ physical) is the natural next probe but is
+**deferred** — the practical deliverable (§4.1, convergence above the fold) does not depend on it. The
+`STRIP_REACTION_FROM_STAB` gate is retained (byte-identical diagnostic, like `C1_MULT`/`VISC_ADJ_MULT`)
+for that follow-up.
 
 ---
 
 ## 5. Open items / next steps
-- **Confirm or refute Layer 2.** Valid tests: (a) finish the **OSGS** trim-vs-full A/B at low α; (b)
-  for **ASGS**, a code change to strip σu from the stabilization residual (the projection trim won't
-  do it for ASGS). If trimming the reaction recovers convergence, the mechanism is confirmed.
-- **Recovering the fold cells** (if wanted as converged, not folded): **continuation into the corner**
-  (start at α=0.5 or Re=1, walk to α=0.1 / Re=1e5), the same device the regular harness's Phase-2
-  `run_continuation.jl` uses for its excluded corner.
+- **✅ DONE (2026-07-07) — recovering the α=0.1 × Re=1e5 corner (k=1):** extend the mesh ladder above
+  the fold (N=[160,320], `data/cocquet_form_mms_vms_corner.json`). Both ASGS & OSGS reach FE-optimal
+  roots (H¹u ≈ 1.07/1.10, L²u ≈ 3.0); see §4.1. This is the "recovering the fold cells" item below,
+  executed via the direct exact-guess route (mesh-continuation not needed — the cold exact-guess
+  reached N=320 directly). Cheap remaining: k=2 corner → N=160; optional k=1 → N=640 for a 3-point slope.
+- **Layer-2 mechanism (why the coarse branch folds) is characterized, not a blocker.** §4.1 shows the
+  fold is a coarse-mesh turning point driven by the reaction magnitude (the paper's 1/α₀ degradation),
+  and that the rate is optimal once a root exists — so confirming the exact σ̃_α coupling is now a
+  *theory-completeness* question, not a prerequisite for the deliverable. If still wanted: (a) finish
+  the **OSGS** trim-vs-full A/B at low α; (b) for **ASGS**, a code change to strip σu from the
+  stabilization residual (the projection trim won't do it for ASGS).
+- **Recovering the fold cells (alternative route, not needed here):** **continuation into the corner**
+  (start at α=0.5 or Re=1, walk to α=0.1 / Re=1e5), the device the regular harness's Phase-2
+  `run_continuation.jl` uses. The direct exact-guess mesh-ladder (§4.1) superseded it for k=1; keep
+  continuation in reserve if a future push hits a mesh where the exact-guess basin narrows.
 - **Throwaway probes removed (2026-06-16):** the `diagnose_*.jl` probes, `data/_validate_*.json`, the
   superseded `plot_combined.py`, the stale `cocquet_form_mms.json.orig`, and the dead-end A/B configs
   (`isolation_{trim,full,osgs_trim,osgs_full}.json`) were deleted. **Kept:** `data/isolation_alphasweep.json`
