@@ -320,7 +320,7 @@ Now let me check if I can find another lateral angle. Let me look at the FreeFem
 
 Now I have a really good handle on the situation. Let me now do my analysis and write up the lateral ideas. But first let me check one more thing — the inlet velocity Dirichlet bc enforcement when using the FreeFem mesh:
 
-OK so this is for the AllDirichlet test. Let me now check the main CocquetExperimentIrregularMesh (FreeFem path):
+OK so this is for the AllDirichlet test. Let me now check the main freefem_meshes variant (FreeFem path):
 
 OK now I have an excellent understanding. Time to deliver my lateral analysis.
 
@@ -504,7 +504,7 @@ The good news: your code is almost certainly correct. The bad news (for matching
 
 # Hypothesis triage status (2026-05-24, post-exploration)
 
-After read-only exploration of [src/formulations/viscous_operators.jl](../../src/formulations/viscous_operators.jl), [src/metrics.jl](../../src/metrics.jl), [src/config.jl](../../src/config.jl), [src/solvers/nonlinear.jl](../../src/solvers/nonlinear.jl), and [test/extended/CocquetExperiment/galerkin_driver.jl](../../test/extended/CocquetExperiment/galerkin_driver.jl):
+After read-only exploration of [src/formulations/viscous_operators.jl](../../src/formulations/viscous_operators.jl), [src/metrics.jl](../../src/metrics.jl), [src/config.jl](../../src/config.jl), [src/solvers/nonlinear.jl](../../src/solvers/nonlinear.jl), and [test/extended/CocquetTubeTest/galerkin_driver.jl](../../test/extended/CocquetTubeTest/galerkin_driver.jl):
 
 ## H-E — discarded by code reading
 
@@ -514,11 +514,11 @@ Optional sensitivity-only confirmation (doubling ν to see how much absolute err
 
 ## H-D — unfalsifiable from inside this repo
 
-The only `.edp` file in the repo is the mesh-generation one (`test/extended/CocquetExperimentIrregularMesh/data/meshes/freefem/create_paper_meshes.edp`). There is no Cocquet *solver* `.edp`. The hypothesis that they iterate on `w = u − V` (lifting) and plot `‖w_h − w_ref‖` cannot be tested without access to their actual solver code. **Parked** until external action: emailing the corresponding author (hal-02561058) or finding supplementary materials on the journal version.
+The only `.edp` file in the repo is the mesh-generation one (`test/extended/CocquetTubeTest/data/freefem_meshes/meshes/create_paper_meshes.edp`). There is no Cocquet *solver* `.edp`. The hypothesis that they iterate on `w = u − V` (lifting) and plot `‖w_h − w_ref‖` cannot be tested without access to their actual solver code. **Parked** until external action: emailing the corresponding author (hal-02561058) or finding supplementary materials on the journal version.
 
 ## H-A — discarded (squared values match paper magnitude near N=20 but slope is wrong)
 
-Diagnostic plot at [test/extended/CocquetExperimentIrregularMeshFreefemDivs/results/h_a_squared_overlay.png](../../test/extended/CocquetExperimentIrregularMeshFreefemDivs/results/h_a_squared_overlay.png) (script: [plot_h_a_squared_overlay.py](../../test/extended/CocquetExperimentIrregularMeshFreefemDivs/plot_h_a_squared_overlay.py)). Galerkin P2/P1 on the freefem-divs mesh, vs hand-read Figure 2 (Re=500, c_in=0.5) values `(3e-5, 1e-5, 4e-6, 5e-7, 1.5e-7)` at N=(10,20,40,80,100):
+Diagnostic plot at [test/extended/CocquetTubeTest/results/freefem_divisions/h_a_squared_overlay.png](../../test/extended/CocquetTubeTest/results/freefem_divisions/h_a_squared_overlay.png) (script `plot_h_a_squared_overlay.py`, removed in the CocquetTubeTest unification — recoverable from git history). Galerkin P2/P1 on the freefem-divs mesh, vs hand-read Figure 2 (Re=500, c_in=0.5) values `(3e-5, 1e-5, 4e-6, 5e-7, 1.5e-7)` at N=(10,20,40,80,100):
 
 | N | raw `‖e_u‖` | raw / paper | squared `‖e_u‖²` | squared / paper |
 |---:|---:|---:|---:|---:|
@@ -536,7 +536,7 @@ Side observation worth keeping: the **raw L² slope of −1.76** on the freefem-
 
 ## H-C — discarded (trial-space projection matches free-DOF projection within 1.4% for Galerkin)
 
-Implemented as `compute_trial_projection_errors` in [src/metrics.jl](../../src/metrics.jl); plumbed into freefem-divs sweep ([run_convergence.jl](../../test/extended/CocquetExperimentIrregularMeshFreefemDivs/run_convergence.jl)) as `errors_l2_u_trial` / `errors_h1_u_trial`. Rerun on the same freefem-divs config (N=10,20,40,80,100; N_ref=200).
+Implemented as `compute_trial_projection_errors` in [src/metrics.jl](../../src/metrics.jl); plumbed into freefem-divs sweep ([run_convergence.jl](../../test/extended/CocquetTubeTest/run_convergence.jl)) as `errors_l2_u_trial` / `errors_h1_u_trial`. Rerun on the same freefem-divs config (N=10,20,40,80,100; N_ref=200).
 
 For the **Galerkin P2/P1** case (direct paper comparison):
 
@@ -562,7 +562,7 @@ The trial-space-projection metric *cannot close even 1% of the 322×–1126× ma
 
 The trailing `L²(Ω)²` is the **vector-valued L²** notation (`L²(Ω;ℝ²)`), not a squared norm. The previous AI's "squared norm" reading was incorrect. The stopping rule is plain `max(‖Δp‖_{L²}, ‖Δu‖_{L²})`. The (it_max=10, tol=1e-5 or 1e-10) values from page 30 are attached to the **Figure 1** c_in,min study at N=40,120; Figure 2's exact values are unspecified in the paper.
 
-**Implementation:** new sibling `test/extended/CocquetExperimentLiteralPicard/` — literal pure-Picard driver ([literal_picard_driver.jl](../../test/extended/CocquetExperimentLiteralPicard/literal_picard_driver.jl)) that runs only Picard with `picard_iterations=10` as a hard cap (no Newton, no Newton polish, no Newton fallback). Both N=200 reference and N≤100 coarse runs use the same cap, so any iteration-truncation bias is shared symmetrically. **No code under `src/` was touched.**
+**Implementation:** new sibling `test/extended/CocquetTubeTest/data/literal_picard/` — literal pure-Picard driver ([literal_picard_driver.jl](../../test/extended/CocquetTubeTest/literal_picard_driver.jl)) that runs only Picard with `picard_iterations=10` as a hard cap (no Newton, no Newton polish, no Newton fallback). Both N=200 reference and N≤100 coarse runs use the same cap, so any iteration-truncation bias is shared symmetrically. **No code under `src/` was touched.**
 
 **Result on freefem-divs mesh, Galerkin P2/P1:**
 

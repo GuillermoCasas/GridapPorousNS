@@ -2,6 +2,8 @@
     "_comment": "Cocquet convergence study with OUTLET-CORNER TOPOLOGY MODIFICATION. Identical to CocquetExperiment/data/paper_comparison.json in every physical, numerical and discretization parameter — same Re=500, c_in=0.5, transverse Forchheimer porosity, partition [400,200], TRI elements, three-way comparison VMS P1/P1 + VMS P2/P2 + Cocquet Galerkin P2/P1. ONE difference: the two outlet-side corner vertices (entities 2,4 = (2,0),(2,1)) are stripped from the 'walls' Dirichlet tag and become free DOFs. See theory/CornerSingularity.md for the hypothesis (replicates the accidental free-corner behavior of FreeFem++ unstructured tagging that lets the Cocquet et al. results escape the mixed-BC corner singularity that caps Gridap's P2/P2 convergence). If P2/P2 L²/H¹ slopes recover toward 3/2 the corner is proven to be the singular factor; if they remain capped the hypothesis is falsified. Run: julia --project=../../.. run_convergence.jl paper_comparison_modified_corner.json",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "modified_corner",
+    "alpha_profile": "exponential",
     "k_convergence_list": [
         1
     ],

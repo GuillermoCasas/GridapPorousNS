@@ -2,8 +2,10 @@
     "_comment": "Cocquet Fig. 2 reproduction on the ACTUAL FreeFem-generated meshes (data/meshes/freefem/), THREE-WAY: (1) unstabilized Galerkin Taylor-Hood P2/P1 with P1 porosity = the paper's exact method, (2) stabilized VMS-ASGS equal-order P1/P1, (3) stabilized VMS-ASGS equal-order P2/P2. Same physics across all three (Re=500, c_in=0.5, physical_epsilon=1e-7, Forchheimer-Ergun Eq.49). Reference N=200 (mesh_fig2_N200_reference.msh), coarse N in {10,20,30,40,50,60,70,80,90,100}.",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "standard",
+    "alpha_profile": "exponential",
     "mesh_generator": "UNSTRUCTURED",
-    "freefem_mesh_dir": "data/meshes/freefem",
+    "freefem_mesh_dir": "meshes",
     "k_convergence_list": [
         1
     ],

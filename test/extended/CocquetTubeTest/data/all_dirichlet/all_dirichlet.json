@@ -2,6 +2,9 @@
     "_comment": "FLIP B (all-Dirichlet) diagnostic — IDENTICAL to CocquetExperiment/paper_comparison.json (Re=500, c_in=0.5, transverse porosity, equal-order P1/P1 and P2/P2, interpolated porosity at order k_v, N=200 reference over coarse N in {10,20,40,80}, h_floor_weight=0) EXCEPT the outlet is imposed as a Dirichlet boundary (same parabolic profile as the inlet) instead of the traction-free Neumann outlet. This makes the wall/outlet corners Dirichlet-Dirichlet (compatible) to test whether the benchmark's mixed-BC corner singularity caps P2/P2 velocity-L2 convergence. outlet_truncation_delta=0 (no traction outlet to truncate; errors over whole domain). Run: julia --project=../../.. run_convergence.jl all_dirichlet.json",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "all_dirichlet",
+    "alpha_profile": "exponential",
+    "quadrature_degree_bonus": 12,
     "k_convergence_list": [
         1
     ],

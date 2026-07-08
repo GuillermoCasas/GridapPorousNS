@@ -2,6 +2,8 @@
     "_comment": "alpha=1 CONTROL — IDENTICAL to CocquetExperiment/paper_comparison.json (Re=500, c_in=0.5, mixed BC with traction outlet, equal-order P1/P1 and P2/P2, N=200 reference over coarse N in {10,20,40,80}, h_floor_weight=0) EXCEPT the porosity is overridden in run_convergence.jl to alpha=1 everywhere. At alpha=1 the generalized formulation reduces to plain Navier-Stokes (reaction sigma=0, no porosity weighting, porosity interpolation exact). Optimal convergence here proves the mixed-BC/corner and core solver are sound and localizes the benchmark's underperformance to the generalized formulation. Run: julia --project=../../.. run_convergence.jl alpha1.json",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "standard",
+    "alpha_profile": "constant",
     "k_convergence_list": [
         1
     ],

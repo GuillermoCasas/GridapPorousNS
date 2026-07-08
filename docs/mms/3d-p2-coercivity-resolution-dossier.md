@@ -31,12 +31,19 @@ remedy is an **element-aware `c₁`** (article.tex line 910 explicitly makes `c�
   solid; the *absolute* margin claim rests on the paper's own line-910 statement + the short-ladder reading.
 
 **What would overturn / sharpen this (open experiments):**
-1. A genuinely well-shaped, quasi-uniform 3D tet family (uniform aspect `h/ρ ≲ 6`, no boundary slivers) that
-   **converges at plain `4k⁴`** → confirms "well-shaped tets are inside the margin, Kuhn is the pathology."
-   If instead it **still fails** → the stronger statement holds: `4k⁴` is under-margined for *all* 3D tets,
-   and the paper's optimal §5.2 owes more to its 3-mesh ladder than to element quality.
+1. A genuinely well-shaped, quasi-uniform 3D tet family (uniform aspect `h/ρ ≲ 6`, **no boundary slivers**) that
+   **converges at plain `4k⁴`** → confirms "well-shaped tets are inside the margin, Kuhn is the pathology"
+   (Reading A). If instead it **still fails** → the stronger statement holds: `4k⁴` is under-margined for *all*
+   3D tets (Reading B). **Status (2026-07-08): still open, and now harder to reach than it looked** — every
+   mesher tried carries a worst-element tail over the margin: gmsh (all algorithms) keeps a sliver tail
+   (max 11–17) despite a good median (~7), the gmsh sequence is non-self-similar (erratic), and the BCC lattice
+   has Kuhn-level boundary caps (§3.5). The gmsh evidence *leans toward Reading B in practice* (realistic 3D tet
+   meshes generally fail at `4k⁴`); a definitive answer needs a sliver-free, self-similar, boundary-treated
+   well-shaped sequence (isosurface-stuffing / boundary-fixed BCC) — real meshing work not yet done.
 2. Kratos's *actual* §5.2 mesh statistics: if its tets have worst-aspect `> 8` yet it converges optimally at
    `4k⁴` over a *long* ladder → refutes the `C_inv`/margin explanation and reopens a code-difference hunt.
+   (Note: a 3-mesh reading of the gmsh HXT data — §3.5 — gives a *negative* rate from the two finest, so the
+   paper's meshes were genuinely better-behaved than gmsh's; this is consistent but unverified.)
 3. Directly assembling the stabilized Jacobian and computing its spectrum (deferred — Céa already forces the
    answer, §2.3; would only quantify severity).
 
@@ -175,17 +182,38 @@ The Kuhn tet is the worst-shaped of the structured options; its poor shape-regul
 
 ### 3.5 Attempts to build a well-shaped 3D tet family (the positive test — **not cleanly achieved**)
 
-| mesh | worst aspect | P2 @ paper c₁ |
+| mesh | worst aspect (median / max) | P2 @ paper c₁ |
 |---|---|---|
 | structured Kuhn | 8.36 (uniform) | erratic, ~0.049 |
-| gmsh Delaunay+optimize, slab | 12.8 → 21.7 (grows under red refine) | erratic, ~0.1 |
+| gmsh Delaunay+optimize, slab | med 12.8 → 21.7 (grows under red refine) | erratic, ~0.1 |
 | gmsh Delaunay+optimize, cube | 11–13 | erratic (incl. a non-convergence) |
 | **BCC lattice** (hand-built, tiles: vol=1.000000) | **bulk 5.66 / boundary caps 8.83** | erratic (L²u 0.126→0.097→0.011) |
 
-**Finding: a genuinely well-shaped 3D tet family is hard to construct** — gmsh leaves slivers *worse* than
-Kuhn, and the BCC lattice's boundary caps (8.83 ≈ Kuhn) reintroduce a Kuhn-level defect at the boundary even
-though its bulk (5.66) is good. This difficulty is *itself* part of the story (it is why the pathology bites
-tets and never quads/hexes), but it means the **clean positive demonstration is still open** (§0, item 1).
+**gmsh algorithm sweep (2026-07-08, on the cube).** Prompted by the question of whether a *different* mesher
+/ a more nearly **quasi-uniform sequence** could reach the clean test. Sweeping Delaunay(1)/Frontal(4)/HXT(10)
+× Netgen-optimization passes {0,5,10} × threshold {0.5,0.7,0.9}, worst-aspect at lc=0.12 and 0.08:
+- **median aspect 6.6–7.3 — better than Kuhn's 8.36, and *consistent* across lc** (quasi-uniform *bulk*), but
+- **a sliver tail persists: p99 ≈ 9.5–10.7, max ≈ 11–17**, worse than Kuhn, **inconsistent** level-to-level,
+  and **no algorithm or optimization setting removes it**. HXT gives the tightest max (11.2/11.8).
+
+**HXT convergence ladder at paper c₁ (2026-07-08, independent meshes, cube):** median ≈ 6.8–7.1 (< Kuhn),
+max ≈ 11.5–12; L²u `0.0845 → 0.0300 → 0.0614` — the first rate is **optimal (3.32)** but it **reverts at
+lc=0.10** (rate −3.1; H¹u grows 1.42→3.29). So even the **better-median gmsh sequence is erratic** at paper c₁.
+
+**Finding: a genuinely well-shaped 3D tet *sequence* is not achievable with available meshers.** Every option
+carries some element over the margin *or* violates quasi-uniformity: structured Kuhn is quasi-uniform but
+uniformly over the edge (8.36); gmsh has a good, quasi-uniform *bulk* (~7) but a **non-quasi-uniform sliver
+tail** (11–17, varying) — and because the meshes are *independent* (not nested), the slivers land in different
+places each level, so the error jumps around (the hallmark of a non-quasi-uniform sequence, exactly the
+regularity the theorems require); nested-red degrades (12→21); BCC is self-similar and good-bulk but has
+Kuhn-level boundary caps. **So the clean positive demonstration is still open** (§0, item 1), and the gmsh
+evidence *shifts the practical balance toward Reading B*: since every realistic 3D tet mesh has a quality tail
+with worst-aspect ≥ 8, `4k⁴` is fragile for 3D tet meshes *in general* — the paper's optimal §5.2 then owes to
+its commercial mesher producing cleaner tets **and/or** its 3-mesh ladder (a 3-mesh reading of the gmsh data
+above — 0.20/0.14/0.10, rate from the two finest — would itself give a *negative* slope, i.e. the paper's
+meshes were genuinely better-behaved than gmsh's). This difficulty is *itself* part of the story (it is why the
+pathology bites tets and never quads/hexes). The only clean route left is a **sliver-free, self-similar,
+boundary-treated well-shaped sequence** (proper isosurface-stuffing / boundary-fixed BCC) — real meshing work.
 
 ---
 
@@ -243,12 +271,16 @@ interim "OPEN — Gridap↔paper discrepancy" verdict is **withdrawn** in favour
    `c₁ ≳ C_inv²` (paper's `ξ ≈ ½`), because the dropped convective/reaction terms add coercivity. So the
    *relative* ordering (Kuhn 214 ≫ quad 60) is robust, but the *absolute* "just barely enough for 2D" claim
    depends on `ξ`, which was not pinned independently.
-2. **No clean positive demo.** I could not build a well-shaped 3D tet family (uniform aspect ≲6, no boundary
-   slivers). The BCC bulk (5.66) is good but its boundary caps (8.83) confound the P2 test. So the statement
-   "well-shaped 3D tets converge at `4k⁴`" is *inferred* (from the `C_inv` ordering + line 910 + the paper's
-   unstructured result), **not directly demonstrated**. If a clean well-shaped family *also* failed at `4k⁴`,
-   the correct statement would be stronger: `4k⁴` is under-margined for *all* 3D tets, and the paper's optimal
-   §5.2 leans on its short ladder.
+2. **No clean positive demo — and the 2026-07-08 gmsh sweep made this harder, not easier.** I could not build
+   a well-shaped 3D tet *sequence* (uniform aspect ≲6, no slivers, self-similar). The BCC bulk (5.66) is good
+   but its boundary caps (8.83) confound it; gmsh (all algorithms) has a good median (~7) but an irreducible,
+   *varying* sliver tail (max 11–17), and its independent-mesh sequence is erratic at `4k⁴` even though its
+   median beats Kuhn (§3.5). So "well-shaped 3D tets converge at `4k⁴`" (Reading A) is *inferred* (from the
+   `C_inv` ordering + line 910 + the paper's unstructured result), **not directly demonstrated** — and the gmsh
+   evidence actively **leans toward Reading B** (`4k⁴` under-margined for realistic 3D tet meshes in general;
+   the paper's §5.2 owes to a cleaner commercial mesher and/or its short ladder). Distinguishing A from B needs
+   a genuinely sliver-free, self-similar, boundary-treated well-shaped sequence, which available meshers do not
+   provide.
 3. **Deviatoric operator specifically.** The paper (line 255) flags that Korn-type arguments "may be
    nontrivial for [the deviatoric operator]." The deviatoric `C_inv` may be genuinely worse than the pure
    symmetric-gradient's, i.e. the deviatoric operator may be intrinsically more fragile — a possible sharper

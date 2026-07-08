@@ -2,6 +2,8 @@
     "_comment": "[H-B] LITERAL-Cocquet-Picard flip of CocquetExperimentIrregularMeshFreefemDivs. Identical setup (FreeFem-divisions unstructured mesh, Re=500, c_in=0.5, Galerkin P2/P1) but the solver is replaced by a custom driver (literal_picard_driver.jl) that runs ONLY Picard iteration (no Newton at all, no Newton polish), capped at picard_iterations=10, with stopping rule max(L2(Du), L2(Dp)) < tol — i.e. the exact protocol of Cocquet et al. (2020) page 30. Tests H-B: the paper's published convergence numbers are not the true discretization error, but the Picard-iterate-after-10-steps error. The 'Galerkin_LiteralPicard' method label triggers the new driver. Both the N=200 reference and the N<=100 coarse runs use the same Picard stopping rule, so any iteration-truncation bias is shared and the differences are apples-to-apples. picard_iterations=10 is the cap; newton_iterations=1 is unused but required by schema validation.",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "standard",
+    "alpha_profile": "exponential",
     "mesh_generator": "UNSTRUCTURED",
     "wall_divisions": "freefem",
     "k_convergence_list": [

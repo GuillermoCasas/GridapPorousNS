@@ -2,6 +2,8 @@
     "_comment": "FREEFEM-DIVISIONS flip of CocquetExperimentIrregularMesh/paper_comparison_irregular.json. ONLY difference: wall_divisions='freefem' instead of the default 'uniform'. Both modes generate a gmsh Delaunay unstructured mesh; 'uniform' gives edge length 1/N everywhere (walls get 2N segments, inlet/outlet get N — what CocquetExperimentIrregularMesh runs), while 'freefem' gives N segments per boundary part regardless of length — the literal buildmesh(a(N)+b(N)+c(N)+d(N)) recipe Cocquet et al. (2020) used. On our [0,2]x[0,1] domain that leaves the walls 2x coarser per edge than the inlet/outlet. Tests whether the FreeFem anisotropy actively helps the slope (corner-adjacent cells are larger and more diffuse) or hurts it (wall boundary layer is under-resolved). Same Re=500, c_in=0.5, same three-way comparison, N_ref=200 over coarse N in {10,20,40,80,100}. Run: cd test/extended/CocquetExperimentIrregularMeshFreefemDivs && julia --project=../../.. run_convergence.jl paper_comparison_irregular_freefem_divs.json",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "standard",
+    "alpha_profile": "exponential",
     "mesh_generator": "UNSTRUCTURED",
     "wall_divisions": "freefem",
     "k_convergence_list": [

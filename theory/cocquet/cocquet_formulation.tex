@@ -17,7 +17,7 @@
 \newcommand{\dx}{\,d\xx}
 
 \title{The Cocquet et al.\ Darcy--Brinkman--Forchheimer formulation\\[2pt]
-\large (reference note for the \texttt{CocquetExperiment} validation)}
+\large (reference note for the \texttt{CocquetTubeTest/data/structured} validation)}
 \author{}
 \date{}
 
@@ -34,7 +34,7 @@ for porous media with mixed boundary conditions}, J.\ Comput.\ Appl.\ Math.\ (20
 \end{quote}
 The PDF is in \texttt{theory/Cocquet et al.\ - 2021 - Error analysis\ldots pdf}; equation numbers below
 are the paper's. The last section maps every term onto our code so the
-\texttt{CocquetExperiment} ``Galerkin'' comparison run reproduces the paper's method exactly.
+\texttt{CocquetTubeTest/data/structured} ``Galerkin'' comparison run reproduces the paper's method exactly.
 
 \section{Continuous problem}
 
@@ -148,13 +148,13 @@ Taylor--Hood $P_2/P_1$ & element pair \texttt{(k\_velocity,k\_pressure)=(2,1)} \
 \end{center}
 
 \paragraph{Where the Galerkin run lives.} The unstabilized assembly is driven by
-\texttt{test/extended/CocquetExperiment/galerkin\_driver.jl} (\emph{not} \texttt{src/}: it is validation
+\texttt{test/extended/CocquetTubeTest/galerkin\_driver.jl} (\emph{not} \texttt{src/}: it is validation
 tooling). It reuses the production builders
 \texttt{build\_stabilized\_weak\_form\_residual} / \texttt{build\_picard\_jacobian} /
 \texttt{build\_stabilized\_weak\_form\_jacobian} with \texttt{mult\_mom=mult\_mass=0}, which zero the VMS
 stabilization terms ($\bm L^\ast\!\cdot\tau\,\mathcal R$) and leave exactly the bare Galerkin DBF system
 of Eq.~4 (with the $\eta p$ penalty). The \texttt{comparison\_runs} list in
-\texttt{data/paper\_comparison.json} runs our VMS $P_1/P_1$ and $P_2/P_2$ (method \texttt{ASGS}) alongside
+\texttt{test/extended/CocquetTubeTest/data/structured/paper\_comparison.json} runs our VMS $P_1/P_1$ and $P_2/P_2$ (method \texttt{ASGS}) alongside
 this Cocquet $P_2/P_1$ Galerkin run (method \texttt{Galerkin}, $P_1$ porosity), and
 \texttt{plot\_convergence.py} draws all three in one figure.
 
@@ -205,7 +205,7 @@ without any transfinite surface constraint --- inherits roughly the same density
 is then genuinely $\sqrt2/N$, matching the paper's $h$.
 
 \paragraph{Cell counts and code wiring.} The corrected meshes are produced by
-\texttt{test/extended/CocquetExperimentIrregularMesh/data/meshes/freefem/create\_paper\_meshes.edp}
+\texttt{test/extended/CocquetTubeTest/data/freefem\_meshes/meshes/create\_paper\_meshes.edp}
 (FreeFem run separately --- not built into
 our Julia toolchain because no macOS-arm64 FreeFem binary exists) and saved as the FreeFem-native
 \texttt{.msh} format. \texttt{src/run\_simulation.jl::load\_freefem\_mesh} translates a FreeFem mesh into
@@ -213,7 +213,7 @@ a Gridap \texttt{DiscreteModel} via an in-line conversion to Gmsh 2.2 format, ma
 boundary labels $1,2,3,4$ onto named physical groups \texttt{"inlet"}, \texttt{"outlet"}, \texttt{"walls"}
 (both walls share one named group) and a 2D \texttt{"domain"} group; these names then resolve directly in
 \texttt{build\_fe\_spaces(\ldots,\ ["inlet","walls"],\ \ldots)}. The
-\texttt{CocquetExperimentIrregularMesh} driver opts into the FreeFem path via the
+\texttt{CocquetTubeTest/data/freefem\_meshes} driver opts into the FreeFem path via the
 \texttt{freefem\_mesh\_dir} key in its config; the file naming convention is
 \texttt{mesh\_fig2\_N<N>.msh} for coarse meshes and \texttt{mesh\_fig2\_N<N>\_reference.msh} for the
 $N=200$ reference. Indicative cell counts:

@@ -2,6 +2,8 @@
     "_comment": "IRREGULAR-MESH flip of CocquetExperiment/paper_comparison.json. ONLY difference: mesh_generator=UNSTRUCTURED (gmsh Delaunay interior with FreeFem-style prescribed boundary divisions), to match Cocquet et al. (2020) Figs 2-3 which used FreeFem buildmesh. Same Re=500, c_in=0.5, transverse porosity, same THREE-WAY comparison (VMS P1/P1, VMS P2/P2, Cocquet Galerkin P2/P1 with P1 porosity). physical_epsilon=1e-7 set explicitly to match the paper's eta pressure penalty, uniformly across all three runs. Reference N=200, coarse N in {10,20,40,80,100} (paper goes up to 100). Run: cd test/extended/CocquetExperimentIrregularMesh && julia --project=../../.. run_convergence.jl paper_comparison_irregular.json",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "standard",
+    "alpha_profile": "exponential",
     "mesh_generator": "UNSTRUCTURED",
     "k_convergence_list": [
         1

@@ -39,10 +39,17 @@ const LU_DOF_LIMIT = 80_000
 # false-rejecting a genuine same-root start. Test-frame constant (not a production knob).
 const ROOT_MATCH_TOL = 1e-3
 
+# [F6 config-driven] The §5.2 PHYSICAL study parameters bundled as a NamedTuple, so a JSON config can
+# override them (via `run_config`) while every existing CLI/sweep path keeps the committed defaults
+# BYTE-IDENTICALLY. `domain` is the (x0,x1,y0,y1,z0,z1) slab. `solve_one` unpacks this into locals that
+# SHADOW the module consts, so its body is unchanged; the default equals the consts, so no path drifts.
+default_study3d() = (re=RE, da=DA, alpha0=ALPHA0, alphainf=ALPHAINF, r1=R1, r2=R2, Lc=L, u=U_AMP, domain=DOMAIN)
+
 function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
                      numerical_epsilon::Float64=0.0, jfnk::Bool=false, anderson::Bool=false,
                      jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing,
-                     iterative_penalty::Bool=true, osgs_skip_boot::Bool=false, ablation::String="full")
+                     iterative_penalty::Bool=true, osgs_skip_boot::Bool=false, ablation::String="full",
+                     alpha0::Float64=ALPHA0, r1::Float64=R1, r2::Float64=R2)
     @assert !(jfnk && anderson) "jfnk and anderson are mutually-exclusive OSGS paths"
     eps_tol_m    = something(eps_tol_m_over, kv == 2 ? 1e-9 : 1e-6)   # k=2 tightened gate (MEMORY lesson)
     # [Route B 2026-07-01] mass gate is now the Philosophy-A algebraic ‖r_C‖/D_C → 0, so default it
@@ -80,7 +87,7 @@ function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over
     cfg = Dict(
         "physical_properties" => Dict("nu"=>1.0, "physical_epsilon"=>1e-8, "numerical_epsilon"=>numerical_epsilon,
                                       "reaction_model"=>"Constant_Sigma", "sigma_constant"=>1.0),
-        "domain" => Dict("alpha_0"=>ALPHA0, "bounding_box"=>[0.0,1.0,0.0,1.0], "r_1"=>R1, "r_2"=>R2),
+        "domain" => Dict("alpha_0"=>alpha0, "bounding_box"=>[0.0,1.0,0.0,1.0], "r_1"=>r1, "r_2"=>r2),
         "numerical_method" => Dict(
             "element_spaces" => Dict("k_velocity"=>kv, "k_pressure"=>kv),
             "mesh" => Dict("element_type"=>"TRI", "partition"=>[1,1]),  # placeholders; gmsh model built directly
@@ -115,7 +122,8 @@ end
 # type keeps a separate folder per mesh sequence and results from different sequences are conserved side-by-side.
 # mesh_sequence="" falls back to the legacy <outroot>/k<kv>/TET/traces/ layout.
 function _write_trajectory_sidecar(; outroot, run_name, kv, method, h_mean, ncells, success,
-                                   trajectory, res_init, res_final, tol_M, tol_C, mesh_sequence::String="")
+                                   trajectory, res_init, res_final, tol_M, tol_C, mesh_sequence::String="",
+                                   re=RE, da=DA, alpha0=ALPHA0)
     try
         cell_rel = isempty(mesh_sequence) ? joinpath("k$(Int(kv))", "TET") :
                                             joinpath("k$(Int(kv))", "TET", mesh_sequence)
@@ -123,10 +131,10 @@ function _write_trajectory_sidecar(; outroot, run_name, kv, method, h_mean, ncel
         isdir(traces_dir) || mkpath(traces_dir)
         nlabel = max(1, round(Int, 1.0 / h_mean))
         trace_name = @sprintf("traj_Re%.0e_Da%.0e_a%.2f_kv%d_kp%d_TET_%s_N%d.json",
-                              RE, DA, ALPHA0, Int(kv), Int(kv), String(method), nlabel)
+                              re, da, alpha0, Int(kv), Int(kv), String(method), nlabel)
         trace_obj = (
             run = run_name,
-            cell = (Re=RE, Da=DA, alpha_0=ALPHA0, kv=Int(kv), kp=Int(kv), etype="TET",
+            cell = (Re=re, Da=da, alpha_0=alpha0, kv=Int(kv), kp=Int(kv), etype="TET",
                     method=String(method), encoding="exact_guess", ncells=Int(ncells), h=h_mean),
             N = nlabel, success = success, successful_eps = 0.0,
             final_residual = res_final, initial_residual = res_init,
@@ -148,7 +156,12 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                    eps_phys::Float64=0.0, mesh_sequence::String="", jfnk::Bool=false, anderson::Bool=false,
                    jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, iterative_penalty::Bool=true,
                    osgs_skip_boot::Bool=false, eps_pert_base::Float64=1.0, max_n_pert::Int=5,
-                   ablation::String="full", h_conv::String="regular_tet")
+                   ablation::String="full", h_conv::String="regular_tet", study=default_study3d())
+    # [F6 config-driven] Unpack the study into locals that SHADOW the module consts. Every reference below
+    # (nu, sigma_c, the porosity, PaperMMS, the eps_pert domain bounds, the trace filename) now reads the
+    # study; with the default study == the consts, this is byte-identical to the pre-config behaviour.
+    RE = study.re; DA = study.da; ALPHA0 = study.alpha0; ALPHAINF = study.alphainf
+    R1 = study.r1; R2 = study.r2; L = study.Lc; U_AMP = study.u; DOMAIN = study.domain
     nu = U_AMP * L / RE
     # ε_num = the NUMERICAL penalty (Codina ITERATIVE penalty, paper ε = 1e-4·ε_ref). The equation is
     # INCOMPRESSIBLE: there is NO physical compressibility, so eps_phys MUST default to 0. The iterative
@@ -163,7 +176,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                           jfnk_maxiter=jfnk_maxiter, jfnk_restart=jfnk_restart, jfnk_reltol=jfnk_reltol,
                           iterative_penalty=iterative_penalty, osgs_skip_boot=osgs_skip_boot,
                           eps_tol_m_over=eps_tol_m_over, ftol_over=ftol_over, eps_tol_mass_over=eps_tol_mass_over,
-                          ablation=ablation)
+                          ablation=ablation, alpha0=ALPHA0, r1=R1, r2=R2)
     sol = config.numerical_method.solver
 
     sigma_c = DA * ALPHAINF * nu / L^2
@@ -330,7 +343,8 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
         _write_trajectory_sidecar(; outroot=trace_dir, run_name=run_name, kv=kv, method=method,
                                   h_mean=h_mean, ncells=num_cells(model), success=success,
                                   trajectory=traj, res_init=res_init, res_final=res_final,
-                                  tol_M=sol.eps_tol_momentum, tol_C=sol.eps_tol_mass, mesh_sequence=mesh_sequence)
+                                  tol_M=sol.eps_tol_momentum, tol_C=sol.eps_tol_mass, mesh_sequence=mesh_sequence,
+                                  re=RE, da=DA, alpha0=ALPHA0)
     end
     return (success=success, ncells=num_cells(model), iters=iters, h_mean=h_mean,
             el2_u=el2_u, el2_p=el2_p, eh1_u=eh1_u, eh1_p=eh1_p, n_ns=n_ns, n_pic=n_pic,
@@ -625,8 +639,99 @@ function run_sweep_cells(; outpath, cells::Vector{Tuple{Int,String,Int,Int}}, ba
     println("\nDONE. cells run merged -> $outpath"); flush(stdout)
 end
 
+# ==============================================================================================
+# [F6 config-driven] Official, committed, config-driven 3D-MMS convergence run. A self-describing JSON
+# (data/smoke3d_p1.json) fixes the §5.2 PHYSICAL case (`study`) + the discretization / mesh study, and
+# drives the SAME solve_one machinery — replacing the hand-edited-driver workflow for the official smoke
+# path (audit F6 / pending-tasks 2a). Returns per-(kv,method) convergence data for the automated guard
+# (test/extended/mms3d_config_smoke_extended_test.jl). The larger diagnostic studies keep the CLI sweep
+# modes below.
+# ==============================================================================================
+
+# Build the physical §5.2 `study` NamedTuple from the parsed config (bounding_box is the 3D slab).
+function _study_from_config(cfg)
+    pp = cfg.physical_properties
+    dm = cfg.domain
+    bb = Float64.(collect(dm.bounding_box))                 # (x0,x1,y0,y1,z0,z1)
+    length(bb) == 6 || error("config domain.bounding_box must be the 3D slab [x0,x1,y0,y1,z0,z1] (got $(length(bb)) entries)")
+    return (re=Float64(pp.Re), da=Float64(pp.Da), alpha0=Float64(dm.alpha_0),
+            alphainf=Float64(pp.alpha_infty), r1=Float64(dm.r_1), r2=Float64(dm.r_2),
+            Lc=Float64(pp.L), u=Float64(pp.U), domain=Tuple(bb))
+end
+
+# Build the mesh sequence named by the config (structured Kuhn from explicit partitions — the uniform,
+# refinement-invariant control the smoke uses — or the red-refined nested family), on the study slab.
+function _models_from_config(cfg, domain)
+    mesh = cfg.numerical_method.mesh
+    seq = String(mesh.sequence)
+    if seq == "structured"
+        parts = [Tuple(Int.(collect(p))) for p in mesh.partitions]
+        return [structured_kuhn_model(p; domain=domain) for p in parts], string(parts)
+    elseif seq == "nested_red"
+        nlev = Int(get(mesh, :levels, 2)); lc = Float64(get(mesh, :base_lc, 0.2))
+        return build_nested_family(nlev; lc=lc, domain=domain), "nested_red(levels=$nlev, base_lc=$lc)"
+    else
+        error("config numerical_method.mesh.sequence must be \"structured\" or \"nested_red\" (got \"$seq\")")
+    end
+end
+
+"""
+    run_config(path) -> Vector of (kv, method, levels)
+
+Run the §5.2 convergence study described by the JSON at `path` (see data/smoke3d_p1.json). Loops every
+`kv × method` over the configured mesh sequence, driving `solve_one` with the config's physical `study`.
+Prints per-level normalized errors + per-segment rates and returns, for each (kv, method), the vector of
+per-level `(h, el2_u, el2_p, eh1_u, eh1_p, success, ncells)` — consumed by the official extended guard.
+"""
+function run_config(path::String)
+    cfg = JSON3.read(read(path, String))
+    study = _study_from_config(cfg)
+    nm = cfg.numerical_method
+    kvs = Int.(collect(nm.element_spaces.k_velocity))
+    methods = String.(collect(nm.stabilization.methods))
+    visc = String(get(nm.stabilization, :viscous_operator, "Deviatoric"))
+    c1_mult = Float64(get(nm.stabilization, :c1_mult, 1.0))
+    eps_mult = Float64(get(nm.stabilization, :eps_mult, 1.0))
+    seq = String(nm.mesh.sequence)
+    models, mesh_desc = _models_from_config(cfg, study.domain)
+    tag = splitext(basename(path))[1]
+    outroot = joinpath(@__DIR__, "results", "config_" * tag)
+
+    println("=== 3D MMS CONFIG run: $(basename(path)) ==="); flush(stdout)
+    println("    study: Re=$(study.re) Da=$(study.da) α0=$(study.alpha0) α∞=$(study.alphainf) " *
+            "r1=$(study.r1) r2=$(study.r2) L=$(study.Lc) U=$(study.u) slab=$(study.domain)")
+    println("    mesh:  $seq $mesh_desc;  kv=$kvs methods=$methods visc=$visc c1_mult=$c1_mult eps_mult=$eps_mult"); flush(stdout)
+
+    out = NamedTuple[]
+    for kv in kvs, method in methods
+        @printf("\n--- kv=%d (%s) method=%s ---\n", kv, kv == 1 ? "P1" : "P2", method); flush(stdout)
+        levels = NamedTuple[]
+        for (i, model) in enumerate(models)
+            r = solve_one(kv, method, model; visc=visc, c1_mult=c1_mult, eps_mult=eps_mult,
+                          study=study, mesh_sequence=seq, trace_dir=outroot, run_name="config_" * tag)
+            push!(levels, (h=r.h_mean, el2_u=r.el2_u, el2_p=r.el2_p, eh1_u=r.eh1_u, eh1_p=r.eh1_p,
+                           success=r.success, ncells=r.ncells))
+            @printf("  level=%d: cells=%d h=%.4g success=%s | L2u=%.4g H1u=%.4g L2p=%.4g\n",
+                    i - 1, r.ncells, r.h_mean, r.success, r.el2_u, r.eh1_u, r.el2_p); flush(stdout)
+        end
+        println("  rates [P$kv opt: L2u $(kv+1), H1u $kv, L2p $kv]:")
+        for i in 1:length(levels)-1
+            a, b = levels[i], levels[i+1]
+            @printf("    h %.3g->%.3g: L2u=%.2f H1u=%.2f L2p=%.2f\n",
+                    a.h, b.h, slope(a.el2_u, b.el2_u, a.h, b.h), slope(a.eh1_u, b.eh1_u, a.h, b.h),
+                    slope(a.el2_p, b.el2_p, a.h, b.h)); flush(stdout)
+        end
+        push!(out, (kv=kv, method=method, levels=levels))
+    end
+    return out
+end
+
 if abspath(PROGRAM_FILE) == @__FILE__
-    if length(ARGS) >= 1 && ARGS[1] == "sweep_structured"
+    if length(ARGS) >= 1 && ARGS[1] == "config"
+        # smoke3d.jl config <path.json>  — official config-driven §5.2 convergence run (audit F6).
+        cfgpath = length(ARGS) >= 2 ? ARGS[2] : error("config mode needs a JSON path, e.g. data/smoke3d_p1.json")
+        run_config(cfgpath)
+    elseif length(ARGS) >= 1 && ARGS[1] == "sweep_structured"
         # smoke3d.jl sweep_structured [max_n_pert]  — full §5.2 sweep on the STRUCTURED Kuhn family with the
         # eps_pert homotopy + iterative penalty (default solver). Writes results/k{1,2}/TET/structured/.
         mnp = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3

@@ -47,15 +47,19 @@ python analyze_results.py   # post-sweep analysis (reads the per-(kv,etype) DBs 
 
 # Cocquet reference experiment (convergence study; compares VMS P1/P1 & P2/P2 against the
 # unstabilized Galerkin Taylor-Hood P2/P1 "Cocquet" method via the comparison_runs config).
-cd test/extended/CocquetExperiment
-julia --project=../../.. run_convergence.jl paper_comparison.json
-python plot_convergence.py
+cd test/extended/CocquetTubeTest
+julia --project=../../.. run_convergence.jl data/structured/paper_comparison.json
+python plot_convergence.py structured
 ```
 
-The sibling directories `test/extended/Cocquet{Alpha1,Deviatoric,LinearReaction,AllDirichlet}` are
-single-variable diagnostic flips off this benchmark (see `docs/cocquet/convergence-analysis.md`);
-`test/extended/CocquetFormMMS` is the manufactured-solution sibling. The exact Cocquet (unstabilized
-Galerkin) formulation is documented in `theory/cocquet/cocquet_formulation.tex`.
+`test/extended/CocquetTubeTest` is the single, config-driven Cocquet tube-flow test: each variant is a
+config under `data/<name>/` (structured baseline, plus single-variable flips — `alpha_one`,
+`deviatoric`, `linear_reaction`, `all_dirichlet`, `modified_corner` — and alternate mesh sequences —
+`unstructured_gmsh`, `freefem_meshes`, `freefem_divisions`, `literal_picard`), each writing to the
+parallel folder `results/<name>/` with a uniform schema (see `CocquetTubeTest/README.md` and
+`docs/cocquet/convergence-analysis.md`). `test/extended/CocquetFormMMS` is the separate
+manufactured-solution sibling. The exact Cocquet (unstabilized Galerkin) formulation is documented in
+`theory/cocquet/cocquet_formulation.tex`.
 
 ### Single simulation from a JSON config
 

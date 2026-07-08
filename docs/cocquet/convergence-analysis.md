@@ -7,7 +7,7 @@
 This document summarizes the investigation into the sub-optimal convergence rates observed in the Cocquet numerical experiment.
 
 ## 1. Context and Problem Statement
-In the Cocquet benchmark test (defined in `test/extended/CocquetExperiment/run_convergence.jl`), we solve the 2D steady-state Darcy-Brinkman-Forchheimer (DBF) model on the domain $\Omega = [0, 2] \times [0, 1]$ with:
+In the Cocquet benchmark test (defined in `test/extended/CocquetTubeTest/run_convergence.jl`), we solve the 2D steady-state Darcy-Brinkman-Forchheimer (DBF) model on the domain $\Omega = [0, 2] \times [0, 1]$ with:
 - An inlet velocity boundary condition $u_{\text{in}}(y) = c_{\text{in}} y (1 - y)$ at $x = 0$ with $c_{\text{in}} = 0.5$.
 - No-slip walls at $y = 0$ and $y = 1$.
 - A traction-free Neumann boundary condition at the outlet $x = 2$.
@@ -163,7 +163,7 @@ The residual second-order item (mild high-Re/strong-drag pre-asymptotic erosion 
 
 ## 8. Investigation Phase 7: Stabilized equal-order comparison with the paper (RESOLVED)
 
-With the fix in place, we reproduced the paper's study at its own mesh sizes — reference **N=200**, coarse **N ∈ {10,20,40,80}** ($h=\sqrt2/N$) — for the **stabilized equal-order** pairs P1/P1 and P2/P2 (the VMS method's purpose) plus Taylor–Hood P2/P1. Driver: `run_convergence.jl paper_comparison.json` (element-pair sweep). All nonlinear solves converged (4 iterations each) at Re=500.
+With the fix in place, we reproduced the paper's study at its own mesh sizes — reference **N=200**, coarse **N ∈ {10,20,40,80}** ($h=\sqrt2/N$) — for the **stabilized equal-order** pairs P1/P1 and P2/P2 (the VMS method's purpose) plus Taylor–Hood P2/P1. Driver: `run_convergence.jl data/structured/paper_comparison.json` (element-pair sweep). All nonlinear solves converged (4 iterations each) at Re=500.
 
 | Element pair | velocity $L^2$ slopes | velocity $H^1$ slopes | pressure $L^2$ slopes |
 | :-- | :-- | :-- | :-- |
@@ -171,7 +171,7 @@ With the fix in place, we reproduced the paper's study at its own mesh sizes —
 | P2/P2 (stab.) | 2.68, 1.69, 1.51 | 1.94, 1.99, 1.98 → $O(h^2)$ | 0.68, 1.01, 1.44 |
 | P2/P1 (Taylor–Hood) | 2.74, 1.86, 1.53 | 1.94, 1.99, 1.98 → $O(h^2)$ | 0.91, 1.08, 1.45 |
 
-The stabilized equal-order elements achieve **optimal energy-norm rates**: P1/P1 gives $O(h)$ velocity $H^1$; P2/P2 gives $O(h^2)$ velocity $H^1$ — matching the paper's reported $O(h^2)$ total error for Taylor–Hood. The velocity-$H^1$ slopes are clean and robust. The velocity-$L^2$ slope decays at the fine end (P2/P2: $2.68 \to 1.69 \to 1.51$); a finer reference ($N=320$) did **not** lift it, so it is **not** a reference-resolution effect — the cause is investigated in Phase 8. Results in `results/convergence_paper_comparison.h5`.
+The stabilized equal-order elements achieve **optimal energy-norm rates**: P1/P1 gives $O(h)$ velocity $H^1$; P2/P2 gives $O(h^2)$ velocity $H^1$ — matching the paper's reported $O(h^2)$ total error for Taylor–Hood. The velocity-$H^1$ slopes are clean and robust. The velocity-$L^2$ slope decays at the fine end (P2/P2: $2.68 \to 1.69 \to 1.51$); a finer reference ($N=320$) did **not** lift it, so it is **not** a reference-resolution effect — the cause is investigated in Phase 8. Results in `results/structured/convergence.h5`.
 
 ---
 
@@ -199,18 +199,18 @@ Phase 8 left the boundary-condition mechanism as a "documented possibility, not 
 
 ### The test ladder
 
-Each test changes exactly one thing relative to `CocquetExperiment` (the benchmark: varying porosity interpolated at order $k_v$, Forchheimer reaction, SymmetricGradient viscous, mixed BC, self-reference vs $N=200$):
+Each test changes exactly one thing relative to `CocquetTubeTest/data/structured` (the benchmark: varying porosity interpolated at order $k_v$, Forchheimer reaction, SymmetricGradient viscous, mixed BC, self-reference vs $N=200$):
 
 | Test (directory) | The one change | Isolates |
 | :-- | :-- | :-- |
-| `CocquetAlpha1` | porosity $\alpha\equiv1$ (⇒ plain NS: $\sigma=0$, no porosity weighting, porosity exact) | the entire generalized formulation + quadrature |
-| `CocquetAllDirichlet` (Flip B) | outlet → Dirichlet (inlet parabola; corners become Dirichlet–Dirichlet) | the mixed-BC corner |
-| `CocquetDeviatoric` | viscous → DeviatoricSymmetric (the MMS/canonical operator) | the SymmetricGradient outlet traction specifically |
-| `CocquetLinearReaction` | `sigma_nonlinear = 0` (Forchheimer $|u|$ term off) | the nonlinear reaction |
+| `CocquetTubeTest/data/alpha_one` | porosity $\alpha\equiv1$ (⇒ plain NS: $\sigma=0$, no porosity weighting, porosity exact) | the entire generalized formulation + quadrature |
+| `CocquetTubeTest/data/all_dirichlet` (Flip B) | outlet → Dirichlet (inlet parabola; corners become Dirichlet–Dirichlet) | the mixed-BC corner |
+| `CocquetTubeTest/data/deviatoric` | viscous → DeviatoricSymmetric (the MMS/canonical operator) | the SymmetricGradient outlet traction specifically |
+| `CocquetTubeTest/data/linear_reaction` | `sigma_nonlinear = 0` (Forchheimer $|u|$ term off) | the nonlinear reaction |
 
 ### Decisive result 1 — α≡1 (plain Navier–Stokes) is STILL capped
 
-`CocquetAlpha1` (mixed BC, $\alpha\equiv1$, self-reference, $N\in\{10,20,40,80\}$ vs ref $N=200$):
+`alpha_one` (mixed BC, $\alpha\equiv1$, self-reference, $N\in\{10,20,40,80\}$ vs ref $N=200$):
 
 | Pair | velocity $L^2$ slopes | velocity $H^1$ slopes |
 | :-- | :-- | :-- |
@@ -245,15 +245,15 @@ The paper reports optimal $O(h^2)$ for Taylor–Hood P2/P1. Our equal-order meth
 
 The two running flips are now **confirmatory**. Expected outcomes and what each would establish:
 
-**`CocquetAllDirichlet` (Flip B — outlet made Dirichlet, corner removed):**
+**`all_dirichlet` (Flip B — outlet made Dirichlet, corner removed):**
 - **P2/P2 recovers toward $O(h^3)$ (L²) / $O(h^2)$ (H¹)** → *expected, and definitive*: with porosity/reaction held at the benchmark values and only the corner removed, recovery proves the mixed-BC corner is the sole cause. Combined with α≡1, the chain is closed: corner, independent of the generalized formulation.
 - **P2/P2 stays $\approx1.4$** → would be surprising and would *contradict* the spatial-localization evidence; it would force re-opening the **interpolated-porosity** hypothesis (Flip B keeps interpolated varying $\alpha_h$ + self-reference, whereas the optimal `CocquetFormMMS` has exact $\alpha$ + exact solution). Next step then = **Flip A** (exact porosity, mixed BC) and a self-reference-vs-exact comparison. (Low prior, given the error is demonstrably at the corner in plain NS.)
 
-**`CocquetDeviatoric` (viscous → DeviatoricSymmetric, mixed BC kept):**
+**`deviatoric` (viscous → DeviatoricSymmetric, mixed BC kept):**
 - **P2/P2 recovers** → the **SymmetricGradient outlet traction** $(2\nu S(u)-pI)\,n=0$ specifically aggravates the corner; the deviatoric/"do-nothing" outflow has a milder (or absent) singularity. *Practical fix available*: change the outlet formulation.
 - **P2/P2 stays capped** → the corner is **operator-independent** (any Dirichlet/Neumann right-angle outlet produces it); only removing the Neumann outlet (Flip B) or grading/rounding the corner helps.
 
-**`CocquetLinearReaction` ($\sigma_{nl}=0$):** expected **unchanged** ($\approx1.4$) → nonlinear reaction contributes nothing to the cap. A change would flag an interaction between the $|u|$ kink (non-smooth where $u=0$ on walls) and the corner.
+**`linear_reaction` ($\sigma_{nl}=0$):** expected **unchanged** ($\approx1.4$) → nonlinear reaction contributes nothing to the cap. A change would flag an interaction between the $|u|$ kink (non-smooth where $u=0$ on walls) and the corner.
 
 ### Practical remedies (if optimal benchmark P2 rates are desired)
 
@@ -265,10 +265,10 @@ All **mixed-BC** variants ($N\in\{10,20,40,80\}$ vs ref $N=200$) — regardless 
 
 | Test | one change vs benchmark | P2/P2 velocity $L^2$ slopes | P2/P2 velocity $H^1$ |
 | :-- | :-- | :-- | :-- |
-| `CocquetExperiment` (benchmark) | — | 1.39, 1.13, 1.43 | ≈0.8 |
-| `CocquetAlpha1` | $\alpha\equiv1$ (plain NS) | 1.45, 1.25, 1.49 | 0.84, 0.76, 0.78 |
-| `CocquetDeviatoric` | viscous → DeviatoricSymmetric | 1.26, 1.11, 1.44 | 0.78, 0.75, 0.79 |
-| `CocquetLinearReaction` | $\sigma_{nl}=0$ | 1.25, 1.14, 1.46 | 0.80, 0.77, 0.79 |
+| `structured` (benchmark) | — | 1.39, 1.13, 1.43 | ≈0.8 |
+| `alpha_one` | $\alpha\equiv1$ (plain NS) | 1.45, 1.25, 1.49 | 0.84, 0.76, 0.78 |
+| `deviatoric` | viscous → DeviatoricSymmetric | 1.26, 1.11, 1.44 | 0.78, 0.75, 0.79 |
+| `linear_reaction` | $\sigma_{nl}=0$ | 1.25, 1.14, 1.46 | 0.80, 0.77, 0.79 |
 
 (All P1/P1 stay $\approx1.8$–$1.9$ in $L^2$ / $\approx0.85$ in $H^1$.) Interpretation per the decision tree:
 - **Deviatoric stays capped** ⇒ the corner is **operator-independent** — not specific to the SymmetricGradient outlet traction. Changing the outlet *operator* cannot fix it.
@@ -279,7 +279,7 @@ Every mixed-BC case is pinned at P2/P2 $L^2\approx1.3$–$1.4$, consistent with 
 
 ### The clincher — removing the corner recovers P2
 
-`CocquetAllDirichlet` (Flip B — outlet made Dirichlet with the inlet parabola, so the wall/outlet corners become Dirichlet–Dirichlet; **interpolated varying porosity and Forchheimer reaction kept at benchmark values**):
+`all_dirichlet` (Flip B — outlet made Dirichlet with the inlet parabola, so the wall/outlet corners become Dirichlet–Dirichlet; **interpolated varying porosity and Forchheimer reaction kept at benchmark values**):
 
 | Pair | velocity $L^2$ slopes | velocity $H^1$ slopes | pressure $L^2$ slopes |
 | :-- | :-- | :-- | :-- |
@@ -293,14 +293,14 @@ P2/P2 **recovers** ($L^2: 1.99\to2.53\to2.84$, $H^1: 1.12\to1.60\to1.86$), versu
 **Status: RESOLVED.** The benchmark's P2/P2 sub-optimality is a **Dirichlet/Neumann corner singularity at the traction outlet**, proven by four independent lines of evidence:
 1. **α≡1 (plain NS) is still capped** → not the generalized formulation, not quadrature.
 2. **Error localization** → 50% of velocity / 98% of pressure error within $R=0.1$ of the outlet corners (0% at the compatible inlet corners), in plain NS.
-3. **Operator/reaction flips stay capped** → `CocquetDeviatoric` (≈1.3) and `CocquetLinearReaction` (≈1.3) show the cap is independent of viscous operator and nonlinear reaction.
-4. **Removing the corner recovers it** → `CocquetAllDirichlet` P2/P2 $L^2\to2.84$.
+3. **Operator/reaction flips stay capped** → `deviatoric` (≈1.3) and `linear_reaction` (≈1.3) show the cap is independent of viscous operator and nonlinear reaction.
+4. **Removing the corner recovers it** → `all_dirichlet` P2/P2 $L^2\to2.84$.
 
-It bites only quadratics because a fixed regularity ceiling ($s\approx0.8$) is masked by P1's larger interior error but exposed by P2's much smaller one. The energy-norm ($H^1$) rate the VMS theory guarantees is met on every variant; the velocity-$L^2$ extra order is genuinely boundary-limited, matching Cocquet et al.'s own observation. Remedies (corner-graded mesh, measuring away from the corner via `outlet_truncation_delta>0`, or rounding the corner) are modelling/measurement choices, not bug fixes. Associated tests: `test/extended/{CocquetAlpha1,CocquetDeviatoric,CocquetLinearReaction,CocquetAllDirichlet}`.
+It bites only quadratics because a fixed regularity ceiling ($s\approx0.8$) is masked by P1's larger interior error but exposed by P2's much smaller one. The energy-norm ($H^1$) rate the VMS theory guarantees is met on every variant; the velocity-$L^2$ extra order is genuinely boundary-limited, matching Cocquet et al.'s own observation. Remedies (corner-graded mesh, measuring away from the corner via `outlet_truncation_delta>0`, or rounding the corner) are modelling/measurement choices, not bug fixes. Associated tests: `test/extended/CocquetTubeTest/data/{alpha_one,deviatoric,linear_reaction,all_dirichlet}`.
 
 **Mesh-size (`h`) consistency fix.** All Cocquet drivers now compute the τ characteristic length as $\sqrt{2\cdot\text{area}}=1/N$ for triangles (the structured mesh parameter), matching `test/extended/CocquetFormMMS`. Previously this driver used $\sqrt{\text{area}}=1/(N\sqrt2)$ — a factor $\sqrt2$ too small, which only rescaled τ by a constant (rate-neutral; all slopes above are unaffected) but made the Cocquet and MMS drivers inconsistent. Cocquet et al. report the triangle *diameter* $h=\sqrt2/N$ (a further $\sqrt2$); since our convergence slopes are measured against $N$, the convention does not enter the rates.
 
-**Open confirmation item.** A finer-mesh run ($N$ up to $160$) of `CocquetAllDirichlet` (and `CocquetFormMMS`) would verify the pre-asymptotic interpretation by showing P2 $H^1\to2$, $L^2\to3$. Until then, "optimal recovery" is asserted as a *trend*, not a measured plateau.
+**Open confirmation item.** A finer-mesh run ($N$ up to $160$) of `all_dirichlet` (and `CocquetFormMMS`) would verify the pre-asymptotic interpretation by showing P2 $H^1\to2$, $L^2\to3$. Until then, "optimal recovery" is asserted as a *trend*, not a measured plateau.
 
 ---
 
@@ -310,7 +310,7 @@ It bites only quadratics because a fixed regularity ceiling ($s\approx0.8$) is m
 
 > **⚠ Note (2026-05-26):** Phase 10 below concludes that the convergence cap is the mixed-BC outlet corner singularity and is method-independent. This conclusion was drawn entirely on a **structured Cartesian-simplexified** mesh. **Phase 11 (further down) revises it:** on an unstructured FreeFem-style mesh the velocity-L² cap relaxes substantially and slopes recover toward Cocquet's reported O(h²). The "method-independent corner singularity" reading of Phase 10 is therefore a **structured-mesh artefact**; the corner DOES dominate the cap, but on a mesh whose triangulation is not corner-aligned the dominance weakens. Read Phase 11 before relying on Phase 10's conclusions. See also [cocquet_investigation_synthesis.md](investigation-synthesis.md) §5.3 / §5.7 for the post-S5-audit picture.
 
-To test whether the cap is our VMS formulation or the problem, we implemented Cocquet et al.'s *exact* discrete method — inf-sup-stable **Taylor–Hood $P_2/P_1$ with no stabilization** (pure Galerkin), $P_1$ porosity, $\eta p$ penalty — and ran it next to our VMS $P_1/P_1$ and $P_2/P_2$ in one figure. The unstabilized assembly reuses the production weak-form builders with `mult_mom=mult_mass=0` and lives in `test/extended/CocquetExperiment/galerkin_driver.jl` (validation tooling; `src/` is untouched). See `theory/cocquet/cocquet_formulation.tex` for the documented formulation and the code map.
+To test whether the cap is our VMS formulation or the problem, we implemented Cocquet et al.'s *exact* discrete method — inf-sup-stable **Taylor–Hood $P_2/P_1$ with no stabilization** (pure Galerkin), $P_1$ porosity, $\eta p$ penalty — and ran it next to our VMS $P_1/P_1$ and $P_2/P_2$ in one figure. The unstabilized assembly reuses the production weak-form builders with `mult_mom=mult_mass=0` and lives in `test/extended/CocquetTubeTest/galerkin_driver.jl` (validation tooling; `src/` is untouched). See `theory/cocquet/cocquet_formulation.tex` for the documented formulation and the code map.
 
 ### Result — the exact Cocquet method is corner-capped too
 
@@ -374,7 +374,7 @@ The $h$-consistency fix ($\sqrt{\rm area}\to\sqrt{2\,{\rm area}}$) rescales $\ta
 **A confound the entire Phase 1–10 ladder never tested:** every prior run used a **structured Cartesian mesh simplexified into right triangles**, with edges aligned to the $90^\circ$ no-slip/traction outlet corner, and a **structured $N=200$ self-reference**. Cocquet et al. used **FreeFem `buildmesh`** — an **unstructured Delaunay** mesh. Phase 9–10 concluded the P2 cap was a *mesh- and method-independent* corner singularity (and that "the paper's $H^3\times H^2$ claim is incorrect"). That conclusion was drawn **entirely on the structured family**.
 
 ### The test
-New self-contained sibling `test/extended/CocquetExperimentIrregularMesh` — a single-variable flip whose **only** change vs the benchmark is the mesh: `PorousNSSolver.build_unstructured_model(N)` (gmsh) with **prescribed boundary divisions** (transfinite curves: inlet $N$, outlet $N$, walls $2N$ → uniform edge $\approx1/N$) and an **unstructured Delaunay interior** — exactly the FreeFem `buildmesh` paradigm (boundary node count fixed, interior irregular). Same weak form, same 3-way comparison (VMS P1/P1, VMS P2/P2, Cocquet Galerkin P2/P1 with P1 porosity), same $(\mathrm{Re},c_{in})=(500,0.5)$, ref $N=200$, coarse $N\in\{10,20,40,80,100\}$, `physical_epsilon`$=10^{-7}$ (the paper's $\eta$, set explicitly). Cross-mesh errors use a tolerant `KDTreeSearch` (the coarse and reference unstructured meshes are non-nested). The benchmark `CocquetExperiment` and all of `src/` behaviour for structured runs are unchanged (the mesh generator defaults to `STRUCTURED`).
+New self-contained sibling `test/extended/CocquetTubeTest/data/unstructured_gmsh` — a single-variable flip whose **only** change vs the benchmark is the mesh: `PorousNSSolver.build_unstructured_model(N)` (gmsh) with **prescribed boundary divisions** (transfinite curves: inlet $N$, outlet $N$, walls $2N$ → uniform edge $\approx1/N$) and an **unstructured Delaunay interior** — exactly the FreeFem `buildmesh` paradigm (boundary node count fixed, interior irregular). Same weak form, same 3-way comparison (VMS P1/P1, VMS P2/P2, Cocquet Galerkin P2/P1 with P1 porosity), same $(\mathrm{Re},c_{in})=(500,0.5)$, ref $N=200$, coarse $N\in\{10,20,40,80,100\}$, `physical_epsilon`$=10^{-7}$ (the paper's $\eta$, set explicitly). Cross-mesh errors use a tolerant `KDTreeSearch` (the coarse and reference unstructured meshes are non-nested). The benchmark `structured` and all of `src/` behaviour for structured runs are unchanged (the mesh generator defaults to `STRUCTURED`).
 
 ### Decisive result — the velocity-$L^2$ cap disappears on the unstructured mesh
 
@@ -387,7 +387,7 @@ New self-contained sibling `test/extended/CocquetExperimentIrregularMesh` — a 
 | VMS P1/P1 | vel $L^2$ slopes | 1.72, 1.79, 1.96 | 1.13, 1.57, 2.00, 2.10 | — |
 | VMS P1/P1 | vel $H^1$ slopes | 0.89, 0.91, 0.84 | 0.34, 0.70, 1.01, 1.15 | — |
 
-(Read the clean $20\!\to\!40\!\to\!80$ trend; the finest $80\!\to\!100$ segment sits close to the $N=200$ reference and is deflated/noisy — e.g. Galerkin vel $L^2$ $1.87\!\to\!1.98$ then dips to $1.80$. Results in `test/extended/CocquetExperimentIrregularMesh/results/convergence_paper_comparison_irregular.{h5,png}`.)
+(Read the clean $20\!\to\!40\!\to\!80$ trend; the finest $80\!\to\!100$ segment sits close to the $N=200$ reference and is deflated/noisy — e.g. Galerkin vel $L^2$ $1.87\!\to\!1.98$ then dips to $1.80$. Results in `test/extended/CocquetTubeTest/results/unstructured_gmsh/convergence.{h5,png}`.)
 
 **The exact Cocquet method's velocity $L^2$ tracks $O(h^2)$ on the unstructured mesh — reproducing the right panel of the paper's Figure 2** — whereas the structured mesh held it at $\approx1.1$–$1.5$ (and the structured P2/P2 *decayed*). The qualitative signature flips completely: on the structured mesh the P2 energy norm was **flat/capped** ($H^1\approx0.73$–$0.78$, supposedly a fixed regularity ceiling); on the unstructured mesh it **climbs** ($H^1: 0.8\to1.15$ for P2/P1; $0.72\to1.54$ for P2/P2).
 
@@ -437,16 +437,16 @@ Phase 11 left the unstructured-mesh experiment with a $\approx 20\times$ magnitu
 - **`freefem_to_gmsh(...)`** and **`load_freefem_mesh(path)`** in the same file — convert FreeFem's text `.msh` format (`nv nt nbe` header, vertex/triangle/edge sections with integer labels) into Gmsh 2.2 ASCII and load via `GmshDiscreteModel`. Labels map by convention: FreeFem `1→"inlet"`, `2→"outlet"`, `3,4→"walls"`, plus a 2D `"domain"` group. The temp .msh is auto-cleaned.
 - **`GridapGmsh` (= 0.7.3) + `gmsh_jll` (~ 4.9.3)** added to `[deps]` / `[compat]` in [Project.toml](../../Project.toml). Newer `gmsh_jll` (e.g. 4.15) has an ABI mismatch with the vendored wrapper that surfaces as a segfault in `addPhysicalGroup`; pin defensively.
 - **Tolerant cross-mesh search** in [`compute_reference_errors`](../../src/metrics.jl): optional `search_method=KDTreeSearch(num_nearest_vertices=k)` kwarg. The default behaviour (no kwarg) is unchanged, so the structured benchmark is byte-for-byte identical. The Irregular-mesh driver passes `k=10` to handle the non-nested unstructured case (where near-boundary fine quadrature points otherwise fail point-location and crash).
-- **`test/extended/CocquetExperimentIrregularMesh/`** — a new self-contained sibling test mirroring the `Cocquet{Alpha1,Deviatoric,…}` pattern; the only difference from the benchmark is the mesh source. The driver reads `mesh_generator` (`"STRUCTURED"` / `"UNSTRUCTURED"`) and `freefem_mesh_dir` from the JSON config, with `mesh_file` plumbed through `build_solver` so the same code path handles structured, gmsh-generated unstructured, and externally-supplied FreeFem meshes. The original `CocquetExperiment` test is **untouched**.
-- **`physical_epsilon = 10^{-7}`** set explicitly in both new configs ([`paper_comparison_irregular.json`](../../test/extended/CocquetExperimentIrregularMesh/data/paper_comparison_irregular.json), [`paper_comparison_freefem.json`](../../test/extended/CocquetExperimentIrregularMesh/data/paper_comparison_freefem.json)) — matching the paper's $\eta = 10^{-7}$ exactly, instead of inheriting $10^{-8}$ from `base_config.json`.
+- **`test/extended/CocquetTubeTest/data/unstructured_gmsh/`** — a new self-contained sibling test mirroring the `CocquetTubeTest/data/{alpha_one,deviatoric,…}` pattern; the only difference from the benchmark is the mesh source. The driver reads `mesh_generator` (`"STRUCTURED"` / `"UNSTRUCTURED"`) and `freefem_mesh_dir` from the JSON config, with `mesh_file` plumbed through `build_solver` so the same code path handles structured, gmsh-generated unstructured, and externally-supplied FreeFem meshes. The original `structured` test is **untouched**.
+- **`physical_epsilon = 10^{-7}`** set explicitly in both new configs ([`paper_comparison_irregular.json`](../../test/extended/CocquetTubeTest/data/unstructured_gmsh/paper_comparison_irregular.json), [`paper_comparison_freefem.json`](../../test/extended/CocquetTubeTest/data/freefem_meshes/paper_comparison_freefem.json)) — matching the paper's $\eta = 10^{-7}$ exactly, instead of inheriting $10^{-8}$ from `base_config.json`.
 
 ### Phase 9–10's hypotheses, retested
-- **"The cap is a correlated-cancellation artifact of the structured self-reference"** (the Phase 11 first cut). **Refuted** by a cross-mesh-family test ([xfamily_diag.jl](../../test/extended/CocquetExperimentIrregularMesh/xfamily_diag.jl)): for the Cocquet Galerkin P2/P1 at $N=10$ vs $N=80$, the structured coarse solution gives $2.88\times10^{-4}$ against its same-family structured reference and $4.12\times10^{-4}$ against an *independent unstructured* reference — essentially the same error in both directions. The structured coarse and reference are not correlated enough to mask a global error; the structured *solution itself* is genuinely $\sim20\times$ more accurate at $N=10$ than the unstructured gmsh Delaunay one.
+- **"The cap is a correlated-cancellation artifact of the structured self-reference"** (the Phase 11 first cut). **Refuted** by a cross-mesh-family test (`xfamily_diag.jl`, removed in the CocquetTubeTest unification — recoverable from git history): for the Cocquet Galerkin P2/P1 at $N=10$ vs $N=80$, the structured coarse solution gives $2.88\times10^{-4}$ against its same-family structured reference and $4.12\times10^{-4}$ against an *independent unstructured* reference — essentially the same error in both directions. The structured coarse and reference are not correlated enough to mask a global error; the structured *solution itself* is genuinely $\sim20\times$ more accurate at $N=10$ than the unstructured gmsh Delaunay one.
 - **"The metric inflates the unstructured error"**. **Refuted** by reporting both nested and consistent metrics side-by-side: they agree to within $\sim1\%$ for every $N$ on the FreeFem mesh and show *identical* per-segment slope patterns.
 - **"Mesh quality (cell shape/size)"**. **Refuted** by direct inspection — gmsh Delaunay at $N=10$ has 506 cells with $h \in [0.069, 0.112]$ (mean 0.088), *finer* than the structured 400 cells with leg $0.1$; aspect ratios are tight. The unstructured mesh is not degenerate.
 
 ### Spatial error localization
-[localize_err.jl](../../test/extended/CocquetExperimentIrregularMesh/localize_err.jl) bins $\|e_u\|^2$ by region for Cocquet Galerkin P2/P1 at $N=10$ vs $N=80$:
+`localize_err.jl` (removed in the CocquetTubeTest unification — recoverable from git history) bins $\|e_u\|^2$ by region for Cocquet Galerkin P2/P1 at $N=10$ vs $N=80$:
 
 | region | structured | unstructured |
 | :-- | :-- | :-- |
@@ -461,7 +461,7 @@ Two completely disjoint failure modes:
 - **Unstructured (gmsh Delaunay)**: only 1 % at the outlet corner; the cost is **62 % in the bulk channel**. The isotropic, randomly-oriented Delaunay triangulation cannot sample the parabolic-in-$y$ channel flow as efficiently per DOF as edges-aligned-with-the-flow can. The 20× magnitude inflation is genuinely a *bulk* effect of the gmsh Delaunay topology, not a corner effect.
 
 ### Why gmsh Delaunay is not a FreeFem stand-in
-Three mesh recipes were tested at $N=10$ vs $N=80$ (Cocquet Galerkin P2/P1, [freefem_recipe_diag.jl](../../test/extended/CocquetExperimentIrregularMesh/freefem_recipe_diag.jl)):
+Three mesh recipes were tested at $N=10$ vs $N=80$ (Cocquet Galerkin P2/P1, `freefem_recipe_diag.jl`, removed in the CocquetTubeTest unification — recoverable from git history):
 
 | recipe | cells @ $N=10$ | vel $L^2$ |
 | :-- | --: | :-- |
@@ -484,7 +484,7 @@ But in FreeFem++, `border(N)` means $N$ *segments* on that border, irrespective 
 The two statements (literal "N per border" *and* $h=\sqrt2/N$) cannot both be true.
 
 ### Reproduction on the paper's actual FreeFem meshes (literal recipe first)
-The user generated the FreeFem meshes via [create_paper_meshes.edp](../../test/extended/CocquetExperimentIrregularMesh/data/meshes/freefem/create_paper_meshes.edp) (cell count $170$ at $N=10$, $63\,872$ at $N=200$ — confirms the literal anisotropic recipe). Three-way convergence on these:
+The user generated the FreeFem meshes via [create_paper_meshes.edp](../../test/extended/CocquetTubeTest/data/freefem_meshes/meshes/create_paper_meshes.edp) (cell count $170$ at $N=10$, $63\,872$ at $N=200$ — confirms the literal anisotropic recipe). Three-way convergence on these:
 
 | method (literal FreeFem mesh) | vel $L^2$ @ $N=10\to100$ | endpoint slope | finest segment slope |
 | :-- | :-- | :-- | :-- |
@@ -492,7 +492,7 @@ The user generated the FreeFem meshes via [create_paper_meshes.edp](../../test/e
 | VMS ASGS P2/P2 | $1.64\times10^{-3} \to 9.57\times10^{-5}$ | 1.21 | 1.89 |
 | **Cocquet Galerkin P2/P1** | $\mathbf{1.55\times10^{-3} \to 9.62\times10^{-5}}$ | **1.21** | **1.94** |
 
-Magnitude is now $\sim4\times$ closer to the paper than the gmsh Delaunay run was ($5.86\times10^{-3} \to 1.55\times10^{-3}$ at $N=10$ for the Cocquet method). Slopes climb but don't reach a clean 2 over the range. h5 archived as [convergence_paper_comparison_freefem_LITERAL.h5](../../test/extended/CocquetExperimentIrregularMesh/results/) (gitignored under `results/`).
+Magnitude is now $\sim4\times$ closer to the paper than the gmsh Delaunay run was ($5.86\times10^{-3} \to 1.55\times10^{-3}$ at $N=10$ for the Cocquet method). Slopes climb but don't reach a clean 2 over the range. h5 archived as [convergence.h5](../../test/extended/CocquetTubeTest/results/freefem_meshes/) (gitignored under `results/`).
 
 ### Reproduction on uniform-edge FreeFem meshes (the correction)
 Per the inconsistency analysis (and now documented as a new section in [theory/cocquet/cocquet_formulation.tex](../../theory/cocquet/cocquet_formulation.tex)), the user re-ran `create_paper_meshes.edp` with the **single one-line change**
@@ -543,8 +543,8 @@ The natural BC $\varepsilon(2\mathrm{Re}^{-1}\mathbf S(\mathbf u)-p\mathbf I)\ma
 **Most plausible undocumented difference with the paper**: their solver `.edp` (not in the paper, not in the meshes-only `.edp` we have) may implement the outlet BC slightly differently — most likely as a backflow-stabilised "do-nothing" outflow, or using `∇u:∇v` weakly (whose natural BC is the pseudo-traction $2\nu\partial\mathbf u/\partial\mathbf n - p\mathbf n$, not the symmetric-gradient traction). Either choice would soften the corner-singular pressure mode and could yield straight slope-2 curves on the same meshes without anything else changing.
 
 **Files of record**:
-- driver + configs: [test/extended/CocquetExperimentIrregularMesh/](../../test/extended/CocquetExperimentIrregularMesh/) — `run_convergence.jl`, `plot_convergence.py`, `data/paper_comparison_irregular.json` (gmsh path), `data/paper_comparison_freefem.json` (FreeFem path).
-- diagnostic scripts (kept as evidence): `xfamily_diag.jl`, `freefem_recipe_diag.jl`, `localize_err.jl`.
-- meshes: [data/meshes/freefem/](../../test/extended/CocquetExperimentIrregularMesh/data/meshes/freefem/) — the user's FreeFem `.msh` files (uniform recipe) + the generating `create_paper_meshes.edp`. The literal-recipe meshes are not committed; the one-line `.edp` change documented above regenerates them in seconds.
+- driver + configs: [test/extended/CocquetTubeTest/](../../test/extended/CocquetTubeTest/) — `run_convergence.jl`, `plot_convergence.py`, `data/unstructured_gmsh/paper_comparison_irregular.json` (gmsh path), `data/freefem_meshes/paper_comparison_freefem.json` (FreeFem path).
+- diagnostic scripts: `xfamily_diag.jl`, `freefem_recipe_diag.jl`, `localize_err.jl` — removed in the CocquetTubeTest unification (recoverable from git history); their findings remain recorded above.
+- meshes: [meshes/](../../test/extended/CocquetTubeTest/data/freefem_meshes/meshes/) — the user's FreeFem `.msh` files (uniform recipe) + the generating `create_paper_meshes.edp`. The literal-recipe meshes are not committed; the one-line `.edp` change documented above regenerates them in seconds.
 - src additions: `freefem_to_gmsh`, `load_freefem_mesh`, `build_unstructured_model` in [src/run_simulation.jl](../../src/run_simulation.jl); `search_method` kwarg in [src/metrics.jl](../../src/metrics.jl).
 - theory: new "Mesh generation and the paper's $h=\sqrt2/N$ inconsistency" section appended to [theory/cocquet/cocquet_formulation.tex](../../theory/cocquet/cocquet_formulation.tex).

@@ -2,6 +2,8 @@
     "_comment": "Cocquet convergence study for comparison with Cocquet et al. (2020), Figs 2-3: same physical case (Re=500, c_in=0.5, transverse porosity). THREE-WAY comparison in one plot via comparison_runs: our VMS-stabilized equal-order P1/P1 and P2/P2 (method ASGS), and the EXACT Cocquet method — unstabilized Galerkin Taylor-Hood P2/P1 with P1 porosity (method Galerkin, run via galerkin_driver.jl). Reference N=200 (matching the paper) over coarse N in {10,20,40,80}. outlet_truncation_delta=0 (whole domain). h_floor_weight=0 (reaction-speed fix). Run: julia --project=../../.. run_convergence.jl paper_comparison.json",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "standard",
+    "alpha_profile": "exponential",
     "k_convergence_list": [
         1
     ],

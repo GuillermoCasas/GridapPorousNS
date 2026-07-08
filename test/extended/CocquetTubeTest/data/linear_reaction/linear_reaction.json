@@ -2,6 +2,8 @@
     "_comment": "NONLINEAR-REACTION ISOLATION — IDENTICAL to CocquetExperiment/paper_comparison.json (Re=500, c_in=0.5, varying porosity, mixed BC with traction outlet, SymmetricGradient viscous, equal-order P1/P1 and P2/P2, N=200 reference over coarse N in {10,20,40,80}, h_floor_weight=0) EXCEPT sigma_nonlinear=0, which turns OFF the Forchheimer |u| nonlinear drag while keeping the linear porosity-dependent Darcy term sigma_linear*((1-a)/a)^2. This is the ONLY change vs the benchmark. If P2/P2 is unchanged, the nonlinear reaction contributes nothing to the cap (corner-dominated). Run: julia --project=../../.. run_convergence.jl linear_reaction.json",
     "Re": 500.0,
     "c_in": 0.5,
+    "boundary_policy": "standard",
+    "alpha_profile": "exponential",
     "k_convergence_list": [
         1
     ],

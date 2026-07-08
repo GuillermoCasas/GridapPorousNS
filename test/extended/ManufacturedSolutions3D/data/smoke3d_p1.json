@@ -1,0 +1,41 @@
+{
+  "description": "Official lean 3D-MMS smoke (paper article.tex 5.2). z-extruded 2D manufactured field on the (0,1)x(0,1)x(0,0.3) slab, fixed (alpha_0,Re,Da)=(0.5,1,1), P1 velocity/pressure, both ASGS and OSGS, Deviatoric viscous operator, paper stabilization constants (c1_mult=1), structured Kuhn tets (uniform, refinement-invariant quality). Drives smoke3d.jl run_config; asserted by test/extended/mms3d_config_smoke_extended_test.jl. See docs/pending-tasks.md 2a / formulation-audit 2026-06-24 F6.",
+  "physical_properties": {
+    "Re": 1.0,
+    "Da": 1.0,
+    "alpha_infty": 1.0,
+    "U": 1.0,
+    "L": 1.0
+  },
+  "domain": {
+    "alpha_0": 0.5,
+    "r_1": 0.2,
+    "r_2": 0.4,
+    "bounding_box": [0.0, 1.0, 0.0, 1.0, 0.0, 0.3]
+  },
+  "numerical_method": {
+    "element_spaces": {
+      "k_velocity": [1]
+    },
+    "stabilization": {
+      "methods": ["ASGS", "OSGS"],
+      "viscous_operator": "Deviatoric",
+      "c1_mult": 1.0,
+      "eps_mult": 1.0
+    },
+    "mesh": {
+      "sequence": "structured",
+      "partitions": [[8, 8, 2], [12, 12, 3], [16, 16, 4]]
+    }
+  },
+  "assertions": {
+    "comment": "Consumed by the extended guard. Rates are the FINE-segment per-method minimums; ASGS-P1 L2u is intrinsically sub-optimal (~1.2, method-intrinsic Aubin-Nitsche deficiency, audit B.1), OSGS-P1 recovers ~2. H1u is optimal (~1) for both. Thresholds carry margin below the measured structured-Kuhn rates.",
+    "require_success_all": true,
+    "require_monotone_decrease": true,
+    "min_h1u_rate": 0.75,
+    "min_l2u_rate": {
+      "ASGS": 0.9,
+      "OSGS": 1.6
+    }
+  }
+}
