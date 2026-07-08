@@ -102,7 +102,7 @@ function setup_cell(; Re::Float64, Da::Float64, alpha_0::Float64, n::Int,
                                             config.physical_properties.velocity_magnitude_derivative_floor),
         nu_calc, config.physical_properties.physical_epsilon,
     )
-    mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
+    mms = PorousNSSolver.PaperMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
     u_final = PorousNSSolver.get_u_ex(mms)
     p_final = PorousNSSolver.get_p_ex(mms)
     U_c, P_c = PorousNSSolver.get_characteristic_scales(mms)

@@ -143,7 +143,7 @@ function build_cell(label::String; Re, Da, alpha_0, kv=1, n=10, element_type="QU
         U_amp * L / Float64(Re),
         config.physical_properties.physical_epsilon,
     )
-    mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
+    mms = PorousNSSolver.PaperMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
     u_final = PorousNSSolver.get_u_ex(mms)
     p_final = PorousNSSolver.get_p_ex(mms)
     U_c, P_c = PorousNSSolver.get_characteristic_scales(mms)

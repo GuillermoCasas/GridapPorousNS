@@ -4,13 +4,13 @@
 # "mesh/field best-approximation" from "method". Optimal P1: L2 ~ h^2, H1 ~ h^1.
 using Gridap, GridapGmsh, PorousNSSolver
 const PNS = PorousNSSolver
-include("mesh3d.jl"); include("mms3d.jl")
+include("mesh3d.jl")   # MMS oracle now lives in src/problems/mms_paper.jl (PNS.UExFunc{3}). [unified 2026-07-08]
 
 slope(e0,e1,h0,h1) = log(e0/e1)/log(h0/h1)
 
 function interp_errs(domain, lcs; kv=1, qdeg=14)
     alpha_field = PNS.SmoothRadialPorosity(0.5, 1.0, 0.2, 0.4)
-    u_ex = UExFunc3D(1.0, 0.5, alpha_field, 1.0)
+    u_ex = PNS.UExFunc{3}(1.0, 0.5, alpha_field, 1.0)
     res = []
     for lc in lcs
         model = build_box_tet_model(lc; domain=domain, algorithm=1)
@@ -38,7 +38,7 @@ end
 # tets) — isolates whether the gmsh unstructured mesh QUALITY is degrading the interpolation rate.
 function interp_errs_structured(ns; kv=1, qdeg=14)
     alpha_field = PNS.SmoothRadialPorosity(0.5, 1.0, 0.2, 0.4)
-    u_ex = UExFunc3D(1.0, 0.5, alpha_field, 1.0)
+    u_ex = PNS.UExFunc{3}(1.0, 0.5, alpha_field, 1.0)
     res = []
     for n in ns
         model = simplexify(CartesianDiscreteModel((0.0,1.0,0.0,1.0,0.0,1.0), (n,n,n)))
@@ -66,7 +66,7 @@ end
 # mesh STRATEGY (not the field) was the culprit.
 function interp_errs_nested(domain, base_lc, nlevels; kv=1, qdeg=14)
     alpha_field = PNS.SmoothRadialPorosity(0.5, 1.0, 0.2, 0.4)
-    u_ex = UExFunc3D(1.0, 0.5, alpha_field, 1.0)
+    u_ex = PNS.UExFunc{3}(1.0, 0.5, alpha_field, 1.0)
     fam = build_nested_family(nlevels; lc=base_lc, domain=domain)
     res = []
     for (lvl, model) in enumerate(fam)

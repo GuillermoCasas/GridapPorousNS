@@ -879,7 +879,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                 form = build_mms_formulation(config, Da, Re, U_amp, L_cell, alpha_infty)
 
                                 # Exact execution of full manufactured solutions analytical expressions
-                                mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L_cell, alpha_infty=alpha_infty)
+                                mms = PorousNSSolver.PaperMMS(form, U_amp, alpha_field; L=L_cell, alpha_infty=alpha_infty)
                                 U_c, P_c = PorousNSSolver.get_characteristic_scales(mms)
 
                                 u_final = PorousNSSolver.get_u_ex(mms)

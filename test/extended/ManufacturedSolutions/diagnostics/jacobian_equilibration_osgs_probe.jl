@@ -86,7 +86,7 @@ function setup_cell(; Re::Float64, Da::Float64, alpha_0::Float64, n::Int,
                                             config.physical_properties.velocity_magnitude_derivative_floor),
         nu_calc, config.physical_properties.physical_epsilon,
     )
-    mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
+    mms = PorousNSSolver.PaperMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
     u_final = PorousNSSolver.get_u_ex(mms)
     p_final = PorousNSSolver.get_p_ex(mms)
     U_c, P_c = PorousNSSolver.get_characteristic_scales(mms)
@@ -203,7 +203,7 @@ function main()
                   U_amp=1.0, L=1.0, label="A: default (U=L=1)")
 
     # Encoding B: L=1 fixed, U_amp chosen to centre geom-mean(ν,σ) at 1.
-    # This avoids the MMS shape becoming high-frequency (Paper2DMMS hardcodes sin(πx),
+    # This avoids the MMS shape becoming high-frequency (PaperMMS hardcodes sin(πx),
     # which is one half-period on L=1 but ~L/2 oscillations on L≠1).
     # Spread max/min stays the same — but the absolute magnitudes shift toward 1.
     U_centered = Re / sqrt(alpha_0 * Da)

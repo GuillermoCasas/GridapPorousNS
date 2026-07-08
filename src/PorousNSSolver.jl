@@ -74,11 +74,11 @@ include("solvers/mms_verification.jl")
 include("metrics.jl")
 
 # Problems and IO.
-#   mms_paper_2d   — the 2D manufactured solution from the paper (exact u, p, forcing).
+#   mms_paper      — the paper manufactured solution (exact u, p, forcing), 2D and 3D.
 #   io             — VTK/HDF5 export of the computed fields.
 #   run_simulation — the end-to-end pipeline: load config → mesh → spaces → formulation
 #                    → solve → export.
-include("problems/mms_paper_2d.jl")
+include("problems/mms_paper.jl")
 include("io.jl")
 include("run_simulation.jl")
 

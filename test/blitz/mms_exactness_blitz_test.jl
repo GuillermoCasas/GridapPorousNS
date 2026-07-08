@@ -68,7 +68,7 @@ include("../extended/ManufacturedSolutions/run_test.jl")
     # generalisation; passing L here couples the porosity radii r_1, r_2 to the L-scaled domain.
     alpha_field = build_porosity_field(config, 0.1, alpha_infty, L)
     form = build_mms_formulation(config, Da_bound, Re_bound, U_amp, L, alpha_infty)
-    mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
+    mms = PorousNSSolver.PaperMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
 
     # 3. Retrieve Characteristic scale bindings
     U_c, P_c = PorousNSSolver.get_characteristic_scales(mms)

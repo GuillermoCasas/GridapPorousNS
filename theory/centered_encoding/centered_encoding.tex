@@ -102,7 +102,7 @@ So $U$ controls the geometric mean and $L$ controls the spread.
 The \emph{centered encoding} chooses $U$ so that
 $\sqrt{\nu\,\sigma} = 1$, leaving $L = 1$ because the manufactured solution
 shape $\sin(\pi x)$ is hard-coded for a unit domain (see
-\texttt{Paper2DMMS} in \texttt{src/problems/mms\_paper\_2d.jl}):
+\texttt{PaperMMS} in \texttt{src/problems/mms\_paper.jl}):
 \begin{equation}
   \boxed{\;\;
     U \;=\; \frac{\Reyn}{\sqrt{\alpha_\infty\,\Damk}},
@@ -290,7 +290,7 @@ harness; no modification to the dimensional solver. The original
 for the centered strategy (Section~2), $(L=1, U=1)$ for the legacy
 default, and the variable-$L$ values for balanced and minmax
 (Section~\ref{sec:varL}). The downstream pipeline
-(\code{build\_mms\_formulation}, \code{Paper2DMMS},
+(\code{build\_mms\_formulation}, \code{PaperMMS},
 \code{evaluate\_exactness\_diagnostics}, \code{get\_characteristic\_scales})
 threads $U$ and $L$ through correctly: the MMS exact velocity is multiplied
 by $U$, the manufactured forcing is computed analytically from that

@@ -78,6 +78,15 @@ overturn the verdict. Diagnostic hooks live behind `tau.jl` `TAU_VISC_MULT`, `sm
 ## 2. Tests to promote / add
 
 ### 2a. Make the 3D MMS test config-driven + add an official 3D-MMS extended test (audit F6)
+**Update (2026-07-08): the *oracle* half is DONE.** The separate 3D oracle `mms3d.jl` (`Paper3DMMS`,
+`UExFunc3D`, `evaluate_exactness_diagnostics3d`) — kept "self-contained… so the validated 2D core is
+untouched" — was **unified into the shared dimension-generic** [`src/problems/mms_paper.jl`](../src/problems/mms_paper.jl)
+(`PaperMMS{D}` / `UExFunc{D}` / `PExFunc{D}`, `dim=3`); `smoke3d.jl` / `interp_test.jl` now call the same
+module API as the 2D harness. The only per-dimension analytic term (deviatoric grad-div, `1 − 2/D` ·`∇(∇·u)`)
+is isolated in a `Val(D)`-dispatched helper, byte-identical to both old files — mirroring the formulation-side
+VISC-01 (`0.5 − 1/D`). *Remaining F6 scope (below) is unchanged:* lift the study knobs into a committed JSON
+config + wire the official extended guard.
+
 `test/extended/ManufacturedSolutions3D/smoke3d.jl` is a hand-edited driver with hard-coded study params
 (`RE`/`DA`/`ALPHA0`/`R1`/`R2`/`L`, `mesh_sequence`, `c1_mult`, `kv`/`method` loops) — the 3D analogue of
 the 2D `run_test.jl` but with **no committed config JSON and no automated guard** (the source of the

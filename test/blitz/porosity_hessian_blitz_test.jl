@@ -10,7 +10,7 @@
 #
 # Associated Files / Functions:
 # - `src/models/porosity.jl` (`grad_alpha`, `lap_alpha`, `hess_alpha`)
-# - `src/problems/mms_paper_2d.jl` (`grad_u_ex`, `grad_div_u_ex`)
+# - `src/problems/mms_paper.jl` (`grad_u_ex`, `grad_div_u_ex`)
 # ==============================================================================================
 
 using Pkg

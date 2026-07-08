@@ -5,7 +5,7 @@
 # Cocquet benchmark — the symmetric-gradient viscous term and the nonlinear, porosity-dependent
 # Forchheimer–Ergun reaction σ(α,u)=a(α)+b(α)|u| — but with a smooth, closed-form exact solution.
 # It is a self-contained sibling of test/extended/ManufacturedSolutions and shares the SAME
-# generalized manufactured-solution machinery in src/problems/mms_paper_2d.jl: the exact fields
+# generalized manufactured-solution machinery in src/problems/mms_paper.jl: the exact fields
 # (u_ex, p_ex) and the forcing oracle `evaluate_exactness_diagnostics`, which dispatches on the
 # configured reaction law (constant σ vs. nonlinear Forchheimer-Ergun) and viscous operator. The
 # only difference between this test and the standard MMS is the configured formulation — which is
@@ -18,7 +18,7 @@
 # Associated Files / Functions:
 # - `src/formulations/continuous_problem.jl`
 # - `src/solvers/nonlinear.jl` (`solve_system`)
-# - `src/problems/mms_paper_2d.jl` (exact fields + reaction-aware forcing oracle)
+# - `src/problems/mms_paper.jl` (exact fields + reaction-aware forcing oracle)
 # ==============================================================================================
 
 using Pkg
@@ -104,7 +104,7 @@ end
 function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     # Velocity regularization. h_floor_weight is fixed to 0 so the speed floor is
     # mesh-independent — required for the forcing oracle to stay exact under Forchheimer
-    # (see evaluate_exactness_diagnostics in src/problems/mms_paper_2d.jl).
+    # (see evaluate_exactness_diagnostics in src/problems/mms_paper.jl).
     reg = PorousNSSolver.SmoothVelocityFloor(
         config.physical_properties.u_base_floor_ref,
         0.0,
@@ -630,7 +630,7 @@ function run_mms(config_file="test_config.json")
                                 form = build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
                                 
                                 # Exact execution of full manufactured solutions analytical expressions
-                                mms = PorousNSSolver.Paper2DMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
+                                mms = PorousNSSolver.PaperMMS(form, U_amp, alpha_field; L=L, alpha_infty=alpha_infty)
                                 U_c, P_c = PorousNSSolver.get_characteristic_scales(mms)
                                 
                                 u_final = PorousNSSolver.get_u_ex(mms)

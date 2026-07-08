@@ -4,6 +4,9 @@ Self-contained convergence study for the 3D MMS case of
 [theory/paper/article.tex](../../../theory/paper/article.tex) §5.2 (tables `tab:3DL2` / `tab:3DH1`):
 a z-extruded 2D field on the parallelepiped `(0,1)×(0,1)×(0,0.3)`, fixed
 `(α₀, Re, Da) = (0.5, 1, 1)`, solved with `P1` (4 meshes) and `P2` (3 meshes), both **ASGS** and **OSGS**.
+The exact-solution oracle is the shared dimension-generic core in
+[src/problems/mms_paper.jl](../../../src/problems/mms_paper.jl) (`PorousNSSolver.PaperMMS` with `dim=3`
+gives the z-extruded 3D field); `smoke3d.jl` calls it directly. There is no separate 3D oracle file.
 The meshes are a **nested red-refined tetrahedral family**: one coarse gmsh tet mesh subdivided `1→8`
 per level, so `h` halves exactly at each level.
 
@@ -12,7 +15,6 @@ per level, so `h` halves exactly at each level.
 | file | role |
 |------|------|
 | `mesh3d.jl` | `build_nested_family(nlevels; lc, domain)` — base gmsh tet mesh + recursive red refinement. |
-| `mms3d.jl` | the z-extruded exact-solution oracle (`Paper3DMMS`, exactness diagnostics). |
 | `smoke3d.jl` | the solve driver + sweep/cells runners (see below). |
 | `plot_convergence3d.py` | log–log convergence plots (`results/convergence3d_P{1,2}.png`), 2D-harness format. |
 | `plot_mesh3d.py` | the nested-family mesh mosaic (`results/mesh/mesh_levels.png`). |

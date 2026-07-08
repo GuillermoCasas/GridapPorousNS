@@ -12,7 +12,8 @@ using Dates
 using PorousNSSolver
 const PNS = PorousNSSolver
 include("mesh3d.jl")
-include("mms3d.jl")
+# The manufactured-solution oracle is the shared dimension-generic core in
+# src/problems/mms_paper.jl (PNS.PaperMMS with dim=3 → the z-extruded 3D field). [unified 2026-07-08]
 # [harness-frame] Re/Da iteration-budget knobs (relocated out of production SolverConfig — audit §A.1/F1).
 @isdefined(read_mms_dynamic_budget) || include(joinpath(@__DIR__, "..", "harness_dynamic_budget.jl"))
 
@@ -182,9 +183,10 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                                        PNS.ConstantSigmaLaw(sigma_c), proj, reg, nu, eps_phys;
                                        numerical_epsilon=eps_num)
 
-    mms = Paper3DMMS(form, U_AMP, alpha_field, L, ALPHAINF, eps_phys)   # oracle g uses ε_phys (0 ⇒ incompressible source)
-    U_c, P_c = characteristic_scales3d(mms)
-    u_ex = get_u_ex3d(mms); p_ex = get_p_ex3d(mms)
+    # dim=3 → z-extruded field; the oracle g reads ε_phys from form.physical_epsilon (0 ⇒ incompressible source).
+    mms = PNS.PaperMMS(form, U_AMP, alpha_field; L=L, alpha_infty=ALPHAINF, dim=3)
+    U_c, P_c = PNS.get_characteristic_scales(mms)
+    u_ex = PNS.get_u_ex(mms); p_ex = PNS.get_p_ex(mms)
 
     labels = get_face_labeling(model)
     refe_u = ReferenceFE(lagrangian, VectorValue{3,Float64}, kv)
@@ -238,7 +240,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     h_mean = sum(h_array) / length(h_array)   # ACHIEVED mesh size — the correct convergence abscissa
     alpha_cf = CellField(x -> PNS.alpha(alpha_field, x), Ω)
 
-    f_cf, g_cf, _, _ = evaluate_exactness_diagnostics3d(mms, Ω, dΩ, c_1, c_2)
+    f_cf, g_cf = PNS.evaluate_exactness_diagnostics(mms, model, Ω, dΩ, h_cf, X, Y, c_1, c_2, nothing)
 
     h_scale = h_mean   # key tolerances off the ACHIEVED mesh size (nested family halves h exactly)
     spatial_err_est = h_scale^(kv + 1)

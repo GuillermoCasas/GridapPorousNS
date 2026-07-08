@@ -12,7 +12,7 @@
 #     (u_ex(L·x̂; L) ≡ u_ex(x̂; 1)) within machine precision.
 #
 # Associated Files / Functions:
-# - `src/problems/mms_paper_2d.jl` (`UExFunc`, `grad_u_ex`, `lap_u_ex`, `grad_div_u_ex`, `get_p_ex`)
+# - `src/problems/mms_paper.jl` (`UExFunc`, `grad_u_ex`, `lap_u_ex`, `grad_div_u_ex`, `get_p_ex`)
 # - `theory/centered_encoding/centered_encoding.tex` Section 6 (closed-form derivation)
 # ==============================================================================================
 
@@ -67,9 +67,9 @@ end
     U = 2.5
     alpha_const = 0.8
 
-    # Build a minimal PorousNSSolver formulation so we can construct Paper2DMMS.
+    # Build a minimal PorousNSSolver formulation so we can construct PaperMMS.
     # We don't actually need the dimensional ν, σ to be physically meaningful — we just need
-    # something Paper2DMMS will accept. Use ConstantSigmaLaw with σ=1, viscous op irrelevant.
+    # something PaperMMS will accept. Use ConstantSigmaLaw with σ=1, viscous op irrelevant.
     rxn = PorousNSSolver.ConstantSigmaLaw(1.0)
     visc = PorousNSSolver.DeviatoricSymmetricViscosity()
     proj = PorousNSSolver.ProjectResidualWithoutReactionWhenConstantSigma()
@@ -77,7 +77,7 @@ end
     form = PorousNSSolver.PaperGeneralFormulation(visc, rxn, proj, reg, 1.0, 1e-8)
 
     alpha_field_L1 = _build_uniform_alpha_field(alpha_const, 1.0)
-    mms_L1 = PorousNSSolver.Paper2DMMS(form, U, alpha_field_L1; L=1.0, alpha_infty=alpha_const)
+    mms_L1 = PorousNSSolver.PaperMMS(form, U, alpha_field_L1; L=1.0, alpha_infty=alpha_const)
     u_func_L1 = PorousNSSolver.get_u_ex(mms_L1)
 
     # Sample points safely outside the (collapsed) porosity bump (r > 0.10) so the field is
@@ -130,12 +130,12 @@ end
 
     # L=1 reference field and MMS
     alpha_field_L1 = _build_uniform_alpha_field(alpha_const, 1.0)
-    mms_L1 = PorousNSSolver.Paper2DMMS(form, U, alpha_field_L1; L=1.0, alpha_infty=alpha_const)
+    mms_L1 = PorousNSSolver.PaperMMS(form, U, alpha_field_L1; L=1.0, alpha_infty=alpha_const)
     u_func_L1 = PorousNSSolver.get_u_ex(mms_L1)
 
     # L=10 field (porosity bump radii scaled with L) and MMS
     alpha_field_Lx = _build_uniform_alpha_field(alpha_const, L_test)
-    mms_Lx = PorousNSSolver.Paper2DMMS(form, U, alpha_field_Lx; L=L_test, alpha_infty=alpha_const)
+    mms_Lx = PorousNSSolver.PaperMMS(form, U, alpha_field_Lx; L=L_test, alpha_infty=alpha_const)
     u_func_Lx = PorousNSSolver.get_u_ex(mms_Lx)
 
     sample_points_unit = [
