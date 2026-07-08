@@ -17,6 +17,9 @@ using HDF5
 # every numerical control is an explicit field. Everything downstream consumes these.
 include("config.jl")
 
+# Geometry: the configurable element characteristic size h(K) that feeds the stabilization τ₁/τ₂.
+include("geometry.jl")
+
 # Models: the physical laws of the porous medium.
 #   porosity        — the porosity/permeability field α(x) and its derived quantities.
 #   regularization  — the SmoothVelocityFloor that keeps |u| away from 0 in σ(α,u).
@@ -82,6 +85,7 @@ include("run_simulation.jl")
 export run_simulation
 export load_config
 export PorousNSConfig
+export element_size_field, element_size_convention, ELEMENT_SIZE_CONVENTIONS
 export compute_reference_errors
 export compute_reference_errors_multimask
 export compute_trial_projection_errors

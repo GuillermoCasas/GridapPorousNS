@@ -34,7 +34,8 @@
             "k_pressure": 1
         },
         "stabilization": {
-            "method": "ASGS"
+            "method": "ASGS",
+            "element_size": "shortest_edge"
         },
         "solver": {
             "picard_iterations": 5,

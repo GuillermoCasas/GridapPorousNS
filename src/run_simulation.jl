@@ -375,11 +375,11 @@ function run_simulation(config_path::String;
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
     
-    # Element characteristic size h: √(2·area) for TRI, √area for QUAD (feeds the τ inverse estimates).
-    is_tri_val = (cfg.numerical_method.mesh.element_type == "TRI")
-    cell_measures = get_cell_measure(Ω)
-    h_array = lazy_map(v -> is_tri_val ? sqrt(2.0 * abs(v)) : sqrt(abs(v)), cell_measures)
-    h = CellField(h_array, Ω)
+    # Element characteristic size h feeding the τ inverse estimates, via the configured convention
+    # (StabilizationConfig.element_size): "shortest_edge" (Codina min edge, default) ≡ the legacy
+    # √(2·A)/√A grid spacing on the structured mesh; "volume" reproduces the legacy formula; "diameter"
+    # / "average_edge" rescale τ. See src/geometry.jl.
+    h = element_size_field(Ω, model, element_size_convention(cfg.numerical_method.stabilization.element_size))
     
     # Lift the scalar config inputs into CellFields over Ω so the formulation can evaluate them
     # pointwise at quadrature: α is the (here uniform) porosity field; f is the constant body force.

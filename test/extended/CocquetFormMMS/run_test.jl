@@ -525,9 +525,12 @@ function run_mms(config_file="test_config.json")
                             "viscous_operator_type" => get(nm_dict, "viscous_operator_type", "DeviatoricSymmetric"),
                             "element_spaces" => Dict("k_velocity" => Int(kv), "k_pressure" => Int(kp)),
                             "mesh" => Dict("element_type" => String(etype), "partition" => [n, n]),
-                            "stabilization" => Dict(
-                                "method" => "ASGS"
-                            ),
+                            # [element size] carry the test config's stabilization.element_size when set
+                            # (volume|shortest_edge|average_edge|diameter); otherwise base_config supplies
+                            # the default (shortest_edge) via the deep-merge in load_config_from_dict.
+                            "stabilization" => haskey(stab_dict, "element_size") ?
+                                Dict("method" => "ASGS", "element_size" => stab_dict["element_size"]) :
+                                Dict("method" => "ASGS"),
                             "solver" => get(get(test_dict, "numerical_method", Dict()), "solver", Dict())
                         )
                     )
@@ -610,12 +613,12 @@ function run_mms(config_file="test_config.json")
                                 Ω = Triangulation(model)
                                 dΩ = Measure(Ω, degree + 4)
 
-                                if etype == "TRI"
-                                    h_array = lazy_map(v -> sqrt(2.0 * abs(v)), get_cell_measure(Ω))
-                                else
-                                    h_array = lazy_map(v -> sqrt(abs(v)), get_cell_measure(Ω))
-                                end
-                                h_cf = CellField(collect(h_array), Ω)
+                                # [element size] h(K) via the configured convention (StabilizationConfig.element_size).
+                                # Default "shortest_edge" (Codina min edge) ≡ the old √(2·A)/√A grid-spacing on the
+                                # structured simplex/square mesh, so this is byte-identical there; "volume" reproduces
+                                # the legacy formula exactly; "diameter"/"average_edge" rescale τ. See src/geometry.jl.
+                                esize_conv = PorousNSSolver.element_size_convention(config.numerical_method.stabilization.element_size)
+                                h_cf = PorousNSSolver.element_size_field(Ω, model, esize_conv)
                                 h_pert_cf = CellField(h_raw_func, Ω)
                                 norm_h = sqrt(abs(sum(∫( h_pert_cf ⋅ h_pert_cf )dΩ)))
                                 norm_h > 0.0 || error("Perturbation field norm must be strictly positive.")

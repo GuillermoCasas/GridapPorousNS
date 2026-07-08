@@ -102,6 +102,11 @@ Choice of subgrid-scale stabilization.
 """
 Base.@kwdef struct StabilizationConfig
     method::String
+    # Element characteristic size h(K) convention feeding τ₁/τ₂ (see src/geometry.jl):
+    # "volume" (legacy grid-spacing proxy √(2A)/√A), "shortest_edge" (Codina min edge — default),
+    # "average_edge" (mean edge length), or "diameter" (strict max vertex-pair). A stabilization-
+    # calibration choice: it rescales τ by an O(1) factor. No silent default — carried in base_config.json.
+    element_size::String
 end
 
 """
@@ -425,6 +430,7 @@ function validate!(cfg::PorousNSConfig)
     # Stabilization
     stab = cfg.numerical_method.stabilization
     @assert stab.method in ("ASGS", "OSGS") "Stabilization method must be ASGS or OSGS"
+    @assert stab.element_size in ("volume", "shortest_edge", "average_edge", "diameter") "stabilization.element_size must be one of volume|shortest_edge|average_edge|diameter"
 
     # Formulation Operator validation
     @assert cfg.numerical_method.viscous_operator_type in ("DeviatoricSymmetric", "SymmetricGradient", "Laplacian") "viscous_operator_type strictly expects DeviatoricSymmetric, SymmetricGradient, or Laplacian"
