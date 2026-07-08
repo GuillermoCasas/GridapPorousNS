@@ -303,9 +303,14 @@ follow-up is pursued.
   superseded `plot_combined.py`, the stale `cocquet_form_mms.json.orig`, and the dead-end A/B configs
   (`isolation_{trim,full,osgs_trim,osgs_full}.json`) were deleted. **Kept:** `data/isolation_alphasweep.json`
   + `data/isolation_linctrl.json` (they back the §4 reaction-magnitude finding); `results/` h5 outputs are
-  gitignored. **Still untriaged for pruning** (your call): the pre-redesign
-  `cocquet_form_mms_comparison_C*.json` / `cocquet_form_mms_equalorder.json` (refs=0) and the
-  `cocquet_form_mms_vms_k2.json` shard helper.
+  gitignored.
+- **Historic-config prune (2026-07-08):** the pre-redesign scrap configs `cocquet_form_mms_comparison_C*.json`
+  (the 6 Cconv/Cmild/Creact × galerkin/stab files, refs=0) and `cocquet_form_mms_equalorder.json` were
+  **removed** (git rm), along with 5 orphaned result DBs whose configs were already gone
+  (`isolation_{osgs_full,trim,osgs_trim,full}.h5`, `_validate_osgs.h5`). `data/` is now the 8 live configs.
+  Still borderline (kept pending review): `cocquet_form_mms_comparison_{galerkin,stab}.json` (referenced in
+  `investigation-synthesis.md`) and the old `cocquet_form_mms.json` (still read by `plot_mesh.py`).
+  `cocquet_form_mms_vms_k2.json` is the **active** k=2 shard — keep.
 - **Diagnostic harness change left in place:** `run_test.jl` now gates the `Constant_Sigma` reaction
   trim on `experimental_reaction_mode` (mirroring `src/run_simulation.jl:57`); it does not affect the
   Forchheimer path the real sweep uses.
