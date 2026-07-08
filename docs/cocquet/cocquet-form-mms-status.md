@@ -102,6 +102,16 @@ gate, so the difference is the *problem*, not the solver:
 
 ### 4.1 RESOLVED (2026-07-07, k=1): a coarse-mesh solution-branch fold; the corner is FE-optimal above it
 
+> **Provenance note (2026-07-08 cleanup).** The N=320 corner extension in this section and the
+> mechanism A/B runs in §4.3 were produced **off the official path** — via throwaway side-configs and
+> parallel side-DBs (`*_corner`, `*_strip_*`, `*_c1x64*`), since **removed** per the
+> `.agents/rules/official-results-path.md` rule (do not fork the results pipeline). The **findings
+> stand** as documented (the numbers were read off those runs), but the config/DB paths named below
+> refer to those removed throwaways and are kept only as a record of what was run. To reproduce the
+> corner rates as an *official* result, extend the official `data/cocquet_form_mms_vms.json` mesh ladder
+> (`convergence_partitions` → N=320) and re-run through the harness, archiving the prior N≤160 official
+> DB into `previous_results/` first.
+
 The α=0.1 × Re=1e5 "failure" is a **genuine coarse-mesh turning-point fold of the discrete solution
 branch** — on coarse meshes there is *no* root with ‖R‖≤tol to converge to — that **recedes with mesh
 refinement**. It is not a solver bug and not a stabilization defect. Evidence, all from the committed
