@@ -41,13 +41,15 @@
    (non-monotone). That residual is the known **paper-c₁ P2 under-stabilization** (a τ·c₁ stabilization issue,
    ORTHOGONAL to the penalty — the penalty fixes well-posedness, not stabilization). The earlier "rate 5.25"
    verdict was the L0→L1 segment only; the third mesh exposes the non-monotonicity.
-4. **OSGS-3D: P1 SOLVED, P2 still open.** The combination **iterative penalty + boot-skip + JFNK +
+4. **OSGS-3D: P1 SOLVED, P2 RESOLVED 2026-07-09 (§6).** The combination **iterative penalty + boot-skip + JFNK +
    reference-root homotopy** makes **OSGS P1 robust AND fully optimal** at paper c₁ (`eps_used=1` all 4 meshes;
-   L²u→2.0, H¹u→1.0, L²p→1.8; ~2–4× more accurate than ASGS) — this *resolves* the far-guess non-robustness
-   that earlier P2-centric experiments (§4) had generalized to all of OSGS-3D. **OSGS P2** remains the genuine
-   **∂π/∂u-coupling** problem: the *solution* is accurate and near-optimal (L²u rate ~2.4→2.9, H¹u ~1.6→1.7)
-   but the solver reports `ok=false` (the convergence GATE isn't met) — see §4. (2D k=2 OSGS needs JFNK for the
-   same ∂π/∂u reason.)
+   L²u→2.0, H¹u→1.0, L²p→1.8; ~2–4× more accurate than ASGS). **OSGS P2** was the **∂π/∂u-coupling** problem —
+   `ρ(J_frozen⁻¹·∂π/∂u) ≈ 1249` at paper c₁ made JFNK-GMRES stall, so the solver **sat at the exact-guess
+   interpolant** (the "accurate solution, `ok=false`" was the *interpolation* error of a stuck solver, not a
+   reached root). **Fixed** by a solution-preserving **preconditioner-only c₁×4 inflation**
+   (`osgs_jfnk_precond_c1_mult`): ρ_prec → 3.8, `success=true`, `eps_used=1`, quadratic Newton — **see §6**. This
+   *exposes* a residual §3 question: the paper-c₁ P2-3D root has accurate velocity but under-stabilized pressure
+   (L²p=0.045). (2D k=2 OSGS needs JFNK for the same ∂π/∂u reason.)
 
 ## 1. Symptom & the two false leads
 
@@ -204,6 +206,57 @@ discretization, c₁, the penalty, and the operators are all confirmed correct. 
    test whether it makes the π-update contractive in 3D.
 4. Confirm the c₁=paper-value OSGS *converged root* is optimal (it should be, since ASGS at paper c₁ is
    optimal and the discretization is shared) once a robust solver reaches it.
+
+## 6. RESOLVED (2026-07-09): ρ_prec diagnosis + the c₁-inflated JFNK preconditioner
+
+The §4 blocker is **fixed**. A full re-diagnosis on current code (single-cell probes on the (12,12,3) cell)
+settled the mechanism to **one number** and found a cheap, solution-preserving fix.
+
+**The mechanism — ρ_prec = 1249.** The spectral radius `ρ(J_frozen⁻¹·∂π/∂u)` — the dropped coupling measured
+against the frozen-π preconditioner — is **1249** at paper c₁ (2D reference ≈ 0.88). This one number governs
+*both* solver strategies: JFNK's preconditioned GMRES has an eigenvalue ≈1250 (can't converge at any practical
+budget), and the staggered Picard π-update's contraction rate *is* ρ_prec = 1249 (so it diverges — matching the
+§4 "outer 2 diverges" observation, and refuting the damped-staggering idea, whose rate is the same).
+
+**Everything else refuted (probes, this cell):**
+- **Gate** is ready but *starved* — the `3b76864` residual-floor valve can only accept a solve the solver drives
+  to the floor; here the solver never descends, so `success=false` is *correct*.
+- **The "accurate solution" was the interpolation error of a STUCK solver.** ‖f‖ never leaves 1.7e-3; the solver
+  rolls back to the exact-guess interpolant `[u_ex,p_ex]`, whose error (L²u=0.0012) *coincides* with a discrete
+  root's only because both are O(hᵏ⁺¹). The doc's "OSGS reaches L²u=0.0012187 ⇒ root correct" reasoning was an
+  artifact of starting at the exact solution's interpolant.
+- **FD noise** — refuted (the mat-vec is flat across ε∈[1e-11,1e-4]; `fd_epsilon=1e-8` is fine).
+- **Weak-pin / stronger ε_num** — refuted (an `eps_mult` 1→1000 sweep made GMRES *worse*: ε_num pins the
+  preconditioner but not the residual tangent ⇒ more mismatch).
+- **Constant-pressure gauge deflation** — refuted: the frozen-π tangent *is* near-singular on the pure
+  constant-pressure mode (σ_min=1.14e-9, cond=9.4e8, alignment 1.0000), but deflating it leaves ρ_prec=1249
+  unchanged — so the blowup is NOT the gauge mode (unlike 2D, where deflation gave ρ_defl=0.74).
+
+**The fix — a preconditioner-ONLY c₁ inflation.** A classic Schur/approximate-`J_frozen` preconditioner cannot
+help (the current preconditioner is already *exact* `J_frozen⁻¹` via LU; the problem is the *dropped* `∂π/∂u`,
+not inverting `J_frozen`). What works: assemble the frozen-π preconditioner with **c₁×4** while the residual `F`
+and its matrix-free full tangent stay at **paper c₁**. A larger preconditioner c₁ shrinks the subscale/∂π/∂u
+relative to the preconditioner — ρ_prec falls **1178 → 3.8** (a U-shaped optimum at ×4: ×2→93, ×4→3.8, ×8→7.5,
+×64→58). Because `F` is untouched, the **converged root is the paper-c₁ solution** (provably solution-preserving:
+‖F‖→1.4e-12). Result on (12,12,3): **`success=true`, `eps_used=1`** (robust from the *hardest* perturbed start,
+matching OSGS-P1), **quadratic Newton (5 iterations to machine zero)**.
+
+**Implementation (landed, default-off ⇒ byte-identical; Blitz 272/272, Quick 85/85):**
+- New config `osgs_jfnk_precond_c1_mult` (schema + `config.jl` + `base_config.json`, default **1.0** = off).
+- `osgs_solver.jl`: `solve_osgs_stage!` builds a c₁×mult preconditioner Jacobian closure (`jac_precond_fn`,
+  reusing the physical-c₁ live π — its tangent effect is 2nd-order near the root); `_osgs_jfnk_solve!` uses it for
+  the GMRES left-preconditioner while the mat-vec keeps differencing the physical-c₁ residual (so the root is
+  unchanged) and the C.1 fallback keeps the true paper-c₁ tangent.
+- `smoke3d.jl` `run_sweep_structured`: OSGS-**P2** now uses `jfnk_precond_c1_mult=4` + `jfnk_maxiter=80`
+  (OSGS-P1 unchanged, mult=1); recorded in `solver_prov` (`recipe="boot_skip+JFNK+precond_c1x4"`).
+
+**What this EXPOSES (a §3 hand-off, not a Q4 failure).** Now that the solver reaches the paper-c₁ discrete root,
+its true error is visible: velocity is accurate (L²u=0.00123 ≈ interpolant) but **pressure is ~15× larger
+(L²p=0.0446 vs the stuck-interpolant's 0.0029)**. The paper-c₁ P2-3D *pressure* is genuinely under-stabilized —
+which is the [§3 accuracy question](3d-p2-instability-investigation.md), now directly measurable for the first
+time (c₁×4 *in the residual* gives L²p=0.0029). Q4 (can the solver converge) is resolved; the pressure accuracy
+is §3. **Next:** run the full 4-mesh structured sweep with the fix to get OSGS-P2-3D convergence *rates* and see
+whether the L²p defect is uniform (§3) or converges.
 
 ## Pointers
 
