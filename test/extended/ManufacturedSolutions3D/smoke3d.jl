@@ -334,6 +334,19 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     @printf("    [eps_pert] reference success=%s, robustness eps_used=%.3g\n", success, eps_used); flush(stdout)
     u_h, p_h = final_x0
     el2_u, el2_p, eh1_u, eh1_p = calc_errors3d(u_h, p_h, u_ex, p_ex, U_c, P_c, dΩ)
+    # [OSGS-leak guard — pending-tasks §2c] A non-advancing OSGS "success" (the 0-iteration initial_ftol
+    # short-circuit in nonlinear.jl) leaves final_x0 AT its entry iterate: the ASGS Stage-I boot root (default
+    # path) or the eps_pert interpolant (boot-skip). Neither is a genuine OSGS solve, so recording its error
+    # under the OSGS label leaks an ASGS/interpolant datum into an OSGS column — the byte-identical ASGS/OSGS
+    # error tuples the 3D audit (B.3) flagged. The OSGS coupled stage surfaces this path-agnostically
+    # (osgs_solver.jl:446; ASGS never sets the key, so this is a no-op for ASGS). Mirror the CocquetFormMMS
+    # harness: mark the level FAILED + NaN so the analyzer/plotter skip it as a non-root instead of fitting a
+    # rate through a leaked ASGS error.
+    if get(diag, "osgs_short_circuited_on_entry", false)
+        @printf("    [OSGS-leak guard] OSGS reported success without advancing off its entry iterate — recording NaN (not a genuine OSGS datum).\n"); flush(stdout)
+        success = false
+        el2_u = el2_p = eh1_u = eh1_p = NaN
+    end
     # Newton/Picard iteration split from the stage trajectory (stages tagged ":N"/":P"); the solve is
     # from the exact-solution guess, so eps_pert = 0 (a direct solve, like the 2D corner cells).
     traj = get(diag, "trajectory", Any[])

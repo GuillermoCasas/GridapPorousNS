@@ -627,8 +627,14 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     recenter && _recenter_pressure!(p_prev_ref[])
     local ip_result = (false, verification_result(verifier), x0, iter_count_ref[], 0.0)
     local ip_time = 0.0
+    local osgs_advanced_ever = false
     for ip_pass in 1:sol_cfg.iterative_penalty_max_iters
         ip_result = _one_pass()
+        # [OSGS whole-solve short-circuit] `osgs_advanced_off_entry` is a PER-PASS flag (set in
+        # solve_osgs_stage!, osgs_solver.jl). The final iterative-penalty CONFIRMATION pass legitimately does
+        # 0 iterations (drift→0) and would trip it on a genuinely-converged solve, so accumulate advancement
+        # over ALL passes — the OSGS solve is genuine iff it advanced off its entry on SOME pass.
+        osgs_advanced_ever = osgs_advanced_ever || get(diag_cache, "osgs_advanced_off_entry", false)
         ip_time += ip_result[5]
         ip_result[1] || break          # solve failed this pass → stop (keep the failed result)
         p_new = _pressure_copy(ip_result[3])
@@ -637,6 +643,15 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
         p_prev_ref[] = p_new
         println("      [iter-penalty] pass $(ip_pass): relative pressure drift = $(drift) (xtol=$(sol_cfg.xtol))"); flush(stdout)
         drift < sol_cfg.xtol && break
+    end
+    # [OSGS whole-solve short-circuit] Replace the per-pass leak flag with the WHOLE-SOLVE verdict: OSGS
+    # "short-circuited" (never became a real solve — its recorded state is the leaked entry: the ASGS boot
+    # root, or the exact-guess interpolant under boot-skip) only if it reported success yet advanced on NO
+    # pass. Guarded to OSGS runs (the per-pass key exists only when solve_osgs_stage! ran; ASGS is untouched).
+    # Consumers (the 3D + Cocquet harnesses) read this to record a non-advancing OSGS as NaN, not the leaked
+    # entry error.
+    if haskey(diag_cache, "osgs_advanced_off_entry")
+        diag_cache["osgs_short_circuited_on_entry"] = (ip_result[1] && !osgs_advanced_ever)
     end
     # [gauge-free re-centering] Zero-mean the RETURNED pressure too, not only the lag. The lag re-centering
     # prevents multi-pass ACCUMULATION, but the final stored/exported field still carries one pass's shift
