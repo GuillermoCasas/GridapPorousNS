@@ -206,7 +206,9 @@ function execute_solver(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p, config)
         setup, formulation, iter_solvers, config, x0
     )
 
-    return final_x0, eval_time, iter_count
+    # [mesh_success] surface the solve_system convergence flag so do_run can record per-mesh success
+    # (consumed by plot_convergence.py to mark/exclude non-converged meshes — mirrors the MMS harnesses).
+    return final_x0, eval_time, iter_count, success
 end
 
 function run_convergence()
@@ -340,7 +342,7 @@ function run_convergence()
         println("\n   [+] Assembling High-Fidelity Reference Mesh Solution (N = $N_ref) natively...")
         base_config_dict["output"]["basename"] = "cocquet_ref_$(name)_$(method)_P$(k_v)P$(k_p)_N$(N_ref)"
         mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref = build_solver(N_ref, base_config_dict, Re, c_in; porosity_order=porosity_order, bs_kwargs(N_ref)...)
-        xh_ref, time_ref, iters_ref = exec_fn(mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref)
+        xh_ref, time_ref, iters_ref, _ok_ref = exec_fn(mod_ref, X_ref, Y_ref, dΩ_ref, h_ref, alpha_ref, ru_ref, rp_ref, cfg_ref)
         u_ref, p_ref = xh_ref
 
         # Tolerant cross-mesh point-location. KDTree with a wide candidate set is a strict superset of
@@ -357,7 +359,7 @@ function run_convergence()
         # Trial-projection metric (reference projected onto the coarse TRIAL space).
         errors_l2_u_trial = Float64[]; errors_h1_u_trial = Float64[]
         errors_l2_p_trial = Float64[]; errors_h1_p_trial = Float64[]
-        eval_times = Float64[]; eval_iters = Int[]
+        eval_times = Float64[]; eval_iters = Int[]; mesh_success = Bool[]
 
         # S3 magnitude-gap probes (see docs/cocquet):
         #   cellavg_frac = ‖P₀ e‖²/‖e‖² (within-cell smoothness);  chi_Omega = |Ω|‖ē_Ω‖²/‖e‖²
@@ -380,7 +382,7 @@ function run_convergence()
             base_config_dict["output"]["basename"] = "cocquet_$(name)_$(method)_P$(k_v)P$(k_p)_N$(N)"
             mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h = build_solver(N, base_config_dict, Re, c_in; porosity_order=porosity_order, bs_kwargs(N)...)
 
-            xh_h, time_h, iters_h = exec_fn(mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h)
+            xh_h, time_h, iters_h, ok_h = exec_fn(mod_h, X_h, Y_h, dΩ_h, h_h, alpha_h, ru_h, rp_h, cfg_h)
             u_h, p_h = xh_h
             U_h, P_h = X_h
 
@@ -439,7 +441,7 @@ function run_convergence()
             push!(errors_l2_p, l2_ep); push!(errors_h1_p, h1_ep)
             push!(errors_l2_u_trial, l2_eu_trial); push!(errors_h1_u_trial, h1_eu_trial)
             push!(errors_l2_p_trial, l2_ep_trial); push!(errors_h1_p_trial, h1_ep_trial)
-            push!(eval_times, time_h); push!(eval_iters, iters_h)
+            push!(eval_times, time_h); push!(eval_iters, iters_h); push!(mesh_success, ok_h)
             push!(cellavg_frac_u, md_u.fraction_cellavg); push!(cellavg_frac_p, md_p.fraction_cellavg)
             push!(chi_Omega_u, md_u.chi_Omega);   push!(chi_Omega_p, md_p.chi_Omega)
             push!(l2_cellavg_u, md_u.l2_cellavg); push!(l2_cellavg_p, md_p.l2_cellavg)
@@ -463,6 +465,7 @@ function run_convergence()
             g["errors_h1_p_trial"] = errors_h1_p_trial
             g["eval_times"] = eval_times
             g["eval_iters"] = eval_iters
+            g["mesh_success"] = Int8.(mesh_success)   # [mesh_success] per-mesh converged flag (Int8 1/0), read by plot_convergence.py
             g["cellavg_frac_u"]    = cellavg_frac_u
             g["cellavg_frac_p"]    = cellavg_frac_p
             g["chi_Omega_u"]       = chi_Omega_u

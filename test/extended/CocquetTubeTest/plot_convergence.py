@@ -55,6 +55,7 @@ def plot_cocquet(h5_arg=None):
     markers = ['^', 's', 'o', 'D', 'v', '*']
     plotted = 0
     diag_present = False
+    flagged_unconverged = False   # [2b] any non-converged-but-finite mesh marked with an x
 
     with h5py.File(h5_file, 'r') as file:
         if "N_list" not in file:
@@ -80,6 +81,10 @@ def plot_cocquet(h5_arg=None):
 
             err_u = np.array(group["errors_l2_u"]); err_p = np.array(group["errors_l2_p"])
             err_u_h1 = np.array(group["errors_h1_u"]); err_p_h1 = np.array(group["errors_h1_p"])
+            # [2b] per-mesh converged flag (back-compat: absent -> all True). "success" here = the
+            # nonlinear SOLVE converged (the tube uses a reference-solution error metric, not an MMS root).
+            succ = (np.array(group["mesh_success"], dtype=bool) if "mesh_success" in group
+                    else np.ones(len(N_list), dtype=bool))
 
             marker = markers[midx % len(markers)]; midx += 1
             # Distinct line style per method: ASGS solid, OSGS dashed, Galerkin* (Cocquet) dotted.
@@ -100,6 +105,10 @@ def plot_cocquet(h5_arg=None):
 
             def annotate(ax, err, color, dy):
                 for i in range(len(N_list) - 1):
+                    # [2b] never fit a rate across / into a non-converged or non-finite mesh
+                    if not (succ[i] and succ[i+1] and np.isfinite(err[i]) and np.isfinite(err[i+1])
+                            and err[i] > 0 and err[i+1] > 0):
+                        continue
                     raw = (np.log(err[i+1]) - np.log(err[i])) / (np.log(h[i+1]) - np.log(h[i]))
                     Nm = np.exp(0.5 * (np.log(N_list[i]) + np.log(N_list[i+1])))
                     em = np.exp(0.5 * (np.log(err[i]) + np.log(err[i+1])))
@@ -110,6 +119,15 @@ def plot_cocquet(h5_arg=None):
             annotate(ax1, err_p, 'red', -11)
             annotate(ax2, err_u_h1, 'blue', 7)
             annotate(ax2, err_p_h1, 'red', -11)
+            # [2b] mark non-converged-but-finite meshes with a distinct x (kept + flagged, not dropped)
+            for ax, err, col in ((ax1, err_u, 'blue'), (ax1, err_p, 'red'),
+                                 (ax2, err_u_h1, 'blue'), (ax2, err_p_h1, 'red')):
+                fin = np.isfinite(err) & (err > 0)
+                bad = fin & ~succ
+                if np.any(bad):
+                    ax.loglog(N_list[bad], err[bad], marker='x', linestyle='none', color=col,
+                              ms=13, markeredgewidth=2.5, zorder=6)
+                    flagged_unconverged = True
             plotted += 1
 
             # S3 / corner-excluded probes on ax3 (present for every run of this driver).
@@ -135,6 +153,9 @@ def plot_cocquet(h5_arg=None):
     for ax, ttl, yl in ((ax1, r'$L_2$-norms', r'$L_2$-norm error'),
                         (ax2, r'$H_1$-seminorms', r'$H_1$-seminorm error')):
         ax.set_xlabel(r'$N$'); ax.set_ylabel(yl); ax.set_title(f'Spatial convergence: {ttl}')
+        if flagged_unconverged:   # [2b] legend note for the x markers
+            ax.plot([], [], marker='x', linestyle='none', color='0.35', ms=11, markeredgewidth=2.5,
+                    label='not fully converged (excluded from rate)')
         ax.grid(True, which="both", ls="--"); ax.legend(handlelength=3.0, fontsize=8)
 
     if diag_present:

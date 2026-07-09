@@ -61,19 +61,22 @@ function execute_solver_galerkin_literal_picard(model, X, Y, dΩ, h_cf, alpha_h,
 
     x0_backup = copy(get_free_dof_values(x0))
     iter_count = 0
+    success = false   # [mesh_success] :ok ⇒ converged; :max_iters_caught ⇒ recorded per protocol but NOT a converged root
 
     eval_time = @elapsed begin
         res_p = PorousNSSolver.safe_fe_solve!(x0, solver_picard, op_picard; backup=x0_backup)
         if res_p.state == :ok
             iter_count = res_p.iterations
+            success = true
             println("      [LiteralPicard] converged in $iter_count iterations (state=:ok, residual=$(res_p.residual_norm), reason=$(res_p.stop_reason))")
         elseif res_p.state == :max_iters_caught
             iter_count = it_max
+            success = false
             println("      [LiteralPicard] HIT it_max=$it_max cap (state=:max_iters_caught) — iterate-at-cap recorded as Cocquet's protocol prescribes")
         else
             error("LiteralPicard solver failed unexpectedly (state $(res_p.state)).")
         end
     end
 
-    return x0, eval_time, iter_count
+    return x0, eval_time, iter_count, success
 end

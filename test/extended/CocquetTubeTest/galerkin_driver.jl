@@ -85,5 +85,7 @@ function execute_solver_galerkin(model, X, Y, dΩ, h_cf, alpha_h, refe_u, refe_p
         end
     end
 
-    return x0, eval_time, iter_count
+    # [mesh_success] this driver errors on a genuine solve failure (the Picard fallback at :81), so
+    # reaching here means the Newton-or-Picard solve converged; report success=true.
+    return x0, eval_time, iter_count, true
 end
