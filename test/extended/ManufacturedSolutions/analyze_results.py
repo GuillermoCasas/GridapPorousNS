@@ -585,6 +585,7 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, n
                 if do_plots and _HAVE_MPL:
                     plt.figure(figsize=(10, 8))
                 trow = {'c_idx': c_idx, 'Re': Re, 'Da': Da, 'alpha_0': a0}
+                flagged_unconverged = False   # [2b] any non-true-root-but-finite mesh marked on the plot
 
                 for method, gname in methods.items():
                     g = f[gname]
@@ -643,6 +644,13 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, n
 
                     if do_plots and _HAVE_MPL and len(h):
                         ls = '-' if method == 'ASGS' else '--'
+                        # [2b] per-mesh converged (true-root) mask aligned to the masked/sorted arrays. A
+                        # non-true-root-but-FINITE mesh is marked with a distinct ✕ and EXCLUDED from rate
+                        # annotations — never dropped (an unconverged value carries signal). Mirrors
+                        # ManufacturedSolutions3D/plot_convergence3d.py [2b].
+                        succ = np.array([is_true_root(res[i], int(Ns[i]), kv, c,
+                                                      res0[i] if len(res0) else float('nan'))
+                                         for i in range(len(Ns))], dtype=bool)
                         plt.loglog(h, eu, marker='o', linestyle=ls, color='blue', linewidth=2,
                                    markersize=8, label=f'{method} $L_2$ Velocity ({opt_u_l2})')
                         plt.loglog(h, euh, marker='D', linestyle=ls, color='blue', linewidth=2,
@@ -650,9 +658,17 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, n
                         plt.loglog(h, ep, marker='o', linestyle=ls, color='red', linewidth=2,
                                    markersize=8, markerfacecolor='white',
                                    label=f'{method} $L_2$ Pressure ({opt_p_l2})')
-                        for i in range(len(h) - 1):
-                            for arr, col, opt in ((eu, 'blue', opt_u_l2), (euh, 'blue', opt_u_h1),
-                                                  (ep, 'red', opt_p_l2)):
+                        for arr, col, opt in ((eu, 'blue', opt_u_l2), (euh, 'blue', opt_u_h1),
+                                              (ep, 'red', opt_p_l2)):
+                            fin = np.isfinite(arr) & (arr > 0)
+                            bad = fin & ~succ
+                            if bad.any():
+                                plt.loglog(h[bad], arr[bad], marker='x', linestyle='none', color=col,
+                                           markersize=13, markeredgewidth=2.5, zorder=6)
+                                flagged_unconverged = True
+                            for i in range(len(h) - 1):
+                                if not (fin[i] and fin[i + 1] and succ[i] and succ[i + 1]):
+                                    continue     # never fit a rate across / into a non-converged point
                                 hm = np.sqrt(h[i] * h[i + 1])
                                 em = np.sqrt(arr[i] * arr[i + 1])
                                 sv = (np.log(arr[i + 1]) - np.log(arr[i])) / (np.log(h[i + 1]) - np.log(h[i]))
@@ -666,6 +682,9 @@ def make_plots_and_detailed(h5_glob, config_path, outdir, report_N, slope_tol, n
                 if do_plots and _HAVE_MPL:
                     plt.xlabel(r'Mesh size ($h$)'); plt.ylabel('Error Norms')
                     plt.title(fr'Convergence ($Re: {Re:g}$, $Da: {Da:g}$, $\alpha_0: {a0}$, $k: {kv}$, {etype})')
+                    if flagged_unconverged:      # [2b] legend note for the ✕ (non-converged) markers
+                        plt.plot([], [], marker='x', linestyle='none', color='0.35', markersize=11,
+                                 markeredgewidth=2.5, label='not fully converged (excluded from rate)')
                     if plt.gca().get_legend_handles_labels()[0]:    # skip empty legend (failed cells)
                         plt.legend(handlelength=4.0)
                     plt.grid(True, which="both", ls="--")

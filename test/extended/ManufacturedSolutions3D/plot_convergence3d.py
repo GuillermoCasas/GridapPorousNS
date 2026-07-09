@@ -37,6 +37,20 @@ def _seg_slope(h, e, i):
     return (math.log(e[i + 1]) - math.log(e[i])) / (math.log(h[i + 1]) - math.log(h[i]))
 
 
+def _level_success(r, n):
+    """Per-level convergence flag aligned to the top-level error arrays (which drop it).
+
+    The `levels` sub-records carry `success`; the flat `hs`/`l2u`/… arrays don't. Returns a bool array of
+    length n; missing/short `levels` ⇒ all-True (back-compat with older result JSONs). A `success=False`
+    level is plotted with a distinct marker and EXCLUDED from rate fits, never dropped — an unconverged value
+    that "works but isn't fully converged" carries signal (docs/mms/p2-3d.md §C); only its RATE is untrusted.
+    """
+    lv = r.get("levels")
+    if not isinstance(lv, list) or len(lv) != n:
+        return np.ones(n, dtype=bool)
+    return np.array([bool(x.get("success", True)) for x in lv], dtype=bool)
+
+
 def plot_json(json_path, out_dir=None, stem=None):
     """Plot ANY convergence-results JSON (the aggregate list-of-records schema).
 
@@ -70,23 +84,39 @@ def _plot_by_kv(by_kv, out_dir, stem="convergence3d"):
         plt.figure(figsize=(10, 8))
         ref = next(iter(methods.values()))
         a0, Re, Da = ref["alpha_0"], ref["Re"], ref["Da"]
+        flagged_unconverged = False
         for method, r in sorted(methods.items()):
             ls = "-" if method == "ASGS" else "--"
             h = np.asarray(r["hs"], float)
             eu, euh, ep = (np.asarray(r[k], float) for k in ("l2u", "h1u", "l2p"))
+            succ = _level_success(r, len(h))
             plt.loglog(h, eu, marker="o", linestyle=ls, color="blue", linewidth=2, markersize=8,
                        label=fr"{method} $L_2$ Velocity ({opt_u_l2})")
             plt.loglog(h, euh, marker="D", linestyle=ls, color="blue", linewidth=2, markersize=8,
                        label=fr"{method} $H^1$ Velocity ({opt_u_h1})")
             plt.loglog(h, ep, marker="o", linestyle=ls, color="red", linewidth=2, markersize=8,
                        markerfacecolor="white", label=fr"{method} $L_2$ Pressure ({opt_p_l2})")
-            for i in range(len(h) - 1):
-                for arr, col, opt in ((eu, "blue", opt_u_l2), (euh, "blue", opt_u_h1), (ep, "red", opt_p_l2)):
+            for arr, col, opt in ((eu, "blue", opt_u_l2), (euh, "blue", opt_u_h1), (ep, "red", opt_p_l2)):
+                fin = np.isfinite(arr) & (arr > 0)
+                # [2b] Overlay unconverged-but-finite points with a distinct ✕ (kept + flagged, not dropped).
+                bad = fin & ~succ
+                if bad.any():
+                    plt.loglog(h[bad], arr[bad], marker="x", linestyle="none", color=col,
+                               markersize=13, markeredgewidth=2.5, zorder=6)
+                    flagged_unconverged = True
+                # [2b] Annotate a segment slope ONLY between two adjacent CONVERGED, finite points —
+                # never fit a rate across a non-converged / non-finite level (the manufactured-rate bug).
+                for i in range(len(h) - 1):
+                    if not (fin[i] and fin[i + 1] and succ[i] and succ[i + 1]):
+                        continue
                     hm, em = math.sqrt(h[i] * h[i + 1]), math.sqrt(arr[i] * arr[i + 1])
                     sv = _seg_slope(h, arr, i)
                     plt.annotate(f"{(sv / opt if opt else float('nan')):.2f}", xy=(hm, em),
                                  xytext=(0, 10 if method == "ASGS" else -12), textcoords="offset points",
                                  ha="center", fontsize=8, color=col, fontweight="bold")
+        if flagged_unconverged:
+            plt.plot([], [], marker="x", linestyle="none", color="0.35", markersize=11, markeredgewidth=2.5,
+                     label="not fully converged (excluded from rate)")
         plt.xlabel(r"Mesh size ($h$)")
         plt.ylabel("Error Norms")
         mesh_tag = str(ref.get("mesh", "")).replace("_", " ")

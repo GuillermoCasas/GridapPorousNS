@@ -69,29 +69,43 @@ def plot_group(key, bundles, grp_name, out_dir):
     morder = {'ASGS': 0, 'OSGS': 1, 'GALERKIN': 2}
     bundles = sorted(bundles, key=lambda b: (morder.get(b['method'].upper(), 9), b['kv'], b['kp']))
     drew = False
+    any_unconverged = False   # [2b] any fold-flagged (unconverged-but-finite) point marked
     for b in bundles:
         color, ls = _method_style(b['method'])
         marker = _elem_marker(b['kv'], b['kp'], b['method'])
         h = np.asarray(b['h'])
+        foldv = np.asarray(b.get('fold', np.zeros(len(h), dtype=bool)), dtype=bool)
         for fkey, flabel, is_vel, ford in fields:
             y = np.asarray(b[fkey])
             m = np.isfinite(y) & (y > 0) & np.isfinite(h) & (h > 0)
             if m.sum() < 2: continue
-            hm, ym = h[m], y[m]
-            o = np.argsort(-hm); hm, ym = hm[o], ym[o]
+            hm, ym, cm = h[m], y[m], (~foldv)[m]      # cm[i]=True ⇒ CONVERGED (not fold-flagged)
+            o = np.argsort(-hm); hm, ym, cm = hm[o], ym[o], cm[o]
             mfc = color if is_vel else 'white'        # velocity filled, pressure hollow
             kref = ford(b['kv'], b['kp'])
             ax.loglog(hm, ym, marker=marker, linestyle=ls, color=color, lw=2.0, ms=8,
                       markerfacecolor=mfc, markeredgecolor=color,
                       label=f"{b['label']} · {flabel} ($h^{{{kref}}}$)")
             drew = True
-            for i in range(len(hm) - 1):              # observed per-segment rate
+            # [2b] mark fold-flagged (unconverged-but-finite) points with a distinct ✕; never fit a
+            # rate across / into one. Mirrors ManufacturedSolutions3D/plot_convergence3d.py.
+            bad = ~cm
+            if bad.any():
+                ax.loglog(hm[bad], ym[bad], marker='x', linestyle='none', color=color, ms=13,
+                          markeredgewidth=2.5, zorder=6)
+                any_unconverged = True
+            for i in range(len(hm) - 1):              # observed per-segment rate (converged pairs only)
+                if not (cm[i] and cm[i + 1]):
+                    continue
                 xa = math.sqrt(hm[i] * hm[i + 1]); ya = math.sqrt(ym[i] * ym[i + 1])
                 sv = math.log(ym[i + 1] / ym[i]) / math.log(hm[i + 1] / hm[i])
                 ax.annotate(f'{sv:.2f}', xy=(xa, ya), xytext=(0, 7), textcoords='offset points',
                             ha='center', fontsize=6.5, color=color)
     if not drew:
         plt.close(fig); return
+    if any_unconverged:                           # [2b] legend note for the ✕ (non-converged) markers
+        ax.plot([], [], marker='x', linestyle='none', color='0.35', ms=11, markeredgewidth=2.5,
+                label='not fully converged (excluded from rate)')
     folded = any(bool(np.any(b.get('fold', False))) for b in bundles)
     norm_lbl = r'$L^2$ norms' if grp_name == 'L2' else r'$H^1$ seminorms'
     ttl = rf"Cocquet-form MMS, {norm_lbl} — $Re={Re:g}$, $Da={Da:g}$, $\alpha_0={a0:g}$"
