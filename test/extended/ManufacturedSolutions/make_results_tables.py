@@ -74,15 +74,36 @@ def _decode(x):
 
 
 # ---- HDF5 sweep reader ---------------------------------------------------------------------
-def _finest_pair(g, errname):
-    """Return (slope, FME, (N_coarse, N_fine)) from the two finest meshes for one norm, or None."""
+def _mesh_success(g, n):
+    """Per-mesh converged flag, True where the honest-exit gate did NOT explicitly fail.
+
+    Reads the harness-stored `overall_verification_success` (Int8: 1=true, 0=false, -1=nothing);
+    a 0 means the solve did not verify at that mesh. Missing dataset / length mismatch ⇒ all-True
+    (back-compat with pre-flag sweeps). This is the SAME stored gate the 3D path reads via
+    `levels[].success` — so no table path fits a rate off a non-converged mesh."""
+    if "overall_verification_success" in g:
+        s = np.asarray(g["overall_verification_success"][:]).astype(int)
+        if len(s) == n:
+            return s != 0
+    return np.ones(n, dtype=bool)
+
+
+def _finest_pair(g, errname, ok=None):
+    """Return (slope, FME, (N_coarse, N_fine)) from the two finest CONVERGED meshes for one norm,
+    or None. Both meshes forming the slope must be finite/positive AND converged (per the honest-
+    exit gate); a slope is NEVER fit off a non-converged finest mesh — the cell then renders n.c.,
+    matching load_3d. `ok` (per-mesh converged mask) is computed if not supplied."""
     h = np.asarray(g["h"][:], dtype=float)
     e = np.asarray(g[errname][:], dtype=float)
+    if ok is None:
+        ok = _mesh_success(g, len(h))
     order = np.argsort(h)  # ascending h: finest first
     idx = [i for i in order if np.isfinite(e[i]) and e[i] > 0]
     if len(idx) < 2:
         return None
     i_fine, i_coarse = idx[0], idx[1]
+    if not (ok[i_fine] and ok[i_coarse]):
+        return None      # a finest mesh did not converge -> no rate (n.c.), not a slope off a bad iterate
     hf, hc, ef, ec = h[i_fine], h[i_coarse], e[i_fine], e[i_coarse]
     slope = math.log(ec / ef) / math.log(hc / hf)
     return slope, ef, (int(round(1.0 / hc)), int(round(1.0 / hf)))
@@ -108,12 +129,13 @@ def load_h5(path):
                 continue
             method = _decode(a["method"]).upper()
             rec = {"source": os.path.basename(path), "Npair": None}
+            ok_mesh = _mesh_success(g, len(g["h"])) if "h" in g else None
             ok = True
             for tag, ds in norm_map.items():
                 if ds not in g:
                     ok = False
                     break
-                r = _finest_pair(g, ds)
+                r = _finest_pair(g, ds, ok_mesh)
                 if r is None:
                     ok = False
                     break
@@ -123,6 +145,9 @@ def load_h5(path):
                 rec["Npair"] = npair
             if ok:
                 data[(re, da, al, method)] = rec
+            elif ok_mesh is not None and not np.all(ok_mesh):
+                sys.stderr.write(f"[make_results_tables] 2D cell Re={re:g} Da={da:g} a={al:g} {method}: "
+                                 f"a finest mesh did not converge (success=false) -> reported as n.c.\n")
     return data
 
 
@@ -147,6 +172,13 @@ def load_corner(path_method_pairs):
         for rec in recs:
             if any(rec.get(k) is None for k in _CORNER_MAP.values()):
                 continue  # incomplete (e.g. base_only) record
+            # [rate honesty] corner slopes are pre-computed by the Julia writer, which emits them ONLY
+            # for "rescued" cells (>=2 meshes with roots found) — so this path is gated at the source.
+            # Defensive guard: skip a rec whose stored residuals are non-finite (a crashed mesh), so a
+            # table slope is never shown for a non-converged corner cell.
+            _res = rec.get("residuals")
+            if _res is not None and not all(np.isfinite(float(x)) for x in _res):
+                continue
             re = canon(float(rec["Re"]), RE_VALS)
             da = canon(float(rec["Da"]), DA_VALS)
             al = canon(float(rec["alpha_0"]), ALPHA_VALS)
