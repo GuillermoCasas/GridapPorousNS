@@ -1,6 +1,6 @@
-> **ARCHIVED (2026-07-04).** Raw 2026-05-24 session. Its substantive verdicts (H-A…H-E lateral hypotheses; the corrected ~30–300× magnitude-gap reading) have been MERGED into [investigation-synthesis.md](investigation-synthesis.md). Retained verbatim for provenance.
+> **ARCHIVED (2026-07-04).** Raw 2026-05-24 session. Its substantive verdicts (H-A…H-E lateral hypotheses; the corrected ~30–300× magnitude-gap reading) have been MERGED into [investigation-synthesis.md](../investigation-synthesis.md). Retained verbatim for provenance.
 
-> **RAW CONVERSATION TRANSCRIPT (2026-05-24) — historical.** Kept verbatim for traceability. The settled conclusions of this Cocquet investigation are in the canonical [docs/cocquet/investigation-synthesis.md](investigation-synthesis.md).
+> **RAW CONVERSATION TRANSCRIPT (2026-05-24) — historical.** Kept verbatim for traceability. The settled conclusions of this Cocquet investigation are in the canonical [docs/cocquet/investigation-synthesis.md](../investigation-synthesis.md).
 
 # you asked
 

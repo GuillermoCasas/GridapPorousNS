@@ -149,7 +149,7 @@ harness/reporting, and (iii) hygiene/fragility gaps.
   `noise_floor_success_max_ftol_multiple`, no new magic number) accepts them. With it the **full 2D k2 QUAD
   sweep completed behavior-preserving** (`bf41727`; ASGS+OSGS, N10→N320, 0 NaN, median L²u rate 3.00,
   vs pre-Route-B baseline median rel Δe_u 1.97e-11) — see
-  [`docs/mms/convergence-2d.md`](docs/mms/convergence-2d.md). Full 3D-OSGS sweep remains
+  [`docs/mms/convergence-2d.md`](mms/convergence-2d.md). Full 3D-OSGS sweep remains
   the measurement follow-up. See §C.3 + the F4 checklist item.
 
 ---
@@ -196,7 +196,7 @@ DIAGNOSTIC `eps_C_strong` (traced, never gated). See §0 Resolved ledger / §C.3
   [`docs/convergence_problems_audit/`](docs/convergence_problems_audit/) (`b20cb78`) does **not** exonerate
   Gridap — it was transcribed term-by-term from `continuous_problem.jl`, so it inherited the same discrepancy
   (its "C_inv exceeds 4k⁴" argument is circular); the canonical
-  [`docs/mms/p2-3d.md`](docs/mms/p2-3d.md) records the
+  [`docs/mms/p2-3d.md`](mms/p2-3d.md) records the
   reversal.
 - **ACTION (root cause, NOT a c₁ multiplier):** find the term-level P2-3D code↔paper discrepancy — most likely
   (not certainly) the **P2-3D viscous 2nd-derivative subscale / grad-div coupling** `(½−1/d)∇(∇·u)`
@@ -671,7 +671,7 @@ attribution is REFUTED (2026-07-05):** the clean-room was transcribed **term-by-
 symptom — its "`C_inv` exceeds `4k⁴`" argument is therefore **circular** and does NOT exonerate the Gridap
 code. It is committed at [`docs/convergence_problems_audit/`](docs/convergence_problems_audit/) (`b20cb78`,
 report + NumPy reproducer) and kept for provenance + the code-transcription it encodes. The canonical
-[`docs/mms/p2-3d.md`](docs/mms/p2-3d.md) records the
+[`docs/mms/p2-3d.md`](mms/p2-3d.md) records the
 reversal (Kratos runs paper c₁ with full terms, optimally ⇒ paper c₁ correct; root cause OPEN).
 
 **Verdict — what is right and wrong in the existing 3D-P2 narrative (corrected 2026-07-05).**

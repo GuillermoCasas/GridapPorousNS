@@ -1,7 +1,7 @@
 # OSGS rate loss in the reaction-dominated limit (high Da) — status, evidence, options
 
 **Canonical doc** for the open OSGS convergence-rate issue at high Damköhler number. Supersedes the
-"discrete staggered map" mechanistic account in [`../known_issues.md`](known_issues.md) (Open numerical
+"discrete staggered map" mechanistic account in [`../known_issues.md`](../known_issues.md) (Open numerical
 defect) and the 2026-06-04 caveats in [`../mms/convergence-2d.md`](../mms/convergence-2d.md) §4–6.
 
 Last updated: 2026-06-10.

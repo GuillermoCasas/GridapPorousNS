@@ -1,6 +1,6 @@
-> **ARCHIVED / SUPERSEDED (2026-07-04).** Raw 2026-05-23 transcript. Its central recommendation (untag/free the outlet-corner DOF to escape the singularity) was FALSIFIED — the ModifiedCorner experiment made structured convergence ~3× worse (see [investigation-synthesis.md](investigation-synthesis.md), H1). Retained for provenance only.
+> **ARCHIVED / SUPERSEDED (2026-07-04).** Raw 2026-05-23 transcript. Its central recommendation (untag/free the outlet-corner DOF to escape the singularity) was FALSIFIED — the ModifiedCorner experiment made structured convergence ~3× worse (see [investigation-synthesis.md](../investigation-synthesis.md), H1). Retained for provenance only.
 
-> **RAW CONVERSATION TRANSCRIPT (2026-05-23) — historical.** Corner-singularity Q&A from the Cocquet investigation; kept verbatim for traceability. Consolidated conclusions are in the canonical [docs/cocquet/investigation-synthesis.md](investigation-synthesis.md).
+> **RAW CONVERSATION TRANSCRIPT (2026-05-23) — historical.** Corner-singularity Q&A from the Cocquet investigation; kept verbatim for traceability. Consolidated conclusions are in the canonical [docs/cocquet/investigation-synthesis.md](../investigation-synthesis.md).
 
 # you asked
 
