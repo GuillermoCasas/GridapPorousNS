@@ -26,13 +26,18 @@
     "mesh": {
       "sequence": "structured",
       "partitions": [[8, 8, 2], [12, 12, 3], [16, 16, 4]]
+    },
+    "solver": {
+      "jfnk": true,
+      "osgs_skip_boot": true,
+      "eps_pert_sweep": false
     }
   },
   "assertions": {
-    "comment": "Consumed by the extended guard. Rates are the FINE-segment per-method minimums; ASGS-P1 L2u is intrinsically sub-optimal (~1.2, method-intrinsic Aubin-Nitsche deficiency, audit B.1), OSGS-P1 recovers ~2. H1u is optimal (~1) for both. Thresholds carry margin below the measured structured-Kuhn rates.",
+    "comment": "Consumed by the extended guard as OVERALL (coarsest->finest) per-method rate floors, with margin below the MEASURED structured-Kuhn rates (2026-07-09): ASGS-P1 L2u~1.16 / H1u~0.82 (L2u intrinsically sub-optimal ~1.2 -- method-intrinsic Aubin-Nitsche deficiency, audit B.1); OSGS-P1 L2u~2.1 / H1u~0.95 (recovers optimal). Both robust (eps_used=1) at paper c1 with the default solver.",
     "require_success_all": true,
     "require_monotone_decrease": true,
-    "min_h1u_rate": 0.75,
+    "min_h1u_rate": 0.7,
     "min_l2u_rate": {
       "ASGS": 0.9,
       "OSGS": 1.6

@@ -77,15 +77,28 @@ overturn the verdict. Diagnostic hooks live behind `tau.jl` `TAU_VISC_MULT`, `sm
 
 ## 2. Tests to promote / add
 
-### 2a. Make the 3D MMS test config-driven + add an official 3D-MMS extended test (audit F6)
-**Update (2026-07-08): the *oracle* half is DONE.** The separate 3D oracle `mms3d.jl` (`Paper3DMMS`,
-`UExFunc3D`, `evaluate_exactness_diagnostics3d`) — kept "self-contained… so the validated 2D core is
-untouched" — was **unified into the shared dimension-generic** [`src/problems/mms_paper.jl`](../src/problems/mms_paper.jl)
-(`PaperMMS{D}` / `UExFunc{D}` / `PExFunc{D}`, `dim=3`); `smoke3d.jl` / `interp_test.jl` now call the same
-module API as the 2D harness. The only per-dimension analytic term (deviatoric grad-div, `1 − 2/D` ·`∇(∇·u)`)
-is isolated in a `Val(D)`-dispatched helper, byte-identical to both old files — mirroring the formulation-side
-VISC-01 (`0.5 − 1/D`). *Remaining F6 scope (below) is unchanged:* lift the study knobs into a committed JSON
-config + wire the official extended guard.
+### 2a. Make the 3D MMS test config-driven + add an official 3D-MMS extended test (audit F6) — ✅ DONE 2026-07-09
+**DONE 2026-07-09 — both halves landed.**
+- *Oracle half:* the separate 3D oracle `mms3d.jl` (`Paper3DMMS`, `UExFunc3D`, `evaluate_exactness_diagnostics3d`)
+  — kept "self-contained… so the validated 2D core is untouched" — was **unified into the shared dimension-generic**
+  [`src/problems/mms_paper.jl`](../src/problems/mms_paper.jl) (`PaperMMS{D}` / `UExFunc{D}` / `PExFunc{D}`, `dim=3`);
+  the only per-dimension analytic term (deviatoric grad-div, `1 − 2/D`·`∇(∇·u)`) is isolated in a `Val(D)`-dispatched
+  helper, byte-identical to both old files — mirroring the formulation-side VISC-01 (`0.5 − 1/D`).
+- *Config-driven half:* the §5.2 physical study params (`Re`/`Da`/`α₀`/`r₁`/`r₂`/`L`/`U`/slab) were lifted into a
+  committed JSON ([`data/smoke3d_p1.json`](../test/extended/ManufacturedSolutions3D/data/smoke3d_p1.json)) threaded
+  through `solve_one` via an optional `study` (default == the old consts, so every existing CLI/sweep path stays
+  byte-identical). `smoke3d.jl config <path>` (`run_config`) drives the structured-Kuhn convergence study; an
+  official guard [`test/extended/mms3d_config_smoke_extended_test.jl`](../test/extended/mms3d_config_smoke_extended_test.jl)
+  (registered in `run_extended_tests.jl`) asserts the documented behaviour: all solves succeed + errors fall
+  monotonically; H¹u≈optimal for both methods; **OSGS-P1 recovers L²u≈2.0 while ASGS-P1 is intrinsically ~1.2
+  (B.1)** — method-aware thresholds. Verified GREEN 2026-07-09 (14/14, ~24.5 min).
+- *Solver note:* the config carries a `solver` block enabling the documented OSGS-3D recipe (`jfnk` +
+  `osgs_skip_boot`, `eps_pert_sweep=false`). Without it, default-solver OSGS at the 6144-cell finest mesh **hangs**
+  (the coupled inner Newton caps at 20 loops, the iterative penalty drifts only *harmonically* — 1/n, never reaching
+  `xtol`); JFNK (recovering `∂π/∂u`) makes each level converge in ~2 penalty passes. (See §3d — a real saddle-point
+  preconditioner would remove the JFNK dependence.)
+
+*(Historical scoping notes retained below for context.)*
 
 `test/extended/ManufacturedSolutions3D/smoke3d.jl` is a hand-edited driver with hard-coded study params
 (`RE`/`DA`/`ALPHA0`/`R1`/`R2`/`L`, `mesh_sequence`, `c1_mult`, `kv`/`method` loops) — the 3D analogue of

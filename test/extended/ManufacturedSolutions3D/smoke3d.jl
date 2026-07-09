@@ -47,7 +47,7 @@ default_study3d() = (re=RE, da=DA, alpha0=ALPHA0, alphainf=ALPHAINF, r1=R1, r2=R
 
 function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
                      numerical_epsilon::Float64=0.0, jfnk::Bool=false, anderson::Bool=false,
-                     jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing,
+                     jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, jfnk_precond_c1_mult=nothing,
                      iterative_penalty::Bool=true, osgs_skip_boot::Bool=false, ablation::String="full",
                      alpha0::Float64=ALPHA0, r1::Float64=R1, r2::Float64=R2)
     @assert !(jfnk && anderson) "jfnk and anderson are mutually-exclusive OSGS paths"
@@ -76,6 +76,7 @@ function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over
         jfnk_maxiter === nothing || (solver_dict["osgs_jfnk_gmres_maxiter"] = jfnk_maxiter)
         jfnk_restart === nothing || (solver_dict["osgs_jfnk_gmres_restart"] = jfnk_restart)
         jfnk_reltol  === nothing || (solver_dict["osgs_jfnk_gmres_rel_tol"] = jfnk_reltol)
+        jfnk_precond_c1_mult === nothing || (solver_dict["osgs_jfnk_precond_c1_mult"] = jfnk_precond_c1_mult)
     end
     # [Anderson] opt in to the STAGGERED OSGS outer fixed-point (freeze π → solve consistent frozen-π
     # system → re-project, Anderson-mixed). Each inner solve has a CONSISTENT tangent (no coupled-Newton
@@ -154,7 +155,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                    linsolver::String="auto", trace_dir::Union{Nothing,String}=nothing, run_name::String="",
                    c1_mult::Float64=1.0, eps_tol_m_over=nothing, ftol_over=nothing, eps_tol_mass_over=nothing,
                    eps_phys::Float64=0.0, mesh_sequence::String="", jfnk::Bool=false, anderson::Bool=false,
-                   jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, iterative_penalty::Bool=true,
+                   jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, jfnk_precond_c1_mult=nothing, iterative_penalty::Bool=true,
                    osgs_skip_boot::Bool=false, eps_pert_base::Float64=1.0, max_n_pert::Int=5,
                    ablation::String="full", h_conv::String="regular_tet", study=default_study3d())
     # [F6 config-driven] Unpack the study into locals that SHADOW the module consts. Every reference below
@@ -174,6 +175,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     eps_num = eps_mult * 1e-4 * ALPHA0 / (nu * (1.0 + RE + DA))
     config = build_config(kv, method; numerical_epsilon=eps_num, jfnk=jfnk, anderson=anderson,
                           jfnk_maxiter=jfnk_maxiter, jfnk_restart=jfnk_restart, jfnk_reltol=jfnk_reltol,
+                          jfnk_precond_c1_mult=jfnk_precond_c1_mult,
                           iterative_penalty=iterative_penalty, osgs_skip_boot=osgs_skip_boot,
                           eps_tol_m_over=eps_tol_m_over, ftol_over=ftol_over, eps_tol_mass_over=eps_tol_mass_over,
                           ablation=ablation, alpha0=ALPHA0, r1=R1, r2=R2)
@@ -444,6 +446,14 @@ function run_sweep_structured(; max_n_pert=3)
         osgs_recipe = method == "OSGS"
         for kv in (1, 2)
             @printf("\n=== STRUCTURED SWEEP method=%s kv=%d (%s) ===\n", method, kv, kv==1 ? "P1" : "P2"); flush(stdout)
+            # [JFNK precond-c₁] OSGS-P2-3D: the frozen-π tangent is a WEAK preconditioner for the coupled ∂π/∂u
+            # system — ρ(J_frozen⁻¹·∂π/∂u) ≈ 1178 at paper c₁, so inner GMRES stalls and the solver sits at the
+            # exact-guess interpolant (success=false). A preconditioner-ONLY c₁×4 inflation drops ρ_prec to ≈3.8
+            # (residual F stays paper-c₁, so the converged root is unchanged), restoring quadratic Newton and
+            # eps_used=1 robustness. OSGS-P1 is robust at mult=1. See docs/mms/3d-iterative-penalty-fix-and-osgs-coupling.md §6.
+            osgs_p2 = osgs_recipe && kv == 2
+            pc_mult = osgs_p2 ? 4.0 : nothing                       # c₁-inflation for the JFNK preconditioner (P2 only)
+            jfnk_mx = osgs_recipe ? (osgs_p2 ? 80 : 30) : nothing   # more GMRES headroom for P2 (ρ_prec≈3.8 ⇒ ~tens of iters)
             hs=Float64[]; l2us=Float64[]; l2ps=Float64[]; h1us=Float64[]; h1ps=Float64[]; levels=Any[]
             eps_num_used = NaN   # the ε_num actually used (constant across levels here; captured for provenance)
             for (lvl, part) in enumerate(ladders[kv])
@@ -451,7 +461,7 @@ function run_sweep_structured(; max_n_pert=3)
                 model = structured_kuhn_model(part; domain=DOMAIN)
                 r = solve_one(kv, method, model; visc="Deviatoric", linsolver="LU", max_n_pert=max_n_pert,
                               jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
-                              jfnk_maxiter=(osgs_recipe ? 30 : nothing), jfnk_restart=(osgs_recipe ? 30 : nothing),
+                              jfnk_maxiter=jfnk_mx, jfnk_restart=jfnk_mx, jfnk_precond_c1_mult=pc_mult,
                               trace_dir=outdirs[kv], run_name="sweep_structured", mesh_sequence="structured")
                 eps_num_used = r.numerical_epsilon
                 push!(hs, r.h_mean); push!(l2us, r.el2_u); push!(l2ps, r.el2_p); push!(h1us, r.eh1_u); push!(h1ps, r.eh1_p)
@@ -465,9 +475,10 @@ function run_sweep_structured(; max_n_pert=3)
             # [provenance] self-describing solver recipe so an official result can be reconstructed to the exact
             # configuration that produced it (reproducible-results rule): ASGS uses the default coupled solve with
             # the ASGS Stage-I boot; OSGS uses the 3D recipe (boot-skip + matrix-free JFNK, recovering ∂π/∂u).
-            solver_prov = Dict("recipe"=>(osgs_recipe ? "boot_skip+JFNK" : "default_coupled+boot"),
+            solver_prov = Dict("recipe"=>(osgs_recipe ? (osgs_p2 ? "boot_skip+JFNK+precond_c1x4" : "boot_skip+JFNK") : "default_coupled+boot"),
                                "jfnk"=>osgs_recipe, "osgs_skip_asgs_boot"=>osgs_recipe,
-                               "jfnk_maxiter"=>(osgs_recipe ? 30 : nothing), "jfnk_restart"=>(osgs_recipe ? 30 : nothing),
+                               "jfnk_maxiter"=>jfnk_mx, "jfnk_restart"=>jfnk_mx,
+                               "jfnk_precond_c1_mult"=>something(pc_mult, 1.0),
                                "iterative_penalty"=>true, "numerical_epsilon"=>eps_num_used,
                                "eps_pert_base"=>1.0, "max_n_pert"=>max_n_pert, "linsolver"=>"LU",
                                "viscous_operator"=>"Deviatoric", "reaction"=>"Constant_Sigma")
@@ -692,6 +703,18 @@ function run_config(path::String)
     visc = String(get(nm.stabilization, :viscous_operator, "Deviatoric"))
     c1_mult = Float64(get(nm.stabilization, :c1_mult, 1.0))
     eps_mult = Float64(get(nm.stabilization, :eps_mult, 1.0))
+    # Optional `solver` block = the OSGS-3D robustness recipe. jfnk (matrix-free full ∂π/∂u tangent) +
+    # osgs_skip_boot let OSGS-P1-3D converge in a few inner Newton steps instead of the coupled Newton
+    # capping out (the default-solver hang seen at the finest mesh); eps_pert_sweep=false runs the
+    # reference exact-guess solve ONLY (a convergence smoke needs the reference error, not the
+    # perturbation-robustness sweep). All three are no-ops for ASGS.
+    solver_cfg = get(nm, :solver, nothing)
+    _sget(k, d) = solver_cfg === nothing ? d : get(solver_cfg, k, d)
+    jfnk = Bool(_sget(:jfnk, false))
+    osgs_skip_boot = Bool(_sget(:osgs_skip_boot, false))
+    eps_pert_sweep = Bool(_sget(:eps_pert_sweep, true))
+    # max_n_pert < 0 ⇒ `for attempt in 0:max_n_pert` is an empty range ⇒ NO perturbed attempts ⇒ reference solve only.
+    max_n_pert = eps_pert_sweep ? Int(_sget(:max_n_pert, 5)) : -1
     seq = String(nm.mesh.sequence)
     models, mesh_desc = _models_from_config(cfg, study.domain)
     tag = splitext(basename(path))[1]
@@ -700,7 +723,8 @@ function run_config(path::String)
     println("=== 3D MMS CONFIG run: $(basename(path)) ==="); flush(stdout)
     println("    study: Re=$(study.re) Da=$(study.da) α0=$(study.alpha0) α∞=$(study.alphainf) " *
             "r1=$(study.r1) r2=$(study.r2) L=$(study.Lc) U=$(study.u) slab=$(study.domain)")
-    println("    mesh:  $seq $mesh_desc;  kv=$kvs methods=$methods visc=$visc c1_mult=$c1_mult eps_mult=$eps_mult"); flush(stdout)
+    println("    mesh:  $seq $mesh_desc;  kv=$kvs methods=$methods visc=$visc c1_mult=$c1_mult eps_mult=$eps_mult")
+    println("    solver: jfnk=$jfnk osgs_skip_boot=$osgs_skip_boot eps_pert_sweep=$eps_pert_sweep (max_n_pert=$max_n_pert)"); flush(stdout)
 
     out = NamedTuple[]
     for kv in kvs, method in methods
@@ -708,7 +732,8 @@ function run_config(path::String)
         levels = NamedTuple[]
         for (i, model) in enumerate(models)
             r = solve_one(kv, method, model; visc=visc, c1_mult=c1_mult, eps_mult=eps_mult,
-                          study=study, mesh_sequence=seq, trace_dir=outroot, run_name="config_" * tag)
+                          study=study, mesh_sequence=seq, trace_dir=outroot, run_name="config_" * tag,
+                          jfnk=jfnk, osgs_skip_boot=osgs_skip_boot, max_n_pert=max_n_pert)
             push!(levels, (h=r.h_mean, el2_u=r.el2_u, el2_p=r.el2_p, eh1_u=r.eh1_u, eh1_p=r.eh1_p,
                            success=r.success, ncells=r.ncells))
             @printf("  level=%d: cells=%d h=%.4g success=%s | L2u=%.4g H1u=%.4g L2p=%.4g\n",

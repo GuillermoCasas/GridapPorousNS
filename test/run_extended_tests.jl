@@ -9,6 +9,7 @@ files = [
     "pingpong_equivalence_extended_test.jl",
     "jfnk_equivalence_extended_test.jl",
     "cocquet_jacobian_consistency_extended_test.jl",
+    "mms3d_config_smoke_extended_test.jl",
 ]
 
 @testset "Extended Tests (> 2m)" begin
