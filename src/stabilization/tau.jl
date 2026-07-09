@@ -34,7 +34,7 @@ using Gridap.Algebra
 # Used to test the deviatoric-operator spectral-radius correction: the paper's τ matches the operator's Fourier
 # spectral radius (eq:DesignConditionOnTauWeak); for ∇·(2ανεᵈ) that radius is (4/3)αν|k|² in 3D (longitudinal
 # mode) vs αν|k|² for the Laplacian, and EXACTLY αν|k|² in 2D — so the Laplacian c₁ν/h² under-weights the viscous
-# eigenvalue by 4/3 in 3D only. TAU_VISC_MULT=4/3 applies the correction (docs/mms/3d-p2-instability-investigation.md §3.1).
+# eigenvalue by 4/3 in 3D only. TAU_VISC_MULT=4/3 applies the correction (docs/mms/p2-3d.md §A).
 @inline _tau_ns_inv(mag_u, h, ν, c_1, c_2, tau_reg_lim) =
     (parse(Float64, get(ENV, "TAU_VISC_MULT", "1.0")) * c_1 * ν / (h * h)) + (c_2 * mag_u / h) + tau_reg_lim
 

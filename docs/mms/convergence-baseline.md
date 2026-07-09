@@ -1,7 +1,7 @@
 # MMS convergence baseline — reference for tracking progress
 
 > **STATUS — FROZEN PROVENANCE SNAPSHOT (N≤320, k=1 QUAD, 2026-06-08/10).** Superseded by the Route-B
-> re-run of the sweep — see [`route-b-2d-sweep-status.md`](route-b-2d-sweep-status.md) for the current
+> re-run of the sweep — see [`convergence-2d.md`](convergence-2d.md) for the current
 > algebraic mass gate (Philosophy-A ε_C) + the COMPLETED k1/k2 sweeps. JFNK is now LANDED (the "JFNK
 > target" language below is historical). Kept as the N≤320 reference; the per-cell numbers are the
 > provenance and are intentionally left unrewritten.
@@ -15,7 +15,7 @@
 > formulation target is achieved without a split/term-by-term OSGS. The table below is **kept as the
 > N≤320 reference** (the creep values future fine-mesh work is measured against); the recovered
 > finest-pair rates and the full success summary are in
-> [`convergence-status.md`](convergence-status.md). The **JFNK iteration target stands** (OSGS still
+> [`convergence-2d.md`](convergence-2d.md). The **JFNK iteration target stands** (OSGS still
 > 30–104 inner Newton steps — the dropped ∂π/∂U).
 
 **Snapshot:** 2026-06-08 (N≤320 table) + 2026-06-10 (N=640 recovery, note above).
@@ -67,7 +67,7 @@ Iters = inner Newton steps per mesh, shown as range across N.
 *(The three `Re=1e6, α₀=0.05` cells are deliberately skipped — the high-Re/low-porosity fold has no
 coarse-mesh root. Continuation is one way to reach a root, but the fold clears by ≈N=512, after which a
 **direct exact-guess Newton solve** converges in ~3 iters with no continuation; see
-[fold-recovery.md](fold-recovery.md).)*
+[convergence-2d.md](convergence-2d.md).)*
 
 ## Reading it
 
@@ -97,7 +97,7 @@ coarse-mesh root. Continuation is one way to reach a root, but the fold clears b
   **fold** (the three skipped `Re=10⁶, α₀=0.05` cells), via `run_continuation.jl` (which was broken on
   `main` — missing `probe_stiff_diagnose.jl` `include` — and is now restored). Reaches H¹≈1.0 at the
   target corner. **As of 2026-06-17 the preferred corner path is the direct exact-guess solve**
-  (`run_corner_article.jl` ASGS, `run_corner_osgs.jl` OSGS) at N≥512 — see [fold-recovery.md](fold-recovery.md).
+  (`run_corner_article.jl` ASGS, `run_corner_osgs.jl` OSGS) at N≥512 — see [convergence-2d.md](convergence-2d.md).
 - **`test_config.json`** — the small CLAUDE.md "single simulation" example; not a convergence study.
 
 ## Regenerate

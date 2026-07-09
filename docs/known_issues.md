@@ -34,7 +34,7 @@ Each is verified against the working tree. Severity is the author's call.
   to ~2%, so the discretization is internally consistent — the offset is a **code-vs-code calibration**
   question (candidate causes: characteristic-scale `U_c`/`P_c` normalization, porosity-field definition,
   MMS amplitude). It affects how literally `results/paper_tables.tex` can be read against the paper. Not a
-  convergence failure. Canonical detail: [`mms/fold-recovery.md`](mms/fold-recovery.md) ("Current status &
+  convergence failure. Canonical detail: [`mms/convergence-2d.md`](mms/convergence-2d.md) ("Current status &
   remaining work").
 
 - **3D P₂ is memory-capped + unstable at paper c₁ (2026-06-24).** On this 32 GB machine, direct LU OOMs
@@ -49,7 +49,7 @@ Each is verified against the working tree. Severity is the author's call.
   coercivity deficit" reading is refuted; c₁×4 merely **MASKS a Gridap↔paper implementation discrepancy**.
   NOT mesh quality, NOT a solver bug either. **Root cause OPEN** — a term-level code↔paper discrepancy in the
   P2-3D case (most likely, not certainly, the P2-3D viscous 2nd-derivative subscale; may be broader). Canonical:
-  [`mms/3d-p2-instability-investigation.md`](mms/3d-p2-instability-investigation.md) (verdict); measurements in
+  [`mms/p2-3d.md`](mms/p2-3d.md) (verdict); measurements in
   `docs/formulation-audit-2026-06-24.md` §B.5 + NumPy clean-room `docs/convergence_problems_audit/` (its c₁
   verdict is refuted — it inherited the discrepancy by transcribing `continuous_problem.jl`). **A c₁ multiplier
   is NOT the fix** (it would mask paper-correct c₁); the action is to find the discrepancy. The MEMORY-wall half
@@ -79,7 +79,7 @@ Each is verified against the working tree. Severity is the author's call.
 > velocity rate after all — the coercivity gap degrades the bound's *constant* (σ_a), not the convergence
 > *rate*, consistent with [`../theory/osgs_reaction_note/osgs_reaction_note.tex`](../theory/osgs_reaction_note/osgs_reaction_note.tex)
 > (both methods retain optimal order). No split/term-by-term OSGS is needed. Full numbers:
-> [`mms/convergence-status.md`](mms/convergence-status.md) success box + [`mms/convergence-baseline.md`](mms/convergence-baseline.md).
+> [`mms/convergence-2d.md`](mms/convergence-2d.md) success box + [`mms/convergence-baseline.md`](mms/convergence-baseline.md).
 > The characterization below (why it is genuine and pre-asymptotic, not a gate/encoding/trim bug) stands.
 
 - **OSGS rate-stagnation in the reaction-dominated corner (high Da, low/moderate Re).** A convergence-*rate*

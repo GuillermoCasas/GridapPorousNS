@@ -7,7 +7,7 @@ unstabilized **Galerkin Taylor–Hood P2/P1** ("Cocquet element"), using the **f
 reaction** `σ = a(α)+b(α)|u|`. The driving question: *how does the equal-order stabilized method hold
 up against the inf-sup-stable Cocquet element across the porosity/Reynolds space?*
 
-Related: the standard MMS sweep is `docs/mms/convergence-status.md` (a *different*, constant-σ
+Related: the standard MMS sweep is `docs/mms/convergence-2d.md` (a *different*, constant-σ
 harness); the physical Cocquet benchmark is `docs/cocquet/investigation-synthesis.md`. The
 τ-saturation mechanism referenced below is written up in
 `theory/tau_saturation_note/tau_saturation_note.tex`.
@@ -19,7 +19,7 @@ FE-OPTIMAL there.** Extending the mesh ladder past the main sweep's N=160 cap to
 `data/cocquet_form_mms_vms_corner.json`, its own DB `cocquet_form_mms_vms_corner.h5`) gives two
 converged corner meshes with **optimal rate — H¹u ≈ 1.07 (ASGS) / 1.10 (OSGS), L²u ≈ 3.0 both**
 (see §4.1). This is the same fold-recedes-with-mesh phenomenon the sister `ManufacturedSolutions`
-harness diagnosed decisively for its α=0.05 corner (`docs/mms/fold-recovery.md`), and it matches that
+harness diagnosed decisively for its α=0.05 corner (`docs/mms/convergence-2d.md`), and it matches that
 harness's corner rates (H¹≈1.0, L²≈3.0) — so the fold is not a stabilization defect but the paper's
 intrinsic 1/α₀ degradation pushing the coarse-mesh branch past a turning point. The **k=2 corner**
 already has clean roots at N=40 & N=80 (it clears the fold ~2× earlier); extending it to N=160 to
@@ -127,7 +127,7 @@ DBs:
 - **It is not a basin/initial-guess problem.** The harness *already* initializes each cell from the
   exact-solution interpolant (`run_test.jl` `x0_exact`) plus a perturbation-homotopy, and still folds
   at N≤80 — so a better globalizer cannot manufacture a root that does not exist. This mirrors the
-  sister harness's decisive A1/A2 tests (`docs/mms/fold-recovery.md`): exact Jacobian (4.8e-12),
+  sister harness's decisive A1/A2 tests (`docs/mms/convergence-2d.md`): exact Jacobian (4.8e-12),
   heavy Newton **and** Picard from `u_ex` both stall at ‖R‖≈5e-2 ⇒ no root near the exact solution.
 
 **Recovery (the fix): extend the mesh ladder above the fold.** Config
@@ -142,7 +142,7 @@ not a struggling fold):
 | OSGS | L²u=2.09e-3 (1.5e-6) | L²u=2.44e-4 (5.6e-7) | **3.10** | **1.10** | 3.12 |
 
 H¹u ≈ 1.07/1.10 is **textbook-optimal O(h) for k=1**; L²u ≈ 3.0 is super-optimal for this smooth MMS —
-**identical to the sister harness's α=0.05 corner** (H¹≈1.0, L²≈3.0, `docs/mms/fold-recovery.md`),
+**identical to the sister harness's α=0.05 corner** (H¹≈1.0, L²≈3.0, `docs/mms/convergence-2d.md`),
 which cross-validates the 2-point slope. So the equal-order stabilized method converges optimally at
 α=0.1 × Re=1e5 once the mesh clears the fold — matching the clean α=0.5 deliverable. The
 VMS-folds-at-coarse-mesh / TH-converges contrast stays a true finding; it is a coarse-mesh basin of
@@ -203,7 +203,7 @@ directly — but would add robustness if the ladder is pushed to where the exact
 - **c₁×4 (raised coercivity constant) — PARTIAL help, NOT a fix (2026-07-05).** Motivated by the 3D-P2
   result, where **c₁×4 gives a fully optimal convergent sweep in Gridap** (note: c₁ there is now understood to
   *mask* a Gridap↔paper discrepancy, not fix a coercivity deficit — paper `c₁=4k⁴` is correct per the first
-  author / Kratos full-terms; see [`../mms/3d-p2-instability-investigation.md`](../mms/3d-p2-instability-investigation.md)).
+  author / Kratos full-terms; see [`../mms/p2-3d.md`](../mms/p2-3d.md)).
   Ran `isolation_alphasweep.json` (Re=1e5, k=1, ASGS) at **c₁×1 vs c₁×4** (via a new
   `C1_MULT` env-var hook at the `get_c1_c2` site in `run_test.jl` — default `1.0` = byte-identical):
   - **α=0.1** (folds at *all* N at paper c₁ — N=10/20/40 → NaN): c₁×4 converges **only N=10** (L²u≈0.428,

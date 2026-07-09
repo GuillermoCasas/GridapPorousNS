@@ -43,7 +43,7 @@ with `solve_one(...; linsolver="ILU_GMRES")`.
 "regular mesh"), driven exactly like the 2D harness: each cell uses the **eps_pert homotopy**
 (perturbed start, hard→easy `1 → 0.1 → 0.01 → 0`, first success wins) on top of the **Codina
 iterative penalty** (`ε_num·(pⁿ−pⁿ⁻¹)` in the mass residual — required for the 3D all-Dirichlet
-problem, ill-posed at `ε=0`; see [docs/mms/3d-iterative-penalty-fix-and-osgs-coupling.md](../../../docs/mms/3d-iterative-penalty-fix-and-osgs-coupling.md)).
+problem, ill-posed at `ε=0`; see [docs/mms/p2-3d.md](../../../docs/mms/p2-3d.md)).
 The headline robustness metric per cell is `eps_used` = the **largest** perturbation it still converged
 from (`eps_used=1` ⇒ converged from the hardest start, exactly the 2D behaviour).
 

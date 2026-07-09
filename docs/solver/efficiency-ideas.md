@@ -28,7 +28,7 @@ converged  ⇔  ε_M ≤ tol_M  AND  ε_C ≤ tol_C     # eps_tol_momentum / eps
 ```
 
 The mass gate is now the Route-B algebraic `ε_C = ‖r_C‖ / D_C` (see
-[`docs/mms/route-b-2d-sweep-status.md`](../mms/route-b-2d-sweep-status.md)); the earlier strong-form
+[`docs/mms/convergence-2d.md`](../mms/convergence-2d.md)); the earlier strong-form
 measure `‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖ + ‖g‖)` is now the diagnostic `eps_C_strong`, not the gate.
 
 Both `D_M` and the mass envelope are **measured from the current iterate and known material data** — not
@@ -76,7 +76,7 @@ right answer there. Two structural consequences:
 **Validation before acting.** Cross-tabulate, per (cell, method, N): iterations-to-converge vs. the
 observed convergence rate (`err_u_l2`, `err_u_h1`, `err_p_l2` slopes). Flag only cells that are
 *both* fast *and* rate-deficient. (Note: the known OSGS high-Da rate plateau — `Re=1`, `Da=1e6` — is a
-*rate* issue already tracked in [`mms_convergence_status.md`](../mms/convergence-status.md); it is not the
+*rate* issue already tracked in [`mms_convergence_status.md`](../mms/convergence-2d.md); it is not the
 tolerance.) **Likely conclusion: no change needed** — this item is mostly a verification, documented so
 the question is not re-litigated.
 

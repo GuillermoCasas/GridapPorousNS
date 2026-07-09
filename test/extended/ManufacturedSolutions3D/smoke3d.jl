@@ -242,7 +242,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     #   "regular_tet" = (6√2·V)^{1/3} (regular-tet edge for volume V — the shipped default; a volume PROXY).
     #   "d_fact"      = (6·V)^{1/3} = (d!·V)^{1/d}, the dimension-consistent analog of the 2D harness's
     #                   √(2·Area) (→ h = grid spacing), i.e. the 3D volume formula WITHOUT the extra √2.
-    # Tests whether the tet h-convention drives the P2-3D discrepancy (docs/mms/3d-p2-instability-investigation.md §3).
+    # Tests whether the tet h-convention drives the P2-3D discrepancy (docs/mms/p2-3d.md §3).
     if h_conv == "diameter" || h_conv == "shortest_edge"
         cc = get_cell_coordinates(Ω)
         _redu = h_conv == "shortest_edge" ? minimum : maximum   # shortest edge (min ‖xᵢ−xⱼ‖) vs diameter (max)
@@ -450,7 +450,7 @@ function run_sweep_structured(; max_n_pert=3)
             # system — ρ(J_frozen⁻¹·∂π/∂u) ≈ 1178 at paper c₁, so inner GMRES stalls and the solver sits at the
             # exact-guess interpolant (success=false). A preconditioner-ONLY c₁×4 inflation drops ρ_prec to ≈3.8
             # (residual F stays paper-c₁, so the converged root is unchanged), restoring quadratic Newton and
-            # eps_used=1 robustness. OSGS-P1 is robust at mult=1. See docs/mms/3d-iterative-penalty-fix-and-osgs-coupling.md §6.
+            # eps_used=1 robustness. OSGS-P1 is robust at mult=1. See docs/mms/p2-3d.md §6.
             osgs_p2 = osgs_recipe && kv == 2
             pc_mult = osgs_p2 ? 4.0 : nothing                       # c₁-inflation for the JFNK preconditioner (P2 only)
             jfnk_mx = osgs_recipe ? (osgs_p2 ? 80 : 30) : nothing   # more GMRES headroom for P2 (ρ_prec≈3.8 ⇒ ~tens of iters)

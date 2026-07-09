@@ -6,15 +6,15 @@ and are not run by the tier runners; live results go to the gitignored `../resul
 The old May-2026 partial sweep (`mms-sweep-difficult-cases.partial.{h5,-stdout.log}`) and its retired
 difficulty-taxonomy doc were **removed in the 2026-06-10 cleanup** — fully superseded by the complete,
 validated k=1 QUAD sweep (N=10→640). Current status + numbers:
-[`../../../../docs/mms/convergence-status.md`](../../../../docs/mms/convergence-status.md) (success box),
-[`../../../../docs/mms/fold-recovery.md`](../../../../docs/mms/fold-recovery.md), and
+[`../../../../docs/mms/convergence-2d.md`](../../../../docs/mms/convergence-2d.md) (success box),
+[`../../../../docs/mms/convergence-2d.md`](../../../../docs/mms/convergence-2d.md), and
 [`../../../../docs/mms/convergence-baseline.md`](../../../../docs/mms/convergence-baseline.md).
 
 ## Authoritative validated snapshot — `validated_k1_quad_N640/` (2026-06-10)
 
 The **complete, validated k=1 P1/P1 QUAD sweep** (N=10→640, both ASGS and OSGS, scale-free ε_M/ε_C
 gate; 24 physics cells × 2 methods, the 3 Re=1e6/α₀=0.05 fold cells `skip_cells`-excluded). This is
-the dataset behind the 2026-06-10 success in [`../../../../docs/mms/convergence-status.md`](../../../../docs/mms/convergence-status.md).
+the dataset behind the 2026-06-10 success in [`../../../../docs/mms/convergence-2d.md`](../../../../docs/mms/convergence-2d.md).
 Contents:
 
 - `phase1_quad_k1.h5` — the convergence database (per-mesh `err_{u,p}_{l2,h1}`, `eval_iters/times`,
@@ -31,7 +31,7 @@ regenerable, gitignored under `../results/`).
 
 ## Other kept snapshot — `pre_route_b_2026-07-01/`
 
-The committed pre-Route-B baseline that [`../../../../docs/mms/route-b-2d-sweep-status.md`](../../../../docs/mms/route-b-2d-sweep-status.md)
+The committed pre-Route-B baseline that [`../../../../docs/mms/convergence-2d.md`](../../../../docs/mms/convergence-2d.md)
 cites as the reference the current algebraic mass gate was measured against.
 
 ## Pruned 2026-07-08 (config-lifecycle cleanup)

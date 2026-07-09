@@ -54,7 +54,7 @@ Root cause was the **gate, not JFNK, not the inner-GMRES tolerance** — a clean
 - **Analysis workflow:** single tool `analyze_results.py` (true-root detection → `flagged_cells.json`; merged paper table; per-config plots; honest true-root `Converged` column). Report marks: verified / `*` recovered-at-fine / `‡` genuine sub-optimal / `ˢ` super-convergent / `**` fold-best-root / `N/A`. One-sided slope acceptance (`slope ≥ target − tol`) keeps super-convergence from being mislabelled sub-optimal.
 - **k2 P2 guardrails on 32GB:** use ≤2 shards (P2 N=320 LU is multi-GB; 4+ OOM); `pgrep -f run_test.jl` and kill stragglers before launching (pause/resume can orphan shards, ~13GB zombies caused a false "tight-gate regression" alarm — reproduce single-process before alarming). k1 (P1) tolerates 6 shards.
 
-Source docs consolidated here: `mms/convergence-status.md`, `mms/convergence-baseline.md`, `mms/route-b-2d-sweep-status.md`, `mms/high-order-convergence-gate-and-jfnk.md`.
+Source docs consolidated here: `mms/convergence-2d.md`, `mms/convergence-baseline.md`.
 
 ---
 
@@ -110,7 +110,7 @@ Both corners fill `results/paper_tables.tex` (zero `n.c.`). k=2 needs no extrapo
 - **OSGS slope inflation caveat:** the OSGS corner coupled solve converges slowly-linearly (frozen-π) and is stopped at the production residual, not a tight true root; the FME is reliable (warm-from-ASGS, OSGS≈ASGS) but the OSGS *slope* can be mildly inflated when the coarse (N=512) point is not fully settled (e.g. Da=1e6 reads 2.63 vs ASGS 2.11).
 - **OPEN — Gridap-vs-Kratos magnitude offset:** Gridap corner FME are **~3–12× larger** than the article's (Kratos) values, norm-dependent (vel L²: Gridap 7.9e-5 @N=768 vs paper 1.1e-5 @N=640; pressure L² ~5×; H¹ ~2.4×). **The rates agree** (≈2–3) and Gridap TRI matches Gridap QUAD continuation to ~2%, so the discretization is internally consistent — the offset is a code-vs-code calibration question (candidates: `U_c`/`P_c` normalization, porosity-field definition, MMS amplitude). Worth reconciling before the table is taken as a literal paper reproduction.
 
-Source doc: `mms/fold-recovery.md`.
+Source doc: `mms/convergence-2d.md`.
 
 ---
 
@@ -120,7 +120,7 @@ Source doc: `mms/fold-recovery.md`.
 
 > **The earlier "Gridap↔paper discrepancy / c₁ masks a bug" framing (2026-07-05) is WITHDRAWN.** c₁ is not masking a bug — it is the theorem's own coercivity knob, and `4k⁴` is simply an element-dependent choice that is under-margined here.
 
-**Full for-scrutiny record** (every experiment + numbers, the C_inv table, mesh-independence, shape-regularity, the c₁×4 ladder, τ/h levers, the BCC attempts, the refuted-alternatives table A–O, the paper reconciliation, and the honest caveats / what would overturn the verdict): [`docs/mms/3d-p2-coercivity-resolution-dossier.md`](mms/3d-p2-coercivity-resolution-dossier.md).
+**Full for-scrutiny record** (every experiment + numbers, the C_inv table, mesh-independence, shape-regularity, the c₁×4 ladder, τ/h levers, the BCC attempts, the refuted-alternatives table A–O, the paper reconciliation, and the honest caveats / what would overturn the verdict): [`docs/mms/p2-3d.md`](mms/p2-3d.md).
 
 ### The symptom
 
@@ -165,7 +165,7 @@ The destabilizer is localized to the **viscous adjoint `L*_visc(v)=∇·(2ανε
 
 ### The iterative-penalty well-posedness fix (separate from the c₁ resolution)
 
-3D all-Dirichlet with ε=0 is **ill-posed** (constant-pressure null mode). The **Codina iterative penalty** adds `ε_num·(pⁿ − pⁿ⁻¹)` to the **mass residual** (the code previously had `ε_num` only in the Jacobian, where it cancels in the residual and vanishes at convergence). This fix — with the gated `p_prev` handling — gives well-posedness (Blitz 240/240). **Its "P2 root cause = penalty" claim is WITHDRAWN:** the penalty fixes *well-posedness*, not the P2 *accuracy* defect. Its *original* "NOT c₁" instinct is vindicated (paper c₁ is correct; the P2 defect is the element-margin issue above, neither penalty nor c₁). Also fixed in the same work: spurious-root homotopy acceptance (reference-root match, `5ecc0ca`) and an OSGS→ASGS `initial_ftol` recording leak (`osgs_advanced_off_entry` guard). Canonical: [`mms/3d-iterative-penalty-fix-and-osgs-coupling.md`](mms/3d-iterative-penalty-fix-and-osgs-coupling.md).
+3D all-Dirichlet with ε=0 is **ill-posed** (constant-pressure null mode). The **Codina iterative penalty** adds `ε_num·(pⁿ − pⁿ⁻¹)` to the **mass residual** (the code previously had `ε_num` only in the Jacobian, where it cancels in the residual and vanishes at convergence). This fix — with the gated `p_prev` handling — gives well-posedness (Blitz 240/240). **Its "P2 root cause = penalty" claim is WITHDRAWN:** the penalty fixes *well-posedness*, not the P2 *accuracy* defect. Its *original* "NOT c₁" instinct is vindicated (paper c₁ is correct; the P2 defect is the element-margin issue above, neither penalty nor c₁). Also fixed in the same work: spurious-root homotopy acceptance (reference-root match, `5ecc0ca`) and an OSGS→ASGS `initial_ftol` recording leak (`osgs_advanced_off_entry` guard). Canonical: [`mms/p2-3d.md`](mms/p2-3d.md).
 
 ### 3D official sweep results (2026-06-30, paper c₁, regular Kuhn mesh, self-describing `results/k*/TET/structured/`)
 
@@ -178,7 +178,7 @@ The destabilizer is localized to the **viscous adjoint `L*_visc(v)=∇·(2ανε
 
 Even granting the discretization, OSGS-P2 cannot be *solved*: the damped staggered π-iteration is **violently non-contractive** (drift ratio ρ ≈ 8–65 for ω=1.0 down to 0.1, every ω diverges — mechanism: π = Π(R(u)) with R∋∇²u amplifies high-frequency content ~1/h²; Anderson can't rescue it). **JFNK is not budget-fixable** (inner GMRES stalls at rel-res 0.01–0.16, non-monotone across maxiter 30/100/300 ⇒ the matrix-free `Jᵥ` is noisy because R re-projects π inside every FD probe). A *single* frozen-π solve from the interpolant gives L²u=0.0157 — the fixed point exists and is reasonable; only the iteration to it is unstable. A real saddle-point/MG preconditioner would be needed, but is only worthwhile *after* the discretization is fixed.
 
-Source docs: `mms/3d-p2-instability-investigation.md` (verdict), `mms/3d-iterative-penalty-fix-and-osgs-coupling.md`. Diagnostic hooks (default-off): `smoke3d.jl` `ablation`/`h_conv`; `continuous_problem.jl` `VISC_ADJ_MULT`; `tau.jl` `TAU_VISC_MULT`; `data/phase1_tri_k2.json`.
+Source doc: `mms/p2-3d.md`. Diagnostic hooks (default-off): `smoke3d.jl` `ablation`/`h_conv`; `continuous_problem.jl` `VISC_ADJ_MULT`; `tau.jl` `TAU_VISC_MULT`; `data/phase1_tri_k2.json`.
 
 ---
 
@@ -276,7 +276,7 @@ Source docs: `solver/jfnk-phase0-preconditioner-gate.md`, `solver/osgs-anderson-
 
 ### §4.1 — α=0.1×Re=1e5 is a coarse-mesh solution-branch fold — RESOLVED for k=1 (2026-07-07)
 
-The α=0.1×Re=1e5 "failure" is a **genuine coarse-mesh turning-point fold** — no root with ‖R‖≤tol exists for N≤80 — that **recedes with mesh refinement**; NOT a solver bug or stabilization defect. Evidence: the fold recedes as N↑ and deepens as α↓ (α=0.9/0.5 converge every mesh; **α=0.2 folds at N≤20, converges at N=40; α=0.1 folds at N≤80, has a TRUE root at N=160** — ASGS ‖R‖=1.3e-7 L²u=1.84e-3 in 7 it; OSGS ‖R‖=1.0e-6 L²u=2.09e-3 in 48 it). It is not a basin/initial-guess problem (the harness already inits from the exact interpolant + perturbation-homotopy and still folds at N≤80) — mirroring the sister harness's A1/A2 tests (exact Jacobian 4.8e-12; heavy Newton and Picard from `u_ex` both stall at ‖R‖≈5e-2, §2 / [`mms/fold-recovery.md`](mms/fold-recovery.md)).
+The α=0.1×Re=1e5 "failure" is a **genuine coarse-mesh turning-point fold** — no root with ‖R‖≤tol exists for N≤80 — that **recedes with mesh refinement**; NOT a solver bug or stabilization defect. Evidence: the fold recedes as N↑ and deepens as α↓ (α=0.9/0.5 converge every mesh; **α=0.2 folds at N≤20, converges at N=40; α=0.1 folds at N≤80, has a TRUE root at N=160** — ASGS ‖R‖=1.3e-7 L²u=1.84e-3 in 7 it; OSGS ‖R‖=1.0e-6 L²u=2.09e-3 in 48 it). It is not a basin/initial-guess problem (the harness already inits from the exact interpolant + perturbation-homotopy and still folds at N≤80) — mirroring the sister harness's A1/A2 tests (exact Jacobian 4.8e-12; heavy Newton and Picard from `u_ex` both stall at ‖R‖≈5e-2, §2 / [`mms/convergence-2d.md`](mms/convergence-2d.md)).
 
 **Recovery (extend the ladder above the fold, N=[160,320], cold exact-guess — no mesh-continuation, no `src/` change):**
 
@@ -300,12 +300,12 @@ H¹u ≈ 1.07/1.10 is textbook-optimal O(h) for k=1; L²u ≈ 3.0 super-optimal 
 
 σ̃_α is the **ASGS** estimate. **OSGS** removes the reaction from the orthogonal projection (for constant σ its orthogonal subscale is exactly zero, `article.tex` ~line 619), which the paper says *"facilitates the convergence of the nonlinear iterations"* — a documented reaction/convergence concern ASGS does not phrase the same way. The trim `ProjectResidualWithoutReactionWhenConstantSigma` is **OSGS-only** (`src/stabilization/projection.jl:76-80`) and fires only for `Constant_Sigma`; under **Forchheimer** (what the sweep uses) the reaction stays in the stabilization for **both** methods — consistent with both folding at low α.
 
-Full detail: [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md) (Cocquet synthesis) and [`docs/mms/3d-p2-coercivity-resolution-dossier.md`](mms/3d-p2-coercivity-resolution-dossier.md) (the c₁ mechanism). The τ-saturation note is `theory/tau_saturation_note/tau_saturation_note.tex`. Source doc: `cocquet/cocquet-form-mms-status.md`.
+Full detail: [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md) (Cocquet synthesis) and [`docs/mms/p2-3d.md`](mms/p2-3d.md) (the c₁ mechanism). The τ-saturation note is `theory/tau_saturation_note/tau_saturation_note.tex`. Source doc: `cocquet/cocquet-form-mms-status.md`.
 
 ---
 
 ## Cross-references
 
-- **Full evidence dossiers:** [`docs/mms/3d-p2-coercivity-resolution-dossier.md`](mms/3d-p2-coercivity-resolution-dossier.md), [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md), [`docs/formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md).
+- **Full evidence dossiers:** [`docs/mms/p2-3d.md`](mms/p2-3d.md), [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md), [`docs/formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md).
 - **Theory (LaTeX):** [`theory/paper/article.tex`](../theory/paper/article.tex) (the authoritative formulation), `theory/osgs_reaction_note/osgs_reaction_note.tex`, `theory/tau_saturation_note/tau_saturation_note.tex`, `theory/osgs_algorithm/osgs_algorithm.tex`.
 - **Living companions:** [`lessons_learned.md`](lessons_learned.md) (regression ledger), [`known_issues.md`](known_issues.md) (open code-correctness items), [`solver/paper-code-divergences.md`](solver/paper-code-divergences.md), [`solver/algorithm-code-mapping.md`](solver/algorithm-code-mapping.md), [`solver/nonlinear-convergence-criterion-prompt.md`](solver/nonlinear-convergence-criterion-prompt.md).

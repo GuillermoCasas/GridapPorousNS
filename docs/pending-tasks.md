@@ -12,7 +12,7 @@ relevant file or doc so it can be picked up cold. Grouped by kind:
 
 Nothing here is a *blocker* for the headline results (2D k1/k2 sweeps optimal; OSGS-P1-3D solved; the
 P2-3D verdict is RESOLVED — `4k⁴` under-margined for high-`C_inv` structured tets, see
-[`mms/3d-p2-instability-investigation.md`](mms/3d-p2-instability-investigation.md)). These are refinements,
+[`mms/p2-3d.md`](mms/p2-3d.md)). These are refinements,
 completeness measurements, and hygiene.
 
 ---
@@ -69,8 +69,8 @@ The P2-3D catastrophe is RESOLVED: `4k⁴` is under-margined for high-`C_inv` st
 theory-sanctioned remedy is an **element-aware c₁** (article.tex line 910). This is a formulation-research
 direction, **not** a code change and **not** a `c1_multiplier` mask. If pursued: compute the per-element
 `C_inv²` and set `c₁ ≈ 2ξ·C_inv²` per element type (Kuhn TET needs ≈3.6× the quad). See
-[`mms/3d-p2-instability-investigation.md`](mms/3d-p2-instability-investigation.md) §3.2 and its
-[dossier](mms/3d-p2-coercivity-resolution-dossier.md) for the full argument, caveats, and what would
+[`mms/p2-3d.md`](mms/p2-3d.md) §3.2 and its
+[dossier](mms/p2-3d.md) for the full argument, caveats, and what would
 overturn the verdict. Diagnostic hooks live behind `tau.jl` `TAU_VISC_MULT`, `smoke3d.jl` `h_conv`.
 
 ---
@@ -190,13 +190,13 @@ pressure-Laplacian in the (2,2) block; `τ~h` ⇒ rediscretize per MG level. Do 
 (equal-order 2D cells need no saddle-point preconditioner — Phase-0 verdict). See
 [`solver/jfnk-phase0-preconditioner-gate.md`](solver/jfnk-phase0-preconditioner-gate.md) "3D watch item",
 [`formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md) §F7 (TRIGGERED), and
-[`mms/3d-iterative-penalty-fix-and-osgs-coupling.md`](mms/3d-iterative-penalty-fix-and-osgs-coupling.md) §5.
+[`mms/p2-3d.md`](mms/p2-3d.md) §5.
 
 ### 3e. OSGS-3D-P2 solver robustness (the "good solution, ok=false" blocker)
 The **correct OSGS-P2-3D root IS reachable at paper c₁** (JFNK+boot-skip+penalty on (12,12,3) reaches
 L²u=0.0012187 — exactly the c₁×4 value), but the solve reports **`ok=false`**: purely a convergence-DETECTION
 / robustness problem, not the discretization. Ranked sub-tasks (from
-[`mms/3d-iterative-penalty-fix-and-osgs-coupling.md`](mms/3d-iterative-penalty-fix-and-osgs-coupling.md) §5):
+[`mms/p2-3d.md`](mms/p2-3d.md) §5):
 1. **OSGS far-guess robustness via homotopy descent** — if `eps_pert=1` fails, descend (0.1, 0.01, 0) and
    record the largest survivor; make doomed attempts fail fast (small JFNK budget / divergence-patience guard).
 2. **A real saddle-point/MG preconditioner** (= 3d above) so JFNK's GMRES converges from any guess — the
@@ -241,7 +241,7 @@ pressure L² ~5×, H¹ ~2.4×). Convergence *rates* agree (≈2–3) and Gridap 
 the discretization is internally consistent — the offset is a **code-vs-code calibration** question
 (candidates: characteristic-scale `U_c`/`P_c` normalization, porosity-field definition, MMS amplitude). It
 affects how literally `results/paper_tables.tex` reads against the paper. Not a convergence failure. Detail:
-[`mms/fold-recovery.md`](mms/fold-recovery.md). See [`known_issues.md`](known_issues.md).
+[`mms/convergence-2d.md`](mms/convergence-2d.md). See [`known_issues.md`](known_issues.md).
 
 ### 4d. Config-strictness / schema `required` gaps (audit A.4 / DRIV-03)
 The JSON schema declares `required` for exactly one object (`linear_solver`); add `required` arrays mirroring
@@ -327,6 +327,6 @@ stale leftover can confuse a clean checkout. See [`formulation-audit-2026-06-24.
   [`solver/jfnk-phase0-preconditioner-gate.md`](solver/jfnk-phase0-preconditioner-gate.md).
 - **CocquetFormMMS α=0.1×Re=1e5 k=1 corner** — **DONE 2026-07-07** (FE-optimal above the fold, N=[160,320]).
 - **2D k1 & k2 QUAD sweeps** — **DONE 2026-07-03** under the Route-B algebraic mass gate, behavior-preserving.
-  See [`mms/route-b-2d-sweep-status.md`](mms/route-b-2d-sweep-status.md).
+  See [`mms/convergence-2d.md`](mms/convergence-2d.md).
 - Many audit findings (A.1/A.2/A.3, C.1–C.5, all of Part D, F1–F4) — **RESOLVED**; see the
   [audit §0 Resolved ledger](formulation-audit-2026-06-24.md#resolved-ledger).

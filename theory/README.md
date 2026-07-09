@@ -37,5 +37,5 @@ The `\Guillermo{}` / `\Joaquin{}` author-review macros are defined in `article.t
 
 - Paper↔code map + divergence ledger → [`../docs/solver/`](../docs/solver/).
 - Cocquet investigation (synthesis, analysis, transcripts) → [`../docs/cocquet/`](../docs/cocquet/).
-- MMS status / fold-recovery / next-actions → [`../docs/mms/`](../docs/mms/).
+- MMS status / convergence-2d / next-actions → [`../docs/mms/`](../docs/mms/).
 - Algorithm-improvement history, audit transcripts, refactor brief → [`../docs/solver/`](../docs/solver/).

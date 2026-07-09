@@ -235,7 +235,7 @@ first and then fail the anchor test rather than file a regression.
 > `c₁ = 4k⁴` has ~zero coercivity margin there (`C_inv²` Kuhn 214 vs quad 60). The remedy is an
 > element-aware `c₁` per [`article.tex` line 910](../theory/paper/article.tex#L910), **not** a code
 > change; paper `c₁` is correct. Full detail in
-> [`docs/mms/3d-p2-coercivity-resolution-dossier.md`](mms/3d-p2-coercivity-resolution-dossier.md).
+> [`docs/mms/p2-3d.md`](mms/p2-3d.md).
 
 ### 2.6 OSGS preconditioning & linearization architecture — `[code-divergent-superior]`
 
@@ -523,7 +523,7 @@ Implemented in [`src/solvers/convergence_criterion.jl`](../src/solvers/convergen
 > it accepts machine-floor-converged cells whose `ε_C` cannot reach `tol` because `D_C` collapses for
 > near-divergence-free flow (the mass envelope → 0 when the flow is essentially incompressible). The
 > **momentum (Philosophy A) spec below is still current and unchanged.** See
-> [`docs/mms/route-b-2d-sweep-status.md`](mms/route-b-2d-sweep-status.md).
+> [`docs/mms/convergence-2d.md`](mms/convergence-2d.md).
 
 ### 3.0 Summary
 
@@ -793,7 +793,7 @@ change was the removal of the dead `_resolve_solution_scale_per_field` helper an
 
 - [`docs/formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md) — the deep
   theory↔code + results audit that corroborates the ledger entries above.
-- [`docs/mms/3d-p2-coercivity-resolution-dossier.md`](mms/3d-p2-coercivity-resolution-dossier.md)
+- [`docs/mms/p2-3d.md`](mms/p2-3d.md)
   — the for-scrutiny record behind the `4k⁴`/`c₁` note in §2.5.
 - [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md) — cross-topic
   investigation synthesis.

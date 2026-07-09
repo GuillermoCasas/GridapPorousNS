@@ -2,7 +2,7 @@
 # ==============================================================================================
 # [diagnostic-tool] Article-table reproduction for the stiff MMS fold corner (Re=1e6, α₀=0.05),
 # k=1 P1/P1 — the three cells deferred from the standard sweep via `skip_cells` and handled by
-# the documented α + mesh continuation (docs/mms/fold-recovery.md). For each Da ∈ {1e-6, 1, 1e6}
+# the documented α + mesh continuation (docs/mms/convergence-2d.md). For each Da ∈ {1e-6, 1, 1e6}
 # it runs α-continuation to the target corner at a base mesh that clears the fold, interpolates
 # the converged state up the fine mesh ladder, and reports ALL FOUR normalized error norms
 # (velocity & pressure, L² & H¹) + their two-finest-mesh slopes — the exact quantities tabulated

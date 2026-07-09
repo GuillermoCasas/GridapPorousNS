@@ -9,7 +9,7 @@
 > it accepts machine-floor-converged cells whose `ε_C` cannot reach `tol` because `D_C` collapses for
 > near-divergence-free flow (the mass envelope → 0 when the flow is essentially incompressible). The
 > **momentum (Philosophy A) spec below is still current and unchanged.** See
-> [`docs/mms/route-b-2d-sweep-status.md`](../mms/route-b-2d-sweep-status.md).
+> [`docs/mms/convergence-2d.md`](../mms/convergence-2d.md).
 
 You are implementing the **stopping criterion for the outer nonlinear (Picard / Newton) iteration**
 of a stabilized finite element solver for the stationary generalized (porous) Navier–Stokes

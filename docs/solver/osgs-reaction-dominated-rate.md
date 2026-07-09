@@ -2,7 +2,7 @@
 
 **Canonical doc** for the open OSGS convergence-rate issue at high Damköhler number. Supersedes the
 "discrete staggered map" mechanistic account in [`../known_issues.md`](known_issues.md) (Open numerical
-defect) and the 2026-06-04 caveats in [`../mms/convergence-status.md`](../mms/convergence-status.md) §4–6.
+defect) and the 2026-06-04 caveats in [`../mms/convergence-2d.md`](../mms/convergence-2d.md) §4–6.
 
 Last updated: 2026-06-10.
 
@@ -11,7 +11,7 @@ Last updated: 2026-06-10.
 >    rate climbing `0.57→0.54→0.58→0.73→1.11→1.85` (α₀=1, Da=1e6, N=10→640): the "0.5–0.7" quoted
 >    throughout this doc is the **N≤320 pre-asymptotic value**, and it **recovers to ≥1.0 once N=320→640
 >    is in**. So OSGS reaches the **optimal** rate — this is a slow pre-asymptotic climb, **not** an order
->    ceiling. (Numbers: [`../mms/convergence-status.md`](../mms/convergence-status.md) success box.)
+>    ceiling. (Numbers: [`../mms/convergence-2d.md`](../mms/convergence-2d.md) success box.)
 > 2. **Mechanism (theory correction).** The companion note's thesis was **inverted and corrected
 >    2026-06-09**: the constant-σ annihilation means OSGS *retains the full Galerkin σ* on ‖u‖, whereas
 >    ASGS's stabilization *drains* its reactive coercivity to σ_a = σ−τ₁σ² < σ — so OSGS's coercivity

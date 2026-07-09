@@ -123,7 +123,7 @@ end
 # MEASURED (2026-06-24, Frontal+optimize base lc=0.137): qmin 0.466 -> 0.247 -> 0.151 (L0->L1->L2).
 # So this family is NOT quality-preserving in the regime the convergence study actually samples; the
 # min-quality TAIL falls under refinement and adds rate noise. (Earlier comments here claimed the
-# opposite — that was wrong; see docs/mms/3d-p2-convergence-investigation.md §"mesh-quality mechanics".)
+# opposite — that was wrong; see docs/mms/p2-3d.md §"mesh-quality mechanics".)
 # Independent gmsh remeshes are the other extreme: each level is a fresh, differently-flawed realization
 # whose error level is set by its own quality, so per-segment "rates" are realization SCATTER, not
 # h-convergence. The only refinement-INVARIANT-quality option is a STRUCTURED Kuhn tet family

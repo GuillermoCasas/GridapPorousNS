@@ -37,4 +37,4 @@ the grid and spuriously report a ~4× regression. For a clean Route-B-vs-baselin
 ## Status / provenance pointer
 
 The live Route-B sweep (partial: k1 done, k2 paused at 39/48) and the resume instructions are documented
-in [docs/mms/route-b-2d-sweep-status.md](../../../../../docs/mms/route-b-2d-sweep-status.md).
+in [docs/mms/convergence-2d.md](../../../../../docs/mms/convergence-2d.md).

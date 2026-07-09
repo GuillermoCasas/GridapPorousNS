@@ -11,7 +11,7 @@
 > Gridap↔paper implementation discrepancy that actually causes the failure, then attributed the resulting
 > c₁-sensitivity to element-family coercivity. The real root cause is a **code↔paper discrepancy** (that c₁
 > masks), still **OPEN** — see the canonical
-> [../../mms/3d-p2-instability-investigation.md](../../mms/3d-p2-instability-investigation.md). Kept
+> [../../mms/p2-3d.md](../../mms/p2-3d.md). Kept
 > verbatim for provenance and because its careful term-by-term transcription is a useful map of what the
 > Gridap assembly computes (i.e. where to hunt the discrepancy). Read the verdict below as REFUTED.
 
@@ -136,7 +136,7 @@ Both statements can be true simultaneously; they are about different discretisat
   *triangles* is also consistent: its large reaction σ enters τ₁'s denominator and damps the
   viscous-subscale product.
 
-So Hypothesis A in `3d-p2-instability-investigation.md` ("c₁×4 only shrinks the error
+So Hypothesis A in `p2-3d.md` ("c₁×4 only shrinks the error
 constant, masks — refuted, author-steered") needs revision. The discriminator between
 "masking" and "fixing" is whether the ratio-to-interpolant is pinned at ~1 across a mesh
 family — it is (1.03, 1.02, 1.03 over three meshes, with L²u rates tracking the
@@ -161,7 +161,7 @@ interpolant's own). A masked defect would leave a large or drifting ratio.
    honest statement is that the 3D-P2 columns need element-appropriate c₁ (or the
    Kratos-style reduced subscale, if that is what generated them — worth one email to the
    author asking precisely which subscale terms Kratos assembles at k=2).
-4. **Doc updates** to `3d-p2-instability-investigation.md`: revise Hypothesis A; fix the
+4. **Doc updates** to `p2-3d.md`: revise Hypothesis A; fix the
    "method-INDEPENDENT" TL;DR (the OSGS entry in the §2 table is a frozen-π one-shot, not the
    OSGS fixed point — the companion doc's JFNK root at 0.0012187 shows the OSGS *root* is
    good); note that Experiment D checked `EvalDivDevSymOp` on an analytic field only, which

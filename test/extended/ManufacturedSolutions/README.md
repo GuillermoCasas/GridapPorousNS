@@ -11,7 +11,7 @@ research harness** — it is *not* part of the automated `runtests.jl` tiers.
 |---|---|
 | `run_test.jl` | **Canonical sweep driver.** Reads a `data/<config>.json`, sweeps the factor grid, writes one HDF5 results DB under `results/`. |
 | `analyze_results.py` | **Single analysis entry point.** Detects flagged cells, builds the merged + detailed convergence reports and summary tables, optional plots. |
-| `run_continuation.jl` | Coarse-N fold-**reach** driver (α / mesh-ladder continuation to *find* a root when none exists at coarse N; batch `phase2` mode). At N≥512 a root exists, so prefer the direct solve below. See [`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md). |
+| `run_continuation.jl` | Coarse-N fold-**reach** driver (α / mesh-ladder continuation to *find* a root when none exists at coarse N; batch `phase2` mode). At N≥512 a root exists, so prefer the direct solve below. See [`docs/mms/convergence-2d.md`](../../../docs/mms/convergence-2d.md). |
 | `run_corner_article.jl` | **Direct exact-guess corner solve (ASGS).** Solves the Re=1e6/α₀=0.05 fold corner cells at base N=512 + mesh-step to N=768 — the fold clears by ≈N=512, so plain Newton from the exact guess converges (~3 iters); no α-continuation needed. Writes `results/debug_results/corner_tri_k1_a005.json`. |
 | `run_corner_osgs.jl`, `osgs_corner_lib.jl` | **Direct corner solve (OSGS).** OSGS coupled solve (mirrors `solve_osgs_stage!`), warm-started from the ASGS corner root. Writes `corner_tri_k1_a005_osgs*.json`. |
 | `make_results_tables.py` | Generates `results/paper_tables.tex` — the four `article.tex` tables filled with the latest Gridap results (FME at a common N=320, corner cells extrapolated + daggered; an `ε_pert (N_NS+N_Pic)` solver-effort column). |
@@ -80,7 +80,7 @@ The **fold corner** (Re=1e6, α₀=0.05) is excluded from the sweep by `skip_cel
 at N≤320). It is **reproduced** (P1/TRI, both methods) by a direct exact-guess solve at N≥512 via
 `run_corner_article.jl` (ASGS) / `run_corner_osgs.jl` (OSGS); `run_continuation.jl` is the fallback for
 reaching a root at coarse N. The Q2/QUAD-k2 corner is **also** reproduced (it does not fold — k=2
-converges directly at N=160→320). See [`docs/mms/fold-recovery.md`](../../../docs/mms/fold-recovery.md).
+converges directly at N=160→320). See [`docs/mms/convergence-2d.md`](../../../docs/mms/convergence-2d.md).
 
 ### Concurrent launches into ONE shared database
 
@@ -152,9 +152,9 @@ python analyze_results.py --h5 results/debug_results/_robustness.h5 --no-plots -
    - **ASGS velocity L² rate ≈ 2** (optimal) at `α₀=1.0` and at `Re=1e6`; **≈ 1.6 at `α₀=0.5`** for
      low/unit Re — the known coarse-mesh *pre-asymptotic porosity-layer* effect (the layer is resolved
      by only 2–8 cells at N≤40; it recovers to optimal at fine N). See
-     [`docs/mms/convergence-status.md`](../../../docs/mms/convergence-status.md).
+     [`docs/mms/convergence-2d.md`](../../../docs/mms/convergence-2d.md).
    - **OSGS is flagged on coarse meshes, and this is pre-existing** (independent of harness I/O; it was
-     present in pre-rework baselines too — see [`docs/mms/convergence-status.md`](../../../docs/mms/convergence-status.md)).
+     present in pre-rework baselines too — see [`docs/mms/convergence-2d.md`](../../../docs/mms/convergence-2d.md)).
      Low/unit-Re OSGS converges to ‖R‖~1e-12 (true roots) but trips the strict honest-root gate; high-Re
      OSGS genuinely diverges on coarse N.
    - **Solver-success vs analyzer "no-root" disagreements** are surfaced by the honest-exit gate:

@@ -5,7 +5,7 @@
 > production. The solver now stops on a **scale-free `ε_M`/`ε_C` criterion**:
 > converged ⇔ `ε_M ≤ tol_M` **and** `ε_C ≤ tol_C`, where `ε_M = ‖r_M‖/D_M` (momentum residual over the
 > dynamic force-magnitude envelope) and `ε_C = ‖r_C‖/D_C` — the Route-B "Philosophy-A" algebraic mass
-> gate, symmetric with `ε_M` (see [`docs/mms/route-b-2d-sweep-status.md`](../mms/route-b-2d-sweep-status.md);
+> gate, symmetric with `ε_M` (see [`docs/mms/convergence-2d.md`](../mms/convergence-2d.md);
 > the earlier strong-form `‖ε p + ∇·(α u) − g‖ / (‖∇(α u)‖ + ‖g‖)` is now the diagnostic `eps_C_strong`,
 > not the gate). It is implemented in
 > [`src/solvers/convergence_criterion.jl`](../../src/solvers/convergence_criterion.jl) and specified in
