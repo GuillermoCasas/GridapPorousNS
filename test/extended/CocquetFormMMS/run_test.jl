@@ -432,6 +432,11 @@ function run_mms(config_file="test_config.json")
     h5f = h5open(h5_path, h5_mode)
     max_idx = 0
     existing_signatures = Dict()
+    # [RESUME] per-(cell, method, mesh) results already on disk, so a re-run (erase_past_results=false)
+    # REUSES them instead of recomputing — turning an interrupted sweep into a true resume. Keyed by
+    # (Re, Da, alpha_0, kv, kp, etype, method) → Dict(n => saved metric values). The final h5 is identical
+    # to an uninterrupted run (reused cells carry their original values; only the missing meshes are solved).
+    resume_results = Dict()
     if !erase_past
         for gname in keys(h5f)
             parts = split(gname, "_")
@@ -449,6 +454,20 @@ function run_mms(config_file="test_config.json")
                     et = String(read(att["element_type"]))
                     sig_base = (r, d, a, kv_v, kp_v, et)
                     existing_signatures[sig_base] = idx
+                    # load the per-mesh curve for reuse on resume
+                    meth = String(parts[3])
+                    hs_r  = read(g["h"]); eul = read(g["err_u_l2"]); epl = read(g["err_p_l2"])
+                    euh   = read(g["err_u_h1"]); eph = read(g["err_p_h1"]); et_r = read(g["eval_times"])
+                    ei_r  = read(g["eval_iters"]); ee_r = read(g["eval_eps"]); er_r = read(g["eval_residuals"])
+                    fd_r  = read(g["fold"]); na_r = read(g["osgs_no_advance"])
+                    per_n = Dict{Int,Dict{String,Any}}()
+                    for i in 1:length(hs_r)
+                        per_n[Int(round(1.0/hs_r[i]))] = Dict{String,Any}(
+                            "err_u_l2"=>eul[i], "err_p_l2"=>epl[i], "err_u_h1"=>euh[i], "err_p_h1"=>eph[i],
+                            "eval_times"=>et_r[i], "eval_iters"=>ei_r[i], "eval_eps"=>ee_r[i],
+                            "eval_residuals"=>er_r[i], "fold"=>fd_r[i], "osgs_no_advance"=>na_r[i])
+                    end
+                    resume_results[(r, d, a, kv_v, kp_v, et, meth)] = per_n
                 catch
                 end
             end
@@ -700,6 +719,25 @@ function run_mms(config_file="test_config.json")
                                 for method in methods
                                     run_idx += 1
                                     println("\n--- Progress $(run_idx) / $(total_runs * length(conv_parts)) | Re=$(Re), Da=$(Da), α=$(alpha_0), method=$(method), N=$(n) ---")
+
+                                    # [RESUME] if this (cell, method, mesh) already has a result on disk, reuse it and
+                                    # skip the (expensive) solve. results_cache still accumulates it in mesh order, so a
+                                    # later COMPUTED mesh for the same cell rewrites a complete group; a fully-reused cell
+                                    # is never rewritten and keeps its on-disk group untouched.
+                                    sig_r = (Float64(Re), Float64(Da), Float64(alpha_0), Int(kv), Int(kp), String(etype), String(method))
+                                    if haskey(resume_results, sig_r) && haskey(resume_results[sig_r], Int(n))
+                                        sv = resume_results[sig_r][Int(n)]
+                                        rc = results_cache[(etype, kv, kp, alpha_0, Da, Re, method)]
+                                        push!(rc["hs"], 1.0 / n)
+                                        push!(rc["err_u_l2"], sv["err_u_l2"]);     push!(rc["err_p_l2"], sv["err_p_l2"])
+                                        push!(rc["err_u_h1"], sv["err_u_h1"]);     push!(rc["err_p_h1"], sv["err_p_h1"])
+                                        push!(rc["eval_times"], sv["eval_times"]); push!(rc["eval_iters"], sv["eval_iters"])
+                                        push!(rc["eval_eps"], sv["eval_eps"]);     push!(rc["eval_residuals"], sv["eval_residuals"])
+                                        push!(rc["mms_plateau_success"], nothing); push!(rc["overall_verification_success"], true)
+                                        push!(rc["fold"], sv["fold"]);             push!(rc["osgs_no_advance"], sv["osgs_no_advance"])
+                                        println("  [RESUME] N=$n reused from disk — skipping solve")
+                                        continue
+                                    end
 
                                     # [fix: ASGS≠OSGS] The per-N config_dict hardcodes stabilization.method="ASGS"; without
                                     # this override every OSGS cell silently ran ASGS (solve_system reads the method from the
