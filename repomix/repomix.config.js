@@ -32,7 +32,6 @@ module.exports = isRunFromRepomixFolder ? {
       "../**/*.json",
       "../.agents/**/*",
       "../**/siam/**/*",
-      "**/*.tex",
       "../**/archive/**/*",
       "../tools/**/*",
       "../test/extended/ManufacturedSolutions/previous_results/**/*.md",
@@ -69,7 +68,6 @@ module.exports = isRunFromRepomixFolder ? {
       "**/*.json",
       ".agents/**/*",
       "**/siam/**/*",
-      "**/*.tex",
       "**/archive/**/*",
       "tools/**/*",
       "test/extended/ManufacturedSolutions/previous_results/**/*.md",
@@ -77,4 +75,5 @@ module.exports = isRunFromRepomixFolder ? {
     ]
   }
 };
+
 
