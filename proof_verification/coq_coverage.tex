@@ -101,6 +101,8 @@ and by what other means (a hand audit, the SymPy suite, a Lean~4 roadmap, or
 the convergence tests) each residual item is addressed.
 Section~\ref{sec:amend} records the theory-side amendments applied to keep the
 manuscript $100\%$ compatible with what was verified.
+Section~\ref{sec:conclusion} states, in plain terms, how strong the resulting
+guarantee is and where residual trust remains.
 \end{abstract}
 
 \tableofcontents
@@ -745,6 +747,133 @@ F5 & \file{supplement.tex} is untouched SIAM template boilerplate --- a submissi
 \noindent
 After these edits the paper builds clean (\coq{latexmk} exit~0, $0$ undefined
 references/citations); the two new equation labels resolve.
+
+% =====================================================================
+\section{Conclusion: how much this proves, in plain terms}\label{sec:conclusion}
+% =====================================================================
+
+It is worth stating plainly what a reader should take away.
+
+\subsection{What machine-checking actually buys}
+
+An ordinary proof is read by a human referee, once, under time pressure; a
+missed sign or an unjustified ``clearly'' can survive into print. A
+machine-checked proof is different in kind. Every single inference --- every
+rewrite, every inequality, every case split --- is verified by a small, fixed
+program (the kernel) that knows only the rules of logic and of real arithmetic
+and cannot be hurried, fatigued, or won over by plausibility. Here that check
+is then \emph{repeated by a second, independent program} (\coq{coqchk}) which
+re-derives everything from the compiled proof terms without trusting the first.
+
+The practical consequence: for every theorem in these twelve files, the claim
+\emph{``the stated conclusion follows from the stated hypotheses''} is no longer
+a matter of belief or of referee diligence. The only way such a statement could
+still be false is if the two independent kernels shared a soundness bug that
+happened to strike exactly here --- for a logic and an implementation hardened
+over three decades and exercised across thousands of developments, a
+possibility so remote that it is no longer the dominant source of doubt. In the
+terms of the request: the machine-checked \emph{deductions} are, to an
+overwhelming degree, simply correct --- not ``probably correct'', but correct in
+the same sense that $2+2=4$ is correct, with the residual uncertainty pushed
+down to whether the checker itself is sound.
+
+\subsection{The three things that still require human trust}
+
+Certainty about a \emph{deduction} is not the same as certainty that a
+\emph{theorem is the one you wanted}. A machine-checked result is an
+implication --- ``if these hypotheses, then this conclusion'' --- and exactly
+three things sit outside the kernel and carry whatever doubt remains.
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item \textbf{Reading the statement correctly.} The kernel guarantees the
+    proof matches the statement; it cannot guarantee the statement says what the
+    author meant. \emph{This document is that check}: every Coq statement is
+    mapped to the paper equation it encodes, and the definitions were diffed
+    against the manuscript sources.
+  \item \textbf{The hypotheses holding in the application.} For the two central
+    lemmas, a short list of standard analytic facts (the trusted base of
+    \S\ref{sec:left}) is \emph{assumed}, not proved here. These are textbook
+    results, hand-audited against the manuscript --- but ``hand-audited'' means
+    human-checked, so they still carry the ordinary, small-but-nonzero risk of
+    any careful proof.
+  \item \textbf{The trust base.} The Coq kernel and the standard-library
+    axiomatisation of the real numbers. Universally relied upon; named here for
+    completeness.
+\end{enumerate}
+
+\subsection{The confidence ledger}
+
+Putting it together, the results fall into three honest tiers.
+
+\begin{longtable}{@{}L{0.24\textwidth}L{0.44\textwidth}L{0.26\textwidth}@{}}
+\toprule
+\textbf{Tier} & \textbf{What is in it} & \textbf{What must still be trusted} \\
+\midrule \endhead
+\textbf{1. Certain \newline (unconditional; positivity only)} &
+All the scalar / algebraic content: the $\tau_1,\tau_2,\sigt$ identities, the
+coefficient expansions and lower bounds, the $\varepsilon$-smallness chain, the
+parameter and jump inequalities, the Fourier and coupling spectra, the
+asymptotic limits, the manufactured-solution divergence identity, and the
+plateau bump's $C^1$ behaviour. &
+Only the trust base (kernel $+$ real-number axioms). The positivity hypotheses
+are physically trivial. \\
+\midrule
+\textbf{2. Certain \emph{as an implication} \newline (conditional)} &
+\lbl{lemma:Stability} and \lbl{lemma:Continuity}: the coercivity bound
+$B_S\ge\Cstab\,|||U_h|||^2$ and the continuity bound
+$B_S\le C_{\mathrm{tot}}(\mathrm{Br}_U+\mathrm{Br}_P)|||V|||$, with explicit
+constants and every intermediate step (Cauchy--Schwarz, Young, the
+eighteen-term bookkeeping, the jump treatment, the summation over the mesh)
+inside the kernel. &
+Trust base, \emph{plus} the dozen named analytic hypotheses of \S\ref{sec:left}
+(Green-type identities, inverse estimates) holding --- standard, hand-audited,
+Lean-targeted. \\
+\midrule
+\textbf{3. Hand-audited only \newline (no kernel check yet)} &
+The interpolation replacements \lbl{lem:continterp} and the convergence theorem
+\lbl{th:Convergence} built on them; the Appendix~A elemental-matrix
+transcription (left to SymPy); the subscale-norm / CDR-adjoint items outside
+stdlib-Coq scope. &
+The ordinary risk of a careful human proof. Next to be formalised. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Where the residual gaps are, ranked}
+
+In decreasing order of how much unformalised trust they still carry:
+\begin{itemize}[nosep]
+  \item \textbf{The analytic trusted base} (the hypotheses of Tier~2): the
+    divergence-theorem / integration-by-parts identities and the finite-element
+    inverse estimates. Standard and hand-audited, but not yet machine-checked.
+    The Lean~4 roadmap targets exactly these, and notes that the
+    inverse-estimate technology alone would shrink \lbl{lemma:Stability}'s
+    residual base to the single Green identity \coq{HBS}.
+  \item \textbf{Interpolation and convergence} (\lbl{lem:continterp},
+    \lbl{th:Convergence}): the one corner of the stability/continuity argument
+    with no Coq statement at all --- hand-audited only.
+  \item \textbf{The data / mesh assumptions} (\lbl{H:jump}, \lbl{H:mesh}, the
+    $\varepsilon$-condition, positivity): not gaps in any proof but
+    \emph{conditions of applicability} --- hypotheses the mesh and data must
+    satisfy, present in the paper's theorems in any formal system, with nothing
+    to prove.
+  \item \textbf{Modelling and code} (the two standing caveats of
+    \S\ref{sec:left}): Coq checks the mathematics as stated, not that it models
+    the physics, nor that the Julia/Kratos solvers implement it. The
+    method-of-manufactured-solutions convergence tests are what pin the latter.
+\end{itemize}
+
+\subsection{Bottom line}
+
+The parts of this paper that are pure calculation or pure logical deduction ---
+the whole of the parameter design, the asymptotics and the manufactured-solution
+algebra, and, crucially, the \emph{entire chain of estimates} inside the
+stability and continuity proofs --- are now verified to a standard of certainty
+that human refereeing cannot reach. What still rests on human judgement is a
+\emph{short, explicit, named} list: a handful of standard analysis facts (being
+formalised next in Lean), one interpolation step, and the physical- and
+code-modelling questions that no symbolic proof can settle. The value of the
+exercise is precisely that it shrinks what must be taken on trust from ``the
+whole proof'' to that short list --- and puts the list in plain sight.
 
 % =====================================================================
 \section{Reproducing the check}\label{sec:repro}

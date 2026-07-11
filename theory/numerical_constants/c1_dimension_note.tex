@@ -1,0 +1,583 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{margin=2.7cm}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black]{hyperref}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+\newtheorem{assumption}{Assumption}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\PP}{\mathbb{P}}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\nK}[1]{\left\lVert #1 \right\rVert_{K}}
+\newcommand{\ip}[2]{\left( #1 , #2 \right)}
+\newcommand{\symgrad}{\nabla^{\mathrm{S}}}
+\newcommand{\Proj}{\Pi}
+\newcommand{\chat}{\hat{c}}
+
+\title{A note on the dimension and shape dependence of the viscous
+stabilization constant $c_1$ for quadratic simplicial elements in
+ASGS/VMS methods}
+\author{Guillermo Casas\thanks{CIMNE -- Centre Internacional de M\`etodes
+Num\`erics en Enginyeria, Barcelona. Draft note; comments welcome.}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+In numerical experiments with an algebraic subgrid-scale (ASGS)
+stabilized finite element method for the Brinkman/Navier--Stokes
+equations, we observed that quadratic tetrahedral meshes require a
+value of the algorithmic constant $c_1$ (the coefficient of
+$\nu/h_K^2$ in the inverse stabilization parameter) roughly four times
+larger than quadratic triangular meshes in order to obtain stable,
+optimally convergent solutions, whereas the standard practice inherited
+from the literature is to use the same constants in two and three
+dimensions. We show that this observation is consistent with, and
+quantitatively predicted by, the structure of the stability analysis:
+the elementwise coercivity of the Galerkin-plus-stabilization energy
+imposes the lower bound $c_1 \ge c_1^*(K) = 2\,\chat^2(K)$, where
+$\chat^2(K)$ is the largest eigenvalue of an explicit local
+generalized eigenvalue problem involving the divergence of the
+projected velocity gradient. We compute $c_1^*(K)$ exactly for the
+relevant simplex shapes. For $\PP_1$ elements $c_1^*(K)=0$ identically
+--- the mechanism is absent, which explains why it has left no trace in
+the (predominantly linear-element) stabilized-methods literature. For
+$\PP_2$ elements the threshold is strongly shape- and
+dimension-dependent; for the element shapes produced by structured
+mesh generation the predicted ratio between tetrahedra and triangles is
+$(100+5\sqrt{2})/24 \approx 4.46$, and across the shape pairs
+considered the ratio lies in $[2.8,\,4.5]$. The ingredients
+(inverse-inequality constants as design parameters) are classical, but
+we have not found the two- to three-dimensional rescaling of $c_1$
+stated explicitly anywhere.
+\end{abstract}
+
+\section{The observation and the question}
+\label{sec:observation}
+
+We consider the stabilized finite element approximation of the
+incompressible Brinkman/Navier--Stokes equations in a variable-porosity
+medium, discretized with continuous $\PP_k$ velocity--pressure pairs
+and stabilized with an ASGS/VMS term-by-term method. The stabilization
+parameters follow the standard design of Codina and
+coworkers~\cite{Codina2000,Codina2002,CodinaVMSChapter}: on each
+element $K$ of diameter $h_K$,
+%
+\begin{equation}
+\label{eq:taus}
+\tau_{1,K}
+ = \Bigl( \alpha_K \tau_{\mathrm{NS},K}^{-1} + \sigma \Bigr)^{-1},
+ \qquad
+\tau_{\mathrm{NS},K}^{-1}
+ = c_1 \frac{\nu}{h_K^2} + c_2 \frac{|\boldsymbol a|_K}{h_K},
+ \qquad
+\tau_{2,K} = \frac{h_K^2\,\tau_{\mathrm{NS},K}^{-1}}{c_1\,\alpha_K},
+\end{equation}
+%
+where $\alpha_K$ is an elementwise representative of the porosity,
+$\sigma$ the reaction (Darcy) coefficient, and $c_1$, $c_2$ the
+algorithmic constants, for which the standard values $c_1 = 4$, $c_2 =
+2$ (with $h_K$ divided by the polynomial order for higher-order
+interpolations) are ubiquitous in that
+literature~\cite{Codina2000,Codina2002,CodinaVMSChapter}, in two and
+three dimensions alike. The viscous term of the momentum operator is
+written with a pointwise orthogonal projection $\Proj$ of the velocity
+gradient; in our formulation $\Proj$ extracts the
+\emph{deviatoric--symmetric} part,
+%
+\begin{equation}
+\label{eq:proj}
+\Proj \nabla \boldsymbol u
+ \;=\; \symgrad \boldsymbol u
+   - \tfrac{1}{d}\,(\nabla\!\cdot\!\boldsymbol u)\,\mathbb I ,
+\qquad
+\symgrad \boldsymbol u
+ = \tfrac12\bigl(\nabla\boldsymbol u + \nabla\boldsymbol u^{\!\top}\bigr),
+\end{equation}
+%
+so that the viscous operator reads
+$-2\nabla\!\cdot\!(\alpha\nu\,\Proj\nabla\boldsymbol u)$ and the
+stabilization subtracts, elementwise, the $\tau$-weighted pairing of
+the adjoint and direct residuals in the usual ASGS fashion.
+
+In convergence studies with manufactured solutions we found the
+following. With $\PP_2$ elements, a value of $c_1$ that yields stable
+and optimally convergent results on triangular meshes fails on
+tetrahedral meshes; stability and optimal rates are recovered on the
+tetrahedra only after enlarging $c_1$ by a factor of approximately
+four. With $\PP_1$ elements the same constants work in both dimensions.
+We were not aware of any statement in the VMS/ASGS literature
+prescribing a dimension-dependent $c_1$, so the questions are:
+\emph{is the observation consistent with the theory, why is the factor
+of the observed size, and why has it not been reported?}
+
+The answer developed below is that all three questions are resolved by
+a single, explicitly computable local quantity: the sharp constant of
+the inverse estimate for the operator
+$\boldsymbol u \mapsto \nabla\!\cdot(\Proj\nabla\boldsymbol u)$
+on a single element, which (i) vanishes identically for $\PP_1$
+velocities, and (ii) for $\PP_2$ velocities is between $2.8$ and $4.5$
+times larger (in the squared, $c_1$-relevant normalization) on the
+usual tetrahedron shapes than on the usual triangle shapes.
+
+\section{The mechanism: elementwise coercivity of the viscous ledger}
+\label{sec:mechanism}
+
+Throughout this section, fix an element $K$ and consider the
+\emph{diffusion-dominated, reaction-free limit} on that element:
+$\boldsymbol a = \boldsymbol 0$, $\sigma = 0$, and $\alpha$ constant on
+$K$. This is the binding regime for the constraint derived below (see
+Remark~\ref{rem:relax}), and it is also the regime probed by
+fine-mesh convergence studies at moderate Reynolds number. Since the
+projector~\eqref{eq:proj} is a pointwise algebraic operation, on each
+element $\Proj\nabla\boldsymbol u_h$ is computed exactly from
+$\nabla\boldsymbol u_h$, with no auxiliary $L^2$ projection involved.
+
+Testing the stabilized form with the solution itself, the contribution
+of the element $K$ to the total energy is, in this limit, the exact
+elemental identity
+%
+\begin{equation}
+\label{eq:ledger}
+Q_K(\boldsymbol u_h)
+ \;=\;
+ 2\alpha\nu \nK{\Proj\nabla\boldsymbol u_h}^2
+ \;-\; \tau_{1,K}\,\nK{\,2\nabla\!\cdot\!(\alpha\nu\,\Proj\nabla
+        \boldsymbol u_h)\,}^2
+ \;+\; \tau_{2,K}\,\nK{\nabla\!\cdot\!(\alpha\boldsymbol u_h)}^2 .
+\end{equation}
+%
+Indeed, with $\boldsymbol a = \boldsymbol 0$, $\sigma = 0$ and $p_h =
+q_h = 0$ the momentum residual and its adjoint both reduce to
+$-2\nabla\!\cdot(\alpha\nu\Proj\nabla\boldsymbol u_h)$, so the
+momentum stabilization contributes the (negative) middle term, while
+the mass residual and its adjoint are $\pm\nabla\!\cdot(\alpha
+\boldsymbol u_h)$, contributing the (positive) last term; the Galerkin
+viscous term gives the first, using that $\Proj$ is a pointwise
+orthogonal projection. With $\boldsymbol a = \boldsymbol 0$, $\sigma =
+0$ and $\alpha$ constant, \eqref{eq:taus} gives the exact values
+$\tau_{1,K} = h_K^2/(c_1\alpha\nu)$ and $\tau_{2,K} = \nu/\alpha$;
+substituting, all physical parameters factor out:
+%
+\begin{equation}
+\label{eq:ledger2}
+\frac{Q_K(\boldsymbol u_h)}{\alpha\nu}
+ \;=\;
+ 2 \nK{\Proj\nabla\boldsymbol u_h}^2
+ - \frac{4 h_K^2}{c_1}\,
+   \nK{\nabla\!\cdot\!(\Proj\nabla\boldsymbol u_h)}^2
+ + \nK{\nabla\!\cdot\!\boldsymbol u_h}^2 .
+\end{equation}
+%
+Since the restriction to $K$ of a conforming $\PP_k$ velocity field is
+an arbitrary element of $[\PP_k(K)]^d$, the sign of the elemental
+ledger is characterized exactly by a local eigenvalue problem.
+
+\begin{proposition}[elementwise coercivity threshold]
+\label{prop:threshold}
+Let $k \ge 1$ and define
+%
+\begin{equation}
+\label{eq:c1star}
+c_1^*(K)
+ \;\coloneqq\;
+ \max_{\substack{\boldsymbol u \in [\PP_k(K)]^d \\
+                  \Proj\nabla\boldsymbol u \neq 0}}
+ \frac{4 h_K^2 \nK{\nabla\!\cdot\!(\Proj\nabla\boldsymbol u)}^2}
+      {2\nK{\Proj\nabla\boldsymbol u}^2
+       + \nK{\nabla\!\cdot\!\boldsymbol u}^2}.
+\end{equation}
+%
+Then $Q_K(\boldsymbol u_h) \ge 0$ for all
+$\boldsymbol u_h\vert_K \in [\PP_k(K)]^d$ if and only if
+$c_1 \ge c_1^*(K)$; and if $c_1 < c_1^*(K)$ there exists an elemental
+velocity field for which $Q_K < 0$ while
+$\nK{\Proj\nabla\boldsymbol u_h} > 0$. Moreover, introducing
+%
+\begin{equation}
+\label{eq:chat}
+\chat^{\,2}_{\mathrm{df}}(K)
+ \coloneqq h_K^2 \max_{\substack{\boldsymbol u \in [\PP_k(K)]^d\\
+   \nabla\cdot\boldsymbol u = 0,\ \symgrad\boldsymbol u \neq 0}}
+ \frac{\nK{\nabla\!\cdot\!\symgrad\boldsymbol u}^2}
+      {\nK{\symgrad\boldsymbol u}^2},
+ \qquad
+\chat^{\,2}_{\mathrm{all}}(K)
+ \coloneqq h_K^2 \max_{\substack{\boldsymbol u\\ \Proj\nabla
+   \boldsymbol u\neq 0}}
+ \frac{\nK{\nabla\!\cdot\!(\Proj\nabla\boldsymbol u)}^2}
+      {\nK{\Proj\nabla\boldsymbol u}^2},
+\end{equation}
+%
+one has the two-sided bound
+$2\,\chat^{\,2}_{\mathrm{df}}(K) \le c_1^*(K) \le
+ 2\,\chat^{\,2}_{\mathrm{all}}(K)$.
+All three quantities are the largest eigenvalues of generalized
+eigenvalue problems with exactly assemblable Gram matrices on
+$[\PP_k(K)]^d$, and they depend on $K$ only through its shape (they are
+invariant under similarity transformations of $K$).
+\end{proposition}
+
+\begin{proof}
+The equivalence and the strict-negativity statement are immediate
+from~\eqref{eq:ledger2}: $Q_K \ge 0$ for all elemental fields iff the
+Rayleigh quotient in~\eqref{eq:c1star} never exceeds $c_1$, i.e.\ iff
+$c_1 \ge c_1^*(K)$; a maximizer realizes $Q_K < 0$ when $c_1 <
+c_1^*(K)$. For the lower bound in the two-sided estimate, restrict the
+maximization in~\eqref{eq:c1star} to pointwise divergence-free fields:
+there $\nabla\!\cdot\!\boldsymbol u = 0$ kills the last denominator
+term, and $\Proj\nabla\boldsymbol u = \symgrad\boldsymbol u$
+by~\eqref{eq:proj}, giving the value
+$2\chat^{\,2}_{\mathrm{df}}$. For the upper bound, drop the
+(nonnegative) last denominator term. Both extremal problems are
+generalized eigenvalue problems $A\boldsymbol c = \lambda B\boldsymbol
+c$ for the Gram matrices of the linear maps $\boldsymbol u \mapsto
+\nabla\!\cdot(\Proj\nabla\boldsymbol u)$ etc.\ in any basis of
+$[\PP_k(K)]^d$ (restricted, in the divergence-free case, to the
+kernel of the linear divergence constraints). Shape invariance: under
+$x \mapsto \lambda R x + b$ with $R$ orthogonal, gradients scale by
+$\lambda^{-1}$ and conjugate by $R$, second derivatives by
+$\lambda^{-2}$; every quotient in \eqref{eq:c1star}--\eqref{eq:chat}
+therefore scales by $\lambda^{-2}$, exactly compensated by $h_K^2$.
+\end{proof}
+
+\begin{proposition}[the mechanism is absent for linear elements]
+\label{prop:P1}
+For $k = 1$ on any element, in any dimension,
+$\nabla\!\cdot\!(\Proj\nabla\boldsymbol u) \equiv 0$ for all
+$\boldsymbol u \in [\PP_1(K)]^d$; hence
+$c_1^*(K) = \chat^{\,2}_{\mathrm{df}}(K) =
+\chat^{\,2}_{\mathrm{all}}(K) = 0$, and the elemental
+ledger~\eqref{eq:ledger2} is nonnegative for every $c_1 > 0$.
+\end{proposition}
+
+\begin{proof}
+For linear $\boldsymbol u$ the gradient is constant, hence so is
+$\Proj\nabla\boldsymbol u$, and its divergence vanishes.
+\end{proof}
+
+\begin{remark}[elementwise versus global]
+\label{rem:global}
+Proposition~\ref{prop:threshold} is a statement about the elemental
+energy ledger, i.e.\ about the quantity that the standard coercivity
+analysis controls term by term. It does not by itself produce a
+\emph{global} discrete velocity field with negative total energy when
+$c_1 < c_1^*(K)$, because inter-element continuity constrains which
+elemental worst modes can coexist; empirically, the practical
+stability threshold sits somewhat below $c_1^*$. What the elementwise
+analysis does predict robustly is the \emph{ratio} of thresholds
+between element families, since the conformity slack, the
+$h$-convention of the implementation, and the polynomial-order
+convention are common to the two- and three-dimensional runs and
+cancel in the ratio. This ratio is precisely what the experiment
+measures when the same code, constants and conventions are used in 2D
+and 3D.
+\end{remark}
+
+\begin{remark}[why the diffusive limit is binding]
+\label{rem:relax}
+For $|\boldsymbol a| > 0$ or $\sigma > 0$, $\tau_{1,K}$
+in~\eqref{eq:taus} decreases, which weakens the negative term
+in~\eqref{eq:ledger}; the convective and reactive couplings introduce
+new cross terms, but in the sufficient-condition analysis these are
+absorbed by a Young inequality whose cost again scales with the
+\emph{same} inverse-estimate constants (see
+Section~\ref{sec:consistency}). The diffusion-dominated elemental
+constraint of Proposition~\ref{prop:threshold} is therefore the sharp
+edge of the requirement, and it is the regime reached by mesh
+refinement at fixed physical parameters.
+\end{remark}
+
+\section{Exact values of the threshold for the relevant shapes}
+\label{sec:values}
+
+By Proposition~\ref{prop:threshold} the threshold is a pure shape
+constant. We computed the three quantities of
+\eqref{eq:c1star}--\eqref{eq:chat} for $\PP_2$ velocities on the five
+simplex shapes most relevant in practice, by exact rational assembly
+of the Gram matrices and generalized eigenvalue solves; the results
+were validated by (i) exact rational eigenvalue computation where the
+matrices are rational (the right triangle), (ii) $50$-digit
+arithmetic against closed forms elsewhere, and (iii) Monte--Carlo
+Rayleigh sampling never exceeding the reported maxima. The
+computation scripts accompany this note. In all five cases we found
+$\chat^{\,2}_{\mathrm{df}} = \chat^{\,2}_{\mathrm{all}}$ (the
+maximizer is divergence-free once the deviatoric
+projector~\eqref{eq:proj} is used), so that the two-sided bound of
+Proposition~\ref{prop:threshold} collapses and
+%
+\begin{equation}
+\label{eq:collapse}
+c_1^*(K) \;=\; 2\,\chat^{\,2}(K),
+\qquad
+\chat^{\,2}(K) \coloneqq \chat^{\,2}_{\mathrm{df}}(K)
+             = \chat^{\,2}_{\mathrm{all}}(K).
+\end{equation}
+%
+Note also that on divergence-free $\PP_2$ fields
+$\nabla\!\cdot\symgrad\boldsymbol u = \tfrac12\Delta\boldsymbol u$ is a
+\emph{constant} vector, which is what makes exact evaluation
+straightforward.
+
+\begin{table}[ht]
+\centering
+\caption{Sharp elementwise constants for $\PP_2$ velocities with the
+deviatoric--symmetric projector~\eqref{eq:proj}; $h_K$ is the element
+diameter. ``Right'' denotes the simplex with mutually orthogonal unit
+legs (structured quadrilateral/hexahedral splitting also produces the
+Kuhn shape in 3D). Exact values; decimal forms rounded.}
+\label{tab:constants}
+\begin{tabular}{lccc}
+\toprule
+Element shape $K$ & $\chat^{\,2}(K)$ & $c_1^*(K) = 2\chat^{\,2}(K)$ &
+$c_1^*(K)$ (decimal) \\
+\midrule
+2D right triangle (quad split) & $48$ & $96$ & $96.0$ \\
+2D equilateral triangle        & $24$ & $48$ & $48.0$ \\
+3D right tetrahedron           & $440/3$ & $880/3$ & $293.3$ \\
+3D Kuhn tetrahedron (cube split) & $200+10\sqrt2$ & $400+20\sqrt2$ &
+$428.3$ \\
+3D regular tetrahedron         & $200/3$ & $400/3$ & $133.3$ \\
+\midrule
+any shape, $\PP_1$ velocities  & $0$ & $0$ & $0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The dimensional comparison, i.e.\ the predicted factor by which $c_1$
+must be enlarged when moving from triangles to tetrahedra \emph{with
+the same code, constants and conventions}, is the ratio of thresholds
+for comparable element quality:
+%
+\begin{equation}
+\label{eq:ratios}
+\frac{c_1^*(\text{Kuhn tet})}{c_1^*(\text{right tri})}
+ = \frac{100+5\sqrt2}{24} \approx 4.46,
+\qquad
+\frac{c_1^*(\text{right tet})}{c_1^*(\text{right tri})}
+ = \frac{55}{18} \approx 3.06,
+\qquad
+\frac{c_1^*(\text{regular})}{c_1^*(\text{equilateral})}
+ = \frac{25}{9} \approx 2.78 .
+\end{equation}
+%
+Unstructured tetrahedral meshes of ordinary quality contain elements
+between the regular and the Kuhn shapes (and worse), and the binding
+element is the worst one, so the practically relevant window for the
+3D/2D threshold ratio is roughly $[2.8,\,4.5]$, with the structured
+pairing at $4.46$.
+
+\begin{remark}[$h$-convention sensitivity]
+\label{rem:hconv}
+Table~\ref{tab:constants} uses $h_K = \operatorname{diam} K$, as in the
+convergence analysis. If the implementation instead uses the grid
+spacing $\ell$ of the background structured mesh (a common choice),
+the entries rescale by $(\ell/h_K)^2$, which is $1/2$ for the right
+triangle and $1/3$ for the Kuhn tetrahedron, so the structured-pairing
+ratio becomes $\tfrac23 \cdot 4.46 \approx 2.97$; a mean-edge
+convention gives an intermediate value $\approx 3.6$. The observed
+factor of $\approx 4$ is thus consistent with the prediction under the
+diameter convention, and in any case lies inside the window spanned by
+the standard conventions and shape pairs. What no convention changes
+is the conclusion that the same $c_1$ cannot be optimal for triangles
+and tetrahedra with $\PP_2$ elements.
+\end{remark}
+
+\section{Consistency with the a priori analysis}
+\label{sec:consistency}
+
+The observation is also consistent with the sufficient-condition side
+of the theory. In the stability analysis of the method (for general
+$\sigma \ge 0$, $\boldsymbol a \neq \boldsymbol 0$ and variable
+porosity), coercivity of the stabilized form in the natural mesh-de\-pendent
+norm is established under the condition
+%
+\begin{equation}
+\label{eq:sufficient}
+c_1 \;>\; 2\,\xi\,\bar C^2, \qquad \xi > 2,
+\end{equation}
+%
+where $\xi$ is the free parameter of the Young inequality used to
+absorb the reactive--viscous coupling and $\bar C$ is the constant of
+the weighted local inverse estimate
+$\nK{\nabla\!\cdot(\alpha\,\Proj\nabla\boldsymbol u_h)} \le (\bar
+C/h_K)\,\alpha_K^{1/2} \nK{\alpha^{1/2}\Proj\nabla\boldsymbol u_h}$.
+(We have verified this chain of implications, at the level of every
+algebraic step, in a machine-checked formal development accompanying
+the underlying paper; the condition~\eqref{eq:sufficient} with the
+explicit constants is not an artifact of loose estimation but the
+exact requirement of the proof.) In particular
+$c_1 > 4\bar C^2$ is \emph{necessary for the sufficient condition},
+and for constant porosity the sharp value of $\bar C^2$ on an element
+is exactly $\chat^{\,2}_{\mathrm{all}}(K)$ of~\eqref{eq:chat}. The
+sufficient-condition threshold therefore carries the same shape
+constants and the same 3D/2D ratios as the necessary elementwise
+threshold of Proposition~\ref{prop:threshold}: the two sides of the
+theory bracket the practical threshold and predict the same
+dimensional rescaling. For variable porosity, the analysis further
+decomposes $\bar C = \sqrt{d\,\delta_\alpha}\,C_{\mathrm{inv}} +
+C_\alpha$ (product rule plus the componentwise bound
+$\norm{\nabla\!\cdot M} \le \sqrt d\,\norm{\nabla M}$, with
+$\delta_\alpha$, $C_\alpha$ the porosity-resolution constants), which
+adds an \emph{explicit} factor $d$ on top of the shape dependence of
+$C_{\mathrm{inv}}$; this route gives 3D/2D ratios between $2.5$ and
+$4.3$ for the same shape pairs, again consistent with the window
+of~\eqref{eq:ratios}.
+
+\section{Relation to the literature}
+\label{sec:literature}
+
+The two ingredients of the mechanism are classical, but we have been
+unable to find the conclusion --- that $c_1$ must be rescaled by a
+factor of order $3$--$4.5$ from triangles to tetrahedra for quadratic
+elements --- stated anywhere; the following seems to be an accurate
+summary of the state of the literature (based on a targeted but
+non-exhaustive search).
+
+\emph{(i) Inverse-estimate constants as design parameters.} That
+stabilization parameters must respect local inverse-inequality
+constants, and that these constants depend on the element type,
+polynomial degree and dimension, is the central message of Harari and
+Hughes~\cite{HarariHughes1992}, who tabulate sharp constants for this
+purpose. In the Galerkin/least-squares and SUPG analyses of Franca and
+coworkers the guard appears explicitly as the factor $m_k =
+\min\{1/3,\,2C_k\}$ in the stabilization parameter, with $C_k$ the
+constant of the inverse estimate for the second-order term
+\cite{FrancaFrey1992}; this is exactly the same mechanism as
+Proposition~\ref{prop:threshold}, in a different formulation. Explicit
+dimension-dependent constants for trace-type inverse inequalities on
+simplices are given by Warburton and
+Hesthaven~\cite{WarburtonHesthaven2003}. In the residual-based VMS
+tradition of Hughes and coworkers, the parameter is built from the
+element metric tensor, $\tau_M^{-2} \ni C_I\,\nu^2\, G\!:\!G$, so that
+element shape, size anisotropy and dimension enter \emph{automatically}
+through $G\!:\!G$, with $C_I$ an inverse-estimate constant computed per
+element type~\cite{Bazilevs2007}. In that framework the present
+phenomenon is priced in by construction.
+
+\emph{(ii) The Codina-school parameter design.} The scalar,
+$h_K$-based design~\eqref{eq:taus} with fixed $c_1 = 4$, $c_2 = 2$
+(and $h_K/k$ for higher orders) is standard across two and three
+dimensions in the orthogonal- and algebraic-subscale
+literature~\cite{Codina2000,Codina2002,CodinaVMSChapter}, and we found
+no statement there of a dimension-dependent adjustment.
+Proposition~\ref{prop:P1} explains why none was ever needed: the
+analyses and the vast majority of the computations in that line are
+carried out with linear (or bilinear) elements, for which the
+constraining eigenvalue vanishes identically, so \emph{any} positive
+$c_1$ keeps the elemental viscous ledger nonnegative and the choice of
+$c_1$ is governed by accuracy rather than by coercivity. The
+constraint materializes only for $k \ge 2$, where the second-order
+part of the residual is active elementwise --- and it is then strongly
+dimension- and shape-dependent, as Table~\ref{tab:constants} shows.
+We also note that the $h_K/k$ convention, designed around the
+first-order (convective) scaling of the residual, compensates the
+degree dependence of the \emph{second-order} viscous term only
+partially, which is a separate reason why higher-order elements sit
+closer to the coercivity edge than linear ones at the same nominal
+$c_1$.
+
+\emph{(iii) This paper's formulation.} Two features of the present
+method sharpen the effect relative to the classical Navier--Stokes
+ASGS: the deviatoric--symmetric projection~\eqref{eq:proj} (which
+changes the constants but not, as our computations show, the
+divergence-free extremal mechanism), and the porosity weighting, whose
+analysis contributes the explicit additional factor $d$ noted in
+Section~\ref{sec:consistency}.
+
+\section{Practical recommendations}
+\label{sec:recommendations}
+
+\begin{enumerate}
+\item \textbf{Dimension- and shape-aware $c_1$.} If a value
+$c_1^{2\mathrm D}$ has been validated on triangles, use on tetrahedra
+$c_1^{3\mathrm D} = \rho\, c_1^{2\mathrm D}$ with $\rho$ taken from
+the appropriate row ratio of Table~\ref{tab:constants}; for typical
+mesh pairs $\rho \in [2.8, 4.5]$, and $\rho \approx 4.5$ for
+structured meshes under the diameter convention. This matches the
+empirically found factor of $\approx 4$.
+\item \textbf{Per-element calibration.} Alternatively, compute
+$c_1^*(K)$ once per element type (or per element, for anisotropic
+meshes) from the local generalized eigenvalue
+problem~\eqref{eq:c1star}: assemble the two Gram matrices of
+$\nabla\!\cdot(\Proj\nabla\cdot)$ and of the denominator on
+$[\PP_k(\hat K)]^d$ and take the largest generalized eigenvalue --- a
+one-off, reference-element-sized computation --- and set $c_1 = s\,
+c_1^*(K)$ with a modest safety factor $s$. This is the
+metric-tensor/$C_I$ philosophy of~\cite{HarariHughes1992,Bazilevs2007}
+transplanted to the scalar-$\tau$ design.
+\item \textbf{Degree scaling.} For $k \ge 2$ do not rely on the
+$h_K/k$ substitution to protect the viscous term; the relevant
+operator is second order and its constant grows faster than $k^2$.
+Either of the two previous items handles the degree dependence
+correctly.
+\end{enumerate}
+
+\section*{Reproducibility}
+The exact values in Table~\ref{tab:constants} were obtained with a
+short Python/SymPy script (exact rational Gram assembly; generalized
+eigenvalue solves; validation by exact rational eigencomputation for
+the rational-vertex cases, $50$-digit arithmetic against the closed
+forms elsewhere, and Monte--Carlo Rayleigh sampling), which is
+distributed together with this note.
+
+\begin{thebibliography}{9}
+
+\bibitem{HarariHughes1992}
+I.~Harari and T.~J.~R.~Hughes,
+\emph{What are $C$ and $h$? Inequalities for the analysis and design
+of finite element methods},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ 97 (1992) 157--192.
+
+\bibitem{FrancaFrey1992}
+L.~P.~Franca and S.~L.~Frey,
+\emph{Stabilized finite element methods: II. The incompressible
+Navier--Stokes equations},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ 99 (1992) 209--233.
+
+\bibitem{WarburtonHesthaven2003}
+T.~Warburton and J.~S.~Hesthaven,
+\emph{On the constants in $hp$-finite element trace inverse
+inequalities},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ 192 (2003) 2765--2773.
+
+\bibitem{Bazilevs2007}
+Y.~Bazilevs, V.~M.~Calo, J.~A.~Cottrell, T.~J.~R.~Hughes, A.~Reali and
+G.~Scovazzi,
+\emph{Variational multiscale residual-based turbulence modeling for
+large eddy simulation of incompressible flows},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ 197 (2007) 173--201.
+
+\bibitem{Codina2000}
+R.~Codina,
+\emph{Stabilization of incompressibility and convection through
+orthogonal sub-scales in finite element methods},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ 190 (2000) 1579--1599.
+
+\bibitem{Codina2002}
+R.~Codina,
+\emph{Stabilized finite element approximation of transient
+incompressible flows using orthogonal subscales},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ 191 (2002) 4295--4321.
+
+\bibitem{CodinaVMSChapter}
+R.~Codina, S.~Badia, J.~Baiges and J.~Principe,
+\emph{Variational multiscale methods in computational fluid dynamics},
+in: Encyclopedia of Computational Mechanics, 2nd ed., Wiley, 2018.
+
+\end{thebibliography}
+
+\end{document}

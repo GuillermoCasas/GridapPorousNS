@@ -561,7 +561,10 @@ function run_sweep_nested_red(; c1_mult::Float64=4.0, max_n_pert::Int=-1, base_l
                 r = solve_one(kv, method, model; visc="Deviatoric", linsolver="auto", c1_mult=c1_mult,
                               max_n_pert=max_n_pert, jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
                               jfnk_maxiter=jfnk_mx, jfnk_restart=jfnk_mx, jfnk_precond_c1_mult=pc_mult,
-                              trace_dir=outdirs[kv], run_name="sweep_nested_red", mesh_sequence="nested_red")
+                              # trace_dir is the results ROOT; _write_trajectory_sidecar appends k<kv>/TET/<seq>/traces
+                              # (so traces land at results/k<kv>/TET/nested_red/traces/, beside the JSON — NOT the
+                              # doubly-nested path run_sweep_structured accidentally produces by passing the leaf).
+                              trace_dir=joinpath(@__DIR__, "results"), run_name="sweep_nested_red", mesh_sequence="nested_red")
                 eps_num_used = r.numerical_epsilon
                 push!(hs, r.h_mean); push!(l2us, r.el2_u); push!(l2ps, r.el2_p); push!(h1us, r.eh1_u); push!(h1ps, r.eh1_p)
                 push!(levels, Dict("level"=>lvl-1, "h"=>r.h_mean, "ncells"=>r.ncells,
