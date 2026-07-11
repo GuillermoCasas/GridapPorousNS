@@ -1,39 +1,12 @@
-# latexmk configuration file for porous_NS_with_Gridap theory folder
+# latexmk configuration file for porous_NS_with_Gridap
 
-# 1. Parse command line arguments to detect the target TeX filename
-my $target = "";
-foreach my $arg (@ARGV) {
-    # Skip option flags starting with '-'
-    next if $arg =~ /^-/;
-    
-    # If the argument ends with .tex, extract the base name
-    if ($arg =~ /^(.*)\.tex$/) {
-        $target = $1;
-        last;
-    }
-    
-    # If the argument is just the base name and the .tex file exists
-    if (-e "$arg.tex") {
-        $target = $arg;
-        last;
-    }
-}
+# Route auxiliary files to a target-specific subdirectory
+$aux_dir = 'latex compilation/%B';
 
-# 2. Configure output and auxiliary directories
-if ($target ne "") {
-    # Strip path prefixes if target is specified with path (e.g. theory/article -> article)
-    $target =~ s/.*\///;
-    $aux_dir = "latex compilation/$target";
-} else {
-    # Fallback if latexmk is run without specifying a file
-    $aux_dir = "latex compilation/default";
-}
+# Keep the output PDF in the source directory
+$out_dir = '.';
 
-# The PDF output should always be placed in the current directory (theory/)
-$out_dir = ".";
+# Clean up intermediate files that latexmk knows about
+$clean_ext = 'synctex.gz synctex\(busy\) thm bbl blg';
 
-# Move synctex.gz to the latex compilation folder so it doesn't clutter the directory
-$success_cmd = 'sh -c \'[ -f "%B.synctex.gz" ] && mv "%B.synctex.gz" "' . $aux_dir . '/" || true\'';
-
-# Print configuration info for transparency
-print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to '$out_dir/'\n";
+print "latexmk: Routing auxiliary files to 'latex compilation/%B/' and PDF to './'\n";

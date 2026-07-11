@@ -1,0 +1,24 @@
+# latexmk configuration file for porous_NS_with_Gridap
+
+# Determine the target basename from the command line (e.g. foo.tex -> foo).
+# latexmk does NOT expand %B inside $aux_dir, so compute it explicitly here
+# (same approach as theory/paper/latexmkrc).
+my $target = "";
+foreach my $arg (@ARGV) {
+    next if $arg =~ /^-/;
+    if ($arg =~ /^(.*)\.tex$/) { $target = $1; last; }
+    if (-e "$arg.tex")         { $target = $arg; last; }
+}
+$target =~ s/.*\///;
+$target = "default" if $target eq "";
+
+# Route auxiliary files to a target-specific subdirectory
+$aux_dir = "latex compilation/$target";
+
+# Keep the output PDF in the source directory
+$out_dir = '.';
+
+# Clean up intermediate files that latexmk knows about
+$clean_ext = 'synctex.gz synctex\(busy\) thm bbl blg';
+
+print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to './'\n";

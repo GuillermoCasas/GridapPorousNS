@@ -39,7 +39,16 @@ Manifest.toml
 *.so
 *.dylib
 *.dylib.*
+
+# Coq proof verification auxiliary outputs
+*.vo
+*.vos
+*.vok
+*.glob
+.coq-deps
+.lia.cache
 .nra.cache
+.*.aux
 
 # Ignore repomix outputs
 repomix-output.*

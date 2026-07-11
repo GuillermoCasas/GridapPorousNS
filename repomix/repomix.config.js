@@ -35,7 +35,14 @@ module.exports = isRunFromRepomixFolder ? {
       "../**/archive/**/*",
       "../tools/**/*",
       "../test/extended/ManufacturedSolutions/previous_results/**/*.md",
-      "../test/extended/ManufacturedSolutions/previous_results/**/*.txt"
+      "../test/extended/ManufacturedSolutions/previous_results/**/*.txt",
+      "../**/*.vo",
+      "../**/*.vos",
+      "../**/*.vok",
+      "../**/*.glob",
+      "../**/.*.aux",
+      "../**/.nra.cache",
+      "../**/.lia.cache"
     ]
   }
 } : {
@@ -71,7 +78,14 @@ module.exports = isRunFromRepomixFolder ? {
       "**/archive/**/*",
       "tools/**/*",
       "test/extended/ManufacturedSolutions/previous_results/**/*.md",
-      "test/extended/ManufacturedSolutions/previous_results/**/*.txt"
+      "test/extended/ManufacturedSolutions/previous_results/**/*.txt",
+      "**/*.vo",
+      "**/*.vos",
+      "**/*.vok",
+      "**/*.glob",
+      "**/.*.aux",
+      "**/.nra.cache",
+      "**/.lia.cache"
     ]
   }
 };
