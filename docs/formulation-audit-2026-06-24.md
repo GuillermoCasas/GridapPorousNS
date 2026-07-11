@@ -39,7 +39,7 @@ upheld, each re-checked by an independent code-grounding skeptic and a theory-gr
 remaining work is in (i) a couple of doc↔code contracts, (ii) the convergence *results* and their
 harness/reporting, and (iii) hygiene/fragility gaps.
 
-**3D-P2 c₁ + OSGS-P2 coupling: RESOLVED** — see findings.md section 3 and open-questions.md section 4
+**3D-P2 c₁ + OSGS-P2 coupling: RESOLVED** — see findings.md section 3 (and p2-3d.md §C)
 (this audit's earlier c1-discrepancy / saddle-point-required framing is SUPERSEDED).
 
 ---

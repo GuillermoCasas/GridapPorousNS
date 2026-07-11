@@ -49,7 +49,7 @@ merged"; strip standalone preamble + `\end{document}`, drop `\Reyn`/`\Damk`/`\co
 `supplement.tex` (SIAM boilerplate — replace or drop the `\externaldocument{supplement}` line); add the
 results-section figures (`article.tex` line 1436, currently tables only); confirm the "Kratos Multiphysics"
 implementation claim (line 1015) — this is a Gridap.jl solver (do not silently flip — author call). Full
-list: [`open-questions.md`](open-questions.md) §5.
+list: [`open-questions.md`](open-questions.md) §4.
 
 ---
 

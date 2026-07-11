@@ -70,15 +70,9 @@ For the full experiment-by-experiment evidence behind any entry, follow the link
 
 ---
 
-## 4. [RESOLVED 2026-07-09] OSGS-P2-3D ∂π/∂u coupling — a c₁-inflated JFNK preconditioner
+## 4. [OPEN] Paper editorial / theory items needing author judgment
 
-**Resolved — folded into [`findings.md`](findings.md) §3 and [`docs/mms/p2-3d.md`](mms/p2-3d.md) §C.** In one line: `ρ_prec = ρ(J_frozen⁻¹·∂π/∂u) ≈ 1249` at paper c₁ (2D ref ≈ 0.88) made the frozen-π tangent a hopeless preconditioner, so JFNK-GMRES stalled at the exact-guess **interpolant** (`success=false` was correct; the "accurate but `ok=false`" reading was *interpolation* error, not a reached root). A **preconditioner-only c₁×4 inflation** (`osgs_jfnk_precond_c1_mult`, default-off) drops `ρ_prec`→≈3.8 while the residual stays at paper c₁, reaching the root (quadratic, `eps_used=1`; refuted en route: stronger-`ε_num`, gauge deflation, damped staggering, and a classic Schur preconditioner). Reaching it **exposes** the paper-c₁ P2-3D **pressure under-stabilization** (L²p≈0.045 vs the interpolant's 0.003) — that accuracy question is §3. (The separate iterative-penalty well-posedness fix — `ε_num·(pⁿ−pⁿ⁻¹)` in the mass residual — is unrelated; see `p2-3d.md` §B.)
-
----
-
-## 5. [OPEN] Paper editorial / theory items needing author judgment
-
-Items from the 2026-06-04 documentation audit that need an **author decision**, not a mechanical fix. Full list: this section (§5) — the former `docs/paper/errata.md` was folded here on 2026-07-10. (The paper compiles cleanly — `latexmk` exit 0, 0 undefined refs, 43 pages; the one unambiguous typo, the duplicate Fourier label `eq:728`, is already corrected.)
+Items from the 2026-06-04 documentation audit that need an **author decision**, not a mechanical fix. Full list: this section (§4) — the former `docs/paper/errata.md` was folded here on 2026-07-10. (The paper compiles cleanly — `latexmk` exit 0, 0 undefined refs, 43 pages; the one unambiguous typo, the duplicate Fourier label `eq:728`, is already corrected.)
 
 - **"Kratos Multiphysics" implementation claim** ([`article.tex` line 1057](../theory/paper/article.tex#L1057)). This repository is a **Gridap.jl** solver. Confirm whether the paper's numerical experiments were run in Kratos (historical) or should now read Gridap.jl. **Do not silently flip — author call.** (This is the same Kratos-vs-Gridap boundary that underlies the §2 magnitude offset and the §3 first-author reconciliation.)
 - **Results-section figures** ([`article.tex` line 1478](../theory/paper/article.tex#L1478), `\Guillermo{Add figures}`). Convergence results are currently tables; figure environments not yet added. (Staged convergence-plot PDFs were removed at the author's request as unreferenced.)
