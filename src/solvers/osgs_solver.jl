@@ -176,11 +176,16 @@ end
 # non-converged inner solve, never doing worse than the current solver. OFF by default ⇒ this routine is
 # not entered and `solve_osgs_stage!` runs the existing path bit-identically.
 function _osgs_jfnk_solve!(final_x0, setup::FETopology, formulation::VMSFormulation, config::PorousNSConfig,
-                           base_nls, res_fn_coupled, jac_fn_coupled, diag_cache, iter_count_ref, initial_success)
+                           base_nls, res_fn_coupled, jac_fn_coupled, jac_precond_fn, diag_cache, iter_count_ref, initial_success)
     X, Y = setup.X, setup.Y
     sol_cfg = config.numerical_method.solver
 
-    println("      [+] OSGS JFNK mode: matrix-free full-tangent (∂π/∂u recovered) inner GMRES, frozen-π preconditioner.")
+    # `jac_precond_fn` is the assembled+factored left preconditioner (the frozen-π tangent, optionally c₁-inflated
+    # via osgs_jfnk_precond_c1_mult); the matrix-free mat-vec still differences the PHYSICAL-c₁ residual, so the
+    # solved system (hence the root) is unchanged — only the preconditioner conditioning improves.
+    println("      [+] OSGS JFNK mode: matrix-free full-tangent (∂π/∂u recovered) inner GMRES, " *
+            (sol_cfg.osgs_jfnk_precond_c1_mult == 1.0 ? "frozen-π preconditioner." :
+             "c₁×$(sol_cfg.osgs_jfnk_precond_c1_mult)-inflated frozen-π preconditioner."))
 
     # The FD base point x_k, written by the jacobian wrapper below and read by JFNKLinearSolver.solve!.
     xref = Ref{Vector{Float64}}(copy(get_free_dof_values(final_x0)))
@@ -194,7 +199,7 @@ function _osgs_jfnk_solve!(final_x0, setup::FETopology, formulation::VMSFormulat
     # line-search trial points.
     jac_rec = (x, dx, y) -> begin
         xref[] = copy(get_free_dof_values(x))
-        jac_fn_coupled(x, dx, y)
+        jac_precond_fn(x, dx, y)
     end
 
     jfnk_ls = JFNKLinearSolver(base_nls.ls, Fvec, xref,
@@ -347,6 +352,20 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             pi_u_x, pi_p_x = live_pi!(x)
             build_stabilized_weak_form_jacobian(x, dx, y, setup, formulation, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u_x, pi_p=pi_p_x)
         end
+        # [JFNK precond-c₁] The frozen-π tangent is a WEAK preconditioner for the coupled ∂π/∂u system in 3D-P2:
+        # ρ(J_frozen⁻¹·∂π/∂u) ≈ 1178 ≫ 1, so inner GMRES can't converge. Inflating the PRECONDITIONER's c₁
+        # (only) shrinks the subscale/∂π/∂u relative to the preconditioner — ρ falls to ≈3.8 at c₁×4 (a U-shaped
+        # optimum) — WITHOUT touching the residual F, so the converged root is the physical-c₁ solution. The
+        # preconditioner reuses the physical-c₁ live π (its effect on the tangent is 2nd-order near the root, ∝ R−π).
+        # mult=1.0 ⇒ jac_precond_fn === jac_fn_coupled (byte-identical; the whole feature is off).
+        jac_precond_fn = sol_cfg.osgs_jfnk_precond_c1_mult == 1.0 ? jac_fn_coupled :
+            let vmsform_pc = VMSFormulation(form, c_1 * sol_cfg.osgs_jfnk_precond_c1_mult,
+                                                  c_2 * sol_cfg.osgs_jfnk_precond_c1_mult)
+                (x, dx, y) -> begin
+                    pi_u_x, pi_p_x = live_pi!(x)
+                    build_stabilized_weak_form_jacobian(x, dx, y, setup, vmsform_pc, phys_cfg, freeze_cusp, ExactNewtonMode(); pi_u=pi_u_x, pi_p=pi_p_x)
+                end
+            end
 
         # [honest-recording guard] Capture the entry iterate so we can tell whether the OSGS coupled stage
         # actually ADVANCED off it. The `initial_ftol` short-circuit (nonlinear.jl:687) returns the entry
@@ -364,7 +383,7 @@ function solve_osgs_stage!(success, final_x0, setup::FETopology, formulation::VM
             # Jacobian; falls back to the frozen-π coupled solve on inner non-convergence ([C.1]).
             # Mutually exclusive with osgs_anderson_enabled (enforced by validate!).
             success = _osgs_jfnk_solve!(final_x0, setup, formulation, config, base_nls,
-                                        res_fn_coupled, jac_fn_coupled, diag_cache, iter_count_ref, initial_success)
+                                        res_fn_coupled, jac_fn_coupled, jac_precond_fn, diag_cache, iter_count_ref, initial_success)
         elseif sol_cfg.osgs_anderson_enabled
             # Opt-in staggered Anderson path (off by default ⇒ the existing path below runs, bit-identical).
             success = _osgs_anderson_outer!(final_x0, setup, formulation, config, base_nls,

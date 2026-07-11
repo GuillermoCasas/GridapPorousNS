@@ -507,6 +507,93 @@ function run_sweep_structured(; max_n_pert=3)
     println("\nDONE. structured sweep -> results/k{1,2}/TET/structured/convergence3d_results.json"); flush(stdout)
 end
 
+# Full paper §5.2 sweep on the IRREGULAR nested-red family — the paper's own 3D methodology (an UNSTRUCTURED
+# Delaunay base mesh "to break the symmetry, so the velocity vectors have a nonzero z-component", refined by
+# uniform red 1→8 subdivision so h halves EXACTLY down the sequence) — at the element-aware c₁ (c1_mult,
+# default 4.0 = the adopted robust worst-case for high-C_inv tets; docs/mms/p2-3d.md §A, findings.md §3). This
+# is the irregular-mesh sibling of run_sweep_structured: same schema, same OSGS-3D recipe (boot-skip + JFNK;
+# the preconditioner inflation OSGS-P2 needs is DIFFERENT here — see the osgs_p2_precond_c1_mult note below),
+# but over the refined unstructured family with P1→nlevels_p1+1
+# and P2→nlevels_p2+1 meshes (paper: 4 for P1, 3 for P2). Auto linear backend (LU ≤ LU_DOF_LIMIT, ILU-GMRES
+# above — the finest meshes at ~164K DOF). Writes results/k<kv>/TET/nested_red/convergence3d_results.json
+# (standard plottable schema, self-describing with c1_mult + the solver recipe), archiving any prior JSON to
+# previous_results/convergence3d/ first (reproducible-results rule). Plot: `plot_convergence3d.py nested_red`.
+# NOTE on osgs_p2_precond_c1_mult (default 1.0): with c1_mult already inflating the RESIDUAL c₁ (default 4),
+# the ∂π/∂u coupling (∝ τ₁ ∝ 1/c₁) is already shrunk, so JFNK converges QUADRATICALLY with the frozen-π
+# tangent as-is — no ADDITIONAL preconditioner inflation is needed (de-risk 2026-07-11: OSGS-P2 L0 at c1×4,
+# relative-×1 precond → 5 Newton iters to ‖f‖≈6e-12). Contrast run_sweep_structured, which keeps the residual
+# at paper c₁ and therefore MUST inflate the preconditioner ×4 (ρ_prec 1249→3.8). Raise this only if a finer
+# mesh's ILU preconditioner needs more margin.
+function run_sweep_nested_red(; c1_mult::Float64=4.0, max_n_pert::Int=-1, base_lc::Float64=0.2,
+                              nlevels_p1::Int=3, nlevels_p2::Int=2, osgs_p2_precond_c1_mult::Float64=1.0)
+    archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
+    stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
+    outdirs  = Dict(kv => joinpath(@__DIR__, "results", "k$(kv)", "TET", "nested_red") for kv in (1, 2))
+    outpaths = Dict(kv => joinpath(outdirs[kv], "convergence3d_results.json") for kv in (1, 2))
+    for kv in (1, 2)
+        mkpath(outdirs[kv])
+        if isfile(outpaths[kv])   # archive the prior nested_red JSON before overwriting (provenance)
+            cp(outpaths[kv], joinpath(archdir, "convergence3d_results_k$(kv)_nested_red_$(stamp).json"); force=true)
+        end
+    end
+    nlev_for = Dict(1 => nlevels_p1, 2 => nlevels_p2)
+    maxlev = max(nlevels_p1, nlevels_p2)
+    @printf("=== NESTED-RED (irregular) SWEEP: c1_mult=%.3g base_lc=%.3g | P1→%d meshes P2→%d meshes ===\n",
+            c1_mult, base_lc, nlevels_p1 + 1, nlevels_p2 + 1); flush(stdout)
+    println("[mesh] building irregular nested_red family to level $maxlev (reused across kv/method)..."); flush(stdout)
+    fam = build_nested_family(maxlev; lc=base_lc, domain=DOMAIN)
+    results_by_kv = Dict(1 => Any[], 2 => Any[])
+    for method in ("ASGS", "OSGS")
+        osgs_recipe = method == "OSGS"
+        for kv in (1, 2)
+            @printf("\n=== NESTED-RED SWEEP method=%s kv=%d (%s) ===\n", method, kv, kv==1 ? "P1" : "P2"); flush(stdout)
+            # OSGS-P2-3D: the frozen-π tangent is a WEAK preconditioner for the coupled ∂π/∂u system, so the
+            # matrix-free JFNK-GMRES needs a c₁-inflated preconditioner (residual F stays at the study c₁, so
+            # the converged root is unchanged). OSGS-P1 is robust at relative mult=1. See docs/mms/p2-3d.md §C.
+            osgs_p2 = osgs_recipe && kv == 2
+            pc_mult = osgs_p2 ? osgs_p2_precond_c1_mult : nothing
+            jfnk_mx = osgs_recipe ? (osgs_p2 ? 80 : 30) : nothing
+            models = fam[1:(nlev_for[kv] + 1)]
+            hs=Float64[]; l2us=Float64[]; l2ps=Float64[]; h1us=Float64[]; h1ps=Float64[]; levels=Any[]
+            eps_num_used = NaN
+            for (lvl, model) in enumerate(models)
+                t0 = time()
+                r = solve_one(kv, method, model; visc="Deviatoric", linsolver="auto", c1_mult=c1_mult,
+                              max_n_pert=max_n_pert, jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
+                              jfnk_maxiter=jfnk_mx, jfnk_restart=jfnk_mx, jfnk_precond_c1_mult=pc_mult,
+                              trace_dir=outdirs[kv], run_name="sweep_nested_red", mesh_sequence="nested_red")
+                eps_num_used = r.numerical_epsilon
+                push!(hs, r.h_mean); push!(l2us, r.el2_u); push!(l2ps, r.el2_p); push!(h1us, r.eh1_u); push!(h1ps, r.eh1_p)
+                push!(levels, Dict("level"=>lvl-1, "h"=>r.h_mean, "ncells"=>r.ncells,
+                                   "success"=>r.success, "iters"=>r.iters, "eps_used"=>r.eps_used,
+                                   "l2u"=>r.el2_u, "l2p"=>r.el2_p, "h1u"=>r.eh1_u, "h1p"=>r.eh1_p))
+                @printf("  L%d h=%.4g cells=%d success=%s | L2u=%.4g H1u=%.4g L2p=%.4g  (%.0fs)\n",
+                        lvl-1, r.h_mean, r.ncells, r.success, r.el2_u, r.eh1_u, r.el2_p, time()-t0); flush(stdout)
+                GC.gc()
+            end
+            # [provenance] self-describing recipe so the result reconstructs to the exact config that made it.
+            _pc_label = (pc_mult !== nothing && pc_mult != 1.0) ? "+precond_c1x$(pc_mult)" : ""
+            solver_prov = Dict("recipe"=>(osgs_recipe ? "boot_skip+JFNK" * _pc_label : "default_coupled+boot"),
+                               "jfnk"=>osgs_recipe, "osgs_skip_asgs_boot"=>osgs_recipe,
+                               "jfnk_maxiter"=>jfnk_mx, "jfnk_restart"=>jfnk_mx,
+                               "jfnk_precond_c1_mult"=>something(pc_mult, 1.0),
+                               "iterative_penalty"=>true, "numerical_epsilon"=>eps_num_used,
+                               "max_n_pert"=>max_n_pert, "linsolver"=>"auto",
+                               "viscous_operator"=>"Deviatoric", "reaction"=>"Constant_Sigma")
+            push!(results_by_kv[kv], Dict("kv"=>kv, "kp"=>kv, "method"=>method, "element_type"=>"TET",
+                                "mesh"=>"nested_red", "mesh_sequence"=>"nested_red", "c1_mult"=>c1_mult,
+                                "base_lc"=>base_lc, "alpha_0"=>ALPHA0, "Re"=>RE, "Da"=>DA,
+                                "numerical_epsilon"=>eps_num_used, "solver"=>solver_prov,
+                                "hs"=>hs, "l2u"=>l2us, "l2p"=>l2ps, "h1u"=>h1us, "h1p"=>h1ps, "levels"=>levels))
+            open(outpaths[kv], "w") do io
+                JSON3.write(io, [Dict(k => (v isa AbstractFloat && !isfinite(v) ? nothing : v) for (k,v) in d) for d in results_by_kv[kv]])
+            end
+            println("  [wrote incremental -> $(outpaths[kv])]"); flush(stdout)
+        end
+    end
+    println("\nDONE. nested_red (irregular) sweep -> results/k{1,2}/TET/nested_red/convergence3d_results.json"); flush(stdout)
+end
+
 # Memory-capped, RESUMABLE remainder sweep. ASGS keeps its full paper mesh count (P1=4, P2=3); OSGS
 # is capped to the meshes a DIRECT solver fits in RAM (P1=3, P2=2). The dropped finest OSGS meshes
 # (P1 level-3 = 223744 tets; P2 level-2 = 27968 P2-tets ≈ 150K DOF) exceed this machine's memory —
@@ -772,6 +859,18 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # eps_pert homotopy + iterative penalty (default solver). Writes results/k{1,2}/TET/structured/.
         mnp = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
         run_sweep_structured(; max_n_pert=mnp)
+    elseif length(ARGS) >= 1 && ARGS[1] == "sweep_nested_red"
+        # smoke3d.jl sweep_nested_red [c1_mult] [max_n_pert] [nlevels_p1] [nlevels_p2] [osgs_p2_precond_c1_mult]
+        #   — full §5.2 sweep on the IRREGULAR nested-red (unstructured-base + red-refined) family at the
+        #   element-aware c₁ (default 4.0). P1→nlevels_p1+1 meshes, P2→nlevels_p2+1 (default 4/3, the paper
+        #   counts). Writes results/k{1,2}/TET/nested_red/. Plot: `python plot_convergence3d.py nested_red`.
+        c1m   = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 4.0
+        mnp   = length(ARGS) >= 3 ? parse(Int, ARGS[3]) : -1
+        nlp1  = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : 3
+        nlp2  = length(ARGS) >= 5 ? parse(Int, ARGS[5]) : 2
+        pcm   = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : 1.0
+        run_sweep_nested_red(; c1_mult=c1m, max_n_pert=mnp, nlevels_p1=nlp1, nlevels_p2=nlp2,
+                             osgs_p2_precond_c1_mult=pcm)
     elseif length(ARGS) >= 1 && ARGS[1] == "cells"
         # smoke3d.jl cells [outpath] "kv=2,method=ASGS,lo=2,n=4;..." [base_lc] [geom] [visc] [linsolver]
         #   each chunk runs nested-family levels lo..n-1 (lo default 0); lo>0 runs ONLY finer meshes.

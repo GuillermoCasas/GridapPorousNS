@@ -246,6 +246,12 @@ Base.@kwdef struct SolverConfig
     osgs_jfnk_gmres_maxiter::Int                   # cap on inner-GMRES iterations per Newton step
     osgs_jfnk_gmres_restart::Int                   # GMRES restart (Krylov subspace size before restart)
     osgs_jfnk_fd_epsilon::Float64                  # Brown–Saad FD base b in ε = b·(1+‖U‖)/‖v‖ (~√eps ≈ 1e-8)
+    osgs_jfnk_precond_c1_mult::Float64             # PRECONDITIONER-ONLY c₁ inflation for the JFNK inner solve:
+    #                                                the frozen-π preconditioner uses c₁×mult (and c₂×mult) while
+    #                                                the residual F and its matrix-free full tangent stay at the
+    #                                                physical c₁ — so the converged SOLUTION is unchanged. A larger
+    #                                                preconditioner c₁ shrinks ρ(J_pc⁻¹·∂π/∂u) (~1178→3.8 at ×4 in
+    #                                                3D-P2), letting inner GMRES converge. 1.0 ⇒ off (byte-identical).
     # --- Codina iterative-penalty method (article.tex §5.2 line ~1383, codina1993iterative) ---
     # OFF by default (bit-identical: the mass residual carries no ε term, only the legacy Jacobian ε_num·dp).
     # When enabled AND numerical_epsilon > 0, the mass-equation residual carries the iterative penalty
@@ -405,6 +411,7 @@ function validate!(cfg::PorousNSConfig)
     @assert sol.osgs_jfnk_gmres_maxiter >= 1 "osgs_jfnk_gmres_maxiter must be >= 1"
     @assert sol.osgs_jfnk_gmres_restart >= 1 "osgs_jfnk_gmres_restart must be >= 1"
     @assert sol.osgs_jfnk_fd_epsilon > 0.0 "osgs_jfnk_fd_epsilon (Brown–Saad FD base) must be > 0"
+    @assert sol.osgs_jfnk_precond_c1_mult > 0.0 "osgs_jfnk_precond_c1_mult (JFNK preconditioner-only c₁ inflation) must be > 0"
     @assert sol.iterative_penalty_max_iters >= 1 "iterative_penalty_max_iters must be >= 1"
     # Fail loudly on a contradictory request rather than silently disabling: the iterative penalty is
     # ε_num·(pⁿ − pⁿ⁻¹), which is identically zero at ε_num = 0. Asking for the penalty while leaving the

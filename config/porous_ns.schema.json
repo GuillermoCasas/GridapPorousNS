@@ -523,6 +523,13 @@
                 1e-8
               ]
             },
+            "osgs_jfnk_precond_c1_mult": {
+              "type": "number",
+              "description": "Preconditioner-only c1 inflation for the JFNK inner solve: the frozen-pi preconditioner is assembled with c1*this (and c2*this) while the residual F and its matrix-free full tangent stay at the physical c1, so the converged SOLUTION is unchanged (paper-c1 root). A larger preconditioner c1 shrinks the dropped dpi/du coupling relative to the preconditioner (rho(J_pc^-1 * dpi/du) falls ~1178->3.8 at x4 in 3D-P2), letting inner GMRES converge where a c1=paper preconditioner cannot. 1.0 = off (byte-identical). Must be > 0. Used only when osgs_jfnk_enabled.",
+              "examples": [
+                1.0
+              ]
+            },
             "iterative_penalty_enabled": {
               "type": "boolean",
               "description": "Opt in to the Codina iterative-penalty method (article.tex section 5.2, codina1993iterative). OFF by default (bit-identical: the mass residual carries no epsilon term, only the legacy Jacobian numerical_epsilon*dp). When enabled AND numerical_epsilon > 0, the mass-equation residual carries numerical_epsilon*(p^n - p^{n-1}) (LHS numerical_epsilon*p^n plus lagged RHS numerical_epsilon*p^{n-1}), solved as an OUTER fixed-point loop that holds p^{n-1} fixed within each pass and updates it between passes. It pins the constant-pressure null mode (well-posedness; the 3D all-Dirichlet case is ill-posed at epsilon=0) and vanishes at convergence (p^n=p^{n-1}), so the converged solution is unaltered. The matching numerical_epsilon*dp is already in the Jacobian.",

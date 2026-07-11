@@ -76,6 +76,7 @@
             "osgs_jfnk_gmres_maxiter": 100,
             "osgs_jfnk_gmres_restart": 50,
             "osgs_jfnk_fd_epsilon": 1e-8,
+            "osgs_jfnk_precond_c1_mult": 1.0,
             "iterative_penalty_enabled": false,
             "iterative_penalty_max_iters": 20,
             "recenter_pressure_between_penalty_passes": false,
