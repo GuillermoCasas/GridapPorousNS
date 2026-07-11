@@ -32,8 +32,7 @@ would make `J_frozen` useless — but that run used `physical_epsilon=0` and no 
 Extends the committed [test/quick/osgs_frozen_pi_jacobian_quick_test.jl](../../test/quick/osgs_frozen_pi_jacobian_quick_test.jl)
 machinery (`_a3_problem`: spaces, formulation, `live_pi`, `res_vec`, `jac_mat`), threading a configurable
 `physical_epsilon` and velocity amplitude. Equal-order P1/P1 QUAD (where OSGS pressure stabilization matters),
-`SymmetricGradient + ConstantSigma`, the same setup as the original cost-model measurement. Scripts (throwaway):
-`scratchpad/phase0_jfnk_precond.jl`, `phase0_anderson_baseline.jl`, `phase0_coldstart_robustness.jl`.
+`SymmetricGradient + ConstantSigma`, the same setup as the original cost-model measurement.
 
 ### The two epsilons (kept rigorously distinct — they behave oppositely here)
 
@@ -139,31 +138,20 @@ Factorizations to drive the true residual `‖F‖∞ < 1e-9` (the cost unit tha
 On the stiff/convective cells — the regime that motivates this work — **both** the current path **and** Anderson
 **fail to converge**. JFNK is the only method that converges, and it does so in 2–3 Newton steps.
 
-## Cost arithmetic & decision
+## Cost & decision
 
-Per Newton step JFNK costs **one** `J_frozen` factorization (the preconditioner — same cost as one current
-Newton step) **+** `G` GMRES iters (each = one matrix-free residual eval + one cached back-substitution; **no
-new factorization**). Total JFNK cost ≈ `N_j` factorizations + `N_j·G` back-substitutions.
+Per Newton step JFNK costs one `J_frozen` factorization (the preconditioner) plus `G` GMRES iters (each = one
+matrix-free residual eval + one cached back-substitution, **no new factorization**), so JFNK ≈ `N_j`
+factorizations total. In 3D, where a factorization dominates a back-substitution by orders of magnitude, this is
+decisive.
 
-- **Mild:** `N_j=2`, `G≈1–4` → ~2 factorizations + ~6 substitutions. vs Anderson 32, current 60. **~16–30× fewer factorizations.**
-- **Stiff/convective:** `N_j=3`, `G≈16` (peak ~21) → ~3 factorizations + ~50 substitutions. vs Anderson 355–418 (non-converging), current 60 (diverging). **~100× fewer factorizations, and the only convergent method.**
+**Verdict: GO.** `J_frozen` (ε_num=0, at ε_phys) is a viable, free preconditioner: GMRES converges in 1–4 iters
+(mild) / ≤16–21 iters (stiff/convective) per Newton step, `N_j` (2–3) `≪` `N_c` (60, non-converging/diverging),
+JFNK is the only convergent method on the hardest cells, and no saddle-point / multigrid preconditioner is needed
+for these 2D equal-order cells.
 
-In 3D, where a factorization dominates a back-substitution by orders of magnitude, this is decisive.
+## Carry-over into Phase 1
 
-### Verdict: **GO**
-
-- `J_frozen` (ε_num=0, at the physical ε_phys) is a **viable, free preconditioner**.
-- Decisive metric: GMRES converges in **1–4 iters (mild)** / **≤16–21 iters (stiff/convective)** per Newton step.
-- `N_j` (2–3) `≪` `N_c` (60, non-converging/diverging).
-- The hardest convective cells sit at the GO/CONDITIONAL boundary on **raw** Krylov count (~16–21 peak), but
-  pass the CONDITIONAL cost-arithmetic test overwhelmingly (≈3 factorizations vs 60–418), and JFNK is the only
-  method that converges on them at all.
-- No saddle-point / multigrid preconditioner is needed for these 2D equal-order cells.
-
-## Carry-overs into Phase 1
-
-- **Preconditioner = `J_frozen` with ε_num=0** (the assembled A.3 ExactNewton tangent, reusing
-  `jac_fn_coupled`). Do **not** add ε_num to the JFNK preconditioner.
 - **3D watch item.** These measurements are 2D equal-order. The theory's `‖J_frozen⁻¹·C‖<1` condition is
   already violated by stiff 2D cells (GMRES survives via clustering); 3D may push `G` higher. The built-in
   safety net is the **C.1 honesty machinery** (commit 985ebff, `GMRESNotConvergedError`,
@@ -171,35 +159,15 @@ In 3D, where a factorization dominates a back-substitution by orders of magnitud
   swallowed, and the Picard / frozen-π fallback catches it. If 3D `G` is routinely large, *that* is the
   empirical trigger to add a real saddle-point preconditioner (block/Schur — PCD/LSC/SIMPLE — or Vanka/MG;
   τ₁ already seeds a discrete pressure-Laplacian in the (2,2) block; τ~h ⇒ rediscretize per MG level).
-- **Inexact line search.** The merit slope identity `D = −2Φ` is exact only for the exact Newton step; the
-  Krylov (forcing-term η) step satisfies it only up to the inner residual. Relax the Armijo slope test to the
-  inexact-Newton form `D ≤ −2Φ(1−η)` (osgs_algorithm.tex `\ref{sec:jfnk-change}`).
-- **Behavior preservation.** With `osgs_jfnk_enabled=false`, the existing path must stay byte-identical
-  (verify, as Anderson did). Knobs (inner rel-tol/η, max iters, restart, FD-ε policy) go in schema +
-  `SolverConfig` + base_config with fail-loud `validate!` (repo hard rule: no magic numbers).
+  Phase-2 (3D-P2): this prediction was confirmed and fixed by a c1-inflated preconditioner — see
+  [docs/mms/p2-3d.md](../mms/p2-3d.md) section C (rho_prec ~1249→3.8, `osgs_jfnk_precond_c1_mult`).
 
 ## Phase-1: implemented (2026-06-26)
 
-The GO was acted on. JFNK is wired in opt-in behind `osgs_jfnk_enabled` (default false), mutually exclusive
-with `osgs_anderson_enabled` (`validate!` rejects both on). Design — the theory's "change exactly one thing:
-the inner linear solve":
-
-- **`JFNKLinearSolver`** ([linear_solvers.jl](../../src/solvers/linear_solvers.jl)) — a drop-in matrix-free
-  `LinearSolver`. Its `solve!(dx, ns, b)` runs left-preconditioned GMRES on `J_full·dx = b` where the
-  mat-vec is the directional FD of the coupled residual (`JFNKMatVec`, Brown–Saad ε) and the preconditioner
-  is the factored frozen-π Jacobian `A` Gridap already assembled (`JFNKPrecond`). On non-convergence it
-  raises `GMRESNotConvergedError` ([C.1]).
-- **`_osgs_jfnk_solve!`** ([osgs_solver.jl](../../src/solvers/osgs_solver.jl)) — plugs that solver into the
-  existing `SafeNewtonSolver` (via a new `ls=` override on `_with_overrides`), so the outer Newton, Armijo
-  line search, divergence/stall guards, per-field gate, and C.1 honesty are inherited unchanged. The FD base
-  point x_k is threaded in via a Ref written by a thin wrapper around `jac_fn_coupled` (Gridap evaluates the
-  jacobian at the iterate right before the inner solve). On structural failure it falls back to the standard
-  frozen-π coupled solve from the best iterate — never worse than the current solver.
-- **Two-ε:** the preconditioner is `jac_fn_coupled`, which carries the config's `numerical_epsilon`; Phase-0
-  recommends keeping `ε_num=0` for JFNK (a nonzero ε_num degrades the Krylov count). `base_config` has
-  `numerical_epsilon=0`.
-- **Line search:** reuses the exact-slope `D=−2Φ` test verbatim; at η≈1e-2 the inexact `(1−η)` relaxation is
-  a 1% conservative effect (safe).
+Landed behind `osgs_jfnk_enabled` (default off, byte-identical when off; mutually exclusive with
+`osgs_anderson_enabled`). The preconditioner is the ε_num=0 frozen-π tangent (`jac_fn_coupled`, with
+`base_config` `numerical_epsilon=0`). Verified by `test/extended/jfnk_equivalence_extended_test.jl`. JFNK is now
+also enabled in the official Cocquet-MMS VMS sweep (commit 40063fc), not just opt-in-experimental.
 
 **A/B integration result** (full `solve_system` path, the orthogonality MMS cell, P2/P1): frozen-π = **17
 Newton iters / 8.96 s**, stopping at ‖F‖∞≈3e-5 (soft-stall accepted); JFNK = **6 iters / 6.73 s**, reaching

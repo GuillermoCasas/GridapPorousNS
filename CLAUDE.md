@@ -57,7 +57,7 @@ config under `data/<name>/` (structured baseline, plus single-variable flips —
 `deviatoric`, `linear_reaction`, `all_dirichlet`, `modified_corner` — and alternate mesh sequences —
 `unstructured_gmsh`, `freefem_meshes`, `freefem_divisions`, `literal_picard`), each writing to the
 parallel folder `results/<name>/` with a uniform schema (see `CocquetTubeTest/README.md` and
-`docs/cocquet/convergence-analysis.md`). `test/extended/CocquetFormMMS` is the separate
+`docs/archive/cocquet-convergence-analysis.md`). `test/extended/CocquetFormMMS` is the separate
 manufactured-solution sibling. The exact Cocquet (unstabilized Galerkin) formulation is documented in
 `theory/cocquet/cocquet_formulation.tex`.
 
@@ -103,9 +103,9 @@ The implementation is a literal transcription of [theory/paper/article.tex](theo
 - **Stabilized OSGS system** — `eq:OSGSProblem` (Eqs. 4.10a–d). ASGS is recovered by setting `π_h = 0`. The staggered linearized iteration is `eq:LinearizedOSGSProblem`; the pseudocode driving the solver (the `solver_core.jl` orchestrator + the `osgs_solver.jl` coupled solve) is `alg:StationarySystem`.
 - **Stabilization parameters** — `τ₁` (`eq:Tau1`), `τ₂` (`eq:Tau2`), with `τ_{1,NS}` from `eq:TauNavierStokes`. The numerical constants `c₁ = 4k⁴`, `c₂ = 2k²` (paper Remark after `eq:conditions_on_num_param`) are what `get_c1_c2` returns for equal-order interpolation.
 - **Reaction projection trim** — Section 4.4 mentions that for constant `σ` the reaction term is omitted from the orthogonal projection (its `L²` projection is exactly zero on the FE space). This is what `ProjectResidualWithoutReactionWhenConstantSigma` implements when `experimental_reaction_mode == "standard"` and `reaction_model == "Constant_Sigma"`.
-- **Documented divergences from the paper** — [docs/solver/paper-code-divergences.md](docs/solver/paper-code-divergences.md) catalogues each apparent code/paper mismatch and classifies it. Highlights worth knowing:
-  - The `(1/α)∇·(αa)v` term is intentionally absent from `convective_adjoint` (paper Sec. 5, line ~800 — kept out to preserve the `A² − B²` symmetry in the stability estimate).
-  - `convective_adjoint` returns `+α a·∇v` (positive sign), because the stabilization bilinear form subtracts the adjoint (`B_S` definition under `eq:OSGSProblem`). Flipping the sign in code reproduces the "Anti-SUPG" failure.
+- **Documented divergences from the paper** — [docs/theory-code-map.md](docs/theory-code-map.md) §2 (the divergence ledger) catalogues each apparent code/paper mismatch and classifies it. Highlights worth knowing:
+  - The `(1/α)∇·(αa)v` term is intentionally absent from the convective adjoint term (`conv_adj` in `strong_adjoint_momentum`) (paper Sec. 5, line ~800 — kept out to preserve the `A² − B²` symmetry in the stability estimate).
+  - The convective adjoint term (`conv_adj` in `strong_adjoint_momentum`) is `+α a·∇v` (positive sign), because the stabilization bilinear form subtracts the adjoint (`B_S` definition under `eq:OSGSProblem`). Flipping the sign in code reproduces the "Anti-SUPG" failure.
   - OSGS projection is computed on **unconstrained** spaces `V_free/Q_free` (no Dirichlet) — projecting on the Dirichlet-constrained space introduces an `O(1)` boundary residual that breaks `O(h^{k+1})` MMS convergence.
 
 ### Solver safeguards (`src/solvers/`)
@@ -145,6 +145,10 @@ Enforced at the cultural level (`.agents/rules/reproducible-results.md`). It mus
 
 Per `.agents/rules/fast-verification.md`: after editing anything in `src/formulations/`, `src/stabilization/tau.jl`, `src/models/reaction.jl`, or `src/solvers/nonlinear.jl`, run Blitz immediately. For changes to assembly, residual/Jacobian construction, or solver orchestration, run Quick after Blitz. For convergence-study or MMS-touching changes, also run Extended. A change is not complete until the relevant tiers pass with no failures and no tier-warning messages.
 
+### Documentation gate
+
+Per `.agents/rules/docs-hygiene.md`: **before every commit, reconcile `docs/` with the work just done.** Close finished to-dos in `docs/pending-tasks.md` (move to "Superseded / done"), promote any settled non-obvious result into `docs/findings.md` **with the argument that makes it true**, remove/narrow closed items in `docs/open-questions.md`, append genuine regressions to the append-only `docs/lessons_learned.md`, and update `docs/theory-code-map.md` if the code↔paper mapping drifted. Prefer *net deletion*: solving a problem should shrink `docs/`, not only grow it. The living docs are the six in `docs/README.md` Tier 1; permanent theory belongs in `theory/`, not `docs/`.
+
 ### Test file naming
 
 Suffix test files with `_test.jl` (e.g. `tau_blitz_test.jl`), not prefix.
@@ -153,5 +157,5 @@ Suffix test files with `_test.jl` (e.g. `tau_blitz_test.jl`), not prefix.
 
 - Julia project: `Project.toml` pinned to `Gridap 0.18.6`. `Manifest.toml` is gitignored; resolve locally with `Pkg.instantiate()`.
 - Outputs (VTK, HDF5, sweep results, `traces/`) go under `results/` directories that are gitignored (`results/`, `**/results/`, `**/traces/`). In the MMS harness, per-cell artifacts are organized under `results/k<kv>/<etype>/{vtk,traces}/` next to the convergence plots. **Ad-hoc/debug output a test generates must go under `results/debug_results/`** (not loose in `results/`) — keep the live results tree clean. Deliberately-kept archived snapshots go in a tracked `previous_results/`.
-- `theory/` holds **only the LaTeX sources** now: `theory/paper/` (the SIAM article + its build dependencies, incl. `theory/paper/siam/` for the class/bst), `theory/cocquet/` (the Cocquet-et-al. formulation notes + reference PDF), plus `osgs_algorithm/osgs_algorithm.tex`, `centered_encoding/centered_encoding.tex`, and `osgs_reaction_note/osgs_reaction_note.tex`. All meta-documentation — observations, to-dos, process notes, and the paper↔code references — lives under `docs/` (organized by topic: `docs/solver/`, `docs/cocquet/`, `docs/mms/`, `docs/paper/`). See `docs/README.md` and `theory/README.md` for the indexes. When implementation diverges from the paper, update `docs/solver/paper-code-divergences.md`.
+- `theory/` holds **only the LaTeX sources** now: `theory/paper/` (the SIAM article + its build dependencies, incl. `theory/paper/siam/` for the class/bst), `theory/cocquet/` (the Cocquet-et-al. formulation notes + reference PDF), plus `osgs_algorithm/osgs_algorithm.tex`, `centered_encoding/centered_encoding.tex`, and `osgs_reaction_note/osgs_reaction_note.tex`. All meta-documentation — observations, to-dos, process notes, and the paper↔code references — lives under `docs/` (organized by topic: `docs/solver/`, `docs/cocquet/`, `docs/mms/`). See `docs/README.md` and `theory/README.md` for the indexes. When implementation diverges from the paper, update the divergence ledger in `docs/theory-code-map.md` (§2).
 - `.agents/skills/` contains per-domain skill prompts (regression guards, doc architect, config strictness). They formalize the review checks above.

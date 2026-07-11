@@ -1,8 +1,8 @@
 # Draft follow-up email to Cocquet et al. (re: J. Comput. Appl. Math. 2021)
 
-> **ARTIFACT — draft email (status: unsent as of 2026-06-04).** Not a status doc. Findings context: canonical [cocquet_investigation_synthesis.md](investigation-synthesis.md).
+> **ARTIFACT — draft email (status: unsent as of 2026-06-04).** Not a status doc. Findings context: canonical [cocquet_investigation_synthesis.md](../cocquet/investigation-synthesis.md).
 >
-> **Superseded (unsent draft):** the magnitude/convergence question is settled — the cap is mesh-topology and the gap is ~30–300×; see [investigation-synthesis.md](investigation-synthesis.md).
+> **Superseded (unsent draft):** the magnitude/convergence question is settled — the cap is mesh-topology and the gap is ~30–300×; see [investigation-synthesis.md](../cocquet/investigation-synthesis.md).
 
 This is a **follow-up** to the earlier mesh-focused email (still awaiting response). The follow-up:
 - Acknowledges the prior message in case it got lost.

@@ -1,10 +1,17 @@
 # OSGS solver leaning → single `coupled` route, and the JFNK speed plan
 
+> **ARCHIVED 2026-07-11.** The durable lessons are canonical (append-only) in
+> [`lessons_learned.md`](../lessons_learned.md) — the 2026-06-07 `freeze_after_k`-diverges-in-the-reaction-corner
+> row and the 2026-06-08 stall-sensor-degenerates-OSGS-to-ASGS row; JFNK landed (see
+> [`../solver/jfnk-phase0-preconditioner-gate.md`](../solver/jfnk-phase0-preconditioner-gate.md)).
+> ⚠️ §3's "dead config not yet removed" list is **STALE** — those OSGS knobs were since removed. Kept as the
+> decision record for the coupled-only leaning.
+
 **Status:** CANONICAL. Records (1) the 2026-06-07 decision to collapse the OSGS nonlinear
 solver to a single route (`coupled`) and the evidence that forced it, and (2) the
 **JFNK** enhancement that recovers near-quadratic speed for that route — **proposed here, now
 LANDED** (opt-in `osgs_jfnk_enabled`); the executed version and its Phase-0 gate are the canonical
-[`docs/solver/jfnk-phase0-preconditioner-gate.md`](jfnk-phase0-preconditioner-gate.md). Supersedes
+[`docs/solver/jfnk-phase0-preconditioner-gate.md`](../solver/jfnk-phase0-preconditioner-gate.md). Supersedes
 the "keep `freeze_after_k`" recommendation in the clean-slate redesign synthesis — see "Why not
 freeze_after_k" below.
 
@@ -101,5 +108,5 @@ The JFNK enhancement diagnosed and proposed in this section (recover the dropped
 matrix-free via GMRES on `J·v ≈ [F(U+εv) − F(U)]/ε`, preconditioned by the already-factored frozen-π
 Jacobian) was **implemented and shipped** behind the opt-in `osgs_jfnk_enabled` flag. The Phase-0
 preconditioner gate, the executed design, and the A/B results are the canonical
-[`docs/solver/jfnk-phase0-preconditioner-gate.md`](jfnk-phase0-preconditioner-gate.md) — read that for
+[`docs/solver/jfnk-phase0-preconditioner-gate.md`](../solver/jfnk-phase0-preconditioner-gate.md) — read that for
 the shipped version.

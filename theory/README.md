@@ -13,7 +13,7 @@ Build from `theory/paper/` with its local `latexmkrc` (which adds `paper/siam/` 
 - [`paper/elemental_matrices_appendix.tex`](paper/elemental_matrices_appendix.tex), [`paper/shared.tex`](paper/shared.tex), [`paper/supplement.tex`](paper/supplement.tex), [`paper/references.bib`](paper/references.bib) — `\input`/bibliography dependencies.
 - `paper/figures/bump_plateau.pdf` — the one figure the article references.
 - [`paper/siam/`](paper/siam/) — the SIAM class (`siamart190516.cls`) and bib style (`siamplain.bst`).
-- Open editorial items for the paper: [`../docs/paper/errata.md`](../docs/paper/errata.md).
+- Open editorial items for the paper: [`../docs/open-questions.md`](../docs/open-questions.md) §5.
 
 The `\Guillermo{}` / `\Joaquin{}` author-review macros are defined in `article.tex` (lines ~101–102).
 
@@ -26,7 +26,7 @@ The `\Guillermo{}` / `\Joaquin{}` author-review macros are defined in `article.t
 ## Dedicated Notes
 
 - [`osgs_algorithm/osgs_algorithm.tex`](osgs_algorithm/osgs_algorithm.tex) — OSGS algorithm derivation and pseudocode driving the solver.
-- [`centered_encoding/centered_encoding.tex`](centered_encoding/centered_encoding.tex) — verification working note, **pending merge** into `paper/article.tex` (mechanics in [`../docs/paper/errata.md`](../docs/paper/errata.md)).
+- [`centered_encoding/centered_encoding.tex`](centered_encoding/centered_encoding.tex) — verification working note, **pending merge** into `paper/article.tex` (mechanics in [`../docs/open-questions.md`](../docs/open-questions.md) §5).
 - [`osgs_reaction_note/osgs_reaction_note.tex`](osgs_reaction_note/osgs_reaction_note.tex) — OSGS reaction-dominated convergence analysis note.
 - [`tau_saturation_note/tau_saturation_note.tex`](tau_saturation_note/tau_saturation_note.tex) — τ-saturation / stabilization-parameter analysis note.
 - [`velocity_floor_regularization/velocity_floor_regularization.tex`](velocity_floor_regularization/velocity_floor_regularization.tex) — smooth velocity-floor regularization of the Forchheimer `|u|` term.
@@ -37,5 +37,5 @@ The `\Guillermo{}` / `\Joaquin{}` author-review macros are defined in `article.t
 
 - Paper↔code map + divergence ledger → [`../docs/solver/`](../docs/solver/).
 - Cocquet investigation (synthesis, analysis, transcripts) → [`../docs/cocquet/`](../docs/cocquet/).
-- MMS status / convergence-2d / next-actions → [`../docs/mms/`](../docs/mms/).
+- MMS status / convergence-2d / p2-3d → [`../docs/mms/`](../docs/mms/).
 - Algorithm-improvement history, audit transcripts, refactor brief → [`../docs/solver/`](../docs/solver/).

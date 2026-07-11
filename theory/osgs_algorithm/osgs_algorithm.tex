@@ -782,7 +782,7 @@ $=(\mathrm{true},\mathrm{false},\mathrm{true})$ (Newton-2 accepts a noise-floor 
 Newton-1 does not, but still rejects a soft stall), and the OSGS-inner policy
 $=(\mathrm{true},\mathrm{true},\mathrm{false})$ (\code{OSGS\_INNER\_POLICY}) that classifies the
 single coupled-solve exit of Algorithm~\ref{alg:C}. See
-\code{docs/solver/algorithm-code-mapping.md}.
+\code{docs/theory-code-map.md} (Section~1, the algorithm-box$\rightarrow$code map).
 
 % ============================================================
 \section{Mathematical Preliminaries}
@@ -1759,8 +1759,8 @@ whose normalisation is \emph{measured from the current iterate and the known mat
 it is dimensionless and regime-robust with no a-priori characteristic velocity $U$, length $L$,
 pressure $P$, or global $\mathrm{Re}$/$\mathrm{Da}$. It is realised as the standalone module
 \code{src/solvers/convergence\_criterion.jl}, deliberately kept apart from the iteration machinery: it
-answers \emph{whether} an iterate is converged, not \emph{how} to step. The full design rationale and a
-critical audit of it live in \code{docs/solver/nonlinear-convergence-criterion-prompt.md}.
+answers \emph{whether} an iterate is converged, not \emph{how} to step. The full design rationale lives
+in \code{docs/theory-code-map.md} (Section~3) and the standalone note \code{theory/scale\_free\_gate\_note/}.
 
 \subsection{The criterion}
 With the momentum and mass residuals of the strong problem~\eqref{eq:alg-Ru}--\eqref{eq:alg-Rp}

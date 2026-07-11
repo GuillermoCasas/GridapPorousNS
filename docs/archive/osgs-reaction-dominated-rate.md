@@ -1,7 +1,13 @@
 # OSGS rate loss in the reaction-dominated limit (high Da) — status, evidence, options
 
+> **ARCHIVED 2026-07-11 — RESOLVED.** The settled verdict + the four keeper findings (the annihilation-probe
+> root cause `‖(I−Π)(σu_h)‖/‖σu_h‖=3e-16`, the innocent-but-load-bearing trim, the 22-agent methodological
+> caution, and the OSGS-retains-full-σ theory-sign correction) are canonical in
+> [`findings.md`](../findings.md) §4; the permanent mechanism derivation is in `theory/osgs_reaction_note/`.
+> Kept here as the full record of the deleted staggered route and the audit process.
+
 **Canonical doc** for the open OSGS convergence-rate issue at high Damköhler number. Supersedes the
-"discrete staggered map" mechanistic account in [`../known_issues.md`](../known_issues.md) (Open numerical
+"discrete staggered map" mechanistic account in [`../findings.md`](../findings.md) §4/§7 (Open numerical
 defect) and the 2026-06-04 caveats in [`../mms/convergence-2d.md`](../mms/convergence-2d.md) §4–6.
 
 Last updated: 2026-06-10.
@@ -163,7 +169,7 @@ falsified**: against the coupling-equivalence oracle, `freeze_after_k` diverged 
 the reaction corner — it does *not* land on the coupled fixed point there — so it was rejected and, with
 `staggered`, **deleted** in the 2026-06-08 leaning. The OSGS solver now has the single `coupled` route.
 For the coupling rationale and the iteration-cost fix (JFNK — landed; see
-[`jfnk-phase0-preconditioner-gate.md`](jfnk-phase0-preconditioner-gate.md)), see
+[`jfnk-phase0-preconditioner-gate.md`](../solver/jfnk-phase0-preconditioner-gate.md)), see
 [`coupled-only-leaning-and-jfnk-plan.md`](coupled-only-leaning-and-jfnk-plan.md) §2. The rate cure itself
 is the deferred **split / term-by-term OSGS** of §4B / §8.5 — a formulation change, not a coupling choice.
 

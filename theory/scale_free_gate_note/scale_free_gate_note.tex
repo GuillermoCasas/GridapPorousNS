@@ -1,0 +1,444 @@
+%==============================================================================
+%  Standalone note: A scale-free stopping criterion for the outer nonlinear
+%  (Picard / Newton) iteration of the stabilized porous Navier-Stokes solver.
+%
+%  This is a faithful LaTeX transcription of the specification that previously
+%  lived in docs/theory-code-map.md, Section 3 ("Scale-free nonlinear
+%  convergence criterion"). It introduces no new mathematics: it collects the
+%  momentum measure eps_M, the mass measure eps_C, its sqrt(d) bound, the edge
+%  cases, and the optional pressure-normalized fallback, in the notation of
+%  the manuscript
+%   "A stabilized finite element method for incompressible, inertial flows
+%    in inhomogeneous porous media" (Casas, Gonzalez-Usua, Codina, de-Pouplana).
+%
+%  The macros below replicate the relevant ones defined inline in that paper
+%  (\ViscProj, \Reyn, \Damk, \tauNS, ...), so the equations can be lifted into
+%  the manuscript with no changes. Cross-references of the form
+%  (paper, eq:Label) point to its equation labels.
+%
+%  Companion / implementation status: the production gate lives in
+%  src/solvers/convergence_criterion.jl.
+%
+%  Compiles with a standard TeX install:  pdflatex scale_free_gate_note.tex
+%==============================================================================
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\usepackage{cleveref}
+
+%================= PREAMBLE (mirrors the manuscript / sibling notes) ===========
+% Dimensionless numbers
+\newcommand{\Reyn}{\operatorname{\mathit{Re}}}
+\newcommand{\Damk}{\operatorname{\mathit{Da}}}
+
+% Projection operators used in the viscous term (deviatoric/symmetric split)
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\text{DS}}}{\Pi}}
+
+% Stabilization-parameter shorthand
+\newcommand{\tauNS}{\tau_{1,\text{NS}}}
+
+% Boldface field shorthands (matched to theory/paper/article.tex)
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\bw}{\boldsymbol{w}}
+\newcommand{\bef}{\boldsymbol{f}}
+\newcommand{\bx}{\boldsymbol{x}}
+\newcommand{\bq}{\boldsymbol{q}}
+\newcommand{\bsig}{\boldsymbol{\sigma}}
+\newcommand{\eu}{\boldsymbol{e}_u}
+
+% Operators and norms
+\newcommand{\grad}{\nabla}
+\newcommand{\divg}{\nabla\!\cdot\!}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\norm}[1]{\left\Vert #1\right\Vert}
+\newcommand{\bigOh}{\mathcal{O}}
+
+% Residuals and gate measures
+\newcommand{\rM}{r_{\mathrm M}}
+\newcommand{\rC}{r_{\mathrm C}}
+\newcommand{\DM}{D_{\mathrm M}}
+\newcommand{\DC}{D_{\mathrm C}}
+\newcommand{\epsM}{\varepsilon_{\mathrm M}}
+\newcommand{\epsC}{\varepsilon_{\mathrm C}}
+
+% Theorem environments
+\theoremstyle{plain}
+\newtheorem{proposition}{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+%============================ end PREAMBLE =====================================
+
+\title{A scale-free stopping criterion for the stabilized\\
+porous Navier--Stokes iteration}
+\author{Companion note to \texttt{article.tex} --- porous Navier--Stokes VMS solver\\
+\small (Casas, Gonz\'alez-Us\'ua, Codina, de-Pouplana)}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note records, in the notation of the paper \texttt{article.tex}, the
+stopping criterion for the outer nonlinear (Picard / Newton) iteration of the
+stationary stabilized algorithm (paper, \texttt{alg:StationarySystem}). The goal
+is a criterion \emph{computable from the current iterate together with material
+and mesh data alone}, with \emph{no} a-priori characteristic scales: no
+characteristic velocity $U$, length $L$, pressure $P$, nor any global Reynolds
+$\Reyn$ or Damk\"ohler $\Damk$ number. Those quantities are bespoke to a
+manufactured-solution (MMS) test where they happen to be known; a production
+criterion cannot assume them. We define a momentum measure $\epsM$ and a mass
+measure $\epsC$, each a residual normalized by a quantity measured from the
+iterate, prove the guaranteed bound $\epsC\le\sqrt{d}$ for the flux-gradient
+form, catalogue the edge cases, and document the optional (non-default,
+non-implemented) pressure-normalized fallback. A closing remark records how the
+production code specializes these definitions.
+\end{abstract}
+
+%------------------------------------------------------------------------------
+\section{Summary and the hard constraint}\label{sec:summary}
+%------------------------------------------------------------------------------
+Stop the outer loop when
+\begin{equation}\label{eq:gate}
+  \text{converged}\quad\Longleftrightarrow\quad
+  \max(\epsM,\epsC)\ \le\ \texttt{tol}
+  \qquad(\text{or with separate }\texttt{tol}_{\mathrm M},\ \texttt{tol}_{\mathrm C}),
+\end{equation}
+with
+\begin{itemize}
+  \item \textbf{Momentum} $\displaystyle \epsM=\frac{\norm{\rM^k}}{\DM^k}$,
+    \quad
+    $\DM^k=\norm{\alpha\,\bu\!\cdot\!\grad\bu}
+      +\norm{2\,\divg(\alpha\nu\,\ViscProj\grad\bu)}
+      +\norm{\alpha\grad p}
+      +\norm{\sigma(\bu)\,\bu}
+      +\norm{\bef}$;
+  \item \textbf{Mass} $\displaystyle
+    \epsC=\frac{\norm{\divg(\alpha\bu^k)}}{\norm{\grad(\alpha\bu^k)}}$
+    with the guaranteed bound $\epsC\le\sqrt{d}$
+    (\cref{sec:mass}; this flux-gradient form is now the \emph{diagnostic}
+    \texttt{eps\_C\_strong} --- see \cref{sec:status}).
+\end{itemize}
+All norms are global $L^2(\Omega)$, $\norm{w}=\big(\int_\Omega|w|^2\dd\Omega\big)^{1/2}$,
+accumulated by quadrature in a single assembly pass. Here $\ViscProj$ is the
+deviatoric--symmetric projector of the viscous term (paper notation) and
+$d\in\{2,3\}$. Report $\epsM$ and $\epsC$ separately at every iteration.
+
+\begin{remark}[Hard constraint --- do not violate]\label{rem:hard}
+The criterion \emph{must be computable from the current iterate
+$U^k=(\bu^k,p^k)$ and known material/mesh data alone}: the porosity $\alpha(\bx)$,
+the viscosity $\nu$, the resistance $\sigma=a(\alpha)+b(\alpha)|\bu|$, the body
+force $\bef$, and the element size $h_K$. \emph{No} a-priori characteristic scale
+may be introduced, requested, or hard-coded --- no $U$, $L$, $P$, and no global
+$\Reyn$ or $\Damk$. Those are bespoke to a manufactured-solution test where they
+happen to be known; a production criterion cannot assume them. If a scale is
+needed, it is \emph{measured from the iterate}, not supplied. (Element-level
+$\Reyn_h$, $\Damk_h$ built from $h_K$ and the iterate are allowed --- they are
+not a-priori scales, and appear only in the optional fallback of
+\cref{sec:fallback}.)
+\end{remark}
+
+%------------------------------------------------------------------------------
+\section{Governing equations and residuals}\label{sec:governing}
+%------------------------------------------------------------------------------
+Strong form (kinematic; density absorbed into $\nu$, $p$, $\sigma$), following
+(paper, \texttt{eq:StrongMomentumEquation}--\texttt{eq:StrongMassEquation}):
+\begin{align}
+  \text{momentum:}\quad&
+    \alpha\,\bu\!\cdot\!\grad\bu
+    -2\,\divg(\alpha\nu\,\ViscProj\grad\bu)
+    +\alpha\grad p
+    +\sigma(\alpha,\bu)\,\bu = \bef, \label{eq:mom}\\
+  \text{mass:}\quad&
+    \varepsilon\,p+\divg(\alpha\bu)=0, \label{eq:mass}
+\end{align}
+with the Darcy--Brinkman--Forchheimer closure (paper, \texttt{eq:DBFResistanceTerm})
+\begin{equation}\label{eq:dbf}
+  \sigma(\alpha,\bu)=a(\alpha)+b(\alpha)\,|\bu|
+\end{equation}
+(Darcy $+$ Forchheimer), $\varepsilon\ge0$ a small compressibility (the
+iterative penalty), equal-order $P_k/P_k$ velocity--pressure interpolation, and
+ASGS or OSGS VMS stabilization. We write
+\begin{itemize}
+  \item \textbf{momentum residual} $\rM^k$: the momentum residual evaluated at
+    $U^k$;
+  \item \textbf{mass residual} $\rC^k=\divg(\alpha\bu^k)$
+    ($+\,\varepsilon p^k$ if $\varepsilon>0$; negligible --- see
+    \cref{sec:edge}, edge case~7).
+\end{itemize}
+
+%------------------------------------------------------------------------------
+\section{Momentum normalization}\label{sec:momentum}
+%------------------------------------------------------------------------------
+
+\paragraph{Numerator $\norm{\rM^k}$ --- Philosophy A (algebraic, recommended,
+current).}
+Measure what the solver actually drives to zero: the norm of the assembled
+\emph{stabilized} nonlinear residual \emph{vector} (ASGS/OSGS, subscales
+included), velocity block. Use a fixed vector norm (Euclidean or
+mass-matrix-weighted) --- the \emph{same} norm for every term in $\DM$. Build the
+denominator terms by assembling each physical term's velocity-block contribution
+\emph{through the same weak form}: the viscous term is then the
+integrated-by-parts $\langle\grad^{\mathrm S}\bv,\,2\alpha\nu\,\ViscProj\grad\bu^k\rangle$,
+a first-derivative quantity --- \emph{no second derivatives, no special-casing by
+polynomial order}.
+
+\paragraph{Numerator --- Philosophy B (pointwise force density, only for a
+force-balance picture).}
+Use $L^2(\Omega)$ norms of the strong-form force-density fields directly;
+$\rM^k$ is then the strong residual field. Caveat: the strong residual of a
+finite element solution does \emph{not} vanish at the discrete solution --- it
+floors at the truncation level $\bigOh(h^k)$ in a negative norm --- so
+\texttt{tol} must be set above that floor. The viscous term then needs a second
+derivative. Prefer~A.
+
+\paragraph{Denominator $\DM^k$ --- dynamic term-magnitude envelope.}
+\begin{equation}\label{eq:DM}
+  \DM^k=
+    \underbrace{\norm{\alpha\,\bu^k\!\cdot\!\grad\bu^k}}_{\text{convection}}
+    +\underbrace{\norm{2\,\divg(\alpha\nu\,\ViscProj\grad\bu^k)}}_{\text{viscous}}
+    +\underbrace{\norm{\alpha\grad p^k}}_{\text{pressure gradient}}
+    +\underbrace{\norm{\sigma(\bu^k)\,\bu^k}}_{\text{resistance (Darcy + Forchheimer)}}
+    +\underbrace{\norm{\bef}}_{\text{body force}}.
+\end{equation}
+
+\paragraph{Rationale.}
+\begin{itemize}
+  \item \emph{Why a sum of term magnitudes is regime-robust.} At the solution the
+    momentum terms do not vanish --- they \emph{balance}. Whichever mechanism
+    dominates (viscous as $\Reyn,\Damk\to0$, convection as $\Reyn\to\infty$,
+    resistance as $\Damk\to\infty$) automatically enters the sum and sets the
+    scale, with no regime parameter to choose. (Offline check:
+    non-dimensionalizing sends the four operator terms to coefficients
+    $\Reyn,\ 1,\ (1+\Reyn+\Damk),\ \Damk$, so
+    $\DM\sim(1+\Reyn+\Damk)\,\alpha_\infty\nu U/L^2$. The pressure-gradient term
+    alone carries the coefficient $1+\Reyn+\Damk$ and is leading-order in
+    \emph{every} regime --- so $\norm{\alpha\grad p^k}$ by itself is already a
+    valid scale once $p^k$ has developed.)
+  \item \emph{Why dynamic (recomputed each iteration).} $\sigma$ depends on
+    $|\bu^k|$ through Forchheimer and $\alpha$ varies in space, so the true local
+    resistance is \emph{not} the nominal global $\Damk$. The dynamic sum reads the
+    actual local magnitudes; a frozen analytic prefactor cannot.
+  \item \emph{Why include $\norm{\bef}$.} In forced / manufactured problems $\bef$
+    is one of the balanced forces and can dominate; it prevents the scale
+    collapsing if the operator terms cancel. When $\bef=0$ it contributes nothing.
+  \item \emph{Why the viscous term is unproblematic under Philosophy A.} The weak
+    form already integrated it by parts, so it is first-order. Under Philosophy B
+    with $P_1$, $\divg(\alpha\nu\,\ViscProj\grad\bu_h)\approx0$ element-wise;
+    accept the $\approx0$ contribution --- the co-dominant pressure-gradient term
+    supplies the viscous scale. Do \emph{not} patch with an inverse-estimate
+    factor $C_{\text{inv}}/h$: it overestimates the viscous force on fine meshes
+    and makes $\epsM$ over-optimistic.
+\end{itemize}
+
+%------------------------------------------------------------------------------
+\section{Mass normalization (flux-gradient ratio)}\label{sec:mass}
+%------------------------------------------------------------------------------
+\emph{This section defines what is now the diagnostic \texttt{eps\_C\_strong};
+the production gate uses the algebraic mass residual of \cref{sec:status}.}
+
+\paragraph{Numerator $\norm{\divg(\alpha\bu^k)}$.}
+Use the divergence of the porous flux $\bq^k=\alpha\bu^k$ --- the quantity that
+$\to0$ at the fixed point. With the iterative penalty, the $\varepsilon p^{n-1}$
+term cancels at convergence, leaving the incompressibility residual. If
+$\varepsilon>0$ the consistent numerator is
+$\norm{\varepsilon p^k+\divg(\alpha\bu^k)}$, but $\varepsilon^\ast\sim10^{-4}$,
+so $\norm{\divg(\alpha\bu^k)}$ alone is equivalent and clearer.
+
+\paragraph{Denominator $\norm{\grad(\alpha\bu^k)}$ --- the flux-gradient
+(Frobenius) norm.}
+\begin{equation}\label{eq:epsC}
+  \grad(\alpha\bu^k)=\alpha\grad\bu^k+\bu^k\otimes\grad\alpha
+  \qquad(\text{full second-order tensor; Frobenius norm}),
+  \qquad
+  \epsC=\frac{\norm{\divg(\alpha\bu^k)}}{\norm{\grad(\alpha\bu^k)}}\ \le\ \sqrt{d}.
+\end{equation}
+
+\begin{proposition}[The $\sqrt{d}$ bound]\label{prop:sqrtd}
+Let $\bq=\alpha\bu^k$ and let $\grad\bq$ be its (second-order) gradient tensor.
+Then $\epsC\le\sqrt{d}$ always.
+\end{proposition}
+\begin{proof}
+Pointwise, the divergence is the trace of the gradient tensor,
+$\divg\bq=\operatorname{tr}(\grad\bq)$. For any $d\times d$ matrix $A$, the
+Cauchy--Schwarz inequality applied to
+$\operatorname{tr}(A)=\sum_{i=1}^d A_{ii}=\langle\operatorname{diag},A\rangle$
+gives $(\operatorname{tr}A)^2\le d\,(A\!:\!A)$, where $A\!:\!A=\sum_{ij}A_{ij}^2$
+is the squared Frobenius norm. Hence, pointwise,
+\begin{equation}\label{eq:pointwise}
+  |\divg\bq|^2=\big(\operatorname{tr}(\grad\bq)\big)^2
+  \ \le\ d\,\big(\grad\bq\!:\!\grad\bq\big)
+  = d\,|\grad\bq|_F^2 .
+\end{equation}
+Integrating \eqref{eq:pointwise} over $\Omega$ yields
+$\norm{\divg\bq}^2\le d\,\norm{\grad\bq}_F^2$, and dividing by
+$\norm{\grad\bq}_F^2$ gives $\epsC^2\le d$, i.e.\ $\epsC\le\sqrt{d}$.
+\end{proof}
+
+\paragraph{Rationale.}
+\begin{itemize}
+  \item \emph{Why it is the right scale-free measure.} It is the
+    pressure-normalized ``relative pressure error from mass imbalance'' with the
+    divergence$\to$pressure conversion factor \emph{measured from the iterate
+    instead of supplied}. The conversion factor
+    $\Phi/\alpha_\infty=\norm{p^k}/\norm{\grad(\alpha\bu^k)}$ reproduces the full
+    viscous$+$inertial$+$Darcy envelope in every regime; substituting it into
+    $\epsC=(\Phi/\alpha_\infty)\,\norm{\divg(\alpha\bu^k)}/\norm{p^k}$ cancels
+    $\norm{p^k}$ identically, leaving the flux-gradient ratio. So the gradient
+    ratio \emph{is} the pressure idea with the a-priori factor removed; it never
+    requires $p$.
+  \item \emph{Why genuinely scale-free.} Both norms are built from $\bu^k$ and the
+    known field $\alpha$. Dimensionless by construction.
+  \item \emph{Why the $\sqrt{d}$ bound (a self-check).} By
+    \cref{prop:sqrtd}, $\epsC\le\sqrt{d}$ always; a computed value above
+    $\sqrt{d}$ signals a quadrature / projection / assembly bug --- assert or log.
+  \item \emph{Why keep the $\bu\otimes\grad\alpha$ term.} It is the real flux
+    structure forced by the porosity gradient; the ratio then measures dilatation
+    against the \emph{total} flux variation. When $\alpha$ is constant (including
+    $\alpha\equiv1$, classical Navier--Stokes) it vanishes and
+    $\epsC\to\norm{\divg\bu}/\norm{\grad\bu}$ --- graceful, no special-casing.
+  \item \emph{Why global, not pointwise.} A pointwise ratio blows up wherever
+    $\grad(\alpha\bu)\to0$. Use domain-integrated $L^2$ norms. With no-slip walls
+    plus a parabolic inlet there is always boundary-layer shear, so
+    $\norm{\grad(\alpha\bu^k)}$ is robustly bounded away from zero in practice.
+\end{itemize}
+
+%------------------------------------------------------------------------------
+\section{Edge cases (apply all)}\label{sec:edge}
+%------------------------------------------------------------------------------
+\begin{enumerate}
+  \item \textbf{Trivial initial guess $\bu^0=0$.} $\DM^0$ and
+    $\norm{\grad(\alpha\bu^0)}$ may be $0\Rightarrow 0/0$. Guard every denominator
+    with a \emph{pure underflow floor}
+    $\text{den}=\max(\text{den},\ \texttt{eps}(\text{eltype}))$ (machine epsilon,
+    \emph{not} a problem scale), and do not declare convergence at $k=0$ ---
+    require at least one completed iteration. If $\bu\equiv0$ genuinely solves it
+    (zero boundary conditions, $\bef=0$), the numerators are also $\approx0$ and
+    the floor yields convergence without inventing a scale.
+  \item \textbf{BC-driven flow, $\bef=0$.} The denominator must not rely on
+    $\bef$; once nonzero the internal terms carry $\DM$. $\norm{\bef}=0$
+    contributing nothing is correct.
+  \item \textbf{Uniform porosity $\alpha\equiv\text{const}$ (incl.\
+    $\alpha\equiv1$).} $\grad\alpha=0\Rightarrow\norm{\grad(\alpha\bu)}
+    =\alpha\norm{\grad\bu}$, so $\epsC\to\norm{\divg\bu}/\norm{\grad\bu}$.
+    Expected; do not special-case.
+  \item \textbf{Locally near-uniform flux.} Never a pointwise ratio --- always
+    global $L^2$.
+  \item \textbf{$\epsC>\sqrt{d}$.} Analytically impossible
+    (\cref{prop:sqrtd}) $\Rightarrow$ a bug indicator (assert / log).
+  \item \textbf{All-Dirichlet / pressure indeterminacy
+    ($\Gamma_{\mathrm N}=\varnothing$, $\varepsilon=0$).} Pressure is defined up
+    to a constant (fixed by the zero-mean condition). The flux-gradient ratio is
+    immune --- it uses no $\norm{p}$. Do \emph{not} build a pressure-normalized
+    mass measure here.
+  \item \textbf{Compressibility $\varepsilon>0$ (iterative penalty).} The strict
+    numerator is $\norm{\varepsilon p^k+\divg(\alpha\bu^k)}$, but
+    $\varepsilon^\ast\sim10^{-4}$, so $\norm{\divg(\alpha\bu^k)}$ is equivalent
+    and preferred. The penalty's right-hand-side term cancels at the fixed point.
+  \item \textbf{Newton vs Picard.} Always measure the \emph{genuine nonlinear
+    residual} evaluated at $U^k$ (re-assemble the operator), never the linearized
+    / inner linear-solve residual --- the latter $\to0$ \emph{inside} each step
+    and does not reflect outer convergence. (Gating on the inner residual makes
+    the outer loop stop too early or behave erratically.)
+  \item \textbf{Tolerance vs floor.} $\epsM$ and $\epsC$ cannot fall below the
+    level set by the discretization (the stabilized scheme permits a small nonzero
+    $\divg(\alpha\bu_h)$, $\bigOh(h^k)$) and by $\varepsilon$. Set \texttt{tol}
+    \emph{above} this floor. Diagnostic: a fixed outer-iteration count independent
+    of \texttt{tol} signals either \texttt{tol} below the floor, or measuring a
+    quantity that does not decrease (edge case~8) --- check both.
+  \item \textbf{Stabilization terms.} Numerator $=$ the method's full residual
+    (ASGS/OSGS, subscales included). Denominator $=$ the Galerkin physical force
+    terms of \cref{sec:momentum}; adding the stabilization terms to $\DM$ is
+    optional and harmless (bounded by the Galerkin terms by design).
+  \item \textbf{Element-wise vs global accumulation.} Accumulate $\norm{\cdot}^2$
+    per element, then sum and take the square root (one assembly pass). The global
+    ratio is the default. If a regime varies \emph{strongly} across the mesh, an
+    element-wise envelope (ratio per element, reduced by $\max$ or
+    $\ell^2$-over-elements) is the most faithful variant; offer only if needed.
+\end{enumerate}
+
+%------------------------------------------------------------------------------
+\section{Optional fallback (documented, NOT the default):\\
+pressure-normalized mass measure, still scale-free}\label{sec:fallback}
+%------------------------------------------------------------------------------
+If a pressure-referenced mass measure is explicitly wanted (to read the criterion
+directly as a relative pressure error), replace the global $\Reyn,\Damk$ by
+\emph{element-level}
+\begin{equation}\label{eq:elemRe}
+  \Reyn_h=\frac{|\bu^k|_K\,h_K}{\nu},
+  \qquad
+  \Damk_h=\frac{\sigma_K\,h_K^2}{\alpha_K\,\nu},
+\end{equation}
+the same quantities already inside $\tau_1$ (paper, \texttt{eq:Tau1Final},
+\texttt{eq:TauNavierStokes}). Then
+\begin{equation}\label{eq:epsCalt}
+  \epsC^{\text{alt}}
+  =\frac{\big\|\,\big(h^2/(\alpha_K\tau_{1,K})\big)\,\divg(\alpha\bu^k)\,\big\|}
+        {\norm{p^k}}
+  \ \sim\
+  \frac{\big\|\,\big(\nu(1+\Reyn_h+\Damk_h)/\alpha_K\big)\,\divg(\alpha\bu^k)\,\big\|}
+        {\norm{p^k}},
+\end{equation}
+i.e.\ the divergence$\to$pressure conversion factor expressed through the
+solver's own stabilization parameter $\tau_1$ (so still no bespoke scales --- only
+$h_K$, the iterate, and material data). It is mesh-coupled and fussier than the
+flux-gradient ratio of \cref{sec:mass} and reduces to it in spirit. Use only if
+the explicit pressure reading is required; otherwise prefer \cref{sec:mass}.
+\textbf{This fallback is intentionally \emph{not} implemented in the code.}
+
+%------------------------------------------------------------------------------
+\section{Implementation notes}\label{sec:impl}
+%------------------------------------------------------------------------------
+\begin{itemize}
+  \item Reuse the existing residual weak form for $\rM^k$ (Philosophy~A) so the
+    stabilized residual and the convergence measure stay consistent by
+    construction.
+  \item $L^2(\Omega)$ norm of a field $w$: $\big(\sum_K\int_K w\!\cdot\!w\big)^{1/2}$
+    (Frobenius inner product for tensors).
+  \item $\divg(\alpha\bu)$ and $\grad(\alpha\bu)$ via the differential operators
+    on the $\alpha$-field interpolated in the \emph{same} finite element space as
+    the solution (consistent with the paper's nodal interpolation of $\alpha$).
+  \item Guard denominators with the pure underflow floor
+    $\text{den}=\max(\text{den},\ \texttt{eps})$.
+  \item Log $\epsM$, $\epsC$, and each $\DM$ term per iteration; the per-term
+    breakdown tells which balance is limiting convergence when the loop stalls.
+  \item Assert $\epsC\le\sqrt{d}\,(1+\texttt{tol})$ as a cheap correctness check.
+\end{itemize}
+
+%------------------------------------------------------------------------------
+\section{Implementation status}\label{sec:status}
+%------------------------------------------------------------------------------
+The \emph{momentum} (Philosophy~A) specification of \cref{sec:momentum} is the
+one used in production, unchanged. The \emph{mass} measure has evolved from the
+flux-gradient ratio of \cref{sec:mass}. Concretely:
+
+\begin{itemize}
+  \item \textbf{Gate (production).} The mass gate is the ``Route-B
+    Philosophy-A'' \emph{algebraic} measure
+    \begin{equation}\label{eq:algC}
+      \epsC=\frac{\norm{\rC^k}}{\DC^k},
+    \end{equation}
+    the norm of the assembled \emph{stabilized} mass residual over a
+    term-magnitude envelope $\DC$ --- \emph{symmetric with $\epsM$} of
+    \cref{eq:gate} and gated at the same $\sim10^{-9}$ level.
+  \item \textbf{Residual-floor accept.} A scale-free
+    \texttt{residual\_floor\_reached} accept is also applied: it accepts
+    machine-floor-converged cells whose $\epsC$ cannot reach \texttt{tol} because
+    $\DC$ collapses for near-divergence-free flow (the mass envelope $\to0$ when
+    the flow is essentially incompressible).
+  \item \textbf{Diagnostic.} The flux-gradient ratio
+    $\epsC=\norm{\divg(\alpha\bu^k)}/\norm{\grad(\alpha\bu^k)}$ of
+    \cref{sec:mass} (and its $-g$-subtracted variant) is now the \emph{diagnostic}
+    \texttt{eps\_C\_strong}, no longer the gate.
+\end{itemize}
+
+The gate is implemented in
+\texttt{src/solvers/convergence\_criterion.jl}.
+
+\end{document}

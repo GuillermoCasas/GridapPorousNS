@@ -20,7 +20,7 @@ The **trouble axis is `Re × α₀`, not `Re × Da`.** All difficulty concentrat
 
 ### Completed sweeps (Route-B algebraic mass gate)
 
-The mass convergence gate is now the **Philosophy-A algebraic** `ε_C = ‖r_C‖/D_C` (pressure block of the assembled residual, symmetric with the momentum gate `ε_M = ‖r_M‖/D_M`, gated ~1e-9). The old loose `eps_tol_mass = 0.8` gate is demoted to the diagnostic `eps_C_strong`. Core commit `e455f36`; essential companion fix `3b76864` (below). Gate spec: [`solver/nonlinear-convergence-criterion-prompt.md`](solver/nonlinear-convergence-criterion-prompt.md); config knobs `eps_tol_momentum` / `eps_tol_mass` in `SolverConfig` (`src/config.jl`), consumed by `convergence_criterion.jl` and the `"scale_free"` path in `src/solvers/nonlinear.jl` (`_safe_solve_inner!`).
+The mass convergence gate is now the **Philosophy-A algebraic** `ε_C = ‖r_C‖/D_C` (pressure block of the assembled residual, symmetric with the momentum gate `ε_M = ‖r_M‖/D_M`, gated ~1e-9). The old loose `eps_tol_mass = 0.8` gate is demoted to the diagnostic `eps_C_strong`. Core commit `e455f36`; essential companion fix `3b76864` (below). Gate spec: [`theory-code-map.md`](theory-code-map.md) §3; config knobs `eps_tol_momentum` / `eps_tol_mass` in `SolverConfig` (`src/config.jl`), consumed by `convergence_criterion.jl` and the `"scale_free"` path in `src/solvers/nonlinear.jl` (`_safe_solve_inner!`).
 
 **Final verdict — all three families (canonical `results/k<kv>/<etype>/results.h5`, completed 2026-07-03):**
 
@@ -141,6 +141,16 @@ Source doc: `mms/convergence-2d.md`.
 - **Element-local inverse constant `C_inv²`** (generalized eigenproblem, P2 deviatoric), **mesh-independent** (identical at h=1, ½, ¼): Kuhn TET **214** vs Q2 quad **60**, right-TRI 48, hex 180 — Kuhn tet needs `c₁ ≈ (214/60)·4k⁴ ≈ 3.6×`, matching the empirical `c1_mult=4`. Shape-regularity `h/ρ`: regular 4.90, corner 6.69, **Kuhn 8.36** (worst).
 - **Reconciliation:** the paper's optimal §5.2 P2-3D (slope 3.18/2.02) used **unstructured tets** over **only 3 meshes** (rate from the two finest). Gridap-ASGS was *also* clean over its first 3 meshes and only reverted at the 4th — a resolution the paper's ladder never reached. No contradiction. A genuinely well-shaped 3D tet family is hard to build (gmsh worst-aspect 11–13; a hand-built BCC lattice gives bulk aspect 5.66 but boundary caps 8.83 ≈ Kuhn, still erratic at paper c₁).
 
+### Independent clean-room confirmation of the coercivity margin (2026-07-09)
+
+An external from-scratch recomputation (monomial bases, exact integration, nothing shared with the code) **reproduced the element inverse constants** `C_inv²` = 214 (Kuhn TET) / 60 (Q2 quad) / 48 (P2 right-TRI) / 180 (Q2 hex) exactly, and added two numbers the repo lacked:
+
+- **Regular TET (best-possible tet) = 66.67** — even an *ideal* tet exceeds the quad's 60 and the `c₁=4k⁴=64` budget (in diameter units), so *no* tetrahedron sits comfortably inside the 2D margin. The deviatoric symmetric-gradient operator on the Kuhn tet is worse still: **282.4**.
+- A **single element-independent threshold `ξ* ∈ (1.42, 2.13]`** fits every 2D and 3D data point once `c₁` and `C_inv²` are expressed in the **same** `h`-convention. The apparent "inconsistency" was an apples-to-oranges units error (comparing `c₁=64` in harness-`h` against `C_inv²` in diameter). Converting to consistent diameter units gives ratio ≈2.13 (quads, works) vs ≈0.71 (Kuhn tets, fails) — one threshold, all families.
+- The dimension-dependent **Fourier** correction (the deviatoric viscous symbol's longitudinal eigenvalue `(2−2/d)·αν|k₀|²` = 4/3 in 3D vs 1 in 2D) supplies only ~4/3 of the needed increase; the **dominant** driver is geometric — the Kuhn 1:√2:√3 edge anisotropy carries ~3.3× more high-frequency content than the quad → total ≈3.6×, matching the empirical `c1_mult=4`.
+
+Because this is a pure element-geometry eigenvalue argument (independent of any formulation transcription), it corroborates the coercivity-margin verdict on its own. The same external audit also raised **code observations** (joint c₁/c₂ scaling in the multiplier hooks; a possible `tau_reg_lim` unit inconsistency; the 3D harness's `h`-convention bypass) — captured as **verify-first** leads in [`pending-tasks.md`](pending-tasks.md) §2c, not enshrined here until checked against the code.
+
 ### Refuted alternatives (do not re-chase)
 
 | Hypothesis | Verdict |
@@ -172,11 +182,13 @@ The destabilizer is localized to the **viscous adjoint `L*_visc(v)=∇·(2ανε
 - **OSGS P1 SOLVED** — robust (`eps_used=1`) **and** fully optimal (recipe: iterative-penalty + boot-skip + JFNK + reference-root homotopy).
 - **ASGS P1 robust** (L²u structured-limited — the genuine 3D P1-ASGS L²-order sub-optimality on structured tets; **OSGS recovers it**).
 - **ASGS P2 non-monotone** at paper c₁ (the under-margin above; orthogonal to the penalty fix).
-- **OSGS P2 still ∂π/∂u-open** (`ok=false` but accurate) — see below.
+- **OSGS P2 SOLVED** (2026-07-09) — a preconditioner-only c₁×4 inflation reaches the paper-c₁ root; see below.
 
-### OSGS-P2 is additionally unsolvable — OPEN (separate from the discretization issue)
+### OSGS-P2-3D ∂π/∂u coupling — RESOLVED (2026-07-09, preconditioner-only c₁×4)
 
-Even granting the discretization, OSGS-P2 cannot be *solved*: the damped staggered π-iteration is **violently non-contractive** (drift ratio ρ ≈ 8–65 for ω=1.0 down to 0.1, every ω diverges — mechanism: π = Π(R(u)) with R∋∇²u amplifies high-frequency content ~1/h²; Anderson can't rescue it). **JFNK is not budget-fixable** (inner GMRES stalls at rel-res 0.01–0.16, non-monotone across maxiter 30/100/300 ⇒ the matrix-free `Jᵥ` is noisy because R re-projects π inside every FD probe). A *single* frozen-π solve from the interpolant gives L²u=0.0157 — the fixed point exists and is reasonable; only the iteration to it is unstable. A real saddle-point/MG preconditioner would be needed, but is only worthwhile *after* the discretization is fixed.
+The blocker was **`ρ_prec = ρ(J_frozen⁻¹·∂π/∂u) ≈ 1249`** at paper c₁ (2D ref ≈ 0.88): the frozen-π tangent is a hopeless preconditioner for the coupled `∂π/∂u` system, so JFNK-GMRES stalled and the solver **sat at the exact-guess interpolant** — `success=false` was *correct*. A **preconditioner-only c₁×4 inflation** (`osgs_jfnk_precond_c1_mult`, default-off) drops `ρ_prec` to **≈3.8** (a U-shaped optimum) while the residual `F` stays at paper c₁, so the converged root is unchanged (`‖F‖→1.4e-12`). On (12,12,3): **`success=true`, `eps_used=1`, quadratic Newton (5 iters)**. Landed default-off (Blitz 272/272, Quick 85/85); the OSGS-P2 structured recipe uses `mult=4` + `jfnk_maxiter=80`.
+
+**Corrects the earlier "accurate but `ok=false`" reading:** that was an artifact of starting from the exact-solution **interpolant** — the solver never descended off it, so the reported L²u=0.0012 was the *interpolation* error, not a reached root. Reaching the paper-c₁ root for the first time makes its true error visible: velocity accurate (L²u=0.00123 ≈ interpolant) but **pressure ~15× larger (L²p=0.045)** — the paper-c₁ P2-3D pressure is genuinely under-stabilized (c₁×4 *in the residual* gives L²p=0.0029). That pressure accuracy question is §3 (the coercivity-margin story), now directly measurable. Refuted en route: stronger-`ε_num` (made GMRES worse), constant-pressure gauge deflation (ρ_prec unchanged — unlike 2D), damped staggering (its Picard contraction rate *is* ρ_prec=1249), and a classic Schur / approximate-`J_frozen` preconditioner (already exact `J_frozen⁻¹`; the deficit is the *dropped* `∂π/∂u`, which the c₁-inflated preconditioner approximates).
 
 Source doc: `mms/p2-3d.md`. Diagnostic hooks (default-off): `smoke3d.jl` `ablation`/`h_conv`; `continuous_problem.jl` `VISC_ADJ_MULT`; `tau.jl` `TAU_VISC_MULT`; `data/phase1_tri_k2.json`.
 
@@ -212,7 +224,7 @@ Because `σu_h ∈ V_h`, the orthogonal projection **annihilates the reactive re
 
 ### The trim is innocent; full-residual OSGS is *unstable*
 
-The reaction-projection trim (drop `σu` from the projection for constant σ, article.tex §580, `ProjectResidualWithoutReactionWhenConstantSigma`) is correct and **coefficient-robust at the fixed point** (it removes a quantity annihilated anyway; `continuous_problem.jl:203`). Switching to `ProjectFullResidual` at Da=10⁶ **stalls/diverges at every mesh** (→NaN at N=80) and reports the ASGS Stage-I fallback (H¹ bit-identical to ASGS) — because although the *residual* equals the trim's, the *Jacobians differ*: the trim's `−σ·du` term is load-bearing for solver stability. **This is why the paper trims; the trim is not removable.**
+The reaction-projection trim (drop `σu` from the projection for constant σ, article.tex §580, `ProjectResidualWithoutReactionWhenConstantSigma`) is correct and **coefficient-robust at the fixed point** (it removes a quantity annihilated anyway; `src/stabilization/projection.jl:63-76`). Switching to `ProjectFullResidual` at Da=10⁶ **stalls/diverges at every mesh** (→NaN at N=80) and reports the ASGS Stage-I fallback (H¹ bit-identical to ASGS) — because although the *residual* equals the trim's, the *Jacobians differ*: the trim's `−σ·du` term is load-bearing for solver stability. **This is why the paper trims; the trim is not removable.**
 
 > **Methodological caution (recorded deliberately):** a 22-agent code/theory audit's *synthesis* reached the WRONG verdict ("code bug; full-residual recovers; trim is the cause", conf 88) by reading the ASGS-fallback number of an unstable full-OSGS solve as "full-OSGS optimal." Its own component agents disagreed (trim rated 8/100). Caught by two direct probes (annihilation = 3e-16; full-OSGS stall). A confident multi-agent synthesis is not a substitute for a direct numerical probe of the load-bearing assumption.
 
@@ -220,7 +232,7 @@ The reaction-projection trim (drop `σu` from the projection for constant σ, ar
 
 The rate cure — if a term-by-term rate at all h were wanted — is a **split / term-by-term OSGS**: keep the reactive `σu` in the stabilization with ASGS (identity-projection) treatment while convective/pressure terms keep the orthogonal projection, restoring `−‖τ₁^{1/2}σu‖²` at all h. This is a formulation change (new projection policy `ProjectResidualSplitReaction` + matching Jacobian + its own MMS verification + a paper-divergence entry), **not yet attempted** and not required (the rate recovers by N=640). Rejected alternatives: full-residual OSGS (solver-unstable) and constrained-space projection (breaks the O(h^{k+1}) boundary property). OSGS iteration cost was high (30–104 inner steps, the dropped ∂π/∂u linear rate) — now cut by JFNK (§5).
 
-Full investigation synthesis: [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md). Source doc: `solver/osgs-reaction-dominated-rate.md`.
+Full investigation synthesis: [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md). Source dossier (archived): [`archive/osgs-reaction-dominated-rate.md`](archive/osgs-reaction-dominated-rate.md).
 
 ---
 
@@ -255,7 +267,7 @@ The OSGS coupled solve is an inexact Newton on `F(U)=0` with `π(U)=Π(R(U))` re
 
 Deeper history helps more (m=10 beats m=5 both cases); same fixed point (L2u matches to ~6 sig figs). Config (`numerical_method.solver`): `osgs_anderson_enabled` (false), `osgs_anderson_depth` (5), `osgs_anderson_relaxation` (1.0), `osgs_anderson_safety_factor` (10.0, Powell restart), `osgs_anderson_max_outer` (50). **Note:** on the stiff/convective reaction cells (the JFNK Phase-0 baseline), **both** the current path **and** Anderson *fail to converge* — Anderson is infrastructure for the linear-rate bottleneck, not a substitute for JFNK there.
 
-Source docs: `solver/jfnk-phase0-preconditioner-gate.md`, `solver/osgs-anderson-acceleration.md`.
+Source doc: [`solver/jfnk-phase0-preconditioner-gate.md`](solver/jfnk-phase0-preconditioner-gate.md) (the standalone Anderson dossier was merged into this §5, 2026-07-11).
 
 ---
 
@@ -287,20 +299,37 @@ The α=0.1×Re=1e5 "failure" is a **genuine coarse-mesh turning-point fold** —
 
 H¹u ≈ 1.07/1.10 is textbook-optimal O(h) for k=1; L²u ≈ 3.0 super-optimal — **identical to the sister harness's α=0.05 corner** (H¹≈1.0, L²≈3.0), cross-validating the 2-point slope. So the equal-order stabilized method converges optimally at the corner once past the fold; the fold is the paper's intrinsic 1/α₀ degradation pushing the *coarse-mesh nonlinear discrete map* past a turning point, not a loss of FE order. The k=2 corner already has clean roots at N=40 & N=80 (clears the fold ~2× earlier); extending to N=160 to firm its rate is a cheap remaining follow-up.
 
-### §4.3 — mechanism: Newton is exact; TH is convectively unstable at the corner; σ̃_α unconfirmed (2026-07-08)
+### §4.3 — mechanism: Newton is exact; TH is the *worse* method at the corner; σ̃_α unconfirmed
 
-- **Newton is EXACT for the Cocquet formulation — the fold is NOT a linearization bug.** The permanent test `test/extended/cocquet_jacobian_consistency_extended_test.jl` assembles the Exact-Newton Jacobian for **SymmetricGradient + Forchheimer** vs a centered FD of the residual: **‖J−J_fd‖/‖J_fd‖ ≈ 1e-8…1e-11** for k=1 *and* k=2 at corner-like params, and Newton converges **quadratically** (‖R‖: 2.9e-4→1.3e-5→2.7e-8→2.3e-13). This closed a real coverage gap (the velocity-dependent `∂σ/∂u` Exact-Newton tangent for the Cocquet combo was previously unguarded — `picard_jacobian_equivalence` checks only Picard mode, `osgs_frozen_pi_jacobian` uses ConstantSigma). ⇒ the fold is a genuine property of the correctly-linearized nonlinear problem.
-- **The "Taylor–Hood converges everywhere" claim is FALSE at the corner (correction).** TH (Galerkin P2/P1) at α=0.1×Re=1e5 does **not** reach a root: its residual **stalls at O(1)** (‖R‖ = 650→190→50→13→**3.1** at N=10→160, vs ~1e-9 when it works), velocity error **flat at 0.40** (rate 0). TH is *convectively unstable* here (inf-sup for pressure but no SUPG for convection) — **pressure** converges optimally (L²p rate 2.0, via LBB) while **velocity** is garbage. So the real contrast is **VMS folds hard at coarse mesh (NaN) but converges to an accurate root at N≥160, where TH still cannot** (res 3.1, L²u 0.40). **VMS is the *better* method at the corner.** (At Re=1, TH converges cleanly, rate 2.94 — confirming the corner failure is the high-Re convective instability.)
-- **Reaction-out-of-stabilization A/B — INCONCLUSIVE (σ̃_α not confirmed).** Via a temporary gated `STRIP_REACTION_FROM_STAB` diagnostic (since **REVERTED** — not paper-faithful; default-off was byte-identical, Blitz 243/243; the stripped formulation was self-consistent, J-vs-FD ~1e-11, quadratic): removing σ from the stabilization (τ₁, 𝓛U, 𝓛*V, and derivatives) while keeping the coercive Galerkin `(v,σu)` cleared **only 1 of 3** folding meshes (N=40, to an inaccurate root L²u=0.092, ~3× too large); N=20 and N=80 still fail from the exact guess. **Confound:** the strip also enlarges τ₁ (removes σ from its denominator), and σ is genuinely entangled in the stabilization scale (σ̃_α itself contains τ₁) — so it neither confirms nor cleanly refutes σ̃_α. It does show the fold is **not reducible to a single removable term**; reaction-in-stab is at most a partial contributor.
-- **c₁ — not the lever.** At high Re, τ_NS⁻¹ is convection-dominated (`c₂|u|/h ≫ c₁ν/h²`), so raising c₁ barely moves the stabilization. A c₁×4 probe (via `C1_MULT` env hook, default 1.0 byte-identical): α=0.1 folds at all N at paper c₁, and c₁×4 converges only N=10 (L²u≈0.428, large) and still folds at N=20/40 — *not* a convergent sweep; α=0.2 keeps the same pattern but N=40 error is ~5× smaller (0.0736→0.0151). Marginal help, no rescue — UNLIKE 3D-P2, and expected: this is **k=1**, where the viscous 2nd-derivative subscale (the term c₁ fixed for P2 tets, §3) is *identically zero*, so c₁ acts only through τ_NS. (A c₁×64 confirmation was killed under CPU contention.) The mild help is weak evidence of a coercivity/stabilization component (consistent with the σ̃_α Layer-2 hypothesis).
+- **Newton is EXACT for the Cocquet formulation — the fold is NOT a linearization bug.** Exact-Newton J vs centered FD for **SymmetricGradient + Forchheimer**: **‖J−J_fd‖/‖J_fd‖ ≈ 1e-8…1e-11** (k=1 *and* k=2), quadratic ‖R‖ descent (2.9e-4→1.3e-5→2.7e-8→2.3e-13). Now guarded by `test/extended/cocquet_jacobian_consistency_extended_test.jl` (closed a real gap — the velocity-dependent `∂σ/∂u` tangent for this combo was previously unguarded). ⇒ the fold is a genuine property of the correctly-linearized problem.
+- **"Taylor–Hood converges everywhere" is FALSE at the corner.** TH (Galerkin P2/P1) at α=0.1×Re=1e5 does **not** reach a root: ‖R‖ stalls at O(1) (650→190→50→13→**3.1** at N=10→160), velocity error **flat at 0.40** (rate 0) — convectively unstable (LBB pressure but no SUPG), so **pressure** converges (L²p rate 2.0) while **velocity** is garbage. So **VMS is the *better* method at the corner** (accurate root at N≥160 where TH cannot). (At Re=1, TH converges cleanly, rate 2.94.)
+- **The fold is reaction-magnitude driven, not nonlinearity-driven:** a linear-reaction control (`σ_nl=0`, matched `Da_eff`) folds identically ⇒ the Forchheimer `∂σ/∂u` basin-shrink is not the cause.
 
-**Bottom line: the exact fold mechanism is OPEN.** Ruled out: a Jacobian/linearization bug (Newton exact) and c₁. The leading hypothesis is the paper's **`σ̃_α` coercivity weakening** (ASGS estimate, `article.tex` §`sec:StabilityASGS`, `eq:SigmaAlpha`: `σ̃_α = τ_{1,NS}⁻¹σ/(τ_{1,NS}⁻¹+σ/α_K)` collapses as α→0; TH keeps full σ) — paper-grounded and consistent with every observation (reaction-magnitude driven, low-α specific, fold-recedes-with-mesh) but **not confirmed** (the paper deems σ̃_α *benign for the rate* — the "weaker coercivity ⇒ nonlinear-solver fold" link is an unproven extension, and the strip test was τ₁-confounded). A cleaner isolation (strip σ from 𝓛U/𝓛*V only, holding τ₁ physical) is deferred — the practical deliverable (§4.1) does not depend on it. **The fold is reaction-magnitude driven, not nonlinearity-driven:** a linear-reaction control at α=0.1 with matched `Da_eff` (`σ_nl=0`) folds identically ⇒ the `b(α)|u|` Forchheimer `∂σ/∂u` basin-shrink is not the cause. (Layer 1 — high-Re τ₁-saturation, `theory/tau_saturation_note` — is dormant at Re=1e5, a Re≳1e6 effect, so it does not explain this fold.)
-
-### ASGS vs OSGS reaction handling — do not conflate
-
-σ̃_α is the **ASGS** estimate. **OSGS** removes the reaction from the orthogonal projection (for constant σ its orthogonal subscale is exactly zero, `article.tex` ~line 619), which the paper says *"facilitates the convergence of the nonlinear iterations"* — a documented reaction/convergence concern ASGS does not phrase the same way. The trim `ProjectResidualWithoutReactionWhenConstantSigma` is **OSGS-only** (`src/stabilization/projection.jl:76-80`) and fires only for `Constant_Sigma`; under **Forchheimer** (what the sweep uses) the reaction stays in the stabilization for **both** methods — consistent with both folding at low α.
+**The exact fold mechanism is OPEN** — leading hypothesis is the paper's `σ̃_α` reaction-in-stabilization coercivity weakening (ASGS estimate `eq:SigmaAlpha`, collapses as α→0). The ruled-out list (Jacobian bug; c₁-as-lever), the τ₁-confounded `STRIP_REACTION` strip test, and the ASGS-vs-OSGS reaction-handling distinction (the OSGS-only trim `ProjectResidualWithoutReactionWhenConstantSigma`, `src/stabilization/projection.jl:66-80`, fires only for `Constant_Sigma`; under Forchheimer the reaction stays in the stabilization for both methods) are detailed once in [`open-questions.md`](open-questions.md) §1, its canonical home.
 
 Full detail: [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md) (Cocquet synthesis) and [`docs/mms/p2-3d.md`](mms/p2-3d.md) (the c₁ mechanism). The τ-saturation note is `theory/tau_saturation_note/tau_saturation_note.tex`. Source doc: `cocquet/cocquet-form-mms-status.md`.
+
+---
+
+## 7. Resolved code-correctness issues (folded from the retired `known_issues.md`, 2026-07-10)
+
+Tracked as open code bugs, now fixed — kept here so retiring `known_issues.md` loses nothing. **Open**
+code-correctness items now live in [`pending-tasks.md`](pending-tasks.md) (§2 code–theory consistency, §6 input/output).
+
+- **`cfg.phys.f_x`/`cfg.phys.f_y` would throw** — `run_simulation.jl` read `cfg.phys.f_x`, but the field is
+  `physical_properties`. **FIXED 2026-06-04 (P6):** corrected to `cfg.physical_properties.f_x`/`.f_y`; the
+  production path is now exercised by `test/quick/production_schedule_smoke_quick_test.jl`.
+- **`config/base_config.json` was missing the required `eps_val`** — **RESOLVED 2026-07-04.** The field was
+  renamed to **`physical_epsilon`** and `base_config.json` now carries `"physical_epsilon": 0.0`, so
+  `load_frozen_config("config/base_config.json")` (and the `run_simulation` example) loads cleanly.
+  `validate!` asserts `physical_epsilon >= 0` (it may be 0 — it is ε_phys, not the porosity). See
+  [`formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md) §A.4.
+- **Dead helper after the covariance fix** — `_resolve_solution_scale_per_field` + the `x_per_field_raw`
+  buffer were no longer called (the gate uses the frozen initial-residual scale `‖R₀‖` directly).
+  **RESOLVED 2026-06-04 (P5):** both removed.
+- **High-Da OSGS rate "defect"** — **RESOLVED 2026-06-10: pre-asymptotic, recovers to ≥1.0 at N=640** (not an
+  order ceiling). Full account in §4 above; permanent mechanism in
+  [`../theory/osgs_reaction_note/osgs_reaction_note.tex`](../theory/osgs_reaction_note/osgs_reaction_note.tex).
 
 ---
 
@@ -308,4 +337,4 @@ Full detail: [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-s
 
 - **Full evidence dossiers:** [`docs/mms/p2-3d.md`](mms/p2-3d.md), [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md), [`docs/formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md).
 - **Theory (LaTeX):** [`theory/paper/article.tex`](../theory/paper/article.tex) (the authoritative formulation), `theory/osgs_reaction_note/osgs_reaction_note.tex`, `theory/tau_saturation_note/tau_saturation_note.tex`, `theory/osgs_algorithm/osgs_algorithm.tex`.
-- **Living companions:** [`lessons_learned.md`](lessons_learned.md) (regression ledger), [`known_issues.md`](known_issues.md) (open code-correctness items), [`solver/paper-code-divergences.md`](solver/paper-code-divergences.md), [`solver/algorithm-code-mapping.md`](solver/algorithm-code-mapping.md), [`solver/nonlinear-convergence-criterion-prompt.md`](solver/nonlinear-convergence-criterion-prompt.md).
+- **Living companions:** [`pending-tasks.md`](pending-tasks.md) (backlog + open code-correctness items), [`open-questions.md`](open-questions.md) (open questions), [`lessons_learned.md`](lessons_learned.md) (regression ledger), [`theory-code-map.md`](theory-code-map.md) (paper↔code map + divergence ledger + convergence-gate spec).

@@ -1,11 +1,8 @@
 # 2D MMS convergence — settled state, the convergence gate, and the stiff-corner fold
 
-> **Consolidated 2026-07-09** from the former `convergence-status`, `route-b-2d-sweep-status`, `fold-recovery`,
-> and `high-order-convergence-gate-and-jfnk` docs. The 2D manufactured-solution case is **SETTLED and optimal**;
-> this doc keeps only the load-bearing learnings, the gate spec, the fold mechanism + production method, and the
-> reusable diagnostic recipes. Current headline numbers live in [findings.md](../findings.md); per-cell
-> provenance is [convergence-baseline.md](convergence-baseline.md) + the self-describing result `.h5`s. Backlog:
-> [pending-tasks.md](../pending-tasks.md); open calibration question: [open-questions.md](../open-questions.md).
+> The 2D manufactured-solution case is **SETTLED and optimal**; this doc holds the load-bearing learnings, the
+> gate spec, the fold mechanism + production method, and the reusable diagnostic recipes. Headline numbers →
+> [findings.md](../findings.md); per-cell provenance → [convergence-baseline.md](convergence-baseline.md).
 
 ## Status (one line)
 
@@ -17,7 +14,7 @@ curved-interface-on-structured-mesh difficulty, not a regression.)
 ## 1. The convergence gate — how the solver decides "converged"
 
 - **Scale-free / dimensionless.** Converged ⇔ `ε_M = ‖r_M‖/D_M ≤ tol_M` **and** `ε_C = ‖r_C‖/D_C ≤ tol_C`. No
-  a-priori `U/L/P/Re/Da` scales. Spec: [solver/nonlinear-convergence-criterion-prompt.md](../solver/nonlinear-convergence-criterion-prompt.md).
+  a-priori `U/L/P/Re/Da` scales. Spec: [theory-code-map.md](../theory-code-map.md) §3.
 - **Route B (the mass gate).** `ε_C` is the *algebraic* Philosophy-A `‖r_C‖/D_C` (pressure block of the assembled
   residual, symmetric with `ε_M`), **replacing** the old strong-form measure that floored at `O(h^{kv})` and
   forced the loose `eps_tol_mass = 0.8` rubber-stamp. The strong-form measure survives only as the diagnostic
@@ -60,16 +57,15 @@ curved-interface-on-structured-mesh difficulty, not a regression.)
 - **Pre-asymptotic ≠ order reduction.** Layer-dominated error depresses the slope until the layer is resolved,
   then it recovers. The high-Da OSGS H¹ rate climbs `0.57→0.54→0.58→0.73→1.11→1.85` (N=10→640) — recovers to
   ≥1.0 (the "high-Da coercivity gap" is pre-asymptotic; gap closes like `Da_h ∝ 1/N²`). Mechanism:
-  [solver/osgs-reaction-dominated-rate.md](../solver/osgs-reaction-dominated-rate.md).
+  [findings.md](../findings.md) §4 (full dossier archived under `archive/`).
 - **Aubin–Nitsche L² extra order** (`O(h^{k+1})`) needs elliptic-duality regularity — holds with Dirichlet BCs
   (the manufactured case), **fails with Neumann** (the Cocquet benchmark's traction-free outlet).
 - **k2 P2 memory guardrails on 32 GB.** P2 N=320 LU is multi-GB — use **≤2 concurrent shards** (4+ → OOM); kill
   orphaned processes before launch; **suspect an execution/OOM failure before a numerical one** (a killed shard
   masquerades as a numerical defect).
-- **Gridap-vs-Kratos magnitude offset (OPEN).** Gridap FME is 3–12× larger (norm-dependent); *rates agree*
-  (optimal / super-optimal), so the discretization is valid — but the absolute calibration is an unresolved
-  code-vs-code question (candidates: `U_c/P_c` normalization, porosity-field definition, MMS amplitude; A/B via
-  `stabilization.element_size`). See [open-questions.md](../open-questions.md).
+- **Gridap-vs-Kratos magnitude offset (OPEN).** Gridap FME is 3–12× larger (norm-dependent) but *rates agree*, so
+  the discretization is valid; the absolute calibration is an open code-vs-code question — canonical in
+  [open-questions.md](../open-questions.md) §2.
 - **Diagnostic recipe — is it the gate, the solver, or the inner tolerance?** (reusable, incl. for 3D): (1)
   per-segment rate old-vs-new; (2) re-run the degraded cell with the *old* solver on new code; (3) tighten the
   inner tol → no change ⇒ not the inner solve; (4) tighten the *outer gate* → recovery ⇒ the gate is the cause;
@@ -77,8 +73,7 @@ curved-interface-on-structured-mesh difficulty, not a regression.)
 
 ## JFNK / Anderson (OSGS iteration cost)
 
-Both landed and verified — they cut OSGS iteration count **without changing the root**. Canonical:
-[solver/jfnk-phase0-preconditioner-gate.md](../solver/jfnk-phase0-preconditioner-gate.md) (`osgs_jfnk_enabled`)
-and [solver/osgs-anderson-acceleration.md](../solver/osgs-anderson-acceleration.md) (`osgs_anderson_enabled`).
-JFNK: ~16–100× fewer Newton steps; the frozen-π Jacobian is an effective GMRES preconditioner (1–21 Krylov
-iters); ~5% benign fallback on outer-Newton safeguards. Numbers in [findings.md](../findings.md).
+Both landed and verified — they cut OSGS iteration count **without changing the root** (`osgs_jfnk_enabled`,
+`osgs_anderson_enabled`; JFNK ~16–100× fewer Newton steps, ~5% benign safeguard fallback). Canonical:
+[findings.md](../findings.md) §5 and
+[solver/jfnk-phase0-preconditioner-gate.md](../solver/jfnk-phase0-preconditioner-gate.md).

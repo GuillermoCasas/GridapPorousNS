@@ -42,7 +42,7 @@ If a mathematical choice is not self-evident in the paper, it must be documented
 - **Fallout**: What breaks if changed, and how to verify it via MMS.
 
 ### 3. Explicit Divergence Logging
-Force immediate logging of paper-vs-code mismatches in `references/paper-code-divergences.md`. For any divergence (e.g., ad-hoc scalar floors, adjoint simplifications, modified integration by parts on boundary facets), document:
+Force immediate logging of paper-vs-code mismatches in the divergence ledger `docs/theory-code-map.md` (§2). For any divergence (e.g., ad-hoc scalar floors, adjoint simplifications, modified integration by parts on boundary facets), document:
 - The exact paper theory vs. the concrete code implementation.
 - The classification (`[experimental]`, `[implementation simplification]`, `[suspected bug]`, etc.).
 - The numerical or mathematical consequence (e.g., "Loss of exact symmetry limits convergence to $O(h^k)$ instead of $O(h^{k+1})$").

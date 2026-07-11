@@ -109,11 +109,11 @@ or Julia/LLVM restrictions MUST be recorded here.
 
 ### 2.1 Sub-grid mass-balancing approximation — `[paper-faithful]`
 
-**Location**: `src/formulations/continuous_problem.jl` — `convective_adjoint`.
+**Location**: `src/formulations/continuous_problem.jl` — `strong_adjoint_momentum`.
 
 **Apparent divergence**: The strict integration-by-parts of the subgrid convective velocities forces the
 exact test-side adjoint mapping to include the scalar compressibility term
-`(1/α)∇·(α u) v`. In the code, `convective_adjoint` omits this term explicitly.
+`(1/α)∇·(α u) v`. In the code, `strong_adjoint_momentum` omits this term explicitly.
 
 **Alignment**: Not a divergence. [`article.tex` line 800](../theory/paper/article.tex#L800) explicitly
 justifies removing the `(1/α)∇·(α a) v_h` term across the whole theory:
@@ -164,9 +164,9 @@ post-`fa8aaec` baseline.
 
 ### 2.3 Adjoint streamline mapping positivity — `[paper-faithful]` `[known-fragility]`
 
-**Location**: `src/formulations/continuous_problem.jl` — `convective_adjoint`.
+**Location**: `src/formulations/continuous_problem.jl` — `strong_adjoint_momentum`.
 
-**Apparent divergence**: Naively one expects `L*_conv = −α a·∇v`; the code evaluates `convective_adjoint`
+**Apparent divergence**: Naively one expects `L*_conv = −α a·∇v`; the code evaluates `strong_adjoint_momentum`
 with a **positive** sign (`+α a·∇v`). Reversing it triggers catastrophic divergence at high Reynolds
 (the "Anti-SUPG" failure).
 
@@ -231,11 +231,10 @@ first and then fail the anchor test rather than file a regression.
 
 > **Related (not a ledger entry): the `4k⁴` = `c₁` constant for 3D structured tets.** The 3D-P2 MMS
 > investigation **RESOLVED (2026-07-06)** that `4k⁴` is *under-margined* (not wrong) for high-`C_inv`
-> structured Kuhn tets — the viscous 2nd-derivative subscale is anti-coercive by construction, and
-> `c₁ = 4k⁴` has ~zero coercivity margin there (`C_inv²` Kuhn 214 vs quad 60). The remedy is an
-> element-aware `c₁` per [`article.tex` line 910](../theory/paper/article.tex#L910), **not** a code
-> change; paper `c₁` is correct. Full detail in
-> [`docs/mms/p2-3d.md`](mms/p2-3d.md).
+> structured tets — the remedy is an element-aware `c₁` per
+> [`article.tex` line 910](../theory/paper/article.tex#L910), **not** a code change (paper `c₁` is correct).
+> Full detail — the anti-coercive viscous subscale, the `C_inv²` table, the proofs — in
+> [`docs/mms/p2-3d.md`](mms/p2-3d.md) §A.
 
 ### 2.6 OSGS preconditioning & linearization architecture — `[code-divergent-superior]`
 
@@ -509,284 +508,56 @@ is not robustly bounded.
 
 ---
 
-## 3. Scale-free nonlinear convergence criterion (spec)
+## 3. Scale-free nonlinear convergence criterion (summary + pointer)
 
-The stopping criterion for the outer nonlinear (Picard / Newton) iteration of `alg:StationarySystem`.
-Implemented in [`src/solvers/convergence_criterion.jl`](../src/solvers/convergence_criterion.jl).
+The **permanent derivation** of the scale-free stopping criterion for the outer nonlinear (Picard/Newton)
+iteration now lives in LaTeX at
+[`theory/scale_free_gate_note/scale_free_gate_note.tex`](../theory/scale_free_gate_note/scale_free_gate_note.tex)
+(moved out of `docs/` 2026-07-11 — permanent theory belongs in `theory/`). Implemented in
+[`src/solvers/convergence_criterion.jl`](../src/solvers/convergence_criterion.jl); the operational spec and the
+Route-B status live in [`docs/mms/convergence-2d.md`](mms/convergence-2d.md) §1.
 
-> **STATUS (evolved from the original spec) — the MASS measure has changed.** Production now uses the
-> **Route-B "Philosophy-A" algebraic** mass gate `ε_C = ‖r_C‖ / D_C` — the norm of the assembled
-> stabilized mass residual over a term-magnitude envelope, **symmetric with `ε_M`** and gated at the same
-> `~1e-9` level. The strong-form / flux-gradient measure specified in §3.4 below
-> (`ε_C = ‖∇·(α u)‖ / ‖∇(α u)‖`, and the `−g`-subtracted variant) is now the **diagnostic
-> `eps_C_strong`**, no longer the gate. A **`residual_floor_reached` scale-free accept** was also added:
-> it accepts machine-floor-converged cells whose `ε_C` cannot reach `tol` because `D_C` collapses for
-> near-divergence-free flow (the mass envelope → 0 when the flow is essentially incompressible). The
-> **momentum (Philosophy A) spec below is still current and unchanged.** See
-> [`docs/mms/convergence-2d.md`](mms/convergence-2d.md).
+**In one line.** Stop when `max(ε_M, ε_C) ≤ tol`, both dimensionless and computable from the current iterate +
+material/mesh data alone (**no a-priori `U`/`L`/`P`/`Re`/`Da`** — those are bespoke to a manufactured-solution
+test; a production criterion measures the needed scale from the iterate instead):
 
-### 3.0 Summary
+- **Momentum** `ε_M = ‖r_M‖ / D_M`, `D_M = ‖α u·∇u‖ + ‖2∇·(ανΠ∇u)‖ + ‖α∇p‖ + ‖σ(u)u‖ + ‖f‖` — the assembled
+  stabilized residual over a *dynamic term-magnitude envelope* (Philosophy A: measure what the solver actually
+  drives to zero). Regime-robust because the momentum terms *balance* at the solution, so whichever mechanism
+  dominates (viscous as `Re,Da→0`, convection as `Re→∞`, resistance as `Da→∞`) sets the scale automatically.
+- **Mass (production, Route-B "Philosophy A"):** the algebraic `ε_C = ‖r_C‖ / D_C` — the assembled mass residual
+  over its own term envelope, symmetric with `ε_M`, gated at the same `~1e-9`; plus a `residual_floor_reached`
+  accept for near-divergence-free flow where `D_C → 0` (the mass envelope collapses for essentially
+  incompressible flow, flooring `ε_C` a decade above `tol` even when converged).
+- **Mass (diagnostic `eps_C_strong`):** the flux-gradient ratio `ε_C = ‖∇·(α u)‖ / ‖∇(α u)‖ ≤ √d`. The `√d`
+  bound (`∇·q = tr(∇q)`, `(tr A)² ≤ d(A:A)` ⇒ `‖∇·q‖² ≤ d‖∇q‖_F²`) is a cheap correctness self-check — a value
+  above `√d` signals a quadrature/projection/assembly bug. This flux-gradient measure is the derivation's
+  scale-free mass gate; it was **demoted from the gate to a diagnostic when Route-B landed**.
 
-Stop the outer loop when
-
-```
-converged  ⇔  max(ε_M, ε_C) ≤ tol            (or separate tol_M, tol_C)
-```
-
-with
-
-- **Momentum** `ε_M = ‖r_M^k‖ / D_M^k`, `D_M^k = ‖α u·∇u‖ + ‖2 ∇·(α ν Π u)‖ + ‖α ∇p‖ + ‖σ(u) u‖ + ‖f‖`
-- **Mass** `ε_C = ‖∇·(α u^k)‖ / ‖∇(α u^k)‖` with the guaranteed bound `ε_C ≤ √d` *(now the diagnostic
-  `eps_C_strong`; the gate uses the algebraic mass residual — see the status banner)*
-
-All norms are global `L²(Ω)` (`‖w‖ = sqrt(∫_Ω |w|² dΩ)`), accumulated by quadrature in a single assembly
-pass. `Π` is the deviatoric∘symmetric projector `Π^DS` used in the viscous term; `d ∈ {2,3}`. Report `ε_M`
-and `ε_C` separately every iteration.
-
-### 3.1 Hard constraint (do not violate)
-
-The criterion **must be computable from the current iterate `U^k = (u^k, p^k)` and known material/mesh
-data alone** (`α(x)`, `ν`, `σ = a(α) + b(α)|u|`, `f`, element size `h_K`).
-
-**Do NOT introduce, request, or hard-code any a-priori characteristic scale** — no characteristic velocity
-`U`, length `L`, pressure scale `P`, nor any global Reynolds `Re` or Damköhler `Da`. Those are bespoke to a
-manufactured-solution test where they happen to be known; a production criterion cannot assume them. If you
-find yourself needing such a scale, you have taken a wrong turn — the needed scale is *measured from the
-iterate* instead of supplied. (Element-level `Re_h`, `Da_h` built from `h_K` and the iterate are allowed —
-not a-priori scales; they appear only in the optional fallback, §3.6.)
-
-### 3.2 Governing equations and residuals
-
-Strong form (kinematic; density absorbed into `ν`, `p`, `σ`):
-
-```
-momentum:   α u·∇u − 2∇·(α ν Π∇u) + α ∇p + σ(α,u) u = f
-mass:       ε p + ∇·(α u) = 0
-```
-
-with `σ(α,u) = a(α) + b(α)|u|` (Darcy + Forchheimer), `ε ≥ 0` a small compressibility (iterative penalty),
-equal-order `P_k/P_k` velocity–pressure, ASGS or OSGS VMS stabilization.
-
-- **Momentum residual** `r_M^k` = momentum residual evaluated at `U^k`.
-- **Mass residual** `r_C^k = ∇·(α u^k)` (`+ ε p^k` if `ε > 0`; negligible — see §3.5 edge case 7).
-
-### 3.3 Momentum normalization
-
-**Numerator `‖r_M^k‖` — Philosophy A (algebraic, recommended, current).** Measure what the solver actually
-drives to zero: the norm of the assembled **stabilized** nonlinear residual *vector* (ASGS/OSGS, subscales
-included), velocity block. Use a fixed vector norm (Euclidean or mass-matrix-weighted) — same norm for every
-term in `D_M`. Build the denominator terms by assembling each physical term's velocity-block contribution
-**through the same weak form**: the viscous term is then the integrated-by-parts `⟨∇^S v, 2 α ν Π∇u^k⟩`, a
-first-derivative quantity — **no second derivatives, no special-casing by polynomial order**.
-
-**Philosophy B — pointwise force density (only if you want a force-balance picture).** Use `L²(Ω)` norms of
-the strong-form force-density fields directly; `r_M^k` is the strong residual field. Caveat: the strong
-residual of an FE solution does **not** vanish at the discrete solution — it floors at the truncation level
-`O(h^k)` in a negative norm — so set `tol` above that floor. The viscous term needs a second derivative.
-Prefer A.
-
-**Denominator `D_M^k` — dynamic term-magnitude envelope:**
-
-```
-D_M^k = ‖α u^k·∇u^k‖      (convection)
-      + ‖2 ∇·(α ν Π∇u^k)‖ (viscous)
-      + ‖α ∇p^k‖          (pressure gradient)
-      + ‖σ(u^k) u^k‖       (resistance: Darcy + Forchheimer)
-      + ‖f‖                (body force)
-```
-
-**Rationale.**
-
-- *Why a sum of term magnitudes is regime-robust.* At the solution the momentum terms do not vanish — they
-  *balance*. Whichever mechanism dominates (viscous as `Re,Da→0`, convection as `Re→∞`, resistance as
-  `Da→∞`) automatically enters the sum and sets the scale, no regime parameter to choose. (Offline check:
-  non-dimensionalizing sends the four operator terms to coefficients `Re, 1, (1+Re+Da), Da`, so `D_M ~
-  (1+Re+Da)·α∞νU/L²`. The pressure-gradient term alone has coefficient `1+Re+Da` and is leading-order in
-  *every* regime — so `‖α∇p^k‖` by itself is already a valid scale once `p^k` has developed.)
-- *Why dynamic (recomputed each iteration).* `σ` depends on `|u^k|` through Forchheimer and `α` varies in
-  space, so the true local resistance is *not* the nominal global `Da`. The dynamic sum reads the actual
-  local magnitudes; a frozen analytic prefactor cannot.
-- *Why include `‖f‖`.* In forced/manufactured problems `f` is one of the balanced forces and can dominate;
-  it prevents the scale collapsing if the operator terms cancel. When `f = 0` it contributes nothing.
-- *Why the viscous term is unproblematic under Philosophy A.* The weak form already integrated it by parts,
-  so it is first-order. Under Philosophy B with `P_1`, `∇·(ανΠ∇u_h) ≈ 0` element-wise; accept the ~0
-  contribution — the co-dominant pressure-gradient term supplies the viscous scale. Do **not** patch with
-  an inverse-estimate factor `C_inv/h`: it overestimates the viscous force on fine meshes and makes `ε_M`
-  over-optimistic.
-
-### 3.4 Mass normalization *(now the diagnostic `eps_C_strong` — see the status banner)*
-
-**Numerator `‖∇·(α u^k)‖`.** Use the divergence of the porous flux `q^k = α u^k` — the quantity that → 0
-at the fixed point (with the iterative penalty, the `ε p^{n−1}` term cancels at convergence, leaving the
-incompressibility residual). If `ε > 0`, the consistent numerator is `‖ε p^k + ∇·(α u^k)‖`, but `ε* ~ 1e−4`
-so `‖∇·(α u^k)‖` alone is equivalent and clearer.
-
-**Denominator `‖∇(α u^k)‖` — the flux-gradient (Frobenius) norm:**
-
-```
-∇(α u^k) = α ∇u^k + u^k ⊗ ∇α        (full second-order tensor; Frobenius norm)
-ε_C = ‖∇·(α u^k)‖ / ‖∇(α u^k)‖ ≤ √d
-```
-
-**Rationale.**
-
-- *Why it is the right scale-free measure.* It is the pressure-normalized "relative pressure error from
-  mass imbalance" with the divergence→pressure conversion factor *measured from the iterate instead of
-  supplied*. The conversion factor `Φ/α∞ = ‖p^k‖ / ‖∇(α u^k)‖` reproduces the full viscous+inertial+Darcy
-  envelope in every regime; substituting it into `ε_C = (Φ/α∞)·‖∇·(α u^k)‖/‖p^k‖` cancels `‖p^k‖`
-  identically, leaving the flux-gradient ratio. So the gradient ratio *is* the pressure idea with the
-  a-priori factor removed; it never requires `p`.
-- *Why genuinely scale-free.* Both norms built from `u^k` and the known field `α`. Dimensionless by
-  construction.
-- *Why the `√d` bound (a self-check).* `∇·q = tr(∇q)` and `(tr A)² ≤ d(A:A)` pointwise, so `‖∇·q‖² ≤ d
-  ‖∇q‖_F²`. Thus `ε_C ≤ √d` always; a computed value above `√d` signals a quadrature/projection/assembly
-  bug — assert or log.
-- *Why keep the `u ⊗ ∇α` term.* Real flux structure forced by the porosity gradient; the ratio then
-  measures dilatation against the *total* flux variation. When `α` is constant (incl. `α ≡ 1`, classical
-  Navier–Stokes) it vanishes and `ε_C → ‖∇·u‖/‖∇u‖` — graceful, no special-casing.
-- *Why global, not pointwise.* A pointwise ratio blows up wherever `∇(α u) → 0`. Use domain-integrated
-  `L²` norms. With no-slip walls + parabolic inlet there is always boundary-layer shear, so `‖∇(α u^k)‖` is
-  robustly bounded away from zero in practice.
-
-### 3.5 Edge cases (apply all)
-
-1. **Trivial initial guess `u^0 = 0`.** `D_M^0` and `‖∇(α u^0)‖` may be 0 → `0/0`. Guard every denominator
-   with a *pure underflow floor* `den = max(den, eps(eltype))` (machine epsilon, **not** a problem scale),
-   and do not declare convergence at `k = 0` — require at least one completed iteration. If `u ≡ 0`
-   genuinely solves it (zero BCs, `f = 0`), the numerators are also ~0 and the floor yields convergence
-   without inventing a scale.
-2. **BC-driven flow, `f = 0`.** The denominator must not rely on `f`; once nonzero the internal terms carry
-   `D_M`. `‖f‖ = 0` contributing nothing is correct.
-3. **Uniform porosity `α ≡ const` (incl. `α ≡ 1`).** `∇α = 0` ⇒ `‖∇(α u)‖ = α‖∇u‖`, `ε_C → ‖∇·u‖/‖∇u‖`.
-   Expected; do not special-case.
-4. **Locally near-uniform flux.** Never a pointwise ratio — always global `L²`.
-5. **`ε_C > √d`.** Analytically impossible ⇒ bug indicator (assert/log).
-6. **All-Dirichlet / pressure indeterminacy (`Γ_N = ∅`, `ε = 0`).** Pressure defined up to a constant
-   (fixed by the zero-mean condition). The flux-gradient ratio is immune — uses no `‖p‖`. Do **not** build
-   a pressure-normalized mass measure here.
-7. **Compressibility `ε > 0` (iterative penalty).** Strict numerator `‖ε p^k + ∇·(α u^k)‖`, but
-   `ε* ~ 1e−4`, so `‖∇·(α u^k)‖` is equivalent and preferred. The penalty's RHS term cancels at the fixed
-   point.
-8. **Newton vs Picard.** Always measure the **genuine nonlinear residual** evaluated at `U^k` (re-assemble
-   the operator), never the linearized / inner linear-solve residual — the latter → 0 *inside* each step
-   and does not reflect outer convergence. (Gating on the inner residual makes the outer loop stop too
-   early or behave erratically.)
-9. **Tolerance vs floor.** `ε_M` and `ε_C` cannot fall below the level set by the discretization (the
-   stabilized scheme permits a small nonzero `∇·(α u_h)`, `O(h^k)`) and by `ε`. Set `tol` **above** this
-   floor. Diagnostic: a fixed outer-iteration count independent of `tol` signals either `tol` below the
-   floor, or measuring a quantity that does not decrease (edge case 8) — check both.
-10. **Stabilization terms.** Numerator = the method's full residual (ASGS/OSGS, subscales included).
-    Denominator = the Galerkin physical force terms in §3.3; adding the stabilization terms to `D_M` is
-    optional and harmless (bounded by the Galerkin terms by design).
-11. **Element-wise vs global accumulation.** Accumulate `‖·‖²` per element, then sum and take the square
-    root (one assembly pass). The global ratio is the default. If a regime varies *strongly* across the
-    mesh, an element-wise envelope (ratio per element, reduce by `max` or `ℓ²`-over-elements) is the most
-    faithful variant; offer only if needed.
-
-### 3.6 Optional fallback (documented, NOT the default): pressure-normalized mass measure, still scale-free
-
-If a pressure-referenced mass measure is explicitly wanted (to read the criterion directly as a relative
-pressure error), replace global `Re, Da` by **element-level** `Re_h = |u^k|_K h_K / ν` and
-`Da_h = σ_K h_K² / (α_K ν)` — the same quantities already inside `τ_1`. Then
-
-```
-ε_C^alt = ‖ (h²/(α_K τ_{1,K})) · ∇·(α u^k) ‖ / ‖p^k‖
-        ~ ‖ (ν (1 + Re_h + Da_h)/α_K) · ∇·(α u^k) ‖ / ‖p^k‖
-```
-
-i.e. the divergence→pressure conversion factor expressed through your own stabilization parameter `τ_1`
-(so still no bespoke scales — only `h_K`, the iterate, and material data). It is mesh-coupled and fussier
-than the flux-gradient ratio and reduces to it in spirit. Use only if the explicit pressure reading is
-required; otherwise prefer §3.4. **This §6 fallback is intentionally NOT implemented in the code.**
-
-### 3.7 Implementation notes (Julia / Gridap)
-
-- Reuse the existing residual weak form for `r_M^k` (Philosophy A) so the stabilized residual and the
-  convergence measure stay consistent by construction.
-- `L²(Ω)` norm of a field `w`: `sqrt(sum(∫(w⋅w)dΩ))` (use `⊙`/`inner` and Frobenius for tensors).
-- `∇·(α u)` and `∇(α u)` via Gridap differential operators on the `α`-field interpolated in the same FE
-  space as the solution (consistent with the paper's nodal interpolation of `α`).
-- Guard denominators: `den = max(den, eps(Float64))`.
-- Log `ε_M`, `ε_C`, and each `D_M` term per iteration; the per-term breakdown tells you which balance is
-  limiting convergence when the loop stalls.
-- Assert `ε_C ≤ sqrt(d) * (1 + tol)` as a cheap correctness check.
-
+**Hard constraint (do not violate):** the criterion must never introduce, request, or hard-code a characteristic
+scale. Element-level `Re_h`, `Da_h` built from `h_K` and the iterate are allowed (they are measured, not a-priori)
+and appear only in the documented — but **not implemented** — pressure-normalized fallback. Full rationale, the
+edge cases (trivial guess; uniform porosity → classical NS; all-Dirichlet pressure indeterminacy; the ε>0
+iterative penalty; Newton-vs-Picard must use the genuine nonlinear residual; tolerance-above-floor), and that
+fallback: the `theory/` note above.
 ---
 
-## 4. Normalization / encoding-invariance audit
+## 4. Normalization / encoding-invariance audit (historical — one durable invariant)
 
-*(P5, 2026-06-04.)* Classifies every convergence / drift / divergence / plateau gate in the nonlinear
-solver by whether **both sides of its inequality carry the same units** (dimensionless ratio =
-encoding-invariant) or one side is an **absolute** number compared to a scale-dependent quantity (the bug
-class fixed for the inner gate on 2026-06-02). Verdict legend: **OK** = dimensionally sound; **SUSPECT** =
-absolute-vs-scaled, but see notes; **BUG** = an unambiguous dimensional error.
+*(P5, 2026-06-04.)* This audit classified every nonlinear-solver gate by whether both sides of its inequality
+carry the same units. It is now **historical**: the inner per-field ftol / noise-floor / honest-exit gates
+(#1–#3) were **superseded** by the scale-free `ε_M`/`ε_C` criterion (§3, §2.11) and survive only on the
+`conv_probe === nothing` fallback (Cocquet unstabilized-Galerkin + kernel tests); the two OSGS outer drift
+gates (#5/#6) were **removed** with the staggered loop in the 2026-06-07 coupled-only leaning. All surviving
+gates were dimensionally sound; the only P5 code change was removing the dead `_resolve_solution_scale_per_field`
+helper.
 
-Convention (MMS encoding sweep, `run_test.jl`): velocity residual/iterate `∝ U`, pressure `∝ P_c ∝ U²`, so
-a gate comparing a residual or drift to an **absolute** constant is encoding-dependent.
-
-> **STATUS — SUPERSEDED for production (gates #1–#3).** The inner per-field ftol (#1), noise floor (#2),
-> and honest-exit (#3) gates below are NO LONGER the authoritative inner convergence gate. Production stops
-> on the **scale-free `ε_M`/`ε_C` criterion** (§3 above, §2.11).
-> **Post-`d1fac8e`:** the per-field RELATIVE re-anchoring (gate #1's `rel_k·‖R₀_k‖`) was removed; the
-> fallback gate #1 is now the uniform scalar `ftol` (the relative formulas below are historical). Gates
-> #1–#3 survive ONLY as the `conv_probe === nothing` fallback (Cocquet unstabilized-Galerkin + kernel unit
-> tests) and to feed the `f_norm` trace diagnostic.
-
-| # | Gate | Code | Inequality | LHS / RHS units | Verdict |
-|---|------|------|-----------|-----------------|---------|
-| 1 | Inner per-field ftol *(fallback-only; superseded by ε_M/ε_C)* | `_residual_meets_per_field_ftol` + `effective_ftol_per_field` (`nonlinear.jl`) | `‖R_k‖∞ ≤ max(ftol, rel_k·‖R₀_k‖∞)` | both ∝ residual (per field) | **OK** |
-| 2 | Inner per-field noise floor *(fallback-only; superseded)* | `effective_noise_floor_per_field` + `_residual_meets_per_field_noise_floor` | `‖R_k‖∞ ≤ max(nf, rel_nf_k·‖R₀_k‖∞)` | both ∝ residual | **OK** |
-| 3 | Honest-exit gate *(fallback-only; superseded)* | `noise_floor_success_max_ftol_multiple` + `_residual_meets_per_field_honest_exit_gate` | `‖R_k‖∞ ≤ k_nf·effective_ftol_k` | both ∝ residual (k_nf dimensionless) | **OK** |
-| 4 | Divergence safeguard | `eval_safeguard_termination_bounds!` | Newton: `Φ_new > Φ_old·f`; Picard: `‖b‖∞,new > ‖b‖∞,old·f` | ratio → dimensionless | **OK** |
-| 5 | ~~OSGS outer state-drift~~ | ~~`_compute_state_drift` + `_decide_osgs_convergence`~~ | — | — | **REMOVED** (deleted with the staggered loop, 2026-06-07 leaning) |
-| 6 | ~~OSGS projection-drift~~ | ~~`pi_u_drift`/`pi_p_drift` in `_update_and_project!`~~ | — | — | **REMOVED** (deleted with the staggered loop, 2026-06-07 leaning) |
-| 7 | MMS plateau ratios | `_run_*_mms_extension!` / `_run_osgs_relaxation!` *(dead symbol — now `solve_osgs_stage!`)* | `\|E_k−E_{k-1}\| / max(E_k,E_{k-1},ε·h^p) < τ_err` | ratio → dimensionless | **OK** |
-
-### Gate-by-gate notes
-
-**#1 Inner per-field ftol — OK (the 2026-06-02 fix).** `effective_ftol_per_field[k] = max(ftol,
-relative_ftol_per_field[k]·solution_scale_per_field[k])` with `solution_scale_per_field =
-copy(norm_b_per_field)` = the **frozen initial residual** `‖R₀_k‖∞`. So the working target is the
-dimensionless relative reduction `‖R_k‖∞ ≤ rel_k·‖R₀_k‖∞` — both sides per-field residual,
-encoding-invariant. Confirmed still `‖R₀‖`-based (not `‖x‖`). **The old `‖x‖`-fallback helper
-`_resolve_solution_scale_per_field` (Bernoulli/total-head zero proxy) was DEAD and was removed in P5** — it
-only made sense for a solution-magnitude-scaled gate that no longer exists. Guarded by
-`test/quick/encoding_invariance_quick_test.jl`.
-
-**#2 Noise-floor gate — OK.** Same `_initialize_effective_thresholds` family as #1, scaled by `‖R₀_k‖`.
-
-**#3 Honest-exit gate — OK.** `‖R_k‖∞ ≤ k_nf·effective_ftol_k`; both sides residual-scaled, `k_nf`
-(`noise_floor_success_max_ftol_multiple`) dimensionless.
-
-**#4 Divergence safeguard — OK; do not regress the Picard branch.** In `:newton` mode the test is a merit
-*ratio* `Φ_new/Φ_old > divergence_merit_factor`; in `:picard` mode a residual-inf-norm *ratio*. Both
-dimensionless. The mode split is load-bearing: a Φ-based test in Picard mode caused spurious
-`merit_divergence_escaped` exits (see
-`test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md`). Confirmed the `:picard` branch
-is taken in `:picard` mode.
-
-**#5 / #6 OSGS outer state-drift & projection-drift — REMOVED with the staggered loop (2026-06-07
-leaning).** Both gates, and their helpers (`_compute_state_drift`, `_update_and_project!`,
-`_decide_osgs_convergence`), were **deleted** when OSGS was leaned to a single "coupled" mode (one Newton
-solve that re-projects `π = Π(R(u))` at every residual evaluation). There is no longer an outer relaxation
-loop, so neither early-exit gate exists. The earlier dimensional analysis (absolute tolerance vs
-scale-dependent drift, and the recommended relative-form rewrite) is **moot** and was removed with the
-gates.
-
-**#7 MMS plateau ratios — OK.** `r = |E_k − E_{k-1}| / max(E_k, E_{k-1}, ε·h^p)` is a dimensionless relative
-change; the `h`-scaled `ε` only sets the denominator's noise floor (the §5.1 fix). Compared to the
-dimensionless `tau_err`.
-
-### Summary
-
-All five surviving gates (1–4, 7) are dimensionally sound. **Production gate note:** gates #1–#3 are no
-longer the authoritative inner stopping criterion — production uses the scale-free `ε_M`/`ε_C` gate
-(`convergence_criterion.jl`; spec §3 above), and #1–#3 now run only on the `conv_probe === nothing` fallback
-(Cocquet unstabilized-Galerkin + kernel tests). The two OSGS outer drift gates (5, 6) — dimensionally
-suspect (absolute tolerance vs scale-dependent drift) but empirically inert — no longer exist: deleted with
-the entire staggered outer loop in the 2026-06-07 leaning to the single coupled OSGS mode. The only P5 code
-change was the removal of the dead `_resolve_solution_scale_per_field` helper and its unused buffer.
-
+**The one durable invariant — divergence safeguard, do not regress the Picard branch.**
+`eval_safeguard_termination_bounds!` uses a merit *ratio* in `:newton` mode (`Φ_new/Φ_old > divergence_merit_factor`)
+but a residual-inf-norm *ratio* in `:picard` mode — both dimensionless. The mode split is load-bearing: a Φ-based
+test in Picard mode caused spurious `merit_divergence_escaped` exits
+(`test/extended/ManufacturedSolutions/diagnostics/probe_stiff_findings.md`). Keep the `:picard` branch
+residual-based.
 ---
 
 ## See also

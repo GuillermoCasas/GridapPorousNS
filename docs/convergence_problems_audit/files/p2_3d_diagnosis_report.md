@@ -1,19 +1,18 @@
 # 3D P2 MMS "converged-but-wrong": root cause isolated
 
-> **Status — external clean-room diagnosis (2026-07-02); its central VERDICT is REFUTED (2026-07-05).**
-> This is a standalone NumPy/SciPy reimplementation, committed as an evidentiary bundle (report + reproducer
+> **Status — external clean-room diagnosis (2026-07-02), kept verbatim for provenance. Its verdict was
+> reframed twice and is now SUPERSEDED by the canonical RESOLUTION — read against it.** This is a standalone
+> NumPy/SciPy reimplementation committed as an evidentiary bundle (report + reproducer
 > `files/{pns3d,assemble,verify,ckpt_run}.py`, see §8). Its central claim below — the failure is an
-> **element-family c₁ coercivity deficit** (paper `4k⁴` sub-critical on Kuhn tets; raise c₁) — is
-> **REFUTED by the paper's first author**: Kratos assembles the **full subscale** (no terms removed) and
-> solves this exact 3D-P2 case **optimally at paper c₁ = 4k⁴ on tetrahedra**. So paper c₁ is correct and
-> `C_inv`-exceeds-`4k⁴` is not the mechanism. **This report's own reasoning is circular**: its weak form was
-> transcribed *term-by-term from the Gridap code* (`continuous_problem.jl`, per §1), so it **inherited** the
-> Gridap↔paper implementation discrepancy that actually causes the failure, then attributed the resulting
-> c₁-sensitivity to element-family coercivity. The real root cause is a **code↔paper discrepancy** (that c₁
-> masks), still **OPEN** — see the canonical
-> [../../mms/p2-3d.md](../../mms/p2-3d.md). Kept
-> verbatim for provenance and because its careful term-by-term transcription is a useful map of what the
-> Gridap assembly computes (i.e. where to hunt the discrepancy). Read the verdict below as REFUTED.
+> **element-family c₁ coercivity deficit** (paper `4k⁴` sub-critical on Kuhn tets) — is now **RESOLVED
+> (2026-07-06)**: `4k⁴` is **under-margined, not wrong**, for high-`C_inv` structured tets (the viscous
+> 2nd-derivative subscale is anti-coercive by construction; `C_inv²` Kuhn 214 ≫ quad 60), so paper c₁ is
+> **correct** and the remedy is an **element-aware c₁** ([`article.tex` line 910](../../../theory/paper/article.tex#L910)),
+> **not** a code change. The report's c₁-sensitivity *data* is essentially the coercivity-margin experiment
+> (vindicated); its own "sub-critical bug" framing and the intermediate 2026-07-05 "code↔paper discrepancy"
+> reading are **both withdrawn**. Canonical: [`../../mms/p2-3d.md`](../../mms/p2-3d.md) §A and
+> [`../../findings.md`](../../findings.md) §3. Kept for provenance and because its careful term-by-term
+> transcription is a useful map of what the Gridap assembly computes.
 
 **Verdict.** The failure is *formulation-level, not a Gridap or code defect*: at the paper's
 c₁ = 4k⁴ = 64, the ASGS coupling between the **viscous second-derivative terms in the subscale
@@ -183,7 +182,7 @@ interpolant's own). A masked defect would leave a large or drifting ratio.
   `solve_system` actually executes on the 3D case and whether reported p carries a large mean.
 - **τ₂ regularisation**: paper `eq:Tau2` carries +εh² in the denominator; the code uses
   `tau_reg_lim` instead. Negligible here, but a doc-noteworthy paper/code divergence.
-- Already-known items that remain open in `known_issues.md`: `base_config.json` missing
+- Already-known items that were tracked in the former `known_issues.md` (now `../../findings.md` §7): `base_config.json` missing
   `eps_val` (canonical example unloadable), schema method-enum drift, CocquetFormMMS
   hard-coded ASGS dispatch. The CocquetFormMMS α = 0.1 solver folds are a separate,
   reaction-magnitude-driven phenomenon (solver folds, not converged-but-wrong) and are not
