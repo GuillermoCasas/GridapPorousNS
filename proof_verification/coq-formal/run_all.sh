@@ -2,7 +2,7 @@
 # ---------------------------------------------------------------------------
 #  run_all.sh -- compile and kernel-check the Coq formalisation.
 #
-#  Mirrors the reporting style of theory/verification scripts/: one PASS line
+#  Mirrors the reporting style of proof_verification/sympy/: one PASS line
 #  per file, a final summary, and a non-zero exit code on any failure.
 #
 #  Requires: coqc (Coq 8.16--8.20; developed against 8.18.0).

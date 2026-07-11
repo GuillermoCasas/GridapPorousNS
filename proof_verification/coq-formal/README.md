@@ -4,7 +4,7 @@ This directory contains a Coq formalisation of the algebraic and analytic
 claims underlying *A stabilized finite element method for incompressible,
 inertial flows in inhomogeneous porous media* (Casas, González-Usúa, Codina,
 de-Pouplana). It is the proof-assistant counterpart of the SymPy suite in
-`theory/verification scripts/`: where SymPy checks the identities by symbolic
+`proof_verification/sympy/`: where SymPy checks the identities by symbolic
 computation, the files here prove them from the axioms of the real numbers,
 and the proofs are re-verified by Coq's trusted kernel (`coqchk`).
 
@@ -52,9 +52,10 @@ have been diffed against the manuscript, and the definitions in
 `StabilityAlgebra.v` and `ContinuityAlgebra.v` match eq:TauNavierStokes,
 eq:Tau1Final, eq:Tau2Final, eq:SigmaAlpha, eq:UpperBoundOnEpsilon and the
 appendix's eq:taus, eq:phi1, eq:sigmatilde, eq:epscond, eq:jumpcond verbatim.
-One hygiene note: the SymPy script headers still cite the labels `eq:847` and
-`eq:855`, which no longer exist in the tex (the corresponding displays after
-eq:UpperBoundOnEpsilon are currently unlabelled); see AUDIT.md, finding F3.
+One hygiene note (resolved, AUDIT.md F3): the two coefficient displays after
+eq:UpperBoundOnEpsilon now carry the stable labels `eq:ViscousCoefficientBound`
+and `eq:VelocityCoefficientBound`, and the SymPy script headers cite them; the
+Coq development keeps the historical definition names `visc_847`/`u_855`.
 
 A caveat that remains: Coq verifies the *mathematics as stated*, i.e. that each
 stated identity/inequality/limit follows from the real-number axioms. It does

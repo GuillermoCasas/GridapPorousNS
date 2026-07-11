@@ -7,7 +7,7 @@
 (*  inertial flows in inhomogeneous porous media* (Casas, Gonzalez-Usua,     *)
 (*  Codina, de-Pouplana).                                                    *)
 (*                                                                           *)
-(*  Mirrors theory/verification scripts/fourier_tau_verification.py:         *)
+(*  Mirrors proof_verification/sympy/fourier_tau_verification.py:         *)
 (*   [1] the viscous symbol  sum_ij k_i k_j K_ij                             *)
 (*         = alpha nu (|k0|^2 I + (1 - 2/d) k0 k0^T)   (d = 3),              *)
 (*       its parallel eigenpair with eigenvalue (4/3) alpha nu |k0|^2        *)

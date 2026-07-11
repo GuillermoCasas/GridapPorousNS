@@ -6,7 +6,7 @@
 (*  finite element method for incompressible, inertial flows in              *)
 (*  inhomogeneous porous media*.                                             *)
 (*                                                                           *)
-(*  Mirrors theory/verification scripts/manufactured_solution_verification.  *)
+(*  Mirrors proof_verification/sympy/manufactured_solution_verification.  *)
 (*  py, checks:                                                              *)
 (*   [1] div(alpha u) = 0 for ARBITRARY (differentiable, positive) porosity  *)
 (*       fields, because alpha u = U alpha0 S with the fixed solenoidal      *)
