@@ -161,17 +161,25 @@ porosity variations are resolved by the mesh: there is $C_\alpha\ge0$ such that
   h_K\,\norm{\nabla\alpha}_{L^\infty(K)} \le C_\alpha\,\alpha_{0,K}
   \qquad\forall\,K\in\Th .
 \end{equation}
-In particular $\alpha_{\infty,K}\le \delta_\alpha\,\alpha_{0,K}$ with
-$\delta_\alpha\coloneqq 1+C_\alpha$, so that
+In particular, \amend{the elements being convex,}
+$\alpha_{\infty,K}\le \delta_\alpha\,\alpha_{0,K}$ with
+$\delta_\alpha\coloneqq 1+C_\alpha$ \amend{(for shape-regular non-convex elements the
+same holds with $\delta_\alpha$ enlarged by a constant depending only on the chunkiness
+parameter)}, so that
 $\alpha_{0,K}\le\alpha(\boldsymbol{x})\le\alpha_K\le\delta_\alpha\,\alpha_{0,K}$ for
 $\boldsymbol{x}\in K$.
 \end{assumption}
 
 \begin{assumption}[Advection]\label{H:advection}
-$\ba\in C(\overline{\Omega})^d$ (in the application, $\ba$ is the finite element velocity
-of the previous iteration) and $\nabla\cdot(\alpha\ba)=0$ in the sense of distributions,
+$\ba\in C(\overline{\Omega})^d$ \amend{with $\ba|_K\in W^{1,\infty}(K)^d$ for every
+$K\in\Th$} (in the application, $\ba$ is the \amend{continuous} finite element velocity
+of the previous iteration\amend{, which satisfies this trivially}) and
+$\nabla\cdot(\alpha\ba)=0$ in the sense of distributions,
 i.e.\ $\int_\Omega \alpha\ba\cdot\nabla\psi \dd\Omega = 0$ for all
-$\psi\in W^{1,1}_0(\Omega)$.
+$\psi\in W^{1,1}_0(\Omega)$. \amend{Since $\alpha\ba$ is continuous across interior
+faces, its distributional divergence carries no face contributions, and the global
+identity localises: $\nabla\cdot(\alpha\ba)=0$ a.e.\ in each $K\in\Th$, which is the
+form used in \cref{eq:elemibp}.}
 \end{assumption}
 
 \begin{assumption}[Mesh]\label{H:mesh}

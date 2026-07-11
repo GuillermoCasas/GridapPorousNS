@@ -3,6 +3,10 @@ Limits.v
 DerivKit.v
 StabilityAlgebra.v
 ContinuityAlgebra.v
+AbstractSums.v
+InnerSpace.v
+AbstractStability.v
+AbstractContinuity.v
 TauDesign.v
 Asymptotics.v
 ManufacturedSolution.v

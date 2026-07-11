@@ -816,7 +816,11 @@ We consider the ASGS algorithm with a uniform viscosity $\nu$. For simplicity, w
     \tau_1 &= \frac{1}{\alpha_K \tau_{1, \text{NS}}^{-1} + \sigma} \label{eq:Tau1Final}, \\
     \tau_2 &= \frac{h^2}{c_1 \alpha_K \tau_{1, \text{NS}}} \label{eq:Tau2Final},
 \end{align}
-where $\alpha_K$ is some representative value of the porosity field within element $K$, such that $\alpha_{0,K} \leq \alpha_K \leq \alpha_{\infty,K}$, where we define $\alpha_{0,K}>0$ and $\alpha_{\infty,K}$ to be the infimum and the supremum of $\alpha|_K$. As with the convective velocity norm in the definition of $\tau_{1, \text{NS}}$, we will take $\alpha_K = \alpha_{\infty,K}$, which is also the natural choice according to the analysis presented below, as it yields simplified estimates.
+where $\alpha_K$ is some representative value of the porosity field within element $K$, such that $\alpha_{0,K} \leq \alpha_K \leq \alpha_{\infty,K}$, where we define $\alpha_{0,K}>0$ and $\alpha_{\infty,K}$ to be the infimum and the supremum of $\alpha|_K$. As with the convective velocity norm in the definition of $\tau_{1, \text{NS}}$, we will take $\alpha_K = \alpha_{\infty,K}$, which is also the natural choice according to the analysis presented below, as it yields simplified estimates. \amend{The coefficient bounds below are written for this choice; any other admissible representative works after inserting factors of $\delta_\alpha$, bounded under \cref{H:porosity}.}
+
+\begin{remark}
+\amend{The analysis uses $\tau_2$ as in \cref{eq:Tau2Final}, i.e.\ without the $\varepsilon h^2$ term of \cref{eq:Tau2}. Under \cref{eq:UpperBoundOnEpsilon} the two definitions are equivalent up to the factor $1+C_2<2$: writing $\tau_2^{\mathrm{impl}}$ for \cref{eq:Tau2}, $\tau_2/\tau_2^{\mathrm{impl}} = 1+\varepsilon\tau_2 \le 1+C_2$, so that $\tau_2^{\mathrm{impl}}\le\tau_2\le(1+C_2)\,\tau_2^{\mathrm{impl}}$, and every estimate below holds for the implemented parameter with constants inflated by at most $1+C_2$.}
+\end{remark}
 
 First, let us look at the stability of the Galerkin method for the linearized problem. Let us begin by expressing its associated bilinear form in terms of the velocity and pressure unknowns $\boldsymbol{u}_h$ and $p_h$ as well as a given convective field $\boldsymbol{a}$:
 \begin{align}
@@ -880,7 +884,7 @@ From \cref{eq:UpperBoundOnEpsilon}, \amend{since $\varepsilon \tau_2 \leq C_2 < 
     \varepsilon (1 - \varepsilon \tau_2) \amend{\geq (1 - C_2)\, \varepsilon \eqqcolon C \varepsilon,}
 \end{equation}
 with $C>0$, so as to make sure that the compressibility term does not switch, from adding, to removing stability. \amend{Note that the strict inequality $\varepsilon \tau_2 < 1$ alone would not suffice here, as it provides no uniform margin when $\sigma = 0$.} Using \amend{\cref{eq:Tau1Final}}, the coefficient of $\big \| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \big\|^2_K$ in \cref{eq:StabilityEstimateFinal} can be expanded into
-\begin{equation}
+\begin{equation} \label{eq:ViscousCoefficientBound}
     \nu \tau_1 \left( \alpha_K \Big( 2 - 4 \frac{C_\text{inv}^2}{c_1}  \Big)\frac{c_1\nu}{h^2} + 2\alpha_K \frac{c_2 \amend{\lVert \boldsymbol{a} \rVert_{\infty, K}}}{h} + 2\Big( 1 - \frac{2}{\xi} \Big) \sigma \right) \geq C\nu,
 \end{equation}
 if we take
@@ -888,7 +892,7 @@ if we take
     C = \min{\left\{2 - 4 \frac{C_\text{inv}^2}{c_1}, \ 2\Big( 1 - \frac{2}{\xi} \Big)\right\}}.
 \end{equation}
 On the other hand, the coefficient of $\big\| \boldsymbol{u}_h \big\|^2_K$ becomes
-\begin{equation}
+\begin{equation} \label{eq:VelocityCoefficientBound}
     \alpha_K \tau_1 \sigma \left( \Bigl( 1 - \frac{\xi C_\text{inv}^2}{c_1} \Bigr) \frac{c_1\nu}{h^2} + \frac{c_2\amend{\lVert \boldsymbol{a} \rVert_{\infty,K}}}{h} \right) \geq C \widetilde{\sigma}_\alpha,
 \end{equation}
 where
@@ -920,7 +924,7 @@ We have just shown that the following stability bound holds for the stabilized m
 \end{lemma}
 where
 \begin{equation}
-  \triplenorm{U_h} \coloneqq \bigg(\nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \Big\| \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \Big\|^2 + \varepsilon\big\| p_h \big\|^2 + \Big\| \tau_1^{1/2} \alpha X(U_h) \Big\|_h^2 + \Big\| \tau_2^{1/2} \nabla \cdot ( \alpha \boldsymbol{u}_h ) \Big\|_h^2 \bigg)^{1/2},
+  \triplenorm{U_h} \coloneqq \bigg(\nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \Big\| \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \Big\|_h^2 + \varepsilon\big\| p_h \big\|^2 + \Big\| \tau_1^{1/2} \alpha X(U_h) \Big\|_h^2 + \Big\| \tau_2^{1/2} \nabla \cdot ( \alpha \boldsymbol{u}_h ) \Big\|_h^2 \bigg)^{1/2},
 \end{equation}
 with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
 \begin{remark}

@@ -8,13 +8,26 @@ de-Pouplana). It is the proof-assistant counterpart of the SymPy suite in
 computation, the files here prove them from the axioms of the real numbers,
 and the proofs are re-verified by Coq's trusted kernel (`coqchk`).
 
-**Status: 8 files, ~230 theorems, all proved. No `Admitted`, no `Axiom`,
+**Status: 12 files, ~384 theorems, all proved. No `Admitted`, no `Axiom`,
 no `admit` anywhere** (grep the sources to confirm). Developed and tested
 against Coq 8.18.0 using **only the standard library** — no Mathcomp, no
 Coquelicot, no external packages. Every definition has been checked against
 the manuscript sources (`article.tex`, `continuity_appendix.tex`, July 2026
-revision); a hand audit of the analytic steps that are outside the reach of
-stdlib Coq accompanies this suite in `AUDIT.md`.
+revision).
+
+**Headline of this revision: `lemma:Stability` and `lemma:Continuity` are
+now complete machine-checked theorems** (`abstract_stability`,
+`abstract_continuity_sharp`, `abstract_continuity`), proved over an
+abstract inner-product/mesh interface from a short, named, quantitative
+trusted base of analytic facts — see the abstract layer section and the
+scope ledger below. The elemental Cauchy–Schwarz inequalities are *derived*
+from four inner-product axioms, not assumed; the discrete Cauchy–Schwarz
+over element and face sums is proved by induction; every estimate
+manipulation, coefficient collection, jump treatment and absorption of the
+papers' proofs is inside the kernel-checked development. The residual
+trusted base has a Lean 4 formalisation roadmap (`LEAN_ROADMAP.md`,
+`PorousNSToolbox.lean`). A hand audit of the manuscript accompanies this
+suite in `AUDIT.md`.
 
 ## Why Coq (and not Lean 4 + Mathlib)
 
@@ -51,8 +64,11 @@ Julia/Kratos implementations match them — the latter is what the manufactured
 
 ## File inventory and crosswalk
 
-Dependency order: `Limits.v` and `DerivKit.v` are shared prerequisites; the
-six theorem files are mutually independent.
+Dependency order: `Limits.v` and `DerivKit.v` are shared prerequisites for
+the concrete files; `AbstractSums.v` and `InnerSpace.v` are prerequisites of
+the two abstract files, which also import the closed algebraic theorems of
+`StabilityAlgebra.v` and `ContinuityAlgebra.v` respectively and apply them
+per element. All other files are mutually independent.
 
 ### `Limits.v` — one-sided limit definitions and generic limit lemmas
 
@@ -114,6 +130,53 @@ appendix writes a generic C.
 | `lagrange2/3`, `CS2`, `CS3`, `step1_bound` | the finite Cauchy–Schwarz used in Steps 1 and 8 (eq:easystep) |
 | `norm5_absorption` | Step 9's squaring-and-summing (eq:absorb1–eq:normconv), with the explicit aggregate constant |
 | `tau2impl_le_tau2`, `tau2_le_scaled_impl` | analysis-τ₂ (eq:Tau2Final) vs implemented τ₂ (eq:Tau2): equivalent up to 1+C₂ under eq:epscond — supports AUDIT.md finding F6 |
+
+### The abstract functional-analytic layer
+
+Four files upgrade the two main lemmas from "algebra checked" to "theorem
+checked". `AbstractSums.v` builds finite sums over a list of elements or
+faces with linearity, monotonicity, the triangle inequality, and the
+Cauchy–Schwarz inequality for sums proved by induction, plus subadditivity
+of the square root. `InnerSpace.v` defines a minimal real pre-Hilbert
+record (symmetric, left-bilinear, positive-semidefinite form) and *derives*
+full bilinearity, Cauchy–Schwarz (`CS`, by the discriminant argument with
+the degenerate direction handled), the norm expansions, the triangle
+inequality, the parametrized Young inequality at vector level, and the
+difference-of-squares identity `⟨−a+b, a+b⟩ = ‖b‖² − ‖a‖²` that drives the
+ASGS cancellation.
+
+`AbstractStability.v` then proves **lemma:Stability**: modelling each
+field's elemental restriction as an abstract vector and the parameters via
+the closed formulas, the theorem `abstract_stability` derives
+`B_S(U_h,U_h) ≥ C_stab · |||U_h|||²` with the explicit
+`C_stab = min{C_visc, C_u, 1−C₂, 1} > 0` from exactly two named analytic
+hypotheses: (HBS) the Galerkin-testing/adjoint-expansion identity, and (S3)
+the weighted inverse estimate eq:winv-divvisc — everything else (the
+difference-of-squares step, the expansion of ‖G(u)‖², elemental
+Cauchy–Schwarz, the Young step with parameter ξC̄²να_K/h² and the exact
+cancellation of the inverse-estimate constant, the coefficient collection
+into `visc_final`/`u_final`, the elemental coercivity, and the summation
+over the mesh) is proved.
+
+`AbstractContinuity.v` proves **lemma:Continuity** in full: the eighteen
+terms of eq:Bstab are the definition of B_S; Steps 1–5 and 7 are the
+fourteen per-term bound lemmas; Step 6a's five-term rewriting
+(eq:fiveterms) is the exact identity `step6a`, consuming the three
+integration-by-parts identities as hypotheses; Step 6b splits exactly into
+the volumetric part (`bound_VolP`, via `φ₁τ₁ ≤ √φ₁√τ₁` and (P3)) and the
+jump part (`bound_JmpP`), where lem:jump is applied through the four
+face-resolved coefficient bounds `Jb11–Jb22` with explicit constants,
+facewise Cauchy–Schwarz, and the bounded-multiplicity hypothesis; Step 6c
+is `bound_II_V`; Step 6d is `bound_III` with the four `JD` bounds; Step 8
+is `abstract_continuity_sharp` (eq:assembly, the sharp porosity-weighted
+form); and Step 9's absorption chain eq:absorb1–eq:normconv is
+`absorb_elem` + `step9`, yielding the final
+`abstract_continuity : B_S(U,V) ≤ C_tot (BrU + BrP) |||V|||` with a fully
+explicit constant. The trusted base is the named hypothesis list in the
+file header (integration-by-parts identities, facewise assembly, the two
+face-integral estimates, H:jump, bounded face multiplicity, the eight
+weighted inverse estimates of lem:winv, and eq:epscond); the classification
+and the Lean 4 attack plan for each provable item are in `LEAN_ROADMAP.md`.
 
 ### `TauDesign.v` — Section 4 / Appendix C Fourier design of τ
 
@@ -187,15 +250,31 @@ symbol analysis, coupling spectrum and τ assembly; the §6 asymptotics and
 nondimensionalisation; the §7 manufactured solution, ε_ref chain, DBF
 admissibility, and the plateau bump through C¹.
 
-**Hand-audited but not machine-checked** (see AUDIT.md for the step-by-step
-audit): the functional-analytic layer of the stability and continuity
-proofs — testing with U_h and the vanishing of the convective/pressure
-Galerkin couplings, the weighted inverse estimates of lem:winv, the
-integration-by-parts identities and facewise assembly of Steps 6a–6d, the
-L^∞ inverse estimates and face-measure bookkeeping of the jump terms, and
-the interpolation-theoretic replacements of lem:continterp. Each was
-verified line by line against the manuscript; two precision amendments are
-proposed (AUDIT.md, F1–F2).
+**Formalised in this revision** (the abstract layer): the complete proofs
+of lemma:Stability and lemma:Continuity — including the summation over
+elements, the elemental and discrete Cauchy–Schwarz inequalities (derived,
+not assumed), the Young step, all eighteen term bounds, the exact
+rewritings of Step 6, the jump treatment with explicit constants, the
+facewise Cauchy–Schwarz with bounded multiplicity, and the Step-9
+absorption — as theorems over a named trusted base.
+
+**The residual trusted base** (each item a hypothesis of the abstract
+theorems, stated quantitatively in the file headers): (a) *data/mesh
+assumptions* — H:jump, eq:epscond, bounded face multiplicity, positivity of
+the coefficients — which remain hypotheses in any formal system; (b)
+*Green-type identities* — the Galerkin/adjoint identity (HBS), eq:skew,
+eq:globalibp, eq:elemibp, the elemental pressure IBP, and the two facewise
+assembly identities; (c) *inverse-type estimates* — eq:winv-divvisc (S3)
+and the eight weighted inverse estimates of lem:winv, plus (inside the two
+face-integral hypotheses) the L^∞ inverse estimate, meas(Γᵇ) ≤ Chᵈ⁻¹, and
+Hölder on the face. Classes (b) and (c) are textbook material
+(Brenner–Scott; Ern–Guermond) verified by hand against the manuscript
+(AUDIT.md §4); their Lean 4 formalisation plan is `LEAN_ROADMAP.md` with
+statement skeleton `PorousNSToolbox.lean`. The interpolation-theoretic
+replacements of lem:continterp remain hand-audited only.
+
+Two precision amendments to the appendix's hypotheses are proposed
+(AUDIT.md, F1–F2).
 
 **Deliberately left to the SymPy suite** — CAS-appropriate transcription
 checks where a proof assistant adds cost but no assurance beyond what

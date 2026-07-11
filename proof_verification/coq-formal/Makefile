@@ -20,6 +20,10 @@ VFILES := Limits.v \
           DerivKit.v \
           StabilityAlgebra.v \
           ContinuityAlgebra.v \
+          AbstractSums.v \
+          InnerSpace.v \
+          AbstractStability.v \
+          AbstractContinuity.v \
           TauDesign.v \
           Asymptotics.v \
           ManufacturedSolution.v \
@@ -29,6 +33,10 @@ VOFILES := $(VFILES:.v=.vo)
 
 MODULES := PNSFormal.StabilityAlgebra \
            PNSFormal.ContinuityAlgebra \
+           PNSFormal.AbstractSums \
+           PNSFormal.InnerSpace \
+           PNSFormal.AbstractStability \
+           PNSFormal.AbstractContinuity \
            PNSFormal.TauDesign \
            PNSFormal.Asymptotics \
            PNSFormal.ManufacturedSolution \

@@ -89,5 +89,5 @@ Current status: **106/106 checks pass across 8 scripts.**
 - They are deliberately written to mirror the paper's notation and cite the
   relevant `eq:` labels in comments, so a reader can line up each check with the
   manuscript.
-- Equation numbers (e.g. `eq:847`, `eq:855`) refer to the unnumbered displays in
+- Equation numbers (e.g. `eq:ViscousCoefficientBound`, `eq:VelocityCoefficientBound`) refer to the unnumbered displays in
   §5; `eq:*` names are the LaTeX labels in `theory/paper/`.

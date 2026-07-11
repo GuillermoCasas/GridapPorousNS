@@ -16,8 +16,8 @@
 # it checks:
 #   (1) the four equivalent forms of sigtilde, incl. the key sigtilde = sigma phi1 tau1;
 #   (2) the Young inequality -2xy >= -x^2/xi - xi y^2 (perfect-square identity);
-#   (3) the viscous-coefficient expansion eq:847 == coefficient in eq:StabilityEstimateFinal;
-#   (4) the velocity-coefficient expansion eq:855, and its reduction to >= C sigtilde
+#   (3) the viscous-coefficient expansion eq:ViscousCoefficientBound == coefficient in eq:StabilityEstimateFinal;
+#   (4) the velocity-coefficient expansion eq:VelocityCoefficientBound, and its reduction to >= C sigtilde
 #       with C = 1 - xi Cinv^2/c1 (using sigtilde = sigma phi1 tau1 and |a| >= 0);
 #   (5) the epsilon smallness condition (amendment A1): eq:UpperBoundOnEpsilon
 #       gives eps*tau2 <= C2, hence eps(1-eps*tau2) >= (1-C2)eps.
@@ -64,27 +64,27 @@ check("x^2/xi - 2 x y + xi y^2 = (x/sqrt(xi) - sqrt(xi) y)^2  >= 0",
       sp.simplify(xx**2/xi - 2*xx*yy + xi*yy**2 - (xx/sp.sqrt(xi) - sp.sqrt(xi)*yy)**2) == 0)
 
 # -------------------------------------------------------------------------
-# (3) viscous coefficient: eq:StabilityEstimateFinal  ==  eq:847
+# (3) viscous coefficient: eq:StabilityEstimateFinal  ==  eq:ViscousCoefficientBound
 # -------------------------------------------------------------------------
-print("\n[3] Viscous coefficient expansion (eq:847)")
+print("\n[3] Viscous coefficient expansion (eq:ViscousCoefficientBound)")
 visc_final = nu*tau1*(2/tau1 - 4*Cinv**2*alphaK*nu/h**2 - sp.Rational(4)*sigma/xi)
 visc_847 = nu*tau1*(alphaK*(2 - 4*Cinv**2/c1)*(c1*nu/h**2) + 2*alphaK*c2*amag/h + 2*(1 - 2/xi)*sigma)
-check("nu tau1 (2/tau1 - 4Cinv^2 alpha_K nu/h^2 - 4 sigma/xi) == eq:847 expansion",
+check("nu tau1 (2/tau1 - 4Cinv^2 alpha_K nu/h^2 - 4 sigma/xi) == eq:ViscousCoefficientBound expansion",
       sp.simplify(visc_final - visc_847) == 0)
 
 # -------------------------------------------------------------------------
-# (4) velocity coefficient: eq:StabilityEstimateFinal == eq:855, and >= C sigtilde
+# (4) velocity coefficient: eq:StabilityEstimateFinal == eq:VelocityCoefficientBound, and >= C sigtilde
 # -------------------------------------------------------------------------
-print("\n[4] Velocity coefficient expansion (eq:855) and reduction to C sigtilde")
+print("\n[4] Velocity coefficient expansion (eq:VelocityCoefficientBound) and reduction to C sigtilde")
 u_final = sigma*tau1*(1/tau1 - sigma - xi*Cinv**2*alphaK*nu/h**2)
 u_855 = alphaK*tau1*sigma*((1 - xi*Cinv**2/c1)*(c1*nu/h**2) + c2*amag/h)
-check("sigma tau1 (1/tau1 - sigma - xi Cinv^2 alpha_K nu/h^2) == eq:855 expansion",
+check("sigma tau1 (1/tau1 - sigma - xi Cinv^2 alpha_K nu/h^2) == eq:VelocityCoefficientBound expansion",
       sp.simplify(u_final - u_855) == 0)
 # reduction: u_855 - C*sigtilde = alpha_K tau1 sigma * (1 - xi Cinv^2/c1) * c2 |a|/h * (slack >= 0),
 # using sigtilde = sigma phi1 tau1 = alpha_K sigma tau1NS^{-1} tau1.
 C_u = 1 - xi*Cinv**2/c1
 slack = sp.simplify(u_855 - C_u*sigtilde)
-check("eq:855 - (1 - xi Cinv^2/c1) sigtilde = alpha_K tau1 sigma (xi Cinv^2/c1) c2 |a|/h  >= 0",
+check("eq:VelocityCoefficientBound - (1 - xi Cinv^2/c1) sigtilde = alpha_K tau1 sigma (xi Cinv^2/c1) c2 |a|/h  >= 0",
       sp.simplify(slack - alphaK*tau1*sigma*(xi*Cinv**2/c1)*(c2*amag/h)) == 0)
 
 # -------------------------------------------------------------------------

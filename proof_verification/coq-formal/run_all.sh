@@ -11,7 +11,7 @@
 set -u
 cd "$(dirname "$0")"
 
-FILES=(Limits DerivKit StabilityAlgebra ContinuityAlgebra TauDesign Asymptotics ManufacturedSolution PlateauBump)
+FILES=(Limits DerivKit StabilityAlgebra ContinuityAlgebra AbstractSums InnerSpace AbstractStability AbstractContinuity TauDesign Asymptotics ManufacturedSolution PlateauBump)
 FLAGS=(-Q . PNSFormal -q)
 
 command -v coqc >/dev/null 2>&1 || {
@@ -46,7 +46,7 @@ if command -v coqchk >/dev/null 2>&1; then
   echo
   echo "Running coqchk (independent kernel re-verification) ..."
   if coqchk -Q . PNSFormal -silent -o \
-       PNSFormal.StabilityAlgebra PNSFormal.ContinuityAlgebra PNSFormal.TauDesign PNSFormal.Asymptotics \
+       PNSFormal.StabilityAlgebra PNSFormal.ContinuityAlgebra PNSFormal.AbstractSums PNSFormal.InnerSpace PNSFormal.AbstractStability PNSFormal.AbstractContinuity PNSFormal.TauDesign PNSFormal.Asymptotics \
        PNSFormal.ManufacturedSolution PNSFormal.PlateauBump > /dev/null 2>&1; then
     echo "  [PASS] coqchk: modules successfully checked by the trusted kernel."
   else

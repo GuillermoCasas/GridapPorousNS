@@ -1,5 +1,14 @@
 # Audit of the stability and continuity results
 
+> **Amendment status (2026-07-11).** Findings **F1, F2, F3, F4, F6, F7 have been
+> applied** to `theory/paper/` (`article.tex`, `continuity_appendix.tex`), with the
+> added text marked by the manuscript's `\amend{}` review macro; the paper rebuilds
+> clean (0 undefined refs, both new labels `eq:ViscousCoefficientBound` /
+> `eq:VelocityCoefficientBound` resolve) and the SymPy headers were updated for F3.
+> **F5** (untouched `supplement.tex` boilerplate) is a submission-set decision left
+> to the authors. The "Proposed patch" blocks below are retained as the historical
+> record. A reader's summary is in `proof_verification/coq_coverage.tex` §7.
+
 **Scope.** `lemma:Stability` and its supporting development in §5 of
 `article.tex`; `lemma:Continuity` as stated in the main text and its complete
 proof in `continuity_appendix.tex` (assumptions `H:data`–`H:jump`,
@@ -279,6 +288,14 @@ eq:UpperBoundOnEpsilon. ✔
 ## 5. Machine-checked coverage
 
 `StabilityAlgebra.v` (31 statements) and `ContinuityAlgebra.v` (83
-statements) carry the algebraic load described above; the full crosswalk is
-in the README. Build: `./run_all.sh` (only `coqc` required; `coqchk`
-kernel re-verification included when available).
+statements) carry the algebraic load described above. Beyond the algebra,
+`AbstractStability.v` and `AbstractContinuity.v` (with the supporting
+`AbstractSums.v` and `InnerSpace.v`) prove lemma:Stability and
+lemma:Continuity as complete theorems from the named trusted base listed in
+the README's scope ledger, so that the "MC" markers of §4 now extend to the
+summation, Cauchy–Schwarz, Young, facewise and absorption layers of both
+proofs; only the Green-type identities, the inverse-estimate primitives and
+the data assumptions remain outside the kernel. The full crosswalk is in
+the README; the Lean 4 plan for the residue is LEAN_ROADMAP.md. Build:
+`./run_all.sh` (only `coqc` required; `coqchk` kernel re-verification
+included when available).

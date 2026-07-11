@@ -1,0 +1,780 @@
+% =====================================================================
+%  coq_coverage.tex
+%
+%  A reader's map from the paper's theory (theory/paper/article.tex and
+%  its appendices) to the machine-checked Coq development in
+%  proof_verification/coq-formal/.
+%
+%  Standalone document: compile with
+%      pdflatex coq_coverage.tex   (run twice for cross-references)
+%  or  latexmk -pdf coq_coverage.tex
+%  Uses only standard TeX Live packages (amsmath, amssymb, booktabs,
+%  longtable, listings, hyperref, geometry, xcolor).
+% =====================================================================
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+
+% ---- Coq identifier / label helpers -------------------------------------
+% \detokenize renders underscores literally, so Coq names need no escaping.
+\newcommand{\coq}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\lbl}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+
+% Long typewriter identifiers/paths are unbreakable; let TeX break the line
+% before them rather than run them into the margin.
+\emergencystretch=3em
+\sloppy
+
+% ---- a lightweight Coq listing style ------------------------------------
+\definecolor{coqkw}{rgb}{0.30,0.12,0.55}
+\definecolor{coqcmt}{rgb}{0.30,0.45,0.30}
+\lstdefinelanguage{Coq}{
+  morekeywords={Theorem,Lemma,Corollary,Definition,Record,Proof,Qed,forall,exists,
+    Section,Variable,Variables,Hypothesis,Hypotheses,Require,Import,From,fun,
+    intros,unfold,rewrite,apply,field,split,nra,lra,psatz,pose,assert},
+  sensitive=true,
+  morecomment=[n]{(*}{*)},
+}
+\lstset{
+  language=Coq,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{coqkw}\bfseries,
+  commentstyle=\color{coqcmt}\itshape,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  frame=single,
+  framesep=4pt,
+  xleftmargin=2pt,
+}
+
+% ---- math shorthands matching the paper ---------------------------------
+\newcommand{\sigt}{\widetilde{\sigma}}
+\newcommand{\Cinv}{C_{\mathrm{inv}}}
+\newcommand{\aK}{\alpha_K}
+\newcommand{\Reh}{\mathrm{Re}_h}
+\newcommand{\Dah}{\mathrm{Da}_h}
+\newcommand{\Cstab}{C_{\mathrm{stab}}}
+\renewcommand{\arraystretch}{1.25}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{\bfseries Machine-checked coverage map:\\
+       from the paper's theory to the Coq formalisation}
+\author{Coverage note accompanying \file{proof_verification/coq-formal/}}
+\date{Revised 2026-07-11 \quad (12 files, $\approx$384 theorems;
+      Rocq/Coq build verified: version 9.1.1)}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This note is a reader's map between two artefacts in this repository: the
+mathematical theory of the paper \emph{``A stabilized finite element method
+for incompressible, inertial flows in inhomogeneous porous media''}
+(Casas, Gonz\'alez-Us\'ua, Codina, de-Pouplana), whose \LaTeX{} sources live
+under \file{theory/paper/}, and the Coq formalisation under
+\file{proof_verification/coq-formal/}, which re-proves the paper's algebraic
+and analytic \emph{claims} from the axioms of the real numbers and has them
+re-checked by Coq's trusted kernel. \textbf{The headline of the current
+revision: \lbl{lemma:Stability} and \lbl{lemma:Continuity} are now complete
+machine-checked theorems} (\coq{abstract_stability},
+\coq{abstract_continuity_sharp}, \coq{abstract_continuity}), proved over an
+abstract inner-product / mesh interface from a short, \emph{named,
+quantitative} trusted base of standard analytic facts. Section~\ref{sec:coq}
+is a primer on how Coq (now \emph{Rocq}) works and what ``machine-checked''
+buys. Section~\ref{sec:map} explains the translation convention --- including
+how a lemma with functional-analytic hypotheses is honestly encoded.
+Section~\ref{sec:crosswalk} is the crosswalk itself, one table per Coq file.
+Section~\ref{sec:left} states precisely what is \emph{not} inside the kernel
+and by what other means (a hand audit, the SymPy suite, a Lean~4 roadmap, or
+the convergence tests) each residual item is addressed.
+Section~\ref{sec:amend} records the theory-side amendments applied to keep the
+manuscript $100\%$ compatible with what was verified.
+\end{abstract}
+
+\tableofcontents
+
+% =====================================================================
+\section{Purpose and scope}\label{sec:purpose}
+% =====================================================================
+
+The Coq development mirrors, file by file, the SymPy ``verification scripts''
+suite in \file{theory/verification\ scripts/}: where SymPy checks an identity
+by symbolic computation, the Coq files \emph{prove} it. The suite is
+\textbf{12 files, $\approx 384$ theorems, all proved} --- there is no
+\coq{Admitted}, no \coq{Axiom} and no \coq{admit} anywhere in the sources
+(\coq{grep} confirms this). It was developed against Coq~8.18 using
+\emph{only} the standard library, and it compiles and kernel-checks unchanged
+under the current Rocq~9.1.1.
+
+What changed since the previous revision is a step up in \emph{kind}, not just
+in count. Previously the Coq layer certified the \emph{algebraic skeleton} of
+the two central lemmas (parameter identities, coefficient expansions, the jump
+algebra) while the surrounding \emph{functional-analytic} argument (testing
+with a discrete field, integration by parts, inverse estimates, summation over
+the mesh) was only hand-audited. Four new files
+(\file{AbstractSums.v}, \file{InnerSpace.v}, \file{AbstractStability.v},
+\file{AbstractContinuity.v}) close that gap: they prove \lbl{lemma:Stability}
+and \lbl{lemma:Continuity} \emph{as complete theorems} over an abstract
+inner-product / mesh interface, reducing each to a short list of
+explicitly-named standard analytic facts (Green-type identities and
+inverse-type estimates) that appear as \emph{hypotheses} of the abstract
+theorem. The elemental and discrete Cauchy--Schwarz inequalities, the Young
+step, the difference-of-squares cancellation, all eighteen term bounds, the
+jump treatment, and the assembly over elements and faces are now inside the
+kernel.
+
+Two boundaries still frame everything.
+\begin{itemize}[nosep]
+  \item \textbf{Coverage boundary.} Coq certifies the mathematics down to a
+    named trusted base. That base --- the divergence-theorem / integration-by-parts
+    identities and the finite-element inverse estimates --- is textbook material
+    (Brenner--Scott, Ern--Guermond), hand-audited against the manuscript and
+    slated for a Lean~4 formalisation
+    (Section~\ref{sec:left}). It is \emph{stated quantitatively} as hypotheses,
+    so the abstract theorems are genuine implications, not sketches. Only the
+    interpolation-theoretic replacements of \lbl{lem:continterp} remain
+    hand-audited without a Coq statement.
+  \item \textbf{Meaning boundary.} Coq verifies the \emph{mathematics as
+    stated}: that each identity, inequality or limit follows from the
+    real-number axioms and the named base. It does \emph{not} certify that the
+    statements model the physics, nor that the Julia/Kratos solver implements
+    them --- that is the job of the method-of-manufactured-solutions
+    convergence tests elsewhere in the codebase.
+\end{itemize}
+
+% =====================================================================
+\section{A short primer: how Coq works and what ``verified'' means}\label{sec:coq}
+% =====================================================================
+
+\subsection{Proof assistant, kernel, and the de Bruijn criterion}
+
+Coq (renamed \emph{Rocq} from version~9) is an interactive proof assistant
+built on a small, fixed logic --- the Calculus of Inductive Constructions. A
+Coq \emph{proof} is not prose: it is a formal term whose \emph{type} is the
+statement being proved (the ``propositions-as-types'' correspondence). The
+user constructs that term interactively with \emph{tactics}, but tactics are
+untrusted conveniences; what matters is the object they build.
+
+The trust rests on the \textbf{de Bruijn criterion}: a large, human-friendly
+front end may do arbitrary heuristics, but the final proof term is re-examined
+by a \emph{small, fixed kernel} that only knows the typing rules of the logic.
+If the kernel accepts the term, the theorem holds. In this development the
+kernel is exercised twice:
+\begin{enumerate}[nosep]
+  \item \coq{coqc} type-checks each file as it compiles it;
+  \item \coq{coqchk} --- a \emph{separate}, independent re-implementation of
+    the kernel --- re-verifies the compiled objects (\coq{.vo} files) from
+    scratch, with no trust in \coq{coqc}. The build script runs it and reports
+    \emph{``coqchk: all modules kernel-verified''}.
+\end{enumerate}
+
+\subsection{The trust base --- and why ``no \texttt{Admitted}, no \texttt{Axiom}'' matters}
+
+Believing a Coq theorem means trusting exactly three things: the logic itself
+(the Calculus of Inductive Constructions, studied for decades), the kernel
+implementation, and the \emph{statement} --- one must still read what was
+proved, including its hypotheses. Everything else (tactics, notations, the
+elaborator) cannot make a false theorem be accepted.
+
+Two escape hatches would silently widen that base, and both are audited out
+here:
+\begin{itemize}[nosep]
+  \item \coq{Admitted} / \coq{admit} closes a goal \emph{without} a proof; a
+    single one would let anything ``follow''.
+  \item \coq{Axiom} postulates a statement as true without proof.
+\end{itemize}
+Neither appears anywhere in the twelve files. Consequently every result below
+is reduced to the standard-library axiomatisation of the real numbers (plus,
+for the two abstract lemmas, the explicitly-listed analytic hypotheses ---
+Section~\ref{sec:left}). The suite uses \emph{no external libraries} (no
+Mathcomp, no Coquelicot): the analysis is done on \coq{Coq.Reals} with the
+arithmetic tactics \coq{lra}/\coq{nra} (linear and nonlinear real arithmetic)
+and \coq{field} (rational-function identities). Those tactics are
+decision/normalisation procedures whose \emph{output} is a kernel-checked
+term --- using them does not weaken the guarantee.
+
+\subsection{The abstract-interface method (new in this revision)}
+
+The two main lemmas are proved not against a concrete function space but
+against a \emph{minimal algebraic interface} that the concrete objects satisfy.
+Two devices carry this.
+
+\emph{A pre-Hilbert record.} \file{InnerSpace.v} models the elemental
+$L^2(K)$ pairings by a four-field record: a carrier with addition and scalar
+multiplication and a form \coq{ip} that is symmetric, additive and homogeneous
+in its first argument, and positive-semidefinite.
+
+\begin{lstlisting}
+Record PreHilbert := mkPreHilbert {
+  carrier  :> Type;
+  vadd     : carrier -> carrier -> carrier;
+  vscal    : R -> carrier -> carrier;
+  ip       : carrier -> carrier -> R;
+  ip_sym   : forall x y, ip x y = ip y x;
+  ip_add_l : forall x y z, ip (vadd x y) z = ip x z + ip y z;
+  ip_scal_l: forall a x y, ip (vscal a x) y = a * ip x y;
+  ip_pos   : forall x, 0 <= ip x x }.
+\end{lstlisting}
+
+\noindent
+From these four axioms the file \emph{derives} (does not assume) full
+bilinearity, the Cauchy--Schwarz inequality (by the discriminant argument,
+with the degenerate direction handled), the norm expansions of sums and
+differences, the triangle inequality, the parametrized Young inequality at
+vector level, and the difference-of-squares identity
+$\langle -a+b,\,a+b\rangle = \lVert b\rVert^2 - \lVert a\rVert^2$ that drives
+the ASGS cancellation. Any concrete weighted $L^2(K)$ is an instance, so the
+proofs transfer for free.
+
+\emph{A named trusted base.} A lemma such as \lbl{lemma:Stability} needs one
+genuinely analytic input --- a weighted inverse estimate --- that stdlib Coq
+cannot prove without finite-element scaling theory. Rather than pretend
+otherwise, the estimate is written as an explicit, \emph{quantitative}
+\coq{Hypothesis} of the theorem. The theorem is then a real implication:
+\emph{if} the inverse estimate holds with the stated constant, \emph{then} the
+stability bound holds with the stated constant. This is the honest encoding of
+a ``cited-standard'' fact, and it makes the residual trusted base a finite,
+readable list (Section~\ref{sec:left}) rather than a gap.
+
+\subsection{Reading Coq syntax}\label{sec:syntax}
+
+Table~\ref{tab:syntax} is enough to read every entry in the crosswalk.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}L{0.34\textwidth}L{0.58\textwidth}@{}}
+\toprule
+\textbf{Coq} & \textbf{Meaning} \\
+\midrule
+\coq{Definition n : R := e.}       & Names a real-valued quantity $n := e$. \\
+\coq{Record R := mk { f : T; ax : P }.} & A structure bundling fields \coq{f} with axioms \coq{ax} they satisfy. \\
+\coq{Theorem}/\coq{Lemma}/\coq{Corollary n : P.} & Asserts $P$; the following \coq{Proof. ... Qed.} is its (kernel-checked) proof. \\
+\coq{Section S. ... End S.}        & A scope sharing common parameters and hypotheses. \\
+\coq{Variables (x y : R).}         & Introduces symbolic reals $x,y$ for the section. \\
+\coq{Hypothesis h : 0 < x.}        & A standing assumption; every theorem in the section is conditioned on it. \\
+\coq{forall x, ...} / \coq{exists x, ...} & Universal / existential quantifier. \\
+\coq{<< x , y >>}                  & The pre-Hilbert inner product \coq{ip x y}; \coq{nrm x} $= \sqrt{\langle x,x\rangle}$. \\
+\coq{Rsum Th f}                    & The finite sum $\sum_{k\in\mathtt{Th}} f(k)$ over the mesh element (or face) list. \\
+\coq{a <= b}, \coq{a < b}, \coq{a = b} & Order and equality on $\mathbb{R}$. \\
+\coq{sqrt}, \coq{Rabs}, \coq{exp}, \coq{sin} & Standard-library real functions. \\
+\coq{derivable_pt_lim f x d}       & ``$f$ has derivative $d$ at $x$'' (the stdlib derivative predicate). \\
+\bottomrule
+\end{tabular}
+\caption{The Coq vocabulary used in the statements.}
+\label{tab:syntax}
+\end{table}
+
+A note on total division. In \coq{Coq.Reals}, $x/0$ is defined and equals $0$;
+the development never relies on this --- every division either is harmless by
+construction (its statement carries no hypothesis and the denominator is a
+declared positive quantity) or is guarded by an explicit non-vanishing
+hypothesis.
+
+% =====================================================================
+\section{How paper statements map to Coq}\label{sec:map}
+% =====================================================================
+
+\subsection{Standing hypotheses become section variables}
+
+The paper carries global positivity conventions --- mesh size $h>0$, viscosity
+$\nu>0$, elemental porosity $\aK>0$ (with $\aK\le 1$ in the appendix),
+$\sigma\ge 0$, non-dimensional numbers $\Reh,\Dah\ge 0$, constants
+$c_1,c_2,\Cinv,\xi>0$, profile $0<\alpha_0<1$. In Coq these are the
+\coq{Hypothesis} lines of each \coq{Section}; every theorem there is read as
+``under these positivity assumptions, \dots''.
+
+\subsection{Naming dictionary}
+
+The Coq identifiers transliterate the paper's symbols. The recurring ones:
+
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+Paper & Coq & Paper & Coq \\
+\midrule
+$\tau_1$ (\lbl{eq:Tau1Final})       & \coq{tau1}       & $\varphi_1=\aK\,\tau_{1,\mathrm{NS}}^{-1}$ & \coq{phi1} \\
+$\tau_2$ (\lbl{eq:Tau2Final})       & \coq{tau2}       & $\tau_{1,\mathrm{NS}}$ (\lbl{eq:TauNavierStokes}) & \coq{tau1NS} \\
+$\sigt$ (\lbl{eq:SigmaAlpha})       & \coq{sigt}/\coq{sg} & $\bar C_{\mathrm{inv}}$ (\lbl{lem:winv}) & \coq{Cb} \\
+$\aK$                               & \coq{alphaK}/\coq{aK}     & $|\mathbf a|_{\infty,K}$   & \coq{am} \\
+$\Cinv$ (\lbl{eq:inverse})          & \coq{Cinv}       & $\xi$ (Young parameter)   & \coq{xi} \\
+$\Reh,\Dah$                         & \coq{Re},\coq{Da} & $\varepsilon$ (mass penalty) & \coq{eps} \\
+$B_S(U_h,U_h)$                      & \coq{BS}         & $|||U_h|||^2$ (\lbl{eq:triplenorm}) & \coq{NormSq} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{A worked example, read side by side}
+
+The sharpest scalar statement of the stability section is the \emph{velocity
+slack identity}: the gap between the velocity coefficient of the final
+stability estimate (\lbl{eq:VelocityCoefficientBound}) and $C_u\,\sigt$ is not
+merely non-negative --- it equals a specific product \emph{exactly}. In Coq:
+
+\begin{lstlisting}
+Definition C_u : R := 1 - xi * Cinv^2 / c1.
+
+Theorem velocity_slack_identity :
+  u_855 - C_u * sigt
+    = alphaK * tau1 * sigma * (xi * Cinv^2 / c1) * (c2 * amag / h).
+
+Corollary velocity_coefficient_lower_bound : u_855 >= C_u * sigt.
+\end{lstlisting}
+
+\noindent
+Read: \emph{under the section hypotheses}, the difference of the two
+real-valued expressions equals $\aK\tau_1\sigma\,(\xi\Cinv^2/c_1)(c_2|\mathbf
+a|/h)\ge 0$; hence the lower bound. The proof rewrites with the identity
+$\sigt=\sigma\varphi_1\tau_1$ and discharges the rational-function equality
+with \coq{field}.
+
+\subsection{How a lemma with analytic hypotheses maps}\label{sec:absexample}
+
+The abstract theorems read the same way, with the trusted-base facts as named
+hypotheses. \lbl{lemma:Stability} is \coq{abstract_stability}: under the
+section's positivity plus $c_1>2\xi\bar C_{\mathrm{inv}}^2$, $\xi>2$,
+$C_2<1$, and the three analytic hypotheses
+
+\begin{lstlisting}
+(* HBS: Galerkin testing + adjoint expansion (eq:StabilityEstimate) *)
+Hypothesis HBS :
+  BS = 2*nu * Rsum Th (fun k => << gu k , gu k >>)
+     + sigma * Rsum Th (fun k => << uu k , uu k >>)
+     + eps   * Rsum Th (fun k => << pp k , pp k >>)
+     - Rsum Th (fun k => t1 k * << Lstar_m k , L_m k >>)
+     - Rsum Th (fun k => t2 k * << Lstar_c k , L_c k >>).
+
+(* S3: the weighted inverse estimate eq:winv-divvisc (lem:winv) *)
+Hypothesis S3 :
+  forall k, nrm (du k) <= (2*nu*Cb / hK k) * sqrt (aK k) * nrm (gu k).
+\end{lstlisting}
+
+\noindent
+the theorem concludes
+\begin{lstlisting}
+Theorem abstract_stability :
+  0 < C_stab c1 Cb xi C2  /\  BS >= C_stab c1 Cb xi C2 * NormSq.
+\end{lstlisting}
+
+\noindent
+which is exactly $B_S(U_h,U_h)\ge \Cstab\,|||U_h|||^2$ with the explicit
+$\Cstab=\min\{C_{\mathrm{visc}},C_u,1-C_2,1\}>0$. Everything between the
+hypotheses and the conclusion --- the difference-of-squares cancellation, the
+expansion of $\lVert G(u)\rVert^2$, the elemental Cauchy--Schwarz, the Young
+step with parameter $\xi\bar C_{\mathrm{inv}}^2\nu\aK/h^2$, the exact
+cancellation of the inverse-estimate constant, the coefficient collection, and
+the summation over the mesh --- is machine-checked.
+
+\subsection{What a green check does and does not assert}
+
+An entry marked as covered means: \emph{the displayed relation is a theorem of
+real arithmetic under the stated hypotheses}. For the algebraic files the
+hypotheses are only positivity, so the theorem is unconditional in the
+mathematics. For the two abstract lemmas the hypotheses additionally include
+the named analytic base of Section~\ref{sec:left}; the green check asserts the
+\emph{implication}, and the honesty of the result rests on that base being
+exactly the standard, hand-audited facts it is labelled as.
+
+% =====================================================================
+\section{The crosswalk: theory \texorpdfstring{$\to$}{->} Coq}\label{sec:crosswalk}
+% =====================================================================
+
+Dependency and topic map of the twelve files. \file{Limits.v}/\file{DerivKit.v}
+serve the concrete analytic files; \file{AbstractSums.v}/\file{InnerSpace.v}
+serve the two abstract files, which also import the closed algebraic theorems
+of \file{StabilityAlgebra.v}/\file{ContinuityAlgebra.v} and apply them per
+element.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Coq file & Paper location & Role \\
+\midrule
+\file{Limits.v}      & --- & infrastructure: $\varepsilon$--$\delta$ limit theory \\
+\file{DerivKit.v}    & --- & infrastructure: derivative toolkit \\
+\file{AbstractSums.v}  & --- & infrastructure: finite mesh/face sums, discrete C--S \\
+\file{InnerSpace.v}    & --- & infrastructure: abstract pre-Hilbert space \\
+\file{StabilityAlgebra.v}  & \S\ref{sec:crossStab} (\S5)     & stability estimate, scalar algebra \\
+\file{ContinuityAlgebra.v} & \S\ref{sec:crossCont} (App.\ B) & continuity proof, scalar algebra \\
+\file{AbstractStability.v} & \S\ref{sec:crossAbsStab} (\S5) & \lbl{lemma:Stability}, complete theorem \\
+\file{AbstractContinuity.v}& \S\ref{sec:crossAbsCont} (App.\ B) & \lbl{lemma:Continuity}, complete theorem \\
+\file{TauDesign.v}   & \S\ref{sec:crossTau} (\S4 + App.\ C) & Fourier design of $\tau_1,\tau_2$ \\
+\file{Asymptotics.v} & \S\ref{sec:crossAsym} (\S6)     & robustness in $(\Reh,\Dah)$ \\
+\file{ManufacturedSolution.v} & \S\ref{sec:crossMMS} (\S7) & manufactured solution \\
+\file{PlateauBump.v} & \S\ref{sec:crossBump} (\S7)     & plateau bump, through $C^1$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Infrastructure: \texttt{InnerSpace.v} and \texttt{AbstractSums.v}}\label{sec:crossInfra}
+
+\begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Content (all \emph{derived}, not assumed)} \\
+\midrule \endhead
+\multicolumn{2}{@{}l}{\emph{\file{InnerSpace.v} --- the elemental $L^2(K)$ pairing as a pre-Hilbert space}}\\
+\coq{PreHilbert} (\coq{ip_sym}, \coq{ip_add_l}, \coq{ip_scal_l}, \coq{ip_pos}) & the four axioms modelling a symmetric positive-semidefinite $L^2(K)$ form. \\
+\coq{ip_add_r}, \coq{ip_scal_r}, \coq{ip_sub_l/r}, \coq{ip_opp_l/r} & full bilinearity, from left-linearity $+$ symmetry. \\
+\coq{CS_sq}, \coq{CS}, \coq{CS_le}, \coq{CS_ge} & Cauchy--Schwarz $|\langle x,y\rangle|\le\lVert x\rVert\lVert y\rVert$ (discriminant argument). \\
+\coq{nrm_sq}, \coq{ip_expand_add}, \coq{ip_expand_sub} & Gram expansions $\lVert x\pm y\rVert^2$. \\
+\coq{nrm_triangle} & the triangle inequality. \\
+\coq{young_scalar}, \coq{young_vector} & the parametrized Young inequality at vector level. \\
+\coq{diff_of_squares} & $\langle -a+b,\,a+b\rangle=\lVert b\rVert^2-\lVert a\rVert^2$: the ASGS cancellation. \\
+\midrule
+\multicolumn{2}{@{}l}{\emph{\file{AbstractSums.v} --- sums over the element / face list}}\\
+\coq{Rsum}, \coq{Rsum_plus/minus/opp/scal}, \coq{Rsum_le}, \coq{Rsum_nonneg} & linearity and monotonicity of $\sum_{k\in\mathrm{Th}}$. \\
+\coq{Rsum_abs_le} & the triangle inequality for sums. \\
+\coq{Rsum_CS_sq}, \coq{Rsum_CS} & the discrete Cauchy--Schwarz over the mesh, by induction (the paper's ``C--S for the sums over elements''). \\
+\coq{Rsum_sq_mono}, \coq{sqrt_plus_le}, \coq{sqrt_mono} & squared-sum monotonicity; subadditivity/monotonicity of $\sqrt{\cdot}$. \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{StabilityAlgebra.v} --- \S5: the stability estimate (scalar algebra)}\label{sec:crossStab}
+
+Section hypotheses: $\nu,h,\aK,\sigma>0$, $|\mathbf a|\ge 0$,
+$c_1,c_2,\Cinv,\xi>0$. Mirrors \file{stability_estimate_verification.py}.
+
+\begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Paper content} \\
+\midrule \endhead
+\coq{sigt_form_phi}, \coq{sigt_form_tau1}, \coq{sigt_form_key} & The three forms of $\sigt$ (\lbl{eq:SigmaAlpha}). \\
+\coq{young_perfect_square}, \coq{young_inequality} & Young's step $-2xy\ge -x^2/\xi-\xi y^2$. \\
+\coq{viscous_coefficient_expansion} & Viscous coefficient of \lbl{eq:StabilityEstimateFinal} $=$ the expanded \lbl{eq:ViscousCoefficientBound}. \\
+\coq{velocity_coefficient_expansion}, \coq{velocity_slack_identity}, \coq{velocity_coefficient_lower_bound}, \coq{u_final_lower_bound} & \lbl{eq:VelocityCoefficientBound} and its \emph{exact} slack over $C_u\sigt$, $C_u=1-\xi\Cinv^2/c_1$. \\
+\coq{eps_max_tau2_identity}, \coq{eps_tau2_le_C2}, \coq{pressure_term_coercive}, \coq{epsilon_smallness_chain} & The $\varepsilon$-smallness chain (\lbl{eq:UpperBoundOnEpsilon}): $\varepsilon\tau_2\le C_2$, pressure coeff $\ge(1-C_2)\varepsilon$. \\
+\coq{viscous_coefficient_lower_bound}, \coq{visc_final_lower_bound} & Viscous bracket $\ge C_{\mathrm{visc}}\nu$, $C_{\mathrm{visc}}=\min\{2-4\Cinv^2/c_1,2(1-2/\xi)\}$. \\
+\coq{stability_constants_positive} & $c_1>2\xi\Cinv^2$, $\xi>2$ $\Rightarrow$ coefficients positive (\lbl{eq:conditions_on_num_param}). \\
+\coq{elemental_coercivity} & Elemental assembly $\ge\Cstab\times$ the triple-norm contributions, $\Cstab=\min\{C_{\mathrm{visc}},C_u,1-C_2,1\}$. \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{ContinuityAlgebra.v} --- Appendix B: the continuity proof (scalar algebra)}\label{sec:crossCont}
+
+Section hypotheses: $\nu,h,\aK,c_1,c_2>0$, $\aK\le 1$, $\sigma\ge 0$,
+$|\mathbf a|\ge 0$. Explicit constants wherever the appendix writes a generic
+$C$.
+
+\begin{longtable}{@{}L{0.44\textwidth}L{0.51\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Appendix content} \\
+\midrule \endhead
+\coq{P1_*}, \coq{P2_*}, \coq{P3_*}, \coq{P4_*}, \coq{P5_*} & \lbl{lem:parameters} (P1)--(P5) and the square-root forms. \\
+\coq{sigt_id_tau}, \coq{sigt_id_sub}, \coq{one_minus_sigma_tau1} & \lbl{eq:sigmatilde} and the workhorse $1-\sigma\tau_1=\varphi_1\tau_1$. \\
+\coq{keyvisc_sq}, \coq{keyvisc_sqrt}, \coq{T8_chain}, \coq{T13_chain} & \lbl{eq:keyvisc} (Step~4); the $\sigma\varphi_1\tau_1=\sigt$ absorptions (\lbl{eq:T8bound}, \lbl{eq:T13conv}). \\
+\coq{volpart_scalar}, \coq{sqrtphi_tau_le}, \coq{phi_sqrttau_le}, \coq{sqrtphi_sqrttau_le_1} & \lbl{eq:volpart} (Step~6b) and Steps~6c--6d. \\
+\coq{absorb1_*}, \coq{absorb2_*}, \coq{absorb4_*} & the \lbl{eq:absorb1}--\lbl{eq:absorb4} coefficient chains (Step~9). \\
+\coq{jump_formula}, \coq{phi_diff_bound}, \coq{tau_comp_AB/_BA}, \coq{sg_comp_A_le_B}, \coq{jump_bound_A}, \coq{jumpsplit_AB}, \coq{III_absorb_AB/_BA} & \lbl{lem:jump}, \lbl{eq:jumpest}, \lbl{eq:jumpsplit}, Step~6d --- constants explicit ($C_J/c_J$). \\
+\coq{delta_alpha_bound}, \coq{winv_ratio} & \lbl{H:porosity}'s derived bound and the \lbl{lem:winv} coefficient step $\alpha_\infty/\alpha_0^{1/2}\le\delta^{1/2}\alpha_\infty^{1/2}$. \\
+\coq{lagrange2/3}, \coq{CS2}, \coq{CS3}, \coq{step1_bound}, \coq{norm5_absorption} & the finite Cauchy--Schwarz of Steps~1,~8 and the Step~9 squaring-and-summing. \\
+\coq{tau2impl_le_tau2}, \coq{tau2_le_scaled_impl} & analysis-$\tau_2$ (\lbl{eq:Tau2Final}) vs implemented $\tau_2$ (\lbl{eq:Tau2}): equivalent up to $1+C_2$ (amendment~F6, \S\ref{sec:amend}). \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{AbstractStability.v} --- \lbl{lemma:Stability} as a complete theorem}\label{sec:crossAbsStab}
+
+Models each field's elemental restriction as a \coq{PreHilbert} vector and the
+parameters via the closed \file{StabilityAlgebra.v} formulas. Conclusion:
+\coq{abstract_stability} (see \S\ref{sec:absexample}). Trusted base:
+\coq{HBS}, \coq{S3}, \coq{Heps} (the three of Section~\ref{sec:left}).
+
+\begin{longtable}{@{}L{0.40\textwidth}L{0.55\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Paper content (all machine-checked)} \\
+\midrule \endhead
+\coq{momentum_pairing}, \coq{mass_pairing} & the adjoint / difference-of-squares expansions of the residual pairings (\lbl{eq:StabilityEstimate}). \\
+\coq{Bv_expand}, \coq{du_sq_bound} & expansion of $\lVert G(u)\rVert^2$; the Young step with the exact cancellation of the inverse-estimate constant $\bar C_{\mathrm{inv}}$ (\lbl{eq:BoundOfCrossedTerm}). \\
+\coq{element_lower_bound}, \coq{element_coercive} & the per-element coercivity, importing \coq{elemental_coercivity}. \\
+\coq{BS_as_sum} & re-summation of the tested form over the mesh. \\
+\coq{abstract_stability} & \textbf{\lbl{lemma:Stability}}: $0<\Cstab$ and $B_S(U_h,U_h)\ge\Cstab\,|||U_h|||^2$. \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{AbstractContinuity.v} --- \lbl{lemma:Continuity} as a complete theorem}\label{sec:crossAbsCont}
+
+Adds a face list with the two neighbouring elements $e_1,e_2$ per interior
+face. Conclusion: \coq{abstract_continuity}. Trusted base: the IBP / facewise
+/ face-estimate / jump / mesh / inverse-estimate / $\varepsilon$ hypotheses of
+Section~\ref{sec:left}.
+
+\begin{longtable}{@{}L{0.40\textwidth}L{0.55\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Appendix content (all machine-checked)} \\
+\midrule \endhead
+\coq{BS} $= $ \coq{T1} $+\cdots+$ \coq{T18} & the eighteen-term decomposition of $B_S$ (\lbl{eq:Bstab}, Step~0). \\
+\coq{bound_T1}, \coq{bound_T3_T14}, \coq{bound_T5}, \coq{bound_T10}, \coq{bound_T15}, \coq{bound_T16}, \coq{bound_T17}, \coq{bound_T18}, \coq{keyvisc_coef} & the per-term bounds of Steps~1--5 and~7. \\
+\coq{step6a} & the exact five-term rewriting of Step~6a (\lbl{eq:fiveterms}), consuming the IBP identities \lbl{eq:elemibp} etc. \\
+\coq{bound_VolP}, \coq{bound_JmpP} (\coq{Jb11}--\coq{Jb22}) & Step~6b: volumetric part via $\varphi_1\tau_1\le\sqrt{\varphi_1}\sqrt{\tau_1}$ and (P3); jump part via \lbl{lem:jump} through four face-resolved bounds, facewise C--S, bounded multiplicity. \\
+\coq{bound_II_V} & Step~6c. \\
+\coq{bound_III} (\coq{JD11}--\coq{JD22}) & Step~6d, with the four face-difference bounds. \\
+\coq{face_CS_pair} & facewise Cauchy--Schwarz with the multiplicity hypotheses. \\
+\coq{abstract_continuity_sharp} & Step~8: the sharp porosity-weighted assembly (\lbl{eq:assembly}). \\
+\coq{absorb_elem}, \coq{step9} & Step~9: the \lbl{eq:absorb1}--normconv absorption chain. \\
+\coq{abstract_continuity} & \textbf{\lbl{lemma:Continuity}}: $B_S(U,V)\le C_{\mathrm{tot}}(\mathrm{Br}_U+\mathrm{Br}_P)\,|||V|||$, $C_{\mathrm{tot}}$ fully explicit. \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{TauDesign.v} --- \S4 / Appendix C: Fourier design of \texorpdfstring{$\tau$}{tau}}\label{sec:crossTau}
+
+Mirrors \file{fourier_tau_verification.py}. Section hypotheses: $\nu,\alpha,h>0$.
+
+\begin{longtable}{@{}L{0.40\textwidth}L{0.55\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Paper content} \\
+\midrule \endhead
+\coq{viscous_symbol_closed_form} & $\sum_{ij}k_ik_j\mathbf K_{ij}=\alpha\nu(|k|^2 I+\tfrac13 kk^\top)$, $d{=}3$ (\lbl{eq:matrices_stationary_strong_problem}). \\
+\coq{viscous_parallel_eigenpair}, \coq{viscous_transverse_eigenpair}, \coq{parallel_factor_d3/d2} & viscous spectrum $\tfrac43\alpha\nu|k|^2$, $\alpha\nu|k|^2$; the $d{=}3,2$ prefactors. \\
+\coq{convective_symbol_scalar}, \coq{convective_spectral_radius} & convective symbol and radius $(\alpha/h)|w\cdot k|$. \\
+\coq{coupling_*}, \coq{coupling_spectrum}, \coq{coupling_spectral_radius} & pressure--velocity coupling $\mathbf C$: spectrum $\{0,\pm|k|\}$. \\
+\coq{taub_pair_solves}, \coq{taub_pair_unique} & $XY=c^2,\;X/Y=\lambda$ $\Rightarrow$ unique positive $(c\sqrt\lambda,c/\sqrt\lambda)$. \\
+\coq{sqrt_lam_choice}, \coq{tau1_inv_assembled}, \coq{tau2_assembled}, \coq{visc_plus_conv_momentum} & assembly of \lbl{eq:Tau1}, \lbl{eq:Tau2}, \lbl{eq:CAlpha}, \lbl{eq:TauNavierStokes}. \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{Asymptotics.v} --- \S6: robustness in \texorpdfstring{$(\Reh,\Dah)$}{(Re,Da)}}\label{sec:crossAsym}
+
+Mirrors \file{robustness_asymptotics_verification.py}. Section hypotheses:
+$\nu,h,\aK>0$; $\Reh,\Dah\ge0$.
+
+\begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Paper content} \\
+\midrule \endhead
+\coq{tau1_general_form}, \coq{tau2_general_form}, \coq{sigt_general_form} & closed forms in $(\Reh,\Dah)$ (\lbl{eq:GeneralAsymptoticBehaviourOfParameters}). \\
+\coq{dom_viscosity_*} & dominant viscous diffusion ($\Reh,\Dah\to0$) (\S6.1). \\
+\coq{dom_convection_*} & dominant convection ($\Reh\to\infty$): genuine \coq{tendsto_at_top} limits (\S6.2). \\
+\coq{dom_reaction_*} & dominant reaction ($\Dah\to\infty$): $\tau_1\sigma\to1$, $\Dah$-independence of $\tau_2$ (paper \S6.3). \\
+\coq{convection_coefficient}, \coq{viscous_coefficient}, \coq{pressure_coefficient}, \coq{reaction_coefficient}, \coq{forcing_coefficient} & nondimensionalisation coefficients $\Reh,1,(1{+}\Reh{+}\Dah),\Dah$ (\lbl{eq:DimensionlessMomentumEquation}, \lbl{eq:PressureScale}). \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{ManufacturedSolution.v} --- \S7: the manufactured solution}\label{sec:crossMMS}
+
+Mirrors \file{manufactured_solution_verification.py}; genuine
+\coq{derivable_pt_lim} derivatives.
+
+\begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Paper content} \\
+\midrule \endhead
+\coq{manufactured_mass_conservation_2d/3d} & $\nabla\!\cdot(\alpha\mathbf u)=0$ for arbitrary differentiable positive $\alpha$ (\lbl{eq:ManufacturedProblem}). \\
+\coq{boundary_trace_nonzero} & $u_2(0,0)>0$: the trace does not vanish (amendment A11). \\
+\coq{rhs_closed_form}, \coq{denominator_gap}, \coq{mid_le_rhs}, \coq{eps_choice_margin} & the \lbl{eq:EpsilonRef} chain at $C_2=10^{-2}$, and $\varepsilon:=10^{-4}\varepsilon_{\mathrm{ref}}$. \\
+\coq{dbf_a_nonneg}, \coq{dbf_b_nonneg} & DBF coefficients admissible on $0<\alpha\le1$ (\lbl{eq:DBFResistanceTerm}). \\
+\coq{alpha_lit_at_1}, \coq{alpha_lit_deriv(_pos)}, \coq{alpha_lit_at_0_range} & literature profile $\alpha(y)=0.45+0.55e^{y-1}$ (paper \S7.3). \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{PlateauBump.v} --- \S7: the plateau bump, through \texorpdfstring{$C^1$}{C1}}\label{sec:crossBump}
+
+$\gamma(\eta)=(2\eta-1)/(\eta(1-\eta))$,
+$\alpha_{\mathrm{mid}}=1-(1-\alpha_0)/(1+e^\gamma)$
+(\lbl{eq:PlateauBumpFunction}, \lbl{eq:Gamma}). Explicit $\varepsilon$--$\delta$
+on $t<e^t$ and $t^3/27\le e^t$.
+
+\begin{longtable}{@{}L{0.40\textwidth}L{0.55\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Paper content} \\
+\midrule \endhead
+\coq{gam_deriv}, \coq{gam'_pos}, \coq{q_deriv}, \coq{am_deriv}, \coq{am'_pos} & genuine derivatives of $\gamma$ and $\alpha_{\mathrm{mid}}$; strict monotonicity. \\
+\coq{am_range} & $\alpha_0<\alpha_{\mathrm{mid}}<1$ unconditionally. \\
+\coq{exp_gam_small}, \coq{exp_gam_cubic_small}, \coq{gam'_upper_small/_big} (and mirrors) & quantitative decay bounds near $0$ and $1$. \\
+\coq{am_limit_0}, \coq{am_limit_1} & continuity of the joins ($C^0$). \\
+\coq{am'_limit_0}, \coq{am'_limit_1} & vanishing derivative at the joins ($C^1$). \\
+\bottomrule
+\end{longtable}
+
+The paper's $C^\infty$ claim rests on every derivative vanishing at the joins;
+the \emph{first-order} case (which the SymPy script also checks) is what is
+formalised.
+
+\subsection{Infrastructure: \texttt{Limits.v} and \texttt{DerivKit.v}}
+
+\file{Limits.v} defines \coq{tendsto_at_top}, \coq{tendsto_at_0plus},
+\coq{tendsto_at_1minus} (explicit $\varepsilon$--$\delta$, no filters), transfer
+lemmas, and the generic rational limits consumed by \file{Asymptotics.v} and
+\file{PlateauBump.v}. \file{DerivKit.v} provides \coq{derivable_pt_lim}
+helpers and derivatives of $a\cdot t$, $\sin(at)$, $\cos(at)$, $c\cdot f(t)$,
+$e^{t-1}$. Neither is paper-specific.
+
+% =====================================================================
+\section{The residual trusted base and what is left}\label{sec:left}
+% =====================================================================
+
+With the abstract layer in place, the ``what is left'' story is now a short,
+explicit list. Every item below is either (i) a named hypothesis of the two
+abstract theorems --- standard analysis, hand-audited and slated for Lean --- or
+(ii) genuinely outside the current scope, and covered by the SymPy suite.
+
+\subsection{The named trusted base of the two abstract theorems}
+
+The companion \file{LEAN_ROADMAP.md} classifies each hypothesis into three
+classes. Class~D items are assumptions on data/mesh --- hypotheses of the
+paper's theorems in any formal system, with nothing to prove. Classes~G and~I
+are the textbook analytic facts (Brenner--Scott, Ern--Guermond), hand-audited
+against the manuscript in \file{AUDIT.md}~\S4.
+
+\begin{longtable}{@{}L{0.30\textwidth}L{0.34\textwidth}cL{0.16\textwidth}@{}}
+\toprule
+\textbf{Coq hypothesis} & \textbf{Paper} & \textbf{Class} & \textbf{Status} \\
+\midrule \endhead
+\coq{HBS} & Galerkin/adjoint identity (\lbl{eq:StabilityEstimate} testing) & G & hand-audited \\
+\coq{S3} & \lbl{eq:winv-divvisc} (\lbl{lem:winv}) & I & hand-audited \\
+\coq{Heps}, \coq{H_eps} & \lbl{eq:UpperBoundOnEpsilon} / \lbl{eq:epscond} & D & assumption \\
+\coq{H_skew} & \lbl{eq:skew}, identity (i) & G & hand-audited \\
+\coq{H_ibp_vp}, \coq{H_ibp_qu} & \lbl{eq:globalibp}, identity (ii) & G & hand-audited \\
+\coq{H_elem_conv_ibp} & \lbl{eq:elemibp}, identity (iii) & G & hand-audited \\
+\coq{H_elem_p_ibp} & elemental pressure IBP (Step~6b) & G & hand-audited \\
+\coq{H_assemble_p}, \coq{H_assemble_c} & facewise assembly (Steps~6b,~6d) & G & hand-audited \\
+\coq{H_face_p}, \coq{H_face_c} & \lbl{eq:jumpest}/face estimates: H\"older $+$ $\mathrm{meas}\le Ch^{d-1}$ $+$ $L^\infty$ inverse $+$ $\alpha\le\aK$ & I,G & hand-audited \\
+\coq{H_jump} & \lbl{H:jump} & D & assumption \\
+\coq{H_mult1}, \coq{H_mult2} & bounded face multiplicity (\lbl{H:mesh}) & D & assumption \\
+\coq{Hw_gu} \dots \coq{Hw_divu} (8) & weighted inverse estimates of \lbl{lem:winv} (\lbl{eq:inverse}) & I & hand-audited \\
+\bottomrule
+\end{longtable}
+
+\noindent
+The roadmap observes that Classes~G and~I collapse onto two primitives:
+\begin{itemize}[nosep]
+  \item \textbf{Class~I} reduces to the \emph{unweighted} inverse estimate on a
+    shape-regular simplex (an $L^2$ and an $L^\infty$ version) plus a
+    weighted-to-unweighted reduction --- whose \emph{scalar} chain
+    ($\alpha_\infty/\alpha_0$ comparabilities under \lbl{H:porosity}) is
+    \emph{already machine-checked} in \file{ContinuityAlgebra.v}
+    (\coq{delta_alpha_bound}, \coq{winv_ratio}); only the norm-level gluing
+    remains.
+  \item \textbf{Class~G} reduces to the divergence theorem on a single simplex
+    for (polynomial)$\times$($W^{1,\infty}$ weight) data, plus finite
+    bookkeeping over elements and faces using continuity of the integrands.
+\end{itemize}
+
+\subsection{Hand-audited without a Coq statement}
+
+The interpolation-theoretic replacements of \lbl{lem:continterp} (and the
+triangle-inequality assembly of \lbl{thm:convergence} / \lbl{th:Convergence}
+built on them) are re-derived line by line against the manuscript in
+\file{AUDIT.md}~\S4 but do not yet have a Coq statement. This is the one part
+of the stability/continuity development still resting on the hand audit alone.
+
+\subsection{The Lean~4 roadmap (a plan, not a verification)}
+
+\file{LEAN_ROADMAP.md} lays out an assistant-driven plan to discharge
+Classes~G and~I in Lean~4 + Mathlib, with a companion statement skeleton
+\file{PorousNSToolbox.lean}. \textbf{That skeleton is explicitly a statement
+roadmap, not a proof artifact}: every target ends in \coq{sorry} and it is not
+expected to elaborate against current Mathlib without API repair. Nothing in
+the Lean file is machine-checked; it pins the intended semantics of each
+residual target (unweighted inverse estimate on a simplex, its $L^\infty$
+sibling and the face-measure bound, the weighted reductions, and the
+simplex divergence theorem) for a future formalisation loop. The dependency-minimal
+path noted there is the inverse-estimate technology, which alone would
+discharge \coq{S3} and all eight \coq{Hw_*}, shrinking
+\lbl{lemma:Stability}'s trusted base to the single Green identity \coq{HBS}.
+
+\subsection{Deliberately delegated to the SymPy suite}
+
+The Appendix~A elemental matrices
+(\file{elemental_matrices_verification.py},
+\file{elemental_bilinear_form_verification.py}) are transcription checks by
+symbolic differentiation of shape functions --- a computer-algebra task where a
+proof assistant adds cost but no assurance. They are left to SymPy.
+
+\subsection{Out of scope for standard-library Coq}
+
+Two items need machinery absent from stdlib Coq (natural in Lean~4 + Mathlib),
+covered only by the SymPy scripts: the subscale-norm equivalence of
+\file{subscale_norm_verification.py} (Appendix~B9, Rayleigh-quotient spectral
+theory), and the CDR adjoint / Green's-identity computation of
+\file{cdr_operator_verification.py} (the divergence theorem in general form).
+
+\subsection{The two standing caveats}
+
+\begin{itemize}[nosep]
+  \item \textbf{Statements, not models.} Coq certifies that each identity,
+    inequality and limit follows from the real-number axioms (and, for the two
+    abstract lemmas, the named base). It cannot certify that these are the
+    \emph{right} statements about the physics --- that requires reading them,
+    which the crosswalk is meant to make easy.
+  \item \textbf{Theory, not code.} Coq says nothing about whether the Julia or
+    Kratos solvers implement the verified formulas. That correspondence is
+    established empirically by the method-of-manufactured-solutions convergence
+    tests in the codebase (the $O(h^{k+1})$ plateaus).
+\end{itemize}
+
+% =====================================================================
+\section{Theory-side amendments applied for compatibility}\label{sec:amend}
+% =====================================================================
+
+Formalising the proofs surfaced a few points where the manuscript's hypotheses
+or notation were slightly looser than what the proofs consume. The following
+amendments (catalogued in \file{proof_verification/AUDIT.md}, findings F1--F7)
+have been \textbf{applied} to \file{theory/paper/} so the manuscript is
+$100\%$ compatible with the verified statements. None changes a mathematical
+result; each closes a precision or hygiene gap. The added text is marked with
+the manuscript's \verb|\amend{}| review macro.
+
+\begin{longtable}{@{}cL{0.72\textwidth}c@{}}
+\toprule
+\textbf{ID} & \textbf{Amendment} & \textbf{Status} \\
+\midrule \endhead
+F1 & \lbl{H:advection} now grants $\mathbf a|_K\in W^{1,\infty}(K)^d$ elementwise (with the localisation of $\nabla\!\cdot(\alpha\mathbf a)=0$ to each $K$), which identity (iii)/\lbl{eq:elemibp} --- the Coq hypothesis \coq{H_elem_conv_ibp} --- actually uses. & applied \\
+F2 & \lbl{H:porosity}'s derived bound $\alpha_{\infty,K}\le\delta_\alpha\alpha_{0,K}$ now states the element-convexity it relies on (matching \coq{delta_alpha_bound}/\coq{winv_ratio}). & applied \\
+F3 & the two previously-unlabelled coefficient displays after \lbl{eq:UpperBoundOnEpsilon} now carry stable labels \lbl{eq:ViscousCoefficientBound} and \lbl{eq:VelocityCoefficientBound} (the anchors of \coq{visc_final}/\coq{u_855}); the SymPy headers were updated to match. & applied \\
+F4 & the main-text triple norm now writes the elementwise-weighted term $\lVert\sigt_\alpha^{1/2}\mathbf u_h\rVert_h^2$ with the broken-norm subscript, matching \lbl{eq:triplenorm}. & applied \\
+F6 & a remark after \lbl{eq:Tau2Final} records that the analysis $\tau_2$ and the implemented \lbl{eq:Tau2} are equivalent up to $1+C_2<2$ (machine-checked: \coq{tau2impl_le_tau2}, \coq{tau2_le_scaled_impl}). & applied \\
+F7 & a clause notes that the coefficient bounds are written for $\aK=\alpha_{\infty,K}$; other representatives cost factors of $\delta_\alpha$. & applied \\
+\midrule
+F5 & \file{supplement.tex} is untouched SIAM template boilerplate --- a submission-set decision for the authors, left unchanged. & deferred \\
+\bottomrule
+\end{longtable}
+
+\noindent
+After these edits the paper builds clean (\coq{latexmk} exit~0, $0$ undefined
+references/citations); the two new equation labels resolve.
+
+% =====================================================================
+\section{Reproducing the check}\label{sec:repro}
+% =====================================================================
+
+From \file{proof_verification/coq-formal/}:
+\begin{lstlisting}[language=bash,keywordstyle=\color{black}]
+# one-time: install Coq / Rocq (any of)
+brew install coq          # macOS (installs Rocq 9.1.x, provides coqc/coqchk)
+apt install coq           # Debian/Ubuntu (Coq 8.x)
+opam install coq
+
+# verify
+./run_all.sh              # per-file PASS + coqchk kernel re-verification
+\end{lstlisting}
+
+\noindent
+All twelve files compile and kernel-check unchanged on Rocq~9.1.1 (the only
+console output is a deprecation notice that \coq{From Coq} is now spelled
+\coq{From Stdlib}; the $8.16$--$8.20$-compatible spelling is kept on purpose
+for portability). A passing run prints one \coq{[PASS]} line per file, then
+\emph{``coqchk: all modules kernel-verified''}.
+
+\bigskip
+\noindent\emph{Cross-references.} File-level detail and the SymPy$\leftrightarrow$Coq
+mapping: \file{README.md} in the \file{coq-formal/} directory. The step-by-step
+audit of the analytic steps and the F1--F7 findings: \file{AUDIT.md}. The Lean~4
+plan for the residual base: \file{LEAN_ROADMAP.md} and \file{PorousNSToolbox.lean}.
+The authoritative theory: \file{theory/paper/article.tex} and its appendices
+(\file{continuity_appendix.tex}, \file{fourier_appendix.tex},
+\file{elemental_matrices_appendix.tex}).
+
+\end{document}
