@@ -9,6 +9,7 @@ FETCH_HEAD
 
 # Redundant archive: the diffable extracted sources live in files/; keep the opaque zip out of git.
 docs/convergence_problems_audit/files.zip
+proof_verification/files/*.zip
 
 # Ignore compiled artifacts and test result output directories entirely
 results/
@@ -38,6 +39,7 @@ Manifest.toml
 *.so
 *.dylib
 *.dylib.*
+.nra.cache
 
 # Ignore repomix outputs
 repomix-output.*
