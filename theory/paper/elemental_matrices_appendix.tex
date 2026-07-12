@@ -317,16 +317,12 @@ Putting together the results from \cref{sec:FQComponents,sec:FVComponents,sec:KQ
 \begin{align}
   \mathbf{K} = &
   \begin{bmatrix}
-    \mathbf{I} & \mathbf{0} \\
-    \mathbf{0} & \mathbf{0}
-  \end{bmatrix} +
-  \begin{bmatrix}
-    \mathbf{G}_S + \mathbf{D}_{\nu D} + \mathbf{V} + \mathbf{G}_{\beta} + \mathbf{D}_{\beta} + \mathbf{R}_\sigma & \mathbf{P} + \mathbf{G}_P \\
-    \mathbf{Q}_D + \mathbf{G}_{\alpha D}                                                                         & \mathbf{P}_Q
+    \mathbf{G}_S + \mathbf{D}_{\nu D} + \mathbf{V} + \mathbf{R}_\sigma & \mathbf{P} + \mathbf{G}_P \\
+    \mathbf{Q}_D + \mathbf{G}_{\alpha D}                              & \mathbf{P}_Q
   \end{bmatrix} + \mathbf{K}_{\text{S}}, \\
   \mathbf{F} = &
   \begin{bmatrix}
-    \boldsymbol{V}_F \\
+    \boldsymbol{V}_F + \amend{\boldsymbol{V}_T} \\
     0
   \end{bmatrix} + \mathbf{F}_{\text{S}},
 \end{align}

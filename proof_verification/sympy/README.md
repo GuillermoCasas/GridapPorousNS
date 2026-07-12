@@ -14,7 +14,7 @@ python3 -m venv /tmp/sympy_venv && /tmp/sympy_venv/bin/pip install sympy numpy
 /tmp/sympy_venv/bin/python "run_all.py"
 ```
 
-Current status: **106/106 checks pass across 8 scripts.**
+Current status: **110/110 checks pass across 9 scripts.**
 
 | Script | Paper location | What it verifies | Checks |
 |---|---|---|---|
@@ -25,6 +25,7 @@ Current status: **106/106 checks pass across 8 scripts.**
 | `manufactured_solution_verification.py` | §7 (`eq:ManufacturedProblem`, `eq:PlateauBumpFunction`, `eq:Gamma`, `eq:EpsilonRef`, literature example) | `∇·(αu)=0` (2D and the 3D z-extruded field); the boundary-trace point (A11); the plateau-bump `dγ/dη>0`, limits/monotonicity/`C^∞` joining; the `eq:EpsilonRef` chain and that `ε=10⁻⁴ε_ref` meets A1 with `C₂=10⁻²`; the literature DBF `a(α),b(α)≥0` and porosity profile. | 17 |
 | `elemental_matrices_verification.py` | App. A Galerkin terms | Each Galerkin elemental component `T_(ai)(bj)=∂T/∂U_j^b` re-derived by symbolic differentiation and matched to the printed formula. | 19 |
 | `elemental_bilinear_form_verification.py` | App. A stabilization LHS+RHS (`eq:StabilizationLVLU`, `eq:StabilizationLVF`) | **All ~60 stabilization matrix terms** (by family vs. the bilinear form) **plus the RHS vectors** `F_V` (`A_F…V_φ`) and `F_Q` (`Q_αF, Q_φ`). | 14 |
+| `assembly_consistency_verification.py` | App. A assembly (`\mathbf{K}, \mathbf{K}_S, \mathbf{F}, \mathbf{F}_S`) | **Structural (bookkeeping)** cross-check the two scripts above cannot see: every matrix *named* in the assembled `K/K_S/F/F_S` must be *defined*, and every *defined* matrix must appear in the assembly. Parses the appendix directly. | 4 |
 | `subscale_norm_verification.py` | §4 (`eq:BoundProjectionOfLBySubscales`, B9) | The operator-norm bound `|L̂û|²_Λ ≤ |L̂|²_Λ|û|²_{Λ⁻¹}` (Monte-Carlo, `n=3,4`), the B9 formula `|L̂|²_Λ=ρ_{Λ⁻¹}(L̂^†ΛL̂)`, and tightness at the maximizing eigenvector. | 8 |
 
 ---
@@ -63,6 +64,20 @@ Current status: **106/106 checks pass across 8 scripts.**
   - `G_βF` (`eq:GBetaFTerm`) — its second forcing index should be `f̄ᵢ`, not `f̄ₖ`;
   - `Q_φ` (`eq:QPhiTerm`) — sign should be `−τ₂ ε Nᵃ φ̄` (to match `eq:StabilizationLVF`'s
     own `−(ε/α)q`, consistent with the verified `Q_P`).
+- **Assembly bookkeeping (App. A "Putting together the results") — complete.**
+  The content checks above verify each matrix *in isolation* but never look at
+  the assembled displays. `assembly_consistency_verification.py` closes that gap:
+  it enforces that every matrix *named* in `K, K_S, F, F_S` is *defined* and
+  every *defined* matrix is *used*. Running it against the July-2026 revision
+  **found and fixed four assembly-display defects** — three *named-but-undefined*
+  (`I`, a transient mass matrix, identically zero in this stationary paper; and
+  the bare `G_β`, `D_β`, which exist only as two-subscript stabilization
+  cross-terms, never as Galerkin blocks) and one *defined-but-unused* (`V_T`, the
+  Neumann traction load, silently dropped from `F`). Since the Galerkin viscous
+  term `2ν(α∇v,∇ˢu) − (2ν/3)(α∇·v,∇·u)` differentiates to exactly `G_S + D_νD`
+  (no `∇α`; porosity gradients arise only in the stabilization), the bare
+  `G_β, D_β` were mathematically spurious rather than mere typos. Full write-up:
+  [`docs/part_i_erratum.md`](../../docs/part_i_erratum.md).
 
 ### Verifiable, not yet encoded (one remaining)
 - **The Galerkin coercivity identity `eq:StabilityEstimate` itself** (the
