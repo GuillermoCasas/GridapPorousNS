@@ -231,3 +231,32 @@ Qed.
 (*  Monotonicity of the square root, restated for convenience. *)
 Lemma sqrt_mono : forall x y : R, x <= y -> sqrt x <= sqrt y.
 Proof. exact sqrt_le_1_alt. Qed.
+
+(*  The discrete l2-in-l1 inequality:  sqrt (sum a_k^2) <= sum a_k  for
+    nonnegative entries (the appendix's eq:Enorm step). *)
+Lemma sqrt_sum_sq_le_sum :
+  forall (K : Type) (l : list K) (f : K -> R),
+    (forall k, 0 <= f k) ->
+    sqrt (Rsum l (fun k => (f k)^2)) <= Rsum l f.
+Proof.
+  intros K l f Hf. induction l as [| a t IH]; cbn [Rsum].
+  - rewrite sqrt_0. lra.
+  - assert (HS0 : 0 <= Rsum t (fun k => (f k)^2))
+      by (apply Rsum_nonneg; intro k; apply pow2_ge_0).
+    assert (HT0 : 0 <= Rsum t f) by (apply Rsum_nonneg; exact Hf).
+    pose proof (Hf a) as Ha.
+    apply nonneg_le_of_sqr; [apply sqrt_pos | lra |].
+    replace ((sqrt ((f a)^2 + Rsum t (fun k => (f k)^2)))^2)
+      with (sqrt ((f a)^2 + Rsum t (fun k => (f k)^2))
+            * sqrt ((f a)^2 + Rsum t (fun k => (f k)^2))) by ring.
+    rewrite sqrt_sqrt by (pose proof (pow2_ge_0 (f a)); lra).
+    (*  (f a + S)^2 >= f a ^2 + (sqrt of tail bound)^2  *)
+    assert (Hsq : (sqrt (Rsum t (fun k => (f k)^2)))^2
+                  = Rsum t (fun k => (f k)^2)).
+    { replace ((sqrt (Rsum t (fun k => (f k)^2)))^2)
+        with (sqrt (Rsum t (fun k => (f k)^2))
+              * sqrt (Rsum t (fun k => (f k)^2))) by ring.
+      apply sqrt_sqrt; exact HS0. }
+    assert (Hst : 0 <= sqrt (Rsum t (fun k => (f k)^2))) by apply sqrt_pos.
+    nra.
+Qed.

@@ -7,7 +7,7 @@
 (*  flows in inhomogeneous porous media* (Casas, González-Usúa, Codina,      *)
 (*  de-Pouplana).                                                            *)
 (*                                                                           *)
-(*  Mirrors proof_verification/sympy/stability_estimate_verification.py.  *)
+(*  Mirrors theory/verification scripts/stability_estimate_verification.py.  *)
 (*  With                                                                     *)
 (*     tau1NS^{-1} = c1 nu/h^2 + c2 |a|/h            (eq:TauNavierStokes)    *)
 (*     tau1  = (alpha_K tau1NS^{-1} + sigma)^{-1}    (eq:Tau1Final)          *)

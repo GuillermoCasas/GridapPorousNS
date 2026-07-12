@@ -6,7 +6,7 @@
 (*  finite element method for incompressible, inertial flows in              *)
 (*  inhomogeneous porous media* (eq:PlateauBumpFunction, eq:Gamma).                            *)
 (*                                                                           *)
-(*  Mirrors proof_verification/sympy/manufactured_solution_verification.  *)
+(*  Mirrors theory/verification scripts/manufactured_solution_verification.  *)
 (*  py (bump section).  With                                                 *)
 (*      gamma(eta)  = (2 eta - 1) / (eta (1 - eta)),                         *)
 (*      alpha_mid   = 1 - (1 - alpha0) / (1 + e^{gamma(eta)}),               *)

@@ -7,6 +7,8 @@ AbstractSums.v
 InnerSpace.v
 AbstractStability.v
 AbstractContinuity.v
+AbstractInterpolation.v
+AbstractConvergence.v
 TauDesign.v
 Asymptotics.v
 ManufacturedSolution.v

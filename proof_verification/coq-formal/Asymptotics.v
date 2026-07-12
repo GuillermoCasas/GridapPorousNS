@@ -5,7 +5,7 @@
 (*  analysis of Section 6 of *A stabilized finite element method for         *)
 (*  incompressible, inertial flows in inhomogeneous porous media*.           *)
 (*                                                                           *)
-(*  Mirrors proof_verification/sympy/robustness_asymptotics_verification. *)
+(*  Mirrors theory/verification scripts/robustness_asymptotics_verification. *)
 (*  With the exact parameters (equal-order constants c1 = c2 = 1),           *)
 (*      |a|    = Re_h nu / h,          sigma = Da_h alpha_K nu / h^2,        *)
 (*      tau1NS^{-1} = nu/h^2 + |a|/h = (nu/h^2)(1 + Re_h),                   *)

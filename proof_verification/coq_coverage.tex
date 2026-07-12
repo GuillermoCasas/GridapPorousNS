@@ -71,8 +71,8 @@
 \title{\bfseries Machine-checked coverage map:\\
        from the paper's theory to the Coq formalisation}
 \author{Coverage note accompanying \file{proof_verification/coq-formal/}}
-\date{Revised 2026-07-11 \quad (12 files, $\approx$384 theorems;
-      Rocq/Coq build verified: version 9.1.1)}
+\date{Revised 2026-07-12 \quad (14 files, $\approx$531 theorems;
+      developed on Coq 8.18; all 14 files build-verified on Rocq 9.1.1)}
 
 \begin{document}
 \maketitle
@@ -87,11 +87,16 @@ under \file{theory/paper/}, and the Coq formalisation under
 \file{proof_verification/coq-formal/}, which re-proves the paper's algebraic
 and analytic \emph{claims} from the axioms of the real numbers and has them
 re-checked by Coq's trusted kernel. \textbf{The headline of the current
-revision: \lbl{lemma:Stability} and \lbl{lemma:Continuity} are now complete
-machine-checked theorems} (\coq{abstract_stability},
-\coq{abstract_continuity_sharp}, \coq{abstract_continuity}), proved over an
+revision: the paper's entire a priori chain --- \lbl{lemma:Stability},
+\lbl{lemma:Continuity}, \lbl{lem:continterp} and \lbl{thm:convergence} ---
+now consists of complete machine-checked theorems}
+(\coq{abstract_stability}, \coq{abstract_continuity},
+\coq{abstract_continterp}, \coq{abstract_convergence}), proved over an
 abstract inner-product / mesh interface from a short, \emph{named,
-quantitative} trusted base of standard analytic facts. Section~\ref{sec:coq}
+quantitative} trusted base of standard analytic facts; the convergence
+theorem is a genuine kernel-level \emph{composition} of the closed
+stability and interpolation-continuity lemmas, with the triple-norm
+triangle inequality proved rather than assumed. Section~\ref{sec:coq}
 is a primer on how Coq (now \emph{Rocq}) works and what ``machine-checked''
 buys. Section~\ref{sec:map} explains the translation convention --- including
 how a lemma with functional-analytic hypotheses is honestly encoded.
@@ -114,11 +119,12 @@ guarantee is and where residual trust remains.
 The Coq development mirrors, file by file, the SymPy ``verification scripts''
 suite in \file{proof_verification/sympy/}: where SymPy checks an identity
 by symbolic computation, the Coq files \emph{prove} it. The suite is
-\textbf{12 files, $\approx 384$ theorems, all proved} --- there is no
+\textbf{14 files, $\approx 531$ theorems, all proved} --- there is no
 \coq{Admitted}, no \coq{Axiom} and no \coq{admit} anywhere in the sources
 (\coq{grep} confirms this). It was developed against Coq~8.18 using
-\emph{only} the standard library, and it compiles and kernel-checks unchanged
-under the current Rocq~9.1.1.
+\emph{only} the standard library, and all fourteen files compile and
+kernel-check unchanged under the current Rocq~9.1.1 (the two new files use
+no constructs beyond those of the existing suite).
 
 What changed since the previous revision is a step up in \emph{kind}, not just
 in count. Previously the Coq layer certified the \emph{algebraic skeleton} of
@@ -137,6 +143,25 @@ step, the difference-of-squares cancellation, all eighteen term bounds, the
 jump treatment, and the assembly over elements and faces are now inside the
 kernel.
 
+The present revision closes the last remaining corner. Two new files ---
+\file{AbstractInterpolation.v} and \file{AbstractConvergence.v} --- prove
+\lbl{lem:continterp} and \lbl{thm:convergence} as complete theorems. The
+first reruns the continuity machinery with the first argument equal to the
+interpolation error, exactly as the appendix's proof prescribes: the
+discrete inverse estimates on the first slot are replaced by the
+interpolation estimates \lbl{eq:interpdivvisc}--\lbl{eq:interpinftyE}
+(seven named hypotheses \coq{HI_*}, one constant), while the discrete
+second argument keeps its hypotheses verbatim. The second composes the two
+closed lemmas \emph{inside the kernel}: \coq{abstract_stability} is
+applied to the discrete error, \coq{abstract_continterp} to the
+(interpolation error, discrete error) pair, the two are glued by Galerkin
+orthogonality (\coq{Horth}) and the tested identity for the
+discrete-error pair (\coq{HBS_W}), and the triangle inequality for the
+mesh-dependent triple norm is \emph{proved} from the pre-Hilbert axioms.
+Even the agreement of the $\tau_1,\tau_2,\sigt$ formulas across the two
+scalar-algebra modules is machine-checked (\coq{tau1_agree},
+\coq{tau2_agree}, \coq{sigt_agree}).
+
 Two boundaries still frame everything.
 \begin{itemize}[nosep]
   \item \textbf{Coverage boundary.} Coq certifies the mathematics down to a
@@ -145,9 +170,12 @@ Two boundaries still frame everything.
     (Brenner--Scott, Ern--Guermond), hand-audited against the manuscript and
     slated for a Lean~4 formalisation
     (Section~\ref{sec:left}). It is \emph{stated quantitatively} as hypotheses,
-    so the abstract theorems are genuine implications, not sketches. Only the
-    interpolation-theoretic replacements of \lbl{lem:continterp} remain
-    hand-audited without a Coq statement.
+    so the abstract theorems are genuine implications, not sketches. The
+    base now also contains the interpolation estimates of
+    \lbl{eq:interp}/\lbl{eq:interpinfty} (Bramble--Hilbert technology),
+    which enter \lbl{lem:continterp} as the named hypotheses \coq{HI_*},
+    and the Galerkin-orthogonality item \coq{Horth} of the convergence
+    file.
   \item \textbf{Meaning boundary.} Coq verifies the \emph{mathematics as
     stated}: that each identity, inequality or limit follows from the
     real-number axioms and the named base. It does \emph{not} certify that the
@@ -197,9 +225,9 @@ here:
     single one would let anything ``follow''.
   \item \coq{Axiom} postulates a statement as true without proof.
 \end{itemize}
-Neither appears anywhere in the twelve files. Consequently every result below
+Neither appears anywhere in the fourteen files. Consequently every result below
 is reduced to the standard-library axiomatisation of the real numbers (plus,
-for the two abstract lemmas, the explicitly-listed analytic hypotheses ---
+for the four abstract theorems, the explicitly-listed analytic hypotheses ---
 Section~\ref{sec:left}). The suite uses \emph{no external libraries} (no
 Mathcomp, no Coquelicot): the analysis is done on \coq{Coq.Reals} with the
 arithmetic tactics \coq{lra}/\coq{nra} (linear and nonlinear real arithmetic)
@@ -385,7 +413,7 @@ the summation over the mesh --- is machine-checked.
 An entry marked as covered means: \emph{the displayed relation is a theorem of
 real arithmetic under the stated hypotheses}. For the algebraic files the
 hypotheses are only positivity, so the theorem is unconditional in the
-mathematics. For the two abstract lemmas the hypotheses additionally include
+mathematics. For the four abstract theorems the hypotheses additionally include
 the named analytic base of Section~\ref{sec:left}; the green check asserts the
 \emph{implication}, and the honesty of the result rests on that base being
 exactly the standard, hand-audited facts it is labelled as.
@@ -394,11 +422,11 @@ exactly the standard, hand-audited facts it is labelled as.
 \section{The crosswalk: theory \texorpdfstring{$\to$}{->} Coq}\label{sec:crosswalk}
 % =====================================================================
 
-Dependency and topic map of the twelve files. \file{Limits.v}/\file{DerivKit.v}
+Dependency and topic map of the fourteen files. \file{Limits.v}/\file{DerivKit.v}
 serve the concrete analytic files; \file{AbstractSums.v}/\file{InnerSpace.v}
-serve the two abstract files, which also import the closed algebraic theorems
-of \file{StabilityAlgebra.v}/\file{ContinuityAlgebra.v} and apply them per
-element.
+serve the four abstract-theorem files, which also import the closed algebraic
+theorems of \file{StabilityAlgebra.v}/\file{ContinuityAlgebra.v} and apply them
+per element.
 
 \begin{center}
 \small
@@ -414,6 +442,8 @@ Coq file & Paper location & Role \\
 \file{ContinuityAlgebra.v} & \S\ref{sec:crossCont} (App.\ B) & continuity proof, scalar algebra \\
 \file{AbstractStability.v} & \S\ref{sec:crossAbsStab} (\S5) & \lbl{lemma:Stability}, complete theorem \\
 \file{AbstractContinuity.v}& \S\ref{sec:crossAbsCont} (App.\ B) & \lbl{lemma:Continuity}, complete theorem \\
+\file{AbstractInterpolation.v}& \S\ref{sec:crossAbsInterp} (App.\ B) & \lbl{lem:continterp}, complete theorem \\
+\file{AbstractConvergence.v}& \S\ref{sec:crossAbsConv} (App.\ B) & \lbl{thm:convergence}, complete theorem \\
 \file{TauDesign.v}   & \S\ref{sec:crossTau} (\S4 + App.\ C) & Fourier design of $\tau_1,\tau_2$ \\
 \file{Asymptotics.v} & \S\ref{sec:crossAsym} (\S6)     & robustness in $(\Reh,\Dah)$ \\
 \file{ManufacturedSolution.v} & \S\ref{sec:crossMMS} (\S7) & manufactured solution \\
@@ -530,6 +560,89 @@ Section~\ref{sec:left}.
 \bottomrule
 \end{longtable}
 
+\subsection{\texttt{AbstractInterpolation.v} --- \lbl{lem:continterp} as a complete theorem}\label{sec:crossAbsInterp}
+
+The continuity machinery rerun with the first argument equal to the
+interpolation error $E=U-\widehat U_h$, exactly as the appendix's proof
+prescribes. The first-slot vector family now models $E$; two nonnegative
+elemental size functionals $\mathtt{IU}\,k\sim E_{\mathrm{int},K}(\mathbf u)$
+and $\mathtt{IP}\,k\sim E_{\mathrm{int},K}(p)$ enter through the seven
+interpolation hypotheses \coq{HI_*} (the replacement table
+\lbl{eq:interpdivvisc}--\lbl{eq:interpzero}, one constant \coq{CI}) and
+through the two face-integral hypotheses, whose first-argument $L^\infty$
+content is now the interpolation estimate \lbl{eq:interpinftyE}. The
+discrete second argument keeps its hypotheses verbatim (the appendix's
+observation~(1): the exact identities remain valid for $E$).
+
+\begin{longtable}{@{}L{0.40\textwidth}L{0.55\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Appendix content (all machine-checked)} \\
+\midrule \endhead
+\coq{bound_T6}, \coq{bound_T7}, \coq{bound_T8} & the Step-4 chains with
+\lbl{eq:interpdivvisc} in place of the double inverse estimate; explicit
+constants $4\bar C_{\mathrm{inv}}C_I/c_1$, $2C_I/\sqrt{c_1}$. \\
+\coq{bound_VolP}, \coq{bound_II_V} & Steps 6b--6c with the $m'{=}0$
+estimates \lbl{eq:interpzero} on the first slot. \\
+\coq{bound_JmpP}, \coq{bound_III} & the jump terms with
+\lbl{eq:interpinftyE} replacing the $L^\infty$ inverse estimate on the
+first argument (V-side kept), through the same facewise C--S and
+multiplicity machinery. \\
+\coq{absorb_elem}, \coq{interp_triple_norm} & the Step-9 absorption with
+the interpolation table; \lbl{eq:Enorm} in its sharp $\ell^2$ form,
+$|||E|||\le\sqrt2\,K_{\mathrm{agg}}^{I}\,(\Psi_U+\Psi_P)$. \\
+\coq{abstract_continterp_sharp} & the three-group assembly, in
+absolute-value form. \\
+\coq{abstract_continterp} & \textbf{\lbl{lem:continterp}}:
+$|B_S(E,V_h)|\le C_{\mathrm{tot}}^{I}\,(\Psi_U+\Psi_P)\,|||V_h|||$, the
+$\ell^2$ (porosity-weighted) form of $\psi(h)$; constants fully explicit. \\
+\coq{abstract_continterp_l1} & the appendix's $\ell^1$ form of
+\lbl{eq:psih}, via the discrete $\ell^2\subset\ell^1$ inequality
+(\coq{sqrt_sum_sq_le_sum}, proved in \file{AbstractSums.v}). \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{AbstractConvergence.v} --- \lbl{thm:convergence} as a kernel-level composition}\label{sec:crossAbsConv}
+
+The convergence theorem proved by literally \emph{applying} the two closed
+theorems inside Coq --- not by re-deriving them and not by assuming their
+conclusions. \coq{abstract_stability} is instantiated at the discrete
+error $E_h=\widehat U_h-U_h$ (its inverse-estimate input is literally the
+V-side hypothesis \coq{Hw_dv}; its $\varepsilon$-condition is
+definitionally the same \lbl{eq:epscond}), \coq{abstract_continterp} at
+the pair $(E,E_h)$. The only trusted additions over the union of the two
+prior files are \coq{HBS_W} (the tested identity for the discrete-error
+pair --- the same class-G item as the stability lemma's own \coq{HBS}) and
+\coq{Horth} (Galerkin orthogonality \lbl{eq:consistency} together with
+bilinearity of $B_S$ in its first argument).
+
+\begin{longtable}{@{}L{0.40\textwidth}L{0.55\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Content (all machine-checked)} \\
+\midrule \endhead
+\coq{tau1_agree}, \coq{tau2_agree}, \coq{sigt_agree} & the
+$\tau_1,\tau_2,\sigt$ formulas of \file{StabilityAlgebra.v} and
+\file{ContinuityAlgebra.v} agree (the first two definitionally, the third
+as a field identity): the two developments provably speak about the same
+parameters. \\
+\coq{NW2_bridge} & the stability file's $|||E_h|||^2$ equals the
+continuity file's, term by term over the mesh. \\
+\coq{stab_W}, \coq{cont_EW} & the two closed theorems, applied. \\
+\coq{NW_bound} & $|||E_h|||\le(C_{\mathrm{tot}}^{I}/\Cstab)\,\psi$: the
+appendix's chain
+$C|||E_h|||^2\le B_S(E_h,E_h)=-B_S(E,E_h)\le C\psi\,|||E_h|||$. \\
+\coq{Qk_CS}, \coq{sumQ_CS}, \coq{NErr_triangle} & the triangle inequality
+for the mesh-dependent triple norm, \emph{proved} from the pre-Hilbert
+axioms: per-element five-fold Cauchy--Schwarz (the discrete C--S applied
+over an explicit five-element index list), then the discrete C--S over the
+mesh. \\
+\coq{abstract_convergence} & \textbf{\lbl{thm:convergence}}:
+$|||U-U_h|||\le(K_{\mathrm{abs}}^{I}+C_{\mathrm{tot}}^{I}/\Cstab)
+(\Psi_U+\Psi_P)$ --- the porosity-weighted sharp form of
+\lbl{rem:sharperconv}. \\
+\coq{abstract_convergence_l1} & \lbl{eq:convergence}'s $\ell^1$ line. \\
+\bottomrule
+\end{longtable}
+
 \subsection{\texttt{TauDesign.v} --- \S4 / Appendix C: Fourier design of \texorpdfstring{$\tau$}{tau}}\label{sec:crossTau}
 
 Mirrors \file{fourier_tau_verification.py}. Section hypotheses: $\nu,\alpha,h>0$.
@@ -618,11 +731,11 @@ $e^{t-1}$. Neither is paper-specific.
 % =====================================================================
 
 With the abstract layer in place, the ``what is left'' story is now a short,
-explicit list. Every item below is either (i) a named hypothesis of the two
-abstract theorems --- standard analysis, hand-audited and slated for Lean --- or
-(ii) genuinely outside the current scope, and covered by the SymPy suite.
+explicit list. Every item below is either (i) a named hypothesis of the
+abstract theorems --- standard analysis, hand-audited and slated for Lean ---
+or (ii) genuinely outside the current scope, and covered by the SymPy suite.
 
-\subsection{The named trusted base of the two abstract theorems}
+\subsection{The named trusted base of the abstract theorems}
 
 The companion \file{LEAN_ROADMAP.md} classifies each hypothesis into three
 classes. Class~D items are assumptions on data/mesh --- hypotheses of the
@@ -645,9 +758,21 @@ against the manuscript in \file{AUDIT.md}~\S4.
 \coq{H_face_p}, \coq{H_face_c} & \lbl{eq:jumpest}/face estimates: H\"older $+$ $\mathrm{meas}\le Ch^{d-1}$ $+$ $L^\infty$ inverse $+$ $\alpha\le\aK$ & I,G & hand-audited \\
 \coq{H_jump} & \lbl{H:jump} & D & assumption \\
 \coq{H_mult1}, \coq{H_mult2} & bounded face multiplicity (\lbl{H:mesh}) & D & assumption \\
-\coq{Hw_gu} \dots \coq{Hw_divu} (8) & weighted inverse estimates of \lbl{lem:winv} (\lbl{eq:inverse}) & I & hand-audited \\
+\coq{Hw_gu} \dots \coq{Hw_divu} (8) & weighted inverse estimates of \lbl{lem:winv} (\lbl{eq:inverse}); \lbl{lem:continterp} keeps only the three V-side ones & I & hand-audited \\
+\coq{HI_gu} \dots \coq{HI_pp} (7) & interpolation estimates \lbl{eq:interp}/\lbl{eq:interpinfty} via the replacement table \lbl{eq:interpdivvisc}--\lbl{eq:interpzero} (Bramble--Hilbert) & I & hand-audited \\
+\coq{HBS_W} & the tested identity \lbl{eq:StabilityEstimate} for the discrete-error pair (same class as \coq{HBS}) & G & hand-audited \\
+\coq{Horth} & Galerkin orthogonality \lbl{eq:consistency} $+$ bilinearity of $B_S$ in its first argument & G & hand-audited \\
 \bottomrule
 \end{longtable}
+
+\noindent
+Interface integrity is itself machine-checked: stability's
+inverse-estimate input is literally the hypothesis \coq{Hw_dv}, its
+$\varepsilon$-condition is definitionally \lbl{eq:epscond}
+(\coq{Heps_W}), and the $\tau_1,\tau_2,\sigt$ formulas of the two
+scalar-algebra modules are proved to agree
+(\coq{tau1_agree}/\coq{tau2_agree}/\coq{sigt_agree}), so the composed
+statements provably concern the same quantities.
 
 \noindent
 The roadmap observes that Classes~G and~I collapse onto two primitives:
@@ -658,7 +783,10 @@ The roadmap observes that Classes~G and~I collapse onto two primitives:
     ($\alpha_\infty/\alpha_0$ comparabilities under \lbl{H:porosity}) is
     \emph{already machine-checked} in \file{ContinuityAlgebra.v}
     (\coq{delta_alpha_bound}, \coq{winv_ratio}); only the norm-level gluing
-    remains.
+    remains. With \lbl{lem:continterp} formalised, Class~I now also contains
+    the interpolation estimates \coq{HI_*} --- Bramble--Hilbert/Deny--Lions
+    technology on a shape-regular simplex, the natural companion Lean
+    target.
   \item \textbf{Class~G} reduces to the divergence theorem on a single simplex
     for (polynomial)$\times$($W^{1,\infty}$ weight) data, plus finite
     bookkeeping over elements and faces using continuity of the integrands.
@@ -666,11 +794,14 @@ The roadmap observes that Classes~G and~I collapse onto two primitives:
 
 \subsection{Hand-audited without a Coq statement}
 
-The interpolation-theoretic replacements of \lbl{lem:continterp} (and the
-triangle-inequality assembly of \lbl{thm:convergence} / \lbl{th:Convergence}
-built on them) are re-derived line by line against the manuscript in
-\file{AUDIT.md}~\S4 but do not yet have a Coq statement. This is the one part
-of the stability/continuity development still resting on the hand audit alone.
+None remain within the stability/continuity/convergence development: with
+\file{AbstractInterpolation.v} and \file{AbstractConvergence.v}, the
+interpolation replacements of \lbl{lem:continterp} and the
+triangle-inequality assembly of \lbl{thm:convergence} --- previously the
+one corner resting on the hand audit alone --- are inside the kernel (the
+triangle inequality is \emph{proved}, not assumed). What remains outside
+Coq is exactly the SymPy-delegated and out-of-scope material of the next
+two subsections, plus the named hypothesis base above.
 
 \subsection{The Lean~4 roadmap (a plan, not a verification)}
 
@@ -707,8 +838,8 @@ theory), and the CDR adjoint / Green's-identity computation of
 
 \begin{itemize}[nosep]
   \item \textbf{Statements, not models.} Coq certifies that each identity,
-    inequality and limit follows from the real-number axioms (and, for the two
-    abstract lemmas, the named base). It cannot certify that these are the
+    inequality and limit follows from the real-number axioms (and, for the four
+    abstract theorems, the named base). It cannot certify that these are the
     \emph{right} statements about the physics --- that requires reading them,
     which the crosswalk is meant to make easy.
   \item \textbf{Theory, not code.} Coq says nothing about whether the Julia or
@@ -765,7 +896,7 @@ and cannot be hurried, fatigued, or won over by plausibility. Here that check
 is then \emph{repeated by a second, independent program} (\coq{coqchk}) which
 re-derives everything from the compiled proof terms without trusting the first.
 
-The practical consequence: for every theorem in these twelve files, the claim
+The practical consequence: for every theorem in these fourteen files, the claim
 \emph{``the stated conclusion follows from the stated hypotheses''} is no longer
 a matter of belief or of referee diligence. The only way such a statement could
 still be false is if the two independent kernels shared a soundness bug that
@@ -819,22 +950,27 @@ Only the trust base (kernel $+$ real-number axioms). The positivity hypotheses
 are physically trivial. \\
 \midrule
 \textbf{2. Certain \emph{as an implication} \newline (conditional)} &
-\lbl{lemma:Stability} and \lbl{lemma:Continuity}: the coercivity bound
-$B_S\ge\Cstab\,|||U_h|||^2$ and the continuity bound
-$B_S\le C_{\mathrm{tot}}(\mathrm{Br}_U+\mathrm{Br}_P)|||V|||$, with explicit
-constants and every intermediate step (Cauchy--Schwarz, Young, the
-eighteen-term bookkeeping, the jump treatment, the summation over the mesh)
-inside the kernel. &
+\lbl{lemma:Stability}, \lbl{lemma:Continuity}, \lbl{lem:continterp} and
+\lbl{thm:convergence}: the coercivity bound
+$B_S\ge\Cstab\,|||U_h|||^2$, the continuity bound
+$B_S\le C_{\mathrm{tot}}(\mathrm{Br}_U+\mathrm{Br}_P)|||V|||$, the
+interpolation-error continuity
+$|B_S(E,V_h)|\le C_{\mathrm{tot}}^{I}(\Psi_U+\Psi_P)|||V_h|||$ and the
+convergence estimate
+$|||U-U_h|||\le(K_{\mathrm{abs}}^{I}+C_{\mathrm{tot}}^{I}/\Cstab)
+(\Psi_U+\Psi_P)$, with explicit constants and every intermediate step
+(Cauchy--Schwarz, Young, the eighteen-term bookkeeping, the jump
+treatment, the summation over the mesh, the triple-norm triangle
+inequality, the composition itself) inside the kernel. &
 Trust base, \emph{plus} the dozen named analytic hypotheses of \S\ref{sec:left}
 (Green-type identities, inverse estimates) holding --- standard, hand-audited,
 Lean-targeted. \\
 \midrule
-\textbf{3. Hand-audited only \newline (no kernel check yet)} &
-The interpolation replacements \lbl{lem:continterp} and the convergence theorem
-\lbl{th:Convergence} built on them; the Appendix~A elemental-matrix
-transcription (left to SymPy); the subscale-norm / CDR-adjoint items outside
-stdlib-Coq scope. &
-The ordinary risk of a careful human proof. Next to be formalised. \\
+\textbf{3. Outside the Coq scope \newline (SymPy-verified)} &
+The Appendix~A elemental-matrix transcription (left to SymPy by design);
+the subscale-norm / CDR-adjoint items outside stdlib-Coq scope. &
+The ordinary risk of a careful symbolic computation, mitigated by the
+SymPy suite. \\
 \bottomrule
 \end{longtable}
 
@@ -848,9 +984,10 @@ In decreasing order of how much unformalised trust they still carry:
     The Lean~4 roadmap targets exactly these, and notes that the
     inverse-estimate technology alone would shrink \lbl{lemma:Stability}'s
     residual base to the single Green identity \coq{HBS}.
-  \item \textbf{Interpolation and convergence} (\lbl{lem:continterp},
-    \lbl{th:Convergence}): the one corner of the stability/continuity argument
-    with no Coq statement at all --- hand-audited only.
+  \item \textbf{The two consistency-class items of the convergence file}
+    (\coq{HBS_W}, \coq{Horth}): Green-type material of the same character
+    as \coq{HBS}, hand-audited; the interpolation estimates \coq{HI_*}
+    join the Class-I Lean targets.
   \item \textbf{The data / mesh assumptions} (\lbl{H:jump}, \lbl{H:mesh}, the
     $\varepsilon$-condition, positivity): not gaps in any proof but
     \emph{conditions of applicability} --- hypotheses the mesh and data must
@@ -867,11 +1004,12 @@ In decreasing order of how much unformalised trust they still carry:
 The parts of this paper that are pure calculation or pure logical deduction ---
 the whole of the parameter design, the asymptotics and the manufactured-solution
 algebra, and, crucially, the \emph{entire chain of estimates} inside the
-stability and continuity proofs --- are now verified to a standard of certainty
-that human refereeing cannot reach. What still rests on human judgement is a
-\emph{short, explicit, named} list: a handful of standard analysis facts (being
-formalised next in Lean), one interpolation step, and the physical- and
-code-modelling questions that no symbolic proof can settle. The value of the
+stability, continuity, interpolation and convergence proofs --- are now
+verified to a standard of certainty that human refereeing cannot reach. What
+still rests on human judgement is a \emph{short, explicit, named} list: a
+handful of standard analysis facts (Green-type identities, inverse and
+interpolation estimates --- being formalised next in Lean) and the physical-
+and code-modelling questions that no symbolic proof can settle. The value of the
 exercise is precisely that it shrinks what must be taken on trust from ``the
 whole proof'' to that short list --- and puts the list in plain sight.
 
@@ -891,7 +1029,7 @@ opam install coq
 \end{lstlisting}
 
 \noindent
-All twelve files compile and kernel-check unchanged on Rocq~9.1.1 (the only
+All fourteen files compile and kernel-check unchanged on Rocq~9.1.1 (the only
 console output is a deprecation notice that \coq{From Coq} is now spelled
 \coq{From Stdlib}; the $8.16$--$8.20$-compatible spelling is kept on purpose
 for portability). A passing run prints one \coq{[PASS]} line per file, then

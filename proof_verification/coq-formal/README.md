@@ -4,19 +4,20 @@ This directory contains a Coq formalisation of the algebraic and analytic
 claims underlying *A stabilized finite element method for incompressible,
 inertial flows in inhomogeneous porous media* (Casas, González-Usúa, Codina,
 de-Pouplana). It is the proof-assistant counterpart of the SymPy suite in
-`proof_verification/sympy/`: where SymPy checks the identities by symbolic
+`theory/verification scripts/`: where SymPy checks the identities by symbolic
 computation, the files here prove them from the axioms of the real numbers,
 and the proofs are re-verified by Coq's trusted kernel (`coqchk`).
 
-**Status: 12 files, ~384 theorems, all proved. No `Admitted`, no `Axiom`,
+**Status: 14 files, ~531 theorems, all proved. No `Admitted`, no `Axiom`,
 no `admit` anywhere** (grep the sources to confirm). Developed and tested
 against Coq 8.18.0 using **only the standard library** — no Mathcomp, no
 Coquelicot, no external packages. Every definition has been checked against
 the manuscript sources (`article.tex`, `continuity_appendix.tex`, July 2026
 revision).
 
-**Headline of this revision: `lemma:Stability` and `lemma:Continuity` are
-now complete machine-checked theorems** (`abstract_stability`,
+**Headline of this revision: the paper's entire a priori chain --
+`lemma:Stability`, `lemma:Continuity`, `lem:continterp` and
+`thm:convergence` -- consists of complete machine-checked theorems** (`abstract_stability`,
 `abstract_continuity_sharp`, `abstract_continuity`), proved over an
 abstract inner-product/mesh interface from a short, named, quantitative
 trusted base of analytic facts — see the abstract layer section and the
@@ -24,7 +25,39 @@ scope ledger below. The elemental Cauchy–Schwarz inequalities are *derived*
 from four inner-product axioms, not assumed; the discrete Cauchy–Schwarz
 over element and face sums is proved by induction; every estimate
 manipulation, coefficient collection, jump treatment and absorption of the
-papers' proofs is inside the kernel-checked development. The residual
+papers' proofs is inside the kernel-checked development.
+
+Two further files close the convergence analysis. `AbstractInterpolation.v`
+proves **lem:continterp** by rerunning the continuity machinery with the
+first argument equal to the interpolation error, exactly as the appendix
+prescribes: the discrete inverse estimates on the first slot are replaced
+by the interpolation estimates eq:interpdivvisc--eq:interpinftyE (seven
+named hypotheses `HI_*`, one constant CI), the V-side stays discrete and
+keeps its hypotheses verbatim, and the conclusions are
+`abstract_continterp` (|B_S(E,V)| <= CtotI (PsiU + PsiP) |||V|||, the
+sharp l2 form of psi(h)), its l1 corollary, and `interp_triple_norm`
+(eq:Enorm). `AbstractConvergence.v` then proves **thm:convergence** as a
+genuine composition *inside the kernel*: the closed `abstract_stability`
+is applied to the discrete error W (its inverse-estimate input is
+literally the V-side hypothesis `Hw_dv`, and its eps-condition is
+definitionally the same eq:epscond; the cross-module agreement of the
+tau1/tau2/sigma-tilde formulas is itself machine-checked --
+`tau1_agree`/`tau2_agree`/`sigt_agree`), the closed `abstract_continterp`
+is applied to the pair (E, W), the two are glued by the single genuinely
+new trusted item `Horth` (Galerkin orthogonality eq:consistency plus
+bilinearity of B_S in its first argument) and by `HBS_W` (the tested
+identity for the W-pair, the same class-G item as the stability lemma's
+own `HBS`), and the triangle inequality for the mesh-dependent triple
+norm is **proved** from the pre-Hilbert axioms (per-element five-fold
+Cauchy--Schwarz via the discrete C--S over an explicit five-element index
+list, then the discrete C--S over the mesh; the error family's
+components are the componentwise sums of the two families, which is
+faithful because every component map is linear in U). Conclusion:
+`abstract_convergence`, |||U - U_h||| <= (KabsI + CtotI/C_stab)
+(PsiU + PsiP), with the l1 form of eq:convergence as a corollary; the
+porosity-weighted sharp form of rem:sharperconv is what is proved.
+
+The residual
 trusted base has a Lean 4 formalisation roadmap (`LEAN_ROADMAP.md`,
 `PorousNSToolbox.lean`). A hand audit of the manuscript accompanies this
 suite in `AUDIT.md`.
@@ -52,10 +85,9 @@ have been diffed against the manuscript, and the definitions in
 `StabilityAlgebra.v` and `ContinuityAlgebra.v` match eq:TauNavierStokes,
 eq:Tau1Final, eq:Tau2Final, eq:SigmaAlpha, eq:UpperBoundOnEpsilon and the
 appendix's eq:taus, eq:phi1, eq:sigmatilde, eq:epscond, eq:jumpcond verbatim.
-One hygiene note (resolved, AUDIT.md F3): the two coefficient displays after
-eq:UpperBoundOnEpsilon now carry the stable labels `eq:ViscousCoefficientBound`
-and `eq:VelocityCoefficientBound`, and the SymPy script headers cite them; the
-Coq development keeps the historical definition names `visc_847`/`u_855`.
+One hygiene note: the SymPy script headers still cite the labels `eq:847` and
+`eq:855`, which no longer exist in the tex (the corresponding displays after
+eq:UpperBoundOnEpsilon are currently unlabelled); see AUDIT.md, finding F3.
 
 A caveat that remains: Coq verifies the *mathematics as stated*, i.e. that each
 stated identity/inequality/limit follows from the real-number axioms. It does
@@ -271,13 +303,16 @@ face-integral hypotheses) the L^∞ inverse estimate, meas(Γᵇ) ≤ Chᵈ⁻¹
 Hölder on the face. Classes (b) and (c) are textbook material
 (Brenner–Scott; Ern–Guermond) verified by hand against the manuscript
 (AUDIT.md §4); their Lean 4 formalisation plan is `LEAN_ROADMAP.md` with
-statement skeleton `PorousNSToolbox.lean`. The interpolation-theoretic
-replacements of lem:continterp remain hand-audited only.
+statement skeleton `PorousNSToolbox.lean`. The interpolation estimates of
+eq:interp/eq:interpinfty (Bramble--Hilbert technology) enter
+lem:continterp as the named Class-(c) hypotheses `HI_*`, hand-audited
+like the rest; with them, lem:continterp and thm:convergence are fully
+formalised (`AbstractInterpolation.v`, `AbstractConvergence.v`), and the
+only class-(b) additions of the convergence file are `HBS_W` and `Horth`
+(consistency + bilinearity).
 
-Two precision amendments to the appendix's hypotheses (AUDIT.md, F1–F2), plus
-the hygiene/notation/strengthening items F3, F4, F6, F7, have been **applied**
-to `theory/paper/` (see AUDIT.md's amendment-status banner and
-`../coq_coverage.tex` §7).
+Two precision amendments to the appendix's hypotheses are proposed
+(AUDIT.md, F1–F2).
 
 **Deliberately left to the SymPy suite** — CAS-appropriate transcription
 checks where a proof assistant adds cost but no assurance beyond what

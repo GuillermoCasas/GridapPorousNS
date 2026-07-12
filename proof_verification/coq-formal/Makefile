@@ -24,6 +24,8 @@ VFILES := Limits.v \
           InnerSpace.v \
           AbstractStability.v \
           AbstractContinuity.v \
+          AbstractInterpolation.v \
+          AbstractConvergence.v \
           TauDesign.v \
           Asymptotics.v \
           ManufacturedSolution.v \
@@ -37,6 +39,8 @@ MODULES := PNSFormal.StabilityAlgebra \
            PNSFormal.InnerSpace \
            PNSFormal.AbstractStability \
            PNSFormal.AbstractContinuity \
+           PNSFormal.AbstractInterpolation \
+           PNSFormal.AbstractConvergence \
            PNSFormal.TauDesign \
            PNSFormal.Asymptotics \
            PNSFormal.ManufacturedSolution \

@@ -156,3 +156,25 @@ data assumptions.
    discharged item moves from "trusted" to "formalised (Lean)", and the
    two-system split should be stated explicitly wherever the formalisation
    is cited.
+
+
+## T6 — Interpolation estimates (new: lem:continterp's Class-I additions)
+
+With `AbstractInterpolation.v` in the kernel, Class I gains the seven
+interpolation hypotheses `HI_*` (eq:interp / eq:interpinfty via the
+replacement table eq:interpdivvisc–eq:interpzero). Lean target: the
+Bramble–Hilbert / Deny–Lions lemma on a shape-regular simplex plus the
+scaling argument — Mathlib has the Sobolev and polynomial-approximation
+ingredients but not the assembled estimate. The L∞ variants additionally
+need the (already-targeted) H² ↪ C⁰ embedding for d ≤ 3. Discharging T6
+together with T1–T2 removes every Class-I hypothesis of all four abstract
+theorems.
+
+## T7 — Consistency (the convergence file's Class-G additions)
+
+`HBS_W` is the same tested-identity material as `HBS` (T3-class). `Horth`
+= eq:consistency + bilinearity: Green's identity for the strong operator
+applied to the exact solution (regularity eq:regularity) plus linearity
+of every component map — the latter is definitional in any concrete
+instantiation; the former is T3's divergence-theorem primitive again. No
+new primitive is required beyond T1–T5.
