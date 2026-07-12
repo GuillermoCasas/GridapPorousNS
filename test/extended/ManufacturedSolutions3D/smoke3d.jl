@@ -12,6 +12,10 @@ using Dates
 using PorousNSSolver
 const PNS = PorousNSSolver
 include("mesh3d.jl")
+# Element-type-aware viscous stabilization constant c₁*(K) (theory/numerical_constants/
+# c1_dimension_note.tex, transcribed + Table-1 validated). Guarded so the probes that include both
+# this file and element_c1.jl do not re-`const` its Gauss nodes. [element-aware-c1]
+@isdefined(element_c1_star) || include(joinpath(@__DIR__, "element_c1.jl"))
 # The manufactured-solution oracle is the shared dimension-generic core in
 # src/problems/mms_paper.jl (PNS.PaperMMS with dim=3 → the z-extruded 3D field). [unified 2026-07-08]
 # [harness-frame] Re/Da iteration-budget knobs (relocated out of production SolverConfig — audit §A.1/F1).
@@ -49,7 +53,7 @@ function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over
                      numerical_epsilon::Float64=0.0, jfnk::Bool=false, anderson::Bool=false,
                      jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, jfnk_precond_c1_mult=nothing,
                      iterative_penalty::Bool=true, osgs_skip_boot::Bool=false, ablation::String="full",
-                     alpha0::Float64=ALPHA0, r1::Float64=R1, r2::Float64=R2)
+                     recenter::Bool=false, alpha0::Float64=ALPHA0, r1::Float64=R1, r2::Float64=R2)
     @assert !(jfnk && anderson) "jfnk and anderson are mutually-exclusive OSGS paths"
     eps_tol_m    = something(eps_tol_m_over, kv == 2 ? 1e-9 : 1e-6)   # k=2 tightened gate (MEMORY lesson)
     # [Route B 2026-07-01] mass gate is now the Philosophy-A algebraic ‖r_C‖/D_C → 0, so default it
@@ -85,8 +89,14 @@ function build_config(kv::Int, method::String; eps_tol_m_over=nothing, ftol_over
     # [osgs_skip_asgs_boot] run OSGS directly from the (eps_pert) initial guess — no ASGS pre-boot (the boot
     # is a code-side safeguard, not in the paper; the eps_pert homotopy provides cold-start globalization).
     osgs_skip_boot && (solver_dict["osgs_skip_asgs_boot"] = true)
+    # [pressure re-centering] Bound the all-Dirichlet pressure-mean drift −ρ/(ε_num·|Ω|) that the WEAK gauge
+    # (ε_num pins pⁿ to pⁿ⁻¹, not to zero mean) accumulates each penalty pass — a single P2 pass can already
+    # reach O(230) and dominate ‖p‖, corrupting the L²p error/rate and making the drift stopping-test spurious
+    # (theory/pressure_recentering_note). Zero-meaning pⁿ each pass is EXACT (pure gauge; ε_phys=0 required, so
+    # we drop the config's vestigial 1e-8 — the assembled form already uses eps_phys=0). Default off = legacy.
+    recenter && (solver_dict["recenter_pressure_between_penalty_passes"] = true)
     cfg = Dict(
-        "physical_properties" => Dict("nu"=>1.0, "physical_epsilon"=>1e-8, "numerical_epsilon"=>numerical_epsilon,
+        "physical_properties" => Dict("nu"=>1.0, "physical_epsilon"=>(recenter ? 0.0 : 1e-8), "numerical_epsilon"=>numerical_epsilon,
                                       "reaction_model"=>"Constant_Sigma", "sigma_constant"=>1.0),
         "domain" => Dict("alpha_0"=>alpha0, "bounding_box"=>[0.0,1.0,0.0,1.0], "r_1"=>r1, "r_2"=>r2),
         "numerical_method" => Dict(
@@ -157,7 +167,13 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                    eps_phys::Float64=0.0, mesh_sequence::String="", jfnk::Bool=false, anderson::Bool=false,
                    jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, jfnk_precond_c1_mult=nothing, iterative_penalty::Bool=true,
                    osgs_skip_boot::Bool=false, eps_pert_base::Float64=1.0, max_n_pert::Int=5,
-                   ablation::String="full", h_conv::String="regular_tet", study=default_study3d())
+                   ablation::String="full", h_conv::String="regular_tet", study=default_study3d(),
+                   # [element-aware-c1] c1_mode="fixed" ⇒ legacy scalar c1_mult (and c2_mult, default = c1_mult).
+                   # c1_mode="element_aware" ⇒ per-element coercivity floor c₁*(K) (element_c1.jl) reduced over
+                   # the mesh by (c1_percentile, c1_safety), applied c₁-ONLY (c₂ stays at paper — only the
+                   # viscous constant gates coercivity; c1_dimension_note.tex §, coercivity_probe.jl rationale).
+                   c1_mode::String="fixed", c1_percentile::Float64=100.0, c1_safety::Float64=1.0,
+                   c2_mult::Float64=NaN, recenter::Bool=false)
     # [F6 config-driven] Unpack the study into locals that SHADOW the module consts. Every reference below
     # (nu, sigma_c, the porosity, PaperMMS, the eps_pert domain bounds, the trace filename) now reads the
     # study; with the default study == the consts, this is byte-identical to the pre-config behaviour.
@@ -178,7 +194,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                           jfnk_precond_c1_mult=jfnk_precond_c1_mult,
                           iterative_penalty=iterative_penalty, osgs_skip_boot=osgs_skip_boot,
                           eps_tol_m_over=eps_tol_m_over, ftol_over=ftol_over, eps_tol_mass_over=eps_tol_mass_over,
-                          ablation=ablation, alpha0=ALPHA0, r1=R1, r2=R2)
+                          ablation=ablation, recenter=recenter, alpha0=ALPHA0, r1=R1, r2=R2)
     sol = config.numerical_method.solver
 
     sigma_c = DA * ALPHAINF * nu / L^2
@@ -232,8 +248,9 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     degree = PNS.get_quadrature_degree(PNS.PaperGeneralFormulation, kv, PNS.ConstantSigmaLaw(0.0))
     Ω = Triangulation(model); dΩ = Measure(Ω, degree + 4)
     c_1, c_2 = PNS.get_c1_c2(PNS.PaperGeneralFormulation, kv)
-    c_1 *= c1_mult; c_2 *= c1_mult   # [diagnostic] scale stabilization constants — paper Remark (eq:conditions_on_num_param):
-                                     # the coercivity bound needs c1 > 2ξ·C_inv², and the OPTIMAL c1 depends on element type.
+    # c₁/c₂ scaling happens AFTER h_array is built (element_aware needs the element geometry + the SAME
+    # per-cell h the solver feeds τ). paper Remark (eq:conditions_on_num_param): coercivity needs
+    # c1 > 2ξ·C_inv², and the OPTIMAL c1 is element-type dependent (c1_dimension_note.tex).
 
     # tet element size. [diagnostic h_conv]:
     #   "diameter"    = the LITERAL element diameter h_K = max‖xᵢ−xⱼ‖ (longest edge) — the mathematically
@@ -254,6 +271,23 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     h_cf = CellField(h_array, Ω)
     h_mean = sum(h_array) / length(h_array)   # ACHIEVED mesh size — the correct convergence abscissa
     alpha_cf = CellField(x -> PNS.alpha(alpha_field, x), Ω)
+
+    # [element-aware-c1] scale c₁/c₂ now (h_array is available). "fixed": legacy scalar path (c₂ follows
+    # c1_mult unless c2_mult given). "element_aware": c₁ ← c₁·mult_eff where mult_eff is the per-element
+    # coercivity floor c₁*(K) reduced over the mesh at (c1_percentile, c1_safety) and floored at the paper
+    # value; c₂ untouched (c₁-ONLY — only the viscous constant gates coercivity).
+    c1_mult_eff = c1_mult
+    if c1_mode == "element_aware"
+        cc_cells = collect(get_cell_coordinates(Ω))
+        c1_mult_eff = calibrated_c1_mult(cc_cells, h_array, kv;
+                                         percentile=c1_percentile, safety=c1_safety, floor_at_paper=true)
+        c_1 *= c1_mult_eff                       # c₁-ONLY; c₂ stays at the paper value
+        @printf("    [c1 element-aware] kv=%d pctl=%.4g safety=%.3g -> mult_eff=%.3f (paper c₁=%.4g, used c₁=%.4g)\n",
+                kv, c1_percentile, c1_safety, c1_mult_eff, 4.0*kv^4, c_1); flush(stdout)
+    else
+        c_1 *= c1_mult
+        c_2 *= (isnan(c2_mult) ? c1_mult : c2_mult)
+    end
 
     f_cf, g_cf = PNS.evaluate_exactness_diagnostics(mms, model, Ω, dΩ, h_cf, X, Y, c_1, c_2, nothing)
 
@@ -362,6 +396,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
     return (success=success, ncells=num_cells(model), iters=iters, h_mean=h_mean,
             el2_u=el2_u, el2_p=el2_p, eh1_u=eh1_u, eh1_p=eh1_p, n_ns=n_ns, n_pic=n_pic,
             eps_used=eps_used,           # [eps_pert] largest perturbation from which this cell converged (robustness)
+            c1_mult_eff=c1_mult_eff,     # [element-aware-c1] effective c₁ multiplier actually applied (provenance)
             numerical_epsilon=eps_num)   # the Codina iterative-penalty ε_num actually used (provenance)
 end
 
@@ -440,18 +475,24 @@ end
 # "structured"), archiving any prior JSON to previous_results/convergence3d/ first (reproducible-results rule).
 # Records the per-cell `eps_used` (largest perturbation it converged from) as the robustness map. Constant-aspect
 # (1.2) Kuhn ladders, all LU-feasible: P1 (8,8,2)→(16,16,4)→(24,24,6)→(32,32,8); P2 (12,12,3)→(16,16,4)→(20,20,5).
-function run_sweep_structured(; max_n_pert=3)
+function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=1.0, recenter::Bool=true)
     ladders = Dict(1 => [(8,8,2),(16,16,4),(24,24,6),(32,32,8)], 2 => [(12,12,3),(16,16,4),(20,20,5)])
+    # c1_mult>1 ⇒ ROBUST c₁×N in the RESIDUAL (c₁-only; c₂ stays at paper — only the viscous constant gates
+    # coercivity), written to a DISTINCT leaf so the paper-c₁ `structured/` results stay reconstructable
+    # (reproducible-results rule). Default 1.0 = paper c₁ (the strictly-faithful official §5.2 run).
+    seq = c1_mult == 1.0 ? "structured" :
+          "structured_c1x$(c1_mult == round(c1_mult) ? string(Int(round(c1_mult))) : string(c1_mult))"
     archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
     stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
-    outdirs  = Dict(kv => joinpath(@__DIR__, "results", "k$(kv)", "TET", "structured") for kv in (1, 2))
+    outdirs  = Dict(kv => joinpath(@__DIR__, "results", "k$(kv)", "TET", seq) for kv in (1, 2))
     outpaths = Dict(kv => joinpath(outdirs[kv], "convergence3d_results.json") for kv in (1, 2))
     for kv in (1, 2)
         mkpath(outdirs[kv])
-        if isfile(outpaths[kv])   # archive the prior structured JSON before overwriting (provenance)
-            cp(outpaths[kv], joinpath(archdir, "convergence3d_results_k$(kv)_structured_pre_homotopy_$(stamp).json"); force=true)
+        if isfile(outpaths[kv])   # archive the prior JSON before overwriting (provenance)
+            cp(outpaths[kv], joinpath(archdir, "convergence3d_results_k$(kv)_$(seq)_$(stamp).json"); force=true)
         end
     end
+    @printf("=== STRUCTURED SWEEP: c1_mult=%.3g (residual, c₁-only) -> leaf '%s' ===\n", c1_mult, seq); flush(stdout)
     results_by_kv = Dict(1 => Any[], 2 => Any[])   # accumulates each (method) block per kv across the outer loop
     for method in ("ASGS", "OSGS")
         osgs_recipe = method == "OSGS"
@@ -463,17 +504,22 @@ function run_sweep_structured(; max_n_pert=3)
             # (residual F stays paper-c₁, so the converged root is unchanged), restoring quadratic Newton and
             # eps_used=1 robustness. OSGS-P1 is robust at mult=1. See docs/mms/p2-3d.md §6.
             osgs_p2 = osgs_recipe && kv == 2
-            pc_mult = osgs_p2 ? 4.0 : nothing                       # c₁-inflation for the JFNK preconditioner (P2 only)
-            jfnk_mx = osgs_recipe ? (osgs_p2 ? 80 : 30) : nothing   # more GMRES headroom for P2 (ρ_prec≈3.8 ⇒ ~tens of iters)
+            # OSGS-P2 JFNK preconditioner c₁-inflation is ONLY needed when the residual is at paper c₁
+            # (ρ_prec≈1178 ⇒ GMRES stalls). With c₁×4 ALREADY in the residual (c1_mult≥4) ρ_prec is O(1), so
+            # NO extra preconditioner inflation (relative ×1). See docs/mms/p2-3d.md §6 + run_sweep_nested_red.
+            pc_mult = osgs_p2 ? (c1_mult >= 4.0 ? nothing : 4.0) : nothing
+            jfnk_mx = osgs_recipe ? (osgs_p2 ? 80 : 30) : nothing   # more GMRES headroom for P2
             hs=Float64[]; l2us=Float64[]; l2ps=Float64[]; h1us=Float64[]; h1ps=Float64[]; levels=Any[]
             eps_num_used = NaN   # the ε_num actually used (constant across levels here; captured for provenance)
             for (lvl, part) in enumerate(ladders[kv])
                 t0 = time()
                 model = structured_kuhn_model(part; domain=DOMAIN)
                 r = solve_one(kv, method, model; visc="Deviatoric", linsolver="LU", max_n_pert=max_n_pert,
+                              c1_mult=c1_mult, c2_mult=1.0,   # robust c₁×N in the residual, c₁-ONLY (c₂ at paper)
+                              recenter=recenter,              # zero-mean the lagged pressure each penalty pass (honest gauge)
                               jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
                               jfnk_maxiter=jfnk_mx, jfnk_restart=jfnk_mx, jfnk_precond_c1_mult=pc_mult,
-                              trace_dir=outdirs[kv], run_name="sweep_structured", mesh_sequence="structured")
+                              trace_dir=outdirs[kv], run_name="sweep_structured", mesh_sequence=seq)
                 eps_num_used = r.numerical_epsilon
                 push!(hs, r.h_mean); push!(l2us, r.el2_u); push!(l2ps, r.el2_p); push!(h1us, r.eh1_u); push!(h1ps, r.eh1_p)
                 push!(levels, Dict("level"=>lvl-1, "partition"=>collect(part), "h"=>r.h_mean, "ncells"=>r.ncells,
@@ -486,15 +532,16 @@ function run_sweep_structured(; max_n_pert=3)
             # [provenance] self-describing solver recipe so an official result can be reconstructed to the exact
             # configuration that produced it (reproducible-results rule): ASGS uses the default coupled solve with
             # the ASGS Stage-I boot; OSGS uses the 3D recipe (boot-skip + matrix-free JFNK, recovering ∂π/∂u).
-            solver_prov = Dict("recipe"=>(osgs_recipe ? (osgs_p2 ? "boot_skip+JFNK+precond_c1x4" : "boot_skip+JFNK") : "default_coupled+boot"),
+            solver_prov = Dict("recipe"=>(osgs_recipe ? (pc_mult !== nothing ? "boot_skip+JFNK+precond_c1x$(Int(round(pc_mult)))" : "boot_skip+JFNK") : "default_coupled+boot"),
                                "jfnk"=>osgs_recipe, "osgs_skip_asgs_boot"=>osgs_recipe,
                                "jfnk_maxiter"=>jfnk_mx, "jfnk_restart"=>jfnk_mx,
                                "jfnk_precond_c1_mult"=>something(pc_mult, 1.0),
-                               "iterative_penalty"=>true, "numerical_epsilon"=>eps_num_used,
+                               "c1_scaling"=>"residual_c1_only", "c2_mult"=>1.0,
+                               "iterative_penalty"=>true, "recenter_pressure"=>recenter, "numerical_epsilon"=>eps_num_used,
                                "eps_pert_base"=>1.0, "max_n_pert"=>max_n_pert, "linsolver"=>"LU",
                                "viscous_operator"=>"Deviatoric", "reaction"=>"Constant_Sigma")
             push!(results_by_kv[kv], Dict("kv"=>kv, "kp"=>kv, "method"=>method, "element_type"=>"TET",
-                                "mesh"=>"structured_kuhn", "mesh_sequence"=>"structured", "c1_mult"=>1.0,
+                                "mesh"=>"structured_kuhn", "mesh_sequence"=>seq, "c1_mult"=>c1_mult,
                                 "alpha_0"=>ALPHA0, "Re"=>RE, "Da"=>DA, "numerical_epsilon"=>eps_num_used,
                                 "solver"=>solver_prov,
                                 "hs"=>hs, "l2u"=>l2us, "l2p"=>l2ps, "h1u"=>h1us, "h1p"=>h1ps, "levels"=>levels))
@@ -504,7 +551,7 @@ function run_sweep_structured(; max_n_pert=3)
             println("  [wrote incremental -> $(outpaths[kv])]"); flush(stdout)
         end
     end
-    println("\nDONE. structured sweep -> results/k{1,2}/TET/structured/convergence3d_results.json"); flush(stdout)
+    println("\nDONE. structured sweep (c1_mult=$c1_mult) -> results/k{1,2}/TET/$seq/convergence3d_results.json"); flush(stdout)
 end
 
 # Full paper §5.2 sweep on the IRREGULAR nested-red family — the paper's own 3D methodology (an UNSTRUCTURED
@@ -595,6 +642,107 @@ function run_sweep_nested_red(; c1_mult::Float64=4.0, max_n_pert::Int=-1, base_l
         end
     end
     println("\nDONE. nested_red (irregular) sweep -> results/k{1,2}/TET/nested_red/convergence3d_results.json"); flush(stdout)
+end
+
+# =============================================================================================
+# [element-aware-c1] C₁-STRATEGY STUDY on the IRREGULAR nested_red family.
+# The overnight experiment for theory/numerical_constants/c1_dimension_note.tex: does clearing the
+# irregular mesh's WORST-element coercivity floor (element_c1.jl) fix the k=2 rate depression that the
+# Kuhn-calibrated empirical c1_mult=4 leaves? Builds the nested_red family ONCE (so every c₁ strategy
+# is compared on IDENTICAL meshes — gmsh is not bit-reproducible across builds), then runs, per kv/
+# method, a ladder of c₁ strategies:
+#   k=2: c1fixed4 (baseline ×4) | c1aware_p90 | c1aware_p99 | c1aware_max   (element-aware, c₁-only)
+#   k=1: c1fixed4 (baseline ×4) | c1aware (→ paper c₁, since c₁*(K)≡0 for P1 — the control)
+# Each strategy writes its OWN self-describing leaf results/k<kv>/TET/nested_red_<label>/ (baseline
+# nested_red/ untouched — provenance preserved), recording c1_mode/percentile/safety + the PER-LEVEL
+# effective multiplier (element-aware mult grows with refinement as the tail degrades). Same OSGS-3D
+# recipe as run_sweep_nested_red (boot-skip + JFNK; precond mult=1 — the inflated residual c₁ already
+# shrinks ρ_prec). Plot each: `python plot_convergence3d.py nested_red_<label>`.
+_c1study_strategies(kv) = kv == 2 ? [
+        (label="c1fixed4",    mode="fixed",         mult=4.0, pctl=100.0, safety=1.0),
+        (label="c1aware_p90", mode="element_aware", mult=1.0, pctl=90.0,  safety=1.0),
+        (label="c1aware_p99", mode="element_aware", mult=1.0, pctl=99.0,  safety=1.0),
+        (label="c1aware_max", mode="element_aware", mult=1.0, pctl=100.0, safety=1.0),
+    ] : [
+        (label="c1fixed4",    mode="fixed",         mult=4.0, pctl=100.0, safety=1.0),
+        (label="c1aware",     mode="element_aware", mult=1.0, pctl=100.0, safety=1.0),   # →paper c₁ (P1: c₁*≡0)
+    ]
+
+function run_c1study_nested_red(; base_lc::Float64=0.2, nlevels_p1::Int=3, nlevels_p2::Int=2, max_n_pert::Int=-1)
+    archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
+    stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
+    maxlev = max(nlevels_p1, nlevels_p2)
+    nlev_for = Dict(1 => nlevels_p1, 2 => nlevels_p2)
+    println("=== C1-STUDY (element-aware) on nested_red: building family to level $maxlev (reused across ALL strategies) ==="); flush(stdout)
+    fam = build_nested_family(maxlev; lc=base_lc, domain=DOMAIN)
+    # k=2 first (the decisive P2 science), then k=1 controls; ASGS before OSGS (cheaper) within each.
+    for kv in (2, 1)
+        strategies = _c1study_strategies(kv)
+        models = fam[1:(nlev_for[kv] + 1)]
+        for strat in strategies
+            seq = "nested_red_$(strat.label)"
+            outdir = joinpath(@__DIR__, "results", "k$(kv)", "TET", seq); mkpath(outdir)
+            outpath = joinpath(outdir, "convergence3d_results.json")
+            if isfile(outpath)
+                cp(outpath, joinpath(archdir, "convergence3d_results_k$(kv)_$(seq)_$(stamp).json"); force=true)
+            end
+            @printf("\n########## kv=%d  strategy=%s (mode=%s pctl=%.4g)  ##########\n",
+                    kv, strat.label, strat.mode, strat.pctl); flush(stdout)
+            blocks = Any[]
+            for method in ("ASGS", "OSGS")
+                osgs_recipe = method == "OSGS"
+                osgs_p2 = osgs_recipe && kv == 2
+                jfnk_mx = osgs_recipe ? (osgs_p2 ? 80 : 30) : nothing
+                @printf("\n--- kv=%d %s method=%s ---\n", kv, strat.label, method); flush(stdout)
+                hs=Float64[]; l2us=Float64[]; l2ps=Float64[]; h1us=Float64[]; h1ps=Float64[]; levels=Any[]
+                eps_num_used = NaN
+                for (lvl, model) in enumerate(models)
+                    t0 = time()
+                    # [resilience] an unattended overnight run must survive a single bad solve (OOM on the
+                    # finest mesh, ILU non-convergence throwing, …): catch, record a failure level, continue.
+                    r = try
+                        solve_one(kv, method, model; visc="Deviatoric", linsolver="auto",
+                                  c1_mode=strat.mode, c1_mult=strat.mult, c1_percentile=strat.pctl, c1_safety=strat.safety,
+                                  max_n_pert=max_n_pert, jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
+                                  jfnk_maxiter=jfnk_mx, jfnk_restart=jfnk_mx,
+                                  trace_dir=joinpath(@__DIR__, "results"), run_name="c1study_$(strat.label)",
+                                  mesh_sequence=seq)
+                    catch err
+                        @printf("  L%d THREW %s — recording failure, continuing\n", lvl-1, sprint(showerror, err)); flush(stdout)
+                        (success=false, ncells=num_cells(model), iters=0, h_mean=mesh_hmean(model),
+                         el2_u=NaN, el2_p=NaN, eh1_u=NaN, eh1_p=NaN, n_ns=0, n_pic=0, eps_used=0.0,
+                         c1_mult_eff=NaN, numerical_epsilon=NaN)
+                    end
+                    eps_num_used = isfinite(r.numerical_epsilon) ? r.numerical_epsilon : eps_num_used
+                    push!(hs, r.h_mean); push!(l2us, r.el2_u); push!(l2ps, r.el2_p); push!(h1us, r.eh1_u); push!(h1ps, r.eh1_p)
+                    push!(levels, Dict("level"=>lvl-1, "h"=>r.h_mean, "ncells"=>r.ncells, "success"=>r.success,
+                                       "iters"=>r.iters, "eps_used"=>r.eps_used, "c1_mult_eff"=>r.c1_mult_eff,
+                                       "l2u"=>r.el2_u, "l2p"=>r.el2_p, "h1u"=>r.eh1_u, "h1p"=>r.eh1_p))
+                    @printf("  L%d h=%.4g cells=%d success=%s c1×=%.3g | L2u=%.4g H1u=%.4g L2p=%.4g  (%.0fs)\n",
+                            lvl-1, r.h_mean, r.ncells, r.success, r.c1_mult_eff, r.el2_u, r.eh1_u, r.el2_p, time()-t0); flush(stdout)
+                    GC.gc()
+                end
+                solver_prov = Dict("recipe"=>(osgs_recipe ? "boot_skip+JFNK" : "default_coupled+boot"),
+                                   "jfnk"=>osgs_recipe, "osgs_skip_asgs_boot"=>osgs_recipe,
+                                   "jfnk_maxiter"=>jfnk_mx, "jfnk_precond_c1_mult"=>1.0,
+                                   "iterative_penalty"=>true, "numerical_epsilon"=>eps_num_used,
+                                   "max_n_pert"=>max_n_pert, "linsolver"=>"auto",
+                                   "viscous_operator"=>"Deviatoric", "reaction"=>"Constant_Sigma")
+                push!(blocks, Dict("kv"=>kv, "kp"=>kv, "method"=>method, "element_type"=>"TET",
+                                   "mesh"=>"nested_red", "mesh_sequence"=>seq,
+                                   "c1_mode"=>strat.mode, "c1_mult"=>strat.mult,
+                                   "c1_percentile"=>strat.pctl, "c1_safety"=>strat.safety,
+                                   "base_lc"=>base_lc, "alpha_0"=>ALPHA0, "Re"=>RE, "Da"=>DA,
+                                   "numerical_epsilon"=>eps_num_used, "solver"=>solver_prov,
+                                   "hs"=>hs, "l2u"=>l2us, "l2p"=>l2ps, "h1u"=>h1us, "h1p"=>h1ps, "levels"=>levels))
+                open(outpath, "w") do io
+                    JSON3.write(io, [Dict(k => (v isa AbstractFloat && !isfinite(v) ? nothing : v) for (k,v) in d) for d in blocks])
+                end
+                println("  [wrote incremental -> $outpath]"); flush(stdout)
+            end
+        end
+    end
+    println("\nDONE. c1-study -> results/k{1,2}/TET/nested_red_<strategy>/convergence3d_results.json"); flush(stdout)
 end
 
 # Memory-capped, RESUMABLE remainder sweep. ASGS keeps its full paper mesh count (P1=4, P2=3); OSGS
@@ -858,10 +1006,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
         cfgpath = length(ARGS) >= 2 ? ARGS[2] : error("config mode needs a JSON path, e.g. data/smoke3d_p1.json")
         run_config(cfgpath)
     elseif length(ARGS) >= 1 && ARGS[1] == "sweep_structured"
-        # smoke3d.jl sweep_structured [max_n_pert]  — full §5.2 sweep on the STRUCTURED Kuhn family with the
-        # eps_pert homotopy + iterative penalty (default solver). Writes results/k{1,2}/TET/structured/.
+        # smoke3d.jl sweep_structured [max_n_pert] [c1_mult]  — full §5.2 sweep on the STRUCTURED Kuhn family
+        # with the eps_pert homotopy + iterative penalty. c1_mult>1 ⇒ ROBUST c₁×N in the residual (c₁-only) →
+        # leaf results/k*/TET/structured_c1x<N>/ (all LU-feasible, every cell certifies). Default 1.0 = paper c₁.
         mnp = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
-        run_sweep_structured(; max_n_pert=mnp)
+        c1m = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 1.0
+        run_sweep_structured(; max_n_pert=mnp, c1_mult=c1m)
     elseif length(ARGS) >= 1 && ARGS[1] == "sweep_nested_red"
         # smoke3d.jl sweep_nested_red [c1_mult] [max_n_pert] [nlevels_p1] [nlevels_p2] [osgs_p2_precond_c1_mult]
         #   — full §5.2 sweep on the IRREGULAR nested-red (unstructured-base + red-refined) family at the
@@ -874,6 +1024,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
         pcm   = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : 1.0
         run_sweep_nested_red(; c1_mult=c1m, max_n_pert=mnp, nlevels_p1=nlp1, nlevels_p2=nlp2,
                              osgs_p2_precond_c1_mult=pcm)
+    elseif length(ARGS) >= 1 && ARGS[1] == "c1study_nested_red"
+        # smoke3d.jl c1study_nested_red [nlevels_p1] [nlevels_p2] [max_n_pert]
+        #   — element-aware c₁ study on ONE nested_red family: baseline ×4 vs the element_c1 percentile
+        #   ladder (k=2: p90/p99/max; k=1: →paper c₁). Writes results/k{1,2}/TET/nested_red_<strategy>/.
+        nlp1 = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
+        nlp2 = length(ARGS) >= 3 ? parse(Int, ARGS[3]) : 2
+        mnp  = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : -1
+        run_c1study_nested_red(; nlevels_p1=nlp1, nlevels_p2=nlp2, max_n_pert=mnp)
     elseif length(ARGS) >= 1 && ARGS[1] == "cells"
         # smoke3d.jl cells [outpath] "kv=2,method=ASGS,lo=2,n=4;..." [base_lc] [geom] [visc] [linsolver]
         #   each chunk runs nested-family levels lo..n-1 (lo default 0); lo>0 runs ONLY finer meshes.

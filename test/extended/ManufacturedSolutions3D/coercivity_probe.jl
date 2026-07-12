@@ -45,7 +45,7 @@ Returns the symmetric velocity block S, the Galerkin energy Gram G (both n_u×n_
 sparse), and diagnostic metadata. c₁ is scaled by `c1_mult`; c₂ is held at the paper value.
 """
 function probe_matrices(partition; kv::Int=2, c1_mult::Float64=1.0, h_conv::String="shortest_edge",
-                        lin_mode::Symbol=:picard, study=default_study3d())
+                        lin_mode::Symbol=:picard, study=default_study3d(), model=nothing)
     RE=study.re; DA=study.da; ALPHA0=study.alpha0; ALPHAINF=study.alphainf
     R1=study.r1; R2=study.r2; L=study.Lc; U_AMP=study.u; DOMAIN=study.domain
     nu = U_AMP*L/RE
@@ -66,7 +66,7 @@ function probe_matrices(partition; kv::Int=2, c1_mult::Float64=1.0, h_conv::Stri
     mms = PNS.PaperMMS(form, U_AMP, alpha_field; L=L, alpha_infty=ALPHAINF, dim=3)
     u_ex = PNS.get_u_ex(mms); p_ex = PNS.get_p_ex(mms)
 
-    model = structured_kuhn_model(partition; domain=DOMAIN)
+    model = model === nothing ? structured_kuhn_model(partition; domain=DOMAIN) : model   # accept a pre-built mesh
     labels = get_face_labeling(model)
     refe_u = ReferenceFE(lagrangian, VectorValue{3,Float64}, kv)
     refe_p = ReferenceFE(lagrangian, Float64, kv)

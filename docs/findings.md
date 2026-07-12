@@ -192,6 +192,10 @@ The blocker was **`ρ_prec = ρ(J_frozen⁻¹·∂π/∂u) ≈ 1249`** at paper 
 
 Source doc: `mms/p2-3d.md`. Diagnostic hooks (default-off): `smoke3d.jl` `ablation`/`h_conv`; `continuous_problem.jl` `VISC_ADJ_MULT`; `tau.jl` `TAU_VISC_MULT`; `data/phase1_tri_k2.json`.
 
+### Element-aware c₁ made exact — irregular-mesh sub-optimality is NOT coercivity (2026-07-12)
+
+`theory/numerical_constants/c1_dimension_note.tex` gives the exact elementwise coercivity floor `c₁*(K) = 2ĉ²(K)` (pure shape constant); `test/extended/ManufacturedSolutions3D/element_c1.jl` transcribes it and **reproduces the note's Table to ~1e-14** (`ĉ²(Kuhn)=214` **is** the `C_inv²≈214` above; P1 ⇒ `c₁*≡0`). Measured on nested_red (`c1_distribution_probe.jl`), the red-refined **quality tail grows** so `c₁*/64` reaches p99 7.6 / max 14.9 at L2 (Kuhn is flat ≈2.87) ⇒ a fraction is elementwise sub-coercive at `×4`. **But the same-mesh study `smoke3d.jl c1study_nested_red` REFUTES that as the lever:** `×4`→`×14.9` moves the k=2 finest `L2u` rate by **Δ≈±0.05** (2.63–2.68; L2 byte-identical = the ILU-GMRES-uncertified interpolant). So the nested_red k=2 sub-optimality is **mesh-quality + hardware, not tail-coercivity** — `c₁` is the lever only for *uniform* sub-coercivity (Kuhn @ paper c₁). k=1 control: element-aware→`mult=1` is *worse* accuracy than `×4` ⇒ element-aware c₁ is the coercivity **floor**, not the accuracy optimum. Artifacts: `nested_red_<strategy>/` result leaves, `compare_c1study.py`. Source doc: `mms/p2-3d.md` §A.
+
 ---
 
 ## 4. OSGS reaction-dominated rate (high Da) — RESOLVED (pre-asymptotic; recovers by N=640)
