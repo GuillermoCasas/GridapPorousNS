@@ -45,7 +45,7 @@ Variables (c1 c2 Cinv xi : R).            (* tau constants, inverse-estimate *)
 Hypothesis nu_pos     : 0 < nu.
 Hypothesis h_pos      : 0 < h.
 Hypothesis alphaK_pos : 0 < alphaK.
-Hypothesis sigma_pos  : 0 < sigma.
+Hypothesis sigma_nonneg : 0 <= sigma.   (* H:data allows sigma = 0 *)
 Hypothesis amag_nonneg: 0 <= amag.        (* |a| >= 0 : it is a norm         *)
 Hypothesis c1_pos     : 0 < c1.
 Hypothesis c2_pos     : 0 < c2.
@@ -86,7 +86,7 @@ Proof. unfold tau1NS. apply Rinv_0_lt_compat, tau1NS_inv_pos. Qed.
 Lemma sigt_denom_pos : 0 < tau1NS_inv + sigma / alphaK.
 Proof.
   pose proof tau1NS_inv_pos.
-  assert (0 < sigma / alphaK) by (apply Rdiv_lt_0_compat; lra).
+  assert (0 <= sigma / alphaK) by (apply Rdiv_nonneg; lra).
   lra.
 Qed.
 
@@ -114,7 +114,7 @@ Proof.
   pose proof cleared_NS_pos.
   assert (0 < alphaK * (c1 * nu + c2 * amag * h)) by nra.
   assert (0 < h * h) by nra.
-  assert (0 < sigma * (h * h)) by nra.
+  assert (0 <= sigma * (h * h)) by nra.
   lra.
 Qed.
 
@@ -156,12 +156,14 @@ Proof.
   field. repeat split; nra.
 Qed.
 
-Lemma sigt_pos : 0 < sigt.
+(*  With sigma >= 0 (H:data) this is nonnegativity, not strict positivity:   *)
+(*  at sigma = 0 one has sigt = 0, which is exactly the reaction-free case.   *)
+Lemma sigt_nonneg : 0 <= sigt.
 Proof.
   rewrite sigt_form_key. unfold phi1.
   pose proof tau1NS_inv_pos as H1. pose proof tau1_pos as H2.
   assert (Hp : 0 < alphaK * tau1NS_inv) by nra.
-  assert (0 < sigma * (alphaK * tau1NS_inv)) by nra.
+  assert (0 <= sigma * (alphaK * tau1NS_inv)) by nra.
   nra.
 Qed.
 
@@ -253,8 +255,8 @@ Proof.
   assert (HCinv2 : 0 < Cinv^2) by (apply pow_lt; lra).
   assert (HA : 0 < xi * Cinv^2 / c1) by (apply Rdiv_lt_0_compat; nra).
   assert (P1 : 0 < alphaK * tau1) by nra.
-  assert (P2 : 0 < alphaK * tau1 * sigma) by nra.
-  assert (P3 : 0 < alphaK * tau1 * sigma * (xi * Cinv^2 / c1)) by nra.
+  assert (P2 : 0 <= alphaK * tau1 * sigma) by nra.
+  assert (P3 : 0 <= alphaK * tau1 * sigma * (xi * Cinv^2 / c1)) by nra.
   assert (P4 : 0 <= alphaK * tau1 * sigma * (xi * Cinv^2 / c1) * (c2 * amag / h))
     by nra.
   lra.
@@ -312,8 +314,12 @@ Qed.
 
 (*  eq:conditions_on_num_param:  c1 > 2 xi Cinv^2 with xi > 2 makes both     *)
 (*  stability constants strictly positive.                                   *)
-Theorem stability_constants_positive :
-  c1 > 2 * xi * Cinv^2 -> xi > 2 -> 0 < C_visc /\ 0 < C_u.
+(*  SHARP form of eq:conditions_on_num_param.  Positivity of the two          *)
+(*  coefficients needs only  c1 > xi * Cinv^2  (together with xi > 2, which    *)
+(*  already forces c1 > 2 Cinv^2, the condition C_visc needs).  This is a      *)
+(*  factor of two weaker than the condition the manuscript states.            *)
+Theorem stability_constants_positive_sharp :
+  c1 > xi * Cinv^2 -> xi > 2 -> 0 < C_visc /\ 0 < C_u.
 Proof.
   intros Hc Hxi.
   assert (HC2p : 0 < Cinv^2) by nra.
@@ -338,6 +344,18 @@ Proof.
   split; [unfold C_visc; apply Rmin_pos; assumption | exact HCu].
 Qed.
 
+(*  The manuscript's condition (eq:conditions_on_num_param, prop:stability).   *)
+(*  It implies the sharp one, since xi > 2 > 1.                                *)
+Corollary stability_constants_positive :
+  c1 > 2 * xi * Cinv^2 -> xi > 2 -> 0 < C_visc /\ 0 < C_u.
+Proof.
+  intros Hc Hxi.
+  apply stability_constants_positive_sharp; [| exact Hxi].
+  assert (0 < Cinv^2) by nra. nra.
+Qed.
+
+
+
 (* ========================================================================= *)
 (*  (5)  The epsilon smallness chain (amendment A1).                         *)
 (*       eq:UpperBoundOnEpsilon gives eps <= eps_max with                    *)
@@ -347,8 +365,8 @@ Qed.
 
 Section EpsilonChain.
 Variables (eps C2 : R).
-Hypothesis eps_pos : 0 < eps.
-Hypothesis C2_pos  : 0 < C2.
+Hypothesis eps_nonneg : 0 <= eps.   (* H:data allows eps = 0 *)
+Hypothesis C2_nonneg  : 0 <= C2.    (* eq:epscond allows C2 = 0 *)
 
 Definition eps_max : R := C2 * c1 * alphaK^2 * tau1 / h^2.
 
@@ -371,12 +389,14 @@ Proof.
   clear_denoms.
 Qed.
 
-Lemma alphaK_tau1_lt_tau1NS : alphaK * tau1 < tau1NS.
+(*  With sigma >= 0 this is  <=  rather than  < : at sigma = 0 the two sides *)
+(*  coincide (tau1 = tau1NS/alpha_K).  The chain below only needs <=.        *)
+Lemma alphaK_tau1_le_tau1NS : alphaK * tau1 <= tau1NS.
 Proof.
   pose proof tau1NS_minus_alphaK_tau1 as Hid.
   pose proof tau1_pos as H1. pose proof tau1NS_pos as H2.
-  assert (0 < sigma * tau1) by nra.
-  assert (0 < sigma * tau1 * tau1NS) by nra.
+  assert (0 <= sigma * tau1) by nra.
+  assert (0 <= sigma * tau1 * tau1NS) by nra.
   lra.
 Qed.
 
@@ -385,13 +405,13 @@ Theorem eps_tau2_le_C2 : eps <= eps_max -> eps * tau2 <= C2.
 Proof.
   intros Heps.
   pose proof eps_max_tau2_identity as Hid.
-  pose proof alphaK_tau1_lt_tau1NS as Hlt.
+  pose proof alphaK_tau1_le_tau1NS as Hlt.
   pose proof tau1NS_pos as HNS. pose proof tau1_pos as Ht1.
   pose proof tau2_pos as Ht2.
   (* eps * tau2 <= eps_max * tau2 = C2 * (alphaK*tau1/tau1NS) <= C2 * 1 *)
   assert (Hstep1 : eps * tau2 <= eps_max * tau2) by nra.
-  assert (Hratio : alphaK * tau1 / tau1NS < 1).
-  { apply (Rmult_lt_reg_r tau1NS); [exact HNS |].
+  assert (Hratio : alphaK * tau1 / tau1NS <= 1).
+  { apply (Rmult_le_reg_r tau1NS); [exact HNS |].
     unfold Rdiv. rewrite Rmult_assoc, Rinv_l; lra. }
   assert (Hstep2 : C2 * alphaK * tau1 / tau1NS <= C2).
   { replace (C2 * alphaK * tau1 / tau1NS) with (C2 * (alphaK * tau1 / tau1NS))
@@ -425,6 +445,44 @@ Proof. intros H. apply pressure_term_coercive, eps_tau2_le_C2, H. Qed.
 (* ========================================================================= *)
 
 Definition C_stab : R := Rmin (Rmin C_visc C_u) (Rmin (1 - C2) 1).
+
+(*  Why the manuscript's factor of two is not idle: it buys a quantitative     *)
+(*  MARGIN, not merely positivity.  Under c1 > 2 xi Cinv^2 and xi > 2,         *)
+(*                                                                             *)
+(*      C_u > 1/2       and       2 - 4 Cinv^2 / c1 > 1,                       *)
+(*                                                                             *)
+(*  so that the coercivity constant enjoys a floor that is free of Cinv:       *)
+(*                                                                             *)
+(*      C_stab >= min{ 2(1 - 2/xi),  1/2,  1 - C2 }.                           *)
+(*                                                                             *)
+(*  Under the sharp condition c1 > xi Cinv^2 the constants are still positive  *)
+(*  but C_u -> 0 as c1 decreases to xi Cinv^2, so the floor is lost.           *)
+Theorem C_stab_margin :
+  c1 > 2 * xi * Cinv^2 -> xi > 2 ->
+  C_u > 1/2
+  /\ 2 - 4 * Cinv^2 / c1 > 1
+  /\ C_stab >= Rmin (Rmin (2 * (1 - 2 / xi)) (1/2)) (1 - C2).
+Proof.
+  intros Hc Hxi.
+  assert (HCinv2 : 0 < Cinv^2) by nra.
+  assert (HA : 2 - 4 * Cinv^2 / c1 > 1).
+  { assert (Hlt : 4 * Cinv^2 / c1 < 1).
+    { apply (Rmult_lt_reg_r c1); [exact c1_pos |].
+      replace (4 * Cinv^2 / c1 * c1) with (4 * Cinv^2) by (field; lra).
+      nra. }
+    lra. }
+  assert (HCu : C_u > 1/2).
+  { unfold C_u.
+    assert (Hlt : xi * Cinv^2 / c1 < 1/2).
+    { apply (Rmult_lt_reg_r c1); [exact c1_pos |].
+      replace (xi * Cinv^2 / c1 * c1) with (xi * Cinv^2) by (field; lra).
+      lra. }
+    lra. }
+  repeat split; try assumption.
+  pose proof C2_nonneg as HC2.
+  unfold C_stab, C_visc, Rmin.
+  repeat (destruct (Rle_dec _ _)); lra.
+Qed.
 
 Theorem elemental_coercivity :
   forall Pn Vn Un Xn Dn : R,
@@ -461,7 +519,7 @@ Proof.
     lra. }
   assert (B3 : u_final * Un >= C_stab * (sigt * Un)).
   { assert (S1 : u_final * Un >= C_u * sigt * Un) by nra.
-    assert (Hsu : 0 <= sigt * Un) by (pose proof sigt_pos; nra).
+    assert (Hsu : 0 <= sigt * Un) by (pose proof sigt_nonneg; nra).
     assert (S2 : C_u * sigt * Un >= C_stab * (sigt * Un)) by nra.
     lra. }
   assert (B4 : Xn >= C_stab * Xn) by nra.

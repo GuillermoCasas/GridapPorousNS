@@ -174,8 +174,16 @@ Hypothesis IP_nonneg : forall k, 0 <= IP k.
 
 Variable FBp : F -> R.   (*  int_{face} alpha (n . v) p                        *)
 Variable FBc : F -> R.   (*  int_{face} alpha (n . a) (u . v)                  *)
-Variable FBp_e : K -> R. (*  int_{bdry K} alpha (n_K . v) p                    *)
-Variable FBc_e : K -> R. (*  int_{bdry K} alpha (n_K . a) (u . v)              *)
+(*  The elemental boundary terms of the two elementwise integration-by-parts *)
+(*  identities.  These are NOT free variables: by the divergence theorem on K *)
+(*  (eq:elemibp and its pressure sibling) the boundary integral EQUALS the    *)
+(*  integration-by-parts defect, so we DEFINE it as that defect.  The two     *)
+(*  identities H_elem_conv_ibp / H_elem_p_ibp then become theorems rather     *)
+(*  than hypotheses -- as they must, since with FB*_e free they constrained   *)
+(*  nothing.  All the real content of the boundary terms lives in the         *)
+(*  assembly hypotheses H_assemble_p/c and the face estimates H_face_p/c.     *)
+Definition FBp_e (k : K) : R := << (vv k) , (gpu k) >> + << (divv k) , (pp k) >>.
+Definition FBc_e (k : K) : R := << (cxu k) , (vv k) >> + << (cxv k) , (uu k) >>.
 
 (* ========================================================================= *)
 (*  The trusted base.                                                        *)
@@ -194,13 +202,15 @@ Hypothesis H_ibp_qu :
   Rsum Th (fun k => << (qq k) , (divu k) >>)
   = - Rsum Th (fun k => << (uu k) , (gpv k) >>).
 
-(*  eq:elemibp (identity (iii)).  *)
-Hypothesis H_elem_conv_ibp :
+(*  eq:elemibp (identity (iii)) -- now a THEOREM, by the definition of FBc_e. *)
+Lemma H_elem_conv_ibp :
   forall k, << (cxu k) , (vv k) >> = - << (cxv k) , (uu k) >> + FBc_e k.
+Proof. intro k. unfold FBc_e. ring. Qed.
 
-(*  Elemental pressure integration by parts (Step 6b).  *)
-Hypothesis H_elem_p_ibp :
+(*  Elemental pressure integration by parts (Step 6b) -- likewise a theorem.  *)
+Lemma H_elem_p_ibp :
   forall k, << (vv k) , (gpu k) >> = - << (divv k) , (pp k) >> + FBp_e k.
+Proof. intro k. unfold FBp_e. ring. Qed.
 
 (*  Facewise assembly (Steps 6b, 6d): the elemental boundary contributions,  *)
 (*  weighted by the elementwise-constant tau_1, assemble into jump-weighted  *)
@@ -281,14 +291,14 @@ Hypothesis H_eps :
 (*  Additional data of the convergence theorem.                              *)
 (* ========================================================================= *)
 
-(*  The Young parameter and the strict positivity required by the stability  *)
-(*  lemma (prop:stability).                                                  *)
+(*  The Young parameter and the numerical-parameter condition required by    *)
+(*  the stability lemma (prop:stability), in its sharp form.  Note that NO    *)
+(*  strict positivity of sigma, eps or C2 is needed any more: the             *)
+(*  nonnegativity already assumed above (H:data) suffices, so the             *)
+(*  reaction-free case sigma = 0 is an instance of this theorem.              *)
 Variable xi : R.
 Hypothesis xi_large  : xi > 2.
-Hypothesis c1_large  : c1 > 2 * xi * Cb^2.
-Hypothesis sigma_pos : 0 < sigma.
-Hypothesis eps_pos   : 0 < eps.
-Hypothesis C2_pos    : 0 < C2.
+Hypothesis c1_large  : c1 > xi * Cb^2.
 
 Lemma xi_pos_l : 0 < xi.
 Proof. lra. Qed.
@@ -310,10 +320,128 @@ Definition xw : K -> V := AbstractInterpolation.xv Hs K cxv gpv.
 (*  The trusted additions.                                                   *)
 (* ========================================================================= *)
 
-(*  The tested identity for the discrete-error pair (eq:StabilityEstimate    *)
-(*  with U_h := W): the same class-G item as the stability lemma's HBS.      *)
-Variable BSWW : R.
-Hypothesis HBS_W :
+(*  B_S(W,W) is now DEFINED as the eighteen-term form of eq:Bstab evaluated  *)
+(*  with BOTH slots equal to the discrete error W -- not assumed.  The        *)
+(*  stability lemma's tested identity (eq:StabilityEstimate at U_h := W) is   *)
+(*  then PROVED below (HBS_W), from two elementary Green-type inputs: the     *)
+(*  DIAGONAL instances of eq:skew and eq:globalibp.                           *)
+(*                                                                            *)
+(*  This replaces the previous monolithic hypothesis HBS_W -- which silently  *)
+(*  bundled the whole difference-of-squares expansion together with these two *)
+(*  identities -- by the two identities alone, and reconciles the two         *)
+(*  encodings of B_S (the free real and the eighteen-term expression) inside  *)
+(*  the kernel.                                                               *)
+Definition BSWW : R :=
+  AbstractInterpolation.BS Hs K Th nu sigma eps c1 c2 hK aK am
+    gv gv dv dv cxv cxv gpv gpv vv vv qq qq divv divv.
+
+(*  eq:skew on the diagonal:  (v, alpha a.grad v) = 0, which is eq:skew with  *)
+(*  both arguments equal (the global identity has no boundary term).          *)
+Hypothesis H_skew_diag :
+  Rsum Th (fun k => << (vv k) , (cxv k) >>) = 0.
+
+(*  eq:globalibp on the diagonal:  (v, alpha grad q) = -(q, div(alpha v)).    *)
+Hypothesis H_ibp_diag :
+  Rsum Th (fun k => << (vv k) , (gpv k) >>)
+  = - Rsum Th (fun k => << (qq k) , (divv k) >>).
+
+(*  ---- bridges between the two scalar-algebra modules, elementwise ------- *)
+Lemma t1S_eq : forall k,
+  AbstractStability.t1 K nu sigma c1 c2 hK aK am k = t1 k.
+Proof. intro k. unfold AbstractStability.t1, t1. apply tau1_agree. Qed.
+
+Lemma t2S_eq : forall k,
+  AbstractStability.t2 K nu c1 c2 hK aK am k = t2 k.
+Proof. intro k. unfold AbstractStability.t2, t2. apply tau2_agree. Qed.
+
+(*  The interpolation file's t1/t2 and this file's are the same function.    *)
+Lemma t1I_fun : AbstractInterpolation.t1 K nu sigma c1 c2 hK aK am = t1.
+Proof. reflexivity. Qed.
+Lemma t2I_fun : AbstractInterpolation.t2 K nu c1 c2 hK aK am = t2.
+Proof. reflexivity. Qed.
+
+(*  The x-component of the discrete error W.  Three names in the development *)
+(*  denote it -- xw here, and the first/second-slot x of the interpolation    *)
+(*  file when both slots carry the W atoms -- and all three are the same      *)
+(*  function, definitionally.                                                 *)
+Definition xW : K -> V := fun k => (cxv k) +v (gpv k).
+
+Lemma xw_is_xW    : xw = xW.                                    Proof. reflexivity. Qed.
+Lemma AIxu_is_xW  : AbstractInterpolation.xu Hs K cxv gpv = xW. Proof. reflexivity. Qed.
+Lemma AIxv_is_xW  : AbstractInterpolation.xv Hs K cxv gpv = xW. Proof. reflexivity. Qed.
+
+(*  ---- the diagonal chunk T2 + T4 vanishes ------------------------------- *)
+Lemma diag_zero :
+  Rsum Th (fun k => << (vv k) , (xW k) >>)
+  + Rsum Th (fun k => << (qq k) , (divv k) >>) = 0.
+Proof.
+  assert (Hext :
+    Rsum Th (fun k => << (vv k) , (xW k) >>)
+    = Rsum Th (fun k => << (vv k) , (cxv k) >> + << (vv k) , (gpv k) >>)).
+  { apply Rsum_ext. intro k. unfold xW. apply ip_add_r. }
+  rewrite Hext, Rsum_plus, H_skew_diag, H_ibp_diag. ring.
+Qed.
+
+(*  ---- the two residual-pairing groups, expanded ------------------------- *)
+Lemma momentum_group :
+  Rsum Th (fun k =>
+    AbstractStability.t1 K nu sigma c1 c2 hK aK am k
+    * << (AbstractStability.Lstar_m Hs K sigma vv xW dv k)
+       , (AbstractStability.L_m Hs K sigma vv xW dv k) >>)
+  = Rsum Th (fun k => t1 k * << (dv k) , (dv k) >>)
+    - 2 * sigma * Rsum Th (fun k => t1 k * << (dv k) , (vv k) >>)
+    + sigma^2 * Rsum Th (fun k => t1 k * << (vv k) , (vv k) >>)
+    - Rsum Th (fun k => t1 k * << (xW k) , (xW k) >>).
+Proof.
+  rewrite <- (Rsum_scal K Th (2 * sigma) (fun k => t1 k * << (dv k) , (vv k) >>)).
+  rewrite <- (Rsum_scal K Th (sigma^2) (fun k => t1 k * << (vv k) , (vv k) >>)).
+  rewrite <- !Rsum_minus, <- !Rsum_plus, <- !Rsum_minus.
+  apply Rsum_ext. intro k.
+  rewrite (AbstractStability.momentum_pairing Hs K sigma vv xW dv k).
+  rewrite (AbstractStability.Bv_expand Hs K sigma vv dv k).
+  rewrite t1S_eq.
+  unfold AbstractStability.Un, AbstractStability.Xn.
+  ring.
+Qed.
+
+Lemma mass_group :
+  Rsum Th (fun k =>
+    AbstractStability.t2 K nu c1 c2 hK aK am k
+    * << (AbstractStability.Lstar_c Hs K eps qq divv k)
+       , (AbstractStability.L_c Hs K eps qq divv k) >>)
+  = eps^2 * Rsum Th (fun k => t2 k * << (qq k) , (qq k) >>)
+    - Rsum Th (fun k => t2 k * << (divv k) , (divv k) >>).
+Proof.
+  rewrite <- (Rsum_scal K Th (eps^2) (fun k => t2 k * << (qq k) , (qq k) >>)).
+  rewrite <- !Rsum_minus.
+  apply Rsum_ext. intro k.
+  rewrite (AbstractStability.mass_pairing Hs K eps qq divv k).
+  rewrite t2S_eq.
+  unfold AbstractStability.Pn, AbstractStability.Dn.
+  ring.
+Qed.
+
+(*  ---- symmetry identifications among the eighteen terms' atoms ---------- *)
+Lemma sym_vv_dv :
+  Rsum Th (fun k => t1 k * << (vv k) , (dv k) >>)
+  = Rsum Th (fun k => t1 k * << (dv k) , (vv k) >>).
+Proof. apply Rsum_ext. intro k. rewrite (ip_sym Hs (vv k) (dv k)). ring. Qed.
+
+Lemma sym_x_dv :
+  Rsum Th (fun k => t1 k * << (xW k) , (dv k) >>)
+  = Rsum Th (fun k => t1 k * << (dv k) , (xW k) >>).
+Proof. apply Rsum_ext. intro k. rewrite (ip_sym Hs (xW k) (dv k)). ring. Qed.
+
+Lemma sym_x_vv :
+  Rsum Th (fun k => t1 k * << (xW k) , (vv k) >>)
+  = Rsum Th (fun k => t1 k * << (vv k) , (xW k) >>).
+Proof. apply Rsum_ext. intro k. rewrite (ip_sym Hs (xW k) (vv k)). ring. Qed.
+
+(*  ======================================================================== *)
+(*  THE TESTED IDENTITY, NOW A THEOREM (was: Hypothesis HBS_W).              *)
+(*  eq:StabilityEstimate with U_h := W.                                      *)
+(*  ======================================================================== *)
+Theorem HBS_W :
   BSWW =
   2 * nu * Rsum Th (fun k => << (gv k) , (gv k) >>)
   + sigma * Rsum Th (fun k => << (vv k) , (vv k) >>)
@@ -326,9 +454,25 @@ Hypothesis HBS_W :
       AbstractStability.t2 K nu c1 c2 hK aK am k
       * << (AbstractStability.Lstar_c Hs K eps qq divv k)
          , (AbstractStability.L_c Hs K eps qq divv k) >>).
+Proof.
+  unfold BSWW, AbstractInterpolation.BS,
+    AbstractInterpolation.T1,  AbstractInterpolation.T2,  AbstractInterpolation.T3,
+    AbstractInterpolation.T4,  AbstractInterpolation.T5,  AbstractInterpolation.T6,
+    AbstractInterpolation.T7,  AbstractInterpolation.T8,  AbstractInterpolation.T9,
+    AbstractInterpolation.T10, AbstractInterpolation.T11, AbstractInterpolation.T12,
+    AbstractInterpolation.T13, AbstractInterpolation.T14, AbstractInterpolation.T15,
+    AbstractInterpolation.T16, AbstractInterpolation.T17, AbstractInterpolation.T18.
+  rewrite xw_is_xW, AIxu_is_xW, AIxv_is_xW, t1I_fun, t2I_fun.
+  rewrite momentum_group, mass_group.
+  rewrite sym_vv_dv, sym_x_dv, sym_x_vv.
+  pose proof diag_zero as Hd.
+  lra.
+Qed.
 
 (*  Galerkin orthogonality (eq:consistency) together with bilinearity of     *)
 (*  B_S in its first argument:  B_S(W,W) = B_S(W - (U - U_h), W) = -B_S(E,W).*)
+(*  Both sides are now the SAME eighteen-term encoding of B_S, so this is    *)
+(*  purely the consistency statement.                                        *)
 Definition BSEW : R :=
   AbstractInterpolation.BS Hs K Th nu sigma eps c1 c2 hK aK am
     gu gv du dv cxu cxv gpu gpv uu vv pp qq divu divv.
@@ -498,8 +642,8 @@ Qed.
 Lemma stab_W : 0 < Cst /\ BSWW >= Cst * NW ^ 2.
 Proof.
   pose proof (abstract_stability Hs K Th nu sigma eps c1 c2 Cb xi C2
-                nu_pos sigma_pos eps_pos c1_pos c2_pos Cb_pos xi_pos_l C2_pos
-                C2_lt_1 c1_large xi_large
+                nu_pos sigma_nonneg eps_nonneg c1_pos c2_pos Cb_pos
+                C2_nonneg C2_lt_1 c1_large xi_large
                 hK aK am hK_pos aK_pos am_nonneg
                 gv vv qq xw divv dv BSWW HBS_W Hw_dv Heps_W) as [H1 H2].
   split; [exact H1 |].
@@ -523,8 +667,8 @@ Proof.
            CI_nonneg
            hK aK am hK_pos aK_pos am_nonneg
            gu gv du dv cxu cxv gpu gpv uu vv pp qq divu divv
-           IU IP IU_nonneg IP_nonneg FBp FBc FBp_e FBc_e
-           H_skew H_ibp_vp H_ibp_qu H_elem_conv_ibp H_elem_p_ibp
+           IU IP IU_nonneg IP_nonneg FBp FBc
+           H_skew H_ibp_vp H_ibp_qu
            H_assemble_p H_assemble_c H_face_p H_face_c H_jump H_mult1 H_mult2
            Hw_gv Hw_dv Hw_cxv HI_gu HI_du HI_cxu HI_gpu HI_divu HI_uu HI_pp
            H_eps).
@@ -954,6 +1098,142 @@ Proof.
   assert (Hpsi : Psi <= Rsum Th (fun k => aK k * sqrt (t2 k) / hK k * IU k
                                           + aK k * sqrt (t1 k) / hK k * IP k)).
   { unfold Psi. lra. }
+  nra.
+Qed.
+
+
+(* ========================================================================= *)
+(*  The implemented tau_2 (eq:Tau2) versus the analysed tau_2                 *)
+(*  (eq:Tau2Final):  the (1 + C2) bridge, wired END TO END.                   *)
+(*                                                                            *)
+(*  The whole analysis above is carried out with the tau_2 of eq:Tau2Final.   *)
+(*  The code forms the tau_2 of eq:Tau2, which carries the extra eps h^2      *)
+(*  term.  ContinuityAlgebra proves the scalar comparison                     *)
+(*                                                                            *)
+(*      tau_2^impl  <=  tau_2  <=  (1 + C2) tau_2^impl,      1 + C2 < 2,      *)
+(*                                                                            *)
+(*  and we now compose it with thm:convergence, so that the convergence       *)
+(*  estimate is available for the parameter the solver actually builds.       *)
+(* ========================================================================= *)
+
+Definition t2i (k : K) : R :=
+  ContinuityAlgebra.tau2impl nu (hK k) (aK k) (am k) c1 c2 eps.
+
+Lemma t2i_le_t2 : forall k, t2i k <= t2 k.
+Proof.
+  intro k. unfold t2i, t2.
+  apply ContinuityAlgebra.tau2impl_le_tau2; auto.
+Qed.
+
+Lemma t2_le_scaled_t2i : forall k, t2 k <= (1 + C2) * t2i k.
+Proof.
+  intro k. unfold t2i, t2.
+  apply (ContinuityAlgebra.tau2_le_scaled_impl
+           nu (hK k) (aK k) sigma (am k) c1 c2
+           nu_pos (hK_pos k) (aK_pos k) sigma_nonneg (am_nonneg k)
+           c1_pos c2_pos eps C2 eps_nonneg C2_nonneg).
+  exact (H_eps k).
+Qed.
+
+Lemma t2i_nonneg : forall k, 0 <= t2i k.
+Proof.
+  intro k. pose proof (t2_le_scaled_t2i k) as H.
+  pose proof (t2_pos' k) as Hp.
+  assert (HC : 0 <= C2) by exact C2_nonneg.
+  nra.
+Qed.
+
+(* ---- the triple norm built with the IMPLEMENTED tau_2 is the weaker one -- *)
+
+Definition perErrI (k : K) : R :=
+  nu * << (gu k) +v (gv k) , (gu k) +v (gv k) >>
+  + sg k * << (uu k) +v (vv k) , (uu k) +v (vv k) >>
+  + eps * << (pp k) +v (qq k) , (pp k) +v (qq k) >>
+  + t1 k * << (xe k) +v (xw k) , (xe k) +v (xw k) >>
+  + t2i k * << (divu k) +v (divv k) , (divu k) +v (divv k) >>.
+
+Definition NErrI2 : R := Rsum Th perErrI.
+Definition NErrI  : R := sqrt NErrI2.
+
+Lemma NErrI_le_NErr : NErrI <= NErr.
+Proof.
+  unfold NErrI, NErr. apply sqrt_mono.
+  unfold NErrI2, NErr2. apply Rsum_le. intro k.
+  unfold perErrI, perErr.
+  pose proof (t2i_le_t2 k) as Hle.
+  pose proof (ip_pos Hs ((divu k) +v (divv k))) as Hd.
+  nra.
+Qed.
+
+(* ---- psi(h) built with the IMPLEMENTED tau_2 ---------------------------- *)
+
+Definition PsUI2 : R :=
+  Rsum Th (fun k => (aK k)^2 * t2i k / (hK k)^2 * (IU k)^2).
+Definition PsUI : R := sqrt PsUI2.
+Definition PsiI : R :=
+  PsUI + AbstractInterpolation.PsP K Th nu sigma c1 c2 hK aK am IP.
+
+Lemma PsUI_nonneg : 0 <= PsUI.
+Proof. unfold PsUI. apply sqrt_pos. Qed.
+
+Lemma sqrt1C2_ge_1 : 1 <= sqrt (1 + C2).
+Proof.
+  pose proof C2_nonneg as HC.
+  replace 1 with (sqrt 1) at 1 by (apply sqrt_1).
+  apply sqrt_mono. lra.
+Qed.
+
+(*  psi (analysis tau_2)  <=  sqrt(1 + C2) * psi (implemented tau_2).         *)
+Lemma Psi_le_scaled_PsiI : Psi <= sqrt (1 + C2) * PsiI.
+Proof.
+  assert (HC2 : 0 <= C2) by exact C2_nonneg.
+  assert (HsC : 0 <= sqrt (1 + C2)) by apply sqrt_pos.
+  (*  the velocity bracket  *)
+  assert (HU : AbstractInterpolation.PsU K Th nu c1 c2 hK aK am IU
+               <= sqrt (1 + C2) * PsUI).
+  { unfold AbstractInterpolation.PsU, PsUI.
+    rewrite <- sqrt_mult_alt by lra.
+    apply sqrt_mono.
+    unfold AbstractInterpolation.PsU2, PsUI2.
+    rewrite t2I_fun.
+    rewrite <- (Rsum_scal K Th (1 + C2)
+                 (fun k => (aK k)^2 * t2i k / (hK k)^2 * (IU k)^2)).
+    apply Rsum_le. intro k.
+    pose proof (t2_le_scaled_t2i k) as Hle.
+    pose proof (hK_pos k) as Hh.
+    pose proof (aK_pos k) as Ha.
+    assert (Hh2 : 0 < (hK k)^2) by nra.
+    assert (HIU : 0 <= (IU k)^2) by nra.
+    assert (Hq : 0 <= (aK k)^2 / (hK k)^2 * (IU k)^2).
+    { apply Rmult_le_pos; [| exact HIU].
+      apply Rmult_le_pos; [nra | left; apply Rinv_0_lt_compat; exact Hh2]. }
+    (*  a^2 * t2 / h^2 * IU^2  <=  (1+C2) * (a^2 * t2i / h^2 * IU^2)  *)
+    replace ((aK k)^2 * t2 k / (hK k)^2 * (IU k)^2)
+      with ((aK k)^2 / (hK k)^2 * (IU k)^2 * t2 k) by (field; lra).
+    replace ((1 + C2) * ((aK k)^2 * t2i k / (hK k)^2 * (IU k)^2))
+      with ((aK k)^2 / (hK k)^2 * (IU k)^2 * ((1 + C2) * t2i k)) by (field; lra).
+    apply Rmult_le_compat_l; assumption. }
+  (*  the pressure bracket is untouched by tau_2, and sqrt(1+C2) >= 1  *)
+  pose proof sqrt1C2_ge_1 as H1.
+  pose proof (AbstractInterpolation.PsP_nonneg K Th nu sigma c1 c2 hK aK am IP) as HP.
+  unfold Psi, PsiI. nra.
+Qed.
+
+(* ========================================================================= *)
+(*  thm:convergence FOR THE IMPLEMENTED PARAMETER.                           *)
+(*                                                                           *)
+(*  Measured in the triple norm the code actually controls, and with psi(h)  *)
+(*  built from the tau_2 the code actually forms, the convergence estimate    *)
+(*  holds with the SAME constant inflated by at most sqrt(1 + C2) < sqrt 2.  *)
+(* ========================================================================= *)
+Theorem abstract_convergence_implemented :
+  NErrI <= sqrt (1 + C2) * Cconv * PsiI.
+Proof.
+  pose proof NErrI_le_NErr as H1.
+  pose proof abstract_convergence as H2.
+  pose proof Psi_le_scaled_PsiI as H3.
+  pose proof Cconv_nonneg as H4.
+  assert (HsC : 0 <= sqrt (1 + C2)) by apply sqrt_pos.
   nra.
 Qed.
 

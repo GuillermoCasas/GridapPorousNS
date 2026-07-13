@@ -8,12 +8,44 @@ de-Pouplana). It is the proof-assistant counterpart of the SymPy suite in
 computation, the files here prove them from the axioms of the real numbers,
 and the proofs are re-verified by Coq's trusted kernel (`coqchk`).
 
-**Status: 14 files, ~531 theorems, all proved. No `Admitted`, no `Axiom`,
-no `admit` anywhere** (grep the sources to confirm). Developed and tested
-against Coq 8.18.0 using **only the standard library** — no Mathcomp, no
-Coquelicot, no external packages. Every definition has been checked against
-the manuscript sources (`article.tex`, `continuity_appendix.tex`, July 2026
-revision).
+**Status: 15 files, ~584 theorems, all proved. No `Admitted`, no `Axiom`,
+no `admit` anywhere** (grep the sources to confirm — and, more strongly,
+`Print Assumptions`: every top-level theorem depends on exactly three axioms,
+all from the standard library's *construction* of the reals
+(`ClassicalDedekindReals.sig_not_dec`, `ClassicalDedekindReals.sig_forall_dec`,
+`FunctionalExtensionality.functional_extensionality_dep`), and on nothing else).
+Compiled and independently kernel-checked (`coqchk`) on Coq 8.18.0 using **only
+the standard library** — no Mathcomp, no Coquelicot, no external packages. Every
+definition has been checked against the manuscript sources (`article.tex`,
+`continuity_appendix.tex`, July 2026 revision).
+
+**This revision shrinks the trusted base.** Four items that were *hypotheses*
+are now *theorems*: `HBS_W` (the tested identity for the discrete-error pair --
+proved from the two *diagonal* Green identities `H_skew_diag`/`H_ibp_diag` that
+it silently bundled, so `B_S(W,W)` is now *defined* as the eighteen-term form
+and the two encodings of `B_S` are reconciled inside the kernel), and
+`H_elem_conv_ibp` / `H_elem_p_ibp` (whose face terms were free variables and so
+constrained nothing; they are now *defined* as the integration-by-parts defect).
+The strictness `sigma > 0`, `eps > 0`, `C2 > 0` is gone -- the development now
+assumes exactly `H:data` (`sigma >= 0`, `eps >= 0`, `0 <= C2 < 1`), so the
+**reaction-free case sigma = 0 is a genuine instance**. The numerical-parameter
+condition is assumed in its *sharp* form `c1 > xi * Cbar^2`
+(`stability_constants_positive_sharp`), with `C_stab_margin` recording what the
+manuscript's two-fold stronger condition buys. And the analysed-vs-implemented
+tau_2 bridge is wired end to end: `abstract_convergence_implemented` states
+thm:convergence for the parameter the solver actually forms, with the constant
+inflated by at most sqrt(1 + C2) < sqrt 2. Trusted base of thm:convergence:
+50 hypotheses -> 46, and the *content* is strictly smaller.
+
+**Non-vacuity is machine-checked too.** `NonVacuity.v` exhibits an explicit
+instance (the carrier `R` with `<x,y> := x*y`, a one-element mesh, rational
+data), discharges *every* hypothesis of `abstract_stability` — including `HBS`,
+`S3` and `Heps` — and applies the theorem inside the kernel, obtaining the
+non-degenerate conclusion `B_S = 7/8 >= C_stab * |||U_h|||^2 = 7/16` with both
+sides strictly positive. So the hypothesis bundle is provably *consistent*: none
+of the abstract theorems is vacuously true. (This settles consistency, not
+soundness: that the finite element objects satisfy the hypotheses is the other
+direction, and is what the hand audit in `AUDIT.md` §4 establishes.)
 
 **Headline of this revision: the paper's entire a priori chain --
 `lemma:Stability`, `lemma:Continuity`, `lem:continterp` and

@@ -60,10 +60,12 @@
 % ---- math shorthands matching the paper ---------------------------------
 \newcommand{\sigt}{\widetilde{\sigma}}
 \newcommand{\Cinv}{C_{\mathrm{inv}}}
+\newcommand{\Cbar}{\bar C_{\mathrm{inv}}}
 \newcommand{\aK}{\alpha_K}
 \newcommand{\Reh}{\mathrm{Re}_h}
 \newcommand{\Dah}{\mathrm{Da}_h}
 \newcommand{\Cstab}{C_{\mathrm{stab}}}
+\newcommand{\Th}{\mathcal{T}_h}          % the triangulation, as in the paper
 \renewcommand{\arraystretch}{1.25}
 
 \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
@@ -71,8 +73,8 @@
 \title{\bfseries Machine-checked coverage map:\\
        from the paper's theory to the Coq formalisation}
 \author{Coverage note accompanying \file{proof_verification/coq-formal/}}
-\date{Revised 2026-07-12 \quad (14 files, $\approx$531 theorems;
-      developed on Coq 8.18; all 14 files build-verified on Rocq 9.1.1)}
+\date{Revised 2026-07-13 \quad (15 files, $\approx$584 theorems; all compiled
+      and \coq{coqchk}-verified on Coq~8.18.0)}
 
 \begin{document}
 \maketitle
@@ -93,7 +95,9 @@ now consists of complete machine-checked theorems}
 (\coq{abstract_stability}, \coq{abstract_continuity},
 \coq{abstract_continterp}, \coq{abstract_convergence}), proved over an
 abstract inner-product / mesh interface from a short, \emph{named,
-quantitative} trusted base of standard analytic facts; the convergence
+quantitative} trusted base of standard analytic facts --- under exactly the
+manuscript's own hypotheses, $\sigma\ge0$ and $\varepsilon\ge0$ included, so
+that the reaction-free case $\sigma=0$ is a genuine instance; the convergence
 theorem is a genuine kernel-level \emph{composition} of the closed
 stability and interpolation-continuity lemmas, with the triple-norm
 triangle inequality proved rather than assumed. Section~\ref{sec:coq}
@@ -101,9 +105,15 @@ is a primer on how Coq (now \emph{Rocq}) works and what ``machine-checked''
 buys. Section~\ref{sec:map} explains the translation convention --- including
 how a lemma with functional-analytic hypotheses is honestly encoded.
 Section~\ref{sec:crosswalk} is the crosswalk itself, one table per Coq file.
-Section~\ref{sec:left} states precisely what is \emph{not} inside the kernel
-and by what other means (a hand audit, the SymPy suite, a Lean~4 roadmap, or
-the convergence tests) each residual item is addressed.
+Section~\ref{sec:assumptions} is the heart of the transparency claim: it reads
+out \emph{every} assumption the machine-checked theorems make --- the explicit
+hypotheses, and equally the implicit ones that live in definitions rather than
+in \coq{Hypothesis} lines --- each in its exact Coq form, its mathematical form,
+and with a discussion of its role, its justification, and whether it could be
+tightened; it also settles the question of whether the hypothesis bundle is
+consistent at all. Section~\ref{sec:left} then states what is \emph{not} inside
+the kernel and by what other means (a hand audit, the SymPy suite, a Lean~4
+roadmap, or the convergence tests) each residual item is addressed.
 Section~\ref{sec:amend} records the theory-side amendments applied to keep the
 manuscript $100\%$ compatible with what was verified.
 Section~\ref{sec:conclusion} states, in plain terms, how strong the resulting
@@ -119,12 +129,13 @@ guarantee is and where residual trust remains.
 The Coq development mirrors, file by file, the SymPy ``verification scripts''
 suite in \file{proof_verification/sympy/}: where SymPy checks an identity
 by symbolic computation, the Coq files \emph{prove} it. The suite is
-\textbf{14 files, $\approx 531$ theorems, all proved} --- there is no
+\textbf{15 files, $\approx 584$ theorems, all proved} --- there is no
 \coq{Admitted}, no \coq{Axiom} and no \coq{admit} anywhere in the sources
-(\coq{grep} confirms this). It was developed against Coq~8.18 using
-\emph{only} the standard library, and all fourteen files compile and
-kernel-check unchanged under the current Rocq~9.1.1 (the two new files use
-no constructs beyond those of the existing suite).
+(\coq{grep} confirms this, and so, more strongly, does \coq{Print Assumptions}:
+\S\ref{sec:stratum0}). It uses \emph{only} the standard library, and the whole
+suite has been compiled and independently kernel-checked on Coq~8.18.0: fifteen
+\coq{[PASS]} lines followed by \emph{``coqchk: modules successfully checked by
+the trusted kernel''} (\S\ref{sec:repro}).
 
 What changed since the previous revision is a step up in \emph{kind}, not just
 in count. Previously the Coq layer certified the \emph{algebraic skeleton} of
@@ -161,6 +172,35 @@ mesh-dependent triple norm is \emph{proved} from the pre-Hilbert axioms.
 Even the agreement of the $\tau_1,\tau_2,\sigt$ formulas across the two
 scalar-algebra modules is machine-checked (\coq{tau1_agree},
 \coq{tau2_agree}, \coq{sigt_agree}).
+
+This revision also \emph{shrinks} the trusted base rather than merely
+describing it. Four things that were assumptions are now theorems, and one
+hypothesis that was stronger than the manuscript's is now exactly the
+manuscript's. (i) The tested identity for the discrete-error pair, \coq{HBS_W},
+is \emph{proved} --- from the two \emph{diagonal} Green identities it was
+silently bundling --- so the larger of the two class-G bundles leaves the base
+and the two encodings of $B_S$ are reconciled inside the kernel. (ii) The two
+elemental integration-by-parts hypotheses are \emph{proved}: their face terms
+were free variables, hence constrained nothing, and are now defined as the
+integration-by-parts defect. (iii) The strictness $\sigma>0$, $\varepsilon>0$,
+$C_2>0$ is gone: the development now assumes exactly \lbl{H:data}, so the
+reaction-free case $\sigma=0$ is a genuine instance. (iv) The numerical-parameter
+condition is assumed in its \emph{sharp} form $c_1>\xi\Cbar^2$, with a separate
+theorem (\coq{C_stab_margin}) recording what the manuscript's two-fold stronger
+condition buys. And (v) the analysed-versus-implemented $\tau_2$ bridge is wired
+end to end: \coq{abstract_convergence_implemented} states \lbl{thm:convergence}
+for the parameter the solver actually forms, with the constant inflated by at
+most $\sqrt{1+C_2}<\sqrt2$. Section~\ref{sec:tighten} is the ledger.
+
+A fifteenth file, \file{NonVacuity.v}, answers the one question a
+hypothesis-heavy formalisation always invites: \emph{could the hypotheses be
+contradictory, making the theorems vacuously true?} It exhibits an explicit
+instance --- the carrier $\mathbb R$ with $\langle x,y\rangle=xy$, a one-element
+mesh, and rational data --- and lets the kernel check that it satisfies every
+hypothesis of \coq{abstract_stability}, yielding the \emph{non-degenerate}
+conclusion $B_S=\tfrac78\ge\Cstab|||U_h|||^2=\tfrac12\cdot\tfrac78=\tfrac7{16}$
+with both sides strictly positive. Consistency of the hypothesis bundle is thus
+itself machine-checked, not argued (\S\ref{sec:vacuity}).
 
 Two boundaries still frame everything.
 \begin{itemize}[nosep]
@@ -207,7 +247,7 @@ kernel is exercised twice:
   \item \coq{coqchk} --- a \emph{separate}, independent re-implementation of
     the kernel --- re-verifies the compiled objects (\coq{.vo} files) from
     scratch, with no trust in \coq{coqc}. The build script runs it and reports
-    \emph{``coqchk: all modules kernel-verified''}.
+    \emph{``coqchk: modules successfully checked by the trusted kernel''}.
 \end{enumerate}
 
 \subsection{The trust base --- and why ``no \texttt{Admitted}, no \texttt{Axiom}'' matters}
@@ -225,10 +265,11 @@ here:
     single one would let anything ``follow''.
   \item \coq{Axiom} postulates a statement as true without proof.
 \end{itemize}
-Neither appears anywhere in the fourteen files. Consequently every result below
-is reduced to the standard-library axiomatisation of the real numbers (plus,
-for the four abstract theorems, the explicitly-listed analytic hypotheses ---
-Section~\ref{sec:left}). The suite uses \emph{no external libraries} (no
+Neither appears anywhere in the fifteen files. Consequently every result below
+is reduced to the standard library's real numbers --- constructed, not
+postulated, but resting on a small fixed set of classical principles
+(\S\ref{sec:stratum0}) --- plus, for the four abstract theorems, the
+explicitly-listed analytic hypotheses of Section~\ref{sec:left}. The suite uses \emph{no external libraries} (no
 Mathcomp, no Coquelicot): the analysis is done on \coq{Coq.Reals} with the
 arithmetic tactics \coq{lra}/\coq{nra} (linear and nonlinear real arithmetic)
 and \coq{field} (rational-function identities). Those tactics are
@@ -268,11 +309,13 @@ $\langle -a+b,\,a+b\rangle = \lVert b\rVert^2 - \lVert a\rVert^2$ that drives
 the ASGS cancellation. Any concrete weighted $L^2(K)$ is an instance, so the
 proofs transfer for free.
 
-\emph{A named trusted base.} A lemma such as \lbl{lemma:Stability} needs one
-genuinely analytic input --- a weighted inverse estimate --- that stdlib Coq
-cannot prove without finite-element scaling theory. Rather than pretend
-otherwise, the estimate is written as an explicit, \emph{quantitative}
-\coq{Hypothesis} of the theorem. The theorem is then a real implication:
+\emph{A named trusted base.} A lemma such as \lbl{lemma:Stability} needs
+genuinely analytic inputs --- a Green-type testing identity and a weighted
+inverse estimate --- that stdlib Coq cannot prove without the variational setup
+and finite-element scaling theory. Rather than pretend otherwise, each is
+written as an explicit, \emph{quantitative} \coq{Hypothesis} of the theorem
+(for \coq{abstract_stability} there are exactly three: \coq{HBS}, \coq{S3} and
+the $\varepsilon$-condition \coq{Heps}; see \S\ref{sec:assumptions}). The theorem is then a real implication:
 \emph{if} the inverse estimate holds with the stated constant, \emph{then} the
 stability bound holds with the stated constant. This is the honest encoding of
 a ``cited-standard'' fact, and it makes the residual trusted base a finite,
@@ -375,8 +418,11 @@ with \coq{field}.
 
 The abstract theorems read the same way, with the trusted-base facts as named
 hypotheses. \lbl{lemma:Stability} is \coq{abstract_stability}: under the
-section's positivity plus $c_1>2\xi\bar C_{\mathrm{inv}}^2$, $\xi>2$,
-$C_2<1$, and the three analytic hypotheses
+section's positivity plus $c_1>\xi\Cbar^{2}$ (the \emph{sharp} form of
+\lbl{eq:conditions_on_num_param}; the manuscript's $c_1>2\xi\Cbar^2$ implies it
+--- \S\ref{sec:stratumD}, D3), $\xi>2$, $C_2<1$, the two analytic hypotheses
+\coq{HBS} and \coq{S3} shown below, and the $\varepsilon$-condition \coq{Heps}
+(class~D, item~23 of Table~\ref{tab:inventory})
 
 \begin{lstlisting}
 (* HBS: Galerkin testing + adjoint expansion (eq:StabilityEstimate) *)
@@ -422,7 +468,7 @@ exactly the standard, hand-audited facts it is labelled as.
 \section{The crosswalk: theory \texorpdfstring{$\to$}{->} Coq}\label{sec:crosswalk}
 % =====================================================================
 
-Dependency and topic map of the fourteen files. \file{Limits.v}/\file{DerivKit.v}
+Dependency and topic map of the fifteen files. \file{Limits.v}/\file{DerivKit.v}
 serve the concrete analytic files; \file{AbstractSums.v}/\file{InnerSpace.v}
 serve the four abstract-theorem files, which also import the closed algebraic
 theorems of \file{StabilityAlgebra.v}/\file{ContinuityAlgebra.v} and apply them
@@ -448,6 +494,7 @@ Coq file & Paper location & Role \\
 \file{Asymptotics.v} & \S\ref{sec:crossAsym} (\S6)     & robustness in $(\Reh,\Dah)$ \\
 \file{ManufacturedSolution.v} & \S\ref{sec:crossMMS} (\S7) & manufactured solution \\
 \file{PlateauBump.v} & \S\ref{sec:crossBump} (\S7)     & plateau bump, through $C^1$ \\
+\file{NonVacuity.v}  & \S\ref{sec:vacuity}             & consistency witness for \lbl{lemma:Stability} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -477,8 +524,17 @@ Coq file & Paper location & Role \\
 
 \subsection{\texttt{StabilityAlgebra.v} --- \S5: the stability estimate (scalar algebra)}\label{sec:crossStab}
 
-Section hypotheses: $\nu,h,\aK,\sigma>0$, $|\mathbf a|\ge 0$,
-$c_1,c_2,\Cinv,\xi>0$. Mirrors \file{stability_estimate_verification.py}.
+Section hypotheses: $\nu,h,\aK>0$, $\sigma\ge0$, $|\mathbf a|\ge 0$,
+$c_1,c_2,\Cinv,\xi>0$; and, in its second section, $\varepsilon\ge0$,
+$C_2\ge0$ --- exactly \lbl{H:data} (\S\ref{sec:stratumD}, D1).
+Mirrors \file{stability_estimate_verification.py}.
+
+\emph{A naming caution.} \file{StabilityAlgebra.v}'s section variable is spelled
+\coq{Cinv}, but it is a \emph{slot}: every use in the abstract layer fills it
+with \coq{Cb} $=\Cbar$ (every instantiation in \file{AbstractStability.v} does
+so). The constants below are therefore written with $\Cbar$ --- which is exactly the
+substitution \lbl{rem:winvconst} prescribes, and what \lbl{prop:stability}
+states. (Renaming the Coq variable to \coq{Cb} would remove the trap.)
 
 \begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
 \toprule
@@ -487,10 +543,12 @@ $c_1,c_2,\Cinv,\xi>0$. Mirrors \file{stability_estimate_verification.py}.
 \coq{sigt_form_phi}, \coq{sigt_form_tau1}, \coq{sigt_form_key} & The three forms of $\sigt$ (\lbl{eq:SigmaAlpha}). \\
 \coq{young_perfect_square}, \coq{young_inequality} & Young's step $-2xy\ge -x^2/\xi-\xi y^2$. \\
 \coq{viscous_coefficient_expansion} & Viscous coefficient of \lbl{eq:StabilityEstimateFinal} $=$ the expanded \lbl{eq:ViscousCoefficientBound}. \\
-\coq{velocity_coefficient_expansion}, \coq{velocity_slack_identity}, \coq{velocity_coefficient_lower_bound}, \coq{u_final_lower_bound} & \lbl{eq:VelocityCoefficientBound} and its \emph{exact} slack over $C_u\sigt$, $C_u=1-\xi\Cinv^2/c_1$. \\
+\coq{velocity_coefficient_expansion}, \coq{velocity_slack_identity}, \coq{velocity_coefficient_lower_bound}, \coq{u_final_lower_bound} & \lbl{eq:VelocityCoefficientBound} and its \emph{exact} slack over $C_u\sigt$, $C_u=1-\xi\Cbar^2/c_1$. \\
 \coq{eps_max_tau2_identity}, \coq{eps_tau2_le_C2}, \coq{pressure_term_coercive}, \coq{epsilon_smallness_chain} & The $\varepsilon$-smallness chain (\lbl{eq:UpperBoundOnEpsilon}): $\varepsilon\tau_2\le C_2$, pressure coeff $\ge(1-C_2)\varepsilon$. \\
-\coq{viscous_coefficient_lower_bound}, \coq{visc_final_lower_bound} & Viscous bracket $\ge C_{\mathrm{visc}}\nu$, $C_{\mathrm{visc}}=\min\{2-4\Cinv^2/c_1,2(1-2/\xi)\}$. \\
-\coq{stability_constants_positive} & $c_1>2\xi\Cinv^2$, $\xi>2$ $\Rightarrow$ coefficients positive (\lbl{eq:conditions_on_num_param}). \\
+\coq{viscous_coefficient_lower_bound}, \coq{visc_final_lower_bound} & Viscous bracket $\ge C_{\mathrm{visc}}\nu$, $C_{\mathrm{visc}}=\min\{2-4\Cbar^2/c_1,2(1-2/\xi)\}$. \\
+\coq{stability_constants_positive_sharp} & $c_1>\xi\Cbar^2$, $\xi>2$ $\Rightarrow$ coefficients positive: the \emph{sharp} form of \lbl{eq:conditions_on_num_param} (a factor two weaker than the manuscript's). \\
+\coq{stability_constants_positive} & the manuscript's $c_1>2\xi\Cbar^2$, $\xi>2$; a corollary of the sharp form. \\
+\coq{C_stab_margin} & what the manuscript's extra factor of two buys: $C_u>\tfrac12$, $2-4\Cbar^2/c_1>1$, hence the $\Cbar$-free floor $\Cstab\ge\min\{2(1-2/\xi),\tfrac12,1-C_2\}$. \\
 \coq{elemental_coercivity} & Elemental assembly $\ge\Cstab\times$ the triple-norm contributions, $\Cstab=\min\{C_{\mathrm{visc}},C_u,1-C_2,1\}$. \\
 \bottomrule
 \end{longtable}
@@ -610,10 +668,11 @@ error $E_h=\widehat U_h-U_h$ (its inverse-estimate input is literally the
 V-side hypothesis \coq{Hw_dv}; its $\varepsilon$-condition is
 definitionally the same \lbl{eq:epscond}), \coq{abstract_continterp} at
 the pair $(E,E_h)$. The only trusted additions over the union of the two
-prior files are \coq{HBS_W} (the tested identity for the discrete-error
-pair --- the same class-G item as the stability lemma's own \coq{HBS}) and
-\coq{Horth} (Galerkin orthogonality \lbl{eq:consistency} together with
-bilinearity of $B_S$ in its first argument).
+prior files are the two \emph{diagonal} Green identities \coq{H_skew_diag} and
+\coq{H_ibp_diag} --- from which the tested identity for the discrete-error pair,
+\coq{HBS_W}, is now \emph{proved} rather than assumed --- together with
+\coq{Horth} (Galerkin orthogonality \lbl{eq:consistency} plus bilinearity of
+$B_S$ in its first argument).
 
 \begin{longtable}{@{}L{0.40\textwidth}L{0.55\textwidth}@{}}
 \toprule
@@ -624,6 +683,11 @@ $\tau_1,\tau_2,\sigt$ formulas of \file{StabilityAlgebra.v} and
 \file{ContinuityAlgebra.v} agree (the first two definitionally, the third
 as a field identity): the two developments provably speak about the same
 parameters. \\
+\coq{diag_zero}, \coq{momentum_group}, \coq{mass_group}, \coq{HBS_W} & the
+tested identity for the discrete-error pair, \textbf{proved} (was a
+hypothesis): the eighteen-term $B_S(W,W)$ is re-assembled into the stability
+form, the $T_2+T_4$ remainder vanishing by the two diagonal Green identities. \\
+\coq{t2i}, \coq{NErrI}, \coq{PsiI}, \coq{abstract_convergence_implemented} & \lbl{thm:convergence} for the \emph{implemented} $\tau_2$ (\lbl{eq:Tau2}): same estimate, constant inflated by at most $\sqrt{1+C_2}<\sqrt2$. \\
 \coq{NW2_bridge} & the stability file's $|||E_h|||^2$ equals the
 continuity file's, term by term over the mesh. \\
 \coq{stab_W}, \coq{cont_EW} & the two closed theorems, applied. \\
@@ -686,7 +750,7 @@ Mirrors \file{manufactured_solution_verification.py}; genuine
 \toprule
 \textbf{Coq statement} & \textbf{Paper content} \\
 \midrule \endhead
-\coq{manufactured_mass_conservation_2d/3d} & $\nabla\!\cdot(\alpha\mathbf u)=0$ for arbitrary differentiable positive $\alpha$ (\lbl{eq:ManufacturedProblem}). \\
+\coq{manufactured_mass_conservation_2d/3d} & $\nabla\!\cdot(\alpha\mathbf u)=0$ for an arbitrary \emph{positive} $\alpha$ --- differentiability not assumed, since $\alpha$ cancels in $\alpha\mathbf u$ (\coq{alpha_u1}, \coq{alpha_u2}) (\lbl{eq:ManufacturedProblem}). \\
 \coq{boundary_trace_nonzero} & $u_2(0,0)>0$: the trace does not vanish (amendment A11). \\
 \coq{rhs_closed_form}, \coq{denominator_gap}, \coq{mid_le_rhs}, \coq{eps_choice_margin} & the \lbl{eq:EpsilonRef} chain at $C_2=10^{-2}$, and $\varepsilon:=10^{-4}\varepsilon_{\mathrm{ref}}$. \\
 \coq{dbf_a_nonneg}, \coq{dbf_b_nonneg} & DBF coefficients admissible on $0<\alpha\le1$ (\lbl{eq:DBFResistanceTerm}). \\
@@ -727,6 +791,1750 @@ helpers and derivatives of $a\cdot t$, $\sin(at)$, $\cos(at)$, $c\cdot f(t)$,
 $e^{t-1}$. Neither is paper-specific.
 
 % =====================================================================
+\section{The assumptions, read in full}\label{sec:assumptions}
+% =====================================================================
+
+A machine-checked theorem is an \emph{implication}. The kernel guarantees, with
+a certainty no human referee can match, that the conclusion follows from the
+hypotheses; it says nothing whatever about whether the hypotheses are true, or
+even about whether they mean what their names suggest. All of the residual risk
+therefore migrates into two places: reading the conclusion correctly, and
+auditing the hypotheses. The crosswalk of Section~\ref{sec:crosswalk} discharges
+the first. This section discharges the second, exhaustively: every assumption
+the four abstract theorems make --- explicit or implicit --- is reproduced here
+in the exact form the kernel sees it, translated into ordinary mathematics,
+matched to the manuscript, and assessed.
+
+\subsection{Why the list below is complete}\label{sec:complete}
+
+Before the list, the structural fact that gives it its value.
+
+The four abstract theorems are not stated about Sobolev spaces. They are stated
+about an \emph{abstract interface}: the fields are opaque vectors in a
+pre-Hilbert space, the mesh is an abstract list, and the elemental quantities
+$h_K,\aK,|\mathbf a|_{\infty,K}$ are abstract real-valued functions on it.
+\textbf{Coq does not know what a gradient is.} It has never heard of
+$\alpha$, of a simplex, or of a polynomial.
+
+The consequence is decisive. In an ordinary paper proof, a step may quietly
+invoke a property of $\nabla$, of the mesh, or of the finite element space
+without the author noticing that a hypothesis was needed --- this is precisely
+how gaps survive refereeing. Here that is impossible. If a step of the argument
+requires a fact about the objects, the fact is not available unless it has been
+written down as a hypothesis, and if it has not been written down the file
+simply does not compile. \emph{The hypothesis list is therefore complete by
+construction, not by diligence.} It is not a list of the assumptions the authors
+remembered to declare; it is a list of every assumption the proof makes
+\emph{about the objects} --- every relation between the atoms that the kernel is
+permitted to use --- enforced by a machine that cannot be persuaded to overlook
+one.
+
+One thing this guarantee does \emph{not} cover, and it is important: the
+\emph{encoding} itself. Whether the abstract atoms and the abstract $B_S$ really
+stand for the objects the paper is about is a question the kernel cannot even
+ask. Assumptions of that kind hide in \coq{Definition}s and \coq{Variable}s
+rather than in \coq{Hypothesis} lines, and they appear in no trusted-base table.
+They are the subject of \S\ref{sec:stratum1}, and they are the reason this
+section has four strata rather than two.
+
+That guarantee is worth more than any individual entry below, and it is the
+reason the abstract-interface method was chosen over a direct formalisation.
+Its price is that the reader must now do the one thing the machine cannot: check
+that each hypothesis, read as a statement about the real finite element objects,
+is true. The rest of this section is written to make that check as easy as
+possible.
+
+We organise the assumptions into four strata, in increasing order of
+mathematical content:
+
+\begin{enumerate}[label=\textbf{Stratum \arabic*.},leftmargin=6.2em,nosep]
+  \setcounter{enumi}{-1}
+  \item The \emph{logic} --- what Coq itself rests on (\S\ref{sec:stratum0}).
+  \item The \emph{interface} --- the modelling identifications made when the
+    finite element objects were encoded as abstract vectors. These are the
+    \emph{implicit} assumptions: they live in \coq{Definition}s and
+    \coq{Variable}s rather than in \coq{Hypothesis} lines, so they appear in no
+    trusted-base table, and they are exactly what a reader is most likely to
+    over-read (\S\ref{sec:stratum1}).
+  \item The \emph{data, mesh and parameter conditions} --- Class~D. Hypotheses
+    of the paper's theorems in any formal system, so there is nothing to prove
+    --- with two disclosed exceptions where Coq asks for more
+    (\S\ref{sec:stratumD}).
+  \item The \emph{analytic base} --- Classes~G and~I: the Green-type identities
+    and the inverse/interpolation estimates. Textbook facts, cited rather than
+    proved, and the only place where genuine mathematics is taken on trust
+    (\S\ref{sec:stratumG}--\S\ref{sec:stratumI}).
+\end{enumerate}
+
+% ---------------------------------------------------------------------
+\subsection{Stratum 0: the logical base}\label{sec:stratum0}
+% ---------------------------------------------------------------------
+
+Three things, and no more, sit under every theorem in the development.
+
+\emph{The logic.} The Calculus of Inductive Constructions, as implemented by the
+Coq/Rocq kernel and independently re-checked by \coq{coqchk}
+(\S\ref{sec:coq}). No \coq{Axiom}, no \coq{Admitted}, no \coq{admit} occurs in
+the fifteen files, so nothing has been postulated behind the reader's back.
+
+\emph{The real numbers.} The development imports \coq{Coq.Reals} (with
+\coq{Lra}, \coq{Lia}, \coq{Psatz}, \coq{List}) and nothing else --- no Mathcomp,
+no Coquelicot. Coq's $\mathbb R$ is the \emph{classical} real line: a complete
+ordered Archimedean field with decidable comparison, so that excluded middle is
+available for statements $x<y$, $x=y$, $x>y$. This is the ordinary
+mathematician's $\mathbb R$, and reasoning classically about it is not a weakness
+but the intended semantics.
+
+We need not take this on trust, and the reader need not either. Coq will
+\emph{print} the axioms a theorem actually depends on. Running, after
+\coq{./run_all.sh},
+\begin{lstlisting}
+From PNSFormal Require Import AbstractConvergence.
+Print Assumptions abstract_convergence.
+\end{lstlisting}
+returns, for each of the four abstract theorems and for the non-vacuity witness
+alike, exactly this list and nothing else:
+\begin{lstlisting}
+Axioms:
+ClassicalDedekindReals.sig_not_dec : forall P : Prop, {~ ~ P} + {~ P}
+ClassicalDedekindReals.sig_forall_dec
+  : forall P : nat -> Prop,
+    (forall n : nat, {P n} + {~ P n}) ->
+    {n : nat | ~ P n} + {forall n : nat, P n}
+FunctionalExtensionality.functional_extensionality_dep
+  : forall (A : Type) (B : A -> Type) (f g : forall x : A, B x),
+    (forall x : A, f x = g x) -> f = g
+\end{lstlisting}
+Three axioms, all from the standard library's \emph{construction} of
+$\mathbb R$ (Coq builds the reals rather than postulating them, and these are the
+classical principles the construction needs): a decidability of double
+negations, a decidability principle for decidable predicates over $\mathbb N$,
+and dependent functional extensionality. All three hold in the ordinary
+set-theoretic model, so they are consistency-preserving. \textbf{There is no
+user-introduced axiom, and no use of propositional excluded middle, proof
+irrelevance, or choice.} Everything else a theorem depends on is a section
+hypothesis --- discharged by Coq into the statement as an explicit argument,
+where it is visible to anyone who prints the type --- and every section
+hypothesis is catalogued below.
+
+\emph{Two totality conventions.} In \coq{Coq.Reals}, division and square root
+are \emph{total}: $x/0 = 0$ and $\sqrt{y} = 0$ for $y<0$. A development can
+accidentally lean on these and prove a statement that is true only because of
+the convention. This one does not. Every division in the abstract files has a
+denominator that is either a \emph{declared} positive quantity ($h_K$, $c_1$,
+$c_2$, $\xi$, $\aK$, $c_J$, the Young parameter $\lambda$) or one \emph{proved}
+positive before use ($\tau_{1,\mathrm{NS}}^{-1}$, $\varphi_1$, $\sqrt{c_1}$,
+$\Cstab$); every $\sqrt{\cdot}$ is applied to a quantity whose nonnegativity is
+likewise declared or proved --- a positive datum, a stabilization parameter
+($\tau_1,\tau_2>0$ by \coq{tau1_pos}, \coq{tau2_pos}), an inner product
+$\langle x,x\rangle$ (the axiom \coq{ip_pos}), or a sum of such
+(\coq{Rsum_nonneg}). The conventions are therefore never load-bearing --- but
+note that this is a property established by \emph{reading the development}, not
+one the kernel enforces: Coq would happily accept a theorem that silently relied
+on $1/0=0$.
+
+% ---------------------------------------------------------------------
+\subsection{Stratum 1: the interface --- the implicit assumptions}\label{sec:stratum1}
+% ---------------------------------------------------------------------
+
+These are the assumptions that do \emph{not} appear as hypotheses, because they
+were made when the mathematics was encoded rather than when it was proved. They
+are no less real for that, and they are the ones a reader is likeliest to
+mis-read. We give all five.
+
+\subsubsection{(I1) The elemental pairing as a pre-Hilbert space}
+
+\file{InnerSpace.v} models the elemental pairing
+$\langle f,g\rangle_K = \int_K f\cdot g\,\mathrm d\Omega$ by a carrier $V$ with
+addition, scalar multiplication and a form $\langle\cdot,\cdot\rangle$ subject
+to exactly four axioms:
+\begin{equation}\label{eq:prehilbert}
+  \langle x,y\rangle=\langle y,x\rangle,\qquad
+  \langle x+y,z\rangle=\langle x,z\rangle+\langle y,z\rangle,\qquad
+  \langle a\,x,y\rangle=a\,\langle x,y\rangle,\qquad
+  \langle x,x\rangle\ \ge\ 0 .
+\end{equation}
+
+\emph{What is assumed.} Symmetry, linearity in the first slot, and positive
+\emph{semi}-definiteness. Nothing else.
+
+\emph{What is deliberately \textbf{not} assumed.} Completeness; definiteness
+($\langle x,x\rangle=0\Rightarrow x=0$); finite dimension; the existence of an
+orthonormal basis; any topology at all. From \eqref{eq:prehilbert} the file
+\emph{derives} full bilinearity, the Cauchy--Schwarz inequality (by the
+discriminant argument, with the degenerate direction handled explicitly --- this
+is where semi-definiteness rather than definiteness earns its keep), the Gram
+expansions of $\lVert x\pm y\rVert^2$, the triangle inequality, the parametrized
+Young inequality at vector level, and the difference-of-squares identity
+$\langle -a+b,\,a+b\rangle=\lVert b\rVert^2-\lVert a\rVert^2$ that drives the
+stabilization cancellation.
+
+\emph{Interpretation.} That the whole a priori theory needs only
+\eqref{eq:prehilbert} is a small mathematical result in its own right, made
+visible by the formalisation: the stability, continuity, interpolation and
+convergence estimates are \emph{algebraic}, not topological. No limit is taken,
+no completeness is used, no Riesz representation is invoked. Soundness in the
+other direction is immediate: every weighted $L^2(K)^m$ pairing --- in
+particular $\int_K \alpha\,\mathbf f\!\cdot\!\mathbf g$ and the Frobenius pairing
+on tensors --- satisfies \eqref{eq:prehilbert}, so it is a model and the theorems
+transfer to it verbatim. \emph{Tightening: none available.} This is the minimal
+interface; removing any of the four axioms breaks Cauchy--Schwarz.
+
+\subsubsection{(I2) The mesh as a finite list, and the absence of geometry}
+
+The triangulation is \coq{Variable Th : list K} over an abstract element type
+\coq{K}; the interior faces are \coq{Fl : list F} with two designated
+neighbours \coq{e1, e2 : F -> K}; and $\sum_{K\in\Th}$ is the fold
+\coq{Rsum Th f}. Three readings follow.
+
+\emph{Finiteness is structural.} A \coq{list} is finite by construction, so
+``the mesh is finite'' is not an assumption that could fail --- it is part of
+the type. Nothing in the development requires the list to be duplicate-free:
+duplicated elements would merely be counted consistently on both sides of every
+inequality.
+
+\emph{There is no geometry.} No simplex, no coordinates, no measure, no normal
+vector appears anywhere. Every geometric fact the proofs need has been pushed
+into (a) the three scalar fields $h_K$, $\aK$, $|\mathbf a|_{\infty,K}$, and
+(b) the analytic hypotheses of Stratum~3. This is what makes those hypotheses
+the \emph{complete} geometric content of the proofs, in the sense of
+\S\ref{sec:complete}.
+
+\emph{Faces carry an assumption about the boundary.} \coq{Fl} is the list of
+\emph{interior} faces. The fact that the boundary faces contribute nothing ---
+because $\mathbf u_h=\mathbf v_h=\mathbf 0$ on $\partial\Omega$ --- is not
+derived; it is folded into the assembly hypotheses \coq{H_assemble_p} and
+\coq{H_assemble_c} (\S\ref{sec:stratumG}). The homogeneous Dirichlet condition
+therefore enters the continuity proof as part of an assumption, not as a
+theorem, and we flag it as such.
+
+\subsubsection{(I3) The fields as independent families --- the crux}
+
+For the continuity lemma the discrete data are declared as
+\begin{lstlisting}
+Variables (gu gv du dv cxu cxv gpu gpv uu vv pp qq divu divv : K -> V).
+\end{lstlisting}
+fourteen \emph{mutually independent} functions from elements to vectors, whose
+intended readings are recorded only in a comment:
+\[
+  \mathtt{gu}\,k \sim \bigl(\alpha^{1/2}\mathcal P\nabla\mathbf u\bigr)\big|_K,
+  \quad
+  \mathtt{du}\,k \sim \bigl(2\nu\,\nabla\!\cdot(\alpha\,\mathcal P\nabla\mathbf u)\bigr)\big|_K,
+  \quad
+  \mathtt{divu}\,k \sim \bigl(\nabla\!\cdot(\alpha\mathbf u)\bigr)\big|_K,
+  \quad \dots
+\]
+\textbf{Nothing in the Coq text asserts that \coq{gu} is the gradient of
+\coq{uu}}, or that \coq{divu} is its divergence. The names are comments; the
+kernel sees fourteen unrelated symbols. The \emph{only} facts relating them are
+the ones written down as hypotheses --- the integration-by-parts identities and
+the inverse/interpolation estimates.
+
+This must be read correctly, in both directions.
+
+\emph{It is not a defect.} The theorem is universally quantified: \emph{for
+every} tuple of fourteen families satisfying the listed hypotheses (and, in the
+stability file, every scalar $B_S$ satisfying \coq{HBS}), the estimate holds. The genuine finite element objects form one such
+tuple --- provided each hypothesis is a true statement about them, which is
+exactly what Stratum~3 asserts and what the hand audit checks. So the theorem
+applies to the real objects, and it applies to more besides. A more general
+theorem is not a weaker one.
+
+\emph{It is what makes the audit exhaustive.} Because the kernel cannot use any
+unlisted property of $\nabla$, the list of relations between the atoms
+\emph{is} the list of analytic facts the proof consumes. That is the content of
+\S\ref{sec:complete}, and it is why we can claim the trusted base is complete
+rather than merely long.
+
+\emph{What a reader must not do.} Read the intended meanings into the statement.
+\coq{abstract_continuity} does not say ``the stabilized form is continuous on
+the discrete space''; it says ``any fourteen families satisfying \coq{H_skew},
+the \coq{Hw_*} and the rest obey the bound''. Likewise \coq{abstract_stability}
+--- whose field list is the shorter one, \emph{six} families
+(\coq{gu uu pp xu divu du}), with only \coq{HBS}, \coq{S3} and \coq{Heps} to
+relate them --- does not say ``$B_S$ is coercive''; it says ``any six families
+and any real $B_S$ satisfying those three hypotheses obey
+$B_S\ge\Cstab|||U_h|||^2$''. The bridge from the second reading to the first is
+the instantiation, and the instantiation is exactly the hand-audited claim that
+the finite element objects satisfy the hypotheses.
+
+\subsubsection{(I4) Three identifications hidden in \texttt{Definition}s}
+
+Three modelling decisions are encoded as definitions rather than hypotheses, so
+they appear in no trusted-base table. All three are sound; all three deserve
+naming, and the last is the subtlest thing in this section.
+
+\emph{The eighteen-term form of $B_S$.} In \file{AbstractStability.v} the
+number $B_S(U_h,U_h)$ is a \coq{Variable BS : R} pinned by the hypothesis
+\coq{HBS}; the identification of $B_S$ with its expansion is therefore an
+explicit, auditable assumption. In \file{AbstractContinuity.v} and
+\file{AbstractInterpolation.v}, by contrast, $B_S$ is a \coq{Definition}:
+\[
+  B_S \;:=\; T_1+T_2+\dots+T_{18},
+\]
+the eighteen terms of \lbl{eq:Bstab}. The claim ``this expression \emph{is} the
+paper's $B_S(\mathbf a;U,V)$'' is thus not a hypothesis but a reading
+obligation --- a Stratum-1 identification, verified by diffing the eighteen
+\coq{Definition}s against the appendix's Step~0 (this is done in
+\file{AUDIT.md}). Nothing is lost, but the two files place the same fact in
+different logical positions, and a reader comparing their hypothesis lists
+should know why one has an \coq{HBS} and the other does not.
+
+\emph{Linearity of the error decomposition.} In \file{AbstractConvergence.v} the
+interpolation error $E=U-\widehat U_h$ is carried by the first-slot atoms and
+the discrete error $W=\widehat U_h-U_h$ by the second-slot ones. (The appendix
+calls the latter $E_h$; we follow the Coq naming, \coq{BSWW}, \coq{HBS_W},
+\coq{NW}, and write $W$ throughout this section.) With that, the triple norm of
+the total error is \emph{defined} by
+\begin{equation}\label{eq:perErr}
+  |||U-U_h|||^2 \;:=\;
+  \sum_{K\in\Th}\Bigl[
+    \nu\,\lVert \mathtt{gu}+\mathtt{gv}\rVert^2
+    + \sigt\,\lVert \mathtt{uu}+\mathtt{vv}\rVert^2
+    + \varepsilon\,\lVert \mathtt{pp}+\mathtt{qq}\rVert^2
+    + \tau_1\lVert \mathtt{xe}+\mathtt{xw}\rVert^2
+    + \tau_2\lVert \mathtt{divu}+\mathtt{divv}\rVert^2 \Bigr].
+\end{equation}
+That is: the atoms of $U-U_h$ are taken to be the \emph{sums} of the atoms of
+$E$ and of $W$. Mathematically this is nothing but the linearity of each atom
+map ($\nabla$, $\nabla\cdot$, $\mathcal P$, multiplication by $\alpha$,
+restriction to $K$) together with $U-U_h=E+W$ --- true, and trivially so. But it
+is an identification, made in a \coq{Definition}, and it is the reason the
+triangle inequality of \coq{NErr_triangle} can be \emph{proved} from the
+pre-Hilbert axioms rather than assumed. We record it here for completeness.
+
+\emph{$B_S$ is never a bilinear form.} This is the subtlest of the
+identifications. Nowhere in the development is $B_S$ a function of two
+arguments. It appears as \emph{scalars}: a free \coq{Variable BS : R} pinned by
+\coq{HBS} (stability), and a \coq{Definition} equal to the eighteen-term
+expression in the atoms (continuity, interpolation, convergence). Bilinearity is
+therefore never available to the kernel as a \emph{fact}; where the paper's
+proof uses it, it has been absorbed into an assumption --- namely \coq{Horth}
+(\S\ref{sec:stratumG}), which assumes not only Galerkin orthogonality but also
+the bilinearity step that turns it into $B_S(W,W)=-B_S(E,W)$.
+
+One consequence of this used to be a real gap, and has now been closed. The
+convergence file needs $B_S(W,W)$, and it had \emph{two} unrelated encodings of
+it: a free real pinned by the hypothesis \coq{HBS_W}, and the eighteen-term
+expression evaluated at the $(W,W)$ atoms. \emph{Nothing proved they agree.}
+Each was separately a true statement about the real $B_S$, so soundness was
+never at risk --- but a transcription error in either encoding would have slipped
+through, and the development gave the parameters exactly this treatment
+(\coq{tau1_agree}, \coq{tau2_agree}, \coq{sigt_agree}) while giving $B_S$ none.
+It does now: $B_S(W,W)$ is \emph{defined} as the eighteen-term expression, and
+the tested form is \emph{proved} from it (\coq{HBS_W}, \S\ref{sec:stratumG}~G1).
+The two encodings are reconciled inside the kernel.
+
+\subsubsection{(I5) Which quantities are global and which are elemental}
+
+The scalars $\nu,\sigma,\varepsilon,c_1,c_2,\Cinv,\Cbar,\xi,C_2,c_J,c_J',
+C_{\mathrm{face}},N_f,C_I$ are single reals: not one of them varies with the
+element. The elementwise objects are the three mesh fields $h_K$, $\aK$,
+$|\mathbf a|_{\infty,K}$, the field atoms of (I3), the interpolation-error
+functionals $\mathtt{IU},\mathtt{IP}$, and the elemental face terms
+$\mathrm{FB}_{p,e},\mathrm{FB}_{c,e}$ --- all of type \coq{K -> R} or
+\coq{K -> V}. Two comments.
+
+\emph{On $\sigma$.} That $\sigma$ is a \emph{constant} is not a Coq artefact:
+it is the paper's own \lbl{H:data}, which reads ``$\nu>0$ and $\sigma\ge0$ are
+constants''. The a priori theory --- in the manuscript and in Coq alike --- is
+for the \emph{linearized} problem, in which the Darcy--Brinkman--Forchheimer law
+$\sigma=a(\alpha)+b(\alpha)|\mathbf u|$ has been frozen at the previous
+iterate. The nonlinearity is the business of the outer iteration and lies
+outside the a priori scope of both artefacts. Coq's global \coq{sigma : R} is
+therefore faithful; a reader should simply not expect the machine-checked
+theorems to say anything about the Forchheimer nonlinearity, because the paper's
+do not either.
+
+\emph{On uniformity.} Every constant in Stratum~3 is a single real, quantified
+\emph{outside} the ``$\forall k$'' of each estimate. Uniformity of the constants
+over the elements of the mesh --- and over the mesh family as $h\to0$ --- is
+thus assumed, not derived. This is not a hidden extra: uniformity is precisely
+the mathematical content of shape-regularity (\lbl{H:mesh}), and the estimates
+would be worthless without it. But it is worth seeing where it lives: it lives
+in the quantifier order.
+
+% ---------------------------------------------------------------------
+\subsection{Stratum 2 (Class D): data, mesh and parameter conditions}\label{sec:stratumD}
+% ---------------------------------------------------------------------
+
+These are hypotheses of the paper's theorems in any formal system. There is
+nothing to \emph{prove}; there is something to \emph{check}, namely that the
+mesh and the data one actually uses satisfy them --- and, in two places noted
+below, something to \emph{disclose}, namely that Coq asks for slightly more than
+the manuscript does.
+
+\subsubsection{D1 --- Positivity: Coq now assumes exactly what the paper does}
+
+This is the complete positivity list of the four abstract theorems --- every
+sign hypothesis they make, with none omitted (items 1--20 of
+Table~\ref{tab:inventory}; the two numerical-parameter conditions, items 21--22,
+are D3):
+\begin{lstlisting}
+(* physical data and mesh *)
+Hypothesis nu_pos       : 0 < nu.
+Hypothesis sigma_nonneg : 0 <= sigma.
+Hypothesis eps_nonneg   : 0 <= eps.
+Hypothesis hK_pos       : forall k, 0 < hK k.
+Hypothesis aK_pos       : forall k, 0 < aK k.
+Hypothesis am_nonneg    : forall k, 0 <= am k.
+(* algorithmic and analytic constants *)
+Hypothesis c1_pos   : 0 < c1.        Hypothesis c2_pos      : 0 < c2.
+Hypothesis Cinv_pos : 0 < Cinv.      Hypothesis Cb_pos      : 0 < Cb.
+Hypothesis C2_nonneg: 0 <= C2.       Hypothesis C2_lt_1     : C2 < 1.
+Hypothesis cJ_pos   : 0 < cJ.        Hypothesis cJ_le_1     : cJ <= 1.
+Hypothesis one_le_cJ' : 1 <= cJ'.    Hypothesis Cface_nonneg: 0 <= Cface.
+Hypothesis Nf_nonneg: 0 <= Nf.       Hypothesis CI_nonneg   : 0 <= CI.
+(* the interpolation-error functionals are nonnegative *)
+Hypothesis IU_nonneg : forall k, 0 <= IU k.
+Hypothesis IP_nonneg : forall k, 0 <= IP k.
+\end{lstlisting}
+
+\emph{Role.} Denominators, radicands and the sign of every coefficient
+collection. \emph{Reasonable.} $\nu>0$, $h_K>0$, $\aK>0$ are physical;
+$|\mathbf a|_{\infty,K}\ge0$ and $\mathtt{IU},\mathtt{IP}\ge0$ because they are
+norms; $c_1,c_2>0$ and $\Cinv,\Cbar>0$, while $C_I,C_{\mathrm{face}},N_f\ge0$
+suffice --- all conventions on constants that are anyway free to be enlarged.
+
+\emph{Exactly the manuscript's hypotheses --- and this was not always so.}
+An earlier revision of the development asked for $\sigma>0$, $\varepsilon>0$ and
+$C_2>0$ \emph{strictly}, where \lbl{H:data} and \lbl{eq:epscond} allow
+$\sigma\ge0$, $\varepsilon\ge0$ and $C_2\ge0$. The reaction-free case
+$\sigma=0$ --- pure Navier--Stokes, no Darcy term --- was therefore not
+literally an instance of the machine-checked theorems. That was an artefact, not
+mathematics: $\sigma$ occurs only \emph{additively} in the denominators
+($\aK\tau_{1,\mathrm{NS}}^{-1}+\sigma$, already positive), no division needs
+$\sigma\ne0$, and \file{ContinuityAlgebra.v} proved the same $\sigt$ identities
+under $\sigma\ge0$ all along. Only three lemmas of \file{StabilityAlgebra.v}
+were genuinely $\sigma$-strict, and each was false at $\sigma=0$ merely by
+being stated with $<$ where $\le$ was true:
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+was & is & at $\sigma=0$ \\
+\midrule
+\coq{sigt_pos} : $0<\sigt$ & \coq{sigt_nonneg} : $0\le\sigt$ & $\sigt=0$ \\
+\coq{alphaK_tau1_lt_tau1NS} : $\aK\tau_1<\tau_{1,\mathrm{NS}}$
+  & \coq{alphaK_tau1_le_tau1NS} : $\aK\tau_1\le\tau_{1,\mathrm{NS}}$
+  & equality \\
+\coq{sigt_denom_pos} (via $\sigma/\aK>0$) & (via $\sigma/\aK\ge0$) & unchanged \\
+\bottomrule
+\end{tabular}
+\end{center}
+With those three weakened, the entire chain goes through unaltered. The
+development now assumes \emph{exactly} \lbl{H:data}: $\sigma\ge0$,
+$\varepsilon\ge0$, $0\le C_2<1$. The reaction-free limit is a genuine instance
+of \coq{abstract_stability} and of \coq{abstract_convergence}, and the last
+place where Coq asked for more than the manuscript is gone.
+
+\emph{One redundant hypothesis also went.} \coq{xi_pos} ($\xi>0$) was declared
+alongside \coq{xi_large} ($\xi>2$), which implies it; it is now derived.
+
+\noindent
+By contrast, one hypothesis the reader might \emph{expect} to find is
+gratifyingly \textbf{absent}: $\aK\le1$. It is a standing hypothesis of
+\file{ContinuityAlgebra.v} (\coq{alphaK_le_1}, used by the scalar lemmas that
+pass from the porosity-weighted estimate to the manuscript's unweighted one),
+but it appears nowhere in \file{AbstractContinuity.v},
+\file{AbstractInterpolation.v} or \file{AbstractConvergence.v}. The reason is
+that those files prove the \emph{sharp}, porosity-weighted forms --- with the
+local weight $\aK$ retained: \lbl{eq:sharpcont} for continuity and
+interpolation, \lbl{rem:sharperconv} for convergence --- and the step that
+discards the weight is exactly the step that needs $\aK\le1$. The abstract
+theorems are therefore strictly stronger than the manuscript's displayed
+estimates, and they need one hypothesis fewer.
+
+\subsubsection{D2 --- The penalty condition on the mass-stabilization parameter}
+
+\begin{lstlisting}
+Hypothesis H_eps : forall k, eps <= C2 * c1 * (aK k)^2 * t1 k / (hK k)^2.
+Hypothesis Heps  : forall k, eps <= eps_max nu (hK k) (aK k) sigma (am k) c1 c2 C2.
+\end{lstlisting}
+Both lines say the same thing --- \coq{eps_max} \emph{is} the right-hand side of
+the first --- and both are the elementwise (equivalently, infimum) form of the
+manuscript's \lbl{eq:epscond}:
+\begin{equation}\label{eq:epscond-here}
+  \varepsilon \;\le\; C_2\,c_1 \min_{K\in\Th}
+  \frac{\aK^{2}\,\tau_{1,K}}{h_K^{2}},\qquad 0\le C_2<1 .
+\end{equation}
+
+\emph{Role.} It is the entire source of pressure coercivity. Through
+\lbl{lem:parameters}\,(P5) it gives $\varepsilon\tau_2\le C_2<1$, hence the
+pressure coefficient $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\,\varepsilon$,
+which is the $1-C_2$ branch of
+$\Cstab=\min\{C_{\mathrm{visc}},C_u,1-C_2,1\}$. In the continuity proof it
+enters Steps~3, 7 and~9.
+
+\emph{Why it is reasonable.} $\varepsilon$ is not a property of nature: it is
+the penalty parameter \emph{we} select. \eqref{eq:epscond-here} is a design rule,
+and a mild one --- it is satisfied by construction in the numerical experiments,
+where \file{ManufacturedSolution.v} machine-checks the concrete chain at
+$C_2=10^{-2}$ and $\varepsilon:=10^{-4}\varepsilon_{\mathrm{ref}}$
+(\coq{rhs_closed_form}, \coq{eps_choice_margin}).
+
+\emph{Tightening.} The two ends of the admissible range of $C_2$ pull against
+each other and the trade-off is exact: as $C_2\uparrow1$ the coercivity constant
+$1-C_2$ collapses, while as $C_2\downarrow0$ the admissible $\varepsilon$
+collapses. There is nothing to gain by weakening the condition; there is
+something to gain by choosing $C_2$ well.
+
+\subsubsection{D3 --- The numerical-parameter condition}
+
+\begin{lstlisting}
+Hypothesis c1_large : c1 > xi * Cb^2.   (* the SHARP form *)
+Hypothesis xi_large : xi > 2.
+\end{lstlisting}
+This is \lbl{eq:conditions_on_num_param}, with $\Cbar$ the \emph{weighted}
+inverse constant of \lbl{lem:winv} (not the bare $\Cinv$; this is precisely the
+substitution prescribed by \lbl{rem:winvconst}, and Coq performs it --- the
+constant passed into $C_u$ and $C_{\mathrm{visc}}$ is \coq{Cb}). The manuscript
+states $c_1>2\xi\Cbar^2$; Coq assumes the weaker $c_1>\xi\Cbar^2$, and the
+paragraph below explains why both are worth having.
+
+\emph{Role.} Remarkably narrow: in the whole development the \emph{content} of
+these two hypotheses is consumed at exactly one place --- the theorem
+\coq{stability_constants_positive_sharp} of \file{StabilityAlgebra.v}, reached
+from \file{AbstractStability.v}; \file{AbstractConvergence.v} merely forwards
+them into \coq{abstract_stability}. Its job is to establish
+\[
+  C_u \;=\; 1-\frac{\xi\,\Cbar^{2}}{c_1}\;>\;0,
+  \qquad
+  C_{\mathrm{visc}} \;=\;
+  \min\Bigl\{\,2-\frac{4\,\Cbar^{2}}{c_1},\ 2\Bigl(1-\frac{2}{\xi}\Bigr)\Bigr\}\;>\;0,
+\]
+and hence $\Cstab>0$. Everything else in the stability proof is indifferent to
+the size of $c_1$.
+
+\emph{How tight it is --- now machine-checked, both ways.} This is the one
+condition in the paper that couples a \emph{numerical} choice ($c_1$) to an
+\emph{analytic} constant ($\Cbar$), so it repays a close look. Positivity of the
+two constants requires
+\[
+  C_u>0 \iff c_1>\xi\,\Cbar^{2},
+  \qquad
+  C_{\mathrm{visc}}>0 \iff c_1>2\,\Cbar^{2}\ \text{ and }\ \xi>2 ,
+\]
+and since $\xi>2$ the first implies the second. \textbf{The sharp sufficient
+condition is therefore $c_1>\xi\Cbar^{2}$ with $\xi>2$ --- a factor of two
+weaker than the manuscript's} --- and that is what the development now assumes
+(\coq{stability_constants_positive_sharp}). The manuscript's condition is kept
+as a corollary (\coq{stability_constants_positive}), since it implies the sharp
+one.
+
+The manuscript's extra factor of two is nevertheless not idle: it buys a
+quantitative \emph{margin} rather than bare positivity, and this too is now a
+theorem (\coq{C_stab_margin}). Under $c_1>2\xi\Cbar^2$ and $\xi>2$,
+\[
+  \frac{\xi\Cbar^2}{c_1}<\frac12
+  \;\Longrightarrow\;
+  C_u>\frac12,
+  \qquad
+  c_1>2\xi\Cbar^2>4\Cbar^2
+  \;\Longrightarrow\;
+  2-\frac{4\Cbar^2}{c_1}>1,
+\]
+so that the coercivity constant enjoys a floor that is free of $\Cbar$
+altogether:
+\[
+  \Cstab \;\ge\; \min\Bigl\{\,2\Bigl(1-\tfrac2\xi\Bigr),\ \tfrac12,\ 1-C_2\Bigr\}.
+\]
+Under the sharp condition alone the constants stay positive but
+$C_u\to0$ as $c_1\downarrow\xi\Cbar^2$, and the floor is lost. So the two
+conditions do different jobs, and the formalisation now records both: the sharp
+one is what the theorem \emph{needs}, the manuscript's is what a practitioner
+should \emph{use}.
+
+\emph{In practice.} $\Cinv$ grows like $k^2$ in the polynomial
+degree~\cite{codina2018hp}, which is what motivates the manuscript's calibration
+$c_1=4k^4$, $c_2=2k^2$; the condition is then a statement about the constant in
+front of $k^4$, and the element-aware $c_1$ study in the repository is the
+empirical counterpart.
+
+\subsubsection{D4 --- Jump control across interior faces}
+
+\begin{lstlisting}
+Hypothesis H_jump :
+  forall f, cJ * ph (e1 f) <= ph (e2 f) /\ ph (e2 f) <= cJ' * ph (e1 f).
+Hypothesis cJ_pos : 0 < cJ.   Hypothesis cJ_le_1 : cJ <= 1.
+Hypothesis one_le_cJ' : 1 <= cJ'.
+\end{lstlisting}
+This is \lbl{H:jump} (the manuscript's \lbl{eq:jumpcond}): for every interior face
+shared by $K_1,K_2$,
+\begin{equation}\label{eq:jumpcond-here}
+  c_J\,\varphi_{1,K_1}\ \le\ \varphi_{1,K_2}\ \le\ c_J'\,\varphi_{1,K_1},
+  \qquad 0<c_J\le1\le c_J' ,
+\end{equation}
+with $\varphi_{1,K}=\aK\,\tau_{1,\mathrm{NS}}^{-1}$.
+
+\emph{Role.} It is what makes the \emph{jump} of $\tau_1$ across a face small
+enough to be absorbed. Via \lbl{lem:jump} it yields
+$\sigma\,\bigl|[\![\tau_1]\!]\bigr|\le C\,\sigt|_{K_i}\,\tau_{1,K_i}$, which is
+the only reason Steps~6b and~6d of the continuity proof close. It is used
+nowhere else.
+
+\emph{Why it is reasonable.} It is the analogue of condition~(39) of
+Codina~\cite{codina2001stabilized}. And it is weaker than it looks: by
+\lbl{H:porosity} the factors $\alpha_{K_i}$ of neighbouring elements are
+automatically comparable, and by \lbl{H:mesh} so are the diameters $h_{K_i}$;
+so \eqref{eq:jumpcond-here} reduces to the comparability of
+$|\mathbf a|_{\infty,K_1}$ and $|\mathbf a|_{\infty,K_2}$ relative to $\nu/h_K$
+--- a mild condition on the advection field, and one that a continuous finite
+element velocity from the previous iterate satisfies as a matter of course.
+
+\emph{Tightening.} The manuscript is careful to say that \lbl{H:jump} is
+``needed only when $\sigma>0$'': at $\sigma=0$ the jump of $\tau_1$ never
+appears. The Coq files assume it unconditionally. This costs nothing (the
+theorems are implications, and one may always supply a true hypothesis), but it
+does mean the $\sigma=0$ specialisation is not obtained for free from
+\coq{abstract_continuity}. A $\sigma$-case split would recover it.
+
+\subsubsection{D5 --- Bounded face multiplicity}
+
+\begin{lstlisting}
+Hypothesis H_mult1 :
+  forall g : K -> R, (forall k, 0 <= g k) ->
+    Rsum Fl (fun f => g (e1 f)) <= Nf * Rsum Th g.
+\end{lstlisting}
+(and \coq{H_mult2} with \coq{e2}). This is the multiplicity clause of
+\lbl{H:mesh}: for every nonnegative elemental quantity $g$,
+\begin{equation}\label{eq:mult}
+  \sum_{f\in\mathcal F}g\bigl(e_i(f)\bigr)\ \le\ N_f\sum_{K\in\Th}g(K),
+  \qquad i=1,2 .
+\end{equation}
+
+\emph{Mathematical content.} \eqref{eq:mult} is exactly the statement that each
+element occurs at most $N_f$ times in the list $\bigl(e_i(f)\bigr)_{f\in
+\mathcal F}$ --- that is, that no element has more than $N_f$ faces. Stating it
+as a functional inequality valid for all nonnegative $g$, rather than as a
+counting fact, is the clean way to say this in a setting with no measure and no
+decidable equality on \coq{K}.
+
+It bundles one further fact, easy to miss and worth naming: applied to a $g$
+supported \emph{off} $\Th$, the right-hand side of \eqref{eq:mult} is zero,
+so the hypothesis also forces $e_i(f)\in\Th$ for every face --- the neighbours
+of a face are elements of the mesh. That is mesh \emph{conformity}, not merely
+bounded multiplicity, and it is assumed here rather than stated separately.
+
+\emph{Role.} It is the sole device by which a sum over faces is converted into a
+sum over elements, in Steps~6b and~6d. \emph{Reasonable.} It is a standard
+consequence of shape-regularity: $N_f$ is bounded by the number of faces of the
+reference element. \emph{Tightening.} None needed; \eqref{eq:mult} is already the
+exact abstraction of the counting fact.
+
+\subsubsection{D6 --- Porosity, and its resolution by the mesh}
+
+\lbl{H:porosity} asks that $\alpha\in W^{1,\infty}(\Omega)$ with $0<\alpha\le1$,
+and that the mesh \emph{resolve} the porosity variation:
+\begin{equation}\label{eq:resolved-here}
+  h_K\,\lVert\nabla\alpha\rVert_{L^\infty(K)}\ \le\ C_\alpha\,\alpha_{0,K}
+  \qquad\forall K\in\Th ,
+\end{equation}
+whence --- for convex elements, and for shape-regular non-convex ones with
+$\delta_\alpha$ enlarged by a factor depending only on the chunkiness parameter
+(this qualifier is amendment~F2 of \S\ref{sec:amend}, added because the
+formalisation needed it) --- $\alpha_{\infty,K}\le\delta_\alpha\,\alpha_{0,K}$
+with $\delta_\alpha=1+C_\alpha$.
+
+\emph{Where it lives in Coq.} Nowhere as a hypothesis of the abstract theorems
+--- and that is worth understanding. \eqref{eq:resolved-here} is what the
+manuscript uses to \emph{prove} \lbl{lem:winv} from the unweighted inverse
+estimate; in the abstract files, \lbl{lem:winv} is assumed (as \coq{S3} and the
+\coq{Hw_*}), so \lbl{H:porosity} has already been consumed and survives only
+\emph{inside the constants} $\Cbar,\Cinv,C_I,C_{\mathrm{face}}$. Its scalar
+core, however, \emph{is} machine-checked: \file{ContinuityAlgebra.v} proves
+\coq{delta_alpha_bound} ($\alpha_\infty-\alpha_0\le C_\alpha\alpha_0
+\Rightarrow \alpha_\infty\le\delta_\alpha\alpha_0$) and \coq{winv_ratio} (the
+step $\alpha_\infty/\alpha_0^{1/2}\le\delta_\alpha^{1/2}\alpha_\infty^{1/2}$
+that turns the unweighted estimate into the weighted one). What remains outside
+the kernel is only the norm-level gluing.
+
+\emph{Why it is reasonable.} It says: do not use a mesh so coarse that the
+porosity swings wildly inside one element. That is not a restriction, it is
+good practice, and it is exactly the condition under which the $\alpha$-weighted
+inverse estimates carry a constant independent of $\alpha$.
+
+% ---------------------------------------------------------------------
+\subsection{Stratum 3 (Class G): the Green-type identities}\label{sec:stratumG}
+% ---------------------------------------------------------------------
+
+We come to the analytic base. Class~G collects the identities that come from
+integration by parts. Each reduces, ultimately, to the divergence theorem on a
+single element for integrands of the form (elementwise polynomial)~$\times$~($W^{1,\infty}$
+weight), plus finite bookkeeping across faces --- material that is entirely
+standard, and entirely absent from Coq's standard library, which is why it is
+assumed. They are hand-audited against the manuscript in \file{AUDIT.md}~\S4 and
+targeted by the Lean~4 roadmap.
+
+They are not all of equal weight, and we say so plainly. \textbf{\coq{HBS} is the
+single largest assumption in the development}; \coq{H_face_p}/\coq{H_face_c} of
+\S\ref{sec:stratumI} is the second. The rest are small.
+
+\subsubsection{G1 --- The tested identity: the largest single assumption}
+
+\begin{lstlisting}
+Hypothesis HBS :
+  BS = 2 * nu * Rsum Th (fun k => << (gu k) , (gu k) >>)
+       + sigma * Rsum Th (fun k => << (uu k) , (uu k) >>)
+       + eps * Rsum Th (fun k => << (pp k) , (pp k) >>)
+       - Rsum Th (fun k => t1 k * << (Lstar_m k) , (L_m k) >>)
+       - Rsum Th (fun k => t2 k * << (Lstar_c k) , (L_c k) >>).
+\end{lstlisting}
+In the manuscript's notation, with
+$\mathcal L_m = \alpha\mathcal X(U_h)-G(\mathbf u_h)$,
+$\mathcal L_m^{*} = -\alpha\mathcal X(U_h)-G(\mathbf u_h)$,
+$\mathcal L_c = \nabla\!\cdot(\alpha\mathbf u_h)+\varepsilon p_h$ and
+$\mathcal L_c^{*} = -\nabla\!\cdot(\alpha\mathbf u_h)+\varepsilon p_h$:
+\begin{equation}\label{eq:HBS-here}
+  B_S(U_h,U_h)
+  = 2\nu\bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\bigr\rVert^2
+  + \sigma\lVert\mathbf u_h\rVert^2
+  + \varepsilon\lVert p_h\rVert^2
+  - \sum_{K}\tau_{1,K}\bigl\langle \mathcal L_m^{*},\mathcal L_m\bigr\rangle_K
+  - \sum_{K}\tau_{2,K}\bigl\langle \mathcal L_c^{*},\mathcal L_c\bigr\rangle_K .
+\end{equation}
+This is the manuscript's stability display \lbl{eq:StabilityEstimate} taken at
+its \emph{first} line,
+$B_S(\mathbf a;U_h,U_h)=B(\mathbf a;U_h,U_h)-\sum_K\langle\mathcal L^{*}U_h,
+\boldsymbol\tau\mathcal LU_h\rangle$, composed with the Galerkin identity that
+precedes it in the manuscript,
+\begin{equation}\label{eq:galerkin-here}
+  B(\mathbf a;U_h,U_h)
+  = 2\nu\bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\bigr\rVert^2
+  + \bigl\lVert\sigma^{1/2}\mathbf u_h\bigr\rVert^2
+  + \varepsilon\lVert p_h\rVert^2 ,
+\end{equation}
+which the manuscript derives ``using the finite element unknown as the test
+function and assuming $\nabla\!\cdot(\alpha\mathbf a)=\mathbf 0$ and
+$\mathbf u_h=\mathbf 0$ on $\partial\Omega$''.
+
+\emph{What it bundles.} A great deal, and the reader is entitled to know
+exactly what: (i) the definition of the Galerkin form $B$ of the linearized
+problem and of the stabilization term
+$-\sum_K\langle\mathcal L^{*}U_h,\boldsymbol\tau\mathcal LU_h\rangle$
+(\lbl{eq:OSGSProblem}); (ii) the substitution $V_h:=U_h$; (iii) the
+\emph{annihilation} of the Galerkin convective, pressure and mass contributions
+at $V_h=U_h$ --- the terms $T_2+T_4$ of \lbl{eq:Bstab} --- which is what
+$\nabla\!\cdot(\alpha\mathbf a)=0$ (\lbl{H:advection}) and
+$\mathbf u_h\in H^1_0$ buy, and which is the whole content of
+\eqref{eq:galerkin-here}; and (iv) the symmetry and idempotence of the pointwise
+deviatoric-symmetric viscous projector $\mathcal P$ (i.e.\ $\mathcal
+P^{\!\top}\mathcal P=\mathcal P$), which turns the manuscript's
+$2(\nabla\mathbf v_h,\alpha\nu\mathcal P\nabla\mathbf u_h)$ --- note the
+\emph{full} gradient in the first slot --- into
+$2\nu\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\rVert^2$. ($\mathcal P$ here
+is the viscous projector of the deviatoric operator, \emph{not} the orthogonal
+subgrid projection $\pi_h$ that distinguishes OSGS from ASGS; it is never the
+identity.)
+
+\emph{Role.} It is the \emph{starting line} of the stability proof. Everything
+downstream is proved in Coq \emph{from} \eqref{eq:HBS-here} --- including, it is
+worth stressing, the rest of \lbl{eq:StabilityEstimate} itself: the
+manuscript's displayed right-hand side, the difference-of-squares form
+$\dots+\lVert\tau_1^{1/2}\alpha\mathcal X(U_h)\rVert_h^2
+-\lVert\tau_1^{1/2}G(\mathbf u_h)\rVert_h^2
++\lVert\tau_2^{1/2}\nabla\!\cdot(\alpha\mathbf u_h)\rVert_h^2
+-\varepsilon^2\lVert\tau_2^{1/2}p_h\rVert_h^2$, is \emph{not} assumed. It is
+derived inside the kernel from \eqref{eq:HBS-here} by \coq{momentum_pairing} and
+\coq{mass_pairing}. So is everything after it: the Young step, the exact
+cancellation of $\Cbar$, the coefficient collection, the assembly.
+
+\emph{Honest assessment.} This is where the most unformalised mathematics sits.
+Three things mitigate it, and none of them eliminates it. It is an
+\emph{identity}, not an inequality, so it cannot silently give away a constant.
+It is verbatim the manuscript's own first display, so auditing it is auditing
+the paper rather than a Coq artefact. And it is independently re-derived by
+symbolic computation in \file{sympy/stability\_estimate\_verification.py}. But
+it is assumed, and everything the stability lemma claims is conditional on it.
+It sits at the top of the residual-trust ledger, and the Lean roadmap explicitly
+advises \emph{against} attacking it first, precisely because discharging it
+presupposes a fully formalised discrete variational problem.
+
+\emph{And \coq{HBS_W} is no longer among them.} The convergence file needs the
+same identity for the discrete-error pair, $B_S(W,W)$. In an earlier revision
+that was a \emph{second} monolithic hypothesis, \coq{HBS_W} --- and it was
+genuinely independent of \coq{H_skew} and \coq{H_ibp_vp}/\coq{H_ibp_qu}, which
+are the \emph{mixed} identities, relating the $E$-atoms to the $W$-atoms.
+Obtaining \eqref{eq:HBS-here} at the pair $(W,W)$ additionally requires their
+\emph{diagonal} instances,
+\begin{equation}\label{eq:diag-here}
+  \sum_K\bigl(\mathbf v,\ \alpha\,\mathbf a\!\cdot\!\nabla\mathbf v\bigr)_K = 0,
+  \qquad
+  \sum_K\bigl(\mathbf v,\ \alpha\nabla q\bigr)_K
+  = -\sum_K\bigl(q,\ \nabla\!\cdot(\alpha\mathbf v)\bigr)_K ,
+\end{equation}
+which \coq{HBS_W} was silently bundling together with the whole
+difference-of-squares expansion.
+
+The development now assumes \eqref{eq:diag-here} --- and \emph{only}
+\eqref{eq:diag-here} --- as the two hypotheses \coq{H_skew_diag} and
+\coq{H_ibp_diag} (items 31--32 of Table~\ref{tab:inventory}), defines $B_S(W,W)$
+to \emph{be} the eighteen-term expression at the $(W,W)$ atoms, and
+\textbf{proves} the tested identity:
+\begin{lstlisting}
+Definition BSWW : R :=
+  AbstractInterpolation.BS Hs K Th nu sigma eps c1 c2 hK aK am
+    gv gv dv dv cxv cxv gpv gpv vv vv qq qq divv divv.
+
+(* qualified names elided for readability; see the source for the full form *)
+Theorem HBS_W :                    (* was: Hypothesis HBS_W *)
+  BSWW = 2*nu * Rsum Th (fun k => << gv k , gv k >>)
+       + sigma * Rsum Th (fun k => << vv k , vv k >>)
+       + eps   * Rsum Th (fun k => << qq k , qq k >>)
+       - Rsum Th (fun k => t1 k * << Lstar_m k , L_m k >>)
+       - Rsum Th (fun k => t2 k * << Lstar_c k , L_c k >>).
+\end{lstlisting}
+The proof is the stability argument run backwards: the eighteen terms are
+expanded, the three pairs that cancel by symmetry of the inner product do so
+(\coq{sym_vv_dv}, \coq{sym_x_dv}, \coq{sym_x_vv}), the momentum and mass
+pairings are re-assembled by the difference-of-squares identity
+(\coq{momentum_group}, \coq{mass_group}, reusing \file{AbstractStability.v}'s own
+\coq{momentum_pairing} and \coq{Bv_expand}), and what remains --- exactly
+$T_2+T_4$ --- vanishes by \eqref{eq:diag-here} (\coq{diag_zero}).
+
+Two things are gained. The larger of the two class-G bundles is \emph{gone from
+the trusted base}, replaced by two elementary identities that a reader can check
+in a line each. And the two encodings of $B_S$ --- the eighteen-term expression
+and the tested form --- are now provably the same number, which is the internal
+consistency check the development previously lacked (\S\ref{sec:stratum1}, I4).
+
+\subsubsection{G2 --- Galerkin orthogonality}
+
+\begin{lstlisting}
+Hypothesis Horth : BSWW = - BSEW.
+\end{lstlisting}
+i.e., writing $E=U-\widehat U_h$ and $W=\widehat U_h-U_h$,
+\begin{equation}\label{eq:horth-here}
+  B_S(W,W) \;=\; -\,B_S(E,W).
+\end{equation}
+
+\emph{What it bundles.} Consistency --- the identity
+$B_S(U-U_h,\,V_h)=0$ for all $V_h\in\mathcal X_h$ (\lbl{eq:consistency}), which
+holds because the stabilized form is residual-based and the exact solution has
+enough regularity (\lbl{eq:regularity}) for $\mathcal L_{\mathbf a}U\in L^2(K)$
+--- together with bilinearity of $B_S$ in its first argument and the algebraic
+identity $W=(U-U_h)-E$.
+
+\emph{Role.} It is the single line
+$B_S(E_h,E_h)=B_S(\widehat U_h-U,E_h)$ of the manuscript's proof of
+\lbl{thm:convergence}, and it is what makes the convergence theorem a statement
+about the \emph{actual} discrete solution rather than about an arbitrary pair of
+fields. Without it, $W$ would be an unconstrained vector and no bound on it
+could hold.
+
+\emph{Why it is reasonable.} Consistency is the design property of a
+residual-based stabilization: the exact solution makes every subgrid residual
+vanish, so it satisfies the discrete problem exactly. It is the least surprising
+assumption in the list, and the easiest to check by hand.
+\emph{Tightening.} Like \coq{HBS}, it becomes provable the moment a concrete
+variational instance is formalised; it needs no primitive beyond the
+divergence-theorem target T4 of the roadmap.
+
+\subsubsection{G3 --- Skew-symmetry of the convective term}
+
+\begin{lstlisting}
+Hypothesis H_skew :
+  Rsum Th (fun k => << (vv k) , (cxu k) >>)
+  = - Rsum Th (fun k => << (uu k) , (cxv k) >>).
+\end{lstlisting}
+This is the manuscript's \lbl{eq:skew} (identity (i) of Step 6a):
+\begin{equation}\label{eq:skew-here}
+  \sum_{K}\bigl\langle \mathbf v,\ \alpha\,\mathbf a\!\cdot\!\nabla\mathbf u
+  \bigr\rangle_K
+  \;=\; -\sum_{K}\bigl\langle \mathbf u,\ \alpha\,\mathbf a\!\cdot\!\nabla\mathbf v
+  \bigr\rangle_K .
+\end{equation}
+
+\emph{Why it is true, and why it is \emph{global}.} Because
+$\alpha\mathbf a\cdot\nabla(\mathbf u\cdot\mathbf v)$ integrates to zero over
+$\Omega$ when $\nabla\!\cdot(\alpha\mathbf a)=0$ (\lbl{H:advection}) and
+$\mathbf u\cdot\mathbf v\in W^{1,1}_0(\Omega)$. Note carefully that
+\eqref{eq:skew-here} is asserted for the \emph{sum over the mesh}, not
+element by element --- and that is correct: the elementwise identity carries a
+face term, which is exactly the content of \coq{H_elem_conv_ibp} below. The
+global version has no face term because the face contributions cancel in pairs.
+The formalisation keeps the two apart, as it must.
+\emph{Role.} Step~6a of the continuity proof. \emph{Reasonable.} Textbook.
+
+\emph{A boundary condition hides here too.} That
+$\mathbf u\cdot\mathbf v\in W^{1,1}_0(\Omega)$ requires \emph{both} arguments to
+vanish on $\partial\Omega$. For $\mathbf v_h$ that is the discrete space; for the
+first argument in \lbl{lem:continterp} --- the interpolation error
+$\mathbf e_{\mathbf u}=\mathbf u-\widehat{\mathbf u}_h$ --- it requires the
+\emph{interpolant to preserve the homogeneous Dirichlet condition},
+$\widehat{\mathbf u}_h\in\mathcal V_{h0}$. The manuscript says so; Coq assumes
+it, silently, inside \coq{H_skew} and the two global identities of G4. It is
+true for the Lagrange interpolant of a function vanishing on the boundary, and
+it is worth knowing that this is where it is being used.
+
+\subsubsection{G4 --- The global pressure identities}
+
+\begin{lstlisting}
+Hypothesis H_ibp_vp :
+  Rsum Th (fun k => << (vv k) , (gpu k) >>)
+  = - Rsum Th (fun k => << (pp k) , (divv k) >>).
+Hypothesis H_ibp_qu :
+  Rsum Th (fun k => << (qq k) , (divu k) >>)
+  = - Rsum Th (fun k => << (uu k) , (gpv k) >>).
+\end{lstlisting}
+These are the manuscript's \lbl{eq:globalibp} (identity (ii)):
+\begin{equation}\label{eq:globalibp-here}
+  \sum_K\bigl\langle\mathbf v,\ \alpha\nabla p\bigr\rangle_K
+  = -\sum_K\bigl\langle p,\ \nabla\!\cdot(\alpha\mathbf v)\bigr\rangle_K,
+  \qquad
+  \sum_K\bigl\langle q,\ \nabla\!\cdot(\alpha\mathbf u)\bigr\rangle_K
+  = -\sum_K\bigl\langle\mathbf u,\ \alpha\nabla q\bigr\rangle_K .
+\end{equation}
+\emph{Content.} The divergence theorem on $\Omega$ with vanishing velocity
+traces. \emph{Role.} Step~6a. \emph{Reasonable.} Textbook.
+
+\subsubsection{G5 --- The elemental identities, with their face terms}
+
+\begin{lstlisting}
+Lemma H_elem_conv_ibp :          (* was: Hypothesis -- see below *)
+  forall k, << (cxu k) , (vv k) >> = - << (cxv k) , (uu k) >> + FBc_e k.
+Lemma H_elem_p_ibp :             (* was: Hypothesis -- see below *)
+  forall k, << (vv k) , (gpu k) >> = - << (divv k) , (pp k) >> + FBp_e k.
+\end{lstlisting}
+The first is the manuscript's \lbl{eq:elemibp} (identity (iii)); the second is the
+elemental pressure identity of Step~6b:
+\begin{equation}\label{eq:elemibp-here}
+\begin{aligned}
+  \bigl\langle\alpha\,\mathbf a\!\cdot\!\nabla\mathbf u,\ \mathbf v\bigr\rangle_K
+  &= -\bigl\langle\alpha\,\mathbf a\!\cdot\!\nabla\mathbf v,\ \mathbf u\bigr\rangle_K
+   + \int_{\partial K}\alpha\,(\mathbf n_K\!\cdot\!\mathbf a)\,
+     (\mathbf u\!\cdot\!\mathbf v)\,\mathrm d\Gamma,\\
+  \bigl\langle\mathbf v,\ \alpha\nabla p\bigr\rangle_K
+  &= -\bigl\langle\nabla\!\cdot(\alpha\mathbf v),\ p\bigr\rangle_K
+   + \int_{\partial K}\alpha\,(\mathbf n_K\!\cdot\!\mathbf v)\,p\,\mathrm d\Gamma .
+\end{aligned}
+\end{equation}
+These are \eqref{eq:skew-here} and \eqref{eq:globalibp-here} \emph{localised},
+with the face terms retained. (The manuscript writes \lbl{eq:elemibp} with the
+elementwise-constant factor $\tau_{1,K}$ carried through all three terms; Coq
+divides it out here --- legitimately, $\tau_{1,K}$ being a positive constant on
+$K$ --- and reintroduces it in the assembly hypotheses of G6.) The first needs $\nabla\!\cdot(\alpha\mathbf a)=0$
+to hold \emph{on each element} --- which is not automatic from the distributional
+statement, and is exactly why amendment~F1 (\S\ref{sec:amend}) strengthened
+\lbl{H:advection} to grant
+$\mathbf a|_K\in W^{1,\infty}(K)^d$ elementwise together with the localisation
+of $\nabla\!\cdot(\alpha\mathbf a)=0$. This is a good illustration of the
+exercise paying for itself: the formalisation \emph{found} the missing clause,
+because the Coq hypothesis could not be justified without it.
+
+\emph{These two identities constrained nothing on their own --- so they are now
+theorems.} A sharp reader will notice that the face terms
+$\mathrm{FB}_{c,e}$ and $\mathrm{FB}_{p,e}$ used to be \emph{free} variables
+(\coq{Variable FBc_e : K -> R}). Given \emph{any} atoms whatsoever, one could
+simply \emph{define}
+$\mathrm{FB}_{c,e}(K):=\langle\alpha\mathbf a\!\cdot\!\nabla\mathbf u,\mathbf
+v\rangle_K+\langle\alpha\mathbf a\!\cdot\!\nabla\mathbf v,\mathbf u\rangle_K$
+and \eqref{eq:elemibp-here} would hold by construction. Taken in isolation,
+then, the two hypotheses were \emph{definitions in disguise}: they named the
+face term rather than constraining anything.
+
+That is exactly what the development now does, and openly:
+\begin{lstlisting}
+Definition FBc_e (k : K) : R := << cxu k , vv k >> + << cxv k , uu k >>.
+Definition FBp_e (k : K) : R := << vv k , gpu k >> + << divv k , pp k >>.
+
+Lemma H_elem_conv_ibp :          (* was: Hypothesis *)
+  forall k, << cxu k , vv k >> = - << cxv k , uu k >> + FBc_e k.
+Proof. intro k. unfold FBc_e. ring. Qed.
+\end{lstlisting}
+This is faithful, not a dodge: by the divergence theorem on $K$ the boundary
+integral \emph{is} the integration-by-parts defect, so defining it as that
+defect is what \lbl{eq:elemibp} says. Two hypotheses leave the trusted base of
+each of the three files, and nothing is lost --- because the mathematical
+content of the boundary terms never lived here. It lives in the two hypotheses
+that \emph{do} constrain them: the assembly identities of~G6, which tie
+$\sum_K\tau_{1,K}\mathrm{FB}_{\cdot,e}(K)$ to interior-face integrals (this is
+where the divergence theorem and the vanishing of the boundary faces actually
+enter), and the face estimates of \S\ref{sec:stratumI}, which bound those
+integrals by norms. The trio carried the weight all along; now the bookkeeping
+says so.
+
+\subsubsection{G6 --- Facewise assembly, Steps 6b and 6d}
+
+\begin{lstlisting}
+Hypothesis H_assemble_p :
+  Rsum Th (fun k => t1 k * FBp_e k)
+  = Rsum Fl (fun f => (t1 (e1 f) - t1 (e2 f)) * FBp f).
+\end{lstlisting}
+(and \coq{H_assemble_c}, identically, with the convective face integral), i.e.
+\begin{equation}\label{eq:assemble-here}
+  \sum_{K\in\Th}\tau_{1,K}\int_{\partial K}\!\!\alpha\,(\mathbf n_K\!\cdot\!\mathbf v)\,p
+  \;=\;
+  \sum_{\Gamma\in\mathcal F}\bigl(\tau_{1,K_1(\Gamma)}-\tau_{1,K_2(\Gamma)}\bigr)
+  \int_{\Gamma}\!\alpha\,(\mathbf n\!\cdot\!\mathbf v)\,p .
+\end{equation}
+
+\emph{Content.} Two facts, bundled. First, on an interior face the integrand is
+single-valued (the fields are continuous across faces) while the two outward
+normals are opposite, so the two elemental contributions combine into one
+face integral weighted by the \emph{jump} $[\![\tau_1]\!]$ --- and $\tau_1$ may
+be pulled out because it is elementwise constant. Second, \textbf{the boundary
+faces contribute nothing}, because $\mathbf u_h=\mathbf v_h=\mathbf 0$ on
+$\partial\Omega$; this is why the right-hand side sums over interior faces only.
+
+\emph{Honest note.} The second fact --- the homogeneous Dirichlet boundary
+condition --- enters the continuity proof \emph{here}, inside an assumption. It
+is not derived. A reader auditing \coq{H_assemble_p} is auditing both the
+face-pairing combinatorics and the boundary condition at once.
+\emph{Role.} Steps~6b and~6d. \emph{Reasonable.} Finite bookkeeping over the
+face lattice, once traces of continuous piecewise polynomials are available.
+
+% ---------------------------------------------------------------------
+\subsection{Stratum 3 (Class I): inverse and interpolation estimates}\label{sec:stratumI}
+% ---------------------------------------------------------------------
+
+Class~I collects the estimates that ``know'' about polynomials and about
+shape-regular geometry: the one kind of fact that a formalisation over an
+abstract inner-product space cannot possibly derive, and must therefore be
+given. Each is assumed with an \emph{explicit constant}, quantified uniformly
+over the elements --- and, as noted in (I5), that uniformity is where
+shape-regularity does its work.
+
+A pedagogical remark that organises everything below. \textbf{An inverse
+estimate is a statement about polynomials, and is false for general Sobolev
+functions.} It says that on an element of size $h$, differentiating a
+polynomial of bounded degree costs at most a factor $C/h$ --- which is true
+because the polynomial space is finite-dimensional and all norms on it are
+equivalent, with the $h$-dependence supplied by scaling to a reference element.
+Nothing of the sort holds for an arbitrary $H^1$ function. This is why, in
+\lbl{lem:continterp}, the estimates applied to the \emph{first} argument must
+change when that argument stops being a finite element function and becomes the
+interpolation error: they are replaced by \emph{interpolation} estimates. The
+Coq files make this substitution visible --- though, as~I2 sets out, not quite
+textual.
+
+\subsubsection{I1 --- The weighted inverse estimates}
+
+The stability lemma needs exactly one of them:
+\begin{lstlisting}
+Hypothesis S3 :
+  forall k, nrm (du k) <= (2 * nu * Cb / hK k) * sqrt (aK k) * nrm (gu k).
+\end{lstlisting}
+\begin{equation}\label{eq:S3-here}
+  \bigl\lVert 2\nu\,\nabla\!\cdot(\alpha\,\mathcal P\nabla\mathbf u_h)\bigr\rVert_K
+  \;\le\; \frac{2\nu\,\Cbar}{h_K}\,\aK^{1/2}\,
+  \bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\bigr\rVert_K ,
+\end{equation}
+which is \lbl{eq:winv-divvisc} (the factor $2\nu$ is present because the Coq atom
+\coq{du} models the full second-order term $2\nu\nabla\!\cdot(\alpha\mathcal
+P\nabla\mathbf u_h)$).
+
+\emph{Role.} It is the \emph{only} analytic input to the stability lemma besides
+\coq{HBS}, and its role is beautiful: it is consumed in \coq{du_sq_bound}, whose
+bound is then fed through the Young step with parameter
+$\lambda=\xi\Cbar^{2}\nu\aK/h_K^{2}$, and the constant $\Cbar$ \emph{cancels
+exactly}:
+\[
+  \frac{4\nu^2\Cbar^2\,\aK/h_K^2}{\lambda} \;=\; \frac{4\nu}{\xi} .
+\]
+That exact cancellation is the mathematical heart of the stability proof --- it
+is why the final constants depend on $\Cbar$ only through the ratio
+$\Cbar^2/c_1$ --- and it is machine-checked.
+
+\emph{Why it is reasonable.} It is the standard inverse estimate
+(Brenner--Scott~\cite{brenner2008mathematical}, Lemma~4.5.3;
+Ern--Guermond~\cite{ernguermond}), reduced from the unweighted case by
+\lbl{H:porosity}; the manuscript proves that reduction, obtaining
+$\Cbar=\sqrt{d\,\delta_\alpha}\,\Cinv+C_\alpha$. \emph{Tightening.} Note that
+$\Cbar>\Cinv$ \emph{strictly}: the porosity is not piecewise polynomial, and
+\lbl{rem:winvconst} is the manuscript's acknowledgement of the price. Since $c_1$
+must exceed $\xi\Cbar^2$ (the manuscript's rule of thumb being $2\xi\Cbar^2$), a
+sharper $\Cbar$ buys a smaller admissible $c_1$ and hence less stabilization ---
+a concrete reason to care.
+
+\emph{One relation deliberately not imposed.} In the manuscript
+$\Cbar=\sqrt{d\,\delta_\alpha}\,\Cinv+C_\alpha\ \ge\ \Cinv$. Coq declares
+\coq{Cinv} and \coq{Cb} as two unrelated positive reals and never assumes
+$\Cinv\le\Cbar$. The theorems are correspondingly more general (they hold for
+any admissible pair), which is sound and costs nothing --- but it does mean that
+the explicit constants the Coq files produce, such as $C_{\mathrm{tot}}$, are
+not automatically comparable term-by-term with the manuscript's until the
+relation is supplied.
+
+The continuity lemma needs eight instances --- and \emph{exactly} eight, one for
+each way the first or second argument enters the eighteen terms. They are the
+whole of \lbl{lem:winv}, instantiated:
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Coq & Estimate & Paper \\
+\midrule
+\coq{Hw_gu}, \coq{Hw_gv}
+  & $\lVert\alpha^{1/2}\mathcal P\nabla\mathbf w_h\rVert_K
+     \le \dfrac{\Cinv}{h_K}\aK^{1/2}\lVert\mathbf w_h\rVert_K$
+  & \lbl{eq:winv-grad} \\
+\coq{Hw_du}, \coq{Hw_dv}
+  & $\lVert 2\nu\nabla\!\cdot(\alpha\mathcal P\nabla\mathbf w_h)\rVert_K
+     \le \dfrac{2\nu\Cbar}{h_K}\aK^{1/2}
+     \lVert\alpha^{1/2}\mathcal P\nabla\mathbf w_h\rVert_K$
+  & \lbl{eq:winv-divvisc} \\
+\coq{Hw_cxu}, \coq{Hw_cxv}
+  & $\lVert\alpha\,\mathbf a\!\cdot\!\nabla\mathbf w_h\rVert_K
+     \le \dfrac{\Cinv}{h_K}\,\aK\,|\mathbf a|_{\infty,K}\lVert\mathbf w_h\rVert_K$
+  & \lbl{eq:winv-conv} \\
+\coq{Hw_gpu}
+  & $\lVert\alpha\nabla r_h\rVert_K
+     \le \dfrac{\Cinv}{h_K}\,\aK\,\lVert r_h\rVert_K$
+  & \lbl{eq:winv-gradp} \\
+\coq{Hw_divu}
+  & $\lVert\nabla\!\cdot(\alpha\mathbf w_h)\rVert_K
+     \le \dfrac{\Cbar}{h_K}\,\aK\,\lVert\mathbf w_h\rVert_K$
+  & \lbl{eq:winv-divu} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The minimality is itself a form of honesty: the trusted base contains the
+instances the proof consumes and no others. In \file{AbstractInterpolation.v}
+only the three $V$-side instances (\coq{Hw_gv}, \coq{Hw_dv}, \coq{Hw_cxv})
+survive, because the first argument is no longer discrete --- see I2. And in
+\file{AbstractConvergence.v} the stability lemma's \coq{S3} is discharged
+\emph{by the kernel} from \coq{Hw_dv}: the two are literally the same statement,
+so the composition introduces no new assumption.
+
+\subsubsection{I2 --- The interpolation estimates}
+
+\begin{lstlisting}
+Hypothesis HI_gu   : forall k, nrm (gu k)   <= CI * sqrt (aK k) / hK k * IU k.
+Hypothesis HI_du   : forall k, nrm (du k)   <= 2 * nu * CI * aK k / (hK k)^2 * IU k.
+Hypothesis HI_cxu  : forall k, nrm (cxu k)  <= CI * aK k * am k / hK k * IU k.
+Hypothesis HI_gpu  : forall k, nrm (gpu k)  <= CI * aK k / hK k * IP k.
+Hypothesis HI_divu : forall k, nrm (divu k) <= CI * aK k / hK k * IU k.
+Hypothesis HI_uu   : forall k, nrm (uu k)   <= CI * IU k.
+Hypothesis HI_pp   : forall k, nrm (pp k)   <= CI * IP k.
+\end{lstlisting}
+With $E=[\mathbf e_{\mathbf u};e_p]=U-\widehat U_h$ and the elemental
+interpolation-error sizes of \lbl{eq:Eint},
+\[
+  E_{\mathrm{int},K}(\mathbf u)=h_K^{k_u+1}\lVert\mathbf u\rVert_{H^{k_u+1}(K)},
+  \qquad
+  E_{\mathrm{int},K}(p)=h_K^{k_p+1}\lVert p\rVert_{H^{k_p+1}(K)},
+\]
+these are exactly the manuscript's replacement table
+\lbl{eq:interpdivvisc}--\lbl{eq:interpzero}:
+\begin{equation}\label{eq:interptable-here}
+\begin{aligned}
+  \bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf e_{\mathbf u}\bigr\rVert_K
+    &\le C\,\aK^{1/2}h_K^{-1}E_{\mathrm{int},K}(\mathbf u), &
+  \bigl\lVert 2\nu\nabla\!\cdot(\alpha\mathcal P\nabla\mathbf e_{\mathbf u})\bigr\rVert_K
+    &\le C\,\nu\,\aK\,h_K^{-2}E_{\mathrm{int},K}(\mathbf u), \\
+  \lVert\alpha\,\mathbf a\!\cdot\!\nabla\mathbf e_{\mathbf u}\rVert_K
+    &\le C\,\aK|\mathbf a|_{\infty,K}h_K^{-1}E_{\mathrm{int},K}(\mathbf u), &
+  \lVert\alpha\nabla e_p\rVert_K
+    &\le C\,\aK\,h_K^{-1}E_{\mathrm{int},K}(p), \\
+  \lVert\nabla\!\cdot(\alpha\mathbf e_{\mathbf u})\rVert_K
+    &\le C\,\aK\,h_K^{-1}E_{\mathrm{int},K}(\mathbf u), &
+  \lVert\mathbf e_{\mathbf u}\rVert_K \le C\,E_{\mathrm{int},K}(\mathbf u),
+  \quad & \lVert e_p\rVert_K \le C\,E_{\mathrm{int},K}(p).
+\end{aligned}
+\end{equation}
+
+\emph{The structural point.} Compare \eqref{eq:interptable-here} with the table
+of I1: they carry \emph{the same elemental coefficients}, with
+$\lVert\mathbf u_h\rVert_K$ and $\lVert p_h\rVert_K$ replaced by
+$E_{\mathrm{int},K}(\mathbf u)$ and $E_{\mathrm{int},K}(p)$. That is the entire
+reason the appendix can say ``rerun the continuity proof with first argument
+$E$'' and be believed, and the formalisation makes the claim checkable rather
+than merely plausible.
+
+Two details of the correspondence are worth stating precisely, because the
+substitution is not quite textual. First, the \coq{HI_*} bounds match the
+\coq{Hw_*} bounds \emph{as the continuity proof composes them}, not one by one:
+\coq{Hw_du} bounds $\mathtt{du}$ by $\mathtt{gu}$ and \coq{Hw_gu} bounds
+$\mathtt{gu}$ by $\mathtt{uu}$, and it is their \emph{composition} --- the
+appendix's ``double'' inverse estimate, with coefficient
+$2\nu\Cbar\Cinv\,\aK/h_K^2$ --- that \coq{HI_du}, with coefficient
+$2\nu C_I\,\aK/h_K^2$, replaces. Second, the two inverse constants $\Cinv$ and
+$\Cbar$ are \emph{merged into the single} $C_I$, as the source says in so many
+words (``one constant \coq{CI} for all of them''). Third, \coq{HI_uu} and
+\coq{HI_pp} have no \coq{Hw_} counterpart at all: a \emph{discrete} first
+argument needs no zeroth-order bound, because $\lVert\mathbf u_h\rVert_K$ simply
+\emph{is} the right-hand side of the other estimates, whereas an interpolation
+error must itself be bounded by $E_{\mathrm{int},K}$. Hence seven \coq{HI_*}
+against five first-argument \coq{Hw_*}. With those three readings in place, the
+file reruns --- and the kernel re-checks --- every one of the eighteen term
+bounds.
+
+\emph{Why they are reasonable.} They are Bramble--Hilbert / Deny--Lions
+technology on a shape-regular simplex (Brenner--Scott~\cite{brenner2008mathematical},
+Thm.~4.4.20; Ern--Guermond~\cite{ernguermond}), combined with
+\eqref{eq:resolved-here} for the $\nabla\alpha$ terms and the pointwise
+contraction $|\mathcal P\mathbf T|\le|\mathbf T|$. The $L^\infty$ variants
+(\lbl{eq:interpinfty}, used inside the face estimates) additionally need
+$H^{k+1}(K)\hookrightarrow C^0(\overline K)$, valid for $d\le3$ since
+$k_u+1,k_p+1>d/2$ --- and this is where the restriction $d\le3$ in the
+manuscript's proof of \lbl{lem:continterp} comes from.
+
+\emph{An important limit of what is proved.} \coq{IU} and \coq{IP} are abstract
+nonnegative functionals (\coq{Variables (IU IP : K -> R)} with
+\coq{IU_nonneg}/\coq{IP_nonneg}). Coq does \emph{not} know that
+$\mathtt{IU}\,k=h_K^{k_u+1}\lVert\mathbf u\rVert_{H^{k_u+1}(K)}$. Consequently
+the machine-checked convergence theorem reads
+\[
+  |||U-U_h||| \;\le\; \Bigl(K_{\mathrm{abs}}^{I}+C_{\mathrm{tot}}^{I}/\Cstab\Bigr)
+  \bigl(\Psi_U+\Psi_P\bigr),
+\]
+with $\Psi_U,\Psi_P$ built from the abstract \coq{IU},~\coq{IP}. \textbf{That
+this is an $O(h^{k+1})$ rate is \emph{not} a kernel fact}: it follows only after
+instantiating \coq{IU},~\coq{IP} with \lbl{eq:Eint}, which is a Stratum-1
+identification. What the kernel certifies is the estimate; what turns the
+estimate into a convergence \emph{rate} is the reading of $E_{\mathrm{int},K}$
+--- and the $O(h^{k+1})$ plateaus of the manufactured-solution tests are the
+empirical confirmation that the reading is the right one.
+
+\subsubsection{I3 --- The face estimates: the most bundled hypothesis}
+
+\begin{lstlisting}
+Hypothesis H_face_p :
+  forall f, Rabs (FBp f)
+  <= Cface * (  aK (e1 f) / hK (e1 f) * (nrm (vv (e1 f)) * nrm (pp (e1 f)))
+              + aK (e2 f) / hK (e2 f) * (nrm (vv (e1 f)) * nrm (pp (e2 f)))
+              + aK (e1 f) / hK (e1 f) * (nrm (vv (e2 f)) * nrm (pp (e1 f)))
+              + aK (e2 f) / hK (e2 f) * (nrm (vv (e2 f)) * nrm (pp (e2 f)))).
+\end{lstlisting}
+(and \coq{H_face_c}, the same with $\alpha(\mathbf n\!\cdot\!\mathbf a)
+(\mathbf u\!\cdot\!\mathbf v)$ and an extra $|\mathbf a|_{\infty,K}$), i.e.\ for
+every interior face $\Gamma$ shared by $K_1,K_2$,
+\begin{equation}\label{eq:face-here}
+  \Bigl|\int_\Gamma \alpha\,(\mathbf n\!\cdot\!\mathbf v)\,p\Bigr|
+  \;\le\; C_{\mathrm{face}}\!\!\sum_{i,j\in\{1,2\}}\!\!
+  \frac{\alpha_{K_j}}{h_{K_j}}\,
+  \lVert\mathbf v\rVert_{K_i}\,\lVert p\rVert_{K_j}.
+\end{equation}
+
+\emph{What it bundles --- five ingredients, one constant.} (i) Hölder on the
+face; (ii) the face-measure bound $\operatorname{meas}(\Gamma)\le C\,h_K^{d-1}$
+(\lbl{H:mesh}); (iii) the $L^\infty$ inverse estimate
+$\lVert\psi_h\rVert_{L^\infty(K)}\le \Cinv h_K^{-d/2}\lVert\psi_h\rVert_K$
+(\lbl{eq:inverse}) applied on \emph{both} neighbours --- replaced, on the
+first-argument side in \file{AbstractInterpolation.v}, by the $L^\infty$
+interpolation estimate \lbl{eq:interpinftyE}; (iv) $\alpha\le\alpha_K$ on the
+face; and (v) the comparability of neighbouring diameters (\lbl{H:mesh}). All
+five collapse into the single constant $C_{\mathrm{face}}$.
+
+\emph{Role.} The jump terms of Steps~6b and~6d --- and, like \lbl{H:jump}, only
+when $\sigma>0$. \emph{Reasonable.} Every ingredient is standard and every one
+of them appears in the manuscript's Step~6b/6d derivation. A caveat on the
+correspondence, though: the manuscript never displays \eqref{eq:face-here}
+itself. What it displays is \lbl{eq:jumpest} and the jump-weighted bounds
+\lbl{eq:jumpsplit}, in which the factor $\sigma|[\![\tau_1]\!]|$ is already
+attached. \eqref{eq:face-here} is that derivation with the jump factor stripped
+off --- Coq reattaches it separately, through \coq{H_assemble_*} and
+\coq{H_jump} --- so a reader checking this hypothesis against the paper must
+perform that regrouping themselves.
+
+\emph{Honest assessment --- and the tightening that is actually available.}
+This is the coarsest-grained assumption in the development, and the second
+largest after \coq{HBS}. A reader auditing it is auditing the manuscript's
+Step~6b/6d derivation, not merely checking a textbook citation. It could be
+decomposed into its five ingredients --- and \emph{should} be, if the abstract
+interface is ever extended with face measures and traces; the roadmap's targets
+T2 (the $L^\infty$ inverse estimate and the face-measure bound) and~T5 are
+exactly that work. Until then, $C_{\mathrm{face}}$ is a name for a bound whose
+derivation lives on paper.
+
+% ---------------------------------------------------------------------
+\subsection{The other ten files: no new assumptions --- and four scope boundaries}\label{sec:scope}
+% ---------------------------------------------------------------------
+
+Everything so far concerns the four abstract theorems, which carry the whole of
+the analytic base. Of the remaining ten files, \emph{eight} are Tier-1 in the
+confidence ledger of \S\ref{sec:conclusion}: their hypotheses are pure
+positivity --- $\nu,h,\aK>0$ and the like --- so their theorems are
+unconditional in the mathematics, and there is nothing to audit in their
+assumptions.
+
+The two exceptions are the scalar-algebra modules that feed the abstract
+theorems, and they carry no \emph{new} assumptions: \file{StabilityAlgebra.v}
+assumes only positivity together with \lbl{H:data}'s $\sigma,\varepsilon,C_2\ge0$
+(D1), and takes $\varepsilon\le\varepsilon_{\max}$ (D2) as a premise of
+\coq{elemental_coercivity} and $c_1>\xi\Cbar^2$, $\xi>2$ (D3, sharp form) as
+premises of \coq{stability_constants_positive_sharp};
+\file{ContinuityAlgebra.v} adds $\aK\le1$ (\coq{alphaK_le_1} --- the one
+hypothesis the abstract files shed, \S\ref{sec:stratumD}), the
+$\varepsilon$-condition (\coq{eps_le}, which \emph{is} \lbl{eq:epscond}),
+$C_2<1$, the jump bounds of \lbl{H:jump} (\coq{jump_low}, \coq{jump_high}) and
+the porosity-resolution increment of \lbl{H:porosity} (\coq{increment}). Every
+one of these has already been audited above as a Class-D item; they reappear
+here only because the scalar lemmas are stated in their own sections.
+
+There is, however, something to audit in their \emph{scope}. In four places what
+is proved is narrower than what the manuscript claims, and a reader is entitled
+to know exactly where.
+
+\emph{(1) The plateau bump is verified through $C^1$, not $C^\infty$.}
+\file{PlateauBump.v} has a single hypothesis, \coq{Hypothesis Ha0 : 0 < a0 < 1}.
+It proves, by explicit $\varepsilon$--$\delta$, that $\alpha_{\mathrm{mid}}$
+meets its neighbours continuously (\coq{am_limit_0}, \coq{am_limit_1}) and with
+vanishing first derivative (\coq{am'_limit_0}, \coq{am'_limit_1}). The
+manuscript asserts $C^\infty$, a claim that rests on \emph{every} derivative
+vanishing at the joins. Only the first-order case is inside the kernel --- and
+it is inside no other artefact either, the SymPy script stopping at the same
+order. The gap is real, and benign: $C^1$ is what finite element interpolation
+of the profile actually consumes.
+
+\emph{(2) The asymptotic limits are partial, with the other number held fixed.}
+In \file{Asymptotics.v} the dominant-convection section declares
+\coq{Variable Da : R} with \coq{Hypothesis Da_pos : 0 < Da} and \emph{then}
+sends $\Reh\to\infty$; the dominant-reaction section declares
+\coq{Variable Re : R} with \coq{Re_nonneg} and sends $\Dah\to\infty$. The limits
+themselves are honest --- genuine $\varepsilon$--$\delta$ statements
+(\coq{tendsto_at_top} of \file{Limits.v}, no filters, no hand-waving) --- but
+they are limits in \emph{one} dimensionless number with the other held fixed at
+an arbitrary admissible value. This is exactly how the manuscript's \S6 reads
+them, so the formalisation is faithful; it simply is not a statement about the
+joint limit $(\Reh,\Dah)\to(\infty,\infty)$, and none is claimed.
+
+\emph{(3) The Fourier design of $\tau$ is a design computation, faithfully
+formalised --- not a proof of optimality.} \file{TauDesign.v} certifies the
+symbol algebra of Appendix~C exactly: the viscous spectrum
+$\tfrac43\alpha\nu|k|^2$ and $\alpha\nu|k|^2$, the convective spectral radius
+$(\alpha/h)|w\!\cdot\!k|$, the coupling spectrum $\{0,\pm|k|\}$, and the
+uniqueness of the positive pair solving $XY=c^2$, $X/Y=\lambda$. What it does
+\emph{not} do --- and cannot, and the manuscript does not claim --- is prove
+that the resulting $\tau_1,\tau_2$ are in any sense optimal for the PDE. The
+Fourier argument is a \emph{frozen-coefficient, plane-wave} heuristic used to
+\emph{design} the parameters; its output is then justified after the fact by the
+stability and convergence theorems, which hold for these $\tau$'s however they
+were arrived at. Coq certifies the computation, not the principle --- and that
+is the right division of labour.
+
+\emph{(4) For the manufactured solution, Coq checks the mass equation, not the
+forcing.} \file{ManufacturedSolution.v} proves
+$\nabla\!\cdot(\alpha\mathbf u)=0$ for the manufactured velocity, and proves it
+for an \emph{arbitrary positive} porosity --- not even a differentiable one. The
+only hypothesis on the profile is \coq{alpha_pos : forall x y, 0 < alphaf x y}.
+The reason is a cancellation the manufactured field is built to exhibit: with
+$\mathbf u=(U\alpha_0/\alpha)\,\mathbf S$ one has $\alpha\mathbf u=U\alpha_0
+\mathbf S$ identically (\coq{alpha_u1}, \coq{alpha_u2}), so $\alpha$ disappears
+from the mass equation before any derivative is taken. The theorem is stated in
+the strongest honest form, with the two partial derivatives as premises:
+\begin{lstlisting}
+Theorem manufactured_mass_conservation_2d :
+  forall x y d1 d2 : R,
+    derivable_pt_lim (fun t => alphaf t y * u1 t y) x d1 ->
+    derivable_pt_lim (fun t => alphaf x t * u2 x t) y d2 ->
+    d1 + d2 = 0.
+\end{lstlisting}
+Read: \emph{whatever} the derivatives of $\alpha u_1$ and $\alpha u_2$ are, they
+sum to zero --- the solenoidal structure is exact, and independent of the
+profile. (The derivatives are not left dangling: the file computes both, in
+\coq{d1_alpha_u1} and \coq{d2_alpha_u2}, as genuine \coq{derivable_pt_lim}
+statements.) The momentum \emph{forcing} $\mathbf f$, by far the larger symbolic
+computation, is verified by SymPy
+(\file{manufactured_solution_verification.py}) and not by Coq. That is a
+deliberate division: it is a differentiation exercise, where a proof assistant
+adds cost and no assurance.
+
+Beyond these four boundaries, the content of the ten files is unconditional: the
+$\tau_1,\tau_2,\sigt$ identities and their asymptotics, the coefficient
+expansions and the $\varepsilon$-smallness chain (machine-checked at the
+concrete $C_2=10^{-2}$, $\varepsilon=10^{-4}\varepsilon_{\mathrm{ref}}$ of the
+numerical experiments), the admissibility of the DBF coefficients on
+$0<\alpha\le1$, and the literature porosity profile.
+
+% ---------------------------------------------------------------------
+\subsection{The complete hypothesis inventory}\label{sec:inventory}
+% ---------------------------------------------------------------------
+
+Everything above, in one place. Table~\ref{tab:inventory} lists \emph{every}
+\coq{Hypothesis} of the four abstract theorems --- all $53$ of them, with none
+omitted and nothing counted twice --- in the exact form the kernel sees it, its
+class, its mathematical content, and the proof steps that consume it. It is the
+audit checklist: a reader who satisfies themselves that each of these $53$ lines
+is a true statement about the finite element objects has, by
+\S\ref{sec:complete}, satisfied themselves of the entire a priori theory.
+
+\medskip
+\noindent\emph{How to read the table.}
+
+\emph{Class} is D (data, mesh and parameter conditions --- hypotheses of the
+paper's theorems in any formal system: nothing to prove, something to check),
+G (Green-type identities --- integration by parts), or I (inverse and
+interpolation estimates). Classes~G and~I are the analytic base; class~D is not.
+
+\emph{In} records which of the four theorems carries the hypothesis:
+\textbf{S}~$=$~\coq{abstract_stability} ($16$ hypotheses),
+\textbf{C}~$=$~\coq{abstract_continuity} ($36$),
+\textbf{I}~$=$~\coq{abstract_continterp} ($41$),
+\textbf{V}~$=$~\coq{abstract_convergence} ($46$).
+The counts differ because the first slot changes character: \textbf{C} has a
+discrete first argument and so carries the five first-slot inverse estimates,
+whereas \textbf{I} and \textbf{V} have the interpolation error there and carry
+the seven interpolation estimates instead (see~I2, \S\ref{sec:stratumI}).
+
+\emph{Symbols.} $U=[\mathbf u;p]$ and $V=[\mathbf v;q]$ are the first and second
+arguments of $B_S$; in \textbf{I} and \textbf{V} the first argument is the
+interpolation error $E=[\mathbf e_{\mathbf u};e_p]=U-\widehat U_h$ and the second
+is the discrete error $W=\widehat U_h-U_h$. $K$ ranges over the elements $\Th$
+and $\Gamma$ over the interior faces, with $K_1=e_1(\Gamma)$, $K_2=e_2(\Gamma)$
+its two neighbours; $[\![\tau_1]\!]_\Gamma=\tau_{1,K_1}-\tau_{1,K_2}$;
+$\varphi_{1,K}=\aK\tau_{1,\mathrm{NS}}^{-1}$;
+$E_{\mathrm{int},K}(\mathbf u)$, $E_{\mathrm{int},K}(p)$ are the elemental
+interpolation-error sizes of \lbl{eq:Eint} (\coq{IU}, \coq{IP});
+$\mathcal P$ is the deviatoric-symmetric viscous projector; and
+$\mathcal L_m,\mathcal L_m^{*},\mathcal L_c,\mathcal L_c^{*}$ are the
+residual/adjoint-residual operators of \eqref{eq:HBS-here}.
+
+\emph{Steps} are those of the appendix's proof of \lbl{lem:continuity}
+(Steps~0--9), with the Coq lemma that consumes the hypothesis given in
+parentheses. These were not assigned by hand: they were extracted mechanically
+from the sources by locating, for each hypothesis, every lemma whose proof
+mentions it.
+
+\begin{longtable}{@{}r@{\ }L{0.155\textwidth}L{0.455\textwidth}L{0.245\textwidth}@{}}
+\caption{Every hypothesis of the four abstract theorems.}\label{tab:inventory}\\
+\toprule
+\textbf{\#} & \textbf{Coq name (class)} & \textbf{Statement} & \textbf{In; steps that use it} \\
+\midrule \endfirsthead
+\multicolumn{4}{@{}l}{\emph{Table~\ref{tab:inventory}, continued}}\\
+\toprule
+\textbf{\#} & \textbf{Coq name (class)} & \textbf{Statement} & \textbf{In; steps that use it} \\
+\midrule \endhead
+\bottomrule \endfoot
+
+\multicolumn{4}{@{}l}{\emph{\textbf{Class D} --- data, mesh and parameter conditions. Nothing to prove; something to check.}}\\[2pt]
+
+1 & \coq{nu_pos} (D) & $\nu>0$ & S,C,I,V; everywhere \\
+2 & \coq{sigma_nonneg} (D) & $\sigma\ge0$ \quad(\lbl{H:data}: $\sigma$ is a \emph{constant}) & S,C,I,V; everywhere \\
+3 & \coq{eps_nonneg} (D) & $\varepsilon\ge0$ & S,C,I,V; everywhere \\
+4 & \coq{c1_pos} (D) & $c_1>0$ & S,C,I,V; everywhere \\
+5 & \coq{c2_pos} (D) & $c_2>0$ & S,C,I,V; everywhere \\
+6 & \coq{C2_nonneg} (D) & $C_2\ge0$ & S,C,I,V; (P5), Steps~3,\,7 \\
+7 & \coq{C2_lt_1} (D) & $C_2<1$ & S,C,I,V; (P5) (\coq{L_P5}); the $1-C_2$ branch of $\Cstab$ \\
+8 & \coq{Cinv_pos} (D) & $\Cinv>0$ \quad(constant of \lbl{eq:inverse}) & C,I,V; carried by the \coq{Hw_*} \\
+9 & \coq{Cb_pos} (D) & $\Cbar>0$ \quad(constant of \lbl{lem:winv}) & S,C,I,V; carried by \coq{S3}, \coq{Hw_du/dv} \\
+10 & \coq{cJ_pos} (D) & $c_J>0$ & C,I,V; \lbl{lem:jump} (\coq{F_base}) \\
+11 & \coq{cJ_le_1} (D) & $c_J\le1$ & C,I,V; \lbl{lem:jump} (\coq{F_base}) \\
+12 & \coq{one_le_cJ'} (D) & $1\le c_J'$ & C,I,V; \lbl{lem:jump} (\coq{F_base}) \\
+13 & \coq{Cface_nonneg} (D) & $C_{\mathrm{face}}\ge0$ & C,I,V; Steps~6b,\,6d (\coq{face6b}, \coq{face6d}) \\
+14 & \coq{Nf_nonneg} (D) & $N_f\ge0$ & C,I,V; facewise C--S (\coq{face_CS_pair}) \\
+15 & \coq{CI_nonneg} (D) & $C_I\ge0$ \quad(constant of \lbl{eq:interp}) & I,V; Step~9 (\coq{absorb_elem}) \\
+16 & \coq{hK_pos} (D) & $h_K>0$ for every $K\in\Th$ & S,C,I,V; every elemental estimate \\
+17 & \coq{aK_pos} (D) & $\aK>0$ for every $K\in\Th$ & S,C,I,V; every elemental estimate \\
+18 & \coq{am_nonneg} (D) & $|\mathbf a|_{\infty,K}\ge0$ for every $K\in\Th$ (it is a norm) & S,C,I,V; Steps~5,\,9 \\
+19 & \coq{IU_nonneg} (D) & $E_{\mathrm{int},K}(\mathbf u)\ge0$ for every $K$ & I,V; Steps~4,\,6c,\,9 \\
+20 & \coq{IP_nonneg} (D) & $E_{\mathrm{int},K}(p)\ge0$ for every $K$ & I,V; Steps~6b,\,9 \\
+21 & \coq{xi_large} (D) & $\xi>2$ \quad(Young parameter; \lbl{eq:conditions_on_num_param}) & S,V; $\Cstab>0$ (\coq{stability_constants_positive_sharp}) \\
+22 & \coq{c1_large} (D) & $c_1>\xi\,\Cbar^{2}$ \quad(the \emph{sharp} form; the manuscript's $c_1>2\xi\Cbar^2$ implies it and additionally buys the margin of \coq{C_stab_margin}) & S,V; $\Cstab>0$, \emph{and nowhere else} \\
+23 & \coq{H_eps} / \coq{Heps} (D) & $\displaystyle \varepsilon \;\le\; C_2\,c_1\,\frac{\aK^{2}\,\tau_{1,K}}{h_K^{2}}$ \ for every $K\in\Th$ \quad(\lbl{eq:epscond}; the two spellings are definitionally equal) & S,C,I,V; (P5), Steps~3,\,7,\,9 \\
+24 & \coq{H_jump} (D) & $c_J\,\varphi_{1,K_1}\le\varphi_{1,K_2}\le c_J'\,\varphi_{1,K_1}$ \ for every interior face $\Gamma$ \quad(\lbl{H:jump}; needed only when $\sigma>0$) & C,I,V; \lbl{lem:jump}, Steps~6b,\,6d \\
+25 & \coq{H_mult1} (D) & $\displaystyle \sum_{\Gamma}g\bigl(K_1(\Gamma)\bigr)\;\le\;N_f\sum_{K\in\Th}g(K)$ \ for every $g\ge0$ \quad(bounded face multiplicity, \emph{and} conformity: $K_i(\Gamma)\in\Th$; \lbl{H:mesh}) & C,I,V; Steps~6b,\,6d (\coq{bound_JmpP}, \coq{bound_III}) \\
+26 & \coq{H_mult2} (D) & the same with $K_2(\Gamma)$ & C,I,V; Steps~6b,\,6d \\
+
+\midrule
+\multicolumn{4}{@{}l}{\emph{\textbf{Class G} --- Green-type identities. The divergence theorem on an element, plus face bookkeeping.}}\\[2pt]
+
+27 & \coq{HBS} (G) & $\displaystyle B_S(U_h,U_h)=2\nu\bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\bigr\rVert^2+\sigma\lVert\mathbf u_h\rVert^2+\varepsilon\lVert p_h\rVert^2-\sum_K\tau_{1,K}\langle\mathcal L_m^{*},\mathcal L_m\rangle_K-\sum_K\tau_{2,K}\langle\mathcal L_c^{*},\mathcal L_c\rangle_K$ \quad(\lbl{eq:StabilityEstimate}, first line, composed with the Galerkin identity \eqref{eq:galerkin-here}) & S only; the starting line (\coq{BS_as_sum}). \textbf{The single largest assumption} (\S\ref{sec:stratumG}) \\
+28 & \coq{H_skew} (G) & $\displaystyle \sum_K\bigl(\mathbf v,\ \alpha\,\mathbf a\!\cdot\!\nabla\mathbf u\bigr)_K=-\sum_K\bigl(\mathbf u,\ \alpha\,\mathbf a\!\cdot\!\nabla\mathbf v\bigr)_K$ \quad(\lbl{eq:skew}; uses $\nabla\!\cdot(\alpha\mathbf a)=0$ and $\mathbf u\!\cdot\!\mathbf v\in W^{1,1}_0$) & C,I,V; Step~6a (\coq{step6a}) \\
+29 & \coq{H_ibp_vp} (G) & $\displaystyle \sum_K\bigl(\mathbf v,\ \alpha\nabla p\bigr)_K=-\sum_K\bigl(p,\ \nabla\!\cdot(\alpha\mathbf v)\bigr)_K$ \quad(\lbl{eq:globalibp}) & C,I,V; Step~6a \\
+30 & \coq{H_ibp_qu} (G) & $\displaystyle \sum_K\bigl(q,\ \nabla\!\cdot(\alpha\mathbf u)\bigr)_K=-\sum_K\bigl(\mathbf u,\ \alpha\nabla q\bigr)_K$ \quad(\lbl{eq:globalibp}) & C,I,V; Step~6a \\
+31 & \coq{H_skew_diag} (G) & $\displaystyle \sum_K\bigl(\mathbf v,\ \alpha\,\mathbf a\!\cdot\!\nabla\mathbf v\bigr)_K=0$ \quad(\lbl{eq:skew} on the \emph{diagonal}) & V; \coq{diag_zero}, hence the \emph{proof} of \coq{HBS_W} \\
+32 & \coq{H_ibp_diag} (G) & $\displaystyle \sum_K\bigl(\mathbf v,\ \alpha\nabla q\bigr)_K=-\sum_K\bigl(q,\ \nabla\!\cdot(\alpha\mathbf v)\bigr)_K$ \quad(\lbl{eq:globalibp} on the \emph{diagonal}) & V; \coq{diag_zero}, hence the \emph{proof} of \coq{HBS_W} \\
+33 & \coq{H_assemble_p} (G) & $\displaystyle \sum_{K}\tau_{1,K}\!\!\int_{\partial K}\!\!\!\alpha\,(\mathbf n_K\!\cdot\!\mathbf v)\,p \;=\;\sum_{\Gamma}[\![\tau_1]\!]_\Gamma\!\int_{\Gamma}\!\alpha\,(\mathbf n\!\cdot\!\mathbf v)\,p$ \quad(face pairing $+$ \emph{vanishing of the boundary faces}, $\mathbf u_h=\mathbf v_h=\mathbf 0$ on $\partial\Omega$) & C,I,V; Step~6b (\coq{step6b_identity}) \\
+34 & \coq{H_assemble_c} (G) & the same with $\int_\Gamma\alpha(\mathbf n\!\cdot\!\mathbf a)(\mathbf u\!\cdot\!\mathbf v)$ & C,I,V; Step~6d (\coq{bound_III}) \\
+35 & \coq{Horth} (G) & $B_S(W,W)=-\,B_S(E,W)$ \quad(Galerkin orthogonality \lbl{eq:consistency} $+$ bilinearity of $B_S$ in its first argument) & V; the convergence chain (\coq{NW_bound}) \\
+
+\midrule
+\multicolumn{4}{@{}l}{\emph{\textbf{Class I} --- inverse and interpolation estimates. True for polynomials (I) and for interpolation errors (I), never for both.}}\\[2pt]
+
+36 & \coq{S3} (I) & $\bigl\lVert 2\nu\nabla\!\cdot(\alpha\mathcal P\nabla\mathbf u_h)\bigr\rVert_K\le \dfrac{2\nu\Cbar}{h_K}\,\aK^{1/2}\bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\bigr\rVert_K$ \quad(\lbl{eq:winv-divvisc}) & S only; the Young step (\coq{du_sq_bound}). In \textbf{V} this slot is filled \emph{by the kernel} from \coq{Hw_dv} \\
+37 & \coq{Hw_gu} (I) & $\bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\bigr\rVert_K\le\dfrac{\Cinv}{h_K}\aK^{1/2}\lVert\mathbf u_h\rVert_K$ \quad(\lbl{eq:winv-grad}) & C; Steps~4,\,9 \\
+38 & \coq{Hw_gv} (I) & the same for $\mathbf v_h$ & C,I,V; Step~4 (\coq{double_inv_v}) \\
+39 & \coq{Hw_du} (I) & $\bigl\lVert 2\nu\nabla\!\cdot(\alpha\mathcal P\nabla\mathbf u_h)\bigr\rVert_K\le\dfrac{2\nu\Cbar}{h_K}\aK^{1/2}\bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\bigr\rVert_K$ \quad(\lbl{eq:winv-divvisc}) & C; Step~4 (\coq{bound_T6}, \coq{bound_T7}) \\
+40 & \coq{Hw_dv} (I) & the same for $\mathbf v_h$ & C,I,V; Step~4; \emph{and} it discharges \coq{S3} in \textbf{V} \\
+41 & \coq{Hw_cxu} (I) & $\lVert\alpha\,\mathbf a\!\cdot\!\nabla\mathbf u_h\rVert_K\le\dfrac{\Cinv}{h_K}\,\aK\,|\mathbf a|_{\infty,K}\lVert\mathbf u_h\rVert_K$ \quad(\lbl{eq:winv-conv}) & C; Step~9 (\coq{absorb_elem}) \\
+42 & \coq{Hw_cxv} (I) & the same for $\mathbf v_h$ & C,I,V; Step~5 (\coq{bound_T13c}) \\
+43 & \coq{Hw_gpu} (I) & $\lVert\alpha\nabla p_h\rVert_K\le\dfrac{\Cinv}{h_K}\,\aK\,\lVert p_h\rVert_K$ \quad(\lbl{eq:winv-gradp}) & C; Step~9 \\
+44 & \coq{Hw_divu} (I) & $\lVert\nabla\!\cdot(\alpha\mathbf u_h)\rVert_K\le\dfrac{\Cbar}{h_K}\,\aK\,\lVert\mathbf u_h\rVert_K$ \quad(\lbl{eq:winv-divu}) & C; Step~9 \\
+45 & \coq{HI_gu} (I) & $\bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf e_{\mathbf u}\bigr\rVert_K\le C_I\,\aK^{1/2}h_K^{-1}E_{\mathrm{int},K}(\mathbf u)$ \quad(\lbl{eq:interpgrad}) & I,V; Step~9 \\
+46 & \coq{HI_du} (I) & $\bigl\lVert 2\nu\nabla\!\cdot(\alpha\mathcal P\nabla\mathbf e_{\mathbf u})\bigr\rVert_K\le 2\nu\,C_I\,\aK\,h_K^{-2}E_{\mathrm{int},K}(\mathbf u)$ \quad(\lbl{eq:interpdivvisc}; replaces the \emph{composition} \coq{Hw_du}$\circ$\coq{Hw_gu}) & I,V; Step~4 (\coq{bound_T6}--\coq{bound_T8}) \\
+47 & \coq{HI_cxu} (I) & $\lVert\alpha\,\mathbf a\!\cdot\!\nabla\mathbf e_{\mathbf u}\rVert_K\le C_I\,\aK\,|\mathbf a|_{\infty,K}h_K^{-1}E_{\mathrm{int},K}(\mathbf u)$ & I,V; Step~9 \\
+48 & \coq{HI_gpu} (I) & $\lVert\alpha\nabla e_p\rVert_K\le C_I\,\aK\,h_K^{-1}E_{\mathrm{int},K}(p)$ & I,V; Step~9 \\
+49 & \coq{HI_divu} (I) & $\lVert\nabla\!\cdot(\alpha\mathbf e_{\mathbf u})\rVert_K\le C_I\,\aK\,h_K^{-1}E_{\mathrm{int},K}(\mathbf u)$ & I,V; Step~9 \\
+50 & \coq{HI_uu} (I) & $\lVert\mathbf e_{\mathbf u}\rVert_K\le C_I\,E_{\mathrm{int},K}(\mathbf u)$ \quad(\lbl{eq:interpzero}; \emph{no} \coq{Hw_} counterpart --- a discrete field needs no zeroth-order bound) & I,V; Steps~6c,\,9 \\
+51 & \coq{HI_pp} (I) & $\lVert e_p\rVert_K\le C_I\,E_{\mathrm{int},K}(p)$ \quad(\lbl{eq:interpzero}; likewise) & I,V; Steps~6b,\,9 \\
+52 & \coq{H_face_p} (I,G) & $\displaystyle\Bigl|\int_\Gamma\alpha\,(\mathbf n\!\cdot\!\mathbf v)\,p\Bigr|\le C_{\mathrm{face}}\!\!\sum_{i,j\in\{1,2\}}\!\!\frac{\alpha_{K_j}}{h_{K_j}}\lVert\mathbf v\rVert_{K_i}\,\pi_j$, \ with $\pi_j=\lVert p_h\rVert_{K_j}$ in \textbf{C} and $\pi_j=E_{\mathrm{int},K_j}(p)$ in \textbf{I},\textbf{V}. \emph{Bundles five facts}: H\"older on $\Gamma$, $\mathrm{meas}(\Gamma)\le Ch_K^{d-1}$, the $L^\infty$ inverse estimate \lbl{eq:inverse} (resp.\ the $L^\infty$ interpolation estimate \lbl{eq:interpinftyE}), $\alpha\le\aK$, and comparability of neighbouring diameters & C,I,V; Step~6b (\coq{face6b}). \textbf{The coarsest bundle} (\S\ref{sec:stratumI}) \\
+53 & \coq{H_face_c} (I,G) & $\displaystyle\Bigl|\int_\Gamma\alpha\,(\mathbf n\!\cdot\!\mathbf a)(\mathbf u\!\cdot\!\mathbf v)\Bigr|\le C_{\mathrm{face}}\!\!\sum_{i,j\in\{1,2\}}\!\!\frac{\alpha_{K_j}|\mathbf a|_{\infty,K_j}}{h_{K_j}}\,\mu_i\,\lVert\mathbf v\rVert_{K_j}$, \ with $\mu_i=\lVert\mathbf u_h\rVert_{K_i}$ in \textbf{C} and $\mu_i=E_{\mathrm{int},K_i}(\mathbf u)$ in \textbf{I},\textbf{V}; same five ingredients as item~52 & C,I,V; Step~6d (\coq{face6d}) \\
+\end{longtable}
+
+\noindent
+Three things are worth reading off the table.
+
+\emph{Class~D is not analytic trust.} Items 1--26 are conditions on the data,
+the mesh and the numerical parameters. They are hypotheses of the manuscript's
+theorems too; a formalisation cannot discharge them, and none of them asks the
+reader to believe a piece of mathematics. The analytic trust is items 27--53,
+and only those.
+
+\emph{The base is far narrower than the count suggests.} Of the $27$ analytic
+items, \emph{sixteen} (items 36--51) are instances of just two textbook facts ---
+the inverse estimate and the Bramble--Hilbert interpolation estimate --- applied
+to the particular fields the proof touches. Discharging those two primitives in
+Lean would remove sixteen rows at a stroke. A further \emph{seven} (items
+28--34) are the divergence theorem, its two diagonal instances, and finite face
+bookkeeping. What is left is genuinely three things: \coq{HBS}, \coq{Horth}, and
+the face bundle \coq{H_face_p}/\coq{H_face_c}.
+
+\emph{Every item is used.} There are no dead hypotheses: each of the $53$ is
+consumed by at least one lemma, as the last column records. And the
+\emph{strict} content of \coq{c1_large} and \coq{xi_large} --- the inequalities
+themselves, as opposed to the weaker $\xi>0$ they imply --- is consumed at
+exactly \emph{one} place between them (\S\ref{sec:stratumD}, D3).
+
+% ---------------------------------------------------------------------
+\subsection{Are the hypotheses consistent? (Non-vacuity)}\label{sec:vacuity}
+% ---------------------------------------------------------------------
+
+A theorem with contradictory hypotheses is true and worthless. Any development
+that assumes a dozen quantitative facts owes the reader an answer to the
+question: could this bundle be unsatisfiable, making the conclusions vacuous?
+There are two answers, and they are different.
+
+\emph{Soundness --- the only one that matters for the paper.} Every hypothesis
+of Stratum~3 is a true statement about the finite element objects, either by
+textbook citation (Classes~G and~I) or by assumption of the manuscript
+(Class~D). The concrete finite element tuple --- $\mathtt{gu}\,K =
+(\alpha^{1/2}\mathcal P\nabla\mathbf u_h)|_K$, and so on --- is therefore a
+model of the whole bundle, and the abstract theorem, being universally
+quantified, applies to it. This is what the crosswalk and the hand audit
+establish, and it is the entire content of the claim that the paper's lemmas are
+machine-checked.
+
+\emph{Consistency --- the pedant's question, answered.} Independently of the
+intended model, the hypothesis bundle is \emph{satisfiable}, so no theorem in
+the development is vacuously true. Here is an explicit witness for
+\coq{abstract_stability}, small enough to check by hand in a minute.
+
+Take the carrier $V=\mathbb R$ with $\langle x,y\rangle:=xy$ --- a pre-Hilbert
+space, since \eqref{eq:prehilbert} is immediate. Let the mesh be a single
+element, $\Th=[k_0]$. Fix
+\[
+  \nu=\sigma=1,\qquad h_{k_0}=\aK=1,\qquad |\mathbf a|_{\infty,k_0}=0,
+  \qquad \xi=3,\quad \Cbar=1,\quad c_1=7,\quad c_2=1,\quad C_2=\tfrac12 ,
+\]
+which satisfies every positivity hypothesis, together with $\xi>2$ and the
+sharp numerical-parameter condition $c_1=7>3=\xi\Cbar^{2}$ (\coq{w_c1_large};
+the manuscript's stronger $c_1>2\xi\Cbar^2=6$ holds here too). The parameter formulas then give, exactly,
+\[
+  \tau_{1,\mathrm{NS}}^{-1}=7,\qquad
+  \tau_1=\tfrac18,\qquad
+  \tau_2=1,\qquad
+  \sigt=\tfrac78,\qquad
+  \varepsilon_{\max}=C_2c_1\aK^2\tau_1/h^2=\tfrac{7}{16}\;>\;0,
+\]
+so $\varepsilon:=\tfrac{7}{16}$ is admissible and \coq{Heps} holds. For the
+atoms take
+\[
+  \mathtt{uu}(k_0)=1,\qquad
+  \mathtt{gu}=\mathtt{pp}=\mathtt{xu}=\mathtt{divu}=\mathtt{du}=0 .
+\]
+Then \coq{S3} reads $0\le0$ and holds; and \coq{HBS}, whose left-hand side is
+the \emph{free} variable $B_S$, is satisfied by \emph{defining} $B_S$ to be its
+right-hand side. Computing that right-hand side: $G(\mathbf u)=\mathtt{du}-
+\sigma\,\mathtt{uu}=-1$, so $\mathcal L_m=\mathcal L_m^{*}=1$ and
+$\mathcal L_c=\mathcal L_c^{*}=0$, whence
+\[
+  B_S \;=\; \sigma\,\mathtt{uu}^2-\tau_1\langle\mathcal L_m^{*},\mathcal L_m\rangle
+     \;=\; 1-\tfrac18 \;=\; \tfrac78 .
+\]
+On the other side, $C_u=1-\xi\Cbar^2/c_1=\tfrac47$,
+$C_{\mathrm{visc}}=\min\{2-\tfrac47,\,2(1-\tfrac23)\}=\tfrac23$, so
+$\Cstab=\min\{\tfrac23,\tfrac47,\tfrac12,1\}=\tfrac12$, while
+$|||U_h|||^2=\sigt\,\mathtt{uu}^2=\tfrac78$. The conclusion of
+\coq{abstract_stability} therefore reads
+\[
+  \tfrac78 \;=\; B_S \;\ge\; \Cstab\,|||U_h|||^2 \;=\; \tfrac12\cdot\tfrac78
+  \;=\; \tfrac{7}{16} ,
+\]
+which is true, and \emph{non-degenerate}: both sides are strictly positive, so
+the theorem is not being satisfied by a $0\ge0$. The hypotheses are jointly
+satisfiable with a non-trivial conclusion.
+
+The same construction extends to the continuity, interpolation and convergence
+bundles, with one wrinkle worth recording, since it is the kind of detail that
+makes or breaks such an argument: \coq{H_jump}, \coq{H_face_p} and
+\coq{H_face_c} are quantified over the face \emph{type} \coq{F}, not over the
+face \emph{list} \coq{Fl}, so emptying the list does not by itself discharge
+them. One must instead set $\mathrm{FB}_p=\mathrm{FB}_c:=0$ (whereupon the face
+estimates read $0\le0$) and let $e_1=e_2$ (whereupon \coq{H_jump} holds because
+$c_J\le1\le c_J'$); with $\mathcal F=[\,]$ the assembly identities then force
+$\mathrm{FB}_{p,e}=\mathrm{FB}_{c,e}=0$, which is consistent, and \coq{H_mult1}
+/ \coq{H_mult2} read $0\le N_f\sum_K g$.
+
+\emph{And it is machine-checked.} The witness above is not a hand argument. It
+is the fifteenth file of the development, \file{NonVacuity.v}: it builds the
+instance ($\mathbb R$ with $\langle x,y\rangle=xy$ is shown to be a
+\coq{PreHilbert}; the mesh is \coq{[tt]}; the data are the rationals above),
+discharges every hypothesis of \coq{abstract_stability} --- including
+\coq{HBS}, \coq{S3} and \coq{Heps} --- and \emph{applies the theorem}:
+\begin{lstlisting}
+Theorem witness_stability :
+  0 < wCstab /\ wBS >= wCstab * wNormSq.
+Proof.
+  exact (AbstractStability.abstract_stability
+           RPH unit wTh wnu wsig weps wc1 wc2 wCb wxi wC2
+           w_nu_pos w_sigma_nonneg w_eps_nonneg w_c1_pos w_c2_pos w_Cb_pos
+           w_C2_nonneg w_C2_lt_1 w_c1_large w_xi_large
+           whK waK wam w_hK_pos w_aK_pos w_am_nonneg
+           wgu wuu wpp wxu wdivu wdu wBS  w_HBS w_S3 w_Heps).
+Qed.
+
+Theorem abstract_stability_is_not_vacuous :
+  wBS >= wCstab * wNormSq
+  /\ 0 < wCstab /\ 0 < wBS /\ 0 < wNormSq
+  /\ wCstab = 1/2 /\ wNormSq = 7/8 /\ wBS = 7/8
+  /\ wCstab * wNormSq = 7/16.
+\end{lstlisting}
+The kernel accepts both, and \coq{Print Assumptions
+abstract_stability_is_not_vacuous} returns the same three real-number axioms as
+every other theorem here --- nothing more. So the claim ``the hypotheses of
+\lbl{lemma:Stability} are consistent, and the coercivity bound it yields is a
+non-trivial inequality between positive numbers'' is now itself a
+machine-checked theorem, not an assurance.
+
+What the witness does \emph{not} show bears repeating: it settles consistency,
+not soundness. That the \emph{finite element} objects satisfy the hypotheses is
+the other direction, and it is what the hand audit of Stratum~3 establishes.
+
+% ---------------------------------------------------------------------
+\subsection{Summary: what was tightened, and what remains}\label{sec:tighten}
+
+The assessments above, collected. Eight of the thirteen items on this list were
+open at the previous revision; all eight are now closed \emph{inside the
+kernel}. What
+remains open is exactly the part that cannot be closed without a concrete
+variational instance --- the Lean~4 targets of \S\ref{sec:left}.
+
+\begin{longtable}{@{}L{0.26\textwidth}cL{0.60\textwidth}@{}}
+\toprule
+\textbf{Item} & & \textbf{Status} \\
+\midrule \endhead
+
+$c_1>2\xi\Cbar^{2}$, $\xi>2$ (D3)
+  & \textbf{closed}
+  & \emph{Sufficient, not necessary} --- and both halves are now theorems.
+    Positivity of $C_u,C_{\mathrm{visc}}$ needs only $c_1>\xi\Cbar^2$ (given
+    $\xi>2$), and that is what the development now assumes
+    (\coq{stability_constants_positive_sharp}); the manuscript's condition is
+    kept as a corollary. The extra factor of two is not idle, and
+    \coq{C_stab_margin} says exactly what it buys: $C_u>\tfrac12$,
+    $2-4\Cbar^2/c_1>1$, hence the $\Cbar$-free floor
+    $\Cstab\ge\min\{2(1-2/\xi),\tfrac12,1-C_2\}$. \\
+
+$\sigma>0$, $\varepsilon>0$, $C_2>0$ (D1)
+  & \textbf{closed}
+  & Was \emph{stronger than the paper}. Now relaxed to \lbl{H:data}'s own
+    $\sigma\ge0$, $\varepsilon\ge0$, $0\le C_2<1$: two lemmas of
+    \file{StabilityAlgebra.v} were restated with $\le$ in place of $<$
+    (\coq{sigt_nonneg}, \coq{alphaK_tau1_le_tau1NS}), a third
+    (\coq{sigt_denom_pos}) kept its statement and was reproved from
+    $\sigma/\aK\ge0$, and the whole chain went through unchanged. \textbf{The reaction-free case
+    $\sigma=0$ is now a genuine instance} of the stability and convergence
+    theorems. \\
+
+\coq{BSWW} never reconciled with the
+eighteen-term $B_S$ (I4)
+  & \textbf{closed}
+  & $B_S(W,W)$ is now \emph{defined} as the eighteen-term expression, and the
+    tested identity is \emph{proved} from it. The two encodings are provably the
+    same number --- the check the parameters already had
+    (\coq{tau1_agree}\,\dots) and $B_S$ lacked. \\
+
+\coq{HBS_W} (G1)
+  & \textbf{closed}
+  & \emph{No longer a hypothesis.} It is now the theorem \coq{HBS_W}, proved
+    from the two \emph{diagonal} identities \coq{H_skew_diag}, \coq{H_ibp_diag}
+    (\eqref{eq:diag-here}) --- which is all it ever contained beyond the
+    difference-of-squares algebra, and that algebra is now inside the kernel. A
+    monolithic class-G bundle traded for two one-line facts. \\
+
+\coq{H_elem_conv_ibp}, \coq{H_elem_p_ibp}
+alone (G5)
+  & \textbf{closed}
+  & Were \emph{vacuous in isolation} (their face terms were free variables). The
+    face terms are now \coq{Definition}s --- the integration-by-parts defect,
+    which is what the divergence theorem says they are --- and the two
+    identities are proved. Two hypotheses leave the trusted base of each of the
+    three files; no content is lost, because the content lives in
+    \coq{H_assemble_*} and \coq{H_face_*}. \\
+
+$\tau_2$: analysed vs.\ implemented
+  & \textbf{closed}
+  & The bridge is now \emph{wired end to end}. \coq{abstract_convergence_implemented}
+    states \lbl{thm:convergence} for the parameter the solver actually forms:
+    measured in the triple norm built from the implemented $\tau_2$
+    (\lbl{eq:Tau2}) and with $\psi(h)$ built from it too, the estimate holds with
+    the same constant inflated by at most $\sqrt{1+C_2}<\sqrt2$. \\
+
+$\xi>0$ (\coq{xi_pos}) alongside $\xi>2$
+  & \textbf{closed}
+  & Redundant; now derived rather than assumed. \\
+
+\midrule
+
+\coq{HBS}, \coq{Horth} (G1, G2)
+  & open
+  & \emph{The largest residual trust}, now that \coq{HBS_W} is gone. Identities,
+    verbatim from the manuscript, symbolically cross-checked --- but assumed.
+    Provable only once a concrete variational instance is formalised (roadmap
+    T4/T7); the roadmap explicitly advises against attacking \coq{HBS} first,
+    precisely because doing so presupposes that instance. \\
+
+\coq{H_face_p}, \coq{H_face_c} (I3)
+  & open
+  & \emph{The coarsest bundle}: five standard ingredients behind one constant.
+    Decomposable only once face measures and traces enter the interface
+    (roadmap T2/T5). \\
+
+\coq{IU}, \coq{IP} abstract (I2)
+  & open
+  & The kernel proves an \emph{estimate}, not a \emph{rate}. The $O(h^{k+1})$
+    reading is a Stratum-1 instantiation, confirmed empirically by the MMS
+    plateaus. Closing it means formalising $E_{\mathrm{int},K}$, i.e.\ Sobolev
+    spaces --- squarely a Lean task. \\
+
+\midrule
+
+\lbl{H:jump} assumed unconditionally (D4)
+  & ---
+  & Not a defect. The manuscript needs it only for $\sigma>0$; supplying a true
+    hypothesis costs nothing, and by \lbl{H:porosity}+\lbl{H:mesh} it holds
+    anyway. A $\sigma$-case split would recover the $\sigma=0$ specialisation
+    for free, but buys nothing. \\
+
+$\aK\le1$ \emph{not} assumed
+  & ---
+  & Not a gap but a bonus: the abstract theorems prove the sharp
+    porosity-weighted forms (\lbl{eq:sharpcont}, \lbl{rem:sharperconv}), which
+    do not need it. \\
+
+Non-vacuity (\S\ref{sec:vacuity})
+  & \textbf{closed}
+  & \file{NonVacuity.v} exhibits an explicit instance and applies
+    \coq{abstract_stability} to it inside the kernel: the hypothesis bundle is
+    consistent and the conclusion non-degenerate. \\
+\bottomrule
+\end{longtable}
+
+\noindent
+The net effect on the analytic base: \coq{HBS_W} and the two elemental
+integration-by-parts hypotheses are gone (three items, one of them large), and
+two elementary diagonal identities are new. The trusted base of
+\lbl{thm:convergence} went from $50$ named hypotheses to $46$, and --- more to
+the point --- the \emph{content} it carries is strictly smaller, since the
+difference-of-squares expansion that \coq{HBS_W} used to smuggle in is now
+proved.
+
+% =====================================================================
 \section{The residual trusted base and what is left}\label{sec:left}
 % =====================================================================
 
@@ -737,7 +2545,11 @@ or (ii) genuinely outside the current scope, and covered by the SymPy suite.
 
 \subsection{The named trusted base of the abstract theorems}
 
-The companion \file{LEAN_ROADMAP.md} classifies each hypothesis into three
+The table below is the \emph{index} of that base. Each entry is stated in full
+--- in both its Coq and its mathematical form, with the proof steps that consume
+it --- in Table~\ref{tab:inventory}, and assessed for role, plausibility and
+tightness in Section~\ref{sec:assumptions}, which also catalogues the
+\emph{implicit} assumptions that no table of hypotheses can show. The companion \file{LEAN_ROADMAP.md} classifies each hypothesis into three
 classes. Class~D items are assumptions on data/mesh --- hypotheses of the
 paper's theorems in any formal system, with nothing to prove. Classes~G and~I
 are the textbook analytic facts (Brenner--Scott, Ern--Guermond), hand-audited
@@ -752,16 +2564,18 @@ against the manuscript in \file{AUDIT.md}~\S4.
 \coq{Heps}, \coq{H_eps} & \lbl{eq:UpperBoundOnEpsilon} / \lbl{eq:epscond} & D & assumption \\
 \coq{H_skew} & \lbl{eq:skew}, identity (i) & G & hand-audited \\
 \coq{H_ibp_vp}, \coq{H_ibp_qu} & \lbl{eq:globalibp}, identity (ii) & G & hand-audited \\
-\coq{H_elem_conv_ibp} & \lbl{eq:elemibp}, identity (iii) & G & hand-audited \\
-\coq{H_elem_p_ibp} & elemental pressure IBP (Step~6b) & G & hand-audited \\
-\coq{H_assemble_p}, \coq{H_assemble_c} & facewise assembly (Steps~6b,~6d) & G & hand-audited \\
+\coq{H_skew_diag}, \coq{H_ibp_diag} & \lbl{eq:skew}/\lbl{eq:globalibp} on the \emph{diagonal}; they replace the former \coq{HBS_W}, which is now \emph{proved} from them & G & hand-audited \\
+\coq{H_assemble_p}, \coq{H_assemble_c} & facewise assembly (Steps~6b,~6d), including the vanishing of the boundary faces & G & hand-audited \\
 \coq{H_face_p}, \coq{H_face_c} & \lbl{eq:jumpest}/face estimates: H\"older $+$ $\mathrm{meas}\le Ch^{d-1}$ $+$ $L^\infty$ inverse $+$ $\alpha\le\aK$ & I,G & hand-audited \\
 \coq{H_jump} & \lbl{H:jump} & D & assumption \\
 \coq{H_mult1}, \coq{H_mult2} & bounded face multiplicity (\lbl{H:mesh}) & D & assumption \\
 \coq{Hw_gu} \dots \coq{Hw_divu} (8) & weighted inverse estimates of \lbl{lem:winv} (\lbl{eq:inverse}); \lbl{lem:continterp} keeps only the three V-side ones & I & hand-audited \\
 \coq{HI_gu} \dots \coq{HI_pp} (7) & interpolation estimates \lbl{eq:interp}/\lbl{eq:interpinfty} via the replacement table \lbl{eq:interpdivvisc}--\lbl{eq:interpzero} (Bramble--Hilbert) & I & hand-audited \\
-\coq{HBS_W} & the tested identity \lbl{eq:StabilityEstimate} for the discrete-error pair (same class as \coq{HBS}) & G & hand-audited \\
 \coq{Horth} & Galerkin orthogonality \lbl{eq:consistency} $+$ bilinearity of $B_S$ in its first argument & G & hand-audited \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{No longer in the base (were hypotheses at the previous revision; now theorems):}}\\
+\coq{HBS_W} & now \emph{proved} from \coq{H_skew_diag}/\coq{H_ibp_diag} (\S\ref{sec:stratumG}, G1) & --- & \textbf{discharged} \\
+\coq{H_elem_conv_ibp}, \coq{H_elem_p_ibp} & now \emph{proved}: their face terms are \coq{Definition}s, the integration-by-parts defect (\S\ref{sec:stratumG}, G5) & --- & \textbf{discharged} \\
 \bottomrule
 \end{longtable}
 
@@ -854,7 +2668,7 @@ theory), and the CDR adjoint / Green's-identity computation of
 
 Formalising the proofs surfaced a few points where the manuscript's hypotheses
 or notation were slightly looser than what the proofs consume. The following
-amendments (catalogued in \file{proof_verification/AUDIT.md}, findings F1--F7)
+amendments (catalogued in \file{proof_verification/AUDIT.md}, findings F1--F8)
 have been \textbf{applied} to \file{theory/paper/} so the manuscript is
 $100\%$ compatible with the verified statements. None changes a mathematical
 result; each closes a precision or hygiene gap. The added text is marked with
@@ -870,6 +2684,7 @@ F3 & the two previously-unlabelled coefficient displays after \lbl{eq:UpperBound
 F4 & the main-text triple norm now writes the elementwise-weighted term $\lVert\sigt_\alpha^{1/2}\mathbf u_h\rVert_h^2$ with the broken-norm subscript, matching \lbl{eq:triplenorm}. & applied \\
 F6 & a remark after \lbl{eq:Tau2Final} records that the analysis $\tau_2$ and the implemented \lbl{eq:Tau2} are equivalent up to $1+C_2<2$ (machine-checked: \coq{tau2impl_le_tau2}, \coq{tau2_le_scaled_impl}). & applied \\
 F7 & a clause notes that the coefficient bounds are written for $\aK=\alpha_{\infty,K}$; other representatives cost factors of $\delta_\alpha$. & applied \\
+F8 & in \lbl{lem:winv} the label \lbl{eq:winv-conv} sat on the \emph{last} line of the display (the pressure-gradient estimate), while the convective line above it had none --- so two of the four references to \lbl{eq:winv-conv} pointed at the wrong estimate. The convective line now carries \lbl{eq:winv-conv} and the pressure-gradient line the new \lbl{eq:winv-gradp}; the four call sites were re-pointed accordingly (the Step-9 ``pressure part'' now cites \lbl{eq:winv-gradp}). Found by the Coq audit, which needed to cite the two estimates separately (\coq{Hw_cxu}/\coq{Hw_cxv} vs \coq{Hw_gpu}). & applied \\
 \midrule
 F5 & \file{supplement.tex} is untouched SIAM template boilerplate --- a submission-set decision for the authors, left unchanged. & deferred \\
 \bottomrule
@@ -896,7 +2711,7 @@ and cannot be hurried, fatigued, or won over by plausibility. Here that check
 is then \emph{repeated by a second, independent program} (\coq{coqchk}) which
 re-derives everything from the compiled proof terms without trusting the first.
 
-The practical consequence: for every theorem in these fourteen files, the claim
+The practical consequence: for every theorem in these fifteen files, the claim
 \emph{``the stated conclusion follows from the stated hypotheses''} is no longer
 a matter of belief or of referee diligence. The only way such a statement could
 still be false is if the two independent kernels shared a soundness bug that
@@ -921,12 +2736,15 @@ three things sit outside the kernel and carry whatever doubt remains.
     author meant. \emph{This document is that check}: every Coq statement is
     mapped to the paper equation it encodes, and the definitions were diffed
     against the manuscript sources.
-  \item \textbf{The hypotheses holding in the application.} For the two central
-    lemmas, a short list of standard analytic facts (the trusted base of
-    \S\ref{sec:left}) is \emph{assumed}, not proved here. These are textbook
-    results, hand-audited against the manuscript --- but ``hand-audited'' means
-    human-checked, so they still carry the ordinary, small-but-nonzero risk of
-    any careful proof.
+  \item \textbf{The hypotheses holding in the application.} For all four
+    abstract theorems, a named list of standard analytic facts (the trusted base
+    of \S\ref{sec:left}, read out in full in \S\ref{sec:assumptions}) is
+    \emph{assumed}, not proved here. These are textbook results, hand-audited
+    against the manuscript --- but ``hand-audited'' means human-checked, so they
+    still carry the ordinary, small-but-nonzero risk of any careful proof. And
+    two of them, \coq{HBS} and the face estimates, bundle enough of the paper's
+    own derivation that auditing them means auditing the paper, not merely
+    checking a citation (\S\ref{sec:stratumG}, \S\ref{sec:stratumI}).
   \item \textbf{The trust base.} The Coq kernel and the standard-library
     axiomatisation of the real numbers. Universally relied upon; named here for
     completeness.
@@ -940,14 +2758,20 @@ Putting it together, the results fall into three honest tiers.
 \toprule
 \textbf{Tier} & \textbf{What is in it} & \textbf{What must still be trusted} \\
 \midrule \endhead
-\textbf{1. Certain \newline (unconditional; positivity only)} &
-All the scalar / algebraic content: the $\tau_1,\tau_2,\sigt$ identities, the
-coefficient expansions and lower bounds, the $\varepsilon$-smallness chain, the
-parameter and jump inequalities, the Fourier and coupling spectra, the
-asymptotic limits, the manufactured-solution divergence identity, and the
-plateau bump's $C^1$ behaviour. &
+\textbf{1. Certain \newline (no analytic trust: positivity, or the paper's own
+Class-D conditions)} &
+All the scalar / algebraic content. Under positivity alone: the
+$\tau_1,\tau_2,\sigt$ identities, the coefficient expansions, the Fourier and
+coupling spectra, the asymptotic limits, the manufactured-solution divergence
+identity, and the plateau bump's $C^1$ behaviour. Under the Class-D conditions
+of \S\ref{sec:stratumD} as \emph{explicit premises} --- $\varepsilon\le
+\varepsilon_{\max}$ (\lbl{eq:epscond}), $c_1>\xi\Cbar^2$ with $\xi>2$ (sharp; the
+manuscript's $2\xi\Cbar^2$ additionally buys the \coq{C_stab_margin} floor),
+$C_2<1$, $\aK\le1$, the jump bounds of \lbl{H:jump} --- the $\varepsilon$-smallness
+chain, the coefficient lower bounds, and the parameter and jump inequalities. &
 Only the trust base (kernel $+$ real-number axioms). The positivity hypotheses
-are physically trivial. \\
+are physically trivial, and the Class-D conditions are hypotheses of the paper's
+theorems in any formal system: they add \emph{no analytic trust}. \\
 \midrule
 \textbf{2. Certain \emph{as an implication} \newline (conditional)} &
 \lbl{lemma:Stability}, \lbl{lemma:Continuity}, \lbl{lem:continterp} and
@@ -962,9 +2786,12 @@ $|||U-U_h|||\le(K_{\mathrm{abs}}^{I}+C_{\mathrm{tot}}^{I}/\Cstab)
 (Cauchy--Schwarz, Young, the eighteen-term bookkeeping, the jump
 treatment, the summation over the mesh, the triple-norm triangle
 inequality, the composition itself) inside the kernel. &
-Trust base, \emph{plus} the dozen named analytic hypotheses of \S\ref{sec:left}
-(Green-type identities, inverse estimates) holding --- standard, hand-audited,
-Lean-targeted. \\
+Trust base, \emph{plus} the named analytic hypotheses of \S\ref{sec:left} ---
+some two dozen of them once the eight \coq{Hw_*} and seven \coq{HI_*} are
+counted individually (Green-type identities, inverse and interpolation
+estimates) --- holding. Standard, hand-audited, Lean-targeted; each is stated
+and assessed in \S\ref{sec:assumptions}. Nothing more: the hypotheses are exactly
+the manuscript's (\S\ref{sec:stratumD}). \\
 \midrule
 \textbf{3. Outside the Coq scope \newline (SymPy-verified)} &
 The Appendix~A elemental-matrix transcription (left to SymPy by design);
@@ -984,15 +2811,18 @@ In decreasing order of how much unformalised trust they still carry:
     The Lean~4 roadmap targets exactly these, and notes that the
     inverse-estimate technology alone would shrink \lbl{lemma:Stability}'s
     residual base to the single Green identity \coq{HBS}.
-  \item \textbf{The two consistency-class items of the convergence file}
-    (\coq{HBS_W}, \coq{Horth}): Green-type material of the same character
-    as \coq{HBS}, hand-audited; the interpolation estimates \coq{HI_*}
-    join the Class-I Lean targets.
+  \item \textbf{The remaining Green-type items of the convergence file}
+    (\coq{Horth}, and the two diagonal identities \coq{H_skew_diag} /
+    \coq{H_ibp_diag} that replaced the former \coq{HBS_W} --- which is now
+    \emph{proved} from them): hand-audited, of the same character as \coq{HBS};
+    the interpolation estimates \coq{HI_*} join the Class-I Lean targets.
   \item \textbf{The data / mesh assumptions} (\lbl{H:jump}, \lbl{H:mesh}, the
     $\varepsilon$-condition, positivity): not gaps in any proof but
     \emph{conditions of applicability} --- hypotheses the mesh and data must
     satisfy, present in the paper's theorems in any formal system, with nothing
-    to prove.
+    to prove --- and, since this revision, with no exception: the development
+    assumes exactly \lbl{H:data}'s $\sigma\ge0$, $\varepsilon\ge0$,
+    $0\le C_2<1$, so the reaction-free case $\sigma=0$ \emph{is} an instance.
   \item \textbf{Modelling and code} (the two standing caveats of
     \S\ref{sec:left}): Coq checks the mathematics as stated, not that it models
     the physics, nor that the Julia/Kratos solvers implement it. The
@@ -1005,11 +2835,15 @@ The parts of this paper that are pure calculation or pure logical deduction ---
 the whole of the parameter design, the asymptotics and the manufactured-solution
 algebra, and, crucially, the \emph{entire chain of estimates} inside the
 stability, continuity, interpolation and convergence proofs --- are now
-verified to a standard of certainty that human refereeing cannot reach. What
-still rests on human judgement is a \emph{short, explicit, named} list: a
-handful of standard analysis facts (Green-type identities, inverse and
-interpolation estimates --- being formalised next in Lean) and the physical-
-and code-modelling questions that no symbolic proof can settle. The value of the
+verified to a standard of certainty that human refereeing cannot reach --- under
+exactly the manuscript's own hypotheses. What still rests on human judgement is a
+\emph{short, explicit, named} list, and Table~\ref{tab:inventory} is that list in
+full: $53$ hypotheses, of which $26$ are conditions on the data and the mesh
+(nothing to prove) and $27$ are analytic. Of those $27$, eighteen are instances
+of two textbook facts (the inverse estimate and Bramble--Hilbert), five are the
+divergence theorem plus face bookkeeping, and the genuine residue is three
+items: \coq{HBS}, \coq{Horth}, and the face bundle. Those, and the physical- and
+code-modelling questions that no symbolic proof can settle. The value of the
 exercise is precisely that it shrinks what must be taken on trust from ``the
 whole proof'' to that short list --- and puts the list in plain sight.
 
@@ -1029,19 +2863,72 @@ opam install coq
 \end{lstlisting}
 
 \noindent
-All fourteen files compile and kernel-check unchanged on Rocq~9.1.1 (the only
-console output is a deprecation notice that \coq{From Coq} is now spelled
-\coq{From Stdlib}; the $8.16$--$8.20$-compatible spelling is kept on purpose
-for portability). A passing run prints one \coq{[PASS]} line per file, then
-\emph{``coqchk: all modules kernel-verified''}.
+A passing run prints one \coq{[PASS]} line per file, then the \coq{coqchk} line.
+The run recorded for this revision (Coq~8.18.0, Ubuntu~24.04, $\approx75$\,s
+wall clock) is:
+\begin{lstlisting}[language=bash,keywordstyle=\color{black}]
+Coq formal verification suite (PNSFormal)
+coqc: The Coq Proof Assistant, version 8.18.0
+  [PASS] Limits.v            [PASS] AbstractContinuity.v
+  [PASS] DerivKit.v          [PASS] AbstractInterpolation.v
+  [PASS] StabilityAlgebra.v  [PASS] AbstractConvergence.v
+  [PASS] ContinuityAlgebra.v [PASS] TauDesign.v
+  [PASS] AbstractSums.v      [PASS] Asymptotics.v
+  [PASS] InnerSpace.v        [PASS] ManufacturedSolution.v
+  [PASS] AbstractStability.v [PASS] PlateauBump.v
+                             [PASS] NonVacuity.v
+RESULT: all 15 files compiled; every theorem is proved.
+Running coqchk (independent kernel re-verification) ...
+  [PASS] coqchk: modules successfully checked by the trusted kernel.
+\end{lstlisting}
+(The sources keep the $8.16$--$8.20$-compatible \coq{From Coq} spelling on
+purpose; on Rocq~9 it merely emits a deprecation notice in favour of
+\coq{From Stdlib}.)
 
 \bigskip
 \noindent\emph{Cross-references.} File-level detail and the SymPy$\leftrightarrow$Coq
 mapping: \file{README.md} in the \file{coq-formal/} directory. The step-by-step
-audit of the analytic steps and the F1--F7 findings: \file{AUDIT.md}. The Lean~4
+audit of the analytic steps and the F1--F8 findings: \file{AUDIT.md}. The Lean~4
 plan for the residual base: \file{LEAN_ROADMAP.md} and \file{PorousNSToolbox.lean}.
 The authoritative theory: \file{theory/paper/article.tex} and its appendices
 (\file{continuity_appendix.tex}, \file{fourier_appendix.tex},
 \file{elemental_matrices_appendix.tex}).
+
+% =====================================================================
+\begin{thebibliography}{9}
+% =====================================================================
+
+\bibitem{brenner2008mathematical}
+S.~C.~Brenner and L.~R.~Scott,
+\emph{The Mathematical Theory of Finite Element Methods}, 3rd~ed.,
+Texts in Applied Mathematics~15, Springer, New York, 2008.
+\newblock (Inverse estimates: Lemma~4.5.3. Interpolation / Bramble--Hilbert:
+Theorem~4.4.20.)
+
+\bibitem{ernguermond}
+A.~Ern and J.-L.~Guermond,
+\emph{Theory and Practice of Finite Elements},
+Applied Mathematical Sciences~159, Springer, New York, 2004.
+\newblock (Inverse inequalities on shape-regular meshes and the local
+interpolation estimates in the form used here.)
+
+\bibitem{codina2001stabilized}
+R.~Codina,
+\emph{A stabilized finite element method for generalized stationary
+incompressible flows},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ \textbf{190} (2001), 2681--2706.
+\newblock (Source of the jump condition of which \lbl{H:jump} is the analogue
+--- condition~(39) there --- and of the $L^\infty$ interpolation estimates
+(78)--(79).)
+
+\bibitem{codina2018hp}
+R.~Codina,
+\emph{On $hp$ convergence of stabilized finite element methods for the
+convection--diffusion equation},
+SeMA Journal \textbf{75} (2018), 591--606.
+\newblock (The $k^2$ growth of $\Cinv$ with the polynomial degree, which
+motivates the calibration $c_1=4k^4$, $c_2=2k^2$.)
+
+\end{thebibliography}
 
 \end{document}

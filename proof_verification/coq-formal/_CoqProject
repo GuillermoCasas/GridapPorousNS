@@ -13,3 +13,4 @@ TauDesign.v
 Asymptotics.v
 ManufacturedSolution.v
 PlateauBump.v
+NonVacuity.v

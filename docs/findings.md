@@ -337,8 +337,39 @@ code-correctness items now live in [`pending-tasks.md`](pending-tasks.md) (§2 c
 
 ---
 
+## 8. Machine-checked a priori theory (Coq) — RESOLVED (the whole chain; trusted base reduced to 3 items)
+
+**Verdict (2026-07-13): the paper's entire a priori chain is machine-checked.** `lemma:Stability`, `lemma:Continuity`, `lem:continterp` and `thm:convergence` are complete Coq theorems (`proof_verification/coq-formal/`, 15 files, ~584 theorems). All compile and are re-verified by `coqchk` (Coq 8.18.0); `Print Assumptions` on each returns exactly three standard-library real-number axioms and **no user axiom** (`ClassicalDedekindReals.sig_not_dec`, `sig_forall_dec`, `FunctionalExtensionality.functional_extensionality_dep`). Full map, and the complete 53-row hypothesis inventory: [`proof_verification/coq_coverage.tex`](../proof_verification/coq_coverage.tex).
+
+### The `c₁` margin, now quantified — this is what §3 was hitting empirically
+
+§3 concluded that `c₁ = 4k⁴` is *under-margined* for high-`C_inv` 3D tets, against the coercivity condition `c₁ > 2ξ·C̄_inv²`. The formalisation makes the two halves of that statement precise, and both are now theorems (`StabilityAlgebra.v`):
+
+- **The sharp threshold is a factor of two lower than the paper states.** Positivity of the two stability coefficients needs only `c₁ > ξ·C̄_inv²` (with `ξ > 2`), not `c₁ > 2ξ·C̄_inv²` — `stability_constants_positive_sharp`. So the paper's condition is *sufficient, not necessary*.
+- **The extra factor of two buys a quantitative floor, not mere positivity** — `C_stab_margin`. Under `c₁ > 2ξ·C̄_inv²` one gets `C_u > 1/2` and `2 − 4C̄_inv²/c₁ > 1`, hence a coercivity constant that is **free of `C̄_inv` altogether**:
+  ```
+  C_stab  ≥  min{ 2(1 − 2/ξ),  1/2,  1 − C₂ }.
+  ```
+  Under the sharp condition alone the constants stay positive but `C_u → 0` as `c₁ ↓ ξ·C̄_inv²`, and the floor is lost.
+
+**Why this matters for §3.** It explains the empirical fold exactly: sitting just above the *positivity* threshold is not enough — coercivity degrades continuously as `c₁` approaches it, so a mesh with a large `C̄_inv` (structured Kuhn tets) lands in the regime where `C_stab` is positive but tiny, which is indistinguishable in practice from loss of coercivity. The element-aware `c₁` remedy is what restores the margin, and `C_stab_margin` says how much margin a given `c₁` actually buys. Note also that the relevant constant is `C̄_inv` (the *weighted* inverse constant of `lem:winv`, `= √(d·δ_α)·C_inv + C_α`), strictly larger than the bare `C_inv` — `rem:winvconst`.
+
+### Other settled results from the formalisation
+
+- **σ = 0 is admissible.** The development assumes exactly `H:data` (`σ ≥ 0`, `ε ≥ 0`, `0 ≤ C₂ < 1`); the reaction-free (pure Navier–Stokes) limit is a genuine instance of the stability and convergence theorems.
+- **The implemented τ₂ is covered.** `abstract_convergence_implemented`: `thm:convergence` holds for the τ₂ the solver actually forms (`eq:Tau2`, with its `ε h²` term) with the constant inflated by at most `√(1+C₂) < √2`.
+- **Non-vacuity is machine-checked.** `NonVacuity.v` exhibits an explicit instance satisfying every hypothesis of `abstract_stability` and yields a *non-degenerate* conclusion (`7/8 ≥ 7/16`, both sides positive) — so no theorem in the development is vacuously true.
+- **Residual trust is three items.** Of the 53 hypotheses, 26 are data/mesh conditions (nothing to prove). Of the 27 analytic ones, 16 are instances of two textbook facts (inverse + Bramble–Hilbert estimates) and 7 are the divergence theorem plus face bookkeeping. The genuine residue is `HBS`, `Horth`, and the face-estimate bundle — the Lean 4 targets ([`LEAN_ROADMAP.md`](../proof_verification/LEAN_ROADMAP.md)).
+
+### A defect it found in the manuscript (amendment F8)
+
+In `lem:winv` the label `eq:winv-conv` sat on the **last** line of the display (the pressure-gradient estimate), while the **convective** line above it had none — so two of the four references to `eq:winv-conv` pointed at the *wrong estimate* (Step 5's "first contribution" and Step 9's "velocity part" are both convective). Fixed: the convective line now carries `eq:winv-conv`, the pressure-gradient line the new `eq:winv-gradp`, and the call sites are re-pointed. Surfaced only because the Coq audit had to cite the two estimates separately (`Hw_cxu`/`Hw_cxv` vs `Hw_gpu`). Recorded in [`proof_verification/AUDIT.md`](../proof_verification/AUDIT.md) F8.
+
+---
+
 ## Cross-references
 
 - **Full evidence dossiers:** [`docs/mms/p2-3d.md`](mms/p2-3d.md), [`docs/cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md), [`docs/formulation-audit-2026-06-24.md`](formulation-audit-2026-06-24.md).
 - **Theory (LaTeX):** [`theory/paper/article.tex`](../theory/paper/article.tex) (the authoritative formulation), `theory/osgs_reaction_note/osgs_reaction_note.tex`, `theory/tau_saturation_note/tau_saturation_note.tex`, `theory/osgs_algorithm/osgs_algorithm.tex`.
+- **Machine-checked theory:** [`proof_verification/coq_coverage.tex`](../proof_verification/coq_coverage.tex) (theory→Coq map + the 53-row hypothesis inventory), [`proof_verification/AUDIT.md`](../proof_verification/AUDIT.md) (hand audit + amendments F1–F8), [`proof_verification/LEAN_ROADMAP.md`](../proof_verification/LEAN_ROADMAP.md).
 - **Living companions:** [`pending-tasks.md`](pending-tasks.md) (backlog + open code-correctness items), [`open-questions.md`](open-questions.md) (open questions), [`lessons_learned.md`](lessons_learned.md) (regression ledger), [`theory-code-map.md`](theory-code-map.md) (paper↔code map + divergence ledger + convergence-gate spec).

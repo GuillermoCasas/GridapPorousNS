@@ -29,7 +29,8 @@ VFILES := Limits.v \
           TauDesign.v \
           Asymptotics.v \
           ManufacturedSolution.v \
-          PlateauBump.v
+          PlateauBump.v \
+          NonVacuity.v
 
 VOFILES := $(VFILES:.v=.vo)
 

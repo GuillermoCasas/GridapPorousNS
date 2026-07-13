@@ -193,6 +193,33 @@ reader trying `α_K = α_{0,K}` with the constants as printed. The appendix
 already fixes `α_K := α_{∞,K}` by definition (line 110), so this concerns
 the main text only.
 
+### F8 (defect — APPLIED) — `lem:winv`: a mislabelled estimate
+
+In `continuity_appendix.tex`, `\label{eq:winv-conv}` sat on the **last** line
+of the `lem:winv` display — the pressure-gradient estimate
+`‖α∇r_h‖_K ≤ (C_inv/h_K) α_K ‖r_h‖_K` — while the **convective** line above it
+(`‖α a·∇w_h‖_K ≤ (C_inv/h_K) α_K |a|_{∞,K} ‖w_h‖_K`) carried no label at all.
+The proof of the lemma refers to "the estimates (eq:winv-conv)" in the plural,
+so the two lines were evidently intended as one labelled group — but LaTeX
+attaches the label to a single line. Consequently **two of the four references
+to `eq:winv-conv` pointed at the wrong estimate**: Step 5 (line ~536, "the first
+contribution", which is the *convective* term `σ(τ₁u, α a·∇v)`) and Step 9
+(line ~798, "the velocity part", also convective) both resolved to the
+pressure-gradient line.
+
+Fixed by splitting the label:
+  * the **convective** line now carries `\label{eq:winv-conv}` (matching the two
+    references that mean it);
+  * the **pressure-gradient** line carries the new `\label{eq:winv-gradp}`;
+  * the proof sentence now cites both;
+  * Step 9's "the pressure part uses (eq:winv-conv) directly" was re-pointed to
+    `eq:winv-gradp`.
+
+Surfaced by the Coq audit, which has to cite the two estimates *separately*
+(`Hw_cxu`/`Hw_cxv` encode the convective one, `Hw_gpu` the pressure-gradient
+one) and so could not use a single label for both. The paper rebuilds clean
+(0 errors, 0 undefined references). No mathematical content changes.
+
 ---
 
 ## 3. What was *not* audited

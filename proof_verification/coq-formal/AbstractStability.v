@@ -33,7 +33,10 @@
 (*                                                                           *)
 (*  Conclusion:  B_S(U_h,U_h) >= C_stab ||| U_h |||^2  with                  *)
 (*  C_stab = min{ C_visc, C_u, 1 - C_2, 1 } > 0 explicit, under              *)
-(*  c1 > 2 xi Cbar^2, xi > 2, C_2 < 1 and eq:UpperBoundOnEpsilon.            *)
+(*  c1 > xi Cbar^2 (the SHARP form of eq:conditions_on_num_param; the        *)
+(*  manuscript's c1 > 2 xi Cbar^2 implies it, and additionally buys the      *)
+(*  margin of StabilityAlgebra.C_stab_margin), xi > 2, C_2 < 1 and           *)
+(*  eq:UpperBoundOnEpsilon.  Note sigma, eps, C_2 need only be >= 0.         *)
 (*                                                                           *)
 (*  Coq 8.18, stdlib only.                                                   *)
 (* ========================================================================= *)
@@ -60,16 +63,23 @@ Variable Th : list K.          (*  the triangulation  *)
 
 Variables (nu sigma eps c1 c2 Cb xi C2 : R).
 Hypothesis nu_pos  : 0 < nu.
-Hypothesis sigma_pos : 0 < sigma.
-Hypothesis eps_pos : 0 < eps.
+Hypothesis sigma_nonneg : 0 <= sigma.   (*  H:data allows sigma = 0  *)
+Hypothesis eps_nonneg   : 0 <= eps.     (*  H:data allows eps   = 0  *)
 Hypothesis c1_pos  : 0 < c1.
 Hypothesis c2_pos  : 0 < c2.
 Hypothesis Cb_pos  : 0 < Cb.        (*  Cbar of rem:winvconst / lem:winv  *)
-Hypothesis xi_pos  : 0 < xi.
-Hypothesis C2_pos  : 0 < C2.
-Hypothesis C2_lt_1 : C2 < 1.
-Hypothesis c1_large : c1 > 2 * xi * Cb^2.   (*  eq:conditions_on_num_param  *)
+Hypothesis C2_nonneg : 0 <= C2.         (*  eq:epscond allows C2 = 0  *)
+Hypothesis C2_lt_1  : C2 < 1.
+(*  eq:conditions_on_num_param, in its SHARP form: positivity of the
+    coefficients needs only c1 > xi Cbar^2 (the manuscript states the
+    two-fold stronger c1 > 2 xi Cbar^2, which additionally buys the
+    margin of StabilityAlgebra.C_stab_margin).                          *)
+Hypothesis c1_large : c1 > xi * Cb^2.
 Hypothesis xi_large : xi > 2.
+
+(*  xi > 0 is implied by xi > 2; it need not be assumed separately.  *)
+Lemma xi_pos : 0 < xi.
+Proof. lra. Qed.
 
 (* ---------- Mesh data ------------------------------------------------------- *)
 
@@ -318,9 +328,9 @@ Proof.
   assert (HDn : 0 <= t2 k * Dn k)
     by (pose proof (Dn_nonneg k); nra).
   exact (elemental_coercivity nu (hK k) (aK k) sigma (am k) c1 c2 Cb xi
-           nu_pos (hK_pos k) (aK_pos k) sigma_pos (am_nonneg k)
+           nu_pos (hK_pos k) (aK_pos k) sigma_nonneg (am_nonneg k)
            c1_pos c2_pos Cb_pos xi_pos
-           eps C2 eps_pos C2_pos
+           eps C2 eps_nonneg C2_nonneg
            (Pn k) (Vn k) (Un k) (t1 k * Xn k) (t2 k * Dn k)
            (Heps k) (Pn_nonneg k) (Vn_nonneg k) (Un_nonneg k) HXn HDn).
 Qed.
@@ -357,7 +367,7 @@ Theorem abstract_stability :
 Proof.
   split.
   - (*  positivity of the explicit constant  *)
-    pose proof (stability_constants_positive c1 Cb xi
+    pose proof (stability_constants_positive_sharp c1 Cb xi
                   c1_pos Cb_pos xi_pos c1_large xi_large) as [HCv HCu].
     unfold C_stab.
     apply Rmin_pos; apply Rmin_pos; lra.

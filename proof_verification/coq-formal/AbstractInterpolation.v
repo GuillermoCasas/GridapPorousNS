@@ -113,8 +113,16 @@ Hypothesis IP_nonneg : forall k, 0 <= IP k.
 
 Variable FBp : F -> R.   (*  int_{face} alpha (n . v) p                        *)
 Variable FBc : F -> R.   (*  int_{face} alpha (n . a) (u . v)                  *)
-Variable FBp_e : K -> R. (*  int_{bdry K} alpha (n_K . v) p                    *)
-Variable FBc_e : K -> R. (*  int_{bdry K} alpha (n_K . a) (u . v)              *)
+(*  The elemental boundary terms of the two elementwise integration-by-parts *)
+(*  identities.  These are NOT free variables: by the divergence theorem on K *)
+(*  (eq:elemibp and its pressure sibling) the boundary integral EQUALS the    *)
+(*  integration-by-parts defect, so we DEFINE it as that defect.  The two     *)
+(*  identities H_elem_conv_ibp / H_elem_p_ibp then become theorems rather     *)
+(*  than hypotheses -- as they must, since with FB*_e free they constrained   *)
+(*  nothing.  All the real content of the boundary terms lives in the         *)
+(*  assembly hypotheses H_assemble_p/c and the face estimates H_face_p/c.     *)
+Definition FBp_e (k : K) : R := << (vv k) , (gpu k) >> + << (divv k) , (pp k) >>.
+Definition FBc_e (k : K) : R := << (cxu k) , (vv k) >> + << (cxv k) , (uu k) >>.
 
 (* ========================================================================= *)
 (*  The trusted base.                                                        *)
@@ -133,13 +141,15 @@ Hypothesis H_ibp_qu :
   Rsum Th (fun k => << (qq k) , (divu k) >>)
   = - Rsum Th (fun k => << (uu k) , (gpv k) >>).
 
-(*  eq:elemibp (identity (iii)).  *)
-Hypothesis H_elem_conv_ibp :
+(*  eq:elemibp (identity (iii)) -- now a THEOREM, by the definition of FBc_e. *)
+Lemma H_elem_conv_ibp :
   forall k, << (cxu k) , (vv k) >> = - << (cxv k) , (uu k) >> + FBc_e k.
+Proof. intro k. unfold FBc_e. ring. Qed.
 
-(*  Elemental pressure integration by parts (Step 6b).  *)
-Hypothesis H_elem_p_ibp :
+(*  Elemental pressure integration by parts (Step 6b) -- likewise a theorem.  *)
+Lemma H_elem_p_ibp :
   forall k, << (vv k) , (gpu k) >> = - << (divv k) , (pp k) >> + FBp_e k.
+Proof. intro k. unfold FBp_e. ring. Qed.
 
 (*  Facewise assembly (Steps 6b, 6d): the elemental boundary contributions,  *)
 (*  weighted by the elementwise-constant tau_1, assemble into jump-weighted  *)

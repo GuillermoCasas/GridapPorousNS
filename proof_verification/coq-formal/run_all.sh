@@ -11,7 +11,7 @@
 set -u
 cd "$(dirname "$0")"
 
-FILES=(Limits DerivKit StabilityAlgebra ContinuityAlgebra AbstractSums InnerSpace AbstractStability AbstractContinuity AbstractInterpolation AbstractConvergence TauDesign Asymptotics ManufacturedSolution PlateauBump)
+FILES=(Limits DerivKit StabilityAlgebra ContinuityAlgebra AbstractSums InnerSpace AbstractStability AbstractContinuity AbstractInterpolation AbstractConvergence TauDesign Asymptotics ManufacturedSolution PlateauBump NonVacuity)
 FLAGS=(-Q . PNSFormal -q)
 
 command -v coqc >/dev/null 2>&1 || {

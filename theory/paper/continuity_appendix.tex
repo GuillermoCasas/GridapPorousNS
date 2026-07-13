@@ -290,10 +290,11 @@ $r_h\in\mathcal{Q}_{h0}$, and all $K\in\Th$,
   \label{eq:winv-divu}\\
   \norm{\alpha\,\ba\cdot\nabla\boldsymbol{w}_h}_{K}
   &\le \frac{\Cinv}{h_K}\,\alpha_K\,|\ba|_{\infty,K}\,
-  \norm{\boldsymbol{w}_h}_{K}, \\
+  \norm{\boldsymbol{w}_h}_{K},
+  \label{eq:winv-conv}\\
   \norm{\alpha\nabla r_h}_{K}
   &\le \frac{\Cinv}{h_K}\,\alpha_K\,\norm{r_h}_{K}.
-  \label{eq:winv-conv}
+  \label{eq:winv-gradp}
 \end{align}
 \end{lemma}
 
@@ -332,8 +333,8 @@ property $|\ViscProj\nabla\boldsymbol{w}_h|\le|\nabla\boldsymbol{w}_h|$ and
 \eqref{eq:inverse}. For \eqref{eq:winv-divu}, expand
 $\nabla\cdot(\alpha\boldsymbol{w}_h)=\alpha\nabla\cdot\boldsymbol{w}_h
 +\nabla\alpha\cdot\boldsymbol{w}_h$ and argue as above (using $\alpha_{0,K}\le\alpha_K$).
-The estimates \eqref{eq:winv-conv} are immediate from $\alpha\le\alpha_K$,
-$|\ba|\le|\ba|_{\infty,K}$ and \eqref{eq:inverse}.
+The estimates \eqref{eq:winv-conv} and \eqref{eq:winv-gradp} are immediate from
+$\alpha\le\alpha_K$, $|\ba|\le|\ba|_{\infty,K}$ and \eqref{eq:inverse}.
 \end{proof}
 
 \begin{remark}\label{rem:winvconst}
@@ -797,7 +798,7 @@ Here \eqref{eq:absorb1} uses \eqref{eq:winv-grad} and
 in \eqref{eq:absorb4} the velocity part uses \eqref{eq:winv-conv},
 $\tau_1^{1/2}\alpha_K|\ba|_\infty/h \le \varphi_1\tau_1^{1/2}/c_2
 \le\varphi_1^{1/2}/c_2$ and \ref{P:27}, while the pressure part uses
-\eqref{eq:winv-conv} directly; and \eqref{eq:absorb5} uses \eqref{eq:winv-divu}. Squaring
+\eqref{eq:winv-gradp} directly; and \eqref{eq:absorb5} uses \eqref{eq:winv-divu}. Squaring
 and summing over the elements,
 \begin{equation}\label{eq:normconv}
   \triplenorm{U_h}
