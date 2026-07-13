@@ -32,11 +32,17 @@ const R2 = 0.4
 const L = 1.0
 const U_AMP = 1.0
 
-# Above this many monolithic (u,p) free DOFs, a direct sparse LU factorization risks exhausting a ~32GB
-# machine on 3D meshes (empirical: LU is comfortable at ~2e4 DOF / ~8.5GB RSS, but the ~1.6e5-DOF fine
-# OSGS systems OOM). solve_one's "auto" linsolver switches to the low-memory ILU-GMRES backend past this
-# threshold — "choose whatever method fits". [code-actual]
-const LU_DOF_LIMIT = 80_000
+# Above this many monolithic (u,p) free DOFs, solve_one's "auto" linsolver switches to ILU-GMRES.
+# [2026-07-13] RAISED 80_000 → 300_000 after MEASURING that direct sparse LU DOES fit the finest 3D cells
+# on this machine: P2-L2 = 142706 DOF and P1-L3 ≈ 163000 DOF both factorize+solve under LU (~1–3h each,
+# ~exact root). The old 80k cutoff forced those cells onto ILU-GMRES, which STAGNATES on the large
+# saddle-point Jacobian (restart-30 GMRES plateaus at ~3% residual → step rejected → the cell returned the
+# exact-guess interpolant with success=false). Root cause was the LINEAR SOLVER, not c₁/coercivity, ε, or a
+# true hardware wall (disentangled 2026-07-13). A strengthened ILU (restart=200,drop=1e-6) matches the LU
+# root for ASGS but NaN-breaks on the harder OSGS coupled/JFNK tangent — so direct LU is the robust choice
+# for BOTH methods. [code-actual]. NOTE: the very finest OSGS cells are the memory risk; the sweep runs
+# ASGS first so its ladders are safely written before any OSGS OOM.
+const LU_DOF_LIMIT = 300_000
 # [eps_pert] relative-L² gate classifying "converged to the SAME discrete root as the exact-guess reference".
 # Same-root agreement is ~the solver's convergence tolerance (≈1e-6, the common discretization error cancels);
 # a different (spurious) root is O(1) away. 1e-3 sits in that 3-order gap, so it rejects spurious roots without
@@ -478,10 +484,11 @@ end
 function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=1.0, recenter::Bool=true)
     ladders = Dict(1 => [(8,8,2),(16,16,4),(24,24,6),(32,32,8)], 2 => [(12,12,3),(16,16,4),(20,20,5)])
     # c1_mult>1 ⇒ ROBUST c₁×N in the RESIDUAL (c₁-only; c₂ stays at paper — only the viscous constant gates
-    # coercivity), written to a DISTINCT leaf so the paper-c₁ `structured/` results stay reconstructable
-    # (reproducible-results rule). Default 1.0 = paper c₁ (the strictly-faithful official §5.2 run).
-    seq = c1_mult == 1.0 ? "structured" :
-          "structured_c1x$(c1_mult == round(c1_mult) ? string(Int(round(c1_mult))) : string(c1_mult))"
+    # coercivity). SINGLE canonical channel per test: always the `structured` leaf. The recipe (c1_mult,
+    # recenter, solver block) is self-described INSIDE each JSON record, and the prior run is archived to
+    # previous_results/convergence3d/ before overwrite — so provenance is preserved WITHOUT forking the
+    # channel into variant leaves (single-channel-per-test rule). Default c1_mult=1.0 = paper c₁.
+    seq = "structured"
     archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
     stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
     outdirs  = Dict(kv => joinpath(@__DIR__, "results", "k$(kv)", "TET", seq) for kv in (1, 2))
@@ -572,7 +579,8 @@ end
 # at paper c₁ and therefore MUST inflate the preconditioner ×4 (ρ_prec 1249→3.8). Raise this only if a finer
 # mesh's ILU preconditioner needs more margin.
 function run_sweep_nested_red(; c1_mult::Float64=4.0, max_n_pert::Int=-1, base_lc::Float64=0.2,
-                              nlevels_p1::Int=3, nlevels_p2::Int=2, osgs_p2_precond_c1_mult::Float64=1.0)
+                              nlevels_p1::Int=3, nlevels_p2::Int=2, osgs_p2_precond_c1_mult::Float64=1.0,
+                              recenter::Bool=true)
     archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
     stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
     outdirs  = Dict(kv => joinpath(@__DIR__, "results", "k$(kv)", "TET", "nested_red") for kv in (1, 2))
@@ -605,14 +613,23 @@ function run_sweep_nested_red(; c1_mult::Float64=4.0, max_n_pert::Int=-1, base_l
             eps_num_used = NaN
             for (lvl, model) in enumerate(models)
                 t0 = time()
-                r = solve_one(kv, method, model; visc="Deviatoric", linsolver="auto", c1_mult=c1_mult,
+                # [resilience] the finest ILU meshes can OOM/throw; catch so one bad cell doesn't kill the run.
+                r = try
+                    solve_one(kv, method, model; visc="Deviatoric", linsolver="auto", c1_mult=c1_mult,
+                              c2_mult=1.0, recenter=recenter,   # c₁-only residual inflation + honest pressure gauge (re-centering)
                               max_n_pert=max_n_pert, jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
                               jfnk_maxiter=jfnk_mx, jfnk_restart=jfnk_mx, jfnk_precond_c1_mult=pc_mult,
                               # trace_dir is the results ROOT; _write_trajectory_sidecar appends k<kv>/TET/<seq>/traces
                               # (so traces land at results/k<kv>/TET/nested_red/traces/, beside the JSON — NOT the
                               # doubly-nested path run_sweep_structured accidentally produces by passing the leaf).
                               trace_dir=joinpath(@__DIR__, "results"), run_name="sweep_nested_red", mesh_sequence="nested_red")
-                eps_num_used = r.numerical_epsilon
+                catch err
+                    @printf("  L%d THREW %s — recording failure, continuing\n", lvl-1, sprint(showerror, err)); flush(stdout)
+                    (success=false, ncells=num_cells(model), iters=0, h_mean=mesh_hmean(model),
+                     el2_u=NaN, el2_p=NaN, eh1_u=NaN, eh1_p=NaN, n_ns=0, n_pic=0, eps_used=0.0,
+                     c1_mult_eff=NaN, numerical_epsilon=NaN)
+                end
+                isfinite(r.numerical_epsilon) && (eps_num_used = r.numerical_epsilon)
                 push!(hs, r.h_mean); push!(l2us, r.el2_u); push!(l2ps, r.el2_p); push!(h1us, r.eh1_u); push!(h1ps, r.eh1_p)
                 push!(levels, Dict("level"=>lvl-1, "h"=>r.h_mean, "ncells"=>r.ncells,
                                    "success"=>r.success, "iters"=>r.iters, "eps_used"=>r.eps_used,
@@ -627,7 +644,8 @@ function run_sweep_nested_red(; c1_mult::Float64=4.0, max_n_pert::Int=-1, base_l
                                "jfnk"=>osgs_recipe, "osgs_skip_asgs_boot"=>osgs_recipe,
                                "jfnk_maxiter"=>jfnk_mx, "jfnk_restart"=>jfnk_mx,
                                "jfnk_precond_c1_mult"=>something(pc_mult, 1.0),
-                               "iterative_penalty"=>true, "numerical_epsilon"=>eps_num_used,
+                               "iterative_penalty"=>true, "recenter_pressure"=>recenter,
+                               "c1_scaling"=>"residual_c1_only", "c2_mult"=>1.0, "numerical_epsilon"=>eps_num_used,
                                "max_n_pert"=>max_n_pert, "linsolver"=>"auto",
                                "viscous_operator"=>"Deviatoric", "reaction"=>"Constant_Sigma")
             push!(results_by_kv[kv], Dict("kv"=>kv, "kp"=>kv, "method"=>method, "element_type"=>"TET",
@@ -1007,8 +1025,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
         run_config(cfgpath)
     elseif length(ARGS) >= 1 && ARGS[1] == "sweep_structured"
         # smoke3d.jl sweep_structured [max_n_pert] [c1_mult]  — full §5.2 sweep on the STRUCTURED Kuhn family
-        # with the eps_pert homotopy + iterative penalty. c1_mult>1 ⇒ ROBUST c₁×N in the residual (c₁-only) →
-        # leaf results/k*/TET/structured_c1x<N>/ (all LU-feasible, every cell certifies). Default 1.0 = paper c₁.
+        # with the eps_pert homotopy + iterative penalty + pressure re-centering. c1_mult>1 ⇒ ROBUST c₁×N in
+        # the residual (c₁-only). SINGLE channel results/k*/TET/structured/ (recipe self-described in the JSON;
+        # prior run archived to previous_results/). All LU-feasible, every cell certifies. Default 1.0 = paper c₁.
         mnp = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
         c1m = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 1.0
         run_sweep_structured(; max_n_pert=mnp, c1_mult=c1m)
