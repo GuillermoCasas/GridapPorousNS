@@ -1451,35 +1451,98 @@ Additionally, we also add the previous-step value of the compressibility term to
     \label{tab:3DH1}
 \end{table}
 
-\subsection{An example from the literature}\label{sec:NumericalExampleFromLiterature} \hfill\\
-We apply the stabilized finite element formulation developed in this paper to the numerical example from Cocquet et al. (2021). Our goal is to compare our stabilized method with the Taylor-Hood finite element approach used in the reference paper, focusing on convergence rates and solution accuracy.
+\subsection{Comparison with an inf{\hyp}sup{\hyp}stable formulation from the literature}\label{sec:NumericalExampleFromLiterature} \hfill\\
+As a final example, we compare the equal{\hyp}order stabilized method developed in this paper against the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood approach employed by Cocquet et al.~\cite{cocquet2021error} for the Darcy{\hyp}Brinkman{\hyp}Forchheimer (DBF) equations. Our goal is the same as in that reference: to assess the convergence rates and accuracy of the two discretizations. Rather than reproducing the tube{\hyp}flow benchmark of~\cite{cocquet2021error}---whose reference solution is itself a fine{\hyp}mesh approximation---we resort once more to the method of manufactured solutions, so that both methods are held to the same standard, namely the exact error.
 
-The numerical experiment considers a 2D, steady-state DBF model. As previously mentioned, the viscous dissipation term is defined by $\Pi = \SPi$, with the Darcy and Forchheimer terms given by:
-\begin{align}
-a(\alpha) &=\frac{150}{\Reyn}\bigg(\frac{1-\alpha}{\alpha}\bigg)^{2}, \\
-b(\alpha) &=1.75\frac{1-\alpha}{\alpha}.
-\end{align}
-
-The computational domain is a rectangle given by $\Omega = (0, 2) \times (0, 1)$. The boundary conditions are of the Dirichlet type on the walls ($\Gamma_\text{w}$)  and the inlet ($\Gamma_{\text{in}}$), and of the Neumann type (traction{\hyp}free) on the outlet ($\Gamma_{\text{out}}$). Specifically:
-\begin{itemize}
-  \item $\boldsymbol{u}=\boldsymbol{0}$ on $\Gamma_\text{w} = [0,2] \times (\{0\} \cup \{1\})$.
-  \item $\boldsymbol{u}=\boldsymbol{u}_\text{in}$ on $\Gamma_\text{in} = \{0\} \times [0,1]$.
-  \item $\boldsymbol{t}_\text{N} = \boldsymbol{0}$ on $\Gamma_\text{out} = \{2\} \times [0,1]$.
-\end{itemize}
-where we recall that $\boldsymbol{t}_\text{N}$ represents the imposed traction (see \cref{eq:neumann_bc,eq:RHS_neumann}), and the imposed velocity field at the inlet is normal to $\Gamma_\text{in}$ and defined by the parabolic profile given by $\amend{u}_\text{in,1}(y) = c_\text{in}y(1-y)$, where $c_\text{in}$ is used as a free parameter to control the Reynolds number of the example. 
-
-The porous medium considered has a spatially varying porosity field given by
-\begin{equation}
-  \alpha(x,y) = 0.45\big(1+\frac{1-0.45}{0.45}\mathrm{e}^{y-1}\big)\amend{.}
+To this end we keep the manufactured fields \cref{eq:ManufacturedProblem} and the porosity bump \cref{eq:PlateauBumpFunction} used throughout this section, together with the Dirichlet data (the exact velocity prescribed on the whole boundary), and only replace the viscous and reaction operators by the DBF particularization of Cocquet et al. That is, we take $\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\SPi}$ (i.e., $\scriptstyle{\DPi} \displaystyle{\equiv} \mathbb{I}$, the full symmetric gradient; cf.\ the discussion around \cref{eq:DBFResistanceTerm}) and the nonlinear Forchheimer{\hyp}Ergun resistance \cref{eq:DBFResistanceTerm}, $\sigma(\alpha,\boldsymbol{u}) = a(\alpha) + b(\alpha)|\boldsymbol{u}|$, with the Ergun{\hyp}type porosity dependence
+\begin{equation}\label{eq:CocquetMMSReaction}
+  a(\alpha) = C_a \left(\frac{1-\alpha}{\alpha}\right)^{2}, \qquad
+  b(\alpha) = C_b \left(\frac{1-\alpha}{\alpha}\right),
 \end{equation}
-As in the reference, the porosity field will be nodally interpolated and represented using the finite elements used in the calculation in each case. 
+where $C_b = 1.75$ is the standard Forchheimer constant used in the reference. Unlike the reference, in which $a$ carries an explicit $1/\Reyn$ factor, we fix the linear (Darcy) coefficient to $C_a = 0.30$, so that the Reynolds and Damk\"ohler numbers can be varied independently. Since the coefficients in \cref{eq:CocquetMMSReaction} are then held fixed, the Damk\"ohler number is set solely by the minimum porosity through $\Damk(\alpha_0) = C_a\big((1-\alpha_0)/\alpha_0\big)^2 + C_b\big((1-\alpha_0)/\alpha_0\big)$. The two values $\alpha_0 \in \{0.5, 0.1\}$ then correspond to $\Damk \approx 2$ and $\Damk \approx 40$ (moderate and strong drag, respectively), which we combine with $\Reyn \in \{1, 10^5\}$ to span the viscosity{\hyp} and convection{\hyp}dominated regimes.
 
-The whole numerical setup mirrors that in the reference: 
-We consider a sequence of structured triangular meshes parametrized by the number of nodes per dimension $N$; the error is calculated with respect to the result on a very fine mesh ($N=200$); and the error functionals considered are the usual $L^2${\hyp}norm error for the velocity as well as
-\begin{equation}
-E_\text{tot} \coloneqq \lVert \SPi \nabla (\boldsymbol{u}_h-\boldsymbol{u})\rVert + \lVert p_h-p\rVert.
-\end{equation}
-The results are presented in \Guillermo{Add figures}.
+We compare three discretizations on the same sequence of structured triangular meshes, obtained by successively halving the nodal distance from a $10\times10$ grid up to $320 \times 320$: our equal{\hyp}order stabilized method with linear ($\mathbb{P}_1/\mathbb{P}_1$) and quadratic ($\mathbb{P}_2/\mathbb{P}_2$) elements, in both its ASGS and OSGS variants; and the unstabilized Galerkin Taylor{\hyp}Hood pair ($\mathbb{P}_2/\mathbb{P}_1$), which satisfies the inf{\hyp}sup condition and is the element used in~\cite{cocquet2021error}. In every case the porosity is nodally interpolated onto the velocity space, as in the reference. \Cref{tab:CocquetMMSL2,tab:CocquetMMSH1} collect the observed convergence rates (computed from the two finest meshes) and the finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm and the $H^1${\hyp}seminorm.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$ is the unstabilized Galerkin Taylor{\hyp}Hood element. Optimal slopes are $k_v+1$ (velocity) and $k_p+1$ (pressure). \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text).}
+    \begin{tabular}{c c l r r r r}
+    \toprule
+    & & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
+    \cmidrule(lr){4-5}\cmidrule(lr){6-7}
+    $\Reyn$ & $\alpha_0$ & \multicolumn{1}{c}{method} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} \\
+    \midrule
+    $1$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.95} & \num{1.33e-4} & \num{1.85} & \num{7.48e-3} \\
+        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.99} & \num{5.63e-5} & \num{1.99} & \num{1.78e-3} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.18} & \num{3.42e-7} & \num{2.02} & \num{1.83e-4} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.02} & \num{2.88e-7} & \num{1.90} & \num{1.77e-4} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{3.24} & \num{2.85e-7} & \num{2.92} & \num{4.17e-6} \\
+    \midrule
+    $1$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.87} & \num{5.33e-4} & \num{1.76} & \num{4.68e-2} \\
+        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.98} & \num{2.04e-4} & \num{1.98} & \num{1.16e-2} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.10} & \num{2.44e-6} & \num{2.04} & \num{1.18e-3} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.03} & \num{1.85e-6} & \num{1.80} & \num{1.10e-3} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{2.97} & \num{1.83e-6} & \num{3.73} & \num{9.52e-6} \\
+    \midrule
+    $10^5$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{2.13} & \num{1.54e-5} & \num{2.14} & \num{4.76e-6} \\
+           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{2.21} & \num{1.94e-5} & \num{2.11} & \num{5.71e-6} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.02} & \num{4.20e-7} & \num{2.86} & \num{9.95e-8} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.04} & \num{4.23e-7} & \num{3.05} & \num{1.07e-7} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{5.14e-1} & \num{2.00} & \num{9.84e-6} \\
+    \midrule
+    $10^5$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{3.01} & \num{2.28e-4} & \num{3.03} & \num{3.58e-5} \\
+           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{3.10} & \num{2.44e-4} & \num{3.12} & \num{3.85e-5} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.98} & \num{2.70e-6} & \num{2.73} & \num{5.96e-7} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.00} & \num{2.72e-6} & \num{3.00} & \num{6.87e-7} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.02e-1} & \num{2.00} & \num{9.84e-6} \\
+    \bottomrule
+    \end{tabular}
+    \label{tab:CocquetMMSL2}
+\end{table}
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $H^1${\hyp}seminorm, computed from the two finest meshes. Rows and notation as in \cref{tab:CocquetMMSL2}. Optimal slopes are $k_v$ (velocity) and $k_p$ (pressure).}
+    \begin{tabular}{c c l r r r r}
+    \toprule
+    & & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
+    \cmidrule(lr){4-5}\cmidrule(lr){6-7}
+    $\Reyn$ & $\alpha_0$ & \multicolumn{1}{c}{method} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} \\
+    \midrule
+    $1$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.03} & \num{3.53e-2} & \num{1.66} & \num{6.27e-1} \\
+        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.00} & \num{3.50e-2} & \num{1.46} & \num{2.31e-1} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.08} & \num{7.12e-4} & \num{0.98} & \num{5.10e-1} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01} & \num{6.62e-4} & \num{0.91} & \num{4.98e-1} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.99} & \num{6.59e-4} & \num{1.05} & \num{1.09e-2} \\
+    \midrule
+    $1$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.05} & \num{1.24e-1} & \num{1.64} & \num{4.75} \\
+        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.01} & \num{1.21e-1} & \num{1.98} & \num{1.15} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.04} & \num{4.78e-3} & \num{0.97} & \num{3.24} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01} & \num{4.23e-3} & \num{0.82} & \num{3.08} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.98} & \num{4.19e-3} & \num{1.48} & \num{1.10e-2} \\
+    \midrule
+    $10^5$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.01} & \num{3.50e-2} & \num{1.00} & \num{1.09e-2} \\
+           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.03} & \num{3.53e-2} & \num{1.00} & \num{1.09e-2} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.06} & \num{1.02e-3} & \num{1.84} & \num{2.47e-4} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.07} & \num{1.02e-3} & \num{2.01} & \num{2.64e-4} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{6.34}    & \num{1.00} & \num{1.09e-2} \\
+    \midrule
+    $10^5$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.06} & \num{1.21e-1} & \num{1.10} & \num{1.10e-2} \\
+           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.10} & \num{1.22e-1} & \num{1.15} & \num{1.10e-2} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.01} & \num{6.59e-3} & \num{1.66} & \num{1.46e-3} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.04} & \num{6.60e-3} & \num{1.93} & \num{1.68e-3} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.96}    & \num{1.00} & \num{1.09e-2} \\
+    \bottomrule
+    \end{tabular}
+    \label{tab:CocquetMMSH1}
+\end{table}
+
+In the viscosity{\hyp}dominated regime ($\Reyn = 1$) the three discretizations behave alike: the velocity converges at the optimal rate for all of them and at both porosities, and the equal{\hyp}order stabilized method matches the accuracy of the more elaborate Taylor{\hyp}Hood pair in the velocity, with the inf{\hyp}sup{\hyp}stable pair being more accurate in the pressure, as befits a discretization with a dedicated pressure space. As in the previous examples, the ASGS and OSGS variants are practically indistinguishable, and the loss of accuracy incurred when lowering $\alpha_0$ from $0.5$ to $0.1$ is consistent with the $1/\alpha_0$ dependence of the estimates in \cref{sec:Robustness}.
+
+The convection{\hyp}dominated regime ($\Reyn = 10^5$) is where the two approaches part ways. The unstabilized Taylor{\hyp}Hood velocity fails to converge: although the $\mathbb{P}_2/\mathbb{P}_1$ pair is inf{\hyp}sup stable---so that its pressure still attains the optimal $L^2$ rate---the Galerkin form provides no control over the dominant convective term, and the velocity error stagnates at an $O(1)$ value on every mesh (marked \emph{n.c.}\ in the tables). The equal{\hyp}order stabilized method, in contrast, retains optimal velocity and pressure convergence at $\alpha_0 = 0.5$, which is precisely the robustness that the stabilization is designed to provide. At the most demanding corner, $(\Reyn,\alpha_0) = (10^5, 0.1)$, the combination of strong drag and high Reynolds number produces a coarse{\hyp}mesh fold of the discrete solution branch: the stabilized nonlinear iteration does not converge on the coarser meshes, but once these are refined enough to resolve the solution (the two finest meshes here) it recovers accurate, optimally{\hyp}converging solutions, whereas Taylor{\hyp}Hood does not converge at this corner either. The tabulated slopes at this corner are therefore two{\hyp}mesh estimates in a pre{\hyp}asymptotic range and should be read as such; the pertinent observation is that the stabilized method delivers an accurate solution there while the unstabilized one does not.
+
+Overall, the equal{\hyp}order stabilized method attains the accuracy of the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood element on the DBF equations without requiring a compatible velocity{\hyp}pressure pair, and it remains robust in the convection{\hyp}dominated regime in which the unstabilized Galerkin method loses stability.
+
 \section{Conclusions}\label{sec:Conclusions}
 We have applied the VMS framework to generalize the formulation and analysis presented in~\cite{codina2001stabilized} to the porous Navier{\hyp}Stokes system, in such a way that the original method is recovered when $\alpha\equiv1$. By using the abstract notation introduced in later works on VMS~\cite{codina2018variational}, we have strived to make it clearer to the less versed reader how the whole process is largely systematic once the particular equations are fit to the general framework.
 
