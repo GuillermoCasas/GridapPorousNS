@@ -579,7 +579,7 @@ end
 # at paper c₁ and therefore MUST inflate the preconditioner ×4 (ρ_prec 1249→3.8). Raise this only if a finer
 # mesh's ILU preconditioner needs more margin.
 function run_sweep_nested_red(; c1_mult::Float64=4.0, max_n_pert::Int=-1, base_lc::Float64=0.2,
-                              nlevels_p1::Int=3, nlevels_p2::Int=2, osgs_p2_precond_c1_mult::Float64=1.0,
+                              nlevels_p1::Int=3, nlevels_p2::Int=2, osgs_p2_precond_c1_mult::Float64=4.0,
                               recenter::Bool=true)
     archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
     stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
@@ -1040,7 +1040,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
         mnp   = length(ARGS) >= 3 ? parse(Int, ARGS[3]) : -1
         nlp1  = length(ARGS) >= 4 ? parse(Int, ARGS[4]) : 3
         nlp2  = length(ARGS) >= 5 ? parse(Int, ARGS[5]) : 2
-        pcm   = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : 1.0
+        pcm   = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : 4.0
         run_sweep_nested_red(; c1_mult=c1m, max_n_pert=mnp, nlevels_p1=nlp1, nlevels_p2=nlp2,
                              osgs_p2_precond_c1_mult=pcm)
     elseif length(ARGS) >= 1 && ARGS[1] == "c1study_nested_red"
