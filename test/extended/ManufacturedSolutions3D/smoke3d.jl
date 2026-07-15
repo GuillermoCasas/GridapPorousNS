@@ -480,9 +480,10 @@ end
 # Writes PER-kv to results/k<kv>/TET/structured/convergence3d_results.json (standard schema; mesh_sequence=
 # "structured"), archiving any prior JSON to previous_results/convergence3d/ first (reproducible-results rule).
 # Records the per-cell `eps_used` (largest perturbation it converged from) as the robustness map. Constant-aspect
-# (1.2) Kuhn ladders, all LU-feasible: P1 (8,8,2)→(16,16,4)→(24,24,6)→(32,32,8); P2 (12,12,3)→(16,16,4)→(20,20,5).
+# (1.2) Kuhn ladders, all LU-feasible: P1 (8,8,2)→(16,16,4)→(24,24,6)→(32,32,8); P2 (12,12,3)→(16,16,4)→(20,20,5)→(24,24,6)
+# (4 P2 meshes: the finest reaches the asymptotic P2 rate, which the 3-mesh ladder's small refinement steps understate).
 function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=1.0, recenter::Bool=true)
-    ladders = Dict(1 => [(8,8,2),(16,16,4),(24,24,6),(32,32,8)], 2 => [(12,12,3),(16,16,4),(20,20,5)])
+    ladders = Dict(1 => [(8,8,2),(16,16,4),(24,24,6),(32,32,8)], 2 => [(12,12,3),(16,16,4),(20,20,5),(24,24,6)])
     # c1_mult>1 ⇒ ROBUST c₁×N in the RESIDUAL (c₁-only; c₂ stays at paper — only the viscous constant gates
     # coercivity). SINGLE canonical channel per test: always the `structured` leaf. The recipe (c1_mult,
     # recenter, solver block) is self-described INSIDE each JSON record, and the prior run is archived to
@@ -511,10 +512,11 @@ function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=1.0, recenter::Bo
             # (residual F stays paper-c₁, so the converged root is unchanged), restoring quadratic Newton and
             # eps_used=1 robustness. OSGS-P1 is robust at mult=1. See docs/mms/p2-3d.md §6.
             osgs_p2 = osgs_recipe && kv == 2
-            # OSGS-P2 JFNK preconditioner c₁-inflation is ONLY needed when the residual is at paper c₁
-            # (ρ_prec≈1178 ⇒ GMRES stalls). With c₁×4 ALREADY in the residual (c1_mult≥4) ρ_prec is O(1), so
-            # NO extra preconditioner inflation (relative ×1). See docs/mms/p2-3d.md §6 + run_sweep_nested_red.
-            pc_mult = osgs_p2 ? (c1_mult >= 4.0 ? nothing : 4.0) : nothing
+            # OSGS-P2 JFNK preconditioner c₁-inflation ×4: the frozen-π tangent is a weak preconditioner for the
+            # coupled ∂π/∂u system (ρ(J_frozen⁻¹·∂π/∂u) high). c₁×4 in the RESIDUAL alone does NOT always suffice
+            # (measured 2026-07-14: the finest irregular OSGS-P2 cell still stalled at precond×1), so inflate the
+            # PRECONDITIONER c₁ ×4 — residual F untouched ⇒ converged root unchanged. See run_sweep_nested_red.
+            pc_mult = osgs_p2 ? 4.0 : nothing
             jfnk_mx = osgs_recipe ? (osgs_p2 ? 80 : 30) : nothing   # more GMRES headroom for P2
             hs=Float64[]; l2us=Float64[]; l2ps=Float64[]; h1us=Float64[]; h1ps=Float64[]; levels=Any[]
             eps_num_used = NaN   # the ε_num actually used (constant across levels here; captured for provenance)
