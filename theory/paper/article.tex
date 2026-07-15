@@ -596,12 +596,18 @@ Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakForm
 \end{align}
 \Cref{eq:OSGSProblem} is the complete discretized system of equations to be solved corresponding to the OSGS method. The ASGS method is then recovered by simply taking $\boldsymbol{\pi}_h = \boldsymbol{0}$. This system is nonlinear and of a larger size (in the OSGS case) than the original Galerkin system due to the introduction of the residual projections $\boldsymbol{\pi}_h$. In \cref{sec:LinearizationOfCoupledSystem} we describe the particular way in which we have decoupled and linearized the system.
 
-\Guillermo{To facilitate the implementation \cref{eq:NonlinearStabilizedEquation}, we provide the worked-out expressions for all required elemental matrix entries in \cref{app:ElementalMatrices}.}
+\Guillermo{To facilitate the implementation of the stabilized form \cref{eq:NonlinearStabilizedEquation}, we provide the worked-out expressions for all the required elemental matrix entries in \cref{app:ElementalMatrices}.}
 
 \subsection{Linearization of the coupled system of discrete equations}\label{sec:LinearizationOfCoupledSystem} \hfill\\
 The process of approximating \cref{eq:OSGSProblem} to make it numerically tractable involves both its linearization with respect to $U$, and the decoupling of \cref{eq:NonlinearStabilizedEquation,eq:ElementwiseSubscaleEquation,eq:NonlinearResidualProjection,eq:DefinitionOfNonlinearParameter}. To the latter end, note that, while equations \cref{eq:NonlinearStabilizedEquation,eq:NonlinearResidualProjection} involve the resolution of two global systems, and must therefore be solved separately, \cref{eq:ElementwiseSubscaleEquation,eq:DefinitionOfNonlinearParameter} are local, in the sense that they express elemental equations, only involving a reduced number of unknowns. Therefore, it is possible to consider the latter two equations both separately or as a single (monolithic) system to be solved independently on each element without running into unacceptable numerical costs.
 
-Here we have opted for the following iteration scheme for \cref{eq:OSGSProblem}:
+\amend{Once a basis of $\mathcal{X}_{h0}$ is fixed, the discrete equation \cref{eq:NonlinearStabilizedEquation}---with the elementwise subscales $\widetilde{U}$ and the projection $\boldsymbol{\pi}_h$ eliminated through \cref{eq:ElementwiseSubscaleEquation,eq:NonlinearResidualProjection}---amounts to a nonlinear algebraic system for the vector $\mathsf{U}$ of nodal values of $U_h = [\boldsymbol{u}_h; p_h]$,}
+\begin{equation}\label{eq:AlgebraicNonlinearSystem}
+  \amend{\mathsf{F}(\mathsf{U}) = \mathsf{0},}
+\end{equation}
+\amend{where $\mathsf{F}$ denotes the (stabilized) residual associated with the difference of the two sides of \cref{eq:NonlinearStabilizedEquation}. The nonlinearity enters both through the convective term and, in the OSGS case, through the dependence of the stabilization parameters $\boldsymbol{\tau}_K$ and of the projection $\boldsymbol{\pi}_h$ on the unknown.}
+
+\amend{We linearize \cref{eq:AlgebraicNonlinearSystem} by a fixed-point (Picard) method, combined with the decoupling described above: at iteration $m$ the convective field and the orthogonal projection are both evaluated from the previous iterate, which renders the momentum--mass problem linear in the current resolved unknown $U_h^m$, after which the elementwise subgrid scales and the updated total field follow locally. This yields the staggered iteration}
 \begingroup
 \allowdisplaybreaks[0]
 \begin{subequations}
@@ -614,7 +620,7 @@ Here we have opted for the following iteration scheme for \cref{eq:OSGSProblem}:
   \end{align}
 \end{subequations}
 \endgroup
-where $m$ is the iteration counter. Such iteration can be used to solve the system of equations as shown in \cref{alg:StationarySystem}.
+\amend{where $m$ is the iteration counter and $\boldsymbol{\pi}_h^m$ projects the residual at the previous iterate. This lagged, linearized form is the one on which the stability and convergence analysis of \cref{sec:StabilityASGS} is carried out, with $\boldsymbol{u}^{m-1}$ replaced by a prescribed convective field $\boldsymbol{a}$ satisfying $\nabla\cdot(\alpha\boldsymbol{a})=0$, and it drives the pseudocode of \cref{alg:StationarySystem}.}
 
 In all rigor, we should point out that in the implementation of \cref{alg:StationarySystem} we do not include the reaction terms in the calculation of the orthogonal projection. The reason is that these terms belong to the finite element space where the solution lives, and so their projection is exactly zero (for constant $\boldsymbol{\sigma}$). However, note that $\boldsymbol{\pi}_h^m$ is calculated with an outdated value of the unknown when one is performing the projections, within the nonlinear iterations loop, using \cref{eq:DiscretizedNonlinearResidualProjection}. So, were we to include these terms in \cref{eq:DiscretizedNonlinearResidualProjection}, the projection of the reaction terms would not exactly cancel. Following standard practice, we have modified the algorithm slightly by removing these terms altogether, which is equivalent to considering that their projection is evaluated at the next (still to be reached) iteration step in \cref{eq:DiscretizedNonlinearStabilizedEquation}, as the resulting algorithm has been observed to facilitate the convergence of the nonlinear iterations. We have chosen not to include this in \cref{alg:StationarySystem} for the sake of generality.
 
@@ -666,7 +672,7 @@ $U^m \gets U_h^m + \widetilde{U}^m$
       $U^m \gets U_h^m + \widetilde{U}^m $ \Comment*[r]{\cref{eq:DiscretizedDefinitionOfNonlinearParameter}}
 }
 $U_h^\infty \gets U_h^m$ \Comment*[r]{Set converged solution}
-\caption{Solving the nonlinear problem \Guillermo{(pseudocode)} \label{alg:StationarySystem}}
+\caption{\amend{Staggered fixed{\hyp}point iteration \cref{eq:LinearizedOSGSProblem} for the discrete OSGS problem \cref{eq:OSGSProblem}; the ASGS method is the special case $\boldsymbol{\pi}_h^m \equiv \boldsymbol{0}$, for which the projection step is omitted.}\label{alg:StationarySystem}}
 \end{algorithm}
 }
 
@@ -911,7 +917,7 @@ In both cases it can be guaranteed that $C>0$ by taking $\xi > 2$ if the conditi
 is met.
 
 \begin{remark}
-    Condition \cref{eq:conditions_on_num_param} implies that the optimal value of $c_1$ depends on the element types involved through the inverse estimate constant. In particular, for elements of the same polynomial order $k$ for the velocity and the pressure, taking $c_1 = 4 k^4, c_2 = 2 k^2$ turns out to be effective~\cite{codina2018hp,villota2019aproximacion}, and was the choice made in all the numerical experiments presented below. This scaling is consistent with the quadratic dependence of $C_\text{inv}$ on the polynomial order, which is known to grow as $k^2$ (see~\cite{codina2018hp} for details). It is also consistent with the interpretation given above of $c_1$ as the square of the characteristic wave number of the oscillations produced by the \emph{unresolved} part of the solution in terms of their contribution to $|\mathcal{L}U|_\Lambda^2$; see \cref{eq:BoundProjectionOfLBySubscales}.
+    Condition \cref{eq:conditions_on_num_param} implies that the optimal value of $c_1$ depends on the element types involved through the inverse estimate constant. In particular, for elements of the same polynomial order $k$ for the velocity and the pressure, taking $c_1 = 4 k^4, c_2 = 2 k^2$ turns out to be effective~\cite{codina2018hp,villota2019aproximacion} \amend{for the two-dimensional (triangular and quadrilateral) meshes, and is the choice made in the two-dimensional experiments of \cref{sec:NumericalExamplesStationaryCase2D}. For the three-dimensional tetrahedral meshes the inverse-estimate constant $C_\text{inv}$ is markedly larger, so a correspondingly larger $c_1$ is required by \cref{eq:conditions_on_num_param}; the value used there is specified in \cref{sec:NumericalExamplesStationaryCase3D}}. This scaling is consistent with the quadratic dependence of $C_\text{inv}$ on the polynomial order, which is known to grow as $k^2$ (see~\cite{codina2018hp} for details). It is also consistent with the interpretation given above of $c_1$ as the square of the characteristic wave number of the oscillations produced by the \emph{unresolved} part of the solution in terms of their contribution to $|\mathcal{L}U|_\Lambda^2$; see \cref{eq:BoundProjectionOfLBySubscales}.
 \end{remark}
 
 We have just shown that the following stability bound holds for the stabilized method:
@@ -946,14 +952,14 @@ Using \cref{lemma:Stability} and the modified version of \cref{lemma:Continuity}
 \begin{theorem} \label{th:Convergence}
  Let $U$ be the exact solution of the linearized problem corresponding to \cref{eq:DiscretizedNonlinearStabilizedEquation}, where $\boldsymbol{u}^{m-1}$ is replaced by a given $\boldsymbol{a}$ such that $\nabla \cdot (\alpha\boldsymbol{a})=0$ and where $\boldsymbol{\pi}_h^m=\boldsymbol{0}$ (ASGS method). Then, under the assumptions of \cref{lemma:Stability,lemma:Continuity}\amend{, and assuming $\boldsymbol{u} \in H^{k_u+1}(\Omega)^d$ and $p \in H^{k_p+1}(\Omega)$}, there exists a positive constant $C$, such that
  \begin{equation}\label{eq:ConvergenceResult}
-    \triplenorm{E_h} \leq C \sum_K{\frac{1}{h_K} \left( \tau_{2,K}^{1/2}\mathrm{E}_{\textup{int},K}(\boldsymbol{u}) + \tau_{1,K}^{1/2} \mathrm{E}_{\textup{int},K}(p) \right)},
+    \triplenorm{E_h} \leq C \sum_K{\frac{\amend{\alpha_K}}{h_K} \left( \tau_{2,K}^{1/2}\mathrm{E}_{\textup{int},K}(\boldsymbol{u}) + \tau_{1,K}^{1/2} \mathrm{E}_{\textup{int},K}(p) \right)},
  \end{equation}
 \end{theorem}
 where $E_h \coloneqq U - U_h$ and where the interpolation error is defined as
 \begin{equation} \label{eq:InterpolationError}
     \mathrm{E}_{\text{int},K}(\psi) \coloneqq h_K^{k_\psi + 1} \| \psi \|_{H^{k_\psi + 1}(K)},
 \end{equation}
-where $\psi$ is the field being interpolated and $k_\psi$ the corresponding polynomial order of the interpolation.
+where $\psi$ is the field being interpolated and $k_\psi$ the corresponding polynomial order of the interpolation. \amend{The estimate \cref{eq:ConvergenceResult} is stated in its sharpest, porosity{\hyp}weighted form: the local factor $\alpha_K \le 1$ makes the bound tighter in regions of low porosity, consistently with the robustness analysis of \cref{sec:Robustness}. A complete proof, following the process of~\cite{codina2001stabilized} adapted to the porosity field, is given in \cref{app:Continuity}.}
 
 % Section on variational crimes:
 %\input{variational_crimes}
@@ -1058,7 +1064,7 @@ Let us thus derive estimates for the norm of the gradient of the pressure. In th
 Here the situation is reversed with respect to the dependence on $\amend{\Damk}$. The loss of one order in the pressure accuracy is greatly mitigated by the \amend{factor $\Damk^{-1/2} = \Damk_h^{-1/2}\, h/L$} in reaction-dominated flows\amend{. Note that this mitigation factor is independent of the mesh size, since $\Damk_h \propto h^2$}.
 
 \section{Numerical examples}\label{sec:NumericalExamples}
-We will resort to the method of manufactured solutions, deriving the exact expression for the forcing term that corresponds to the chosen velocity and pressure fields. We consider the unit square $(0,1) \times (0,1)$ as the domain\amend{, with Dirichlet boundary conditions on all sides given by the trace of the manufactured velocity field}. \Guillermo{All the implementations have been made within the Kratos Multiphysics software\cite{dadvand2010object,ferrandiz2022kratosmultiphysics}}. Our \amend{picks} for the \amend{velocity} and pressure fields are
+We will resort to the method of manufactured solutions, deriving the exact expression for the forcing term that corresponds to the chosen velocity and pressure fields. We consider the unit square $(0,1) \times (0,1)$ as the domain\amend{, with Dirichlet boundary conditions on all sides given by the trace of the manufactured velocity field}. \amend{All the numerical experiments reported in this section have been carried out with an implementation of the method in the finite element library \texttt{Gridap}~\cite{badia2020gridap,verdugo2022gridap}, which was also used to evaluate the manufactured forcing terms and the exact-solution error norms. To reduce the computational cost, the discrete nonlinear systems were solved not with the staggered fixed-point iteration of \cref{alg:StationarySystem} but with an accelerated, Newton-based variant of it: a globalized Newton method in which, for the OSGS formulation, the projection coupling $\partial\boldsymbol{\pi}_h/\partial\boldsymbol{u}_h$ that the staggered scheme drops is recovered matrix-free through a preconditioned Newton--Krylov inner solve. This is purely a solver acceleration---it converges to the same discrete solution \cref{eq:OSGSProblem} as \cref{alg:StationarySystem} and therefore does not affect any of the reported errors.} Our \amend{choices for the} \amend{velocity} and pressure fields are
 \begin{align}\label{eq:ManufacturedProblem}
     \begin{split}
         \boldsymbol{u}(x_1, x_2) &= U \frac{\alpha_0}{\alpha} \left( \text{sin}(\pi x_1)\text{sin}(\pi x_2)\boldsymbol{e}_1 + \text{cos}(\pi x_1)\text{cos}(\pi x_2)\boldsymbol{e}_2\right), \\
@@ -1083,7 +1089,7 @@ and
 \begin{equation}
    \eta \coloneqq \frac{r^2 - r_1^2}{r_2^2 - r_1^2},
 \end{equation}
-where $0 < r_1 < r_2 < 1$. The formulas above define a smooth bump function with a central circular plateau where $\alpha = \alpha_0$ surrounded by the annular region defined by $r\in(r_1, r_2)$, on which the porosity monotonically increases with $r$ up to $\alpha=1$ at $r=r_2$. \Cref{fig:PlateauBump} shows $1-\alpha$, i.e., the matrix's volume fraction.
+where $0 < r_1 < r_2 < 1$. \amend{In all the numerical experiments reported below (2D, 3D and the comparison of \cref{sec:NumericalExampleFromLiterature}) we fix $r_1 = 0.2$ and $r_2 = 0.4$, with $r$ the distance to the center of the unit square---and, in the extruded 3D case, the distance to its central vertical axis---and we take the characteristic scales $U = L = 1$, so that, together with $\alpha_0$, $\Reyn$ and $\Damk$, the manufactured fields, the porosity and the forcing term are completely specified.} The formulas above define a smooth bump function with a central circular plateau where $\alpha = \alpha_0$ surrounded by the annular region defined by $r\in(r_1, r_2)$, on which the porosity monotonically increases with $r$ up to $\alpha=1$ at $r=r_2$. \Cref{fig:PlateauBump} shows $1-\alpha$, i.e., the matrix's volume fraction.
 
 \begin{figure}[!htbp]
   \centering
@@ -1099,17 +1105,17 @@ In order to cover a wide range of regimes, we will consider all the combinations
 For both 2D and 3D tests, we have considered the problem defined by \cref{eq:ManufacturedProblem}. In the following subsections we present the particularities of the various simulations and the results obtained.
 
 \subsection{Manufactured solutions: 2D cases}\label{sec:NumericalExamplesStationaryCase2D} \hfill\\
-We consider two types of elements: linear triangles ($\mathbb{P}_1$ elements) and biquadratic quadrilaterals ($\mathbb{Q}_2$ elements). The sequence of structured meshes is in both cases obtained by successively dividing the nodal distance by two, the coarsest one being given by a $10 \times 10$ grid, and the finest being $640 \times 640$. The triangle elements are obtained by dividing every resulting square into two triangles. In all the examples we take $\varepsilon=0$.
+We consider two types of elements: linear triangles ($\mathbb{P}_1$ elements) and biquadratic quadrilaterals ($\mathbb{Q}_2$ elements). The sequence of structured meshes is in both cases obtained by successively dividing the nodal distance by two, the coarsest one being given by a $10 \times 10$ grid, and the finest being $320 \times 320$. The triangle elements are obtained by dividing every resulting square into two triangles. In all the examples we take $\varepsilon=0$. \amend{Of the eighteen parameter combinations described above, the strongly convection-dominated, low-porosity corner $(\Reyn,\alpha_0)=(10^6,0.05)$ is excluded from the sweep, leaving the fifteen cases reported in each of \cref{tab:Linear2DL2,tab:Linear2DH1,tab:Quadratic2DL2,tab:Quadratic2DH1}.}
 
-\Cref{tab:Linear2DL2,tab:Linear2DH1} contain the measured convergence rates for the $L^2$-norm and $H^1$-seminorm for the $\mathbb{P}_1$ elements, along with the absolute errors in these norms measured on the finest mesh, i.e., the finest mesh error (FME). \Cref{tab:Quadratic2DL2,tab:Quadratic2DH1} are the analogues for $\mathbb{Q}_2$ elements. Overall, let us note that there are no significant differences in accuracy between the ASGS and the OSGS methods over all the test cases. Furthermore, the results are compatible with the error estimates provided in \cref{sec:Robustness}.
+\Cref{tab:Linear2DL2,tab:Linear2DH1} contain the measured convergence rates for the $L^2$-norm and $H^1$-seminorm for the $\mathbb{P}_1$ elements, along with the absolute errors in these norms measured on the finest mesh, i.e., the finest mesh error (FME). \Cref{tab:Quadratic2DL2,tab:Quadratic2DH1} are the analogues for $\mathbb{Q}_2$ elements. \amend{Overall, the velocity errors are practically indistinguishable between the ASGS and the OSGS methods and attain their optimal rates in every case; the two methods differ mainly in the pressure, for which the OSGS variant tends to deliver cleaner and higher convergence rates than the ASGS one (most visibly for the biquadratic element in the viscosity-dominated regime, see below).} Furthermore, the results are compatible with the error estimates provided in \cref{sec:Robustness}.
 
-Indeed, one can immediately check that the effect of variations in the minimum porosity is consistent with the asymptotic analysis above. When passing from $\alpha_0=0.5$ to $\alpha_0=0.05$ (even vs. odd-numbered lines in \cref{tab:Linear2DL2,tab:Linear2DH1,tab:Quadratic2DL2,tab:Quadratic2DH1}), we observe a loss in accuracy of around half an order of magnitude in terms of the FME. This tendency is quite robust although not without a few exceptions, particularly for the pressure when using linear elements.
+\amend{Indeed, the effect of variations in the minimum porosity is consistent with the asymptotic analysis above. When passing from $\alpha_0=0.5$ to $\alpha_0=0.05$ we observe a loss in accuracy of up to about one order of magnitude in terms of the FME. This tendency is quite robust across the whole sweep, the main exception being the pressure in the high-Damk\"ohler cases, which depends only weakly on $\alpha_0$.}
 
-For viscosity-dominated flows (rows 1-4, 7-8), the results are consistent with the predicted asymptotic bounds given by \cref{eq:DominantViscosityVelocityGradientEstimate,eq:DominantViscosityPressureGradientEstimate}. Note that the FME values indicate that both the ASGS and OSGS methods show a very similar accuracy independently of the values taken by the physical parameters in this regime, except for the above-mentioned decrease in accuracy as $\alpha$ decreases. The predicted drop of one order in the pressure accuracy is observed in most cases for linear elements and is even more prevalent for biquadratic elements. The velocity error is optimal in all cases.
+\amend{For viscosity-dominated flows ($\Reyn_h,\Damk_h\to 0$), the results are consistent with the predicted asymptotic bounds given by \cref{eq:DominantViscosityVelocityGradientEstimate,eq:DominantViscosityPressureGradientEstimate}. The velocity error is optimal in all cases and virtually identical for the two methods. The pressure is where the two stabilizations differ most: for the linear element both attain close to the nominal optimal rate, whereas for the biquadratic element the ASGS pressure converges at roughly its nominal optimal rate (slightly below it in the $H^1$-seminorm) while the OSGS pressure is markedly super-optimal, about one order higher in both the $L^2$-norm and the $H^1$-seminorm.}
 
-With respect to convection-dominated flows (cf.\ rows 5-6, 11-12, 17-18), we were unable to get the nonlinear iterations to converge with biquadratic elements on the finest mesh when $\alpha_{\amend{0}} = 0.5$, probably due to the stationary problem becoming ill-defined in this case. Such cases are identified in \cref{tab:Quadratic2DL2,tab:Quadratic2DH1} by the notation \emph{n.c.} (not converged). For the remaining cases, the picture is very similar to that seen in the viscosity-dominated regime: The predicted optimal asymptotic behavior is observed for the velocity and the pressure (which this time converges quadratically in all cases), as the estimates \cref{eq:DominantConvectionXTermEstimate,eq:DominantPressureGradientXTermEstimate} suggest.
+\amend{In convection-dominated flows ($\Reyn_h\to\infty$; the $\Reyn=10^6$ rows), the picture is close to that of the viscosity-dominated regime, in agreement with the estimates \cref{eq:DominantConvectionXTermEstimate,eq:DominantPressureGradientXTermEstimate}: optimal behavior is recovered for the pressure, and with the present mesh sequence the biquadratic element converges on the finest mesh here as well. The biquadratic velocity rate sits slightly below its nominal value ($\approx 2.8$ in $L^2$ and $\approx 1.8$ in $H^1$), which we attribute to the finest mesh not yet being fully within the asymptotic range at this Reynolds number.}
 
-For reaction-dominated flows (rows 13-16), the analysis indicates a slightly more complex convergence profile. As a preamble, let us note the relation $\Damk = \Damk_h L^2/h^2$. The latter implies that the values of $\Damk_h$ actually exhibit considerable variation across the different meshes, becoming about \amend{$64^2 \approx \num{4.1e3}$} times smaller when passing from the coarsest discretization to the finest one. In particular, we can estimate $\Damk_h \approx 10^6/640^2 \approx 2.44$ for the finest mesh, which could be considered marginally reaction-dominated. Nonetheless, note that the 3-order increase in $\Damk_h^{1/2}$ over the range that goes from 1 to $10^6$ (compare rows 7-10 with rows 13-16) still leads to a quite robust decrease of the pressure error by a similar amount in the $L^2$-norm. For the $H^1$-norm, the decrease in error is smaller, although a consistent optimal-order (i.e., one order above the general case) convergence rate is only observed in the high-$\Damk$ cases. These results are all consistent with \cref{eq:DominantReactionPressureGradientEstimate}. For the velocity error, the deterioration of its bound with $\Damk$ suggested by \cref{eq:DominantReactionVelocityGradientEstimate} is not \amend{realized} for linear elements (the FME barely grows when increasing $\Damk=1$ to $\Damk=10^6$ while leaving the other parameters unchanged). For biquadratic elements, a noticeable error growth is observed (compare, e.g., rows 9 and 15 in \cref{tab:Quadratic2DL2,tab:Quadratic2DH1}), although still very far from the estimated $\sim \Damk^{1/2}$ effect.
+\amend{For reaction-dominated flows ($\Damk_h\to\infty$), the analysis indicates a slightly more complex convergence profile. As a preamble, let us note the relation $\Damk = \Damk_h L^2/h^2$, which implies that $\Damk_h$ varies considerably across the mesh sequence, becoming about $32^2 \approx \num{1.0e3}$ times smaller when passing from the coarsest discretization to the finest one. In particular, $\Damk_h \approx 10^6/320^2 \approx 9.8$ on the finest mesh, so even the most reaction-dominated case is only moderately so at that resolution. Nonetheless, increasing $\Damk$ from $1$ to $10^6$ produces a clear improvement of the pressure error, most markedly in the $L^2$-norm, in agreement with \cref{eq:DominantReactionPressureGradientEstimate}; the pressure $L^2$ rate rises to (super-)optimal values in the high-$\Damk$ cases. For the velocity error, the deterioration with $\Damk$ suggested by \cref{eq:DominantReactionVelocityGradientEstimate} is barely perceptible for linear elements and remains very mild for biquadratic ones, far from the estimated $\sim \Damk^{1/2}$ effect.}
 
 \setlength{\heavyrulewidth}{1.5pt}
 \setlength{\abovetopsep}{4pt}
@@ -1130,24 +1136,21 @@ For reaction-dominated flows (rows 13-16), the analysis indicates a slightly mor
 \cmidrule(lr){4-7}
 $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
 \midrule
-$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.00} & \num{2.00} & \num{8.48e-6} & \num{6.38e-6} \\
-$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{2.00} & \num{2.00} & \num{2.95e-5} & \num{4.78e-5} \\
-$1$       & $10^{-6}$ & $0.5$  & \num{2.00} & \num{2.00} & \num{8.48e-6} & \num{6.38e-6} \\
-$1$       & $10^{-6}$ & $0.05$ & \num{2.00} & \num{2.00} & \num{2.95e-5} & \num{4.78e-5} \\
-$10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.20} & \num{2.81} & \num{2.20e-6} & \num{2.22e-6} \\
-$10^{6}$  & $10^{-6}$ & $0.05$ & \num{2.07} & \num{2.08} & \num{1.10e-5} & \num{1.10e-5} \\
-$10^{-6}$ & $1$       & $0.5$  & \num{2.00} & \num{2.00} & \num{8.46e-6} & \num{6.31e-6} \\
-$10^{-6}$ & $1$       & $0.05$ & \num{2.00} & \num{2.00} & \num{2.90e-5} & \num{4.39e-5} \\
-$1$       & $1$       & $0.5$  & \num{2.00} & \num{2.00} & \num{8.46e-6} & \num{6.31e-6} \\
-$1$       & $1$       & $0.05$ & \num{2.00} & \num{2.00} & \num{2.90e-5} & \num{4.39e-5} \\
-$10^{6}$  & $1$       & $0.5$  & \num{2.20} & \num{2.81} & \num{2.20e-6} & \num{2.22e-6} \\
-$10^{6}$  & $1$       & $0.05$ & \num{2.07} & \num{2.08} & \num{1.10e-5} & \num{1.10e-5} \\
-$10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.57} & \num{2.85} & \num{7.42e-6} & \num{1.94e-5} \\
-$10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.11} & \num{2.83} & \num{2.20e-5} & \num{2.02e-5} \\
-$1$       & $10^{6}$  & $0.5$  & \num{2.57} & \num{2.85} & \num{7.42e-6} & \num{1.94e-5} \\
-$1$       & $10^{6}$  & $0.05$ & \num{2.11} & \num{2.83} & \num{2.19e-5} & \num{2.02e-5} \\
-$10^{6}$  & $10^{6}$  & $0.5$  & \num{2.60} & \num{2.56} & \num{2.60e-6} & \num{3.85e-6} \\
-$10^{6}$  & $10^{6}$  & $0.05$ & \num{2.08} & \num{2.11} & \num{7.44e-6} & \num{7.58e-6} \\
+$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.01} & \num{2.12} & \num{6.95e-5} & \num{3.62e-5} \\
+$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.90} & \num{2.08} & \num{6.84e-4} & \num{6.33e-4} \\
+$1$       & $10^{-6}$ & $0.5$  & \num{1.98} & \num{2.00} & \num{7.36e-5} & \num{4.60e-5} \\
+$1$       & $10^{-6}$ & $0.05$ & \num{1.88} & \num{2.01} & \num{5.09e-4} & \num{9.53e-4} \\
+$10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.09} & \num{2.04} & \num{1.75e-5} & \num{2.60e-5} \\
+$10^{-6}$ & $1$       & $0.5$  & \num{1.98} & \num{2.00} & \num{7.37e-5} & \num{4.57e-5} \\
+$10^{-6}$ & $1$       & $0.05$ & \num{1.89} & \num{2.00} & \num{4.83e-4} & \num{8.74e-4} \\
+$1$       & $1$       & $0.5$  & \num{1.98} & \num{2.00} & \num{7.37e-5} & \num{4.57e-5} \\
+$1$       & $1$       & $0.05$ & \num{1.89} & \num{2.00} & \num{4.83e-4} & \num{8.75e-4} \\
+$10^{6}$  & $1$       & $0.5$  & \num{2.09} & \num{2.04} & \num{1.75e-5} & \num{2.60e-5} \\
+$10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.12} & \num{2.00} & \num{1.07e-4} & \num{1.77e-4} \\
+$10^{-6}$ & $10^{6}$  & $0.05$ & \num{1.95} & \num{2.03} & \num{4.37e-4} & \num{1.97e-4} \\
+$1$       & $10^{6}$  & $0.5$  & \num{2.12} & \num{2.00} & \num{1.07e-4} & \num{1.77e-4} \\
+$1$       & $10^{6}$  & $0.05$ & \num{1.95} & \num{2.03} & \num{4.37e-4} & \num{1.97e-4} \\
+$10^{6}$  & $10^{6}$  & $0.5$  & \num{2.10} & \num{2.10} & \num{1.85e-5} & \num{2.85e-5} \\
 \midrule
 \multicolumn{7}{c}{pressure} \\
 \midrule
@@ -1155,24 +1158,21 @@ $10^{6}$  & $10^{6}$  & $0.05$ & \num{2.08} & \num{2.11} & \num{7.44e-6} & \num{
 \cmidrule(lr){4-7}
 $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
 \midrule
-$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.83} & \num{1.30e-2} & \num{2.85e-4} \\
-$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.55} & \num{2.00} & \num{1.61e-3} & \num{1.18e-3} \\
-$1$       & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.83} & \num{6.51e-3} & \num{1.43e-4} \\
-$1$       & $10^{-6}$ & $0.05$ & \num{1.55} & \num{2.00} & \num{8.04e-4} & \num{5.89e-4} \\
-$10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.95} & \num{1.66} & \num{8.92e-7} & \num{1.07e-6} \\
-$10^{6}$  & $10^{-6}$ & $0.05$ & \num{2.02} & \num{2.03} & \num{1.51e-6} & \num{1.52e-6} \\
-$10^{-6}$ & $1$       & $0.5$  & \num{1.00} & \num{1.83} & \num{6.51e-3} & \num{1.42e-4} \\
-$10^{-6}$ & $1$       & $0.05$ & \num{1.55} & \num{2.00} & \num{8.05e-4} & \num{5.92e-4} \\
-$1$       & $1$       & $0.5$  & \num{1.00} & \num{1.83} & \num{4.34e-3} & \num{9.47e-5} \\
-$1$       & $1$       & $0.05$ & \num{1.55} & \num{2.00} & \num{5.37e-4} & \num{3.94e-4} \\
-$10^{6}$  & $1$       & $0.5$  & \num{1.95} & \num{1.66} & \num{8.92e-7} & \num{1.07e-6} \\
-$10^{6}$  & $1$       & $0.05$ & \num{2.02} & \num{2.03} & \num{1.51e-6} & \num{1.52e-6} \\
-$10^{-6}$ & $10^{6}$  & $0.5$  & \num{3.16} & \num{3.21} & \num{1.20e-6} & \num{1.22e-6} \\
-$10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.95} & \num{2.97} & \num{1.98e-6} & \num{2.02e-6} \\
-$1$       & $10^{6}$  & $0.5$  & \num{3.16} & \num{3.21} & \num{1.20e-6} & \num{1.22e-6} \\
-$1$       & $10^{6}$  & $0.05$ & \num{2.95} & \num{2.97} & \num{1.98e-6} & \num{2.02e-6} \\
-$10^{6}$  & $10^{6}$  & $0.5$  & \num{1.89} & \num{1.66} & \num{6.26e-7} & \num{1.03e-6} \\
-$10^{6}$  & $10^{6}$  & $0.05$ & \num{2.03} & \num{2.05} & \num{1.33e-6} & \num{1.35e-6} \\
+$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.20} & \num{2.20} & \num{2.35e-3} & \num{1.86e-3} \\
+$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.97} & \num{2.04} & \num{2.08e-2} & \num{1.76e-2} \\
+$1$       & $10^{-6}$ & $0.5$  & \num{1.88} & \num{2.01} & \num{1.99e-3} & \num{1.33e-3} \\
+$1$       & $10^{-6}$ & $0.05$ & \num{1.79} & \num{2.01} & \num{2.04e-2} & \num{1.34e-2} \\
+$10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.12} & \num{2.05} & \num{4.87e-6} & \num{6.22e-6} \\
+$10^{-6}$ & $1$       & $0.5$  & \num{1.88} & \num{2.01} & \num{2.00e-3} & \num{1.33e-3} \\
+$10^{-6}$ & $1$       & $0.05$ & \num{1.76} & \num{2.00} & \num{2.10e-2} & \num{1.39e-2} \\
+$1$       & $1$       & $0.5$  & \num{1.88} & \num{2.01} & \num{1.33e-3} & \num{8.88e-4} \\
+$1$       & $1$       & $0.05$ & \num{1.76} & \num{2.00} & \num{1.40e-2} & \num{9.29e-3} \\
+$10^{6}$  & $1$       & $0.5$  & \num{2.12} & \num{2.05} & \num{4.87e-6} & \num{6.22e-6} \\
+$10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.27} & \num{2.27} & \num{8.76e-6} & \num{8.76e-6} \\
+$10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.17} & \num{2.17} & \num{1.62e-5} & \num{1.62e-5} \\
+$1$       & $10^{6}$  & $0.5$  & \num{2.27} & \num{2.27} & \num{8.76e-6} & \num{8.76e-6} \\
+$1$       & $10^{6}$  & $0.05$ & \num{2.17} & \num{2.17} & \num{1.62e-5} & \num{1.62e-5} \\
+$10^{6}$  & $10^{6}$  & $0.5$  & \num{2.05} & \num{2.06} & \num{4.16e-6} & \num{4.26e-6} \\
 \bottomrule
 \end{tabular}
 \label{tab:Linear2DL2}
@@ -1195,24 +1195,21 @@ $10^{6}$  & $10^{6}$  & $0.05$ & \num{2.03} & \num{2.05} & \num{1.33e-6} & \num{
 \cmidrule(lr){4-7}
 $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
 \midrule
-$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{9.86e-3} & \num{9.86e-3} \\
-$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.00} & \num{1.00} & \num{3.10e-2} & \num{3.10e-2} \\
-$1$       & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{9.86e-3} & \num{9.86e-3} \\
-$1$       & $10^{-6}$ & $0.05$ & \num{1.00} & \num{1.00} & \num{3.10e-2} & \num{3.10e-2} \\
-$10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.02} & \num{1.09} & \num{9.88e-3} & \num{9.90e-3} \\
-$10^{6}$  & $10^{-6}$ & $0.05$ & \num{1.00} & \num{1.01} & \num{3.10e-2} & \num{3.11e-2} \\
-$10^{-6}$ & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{9.86e-3} & \num{9.86e-3} \\
-$10^{-6}$ & $1$       & $0.05$ & \num{1.00} & \num{1.00} & \num{3.10e-2} & \num{3.10e-2} \\
-$1$       & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{9.86e-3} & \num{9.86e-3} \\
-$1$       & $1$       & $0.05$ & \num{1.00} & \num{1.00} & \num{3.10e-2} & \num{3.10e-2} \\
-$10^{6}$  & $1$       & $0.5$  & \num{1.02} & \num{1.09} & \num{9.88e-3} & \num{9.90e-3} \\
-$10^{6}$  & $1$       & $0.05$ & \num{1.00} & \num{1.01} & \num{3.10e-2} & \num{3.11e-2} \\
-$10^{-6}$ & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.82} & \num{9.86e-3} & \num{2.77e-2} \\
-$10^{-6}$ & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.49} & \num{3.10e-2} & \num{4.06e-2} \\
-$1$       & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.82} & \num{9.86e-3} & \num{2.77e-2} \\
-$1$       & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.49} & \num{3.10e-2} & \num{4.06e-2} \\
-$10^{6}$  & $10^{6}$  & $0.5$  & \num{1.05} & \num{1.12} & \num{1.00e-2} & \num{1.07e-2} \\
-$10^{6}$  & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.01} & \num{3.10e-2} & \num{3.11e-2} \\
+$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{3.50e-2} & \num{3.50e-2} \\
+$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.01} & \num{1.00} & \num{1.76e-1} & \num{1.76e-1} \\
+$1$       & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{3.50e-2} & \num{3.50e-2} \\
+$1$       & $10^{-6}$ & $0.05$ & \num{1.00} & \num{1.01} & \num{1.76e-1} & \num{1.76e-1} \\
+$10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.01} & \num{1.02} & \num{3.53e-2} & \num{3.65e-2} \\
+$10^{-6}$ & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{3.50e-2} & \num{3.50e-2} \\
+$10^{-6}$ & $1$       & $0.05$ & \num{1.00} & \num{1.00} & \num{1.76e-1} & \num{1.76e-1} \\
+$1$       & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{3.50e-2} & \num{3.50e-2} \\
+$1$       & $1$       & $0.05$ & \num{1.00} & \num{1.00} & \num{1.76e-1} & \num{1.76e-1} \\
+$10^{6}$  & $1$       & $0.5$  & \num{1.01} & \num{1.02} & \num{3.53e-2} & \num{3.65e-2} \\
+$10^{-6}$ & $10^{6}$  & $0.5$  & \num{1.02} & \num{1.05} & \num{3.52e-2} & \num{1.23e-1} \\
+$10^{-6}$ & $10^{6}$  & $0.05$ & \num{1.02} & \num{1.03} & \num{1.77e-1} & \num{2.12e-1} \\
+$1$       & $10^{6}$  & $0.5$  & \num{1.02} & \num{1.05} & \num{3.52e-2} & \num{1.23e-1} \\
+$1$       & $10^{6}$  & $0.05$ & \num{1.02} & \num{1.03} & \num{1.77e-1} & \num{2.12e-1} \\
+$10^{6}$  & $10^{6}$  & $0.5$  & \num{1.01} & \num{1.03} & \num{3.54e-2} & \num{3.84e-2} \\
 \midrule
 \multicolumn{7}{c}{pressure} \\
 \midrule
@@ -1220,24 +1217,21 @@ $10^{6}$  & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.01} & \num{3.10e-2} & \num{
 \cmidrule(lr){4-7}
 $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
 \midrule
-$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{0.53} & \num{0.56} & \num{1.52e-1} & \num{2.88e-1} \\
-$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.94} & \num{1.90} & \num{6.54e-2} & \num{7.02e-2} \\
-$1$       & $10^{-6}$ & $0.5$  & \num{0.53} & \num{0.57} & \num{7.61e-2} & \num{1.44e-1} \\
-$1$       & $10^{-6}$ & $0.05$ & \num{1.92} & \num{1.90} & \num{3.30e-2} & \num{3.53e-2} \\
-$10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.45e-3} \\
-$10^{6}$  & $10^{-6}$ & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.45e-3} \\
-$10^{-6}$ & $1$       & $0.5$  & \num{0.53} & \num{0.57} & \num{7.61e-2} & \num{1.44e-1} \\
-$10^{-6}$ & $1$       & $0.05$ & \num{1.92} & \num{1.90} & \num{3.30e-2} & \num{3.55e-2} \\
-$1$       & $1$       & $0.5$  & \num{0.53} & \num{0.57} & \num{5.09e-2} & \num{9.56e-2} \\
-$1$       & $1$       & $0.05$ & \num{1.91} & \num{1.89} & \num{2.24e-2} & \num{2.40e-2} \\
-$10^{6}$  & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.45e-3} \\
-$10^{6}$  & $1$       & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.45e-3} \\
-$10^{-6}$ & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.46e-3} \\
-$10^{-6}$ & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.46e-3} \\
-$1$       & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.46e-3} \\
-$1$       & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.46e-3} \\
-$10^{6}$  & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.45e-3} \\
-$10^{6}$  & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{5.45e-3} \\
+$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.56} & \num{1.60} & \num{3.16e-1} & \num{2.70e-1} \\
+$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.95} & \num{2.07} & \num{2.61}   & \num{2.24}   \\
+$1$       & $10^{-6}$ & $0.5$  & \num{1.47} & \num{1.46} & \num{2.18e-1} & \num{1.81e-1} \\
+$1$       & $10^{-6}$ & $0.05$ & \num{1.71} & \num{2.05} & \num{2.64}   & \num{1.71}   \\
+$10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
+$10^{-6}$ & $1$       & $0.5$  & \num{1.47} & \num{1.46} & \num{2.19e-1} & \num{1.81e-1} \\
+$10^{-6}$ & $1$       & $0.05$ & \num{1.68} & \num{2.02} & \num{2.71}   & \num{1.76}   \\
+$1$       & $1$       & $0.5$  & \num{1.47} & \num{1.46} & \num{1.46e-1} & \num{1.21e-1} \\
+$1$       & $1$       & $0.05$ & \num{1.68} & \num{2.02} & \num{1.81}   & \num{1.17}   \\
+$10^{6}$  & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
+$10^{-6}$ & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
+$10^{-6}$ & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
+$1$       & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
+$1$       & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
+$10^{6}$  & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
 \bottomrule
 \end{tabular}
 \label{tab:Linear2DH1}
@@ -1260,24 +1254,21 @@ $10^{6}$  & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{
     \cmidrule(lr){4-7}
     $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
     \midrule
-    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{3.14} & \num{3.15} & \num{5.60e-9} & \num{5.60e-9} \\
-    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{3.15} & \num{3.15} & \num{4.03e-8} & \num{4.03e-8} \\
-    $1$       & $10^{-6}$ & $0.5$  & \num{3.14} & \num{3.15} & \num{5.60e-9} & \num{5.60e-9} \\
-    $1$       & $10^{-6}$ & $0.05$ & \num{3.15} & \num{3.15} & \num{4.03e-8} & \num{4.03e-8} \\
-    $10^{6}$  & $10^{-6}$ & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $10^{-6}$ & $0.05$ & \num{4.00} & \num{4.01} & \num{7.28e-8} & \num{7.27e-8} \\
-    $10^{-6}$ & $1$       & $0.5$  & \num{3.14} & \num{3.15} & \num{5.60e-9} & \num{5.60e-9} \\
-    $10^{-6}$ & $1$       & $0.05$ & \num{3.15} & \num{3.15} & \num{4.03e-8} & \num{4.03e-8} \\
-    $1$       & $1$       & $0.5$  & \num{3.14} & \num{3.15} & \num{5.60e-9} & \num{5.60e-9} \\
-    $1$       & $1$       & $0.05$ & \num{3.15} & \num{3.15} & \num{4.03e-8} & \num{4.03e-8} \\
-    $10^{6}$  & $1$       & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $1$       & $0.05$ & \num{4.00} & \num{4.01} & \num{7.28e-8} & \num{7.27e-8} \\
-    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{3.86} & \num{4.10} & \num{4.89e-8} & \num{3.39e-8} \\
-    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{3.58} & \num{3.59} & \num{5.89e-8} & \num{5.13e-8} \\
-    $1$       & $10^{6}$  & $0.5$  & \num{3.86} & \num{4.10} & \num{4.89e-8} & \num{3.39e-8} \\
-    $1$       & $10^{6}$  & $0.05$ & \num{3.58} & \num{3.59} & \num{5.89e-8} & \num{5.13e-8} \\
-    $10^{6}$  & $10^{6}$  & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $10^{6}$  & $0.05$ & \num{3.65} & \num{3.66} & \num{6.43e-8} & \num{6.44e-8} \\
+    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{3.00} & \num{3.00} & \num{2.06e-7} & \num{2.07e-7} \\
+    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{2.99} & \num{2.98} & \num{2.39e-6} & \num{2.39e-6} \\
+    $1$       & $10^{-6}$ & $0.5$  & \num{3.00} & \num{3.01} & \num{2.07e-7} & \num{2.08e-7} \\
+    $1$       & $10^{-6}$ & $0.05$ & \num{3.02} & \num{3.01} & \num{2.40e-6} & \num{2.42e-6} \\
+    $10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.82} & \num{2.83} & \num{4.56e-7} & \num{4.57e-7} \\
+    $10^{-6}$ & $1$       & $0.5$  & \num{3.00} & \num{3.01} & \num{2.07e-7} & \num{2.08e-7} \\
+    $10^{-6}$ & $1$       & $0.05$ & \num{3.02} & \num{3.01} & \num{2.40e-6} & \num{2.42e-6} \\
+    $1$       & $1$       & $0.5$  & \num{3.00} & \num{3.01} & \num{2.07e-7} & \num{2.08e-7} \\
+    $1$       & $1$       & $0.05$ & \num{3.02} & \num{3.01} & \num{2.40e-6} & \num{2.42e-6} \\
+    $10^{6}$  & $1$       & $0.5$  & \num{2.82} & \num{2.83} & \num{4.56e-7} & \num{4.57e-7} \\
+    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{3.17} & \num{3.58} & \num{6.63e-7} & \num{6.18e-7} \\
+    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{3.00} & \num{2.95} & \num{2.44e-6} & \num{2.39e-6} \\
+    $1$       & $10^{6}$  & $0.5$  & \num{3.17} & \num{3.58} & \num{6.63e-7} & \num{6.18e-7} \\
+    $1$       & $10^{6}$  & $0.05$ & \num{3.00} & \num{2.95} & \num{2.44e-6} & \num{2.39e-6} \\
+    $10^{6}$  & $10^{6}$  & $0.5$  & \num{2.79} & \num{2.80} & \num{4.43e-7} & \num{4.45e-7} \\
     \midrule
     \multicolumn{7}{c}{pressure} \\
     \midrule
@@ -1285,24 +1276,21 @@ $10^{6}$  & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{
     \cmidrule(lr){4-7}
     $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
     \midrule
-    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.10} & \num{2.05} & \num{5.23e-6}  & \num{5.18e-5} \\
-    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{2.09} & \num{2.00} & \num{3.73e-5}  & \num{3.66e-3} \\
-    $1$       & $10^{-6}$ & $0.5$  & \num{2.10} & \num{2.05} & \num{2.61e-6}  & \num{2.59e-5} \\
-    $1$       & $10^{-6}$ & $0.05$ & \num{2.09} & \num{2.00} & \num{1.86e-5}  & \num{1.83e-4} \\
-    $10^{6}$  & $10^{-6}$ & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $10^{-6}$ & $0.05$ & \num{4.07} & \num{4.11} & \num{9.20e-9}  & \num{9.24e-9} \\
-    $10^{-6}$ & $1$       & $0.5$  & \num{2.10} & \num{2.05} & \num{2.61e-6}  & \num{2.59e-5} \\
-    $10^{-6}$ & $1$       & $0.05$ & \num{2.09} & \num{2.00} & \num{1.86e-5}  & \num{1.83e-4} \\
-    $1$       & $1$       & $0.5$  & \num{2.10} & \num{2.05} & \num{1.74e-6}  & \num{1.73e-5} \\
-    $1$       & $1$       & $0.05$ & \num{2.09} & \num{2.00} & \num{1.24e-5}  & \num{1.22e-4} \\
-    $10^{6}$  & $1$       & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $1$       & $0.05$ & \num{4.07} & \num{4.11} & \num{9.20e-9}  & \num{9.24e-9} \\
-    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{3.10} & \num{2.92} & \num{5.63e-10} & \num{1.18e-8} \\
-    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{3.10} & \num{3.14} & \num{5.64e-10} & \num{1.02e-9} \\
-    $1$       & $10^{6}$  & $0.5$  & \num{3.10} & \num{2.92} & \num{5.63e-10} & \num{1.18e-8} \\
-    $1$       & $10^{6}$  & $0.05$ & \num{3.10} & \num{3.14} & \num{5.64e-10} & \num{1.02e-9} \\
-    $10^{6}$  & $10^{6}$  & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $10^{6}$  & $0.05$ & \num{3.97} & \num{4.00} & \num{4.64e-9}  & \num{4.65e-9} \\
+    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.88} & \num{3.08} & \num{1.91e-5} & \num{2.97e-5} \\
+    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.81} & \num{3.16} & \num{1.95e-4} & \num{4.90e-4} \\
+    $1$       & $10^{-6}$ & $0.5$  & \num{1.90} & \num{3.13} & \num{9.78e-6} & \num{1.67e-5} \\
+    $1$       & $10^{-6}$ & $0.05$ & \num{1.81} & \num{3.45} & \num{1.06e-4} & \num{3.11e-4} \\
+    $10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.90} & \num{3.04} & \num{7.58e-8} & \num{7.91e-8} \\
+    $10^{-6}$ & $1$       & $0.5$  & \num{1.89} & \num{3.13} & \num{9.75e-6} & \num{1.67e-5} \\
+    $10^{-6}$ & $1$       & $0.05$ & \num{1.81} & \num{3.44} & \num{1.05e-4} & \num{3.13e-4} \\
+    $1$       & $1$       & $0.5$  & \num{1.90} & \num{3.13} & \num{6.52e-6} & \num{1.11e-5} \\
+    $1$       & $1$       & $0.05$ & \num{1.81} & \num{3.44} & \num{7.06e-5} & \num{2.09e-4} \\
+    $10^{6}$  & $1$       & $0.5$  & \num{2.90} & \num{3.04} & \num{7.58e-8} & \num{7.91e-8} \\
+    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{3.00} & \num{3.00} & \num{3.84e-9} & \num{3.84e-9} \\
+    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{3.00} & \num{3.02} & \num{3.85e-9} & \num{3.94e-9} \\
+    $1$       & $10^{6}$  & $0.5$  & \num{3.00} & \num{3.00} & \num{3.84e-9} & \num{3.84e-9} \\
+    $1$       & $10^{6}$  & $0.05$ & \num{3.00} & \num{3.02} & \num{3.85e-9} & \num{3.94e-9} \\
+    $10^{6}$  & $10^{6}$  & $0.5$  & \num{2.91} & \num{3.04} & \num{3.82e-8} & \num{3.98e-8} \\
     \bottomrule
     \end{tabular}
     \label{tab:Quadratic2DL2}
@@ -1325,24 +1313,21 @@ $10^{6}$  & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{
     \cmidrule(lr){4-7}
     $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
     \midrule
-    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.10} & \num{2.10} & \num{2.78e-5} & \num{2.78e-5} \\
-    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{2.10} & \num{2.10} & \num{2.00e-4} & \num{2.00e-4} \\
-    $1$       & $10^{-6}$ & $0.5$  & \num{2.10} & \num{2.10} & \num{2.78e-5} & \num{2.78e-5} \\
-    $1$       & $10^{-6}$ & $0.05$ & \num{2.10} & \num{2.10} & \num{2.00e-4} & \num{2.00e-4} \\
-    $10^{6}$  & $10^{-6}$ & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $10^{-6}$ & $0.05$ & \num{2.95} & \num{2.96} & \num{3.61e-4} & \num{3.61e-4} \\
-    $10^{-6}$ & $1$       & $0.5$  & \num{2.10} & \num{2.10} & \num{2.78e-5} & \num{2.78e-5} \\
-    $10^{-6}$ & $1$       & $0.05$ & \num{2.10} & \num{2.10} & \num{2.00e-4} & \num{2.00e-4} \\
-    $1$       & $1$       & $0.5$  & \num{2.10} & \num{2.10} & \num{2.78e-5} & \num{2.78e-5} \\
-    $1$       & $1$       & $0.05$ & \num{2.10} & \num{2.10} & \num{2.00e-4} & \num{2.00e-4} \\
-    $10^{6}$  & $1$       & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $1$       & $0.05$ & \num{2.95} & \num{2.96} & \num{3.61e-4} & \num{3.61e-4} \\
-    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.81} & \num{3.05} & \num{2.13e-4} & \num{1.68e-4} \\
-    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.49} & \num{2.55} & \num{2.73e-4} & \num{2.54e-4} \\
-    $1$       & $10^{6}$  & $0.5$  & \num{2.81} & \num{3.05} & \num{2.13e-4} & \num{1.68e-4} \\
-    $1$       & $10^{6}$  & $0.05$ & \num{2.49} & \num{2.55} & \num{2.73e-4} & \num{2.54e-4} \\
-    $10^{6}$  & $10^{6}$  & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $10^{6}$  & $0.05$ & \num{2.60} & \num{2.61} & \num{3.19e-4} & \num{3.19e-4} \\
+    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.00} & \num{2.00} & \num{4.29e-4} & \num{4.28e-4} \\
+    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{2.00} & \num{1.99} & \num{4.97e-3} & \num{4.95e-3} \\
+    $1$       & $10^{-6}$ & $0.5$  & \num{2.00} & \num{2.00} & \num{4.29e-4} & \num{4.29e-4} \\
+    $1$       & $10^{-6}$ & $0.05$ & \num{2.00} & \num{2.00} & \num{4.96e-3} & \num{4.97e-3} \\
+    $10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.81} & \num{1.81} & \num{1.10e-3} & \num{1.10e-3} \\
+    $10^{-6}$ & $1$       & $0.5$  & \num{2.00} & \num{2.00} & \num{4.29e-4} & \num{4.29e-4} \\
+    $10^{-6}$ & $1$       & $0.05$ & \num{2.00} & \num{2.00} & \num{4.96e-3} & \num{4.97e-3} \\
+    $1$       & $1$       & $0.5$  & \num{2.00} & \num{2.00} & \num{4.29e-4} & \num{4.29e-4} \\
+    $1$       & $1$       & $0.05$ & \num{2.00} & \num{2.00} & \num{4.96e-3} & \num{4.97e-3} \\
+    $10^{6}$  & $1$       & $0.5$  & \num{1.81} & \num{1.81} & \num{1.10e-3} & \num{1.10e-3} \\
+    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.18} & \num{2.59} & \num{1.52e-3} & \num{1.51e-3} \\
+    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.01} & \num{2.10} & \num{5.10e-3} & \num{5.14e-3} \\
+    $1$       & $10^{6}$  & $0.5$  & \num{2.18} & \num{2.59} & \num{1.52e-3} & \num{1.51e-3} \\
+    $1$       & $10^{6}$  & $0.05$ & \num{2.01} & \num{2.10} & \num{5.10e-3} & \num{5.14e-3} \\
+    $10^{6}$  & $10^{6}$  & $0.5$  & \num{1.79} & \num{1.80} & \num{1.07e-3} & \num{1.07e-3} \\
     \midrule
     \multicolumn{7}{c}{pressure} \\
     \midrule
@@ -1350,33 +1335,32 @@ $10^{6}$  & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{5.45e-3} & \num{
     \cmidrule(lr){4-7}
     $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
     \midrule
-    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.04} & \num{1.00} & \num{2.59e-2} & \num{2.56e-2} \\
-    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.03} & \num{0.94} & \num{1.85e-1} & \num{1.81e-1} \\
-    $1$       & $10^{-6}$ & $0.5$  & \num{1.04} & \num{1.00} & \num{1.29e-2} & \num{1.28e-2} \\
-    $1$       & $10^{-6}$ & $0.05$ & \num{1.03} & \num{0.94} & \num{9.23e-2} & \num{9.05e-2} \\
-    $10^{6}$  & $10^{-6}$ & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $10^{-6}$ & $0.05$ & \num{3.02} & \num{3.05} & \num{4.55e-5} & \num{4.57e-5} \\
-    $10^{-6}$ & $1$       & $0.5$  & \num{1.04} & \num{1.00} & \num{1.29e-2} & \num{1.28e-2} \\
-    $10^{-6}$ & $1$       & $0.05$ & \num{1.03} & \num{0.94} & \num{9.23e-2} & \num{9.06e-2} \\
-    $1$       & $1$       & $0.5$  & \num{1.04} & \num{1.00} & \num{8.62e-3} & \num{8.53e-3} \\
-    $1$       & $1$       & $0.05$ & \num{1.03} & \num{0.94} & \num{6.15e-2} & \num{6.04e-2} \\
-    $10^{6}$  & $1$       & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $1$       & $0.05$ & \num{3.02} & \num{3.05} & \num{4.55e-5} & \num{4.57e-5} \\
-    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.10} & \num{2.10} & \num{2.00e-6} & \num{2.00e-6} \\
-    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.09} & \num{2.09} & \num{2.00e-6} & \num{2.00e-6} \\
-    $1$       & $10^{6}$  & $0.5$  & \num{2.10} & \num{2.10} & \num{2.00e-6} & \num{2.00e-6} \\
-    $1$       & $10^{6}$  & $0.05$ & \num{2.09} & \num{2.09} & \num{2.00e-6} & \num{2.00e-6} \\
-    $10^{6}$  & $10^{6}$  & $0.5$  & n.c. & n.c. & n.c. & n.c. \\
-    $10^{6}$  & $10^{6}$  & $0.05$ & \num{2.92} & \num{2.94} & \num{2.29e-5} & \num{2.29e-5} \\
+    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{0.87} & \num{1.97} & \num{4.71e-2} & \num{7.18e-2} \\
+    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{0.93} & \num{2.01} & \num{4.80e-1} & \num{1.16}   \\
+    $1$       & $10^{-6}$ & $0.5$  & \num{0.88} & \num{2.02} & \num{2.41e-2} & \num{4.01e-2} \\
+    $1$       & $10^{-6}$ & $0.05$ & \num{0.79} & \num{2.28} & \num{2.56e-1} & \num{7.36e-1} \\
+    $10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.87} & \num{2.00} & \num{1.86e-4} & \num{1.94e-4} \\
+    $10^{-6}$ & $1$       & $0.5$  & \num{0.88} & \num{2.02} & \num{2.40e-2} & \num{4.01e-2} \\
+    $10^{-6}$ & $1$       & $0.05$ & \num{0.79} & \num{2.28} & \num{2.56e-1} & \num{7.40e-1} \\
+    $1$       & $1$       & $0.5$  & \num{0.88} & \num{2.02} & \num{1.60e-2} & \num{2.68e-2} \\
+    $1$       & $1$       & $0.05$ & \num{0.79} & \num{2.28} & \num{1.71e-1} & \num{4.94e-1} \\
+    $10^{6}$  & $1$       & $0.5$  & \num{1.87} & \num{2.00} & \num{1.86e-4} & \num{1.94e-4} \\
+    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.00} & \num{2.01} & \num{7.98e-6} & \num{8.01e-6} \\
+    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.00} & \num{2.01} & \num{8.00e-6} & \num{8.24e-6} \\
+    $1$       & $10^{6}$  & $0.5$  & \num{2.00} & \num{2.01} & \num{7.98e-6} & \num{8.01e-6} \\
+    $1$       & $10^{6}$  & $0.05$ & \num{2.00} & \num{2.01} & \num{8.00e-6} & \num{8.24e-6} \\
+    $10^{6}$  & $10^{6}$  & $0.5$  & \num{1.88} & \num{2.00} & \num{9.36e-5} & \num{9.76e-5} \\
     \bottomrule
     \end{tabular}
     \label{tab:Quadratic2DH1}
 \end{table}
 
 \subsection{Manufactured solutions: 3D cases}\label{sec:NumericalExamplesStationaryCase3D} \hfill\\
-For the 3D examples, we use the $z$-wise extruded version of the same manufactured field. However, in order to break the symmetry, in this case we focus on unstructured meshes to make sure that the velocity vectors have a nonzero $z${\hyp}component due to the discretization errors. The domain is defined by a $(0, 1) \times (0, 1) \times (0, 0.3)$ parallelepiped. The sequence of meshes generated is obtained by successively doubling the average element size using a commercial meshing application. In this case we consider linear ($\mathbb{P}_1$) and quadratic ($\mathbb{P}_2$) tetrahedra (a sequence of four meshes was used for the $\mathbb{P}_1$ elements and just three for $\mathbb{P}_2$). The physical parameters are fixed to $(\alpha, \Reyn, \Damk) = (0.5, 1, 1)$ for all the cases run.
+For the 3D examples, we use the $z$-wise extruded version of the same manufactured field on the parallelepiped $(0, 1) \times (0, 1) \times (0, 0.3)$. \amend{We report results on two families of tetrahedral meshes, both generated with \texttt{Gridap}: a \emph{regular} family, obtained by splitting a structured Cartesian grid into Kuhn tetrahedra, and an \emph{irregular} family, obtained by successive uniform (red) refinement of an unstructured base mesh, each refinement halving the element size. The irregular family is included precisely because its lack of symmetry forces the velocity to acquire a nonzero $z${\hyp}component through the discretization error, providing a genuinely three-dimensional test; the regular family, in turn, isolates the behavior of the method on well-shaped elements. We consider linear ($\mathbb{P}_1$) and quadratic ($\mathbb{P}_2$) tetrahedra. For the $\mathbb{P}_1$ elements we use four meshes in both families; for the (more expensive) $\mathbb{P}_2$ elements, four on the regular family and three on the irregular one. The regular meshes split a uniform $N \times N \times \lceil 0.3\,N \rceil$ grid of the parallelepiped into Kuhn tetrahedra, with $N \in \{8,16,24,32\}$ for $\mathbb{P}_1$ and $N \in \{12,16,20,24\}$ for $\mathbb{P}_2$; the irregular meshes are produced by an unstructured tetrahedralization of target size $h \approx 0.2$, successively refined by uniform red subdivision, each refinement halving $h$.} The physical parameters are fixed to $(\alpha_0, \Reyn, \Damk) = (0.5, 1, 1)$ for all the cases run.
 
-The unstructured nature of the mesh makes it difficult to ensure that the boundary conditions imposed by the manufactured field are compatible with mass conservation in the discrete case, leading to an ill-posed problem. Thus, in this case we have resorted to the compressibility, taking $\varepsilon > 0$, which makes the problem well-posed. This also eliminates the indeterminacy in the pressure, removing the need to fix it at one point (it imposes that the average pressure is zero, see~\cite{codina1993iterative}).
+\amend{As anticipated in the remark following \cref{eq:conditions_on_num_param}, tetrahedral meshes call for a larger viscous stabilization constant than in two dimensions. For $\mathbb{P}_2$ elements the elementwise viscous energy loses coercivity unless $c_1 \ge 2\hat c^2(K)$, a purely geometric threshold that is about $(100+5\sqrt2)/24 \approx 4.5$ times larger on the Kuhn tetrahedron than on the right triangle, whereas for $\mathbb{P}_1$ elements it vanishes identically.\footnote{These thresholds are the largest eigenvalues of a local (reference-element) generalized eigenvalue problem for the operator $\boldsymbol{u}\mapsto\nabla\cdot(\ViscProj\nabla\boldsymbol{u})$; a detailed derivation will be reported separately.} Accordingly, in all the 3D experiments we take $c_1 = 16 k^4$ and keep $c_2 = 2 k^2$. This round value---four times the two{\hyp}dimensional one---sits just below the elementwise Kuhn threshold; the value is admissible because the inter{\hyp}element continuity of the conforming spaces renders the effective (global) coercivity requirement milder than the elementwise one, and it proved sufficient on all the meshes tested.}
+
+\amend{With Dirichlet conditions imposed on the whole boundary the discrete pressure is determined only up to a constant, and on the irregular meshes the manufactured boundary data is moreover not exactly compatible with discrete mass conservation; both effects render the fully incompressible ($\varepsilon=0$) problem ill-posed. We therefore take a small compressibility $\varepsilon > 0$, which restores well-posedness and, through the iterative penalty below, fixes the pressure by imposing a zero mean, removing the need to prescribe it at a point~\cite{codina1993iterative}.}
 
 We make sure that condition \cref{eq:UpperBoundOnEpsilon} is met, by using the conservative value $\varepsilon = 0.0001 \varepsilon_\text{ref}$, where
 \begin{equation} \label{eq:EpsilonRef}
@@ -1386,7 +1370,7 @@ where the first inequality holds for the parameter ranges chosen for the numeric
 
 Additionally, we also add the previous-step value of the compressibility term to the right-hand side (i.e., we add $\varepsilon p^{n-1}$ to the mass source term) at every nonlinear iteration. This \emph{iterative penalty method}, analyzed in~\cite{codina1993iterative}, ensures that the manufactured solution is not altered.
 
-\Cref{tab:3DL2,tab:3DH1} list the results for the $L^2$-norm and $H^1$-seminorm. As in the 2D case, the results can be considered optimal, with very similar results for ASGS and OSGS.
+\amend{\Cref{tab:3DL2,tab:3DH1} list the results for the $L^2$-norm and $H^1$-seminorm on both mesh families. On the regular mesh the method converges monotonically and the observed rates approach the theoretical optima---the $\mathbb{P}_2$ velocity, in particular, attains essentially optimal $L^2$ and $H^1$ orders on the finest meshes---confirming that, once the element-aware $c_1$ is used, the three-dimensional behavior matches the two-dimensional one. On the irregular mesh the convergence is likewise monotone, but the rates are somewhat lower; this residual sub-optimality is a consequence of the element-quality tail of the refined unstructured meshes (a small fraction of poorly shaped tetrahedra) rather than of the formulation, and it is present for both ASGS and OSGS. As in the 2D case, the two stabilizations yield very similar velocity errors, the main differences again appearing in the pressure.}
 
 \begin{table}[!htbp]
     \centering
@@ -1403,8 +1387,13 @@ Additionally, we also add the previous-step value of the compressibility term to
     \cmidrule(lr){2-5}
     element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
     \midrule
-    $\mathbb{P}_1$ (2) & \num{2.01} & \num{2.07} & \num{3.27e-4} & \num{1.79e-4} \\
-    $\mathbb{P}_2$ (3) & \num{3.18} & \num{3.22} & \num{8.20e-5} & \num{7.20e-5} \\
+    \multicolumn{5}{l}{\textit{regular mesh}} \\
+    $\mathbb{P}_1$ (2) & \num{1.75} & \num{1.91} & \num{1.90e-3} & \num{1.05e-3} \\
+    $\mathbb{P}_2$ (3) & \num{3.33} & \num{3.34} & \num{1.85e-4} & \num{1.79e-4} \\
+    \addlinespace
+    \multicolumn{5}{l}{\textit{irregular mesh}} \\
+    $\mathbb{P}_1$ (2) & \num{1.70} & \num{1.63} & \num{1.10e-3} & \num{8.98e-4} \\
+    $\mathbb{P}_2$ (3) & \num{2.55} & \num{2.56} & \num{2.07e-4} & \num{2.02e-4} \\
     \midrule
     \multicolumn{5}{c}{pressure} \\
     \midrule
@@ -1412,8 +1401,13 @@ Additionally, we also add the previous-step value of the compressibility term to
     \cmidrule(lr){2-5}
     element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
     \midrule
-    $\mathbb{P}_1$ (1) & \num{1.09} & \num{1.01} & \num{3.55e-2} & \num{4.13e-2} \\
-    $\mathbb{P}_2$ (2) & \num{2.32} & \num{2.44} & \num{1.13e-3} & \num{2.37e-3} \\
+    \multicolumn{5}{l}{\textit{regular mesh}} \\
+    $\mathbb{P}_1$ (1) & \num{1.37} & \num{1.85} & \num{2.88e-2} & \num{4.55e-2} \\
+    $\mathbb{P}_2$ (2) & \num{2.32} & \num{2.74} & \num{6.42e-3} & \num{1.57e-2} \\
+    \addlinespace
+    \multicolumn{5}{l}{\textit{irregular mesh}} \\
+    $\mathbb{P}_1$ (1) & \num{1.28} & \num{1.29} & \num{1.51e-2} & \num{2.98e-2} \\
+    $\mathbb{P}_2$ (2) & \num{1.73} & \num{1.66} & \num{7.86e-3} & \num{1.46e-2} \\
     \bottomrule
     \end{tabular}
     \label{tab:3DL2}
@@ -1435,8 +1429,13 @@ Additionally, we also add the previous-step value of the compressibility term to
     \cmidrule(lr){2-5}
     element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
     \midrule
-    $\mathbb{P}_1$ (1) & \num{1.04} & \num{1.03} & \num{6.15e-2} & \num{6.14e-2} \\
-    $\mathbb{P}_2$ (2) & \num{2.02} & \num{2.10} & \num{1.31e-2} & \num{1.20e-2} \\
+    \multicolumn{5}{l}{\textit{regular mesh}} \\
+    $\mathbb{P}_1$ (1) & \num{0.95} & \num{0.97} & \num{8.19e-2} & \num{8.22e-2} \\
+    $\mathbb{P}_2$ (2) & \num{2.22} & \num{2.29} & \num{1.74e-2} & \num{1.81e-2} \\
+    \addlinespace
+    \multicolumn{5}{l}{\textit{irregular mesh}} \\
+    $\mathbb{P}_1$ (1) & \num{0.83} & \num{0.85} & \num{7.63e-2} & \num{7.79e-2} \\
+    $\mathbb{P}_2$ (2) & \num{1.57} & \num{1.62} & \num{2.23e-2} & \num{2.20e-2} \\
     \midrule
     \multicolumn{5}{c}{pressure} \\
     \midrule
@@ -1444,8 +1443,13 @@ Additionally, we also add the previous-step value of the compressibility term to
     \cmidrule(lr){2-5}
     element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
     \midrule
-    $\mathbb{P}_1$ (-) & \num{0.18} & \num{0.20} & \num{9.09e-1} & \num{5.14e-1} \\
-    $\mathbb{P}_2$ (1) & \num{0.95} & \num{1.23} & \num{2.01e-1} & \num{3.67e-1} \\
+    \multicolumn{5}{l}{\textit{regular mesh}} \\
+    $\mathbb{P}_1$ (-) & \num{0.71} & \num{0.88} & \num{7.92e-1} & \num{1.29} \\
+    $\mathbb{P}_2$ (1) & \num{1.18} & \num{1.77} & \num{4.73e-1} & \num{1.15} \\
+    \addlinespace
+    \multicolumn{5}{l}{\textit{irregular mesh}} \\
+    $\mathbb{P}_1$ (-) & \num{0.35} & \num{0.32} & \num{7.25e-1} & \num{1.29} \\
+    $\mathbb{P}_2$ (1) & \num{0.66} & \num{0.63} & \num{7.01e-1} & \num{1.29} \\
     \bottomrule
     \end{tabular}
     \label{tab:3DH1}
@@ -1461,40 +1465,40 @@ To this end we keep the manufactured fields \cref{eq:ManufacturedProblem} and th
 \end{equation}
 where $C_b = 1.75$ is the standard Forchheimer constant used in the reference. Unlike the reference, in which $a$ carries an explicit $1/\Reyn$ factor, we fix the linear (Darcy) coefficient to $C_a = 0.30$, so that the Reynolds and Damk\"ohler numbers can be varied independently. Since the coefficients in \cref{eq:CocquetMMSReaction} are then held fixed, the Damk\"ohler number is set solely by the minimum porosity through $\Damk(\alpha_0) = C_a\big((1-\alpha_0)/\alpha_0\big)^2 + C_b\big((1-\alpha_0)/\alpha_0\big)$. The two values $\alpha_0 \in \{0.5, 0.1\}$ then correspond to $\Damk \approx 2$ and $\Damk \approx 40$ (moderate and strong drag, respectively), which we combine with $\Reyn \in \{1, 10^5\}$ to span the viscosity{\hyp} and convection{\hyp}dominated regimes.
 
-We compare three discretizations on the same sequence of structured triangular meshes, obtained by successively halving the nodal distance from a $10\times10$ grid up to $320 \times 320$: our equal{\hyp}order stabilized method with linear ($\mathbb{P}_1/\mathbb{P}_1$) and quadratic ($\mathbb{P}_2/\mathbb{P}_2$) elements, in both its ASGS and OSGS variants; and the unstabilized Galerkin Taylor{\hyp}Hood pair ($\mathbb{P}_2/\mathbb{P}_1$), which satisfies the inf{\hyp}sup condition and is the element used in~\cite{cocquet2021error}. In every case the porosity is nodally interpolated onto the velocity space, as in the reference. \Cref{tab:CocquetMMSL2,tab:CocquetMMSH1} collect the observed convergence rates (computed from the two finest meshes) and the finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm and the $H^1${\hyp}seminorm.
+We compare three discretizations on the same sequence of structured triangular meshes, obtained by successively halving the nodal distance from a $10\times10$ grid up to $320 \times 320$: our equal{\hyp}order stabilized method with linear ($\mathbb{P}_1/\mathbb{P}_1$) and quadratic ($\mathbb{P}_2/\mathbb{P}_2$) elements, in both its ASGS and OSGS variants; and the unstabilized Galerkin Taylor{\hyp}Hood pair ($\mathbb{P}_2/\mathbb{P}_1$), which satisfies the inf{\hyp}sup condition and is the element used in~\cite{cocquet2021error}. In every case the porosity is nodally interpolated onto the velocity space, as in the reference. \amend{As in the other two{\hyp}dimensional experiments, the equal{\hyp}order runs use the stabilization constants $c_1 = 4k^4$ and $c_2 = 2k^2$ (the triangular value, since $C_\text{inv}$ is that of the two{\hyp}dimensional simplex) and take $\varepsilon = 0$, the free additive constant of the pressure being fixed by the zero{\hyp}mean constraint of the space $\mathcal{Q}_0$.} \Cref{tab:CocquetMMSL2,tab:CocquetMMSH1} collect the observed convergence rates (computed from the two finest meshes) and the finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm and the $H^1${\hyp}seminorm.
 
 \begin{table}[!htbp]
     \centering
-    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$ is the unstabilized Galerkin Taylor{\hyp}Hood element. Optimal slopes are $k_v+1$ (velocity) and $k_p+1$ (pressure). \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text).}
+    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$ is the unstabilized Galerkin Taylor{\hyp}Hood element. \amend{The optimal slope is given in parentheses next to each observed value: $k_v+1$ for the velocity, and for the pressure $k_p$ for the equal{\hyp}order pairs and $k_p+1$ for the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair.} \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text).}
     \begin{tabular}{c c l r r r r}
     \toprule
     & & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
     \cmidrule(lr){4-5}\cmidrule(lr){6-7}
     $\Reyn$ & $\alpha_0$ & \multicolumn{1}{c}{method} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} \\
     \midrule
-    $1$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.95} & \num{1.33e-4} & \num{1.85} & \num{7.48e-3} \\
-        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.99} & \num{5.63e-5} & \num{1.99} & \num{1.78e-3} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.18} & \num{3.42e-7} & \num{2.02} & \num{1.83e-4} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.02} & \num{2.88e-7} & \num{1.90} & \num{1.77e-4} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{3.24} & \num{2.85e-7} & \num{2.92} & \num{4.17e-6} \\
+    $1$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.95}~(2) & \num{1.33e-4} & \num{1.85}~(1) & \num{7.48e-3} \\
+        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.99}~(2) & \num{5.63e-5} & \num{1.99}~(1) & \num{1.78e-3} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.18}~(3) & \num{3.42e-7} & \num{2.02}~(2) & \num{1.83e-4} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.02}~(3) & \num{2.88e-7} & \num{1.90}~(2) & \num{1.77e-4} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{3.24}~(3) & \num{2.85e-7} & \num{2.92}~(2) & \num{4.17e-6} \\
     \midrule
-    $1$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.87} & \num{5.33e-4} & \num{1.76} & \num{4.68e-2} \\
-        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.98} & \num{2.04e-4} & \num{1.98} & \num{1.16e-2} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.10} & \num{2.44e-6} & \num{2.04} & \num{1.18e-3} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.03} & \num{1.85e-6} & \num{1.80} & \num{1.10e-3} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{2.97} & \num{1.83e-6} & \num{3.73} & \num{9.52e-6} \\
+    $1$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.87}~(2) & \num{5.33e-4} & \num{1.76}~(1) & \num{4.68e-2} \\
+        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.98}~(2) & \num{2.04e-4} & \num{1.98}~(1) & \num{1.16e-2} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.10}~(3) & \num{2.44e-6} & \num{2.04}~(2) & \num{1.18e-3} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.03}~(3) & \num{1.85e-6} & \num{1.80}~(2) & \num{1.10e-3} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{2.97}~(3) & \num{1.83e-6} & \num{3.73}~(2) & \num{9.52e-6} \\
     \midrule
-    $10^5$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{2.13} & \num{1.54e-5} & \num{2.14} & \num{4.76e-6} \\
-           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{2.21} & \num{1.94e-5} & \num{2.11} & \num{5.71e-6} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.02} & \num{4.20e-7} & \num{2.86} & \num{9.95e-8} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.04} & \num{4.23e-7} & \num{3.05} & \num{1.07e-7} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{5.14e-1} & \num{2.00} & \num{9.84e-6} \\
+    $10^5$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{2.13}~(2) & \num{1.54e-5} & \num{2.14}~(1) & \num{4.76e-6} \\
+           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{2.21}~(2) & \num{1.94e-5} & \num{2.11}~(1) & \num{5.71e-6} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.02}~(3) & \num{4.20e-7} & \num{2.86}~(2) & \num{9.95e-8} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.04}~(3) & \num{4.23e-7} & \num{3.05}~(2) & \num{1.07e-7} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{5.14e-1} & \num{2.00}~(2) & \num{9.84e-6} \\
     \midrule
-    $10^5$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{3.01} & \num{2.28e-4} & \num{3.03} & \num{3.58e-5} \\
-           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{3.10} & \num{2.44e-4} & \num{3.12} & \num{3.85e-5} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.98} & \num{2.70e-6} & \num{2.73} & \num{5.96e-7} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.00} & \num{2.72e-6} & \num{3.00} & \num{6.87e-7} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.02e-1} & \num{2.00} & \num{9.84e-6} \\
+    $10^5$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{3.01}~(2) & \num{2.28e-4} & \num{3.03}~(1) & \num{3.58e-5} \\
+           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{3.10}~(2) & \num{2.44e-4} & \num{3.12}~(1) & \num{3.85e-5} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.98}~(3) & \num{2.70e-6} & \num{2.73}~(2) & \num{5.96e-7} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.00}~(3) & \num{2.72e-6} & \num{3.00}~(2) & \num{6.87e-7} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.02e-1} & \num{2.00}~(2) & \num{9.84e-6} \\
     \bottomrule
     \end{tabular}
     \label{tab:CocquetMMSL2}
@@ -1502,36 +1506,36 @@ We compare three discretizations on the same sequence of structured triangular m
 
 \begin{table}[!htbp]
     \centering
-    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $H^1${\hyp}seminorm, computed from the two finest meshes. Rows and notation as in \cref{tab:CocquetMMSL2}. Optimal slopes are $k_v$ (velocity) and $k_p$ (pressure).}
+    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $H^1${\hyp}seminorm, computed from the two finest meshes. Rows and notation as in \cref{tab:CocquetMMSL2}, \amend{with the optimal slope given in parentheses next to each observed value: $k_v$ for the velocity, and for the pressure $k_p-1$ for the equal{\hyp}order pairs and $k_p$ for the Taylor{\hyp}Hood pair (a dash denotes that no positive rate is guaranteed).}}
     \begin{tabular}{c c l r r r r}
     \toprule
     & & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
     \cmidrule(lr){4-5}\cmidrule(lr){6-7}
     $\Reyn$ & $\alpha_0$ & \multicolumn{1}{c}{method} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} \\
     \midrule
-    $1$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.03} & \num{3.53e-2} & \num{1.66} & \num{6.27e-1} \\
-        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.00} & \num{3.50e-2} & \num{1.46} & \num{2.31e-1} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.08} & \num{7.12e-4} & \num{0.98} & \num{5.10e-1} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01} & \num{6.62e-4} & \num{0.91} & \num{4.98e-1} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.99} & \num{6.59e-4} & \num{1.05} & \num{1.09e-2} \\
+    $1$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.03}~(1) & \num{3.53e-2} & \num{1.66}~($-$) & \num{6.27e-1} \\
+        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.00}~(1) & \num{3.50e-2} & \num{1.46}~($-$) & \num{2.31e-1} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.08}~(2) & \num{7.12e-4} & \num{0.98}~(1) & \num{5.10e-1} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01}~(2) & \num{6.62e-4} & \num{0.91}~(1) & \num{4.98e-1} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.99}~(2) & \num{6.59e-4} & \num{1.05}~(1) & \num{1.09e-2} \\
     \midrule
-    $1$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.05} & \num{1.24e-1} & \num{1.64} & \num{4.75} \\
-        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.01} & \num{1.21e-1} & \num{1.98} & \num{1.15} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.04} & \num{4.78e-3} & \num{0.97} & \num{3.24} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01} & \num{4.23e-3} & \num{0.82} & \num{3.08} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.98} & \num{4.19e-3} & \num{1.48} & \num{1.10e-2} \\
+    $1$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.05}~(1) & \num{1.24e-1} & \num{1.64}~($-$) & \num{4.75} \\
+        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.01}~(1) & \num{1.21e-1} & \num{1.98}~($-$) & \num{1.15} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.04}~(2) & \num{4.78e-3} & \num{0.97}~(1) & \num{3.24} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01}~(2) & \num{4.23e-3} & \num{0.82}~(1) & \num{3.08} \\
+        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.98}~(2) & \num{4.19e-3} & \num{1.48}~(1) & \num{1.10e-2} \\
     \midrule
-    $10^5$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.01} & \num{3.50e-2} & \num{1.00} & \num{1.09e-2} \\
-           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.03} & \num{3.53e-2} & \num{1.00} & \num{1.09e-2} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.06} & \num{1.02e-3} & \num{1.84} & \num{2.47e-4} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.07} & \num{1.02e-3} & \num{2.01} & \num{2.64e-4} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{6.34}    & \num{1.00} & \num{1.09e-2} \\
+    $10^5$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.01}~(1) & \num{3.50e-2} & \num{1.00}~($-$) & \num{1.09e-2} \\
+           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.03}~(1) & \num{3.53e-2} & \num{1.00}~($-$) & \num{1.09e-2} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.06}~(2) & \num{1.02e-3} & \num{1.84}~(1) & \num{2.47e-4} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.07}~(2) & \num{1.02e-3} & \num{2.01}~(1) & \num{2.64e-4} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{6.34}    & \num{1.00}~(1) & \num{1.09e-2} \\
     \midrule
-    $10^5$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.06} & \num{1.21e-1} & \num{1.10} & \num{1.10e-2} \\
-           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.10} & \num{1.22e-1} & \num{1.15} & \num{1.10e-2} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.01} & \num{6.59e-3} & \num{1.66} & \num{1.46e-3} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.04} & \num{6.60e-3} & \num{1.93} & \num{1.68e-3} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.96}    & \num{1.00} & \num{1.09e-2} \\
+    $10^5$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.06}~(1) & \num{1.21e-1} & \num{1.10}~($-$) & \num{1.10e-2} \\
+           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.10}~(1) & \num{1.22e-1} & \num{1.15}~($-$) & \num{1.10e-2} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.01}~(2) & \num{6.59e-3} & \num{1.66}~(1) & \num{1.46e-3} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.04}~(2) & \num{6.60e-3} & \num{1.93}~(1) & \num{1.68e-3} \\
+           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.96}    & \num{1.00}~(1) & \num{1.09e-2} \\
     \bottomrule
     \end{tabular}
     \label{tab:CocquetMMSH1}
@@ -1550,7 +1554,9 @@ Our analysis and numerical experiments show that the convergence properties of t
 
 The specialization of the robustness analysis to equal{\hyp}order polynomial elements presented in \cref{sec:Robustness} shows a few details previously not discussed, such as the mechanism of pressure error improvement with growing $\amend{\Damk}$ or the (very weak in practice) deterioration of the velocity error with $\Damk$. By normalizing all the variables adequately, we have shown that the absolute errors are very stable with respect to changes in the physical parameters when the convergence rate is similar.
 
-The abstract framework favored here makes it natural to include different particularizations of VMS in a very concise way. This has allowed us to implement both the ASGS and the OSGS versions of the method, showing through the many numerical experiments that both variants have very similar properties, at least for the problem considered.
+The abstract framework favored here makes it natural to include different particularizations of VMS in a very concise way. This has allowed us to implement both the ASGS and the OSGS versions of the method, showing through the many numerical experiments that the two variants behave very similarly for the velocity, \amend{while the OSGS variant tends to deliver somewhat better pressure convergence in some regimes,} at least for the problem considered.
+
+\amend{Two aspects of the numerical study deserve a concluding remark. First, the a priori condition on the viscous stabilization constant, \cref{eq:conditions_on_num_param}, makes explicit its dependence on the local inverse{\hyp}estimate constant; this predicts, and the three{\hyp}dimensional experiments confirm, that quadratic tetrahedra require a markedly larger constant than the two{\hyp}dimensional triangles and quadrilaterals ($c_1 = 16\,k^4$ instead of $4\,k^4$), whereas linear elements need no such increase. With this element{\hyp}aware choice the three{\hyp}dimensional convergence recovers the two{\hyp}dimensional behavior on well{\hyp}shaped (regular) meshes. Second, the comparison of \cref{sec:NumericalExampleFromLiterature} shows that, on the Darcy{\hyp}Brinkman{\hyp}Forchheimer equations, the equal{\hyp}order stabilized method matches the accuracy of the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair used in~\cite{cocquet2021error} without requiring a compatible velocity{\hyp}pressure space, and remains convergent in the convection{\hyp}dominated regime in which the unstabilized Galerkin Taylor{\hyp}Hood velocity does not.}
 
 There are several directions in which we think it is interesting to take the formulation developed here. First, we would like to study the possibility of simplifying the stabilized linear forms, given that not all the terms included are strictly necessary to obtain optimal convergence rates. In this sense, the so{\hyp}called term{\hyp}by{\hyp}term stabilization approach~\cite{codina2008analysis} is a promising alternative.
 

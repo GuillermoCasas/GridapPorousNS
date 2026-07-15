@@ -812,8 +812,9 @@ $\alpha_K\le1$ (\cref{H:porosity}) gives \eqref{eq:continuity}.
 
 \begin{remark}[Sharper, porosity-weighted estimate]\label{rem:sharper}
 The bound \eqref{eq:sharpcont} is strictly sharper than \eqref{eq:continuity} wherever
-$\alpha$ is small, and it propagates to the convergence estimate (cf.\
-\cref{rem:sharperconv}). It is remarkable that the smallness condition
+$\alpha$ is small, and it propagates to the convergence estimate
+\eqref{eq:convergence} (equivalently, the porosity{\hyp}weighted form of the main-text
+estimate \eqref{eq:ConvergenceResult}). It is remarkable that the smallness condition
 \eqref{eq:epscond} on $\varepsilon$, with its factor $\alpha_K^2$, is exactly what is
 needed for the penalty contribution \eqref{eq:absorb3} to carry the weight $\alpha_K$ as
 well; the same factor is the one required by the stability analysis of the main text.
@@ -983,8 +984,8 @@ Under the hypotheses of \cref{prop:stability,lem:continterp},
 \begin{equation}\label{eq:convergence}
 \begin{aligned}
   \triplenorm{U-U_h}
-  &\le C\,\psi(h) \\
-  &\le C\sum_{K\in\Th}h_K^{-1}
+  &\le C\,\psi(h)
+  = C\sum_{K\in\Th}\alpha_K\,h_K^{-1}
   \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr).
 \end{aligned}
 \end{equation}
@@ -1003,11 +1004,8 @@ so $\triplenorm{E_h}\le C\psi(h)$. The triangle inequality and \eqref{eq:Enorm} 
 $\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{E_h}\le C\psi(h)$.
 \end{proof}
 
-\begin{remark}[Sharper convergence estimate]\label{rem:sharperconv}
-Since the proof goes through with the porosity-weighted quantity $\psi(h)$ of
-\eqref{eq:psih}, the convergence estimate of the main text in fact holds in the slightly
-sharper form $\triplenorm{U-U_h}\le C\sum_K \alpha_K h_K^{-1}
-(\tau_{2,K}^{1/2}\Eint{K}{\bu}+\tau_{1,K}^{1/2}\Eint{K}{p})$, with the local weight
-$\alpha_K\le1$. This refinement is consistent with (and slightly strengthens) the
-robustness discussion of the main text in regions of low porosity.
-\end{remark}
+\noindent The bound \eqref{eq:convergence}, which is the porosity{\hyp}weighted form of
+the main-text estimate \eqref{eq:ConvergenceResult}, is the sharpest afforded by the
+present argument; the coarser bound with the weight $\alpha_K$ replaced by $1$ follows at
+once from $\alpha_K\le1$ and matches the form found, without the porosity field,
+in~\cite{codina2001stabilized}.
