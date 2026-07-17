@@ -53,6 +53,7 @@ Manifest.toml
 # Ignore repomix outputs
 repomix-output.*
 *.repomix-output.*
+repomix/repomix-output-*
 
 # LaTeX compilation intermediates (independent of location)
 *.aux
@@ -89,3 +90,7 @@ latex\ compilation/
 /proof_verification/coq_coverage.pdf
 /theory/numerical_constants/c1_dimension_note.pdf
 
+# Python compilation files
+__pycache__/
+*.py[cod]
+*$py.class

@@ -839,8 +839,8 @@ regularity
   U\in\mathcal{W}_r \coloneqq
   \bigl(H^{m}(\Omega)\cap H^1_0(\Omega)\bigr)^d
   \times\bigl(H^{n}(\Omega)\cap\mathcal{Q}_0\bigr),
-  \qquad m\ge k_u+1\ (\ge 2),\quad n\ge k_p+1\ (\ge 2),
 \end{equation}
+with $m\ge k_u+1\ (\ge 2)$ and $n\ge k_p+1\ (\ge 2)$.
 In particular
 $\mathcal{L}_{\ba}U\in L^2(K)$ for every $K$, so that the consistency property
 \eqref{eq:consistency} holds, and for $d\le3$ both $\bu$ and $p$ are continuous on
@@ -865,9 +865,10 @@ Standard interpolation theory~\cite{brenner2008mathematical,ernguermond} provide
 \end{equation}
 and, since $k_u+1,\,k_p+1>d/2$ for $d\le3$, also the $L^\infty$ estimates
 \begin{equation}\label{eq:interpinfty}
-  \norm{\bu-\buhat}_{L^\infty(K)} \le C\,h_K^{-d/2}\,\Eint{K}{\bu},
-  \qquad
-  \norm{p-\widehat{p}_h}_{L^\infty(K)} \le C\,h_K^{-d/2}\,\Eint{K}{p},
+\begin{aligned}
+  \norm{\bu-\buhat}_{L^\infty(K)} &\le C\,h_K^{-d/2}\,\Eint{K}{\bu},\\
+  \norm{p-\widehat{p}_h}_{L^\infty(K)} &\le C\,h_K^{-d/2}\,\Eint{K}{p},
+\end{aligned}
 \end{equation}
 which are the analogues of Eqs.~(78)--(79) of~\cite{codina2001stabilized}. We abbreviate
 $E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
