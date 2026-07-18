@@ -11,9 +11,14 @@
 # Here alpha_0 = 0.5 as in the 3D tables. Run:
 #   julia --project=../../.. run_interpolation_reference3d.jl
 # ==============================================================================================
-using Gridap, GridapGmsh, PorousNSSolver
+using Gridap, GridapGmsh, PorousNSSolver, JSON3
 const PNS = PorousNSSolver
 include("mesh3d.jl")
+
+# Where the machine-readable interpolation reference lands, so make_3d_tables.py can transcribe the
+# interp rows of tab:3DL2 / tab:3DH1 straight from data (no hand-copying). Overwrites in place; the
+# family/kv are keyed inside, so the file is self-describing.
+const INTERP_JSON = joinpath(@__DIR__, "results", "interp_reference3d.json")
 
 # Match smoke3d.jl exactly.
 const DOMAIN = (0.0,1.0, 0.0,1.0, 0.0,0.3)
@@ -76,23 +81,38 @@ function reference_on(models, kv)
     @printf("    slope(two finest): L2u=%.2f H1u=%.2f L2p=%.2f H1p=%.2f  | FME(finest): L2u=%.3e H1u=%.3e L2p=%.3e H1p=%.3e\n",
             sl(x->x.el2_u), sl(x->x.eh1_u), sl(x->x.el2_p), sl(x->x.eh1_p),
             res[end].el2_u, res[end].eh1_u, res[end].el2_p, res[end].eh1_p); flush(stdout)
-    return res
+    # Machine-readable summary for the table generator: two-finest slopes + finest-mesh error (FME).
+    summary = Dict(
+        "kv" => kv, "alpha_0" => ALPHA0,
+        "slope" => Dict("l2u"=>sl(x->x.el2_u), "h1u"=>sl(x->x.eh1_u), "l2p"=>sl(x->x.el2_p), "h1p"=>sl(x->x.eh1_p)),
+        "fme"   => Dict("l2u"=>res[end].el2_u, "h1u"=>res[end].eh1_u, "l2p"=>res[end].el2_p, "h1p"=>res[end].eh1_p),
+        "levels" => [Dict("h"=>r.h, "cells"=>r.cells, "l2u"=>r.el2_u, "h1u"=>r.eh1_u, "l2p"=>r.el2_p, "h1p"=>r.eh1_p) for r in res],
+    )
+    return res, summary
 end
 
 using Printf
 function main()
     kuhn = Dict(1 => [(8,8,2),(16,16,4),(24,24,6),(32,32,8)], 2 => [(12,12,3),(16,16,4),(20,20,5),(24,24,6)])
+    out = Dict{String,Any}("regular" => Dict{String,Any}(), "irregular" => Dict{String,Any}())
     # Regular Kuhn first (fast, deterministic) so those numbers land before the heavy nested-red family.
     for kv in (1, 2)
         println("\n=== REGULAR (Kuhn) P$kv interpolation reference (alpha_0=$ALPHA0) ==="); flush(stdout)
         models = [structured_kuhn_model(p; domain=DOMAIN) for p in kuhn[kv]]
-        reference_on(models, kv)
+        _, summary = reference_on(models, kv)
+        out["regular"][string(kv)] = summary
     end
     for (kv, nlev) in ((1,3),(2,2))
         println("\n=== IRREGULAR (nested-red) P$kv interpolation reference (alpha_0=$ALPHA0) ==="); flush(stdout)
         fam = build_nested_family(nlev; lc=0.2, domain=DOMAIN, algorithm=1)
-        reference_on(fam, kv)
+        _, summary = reference_on(fam, kv)
+        out["irregular"][string(kv)] = summary
     end
+    mkpath(dirname(INTERP_JSON))
+    open(INTERP_JSON, "w") do io
+        JSON3.pretty(io, out)
+    end
+    println("\nWrote interpolation reference -> $INTERP_JSON"); flush(stdout)
 end
 
 main()
