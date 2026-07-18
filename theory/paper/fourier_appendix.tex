@@ -1,5 +1,5 @@
 % =============================================================================
-% Appendix C: Fourier symbols of the differential operator and the term-by-term
+% Appendix B: Fourier symbols of the differential operator and the term-by-term
 % derivation of the stabilization parameters (added June 2026).
 %
 % Every matrix identity, eigenvalue and limit stated below is checked
@@ -34,7 +34,7 @@ The viscous part is second order, so its symbol is the double contraction of the
   \widehat{\mathcal{L}}_{\nu}(\boldsymbol{k}_0)
   = \frac{1}{h^2}\, k_{0,i}\,k_{0,j}\,\mathbf{K}_{ij}.
 \end{equation}
-Inserting the velocity block of $\mathbf{K}_{ij}$ from \cref{eq:matrices_stationary_strong_problem}, whose entries are $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{ij}\delta_{ab}+\tfrac13\delta_{ai}\delta_{aj})$ on the diagonal $a=b$ and $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{bi}\delta_{aj}-\tfrac23\delta_{ai}\delta_{bj})$ off it, the contraction collapses to
+Inserting the velocity block of $\mathbf{K}_{ij}$ from \cref{eq:matrices_stationary_strong_problem}, whose entries \amend{are, for general $d$, $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{ij}\delta_{ab}+(1-\tfrac{2}{d})\delta_{ai}\delta_{aj})$ on the diagonal $a=b$ and $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{bi}\delta_{aj}-\tfrac{2}{d}\delta_{ai}\delta_{bj})$ off it (\cref{eq:matrices_stationary_strong_problem} displays the $d=3$ instance, for which these read $+\tfrac13$ and $-\tfrac23$)}, the contraction collapses to
 \begin{equation}\label{eq:ftViscClosed}
   k_{0,i}k_{0,j}(\mathbf{K}_{ij})_{ab}
    = \alpha\nu\Bigl(|\boldsymbol{k}_0|^2\,\delta_{ab} + \bigl(1-\tfrac{2}{d}\bigr)\,k_{0,a}k_{0,b}\Bigr),
@@ -47,8 +47,9 @@ i.e.\ $\widehat{\mathcal{L}}_{\nu}=\frac{\alpha\nu}{h^2}\bigl(|\boldsymbol{k}_0|
 \end{equation}
 so that the longitudinal eigenvalue is $\tfrac43\,\alpha\nu|\boldsymbol{k}_0|^2/h^2$ for $d=3$ (and equals the transverse one for $d=2$). Its spectral radius gives
 \begin{equation}\label{eq:ftTauNu}
-  \tau_{\nu,1}^{-1} = \frac{4}{3}\,\alpha\nu\,\frac{|\boldsymbol{k}_0|^2}{h^2},\qquad \tau_{\nu,2}^{-1}=0,
+  \tau_{\nu,1}^{-1} = \amend{\Bigl(2-\tfrac{2}{d}\Bigr)}\,\alpha\nu\,\frac{|\boldsymbol{k}_0|^2}{h^2},\qquad \tau_{\nu,2}^{-1}=0,
 \end{equation}
+\amend{which is $\tfrac43\,\alpha\nu|\boldsymbol{k}_0|^2/h^2$ for $d=3$ and exactly $\alpha\nu|\boldsymbol{k}_0|^2/h^2$ for $d=2$, the case of the two-dimensional experiments of \cref{sec:NumericalExamplesStationaryCase2D}. As discussed below, the resulting $O(1)$ factor is deliberately dropped; for $d=2$ there is nothing to drop, the retained expression being exact.}
 which is the first row of \cref{eq:StabilizationParameters}. The squared wavenumber is what makes the identification $c_1\coloneqq|\boldsymbol{k}_0|^2$ consistent downstream.
 
 \subsection{Convective term}\label{sec:ftConvective}
@@ -72,7 +73,7 @@ The block $\mathbf{A}_{\text{b},i}$ couples the $i$-th velocity component to the
   = \mathrm{i}\,\frac{\alpha}{h}
     \begin{bmatrix} \mathbf{0} & \boldsymbol{k}_0 \\[2pt] \boldsymbol{k}_0^{\top} & 0 \end{bmatrix}.
 \end{equation}
-The real coupling matrix $\bigl[\begin{smallmatrix}\mathbf{0}&\boldsymbol{k}_0\\ \boldsymbol{k}_0^{\top}&0\end{smallmatrix}\bigr]$ has eigenvalues $\{+|\boldsymbol{k}_0|,\,-|\boldsymbol{k}_0|,\,0^{(d-1)}\}$, so $\widehat{\mathcal{L}}_b$ has spectral radius $\alpha|\boldsymbol{k}_0|/h$. Because this single magnitude couples two fields carried at different scales, the design seeks a \emph{diagonal} approximation $\boldsymbol{\tau}_b=\diag(\tau_{b,1}\mathbb{I}_d,\tau_{b,2})$. Introducing a free scale $\lambda$ (of units of velocity squared) for the relative momentum/mass weighting, the two design conditions read
+The real coupling matrix $\bigl[\begin{smallmatrix}\mathbf{0}&\boldsymbol{k}_0\\ \boldsymbol{k}_0^{\top}&0\end{smallmatrix}\bigr]$ has eigenvalues $\{+|\boldsymbol{k}_0|,\,-|\boldsymbol{k}_0|,\,0^{(d-1)}\}$, so $\widehat{\mathcal{L}}_b$ has spectral radius $\alpha|\boldsymbol{k}_0|/h$. Because this single magnitude couples two fields carried at different scales, the design seeks a \emph{diagonal} approximation $\boldsymbol{\tau}_b=\diag(\tau_{b,1}\mathbb{I}_d,\tau_{b,2})$. Here $\lambda$ is the scaling factor of the metric $\Lambda$ introduced in \cref{sec:StabilizationDesign} (of units of velocity squared), which in this block plays the role of the relative momentum/mass weighting and is left free until \cref{eq:ftLambda}; the two design conditions read
 \begin{equation}\label{eq:ftBdesign}
 \begin{aligned}
   \tau_{b,1}^{-1}\,\tau_{b,2}^{-1} &= \Bigl(\frac{\alpha|\boldsymbol{k}_0|}{h}\Bigr)^{2}
@@ -105,7 +106,7 @@ Summing the five contributions componentwise, $\boldsymbol{\tau}_K^{-1}=\sum_\bu
   \qquad\text{so that}\qquad
   \sqrt{\lambda} = \frac{h}{|\boldsymbol{k}_0|\,\tau_{1,\text{NS}}},
 \end{equation}
-the coupling and porosity-gradient entries become $\tau_{b,1}^{-1}=\alpha/\tau_{1,\text{NS}}$, $\tau_{b,2}^{-1}=c_1\,\alpha\,\tau_{1,\text{NS}}/h^2$ and $\tau_{\nabla\alpha,1}^{-1}=(h/|\boldsymbol{k}_0|)\,|\nabla\alpha|\,\tau_{1,\text{NS}}^{-1}$, with $c_1=|\boldsymbol{k}_0|^2$. For the \emph{momentum} eigenvalue, the viscous and convective entries collapse onto $\alpha\,\tau_{1,\text{NS}}^{-1}$ (absorbing the constant $\tfrac43$ into $c_1$, and writing $c_2=|\boldsymbol{k}_0\cos\phi|$ so that $c_2|\boldsymbol{w}|=|\boldsymbol{w}\cdot\boldsymbol{k}_0|$, cf.\ \cref{eq:TauNavierStokes}); the $\tau_{b,1}^{-1}$ entry coincides with this same momentum scale and is therefore the self-referential contribution absorbed into the algorithmic constants (the cancellation noted after \cref{eq:StabilizationParameters}). Adding the porosity-gradient and reaction entries gives
+the coupling and porosity-gradient entries become $\tau_{b,1}^{-1}=\alpha/\tau_{1,\text{NS}}$, $\tau_{b,2}^{-1}=c_1\,\alpha\,\tau_{1,\text{NS}}/h^2$ and $\tau_{\nabla\alpha,1}^{-1}=(h/|\boldsymbol{k}_0|)\,|\nabla\alpha|\,\tau_{1,\text{NS}}^{-1}$, with $c_1=|\boldsymbol{k}_0|^2$. For the \emph{momentum} eigenvalue, the viscous and convective entries collapse onto $\alpha\,\tau_{1,\text{NS}}^{-1}$ (ignoring the coefficient $\tfrac43$ of $\tau_{\nu,1}^{-1}$, as is done below \cref{eq:StabilizationParameters}, and writing $c_2=|\boldsymbol{k}_0\cos\phi|$ so that $c_2|\boldsymbol{w}|=|\boldsymbol{w}\cdot\boldsymbol{k}_0|$, cf.\ \cref{eq:TauNavierStokes}); the $\tau_{b,1}^{-1}$ entry coincides with this same momentum scale and is therefore the self-referential contribution absorbed into the algorithmic constants (the cancellation noted after \cref{eq:StabilizationParameters}). Adding the porosity-gradient and reaction entries gives
 \begin{equation}\label{eq:ftTau1}
   \tau_1^{-1}
    = \Bigl(\alpha + \tfrac{h}{|\boldsymbol{k}_0|}|\nabla\alpha|\Bigr)\tau_{1,\text{NS}}^{-1} + \rho_{\Lambda^{-1}}(\boldsymbol{\sigma})

@@ -1,5 +1,5 @@
 % =============================================================================
-% Appendix B: self-contained continuity proof (inlined June 2026).
+% Appendix C: self-contained continuity proof (inlined June 2026).
 % Source: theory/continuity appendix/continuity_appendix.tex (standalone).
 % Transformations applied when inlining:
 %   - standalone preamble / title / abstract / thebibliography / nd{document} stripped;
@@ -141,7 +141,7 @@ norm of the main text is
 Throughout, $C$ denotes a generic positive constant, possibly different at each occurrence,
 that may depend on $d$, on the polynomial degrees, on the shape regularity of the mesh
 family, on the algorithmic constants $c_1,c_2$ and on the constants
-$C_\alpha,C_2,c_J,c_J'$ introduced below, but \emph{not} on the mesh size, nor on
+$C_{\nabla\alpha},C_2,c_J,c_J'$ introduced below, but \emph{not} on the mesh size, nor on
 $\nu,\sigma,\varepsilon,\ba$ or $\alpha$. We assume:
 
 \begin{assumption}[Data]\label{H:data}
@@ -156,14 +156,14 @@ parameter satisfies
 
 \begin{assumption}[Porosity]\label{H:porosity}
 $\alpha\in W^{1,\infty}(\Omega)$ with $0<\alpha\le 1$ in $\overline{\Omega}$, and the
-porosity variations are resolved by the mesh: there is $C_\alpha\ge0$ such that
+porosity variations are resolved by the mesh: there is $C_{\nabla\alpha}\ge0$ such that
 \begin{equation}\label{eq:resolved}
-  h_K\,\norm{\nabla\alpha}_{L^\infty(K)} \le C_\alpha\,\alpha_{0,K}
+  h_K\,\norm{\nabla\alpha}_{L^\infty(K)} \le C_{\nabla\alpha}\,\alpha_{0,K}
   \qquad\forall\,K\in\Th .
 \end{equation}
 In particular, \amend{the elements being convex,}
 $\alpha_{\infty,K}\le \delta_\alpha\,\alpha_{0,K}$ with
-$\delta_\alpha\coloneqq 1+C_\alpha$ \amend{(for shape-regular non-convex elements the
+$\delta_\alpha\coloneqq 1+C_{\nabla\alpha}$ \amend{(for shape-regular non-convex elements the
 same holds with $\delta_\alpha$ enlarged by a constant depending only on the chunkiness
 parameter)}, so that
 $\alpha_{0,K}\le\alpha(\boldsymbol{x})\le\alpha_K\le\delta_\alpha\,\alpha_{0,K}$ for
@@ -272,7 +272,7 @@ The remaining statements follow from $\alpha_K\le 1$ and $C_2<1$.
 
 \begin{lemma}[Weighted inverse estimates]\label{lem:winv}
 Let \cref{H:porosity,H:mesh} hold. There is a constant
-$\Cinva = \Cinva(\Cinv,C_\alpha,d)$ such that, for all
+$\Cinva = \Cinva(\Cinv,C_{\nabla\alpha},d)$ such that, for all
 finite element functions $\boldsymbol{w}_h\in\mathcal{V}_{h0}$,
 $r_h\in\mathcal{Q}_{h0}$, and all $K\in\Th$,
 \begin{align}
@@ -321,13 +321,13 @@ by \eqref{eq:resolved},
 \[
   \norm{\mathbf{M}\,\nabla\alpha}_K
   \le \norm{\nabla\alpha}_{L^\infty(K)}\norm{\mathbf{M}}_K
-  \le \frac{C_\alpha\,\alpha_{0,K}}{h_K}\,
+  \le \frac{C_{\nabla\alpha}\,\alpha_{0,K}}{h_K}\,
   \alpha_{0,K}^{-1/2}\norm{\alpha^{1/2}\mathbf{M}}_K
-  \le \frac{C_\alpha}{h_K}\,\alpha_K^{1/2}\,
+  \le \frac{C_{\nabla\alpha}}{h_K}\,\alpha_K^{1/2}\,
   \norm{\alpha^{1/2}\mathbf{M}}_K .
 \]
 This proves \eqref{eq:winv-divvisc} with
-$\Cinva\coloneqq\sqrt{d\,\delta_\alpha}\,\Cinv+C_\alpha$. Estimate
+$\Cinva\coloneqq\sqrt{d\,\delta_\alpha}\,\Cinv+C_{\nabla\alpha}$. Estimate
 \eqref{eq:winv-grad} follows from $\alpha\le\alpha_K$ on $K$, the pointwise contraction
 property $|\ViscProj\nabla\boldsymbol{w}_h|\le|\nabla\boldsymbol{w}_h|$ and
 \eqref{eq:inverse}. For \eqref{eq:winv-divu}, expand
@@ -341,9 +341,15 @@ $\alpha\le\alpha_K$, $|\ba|\le|\ba|_{\infty,K}$ and \eqref{eq:inverse}.
 \Cref{lem:winv} makes precise the inverse estimates used in the stability proof of the
 main text for the $\alpha$-weighted second-order term: since $\alpha$ is \emph{not}
 piecewise polynomial, the constant is not the bare $\Cinv$ but the slightly larger
-$\Cinva$, which incorporates the porosity-resolution constant $C_\alpha$ of
-\eqref{eq:resolved}. All statements of the main text remain valid verbatim upon replacing
-$\Cinv$ by $\Cinva$ in the conditions on $c_1$.
+$\Cinva$, which incorporates the porosity-resolution constant $C_{\nabla\alpha}$ of
+\eqref{eq:resolved}. \amend{This is the constant that the main text already denotes by
+$\Cinv$: the remark following \cref{eq:InverseEstimateFiniteOrderNorm} there introduces the
+enlarged constant and then, by an explicit abuse of notation, keeps the symbol $\Cinv$ for
+it. The conditions on $c_1$ in the main text---in particular
+\cref{eq:conditions_on_num_param} and the hypothesis of \cref{lemma:Stability}---are
+therefore to be read with the enlarged constant already in place, and require no further
+substitution. We write $\Cinva$ explicitly throughout this appendix only to keep the two
+constants distinguishable within the proofs.}
 \end{remark}
 
 \begin{lemma}[Jump of $\tau_1$]\label{lem:jump}
@@ -993,16 +999,17 @@ Under the hypotheses of \cref{prop:stability,lem:continterp},
 \end{theorem}
 
 \begin{proof}
-Let $E_h\coloneqq\widehat{U}_h-U_h\in\Xh$. By \cref{prop:stability}, consistency
+Let $\Delta_h\coloneqq\widehat{U}_h-U_h\in\Xh$ (not to be confused with the total error
+$E_h = U-U_h$ of \cref{th:Convergence}). By \cref{prop:stability}, consistency
 \eqref{eq:consistency} and \cref{lem:continterp},
 \begin{equation*}
-  C\,\triplenorm{E_h}^2
-  \le \BS(\ba;E_h,E_h)
-  = \BS\bigl(\ba;\widehat{U}_h-U,E_h\bigr)
-  \le C\,\psi(h)\,\triplenorm{E_h},
+  C\,\triplenorm{\Delta_h}^2
+  \le \BS(\ba;\Delta_h,\Delta_h)
+  = \BS\bigl(\ba;\widehat{U}_h-U,\Delta_h\bigr)
+  \le C\,\psi(h)\,\triplenorm{\Delta_h},
 \end{equation*}
-so $\triplenorm{E_h}\le C\psi(h)$. The triangle inequality and \eqref{eq:Enorm} give
-$\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{E_h}\le C\psi(h)$.
+so $\triplenorm{\Delta_h}\le C\psi(h)$. The triangle inequality and \eqref{eq:Enorm} give
+$\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{\Delta_h}\le C\psi(h)$.
 \end{proof}
 
 \noindent The bound \eqref{eq:convergence}, which is the porosity{\hyp}weighted form of

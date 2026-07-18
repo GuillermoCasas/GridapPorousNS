@@ -113,9 +113,15 @@ The speed handed to \eqref{eq:reg} is already the \emph{regularized} speed produ
 \texttt{reaction\_speed} $=\sqrt{\uu\cdot\uu+u_{\mathrm{base}}^2}$ for $\sigma$, and
 \texttt{effective\_speed} (which additionally carries a mesh-diffusive floor) for $\tau$. Thus whenever the
 base floor $u_{\mathrm{base}}=\texttt{u\_base\_floor\_ref}>0$ one already has $\norm{\uu}\ge u_{\mathrm{base}}\gg\eps$
-and \eqref{eq:reg} is a no-op. The floor $\eps$ is load-bearing precisely in the regime the convergence
-studies use, where the harness sets $u_{\mathrm{base}}=0$ to keep the drag law mesh-independent: there
-$\norm{\uu}$ can reach $0$ and $\eps$ is the only guard against the $0/0$. Keeping $\eps$ a \emph{separate}
+and \eqref{eq:reg} is a no-op. This is in fact the situation in the convergence studies: the MMS
+harnesses set the \emph{mesh-diffusive} weight \texttt{h\_floor\_weight} to $0$ (so that the drag law stays
+mesh-independent) while inheriting $u_{\mathrm{base}}=\texttt{u\_base\_floor\_ref}=10^{-4}$ from
+\texttt{config/base\_config.json}; the configuration $u_{\mathrm{base}}=0$ with
+\texttt{h\_floor\_weight}$=0$ is in fact rejected by the config validator, which requires the velocity
+floor to be strictly positive so that the regularization stays $C^1$. Since $u_{\mathrm{base}}=10^{-4}\gg
+\eps=10^{-12}$ there, $\eps$ is by the criterion just stated a \emph{no-op} in the convergence studies,
+and the errors they report are unaffected by it. It remains a genuine guard for configurations that switch
+the base floor off (e.g.\ \texttt{NoRegularization}), which is why it is retained. Keeping $\eps$ a \emph{separate}
 parameter from \texttt{u\_base\_floor\_ref} and \texttt{epsilon\_floor} (which guards an unrelated
 $h\to0$ denominator) lets the three be reasoned about and tuned independently.
 
