@@ -482,13 +482,21 @@ end
 # Records the per-cell `eps_used` (largest perturbation it converged from) as the robustness map. Constant-aspect
 # (1.2) Kuhn ladders, all LU-feasible: P1 (8,8,2)→(16,16,4)→(24,24,6)→(32,32,8); P2 (12,12,3)→(16,16,4)→(20,20,5)→(24,24,6)
 # (4 P2 meshes: the finest reaches the asymptotic P2 rate, which the 3-mesh ladder's small refinement steps understate).
-function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=1.0, recenter::Bool=true)
+function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=4.0, recenter::Bool=true)
     ladders = Dict(1 => [(8,8,2),(16,16,4),(24,24,6),(32,32,8)], 2 => [(12,12,3),(16,16,4),(20,20,5),(24,24,6)])
     # c1_mult>1 ⇒ ROBUST c₁×N in the RESIDUAL (c₁-only; c₂ stays at paper — only the viscous constant gates
     # coercivity). SINGLE canonical channel per test: always the `structured` leaf. The recipe (c1_mult,
     # recenter, solver block) is self-described INSIDE each JSON record, and the prior run is archived to
     # previous_results/convergence3d/ before overwrite — so provenance is preserved WITHOUT forking the
-    # channel into variant leaves (single-channel-per-test rule). Default c1_mult=1.0 = paper c₁.
+    # channel into variant leaves (single-channel-per-test rule).
+    #
+    # Default c1_mult=4.0 ⇒ c₁ = 16k⁴, the paper's THREE-DIMENSIONAL constant (article.tex §7.2: "in all the
+    # 3D experiments we take c₁ = 16k⁴"), matching run_sweep_nested_red's default so both families run the
+    # paper's adopted constant. It was 1.0 (the paper's *2D* constant, 4k⁴) until 2026-07-17, which meant the
+    # published regular-family tables required the NON-default invocation `smoke3d.jl sweep_structured 3 4`
+    # while a default run silently produced 2D-constant results that would be mislabelled as the paper's.
+    # c₁ is element-family-dependent through the coercivity condition c₁ > 2ξ·C̄_inv² (C̄_inv is markedly
+    # larger for tets), so the 2D value is not a safe default for a tet sweep.
     seq = "structured"
     archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
     stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
@@ -1029,9 +1037,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
         # smoke3d.jl sweep_structured [max_n_pert] [c1_mult]  — full §5.2 sweep on the STRUCTURED Kuhn family
         # with the eps_pert homotopy + iterative penalty + pressure re-centering. c1_mult>1 ⇒ ROBUST c₁×N in
         # the residual (c₁-only). SINGLE channel results/k*/TET/structured/ (recipe self-described in the JSON;
-        # prior run archived to previous_results/). All LU-feasible, every cell certifies. Default 1.0 = paper c₁.
+        # prior run archived to previous_results/). All LU-feasible, every cell certifies.
+        # Default c1_mult=4.0 ⇒ c₁ = 16k⁴ = the paper's 3D constant (article.tex §7.2), as in sweep_nested_red.
         mnp = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
-        c1m = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 1.0
+        c1m = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 4.0
         run_sweep_structured(; max_n_pert=mnp, c1_mult=c1m)
     elseif length(ARGS) >= 1 && ARGS[1] == "sweep_nested_red"
         # smoke3d.jl sweep_nested_red [c1_mult] [max_n_pert] [nlevels_p1] [nlevels_p2] [osgs_p2_precond_c1_mult]

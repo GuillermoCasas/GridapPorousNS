@@ -10,6 +10,11 @@
   "max_n_pert": 5,
   "mms_verification_enabled": true,
   "mms_tau_err": 0.0001,
+  "interpolation_reference": {
+      "error_quadrature_degree_boost": 4,
+      "verification_quadrature_degree": 20,
+      "verification_rel_tol": 1e-6
+  },
   "h5_filename": "cocquet_form_mms_vms.h5",
   "physical_properties": {
     "Re": [

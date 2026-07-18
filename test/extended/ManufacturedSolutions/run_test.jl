@@ -228,52 +228,14 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     PorousNSSolver.PaperGeneralFormulation(visc_op, rxn, proj, reg, nu_calculated, eps_calculated)
 end
 
-# Error evaluator returning genuinely DIMENSIONLESS norms (encoding-invariant under L-rescaling).
-#
-# Derivation (writing the dimensional error as e(x) = U_c · ê(x/L), with x̂ = x/L the
-# dimensionless coordinate and Ω the L-scaled physical domain):
-#
-#   ‖e‖²_{L²(Ω)}     = ∫_Ω |e|² dx = U_c² · ∫_Ω |ê(x/L)|² dx
-#                    = U_c² · L^d · ‖ê‖²_{L²(Ω̂)}
-#   ⇒  ‖e‖_{L²(Ω)}   = U_c · √(|Ω|) · ‖ê‖_{L²(Ω̂)}
-#
-#   ‖∇e‖²_{L²(Ω)}    = ∫_Ω (U_c/L)² |∇_x̂ ê|² dx = (U_c/L)² · L^d · ‖∇ê‖²_{L²(Ω̂)}
-#   ⇒  ‖∇e‖_{L²(Ω)}  = U_c · L^{d/2 - 1} · ‖∇ê‖_{L²(Ω̂)}   (independent of L in 2D where d=2)
-#
-# So the dimensionless quantities are:
-#
-#     el2_u_dimless   = ‖e_u‖_{L²(Ω)}  / (U_c · √(|Ω|))   = ‖ê_u‖_{L²(Ω̂)}
-#     eh1_u_dimless   = ‖∇e_u‖_{L²(Ω)} / U_c              = ‖∇ê_u‖_{L²(Ω̂)}        (2D)
-#
-# For L=1 with a unit-area baseline bounding box `[-0.5, 0.5]²` this collapses to the
-# legacy form `el2_u = ‖e‖/U_c`, `eh1_u = ‖∇e‖/(U_c/L)` — so existing centered-encoding
-# K=1 sweeps reproduce bit-identically. For L≠1 (balanced / minmax encodings) the new form
-# removes the L-inflation that the legacy normalisation introduced.
-function calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L, dΩ)
-    e_u = u_final - u_h
-    e_p = p_final - p_h
-
-    # Domain measure |Ω| (this is the *physical* area of the L-scaled domain).
-    area = sum(∫(1.0)dΩ)
-    sqrt_area = sqrt(abs(area))     # √(|Ω|) = L · √(|Ω̂|); for L=1 with [-0.5, 0.5]² this is 1.0
-
-    # 1. Velocity L² error, dimensionless via ‖e_u‖/(U_c · √(|Ω|)).
-    el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ)) / (U_c * sqrt_area)
-
-    # Pressure null-space alignment (centre the error so the gauge-mode is not penalised).
-    mean_e_p = sum(∫(e_p)dΩ) / area
-    e_p_centered = e_p - mean_e_p
-
-    # 2. Pressure L² error, dimensionless via ‖e_p‖/(P_c · √(|Ω|)).
-    el2_p = sqrt(sum(∫(e_p_centered * e_p_centered)dΩ)) / (P_c * sqrt_area)
-
-    # 3. Semi-H¹ errors. In 2D the L from integration cancels the 1/L from the gradient, so
-    # the dimensionless H¹ semi-norm is simply ‖∇e‖/U_c (no L factor in the divisor).
-    eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ)) / U_c
-    eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ)) / P_c
-
-    return el2_u, el2_p, eh1_semi_u, eh1_semi_p
-end
+# The dimensionless error functional `calculate_normalized_errors` lives in the shared
+# `test/extended/mms_error_norms.jl` (extracted 2026-07-17) so that this harness, the Cocquet MMS
+# harness, and the interpolation-reference harness all measure with the SAME definition — the
+# reference curves are printed beside these rows in the paper tables and divided into them as an
+# efficiency, so a divergent reimplementation would corrupt the comparison silently. See that file
+# for the derivation and for the three easy-to-miss details (sqrt|Omega| divisor, pressure
+# mean-centring, no L factor in the H1 divisor).
+include(joinpath(@__DIR__, "..", "mms_error_norms.jl"))
 
 # Declare typed parametric functor evaluating interpolation seamlessly avoiding JIT closures globally at the top level
 struct PerturbationFunc{F1, F2} <: Function
@@ -318,6 +280,12 @@ function execute_outer_homotopy_perturbation_loop!(
     iter_count_attempt = 0
     final_x0 = nothing
     final_residual_attempt = NaN
+    # [reproducible-results] The gate's OWN numbers. eps_M/eps_C (not the raw residual, and not the
+    # mesh-scaled `dynamic_ftol`) are what solve_system's scale-free criterion decides on; persisting
+    # them makes a stored row's converged-ness readable instead of inferable. See the note at the
+    # conv_eval wrapper in src/solvers/solver_core.jl for why this matters.
+    eps_M_attempt = NaN
+    eps_C_attempt = NaN
     # [relative-residual gate] Iter-0 residual ‖R(x₀)‖ of the converged attempt,
     # populated by solve_system into `diagnostics_cache["initial_residual_norm"]`.
     # Provides the natural scale ‖f‖ for the gate `‖R_final‖/‖R_initial‖ < tol`
@@ -406,11 +374,21 @@ function execute_outer_homotopy_perturbation_loop!(
             iter_count_attempt = sys_iter_count
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
             initial_residual_attempt = get(local_diagnostics_cache, "initial_residual_norm", NaN)
+            _cm = get(local_diagnostics_cache, "final_conv_measure", nothing)
+            if _cm !== nothing
+                eps_M_attempt = _cm.eps_M
+                eps_C_attempt = _cm.eps_C
+            end
             break
         else
             println("\n      [❌] Outer loop execution completely stalled structurally above convergence tolerance (`$(dynamic_ftol)`) or system fully diverged.")
             final_residual_attempt = get(local_diagnostics_cache, "final_residual_norm", NaN)
             initial_residual_attempt = get(local_diagnostics_cache, "initial_residual_norm", NaN)
+            _cm = get(local_diagnostics_cache, "final_conv_measure", nothing)
+            if _cm !== nothing
+                eps_M_attempt = _cm.eps_M
+                eps_C_attempt = _cm.eps_C
+            end
         end
     end
 
@@ -418,7 +396,7 @@ function execute_outer_homotopy_perturbation_loop!(
          println("    [WARNING] Completely failed to find root basin. Returning NaN.")
     end
 
-    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt, attempt_traces
+    return success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt, eps_M_attempt, eps_C_attempt, attempt_traces
 end
 
 function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{String}}(), cli_shard=nothing,
@@ -675,6 +653,8 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                         "eval_iters" => Int[],
                         "eval_eps" => Float64[],
                         "eval_residuals" => Float64[],
+                        "eval_eps_M" => Float64[],
+                        "eval_eps_C" => Float64[],
                         "eval_initial_residuals" => Float64[],
                         "mms_plateau_success" => Union{Bool,Nothing}[],
                         "overall_verification_success" => Bool[]
@@ -712,6 +692,9 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                             results_cache[k_id_load]["eval_iters"]      = Vector{Int}(read(grp["eval_iters"]))
                                             results_cache[k_id_load]["eval_eps"]        = Vector{Float64}(read(grp["eval_eps"]))
                                             results_cache[k_id_load]["eval_residuals"]  = Vector{Float64}(read(grp["eval_residuals"]))
+                                            # [resume] tolerate DBs written before eps_M/eps_C were persisted
+                                            results_cache[k_id_load]["eval_eps_M"] = haskey(grp, "eval_eps_M") ? Vector{Float64}(read(grp["eval_eps_M"])) : fill(NaN, length(results_cache[k_id_load]["eval_residuals"]))
+                                            results_cache[k_id_load]["eval_eps_C"] = haskey(grp, "eval_eps_C") ? Vector{Float64}(read(grp["eval_eps_C"])) : fill(NaN, length(results_cache[k_id_load]["eval_residuals"]))
                                             # Backward-compatible: pre-existing HDF5s lack `eval_initial_residuals`.
                                             # Fill with NaN of matching length so the column remains valid in
                                             # the cache and the analyzer's relative gate gracefully falls back
@@ -996,7 +979,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                                 println("    [resume-retry] Prior result at h=$(target_h) was NaN; dropping stale entry and re-solving.")
                                                 # Drop the stale entry so the appended new result lands in the right slot.
                                                 for key in ("hs", "err_u_l2", "err_p_l2", "err_u_h1", "err_p_h1",
-                                                            "eval_times", "eval_iters", "eval_eps", "eval_residuals",
+                                                            "eval_times", "eval_iters", "eval_eps", "eval_residuals", "eval_eps_M", "eval_eps_C",
                                                             "eval_initial_residuals",
                                                             "overall_verification_success", "mms_plateau_success")
                                                     if length(rc[key]) >= idx
@@ -1038,7 +1021,7 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     # NONLINEAR CONVERGENCE LOOP
                                     # Incrementally shrink initial numerical perturbation forcing iterative validation
                                     # ==============================================================================
-                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt, cell_attempt_traces = execute_outer_homotopy_perturbation_loop!(
+                                    success, mms_plateau_success, successful_eps, final_x0, eval_time, iter_count_attempt, final_residual_attempt, initial_residual_attempt, eps_M_attempt, eps_C_attempt, cell_attempt_traces = execute_outer_homotopy_perturbation_loop!(
                                         setup, formulation, iter_solvers, method_config, method, dynamic_ftol,
                                         mms_setup, pert_cfg,
                                         mms_verification_enabled, mms_tau_err, mms_eps_u_l2, mms_eps_u_h1, mms_eps_p_l2,
@@ -1117,6 +1100,8 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                     push!(results_cache[k_id]["eval_iters"], iter_count_attempt)
                                     push!(results_cache[k_id]["eval_eps"], successful_eps)
                                     push!(results_cache[k_id]["eval_residuals"], final_residual_attempt)
+                                    push!(results_cache[k_id]["eval_eps_M"], eps_M_attempt)
+                                    push!(results_cache[k_id]["eval_eps_C"], eps_C_attempt)
                                     push!(results_cache[k_id]["eval_initial_residuals"], initial_residual_attempt)
                                     push!(results_cache[k_id]["mms_plateau_success"], mms_plateau_success)
                                     push!(results_cache[k_id]["overall_verification_success"], overall_verification_success)
@@ -1154,6 +1139,8 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                         g["eval_iters"] = res["eval_iters"]
                                         g["eval_eps"] = res["eval_eps"]
                                         g["eval_residuals"] = res["eval_residuals"]
+                                        g["eval_eps_M"] = res["eval_eps_M"]
+                                        g["eval_eps_C"] = res["eval_eps_C"]
                                         g["eval_initial_residuals"] = res["eval_initial_residuals"]
                                         # Per-mesh convergence status for the detection step (HDF5 can't store
                                         # Union{Bool,Nothing}, so encode: -1=nothing/MMS-disabled, 0=false, 1=true).

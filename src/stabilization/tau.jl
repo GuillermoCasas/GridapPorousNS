@@ -30,13 +30,18 @@ using Gridap.Algebra
 # [TAU-05] τ_{1,NS}⁻¹ = c₁ν/h² + c₂|u|/h + reg-floor — the bracketed inverse denominator of
 # eq:TauNavierStokes (A_NS). Single source of truth shared by compute_tau_1 / compute_tau_2 and their
 # u-derivatives, so the four cannot drift in how they form the NS scale.
-# [diagnostic TAU_VISC_MULT] scales the VISCOUS eigenvalue c₁ν/h² of τ_{1,NS}⁻¹. Default "1.0" ⇒ byte-identical.
-# Used to test the deviatoric-operator spectral-radius correction: the paper's τ matches the operator's Fourier
-# spectral radius (eq:DesignConditionOnTauWeak); for ∇·(2ανεᵈ) that radius is (4/3)αν|k|² in 3D (longitudinal
-# mode) vs αν|k|² for the Laplacian, and EXACTLY αν|k|² in 2D — so the Laplacian c₁ν/h² under-weights the viscous
-# eigenvalue by 4/3 in 3D only. TAU_VISC_MULT=4/3 applies the correction (docs/mms/p2-3d.md §A).
+#
+# [no-hard-coded-parameters] There is deliberately NO knob here scaling the viscous eigenvalue c₁ν/h².
+# A `TAU_VISC_MULT` environment variable formerly did so (removed 2026-07-17). It was a diagnostic for the
+# deviatoric spectral-radius question — ρ(∇·(2ανεᵈ)) is (4/3)αν|k|² in 3D (longitudinal mode) vs αν|k|² for
+# the Laplacian, and EXACTLY αν|k|² in 2D — whose verdict was that the 3D remedy is an element-aware c₁, not
+# a 4/3 viscous correction (docs/mms/p2-3d.md §A; lessons_learned.md 2026-07-06). It was inert by default
+# (1.0), but it violated the rule three ways: not in the schema, not threaded, and — being read from the
+# ambient environment — absent from every result's provenance, so a stored result could not reconstruct the
+# τ that produced it. Any c₁ rescaling must instead come through `stabilization_c1_multiplier`, which is
+# config-borne and recorded (see src/config.jl and config/porous_ns.schema.json).
 @inline _tau_ns_inv(mag_u, h, ν, c_1, c_2, tau_reg_lim) =
-    (parse(Float64, get(ENV, "TAU_VISC_MULT", "1.0")) * c_1 * ν / (h * h)) + (c_2 * mag_u / h) + tau_reg_lim
+    (c_1 * ν / (h * h)) + (c_2 * mag_u / h) + tau_reg_lim
 
 # τ₁ — the momentum-equation stabilization parameter (eq:Tau1). Builds τ_{1,NS}
 # (eq:TauNavierStokes), folds in the porous fraction α and the reaction σ, and

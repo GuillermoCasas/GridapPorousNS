@@ -394,7 +394,17 @@ function run_simulation(config_path::String;
 
     # Stabilization constants c₁, c₂ entering τ₁/τ₂ (eq:Tau1/eq:Tau2): for equal-order interpolation
     # get_c1_c2 returns c₁ = 4k⁴, c₂ = 2k² (paper Remark after eq:conditions_on_num_param).
-    c_1, c_2 = get_c1_c2(typeof(form), kv)
+    #
+    # The equal-order rule is then rescaled by the config-borne multipliers. This is the ONLY place c₁/c₂
+    # are adjusted: `get_c1_c2` states the k-scaling, the config states the element-family calibration.
+    # eq:conditions_on_num_param (c₁ > 2ξ·C̄_inv²) is element-dependent, and the paper adopts c₁ = 4k⁴ in
+    # 2D but c₁ = 16k⁴ for the 3D tetrahedra (§7.2) — i.e. c1_multiplier 1.0 vs 4.0 — because C̄_inv is
+    # markedly larger there. Threading it here (rather than scaling inside the τ kernel) keeps the
+    # multiplier out of the quadrature-point hot path and puts it in the frozen config, so every result
+    # records the c₁ that produced it.
+    c_1_base, c_2_base = get_c1_c2(typeof(form), kv)
+    c_1 = cfg.numerical_method.stabilization.c1_multiplier * c_1_base
+    c_2 = cfg.numerical_method.stabilization.c2_multiplier * c_2_base
     
     # Unconstrained (no-Dirichlet) test spaces V_free/Q_free — required for the OSGS L² projection of
     # the strong residual; projecting on the Dirichlet-constrained space breaks O(h^{k+1}) convergence.

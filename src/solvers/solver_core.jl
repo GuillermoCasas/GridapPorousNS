@@ -473,7 +473,23 @@ function solve_system(setup::FETopology, formulation::VMSFormulation, iter_solve
     # call `_with_overrides`, and that preserves `conv_probe`). Because D_M is read from the iterate — not
     # a per-segment-frozen ‖R₀‖ — the gate is identical across ping-pong segments, removing the
     # re-anchoring that made each segment demand another ×(1/ftol) drop. (convergence_criterion.jl)
-    conv_eval = build_convergence_probe(setup, formulation, sol_cfg.eps_tol_momentum, sol_cfg.eps_tol_mass)
+    conv_eval_raw = build_convergence_probe(setup, formulation, sol_cfg.eps_tol_momentum, sol_cfg.eps_tol_mass)
+
+    # [reproducible-results] Record the LAST gate verdict in the diagnostics cache. ε_M/ε_C are what the
+    # solver actually gates on, but nothing used to persist them: a stored result carried only the raw
+    # ‖r‖ (`eval_residuals`) and the mesh-scaled `dynamic_ftol`, which run_test.jl documents as NOT the
+    # gate. A reader comparing ‖r‖ against that ftol therefore "finds" solves terminating orders of
+    # magnitude above tolerance — which is expected, since ε_M = ‖r_M‖/D_M and D_M is inflated by ~Da at
+    # high Damköhler. That misreading has been made twice on this codebase (docs/findings.md §"methodological
+    # caution"; and again during the 2026-07-17 review audit, where it nearly forced a spurious retraction
+    # of a correct result). Storing the gate's own numbers next to the residuals makes the verdict readable
+    # off the record instead of re-derivable only from the gate's design.
+    # This wrapper costs one dict store per accepted iteration; the measure is already computed.
+    conv_eval = function (x, b, field_blocks)
+        m = conv_eval_raw(x, b, field_blocks)
+        diag_cache["final_conv_measure"] = m
+        return m
+    end
     solver_picard = FESolver(_with_overrides(solver_picard.nls; conv_probe=conv_eval))
     solver_newton = FESolver(_with_overrides(solver_newton.nls; conv_probe=conv_eval))
 

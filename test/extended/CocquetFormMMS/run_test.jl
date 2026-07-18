@@ -162,35 +162,12 @@ function build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
     PorousNSSolver.PaperGeneralFormulation(visc_op, rxn, proj, reg, nu_calculated, eps_calculated)
 end
 
-# Error evaluator operating exclusively upon dimensionless algebraic norms corresponding to characteristic scaling
-function calculate_normalized_errors(u_h, p_h, u_final, p_final, U_c, P_c, L, dΩ)
-    # Native error vectors
-    e_u = u_final - u_h
-    e_p = p_final - p_h
-    
-    # [encoding-invariant] L²-error scales as U_c·L^{d/2} on the L-scaled domain, so divide by U_c·√|Ω|
-    # (NOT U_c alone) to get a genuinely dimensionless norm — invariant under the (L,U) encoding. Mirrors
-    # the regular ManufacturedSolutions harness; without √|Ω| the rate is correct but the magnitude blows
-    # up with L. In 2D the H¹ semi-norm's 1/L (gradient) cancels the L from integration ⇒ divide by U_c.
-    area = sum(∫(1.0)dΩ)
-    sqrt_area = sqrt(abs(area))            # √|Ω| = L·√|Ω̂| ; = 1.0 for L=1 on [-0.5,0.5]²
-
-    # 1. Velocity L² error, dimensionless via ‖e_u‖/(U_c·√|Ω|)
-    el2_u = sqrt(sum(∫(e_u ⋅ e_u)dΩ)) / (U_c * sqrt_area)
-
-    # Align pressure exactly (cancelling null space integration variations)
-    mean_e_p = sum(∫(e_p)dΩ) / area
-    e_p_centered = e_p - mean_e_p
-
-    # 2. Pressure L² error, dimensionless via ‖e_p‖/(P_c·√|Ω|)
-    el2_p = sqrt(sum(∫(e_p_centered * e_p_centered)dΩ)) / (P_c * sqrt_area)
-
-    # 3. Semi-H¹ errors: in 2D the L from integration cancels the 1/L from the gradient ⇒ divide by U_c/P_c.
-    eh1_semi_u = sqrt(sum(∫(∇(e_u) ⊙ ∇(e_u))dΩ)) / U_c
-    eh1_semi_p = sqrt(sum(∫(∇(e_p) ⋅ ∇(e_p))dΩ)) / P_c
-
-    return el2_u, el2_p, eh1_semi_u, eh1_semi_p
-end
+# The dimensionless error functional `calculate_normalized_errors` is shared with the 2D MMS harness
+# and the interpolation-reference harness via `test/extended/mms_error_norms.jl` (consolidated
+# 2026-07-17; the two copies were verified functionally identical before merging). One definition
+# keeps this harness's rows, the 2D rows, and the interpolation reference printed in the paper
+# tables on the same measuring stick.
+include(joinpath(@__DIR__, "..", "mms_error_norms.jl"))
 
 # Declare typed parametric functor evaluating interpolation seamlessly avoiding JIT closures globally at the top level
 struct PerturbationFunc{F1, F2} <: Function

@@ -107,6 +107,21 @@ Base.@kwdef struct StabilizationConfig
     # "average_edge" (mean edge length), or "diameter" (strict max vertex-pair). A stabilization-
     # calibration choice: it rescales τ by an O(1) factor. No silent default — carried in base_config.json.
     element_size::String
+    # Multipliers applied to the equal-order constants returned by `get_c1_c2` (c₁ = 4k⁴, c₂ = 2k²;
+    # paper Remark after eq:conditions_on_num_param). The effective constants are
+    #     c₁_eff = c1_multiplier · 4k⁴,   c₂_eff = c2_multiplier · 2k².
+    #
+    # [paper-faithful] These exist because c₁ is NOT dimension-independent. The coercivity condition
+    # eq:conditions_on_num_param is c₁ > 2ξ·C̄_inv², and C̄_inv is markedly larger for tetrahedra than for
+    # 2D simplices/quads, so the paper adopts c₁ = 4k⁴ in 2D (article.tex Remark; §7.1) and c₁ = 16k⁴ in
+    # 3D (article.tex §7.2) — i.e. c1_multiplier = 1.0 and 4.0 respectively, with c₂ = 2k² in both.
+    # Before 2026-07-17 the 3D constant existed ONLY as a harness keyword argument (`c1_mult` in
+    # smoke3d.jl) that defaulted to 1.0, so `run_simulation` on a tet mesh silently reproduced the 2D
+    # constant and no stored result recorded which c₁ produced it. Carrying it here makes the paper's
+    # own adopted constant reachable from production, validated, and part of every result's provenance.
+    # No silent default — every config states it (base_config.json ships the 2D value 1.0).
+    c1_multiplier::Float64
+    c2_multiplier::Float64
 end
 
 """
@@ -377,6 +392,14 @@ function validate!(cfg::PorousNSConfig)
     @assert 0.0 < dom.alpha_0 <= 1.0 "domain.alpha_0 (porosity) must be in (0, 1]"
     @assert dom.r_1 < dom.r_2 "domain.r_1 must be < domain.r_2 (porosity transition annulus)"
     @assert length(dom.bounding_box) >= 4 && iseven(length(dom.bounding_box)) "domain.bounding_box must have an even length >= 4 ([xmin,xmax,ymin,ymax,...])"
+
+    # Stabilization constants. c₁ and c₂ enter τ₁/τ₂ as the coefficients of the viscous (c₁ν/h²) and
+    # convective (c₂|a|/h) eigenvalues of τ_{1,NS}⁻¹ (eq:TauNavierStokes), and c₁ additionally divides τ₂
+    # (eq:Tau2). A non-positive multiplier would drive τ_{1,NS}⁻¹ ≤ 0 and flip the sign of the subgrid
+    # scales — an anti-stabilization, not a weaker one — so both must be strictly positive.
+    stab = cfg.numerical_method.stabilization
+    @assert stab.c1_multiplier > 0 "stabilization.c1_multiplier must be > 0 (it scales the viscous eigenvalue c₁ν/h² of τ_{1,NS}⁻¹ and divides τ₂; c₁ ≤ 0 inverts the subgrid scales). Paper values: 1.0 in 2D (c₁ = 4k⁴), 4.0 for the 3D tetrahedra (c₁ = 16k⁴)"
+    @assert stab.c2_multiplier > 0 "stabilization.c2_multiplier must be > 0 (it scales the convective eigenvalue c₂|a|/h of τ_{1,NS}⁻¹). Paper value: 1.0 (c₂ = 2k²) in both 2D and 3D"
 
     # Solver
     sol = cfg.numerical_method.solver

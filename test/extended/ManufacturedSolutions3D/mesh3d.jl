@@ -16,6 +16,7 @@ using GridapGmsh
 using Gridap.Adaptivity
 using Gridap.Geometry: get_node_coordinates, get_cell_node_ids, get_grid
 using HDF5
+using Printf   # @sprintf for the committed base-mesh filename (nested_red_base_path)
 
 """
     build_box_tet_model(lc; domain=(0.0,1.0, 0.0,1.0, 0.0,0.3), algorithm=5, save_msh="")
@@ -134,6 +135,46 @@ end
 build_base_mesh(; lc::Float64=0.2, domain=(0.0,1.0, 0.0,1.0, 0.0,0.3), algorithm::Int=1, save_msh::String="") =
     build_box_tet_model(lc; domain=domain, algorithm=algorithm, save_msh=save_msh)
 
+# ----------------------------------------------------------------------------------------------
+# [reproducible-results] Committed base mesh for the irregular (nested-red) family.
+#
+# The ENTIRE irregular family is one gmsh base mesh plus DETERMINISTIC red refinement, so the base mesh
+# alone fixes every level. Until 2026-07-17 that base was generated into an `mktempdir()` and deleted
+# (`build_box_tet_model` writes it, then `rm(dir; recursive=true)`), `save_msh` existed but no caller
+# passed it, and the gmsh version is not pinned — so the published irregular-family numbers could not be
+# guaranteed to correspond to any regenerable mesh. gmsh's unstructured tet generator is not contractually
+# stable across versions: a different gmsh can return a different (equally valid) mesh, and on THIS family
+# the element-quality tail is exactly what the results are sensitive to (docs/mms/p2-3d.md).
+#
+# `nested_red_base_path` is therefore committed alongside the harness and PREFERRED over regeneration:
+# loading it makes the family reproducible independently of the local gmsh. If it is absent, we generate
+# and persist it, and say so loudly — a freshly generated base is a NEW mesh family, not a reproduction.
+nested_red_base_path(; lc::Float64=0.2, algorithm::Int=1) =
+    joinpath(@__DIR__, "meshes", @sprintf("nested_red_base_lc%.3f_alg%d.msh", lc, algorithm))
+
+"""
+    load_or_build_base_mesh(; lc, domain, algorithm, path=nested_red_base_path(...))
+
+Return the nested family's base mesh, loading the committed `.msh` when present and otherwise
+generating it with gmsh and persisting it to `path`. Prefer this over `build_base_mesh` for anything
+whose numbers are published: it is what makes the irregular family regenerable (see the note above).
+"""
+function load_or_build_base_mesh(; lc::Float64=0.2, domain=(0.0,1.0, 0.0,1.0, 0.0,0.3),
+                                 algorithm::Int=1, path::String=nested_red_base_path(; lc=lc, algorithm=algorithm))
+    if isfile(path)
+        @info "[mesh3d] loading COMMITTED nested-red base mesh (reproducible, gmsh-version-independent)" path
+        return GmshDiscreteModel(path)
+    end
+    @warn """
+    [mesh3d] no committed nested-red base mesh at $(path) — generating a FRESH one with the local gmsh and
+    persisting it there. The result is a NEW mesh family: gmsh's unstructured tet generator is not stable
+    across versions, and this family's results are sensitive to its element-quality tail. Commit the file
+    so the numbers are reproducible, and do not compare fresh-base results against previously published
+    ones as if they were the same family.""" lc algorithm
+    model = build_base_mesh(; lc=lc, domain=domain, algorithm=algorithm, save_msh=path)
+    return model
+end
+
 "Uniform red (1->8) refinement applied `n` times; returns a plain UnstructuredDiscreteModel with tags preserved."
 function refine_n_times(model, n::Int)
     m = model
@@ -143,9 +184,15 @@ function refine_n_times(model, n::Int)
     return m
 end
 
-"Nested family [base, refine¹, …, refineⁿ]; built incrementally (each level refines the previous)."
+"""
+Nested family [base, refine¹, …, refineⁿ]; built incrementally (each level refines the previous).
+
+The base mesh comes from `load_or_build_base_mesh`, i.e. the COMMITTED `.msh` when it exists, so the whole
+family is reproducible without depending on the local gmsh version (red refinement is deterministic, so
+the base fixes every level). See the note above `nested_red_base_path`.
+"""
 function build_nested_family(nlevels::Int; lc::Float64=0.2, domain=(0.0,1.0, 0.0,1.0, 0.0,0.3), algorithm::Int=1)
-    base = build_base_mesh(; lc=lc, domain=domain, algorithm=algorithm)
+    base = load_or_build_base_mesh(; lc=lc, domain=domain, algorithm=algorithm)
     fam = Vector{Any}(undef, nlevels + 1)
     fam[1] = base
     for k in 1:nlevels

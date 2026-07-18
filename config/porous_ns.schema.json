@@ -231,6 +231,18 @@
               "examples": [
                 "shortest_edge"
               ]
+            },
+            "c1_multiplier": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Multiplier on the equal-order constant c_1 = 4*k_v^4 returned by get_c1_c2 (paper Remark after eq:conditions_on_num_param); the effective constant is c1_multiplier * 4*k_v^4. c_1 is element-family dependent through the coercivity condition c_1 > 2*xi*C_inv^2: the paper takes c_1 = 4k^4 on the 2D triangular/quadrilateral meshes (c1_multiplier = 1.0, article.tex sec:NumericalExamplesStationaryCase2D) and c_1 = 16k^4 on the 3D tetrahedral meshes (c1_multiplier = 4.0, sec:NumericalExamplesStationaryCase3D), because C_inv is markedly larger for tets. NOTE c_1 enters tau_1/tau_2 in the DENOMINATOR, so a LARGER c_1 gives SMALLER tau, i.e. weaker stabilization.",
+              "examples": [1.0, 4.0]
+            },
+            "c2_multiplier": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Multiplier on the equal-order constant c_2 = 2*k_v^2 returned by get_c1_c2; the effective constant is c2_multiplier * 2*k_v^2. The paper keeps c_2 = 2k^2 in both 2D and 3D (c2_multiplier = 1.0); it is exposed alongside c1_multiplier so the (c_1, c_2) pair is recorded together in every result provenance record.",
+              "examples": [1.0]
             }
           },
           "additionalProperties": false
