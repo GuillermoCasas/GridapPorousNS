@@ -8,7 +8,7 @@ de-Pouplana). It is the proof-assistant counterpart of the SymPy suite in
 computation, the files here prove them from the axioms of the real numbers,
 and the proofs are re-verified by Coq's trusted kernel (`coqchk`).
 
-**Status: 15 files, ~584 theorems, all proved. No `Admitted`, no `Axiom`,
+**Status: 17 files, ~789 theorems, all proved. No `Admitted`, no `Axiom`,
 no `admit` anywhere** (grep the sources to confirm — and, more strongly,
 `Print Assumptions`: every top-level theorem depends on exactly three axioms,
 all from the standard library's *construction* of the reals
@@ -19,13 +19,80 @@ the standard library** — no Mathcomp, no Coquelicot, no external packages. Eve
 definition has been checked against the manuscript sources (`article.tex`,
 `continuity_appendix.tex`, July 2026 revision).
 
-**This revision shrinks the trusted base.** Four items that were *hypotheses*
-are now *theorems*: `HBS_W` (the tested identity for the discrete-error pair --
-proved from the two *diagonal* Green identities `H_skew_diag`/`H_ibp_diag` that
-it silently bundled, so `B_S(W,W)` is now *defined* as the eighteen-term form
-and the two encodings of `B_S` are reconciled inside the kernel), and
-`H_elem_conv_ibp` / `H_elem_p_ibp` (whose face terms were free variables and so
-constrained nothing; they are now *defined* as the integration-by-parts defect).
+**This revision reduces the named trusted base from 53 items to 50.** The count
+is the weakest part of the claim and is stated here first so it can be
+discounted: what the two refactors below buy is *structural*, and in one case
+the row that was removed carried no logical content at all. Exactly **three**
+items that were *hypotheses* are now *theorems*, and **no** item is added:
+
+- **`HBS`** -- the tested identity for the diagonal `B_S(U_h,U_h)`. It is proved
+  from the two *diagonal* Green identities `H_skew_diag`/`H_ibp_diag` that it
+  silently bundled, so `B_S(U_h,U_h)` is now *defined* as the eighteen-term form
+  (`AbstractInterpolation.BS` at the diagonal atoms) and the two encodings of
+  `B_S` are reconciled inside the kernel.
+
+  Two honest qualifications, because the previous revision's label for this row
+  (*"the single largest assumption in the development"*) will not survive
+  inspection. First, **`HBS` was formally vacuous.** It read `Variable BS : R.`
+  `Hypothesis HBS : BS = <five-term expression in free atoms>` -- the eliminable
+  pattern `forall x, x = t -> P x`. A free real constrained only by an equation
+  defining it assumes nothing: the old `abstract_stability` could be instantiated
+  at `BS := t` with `eq_refl` and the hypothesis discharged for free. So deleting
+  it removes no logical content from the theorem, and the 53 -> 50 count includes
+  one phantom row. Second, of the four things `HBS` *informally* bundled, only
+  the annihilation of `T2 + T4` was ever provable; the Galerkin form, the
+  substitution `V_h := U_h` and `P^T P = P` did not vanish but *moved* into the
+  eighteen-term reading obligation.
+
+  What the refactor genuinely buys is therefore not a smaller list but a
+  reconciliation: the bespoke five-term encoding of `B_S` is destroyed, and the
+  number this file bounds from below is now *the same closed expression* the
+  other three files bound from above, checked by the kernel rather than by a
+  reader comparing two displays. The eighteen-term reading obligation it inherits
+  is not new -- it already underpinned `BSWW` in `AbstractConvergence.v` -- so at
+  the level of the union of all files, trust strictly decreases. Two consequences
+  worth knowing: `AbstractStability.v` now imports `AbstractInterpolation.v`
+  (hence the build order), and the atom `xu = alpha X(U_h)` was split into `cxu`,
+  `gpu` with `xu` *defined* as their sum -- one cannot state "the convective part
+  is skew" without naming it.
+- **`IU_nonneg` / `IP_nonneg`** -- nonnegativity of the interpolation-error
+  functionals, now derived from `HI_uu`/`HI_pp` plus `nrm_nonneg`: a norm is
+  nonnegative and `CI > 0`, so `0 <= ||.|| <= CI * IU` forces `IU >= 0`. The
+  price is strengthening `CI >= 0` to **`CI > 0`**, and `{CI > 0}` is logically
+  *strictly stronger* than `{CI >= 0, IU >= 0, IP >= 0}` -- the old set does not
+  imply the new one (take `CI = 0` with all atoms zero: every old hypothesis
+  holds, `CI > 0` fails). So this is a trade (-2 rows, +1 strengthened), not a
+  free reduction, and it is flagged as such in the coverage note.
+
+  Two reasons the trade is nevertheless credibility-neutral. The *justification*
+  burden does not grow: `IU_k = h_K^{k+1} |u|_{H^{k+1}(K)} >= 0` holds by
+  definition of the seminorm, and `C_I > 0` holds for any interpolation estimate
+  anyone would actually cite -- a Bramble--Hilbert constant of zero would assert
+  exact interpolation. And the *strengthening is monotone in the model*: `CI`
+  occurs only on the large side of upper-bound hypotheses (`HI_*`) and in the
+  output constant `KPP_I = sqrt c1 * CI + K6b`, so any model of the old base
+  survives at `CI + 1`, yielding the same theorem with a weaker constant. Nothing
+  is excluded that the analysis wanted to admit.
+
+Three further discharges are part of the development but **not** of this
+revision; they belong to the previous one, which established the 53-item base,
+and are recorded here only so the standing picture is complete:
+
+- **`HBS_W`** -- the same tested identity for the discrete-error diagonal
+  `B_S(W,W)`. It stopped being a *hypothesis* one revision ago, which replaced it
+  with a `Theorem HBS_W` proved from the same two diagonal identities. What *this*
+  revision adds is that even that theorem is retired: `BSWW` is definitionally
+  `AbstractStability.BS` at the W atoms (`BSWW_is_ASBS`, by `reflexivity`), so
+  `AbstractConvergence.v` simply *applies* `abstract_stability` there (`stab_W`),
+  which proves the tested identity internally rather than demanding it. There is
+  now no `Theorem HBS_W` in the development and no `Hypothesis HBS_W` either. The
+  two diagonal identities the convergence file states are the same pair the
+  stability file asks for, so they are *shared* rather than added on top.
+- **`H_elem_conv_ibp` / `H_elem_p_ibp`** -- whose face terms were free variables
+  and so constrained nothing; they are now *defined* as the integration-by-parts
+  defect (`Lemma H_elem_conv_ibp` / `H_elem_p_ibp` in `AbstractContinuity.v` and
+  `AbstractInterpolation.v`).
+
 The strictness `sigma > 0`, `eps > 0`, `C2 > 0` is gone -- the development now
 assumes exactly `H:data` (`sigma >= 0`, `eps >= 0`, `0 <= C2 < 1`), so the
 **reaction-free case sigma = 0 is a genuine instance**. The numerical-parameter
@@ -34,23 +101,68 @@ condition is assumed in its *sharp* form `c1 > xi * Cbar^2`
 manuscript's two-fold stronger condition buys. And the analysed-vs-implemented
 tau_2 bridge is wired end to end: `abstract_convergence_implemented` states
 thm:convergence for the parameter the solver actually forms, with the constant
-inflated by at most sqrt(1 + C2) < sqrt 2. Trusted base of thm:convergence:
-50 hypotheses -> 46, and the *content* is strictly smaller.
+inflated by at most sqrt(1 + C2) < sqrt 2.
 
-**Non-vacuity is machine-checked too.** `NonVacuity.v` exhibits an explicit
-instance (the carrier `R` with `<x,y> := x*y`, a one-element mesh, rational
-data), discharges *every* hypothesis of `abstract_stability` — including `HBS`,
-`S3` and `Heps` — and applies the theorem inside the kernel, obtaining the
-non-degenerate conclusion `B_S = 7/8 >= C_stab * |||U_h|||^2 = 7/16` with both
-sides strictly positive. So the hypothesis bundle is provably *consistent*: none
-of the abstract theorems is vacuously true. (This settles consistency, not
-soundness: that the finite element objects satisfy the hypotheses is the other
-direction, and is what the hand audit in `AUDIT.md` §4 establishes.)
+Per-theorem hypothesis counts (each equal to the number of `Hypothesis`
+declarations in the file, so nothing is declared and left unused):
+`abstract_stability` 16 -> **17** (-`HBS`, +`H_skew_diag`, +`H_ibp_diag`),
+`abstract_continuity` **36** (type byte-identical to the previous revision),
+`abstract_continterp` 41 -> **39**, `abstract_convergence` 46 -> **44**.
+The conclusions of `abstract_continterp` and `abstract_convergence` are
+unchanged; `abstract_stability`'s changed only in that `BS` is now the defined
+eighteen-term expression rather than a free real, and the norm is expressed in
+`cxu`,`gpu` rather than the combined `xu`.
+
+Read that first count carefully, because it cuts against the headline:
+**`abstract_stability`'s own analytic base went up, not down** -- it traded one
+vacuous row for two genuine Green identities. The 53 -> 50 reduction is a
+statement about the *union* over the four files, and it holds only because
+`AbstractConvergence.v` already declared `H_skew_diag` and `H_ibp_diag` for its
+own `BSWW` reasoning; the stability file now shares them rather than adding
+them. Taken standalone, this file assumes strictly more than it did, and assumes
+it honestly.
+
+**Non-vacuity is machine-checked** for three of the four abstract theorems.
+`NonVacuity.v` exhibits an explicit instance for `abstract_stability` (the
+carrier `R` with `<x,y> := x*y`, a small mesh, rational data), discharges
+*every* hypothesis — including `H_skew_diag`, `H_ibp_diag`, `S3` and `Heps` —
+and applies the theorem inside the kernel, obtaining the non-degenerate
+conclusion `B_S = 7/8 >= C_stab * |||U_h|||^2 = 7/16` with both sides strictly
+positive. That witness is now *stronger* than it was: `B_S = 7/8` used to be a
+number it *chose* (a free real, set by fiat, then justified against the assumed
+`HBS`); it is now a number it *computes* from the eighteen-term definition. A
+second witness in the same file (`am = 1`, a two-element mesh, `5069/567 >=
+167/42`) adds a **strictly positive advection field**, and `NonVacuityInterp.v`
+and `NonVacuityConv.v` do the same for `abstract_continterp` (39 hypotheses) and
+`abstract_convergence` (44) — each on a genuine two-element interior-face mesh
+(not `Empty_set`, not `Fl := []`), each with a concrete rational lower bound on
+the right-hand side (`|B_S| = 72181/8400 <= 131 <= RHS` for interpolation;
+`NErr <= C_conv * Psi` with `NErr, Psi > 0` for convergence), not merely
+`RHS > 0`. So three of the four hypothesis bundles are provably *consistent*.
+
+What remains, stated plainly. `abstract_continuity` has **no witness of its
+own** — its consistency still rests on the hand argument. Each witness also has
+disclosed non-sharp corners, recorded in the file banners: the advection witness
+uses a uniform mesh and meets `Heps` at equality (the extremal admissible
+choice, not a strict one); and the interpolation and convergence witnesses
+discharge `H_skew`/`H_ibp_vp`/`H_skew_diag` as `0 = ±0`. That last is *forced*
+(on a skew or antisymmetric diagonal both sides must vanish), but is met by
+*nonzero cancelling* summands — it is exactly that cancellation which pins the
+face data `FB_p`, `FB_c` the rest of the bundle then controls, so those
+hypotheses are not idle. The previously-flagged gap around `CI_pos` — the one
+hypothesis this revision made strictly stronger, and which lives only in the
+interpolation and convergence bundles — is now **closed**: both files discharge
+`0 < CI` strictly (`CI = 1`, `CI = 4`) and jointly with the full bundle. All of
+this settles *consistency*, not *soundness*: that the finite element objects
+satisfy the hypotheses is the other direction, and is what the hand audit in
+`AUDIT.md` §4 establishes.
 
 **Headline of this revision: the paper's entire a priori chain --
 `lemma:Stability`, `lemma:Continuity`, `lem:continterp` and
-`thm:convergence` -- consists of complete machine-checked theorems** (`abstract_stability`,
-`abstract_continuity_sharp`, `abstract_continuity`), proved over an
+`thm:convergence` -- consists of complete machine-checked theorems**
+(`abstract_stability`, `abstract_continuity` with its sharp form
+`abstract_continuity_sharp`, `abstract_continterp`, `abstract_convergence`),
+proved over an
 abstract inner-product/mesh interface from a short, named, quantitative
 trusted base of analytic facts — see the abstract layer section and the
 scope ledger below. The elemental Cauchy–Schwarz inequalities are *derived*
@@ -77,9 +189,10 @@ tau1/tau2/sigma-tilde formulas is itself machine-checked --
 `tau1_agree`/`tau2_agree`/`sigt_agree`), the closed `abstract_continterp`
 is applied to the pair (E, W), the two are glued by the single genuinely
 new trusted item `Horth` (Galerkin orthogonality eq:consistency plus
-bilinearity of B_S in its first argument) and by `HBS_W` (the tested
-identity for the W-pair, the same class-G item as the stability lemma's
-own `HBS`), and the triangle inequality for the mesh-dependent triple
+bilinearity of B_S in its first argument) -- the tested identity for the W-pair,
+formerly the hypothesis `HBS_W`, is not needed at all, since
+`abstract_stability` is applied at those atoms and carries it --
+and the triangle inequality for the mesh-dependent triple
 norm is **proved** from the pre-Hilbert axioms (per-element five-fold
 Cauchy--Schwarz via the discrete C--S over an explicit five-element index
 list, then the discrete C--S over the mesh; the error family's
@@ -214,9 +327,12 @@ ASGS cancellation.
 field's elemental restriction as an abstract vector and the parameters via
 the closed formulas, the theorem `abstract_stability` derives
 `B_S(U_h,U_h) ≥ C_stab · |||U_h|||²` with the explicit
-`C_stab = min{C_visc, C_u, 1−C₂, 1} > 0` from exactly two named analytic
-hypotheses: (HBS) the Galerkin-testing/adjoint-expansion identity, and (S3)
-the weighted inverse estimate eq:winv-divvisc — everything else (the
+`C_stab = min{C_visc, C_u, 1−C₂, 1} > 0` from exactly three named analytic
+hypotheses: (H_skew_diag, H_ibp_diag) the two *diagonal* Green identities,
+and (S3) the weighted inverse estimate eq:winv-divvisc. `B_S(U_h,U_h)` is
+**not** among them: it is a `Definition` (the eighteen-term form at the
+diagonal atoms) and the Galerkin-testing/adjoint-expansion identity is the
+*theorem* `HBS`, proved from the first two — everything else (the
 difference-of-squares step, the expansion of ‖G(u)‖², elemental
 Cauchy–Schwarz, the Young step with parameter ξC̄²να_K/h² and the exact
 cancellation of the inverse-estimate constant, the coefficient collection
@@ -323,14 +439,16 @@ rewritings of Step 6, the jump treatment with explicit constants, the
 facewise Cauchy–Schwarz with bounded multiplicity, and the Step-9
 absorption — as theorems over a named trusted base.
 
-**The residual trusted base** (each item a hypothesis of the abstract
-theorems, stated quantitatively in the file headers): (a) *data/mesh
-assumptions* — H:jump, eq:epscond, bounded face multiplicity, positivity of
-the coefficients — which remain hypotheses in any formal system; (b)
-*Green-type identities* — the Galerkin/adjoint identity (HBS), eq:skew,
-eq:globalibp, eq:elemibp, the elemental pressure IBP, and the two facewise
-assembly identities; (c) *inverse-type estimates* — eq:winv-divvisc (S3)
-and the eight weighted inverse estimates of lem:winv, plus (inside the two
+**The residual trusted base** — 50 hypotheses in total, enumerated row by row
+in Table `tab:inventory` of `../coq_coverage.tex`, which is the authoritative
+list (each item a hypothesis of the abstract theorems, stated quantitatively in
+the file headers): (a) *data/mesh assumptions*, items 1–24 — H:jump, eq:epscond,
+bounded face multiplicity, positivity of the coefficients — which remain
+hypotheses in any formal system; (b) *Green-type identities*, items 25–32 —
+eq:skew, eq:globalibp, their two *diagonal* instances `H_skew_diag`/`H_ibp_diag`,
+the two facewise assembly identities, and `Horth`; (c) *inverse-type estimates*,
+items 33–50 — eq:winv-divvisc (S3) and the eight weighted inverse estimates of
+lem:winv, the seven `HI_*` interpolation estimates, plus (inside the two
 face-integral hypotheses) the L^∞ inverse estimate, meas(Γᵇ) ≤ Chᵈ⁻¹, and
 Hölder on the face. Classes (b) and (c) are textbook material
 (Brenner–Scott; Ern–Guermond) verified by hand against the manuscript
@@ -340,8 +458,21 @@ eq:interp/eq:interpinfty (Bramble--Hilbert technology) enter
 lem:continterp as the named Class-(c) hypotheses `HI_*`, hand-audited
 like the rest; with them, lem:continterp and thm:convergence are fully
 formalised (`AbstractInterpolation.v`, `AbstractConvergence.v`), and the
-only class-(b) additions of the convergence file are `HBS_W` and `Horth`
-(consistency + bilinearity).
+only class-(b) addition of the convergence file is `Horth` (consistency +
+bilinearity) — `HBS_W` is gone entirely, and the file's two diagonal identities
+are the stability file's own, shared rather than added.
+
+**Note what is *not* on that list any more, and what that is worth.** The
+Galerkin/adjoint identity `HBS` used to head class (b), and this file used to
+call it the single largest assumption in the development. That label was wrong:
+as stated it was a free real pinned by its own defining equation, hence
+eliminable, and it constrained nothing. It is now a theorem, proved from the two
+diagonal Green identities, and its convergence twin `HBS_W` is gone outright.
+The gain is that `B_S` has one encoding instead of two, not that a large
+assumption was discharged. `Horth` (consistency + bilinearity) is now the
+largest class-(b) item and the face bundle `H_face_p`/`H_face_c` the second —
+and those two, together with the eighteen-term reading obligation that no row of
+the table can express, are where the residual trust actually sits.
 
 Two precision amendments to the appendix's hypotheses are proposed
 (AUDIT.md, F1–F2).
@@ -388,6 +519,10 @@ make clean
 
 An editor with a Coq plugin (VsCoq, Proof General, CoqIDE) will pick up
 `_CoqProject` automatically for interactive stepping.
+
+The `Makefile` derives the inter-file dependency graph with `coqdep` (written to
+a gitignored `.coq-deps`, regenerated automatically), so `make -jN` is
+parallel-safe — the build order is no longer implied by the file listing.
 
 ## Conventions
 

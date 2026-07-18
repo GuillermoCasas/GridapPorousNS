@@ -5,12 +5,14 @@ StabilityAlgebra.v
 ContinuityAlgebra.v
 AbstractSums.v
 InnerSpace.v
-AbstractStability.v
 AbstractContinuity.v
 AbstractInterpolation.v
+AbstractStability.v
 AbstractConvergence.v
 TauDesign.v
 Asymptotics.v
 ManufacturedSolution.v
 PlateauBump.v
 NonVacuity.v
+NonVacuityInterp.v
+NonVacuityConv.v

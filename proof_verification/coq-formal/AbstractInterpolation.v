@@ -73,7 +73,15 @@ Hypothesis cJ_le_1      : cJ <= 1.
 Hypothesis one_le_cJ'   : 1 <= cJ'.
 Hypothesis Cface_nonneg : 0 <= Cface.     (*  the face-estimate constant     *)
 Hypothesis Nf_nonneg    : 0 <= Nf.        (*  max faces per element (H:mesh) *)
-Hypothesis CI_nonneg    : 0 <= CI.        (*  interpolation constant (eq:interp) *)
+Hypothesis CI_pos       : 0 < CI.         (*  interpolation constant (eq:interp) *)
+
+(*  CI > 0 (rather than merely CI >= 0) is what lets the interpolation        *)
+(*  estimates HI_uu / HI_pp transfer the sign of the pre-Hilbert norm onto    *)
+(*  IU / IP -- see the IU_nonneg / IP_nonneg lemmas below.  The weaker        *)
+(*  0 <= CI is all the rest of the file ever needs, so we re-derive it here   *)
+(*  under its old name and every downstream consumer stays untouched.         *)
+Lemma CI_nonneg : 0 <= CI.
+Proof. pose proof CI_pos. lra. Qed.
 
 (* ---------- Mesh data -------------------------------------------------------- *)
 
@@ -104,10 +112,9 @@ Variables (gu gv du dv cxu cxv gpu gpv uu vv pp qq divu divv : K -> V).
 Definition xu (k : K) : V := (cxu k) +v (gpu k).   (*  (alpha X(E))|_K  *)
 Definition xv (k : K) : V := (cxv k) +v (gpv k).   (*  (alpha X(V))|_K  *)
 
-(*  The elemental interpolation error sizes (eq:Eint).  *)
+(*  The elemental interpolation error sizes (eq:Eint).  Their nonnegativity   *)
+(*  is NOT assumed: it is derived from HI_uu / HI_pp below.                   *)
 Variables (IU IP : K -> R).
-Hypothesis IU_nonneg : forall k, 0 <= IU k.
-Hypothesis IP_nonneg : forall k, 0 <= IP k.
 
 (* ---------- Face data --------------------------------------------------------- *)
 
@@ -220,6 +227,30 @@ Hypothesis HI_uu :
   forall k, nrm (uu k) <= CI * IU k.
 Hypothesis HI_pp :
   forall k, nrm (pp k) <= CI * IP k.
+
+(* ------------------------------------------------------------------------- *)
+(*  IU >= 0 and IP >= 0 are THEOREMS, not hypotheses.                         *)
+(*                                                                           *)
+(*  The pre-Hilbert axioms already give nrm x >= 0 for every x (nrm_nonneg,  *)
+(*  InnerSpace.v), so HI_uu reads 0 <= nrm (uu k) <= CI * IU k.  With CI > 0 *)
+(*  (CI_pos) the product CI * IU k >= 0 forces IU k >= 0; likewise for IP    *)
+(*  via HI_pp.  Nothing else is needed, so the two former hypotheses drop    *)
+(*  out of the trusted base -- at the price of strengthening CI_nonneg to    *)
+(*  CI_pos, which is where the sign transfer happens.  The names are kept    *)
+(*  verbatim so every downstream use site is unchanged.                      *)
+(* ------------------------------------------------------------------------- *)
+
+Lemma IU_nonneg : forall k, 0 <= IU k.
+Proof.
+  intro k. pose proof (nrm_nonneg Hs (uu k)) as Hn.
+  pose proof (HI_uu k) as Hi. nra.
+Qed.
+
+Lemma IP_nonneg : forall k, 0 <= IP k.
+Proof.
+  intro k. pose proof (nrm_nonneg Hs (pp k)) as Hn.
+  pose proof (HI_pp k) as Hi. nra.
+Qed.
 
 (*  eq:epscond, elementwise.  *)
 Hypothesis H_eps :

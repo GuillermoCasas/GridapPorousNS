@@ -98,3 +98,12 @@ authoritative formulation), plus the dedicated notes (`osgs_algorithm`, `osgs_re
 `scale_free_gate_note`). When
 a *permanent* derivation is still stranded in `docs/`, that is a task under `pending-tasks.md` §1 (Theory) to
 move it to LaTeX — not something to grow here.
+
+## Where the machine-checked proofs live (not here)
+
+The paper's a priori chain (stability, continuity, interpolation, convergence) is machine-checked in Coq
+under [`../proof_verification/`](../proof_verification/): four abstract theorems proved from a ~50-hypothesis
+trusted base, plus non-vacuity witnesses. The paper↔Coq map and the trusted-base inventory are in
+[`../proof_verification/coq_coverage.tex`](../proof_verification/coq_coverage.tex); that tree is
+self-documenting (its own `AUDIT.md` / `README.md`), so `docs/` only points to it. See `CLAUDE.md` for the
+verification gate.

@@ -108,6 +108,10 @@ The implementation is a literal transcription of [theory/paper/article.tex](theo
   - The convective adjoint term (`conv_adj` in `strong_adjoint_momentum`) is `+α a·∇v` (positive sign), because the stabilization bilinear form subtracts the adjoint (`B_S` definition under `eq:OSGSProblem`). Flipping the sign in code reproduces the "Anti-SUPG" failure.
   - OSGS projection is computed on **unconstrained** spaces `V_free/Q_free` (no Dirichlet) — projecting on the Dirichlet-constrained space introduces an `O(1)` boundary residual that breaks `O(h^{k+1})` MMS convergence.
 
+### Formal proof (`proof_verification/`)
+
+A Coq development (`proof_verification/coq-formal/`, Coq 8.18, stdlib only) machine-checks the paper's a priori chain: four abstract theorems — `abstract_stability`, `abstract_continuity`, `abstract_continterp`, `abstract_convergence` — proved from a trusted base of ~50 named hypotheses that transcribe the paper's assumptions (soundness of that base is the audit's whole point). The paper↔Coq map and the trusted-base inventory (Table `tab:inventory`) live in `proof_verification/coq_coverage.tex`; the `NonVacuity*.v` files carry witnesses that the hypothesis bundles are jointly satisfiable on concrete, non-degenerate data. Do not restate any of that here — point to `coq_coverage.tex`.
+
 ### Solver safeguards (`src/solvers/`)
 
 `SafeNewtonSolver` (in `nonlinear.jl`) implements: Armijo merit-function line search, divergence/stagnation guards keyed on `stagnation_noise_floor` and `divergence_merit_factor`, and bounded `max_increases`. The orchestration in `solver_core.jl` (`solve_system`) drives the ASGS Stage-I boot (`asgs_solver.jl`: Exact Newton → Picard globalization → homotopy dilution), then dispatches by method (the OSGS coupled solve lives in `osgs_solver.jl`; optional MMS verification in `mms_verification.jl` behind the `SolutionVerifier` seam). These safeguards are intentional design, not clutter — do not weaken them in pursuit of speed.
@@ -144,6 +148,8 @@ Enforced at the cultural level (`.agents/rules/reproducible-results.md`). It mus
 ### Verification gate
 
 Per `.agents/rules/fast-verification.md`: after editing anything in `src/formulations/`, `src/stabilization/tau.jl`, `src/models/reaction.jl`, or `src/solvers/nonlinear.jl`, run Blitz immediately. For changes to assembly, residual/Jacobian construction, or solver orchestration, run Quick after Blitz. For convergence-study or MMS-touching changes, also run Extended. A change is not complete until the relevant tiers pass with no failures and no tier-warning messages.
+
+For the Coq formal-proof tree, after editing any `.v` under `proof_verification/coq-formal/`, run `./run_all.sh` there (compiles every file in `_CoqProject` order, then `coqchk`s every module). The invariant is absolute: ZERO `Admitted`, ZERO `Axiom`, and `Print Assumptions` on the headline theorems returning only the three stdlib axioms (`functional_extensionality_dep`, plus the classical-reals `ClassicalDedekindReals.sig_not_dec` and `sig_forall_dec`). Never weaken a lemma, comment out a check, or admit a goal to make something pass — a false success corrupts a trusted-base audit.
 
 ### Documentation gate
 

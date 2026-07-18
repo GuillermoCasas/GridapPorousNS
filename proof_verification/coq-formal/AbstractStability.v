@@ -1,28 +1,51 @@
 (* ========================================================================= *)
 (*  AbstractStability.v                                                      *)
 (*                                                                           *)
-(*  lemma:Stability of the paper, proved IN FULL -- including the elemental  *)
+(*  lemma:Stability of the paper, proved IN FULL -- including the tested     *)
+(*  (Galerkin-testing / adjoint-expansion) identity itself, the elemental    *)
 (*  inner-product manipulations, the parametrized Young step, and the        *)
 (*  summation over the mesh -- from a named, quantitative trusted base of    *)
-(*  exactly TWO analytic facts:                                              *)
+(*  exactly THREE analytic facts, two of which are elementary Green          *)
+(*  identities:                                                              *)
 (*                                                                           *)
-(*    (HBS)  the Galerkin-testing / adjoint-expansion identity: testing      *)
-(*           B_S with U_h itself gives                                       *)
-(*             B_S(U_h,U_h) = 2 nu ||a^(1/2) P grad u||^2 + sigma ||u||^2    *)
-(*                            + eps ||p||^2                                  *)
-(*                            - sum_K tau_1 < L*_m , L_m >_K                 *)
-(*                            - sum_K tau_2 < L*_c , L_c >_K ,               *)
-(*           where the momentum/mass residual vectors are the paper's        *)
-(*           (eq:strongop, eq:XG):  L_m = alpha X(U) - G(u),                 *)
-(*           L*_m = -alpha X(U) - G(u),  L_c = eps p + div(alpha u),         *)
-(*           L*_c = eps p - div(alpha u).  This packages: integration by     *)
-(*           parts with u_h = 0 on the boundary, div(alpha a) = 0            *)
-(*           (H:advection), and idempotence/symmetry of the projector.       *)
+(*    (H_skew_diag)  eq:skew on the diagonal: the convective form is         *)
+(*           skew-symmetric, so testing it against the velocity itself       *)
+(*           annihilates it,                                                 *)
+(*             sum_K < u_h , alpha a . grad u_h >_K = 0 .                    *)
+(*           This packages div(alpha a) = 0 (H:advection) with u_h = 0 on    *)
+(*           the boundary.                                                   *)
+(*                                                                           *)
+(*    (H_ibp_diag)  eq:globalibp on the diagonal: integration by parts of    *)
+(*           the pressure gradient against the velocity, with no boundary    *)
+(*           term (again u_h = 0 on the boundary),                           *)
+(*             sum_K < u_h , alpha grad p_h >_K                              *)
+(*               = - sum_K < p_h , div(alpha u_h) >_K .                      *)
 (*                                                                           *)
 (*    (S3)   the weighted inverse estimate eq:winv-divvisc (lem:winv):       *)
 (*             || 2 div(alpha nu P grad u) ||_K                              *)
 (*               <= (2 nu Cbar / h_K) alpha_K^(1/2)                          *)
 (*                  || alpha^(1/2) P grad u ||_K .                           *)
+(*                                                                           *)
+(*  B_S(U_h,U_h) is NOT a free real constrained by an assumed identity any    *)
+(*  more.  It is DEFINED (see BS below) as the eighteen-term form of         *)
+(*  eq:Bstab -- the closed AbstractInterpolation.BS -- evaluated with BOTH   *)
+(*  slots carrying the U_h atoms, and the tested identity                    *)
+(*                                                                           *)
+(*      B_S(U_h,U_h) = 2 nu ||a^(1/2) P grad u||^2 + sigma ||u||^2           *)
+(*                     + eps ||p||^2                                         *)
+(*                     - sum_K tau_1 < L*_m , L_m >_K                        *)
+(*                     - sum_K tau_2 < L*_c , L_c >_K                        *)
+(*                                                                           *)
+(*  -- with the paper's momentum/mass residual vectors (eq:strongop, eq:XG)  *)
+(*  L_m = alpha X(U) - G(u),  L*_m = -alpha X(U) - G(u),                     *)
+(*  L_c = eps p + div(alpha u),  L*_c = eps p - div(alpha u) -- is a         *)
+(*  THEOREM (see HBS below), proved from the two Green identities above and  *)
+(*  nothing else.  What used to be the single hypothesis (HBS) silently      *)
+(*  bundled the whole difference-of-squares expansion, the symmetry and      *)
+(*  idempotence of the projector, and the two Green identities into one      *)
+(*  unaudited assumption; the expansion is now machine-checked and only the  *)
+(*  two identities remain assumed.  This mirrors what AbstractConvergence.v  *)
+(*  does for the discrete error W.                                           *)
 (*                                                                           *)
 (*  Everything else -- the difference-of-squares cancellation, the           *)
 (*  expansion of || G(u) ||^2, Cauchy--Schwarz, the Young step with          *)
@@ -43,8 +66,57 @@
 
 From Coq Require Import Reals Lra Lia Psatz List.
 Import ListNotations.
-From PNSFormal Require Import StabilityAlgebra InnerSpace AbstractSums.
+From PNSFormal Require Import StabilityAlgebra InnerSpace AbstractSums
+                              AbstractInterpolation.
 Local Open Scope R_scope.
+
+(*  [known-fragility]  ContinuityAlgebra is deliberately NOT imported here,   *)
+(*  only loaded (transitively, through AbstractInterpolation).  The two       *)
+(*  algebra modules both export tau1, tau2, sigt, tau1_pos, ...; were         *)
+(*  ContinuityAlgebra imported, the LAST import would win and every           *)
+(*  unqualified occurrence below would silently switch modules.  tau1 and     *)
+(*  tau2 agree definitionally (see the two bridges below, both closed by      *)
+(*  reflexivity), so for them the switch would be harmless -- but sigt does   *)
+(*  NOT: StabilityAlgebra.sigt and ContinuityAlgebra.sigt are only            *)
+(*  ALGEBRAICALLY equal (bridging them needs `field' plus positivity; see     *)
+(*  AbstractConvergence.sigt_agree).  This file's C_stab / visc_final /       *)
+(*  u_final / eps_max machinery is StabilityAlgebra's, so the three           *)
+(*  parameter definitions below name their module explicitly and the import   *)
+(*  list stays ContinuityAlgebra-free.  Do not "tidy" either.                 *)
+
+(* ========================================================================= *)
+(*  Bridges between the two scalar-algebra modules.                          *)
+(*                                                                           *)
+(*  tau_1 and tau_2 are given by the SAME closed formula in StabilityAlgebra *)
+(*  and in ContinuityAlgebra (eq:taus), so the bridges are conversions --     *)
+(*  each is closed by reflexivity after unfolding.  They live here, above    *)
+(*  the section, because the eighteen-term B_S imported from                 *)
+(*  AbstractInterpolation.v is phrased with ContinuityAlgebra's parameters   *)
+(*  while the coercivity machinery below is phrased with StabilityAlgebra's; *)
+(*  AbstractConvergence.v (their other consumer) gets them by importing this *)
+(*  file.  The sigt bridge is NOT a conversion and stays there.              *)
+(* ========================================================================= *)
+
+Lemma tau1_agree : forall nu h alphaK sigma amag c1 c2 : R,
+  StabilityAlgebra.tau1 nu h alphaK sigma amag c1 c2
+  = ContinuityAlgebra.tau1 nu h alphaK sigma amag c1 c2.
+Proof.
+  intros.
+  unfold StabilityAlgebra.tau1, StabilityAlgebra.tau1NS_inv,
+         ContinuityAlgebra.tau1, ContinuityAlgebra.phi1,
+         ContinuityAlgebra.tauNSinv.
+  reflexivity.
+Qed.
+
+Lemma tau2_agree : forall nu h alphaK amag c1 c2 : R,
+  StabilityAlgebra.tau2 nu h alphaK amag c1 c2
+  = ContinuityAlgebra.tau2 nu h alphaK amag c1 c2.
+Proof.
+  intros.
+  unfold StabilityAlgebra.tau2, StabilityAlgebra.tau1NS_inv,
+         ContinuityAlgebra.tau2, ContinuityAlgebra.tauNSinv.
+  reflexivity.
+Qed.
 
 Section AbstractStability.
 
@@ -90,10 +162,12 @@ Hypothesis am_nonneg : forall k, 0 <= am k.
 
 (*  The stabilization parameters, per element, via the paper's formulas      *)
 (*  (eq:TauNavierStokes, eq:Tau1Final, eq:Tau2Final, eq:SigmaAlpha) --       *)
-(*  reusing the closed definitions of StabilityAlgebra.v verbatim.           *)
-Definition t1 (k : K) : R := tau1 nu (hK k) (aK k) sigma (am k) c1 c2.
-Definition t2 (k : K) : R := tau2 nu (hK k) (aK k) (am k) c1 c2.
-Definition sg (k : K) : R := sigt nu (hK k) (aK k) sigma (am k) c1 c2.
+(*  reusing the closed definitions of StabilityAlgebra.v verbatim.  The      *)
+(*  module qualifier is load-bearing, not decoration: see the                *)
+(*  [known-fragility] note on the import list above.                         *)
+Definition t1 (k : K) : R := StabilityAlgebra.tau1 nu (hK k) (aK k) sigma (am k) c1 c2.
+Definition t2 (k : K) : R := StabilityAlgebra.tau2 nu (hK k) (aK k) (am k) c1 c2.
+Definition sg (k : K) : R := StabilityAlgebra.sigt nu (hK k) (aK k) sigma (am k) c1 c2.
 
 (* ---------- The discrete fields, elementwise ------------------------------- *)
 
@@ -101,10 +175,20 @@ Definition sg (k : K) : R := sigt nu (hK k) (aK k) sigma (am k) c1 c2.
 (*    gu k   ~  (alpha^(1/2) P grad u_h)|_K                                   *)
 (*    uu k   ~  u_h|_K                                                        *)
 (*    pp k   ~  p_h|_K                                                        *)
-(*    xu k   ~  (alpha X(U_h))|_K = (alpha a . grad u_h + alpha grad p_h)|_K  *)
+(*    cxu k  ~  (alpha a . grad u_h)|_K                                       *)
+(*    gpu k  ~  (alpha grad p_h)|_K                                           *)
 (*    divu k ~  (div(alpha u_h))|_K                                           *)
 (*    du k   ~  (2 div(alpha nu P grad u_h))|_K                               *)
-Variables (gu uu pp xu divu du : K -> V).
+Variables (gu uu pp cxu gpu divu du : K -> V).
+
+(*  The x-component (alpha X(U_h))|_K = (alpha a . grad u_h + alpha grad p_h)|_K
+    is DERIVED from its two summands rather than posited as one opaque atom,
+    exactly as in AbstractInterpolation.v (:xu, :xv).  The split is forced:
+    the two Green identities of the trusted base speak about the convective
+    part and the pressure-gradient part SEPARATELY, so the tested identity
+    below is not even expressible while x stays fused.  Steps 2-5 never look
+    inside x -- they use it only through Xn -- so they are unaffected.       *)
+Definition xu (k : K) : V := (cxu k) +v (gpu k).
 
 (* ---------- The residual vectors (eq:strongop, eq:XG) ----------------------- *)
 
@@ -114,17 +198,32 @@ Definition Lstar_m (k : K) : V := (vopp (xu k)) +v (vopp (Bv k)).   (* -alpha X 
 Definition L_c (k : K) : V := (divu k) +v (eps *v (pp k)).
 Definition Lstar_c (k : K) : V := (vopp (divu k)) +v (eps *v (pp k)).
 
+(* ---------- B_S, DEFINED (not assumed) -------------------------------------- *)
+
+(*  [paper-faithful]  eq:Bstab, in the eighteen-term form of the appendix     *)
+(*  (eq:T1--eq:T18), evaluated at the DIAGONAL: both the trial slot and the   *)
+(*  test slot carry the U_h atoms.  We reuse AbstractInterpolation.BS         *)
+(*  verbatim rather than restate it, so that the number this file bounds      *)
+(*  from below and the number AbstractInterpolation.v / AbstractConvergence.v *)
+(*  bound from above are the SAME closed expression, reconciled inside the    *)
+(*  kernel rather than by a side condition.                                   *)
+Definition BS : R :=
+  AbstractInterpolation.BS Hs K Th nu sigma eps c1 c2 hK aK am
+    gu gu du du cxu cxu gpu gpu uu uu pp pp divu divu.
+
 (* ---------- The trusted base ------------------------------------------------ *)
 
-Variable BS : R.    (*  the number B_S(U_h, U_h)  *)
+(*  (H_skew_diag): eq:skew with both arguments equal -- the convective form   *)
+(*  is skew-symmetric (div(alpha a) = 0, u_h = 0 on the boundary), hence      *)
+(*  vanishes on the diagonal.  The global identity has no boundary term.      *)
+Hypothesis H_skew_diag :
+  Rsum Th (fun k => << (uu k) , (cxu k) >>) = 0.
 
-(*  (HBS): Galerkin testing + adjoint expansion (see header).  *)
-Hypothesis HBS :
-  BS = 2 * nu * Rsum Th (fun k => << (gu k) , (gu k) >>)
-       + sigma * Rsum Th (fun k => << (uu k) , (uu k) >>)
-       + eps * Rsum Th (fun k => << (pp k) , (pp k) >>)
-       - Rsum Th (fun k => t1 k * << (Lstar_m k) , (L_m k) >>)
-       - Rsum Th (fun k => t2 k * << (Lstar_c k) , (L_c k) >>).
+(*  (H_ibp_diag): eq:globalibp with both arguments equal -- integration by    *)
+(*  parts of the pressure gradient, boundary term killed by u_h = 0.         *)
+Hypothesis H_ibp_diag :
+  Rsum Th (fun k => << (uu k) , (gpu k) >>)
+  = - Rsum Th (fun k => << (pp k) , (divu k) >>).
 
 (*  (S3): the weighted inverse estimate eq:winv-divvisc.  *)
 Hypothesis S3 :
@@ -197,6 +296,114 @@ Proof.
   rewrite (ip_expand_sub Hs).
   rewrite ip_scal_r, (ip_scal_l Hs), ip_scal_r.
   ring.
+Qed.
+
+(* ========================================================================= *)
+(*  Step 1b: THE TESTED IDENTITY, NOW A THEOREM (was: Hypothesis HBS).       *)
+(*  eq:StabilityEstimate, i.e. eq:Bstab tested with U_h against itself.      *)
+(*                                                                           *)
+(*  The only inputs are the two diagonal Green identities of the trusted     *)
+(*  base; no positivity is used.  The rest is the difference-of-squares      *)
+(*  algebra of Step 1 plus the symmetry of the inner product.                *)
+(* ========================================================================= *)
+
+(*  The interpolation file's parameters and this file's are the same          *)
+(*  functions: tau_1 and tau_2 are given by one formula in the two algebra    *)
+(*  modules, so these are conversions (cf. tau1_agree / tau2_agree above).    *)
+Lemma t1I_fun : AbstractInterpolation.t1 K nu sigma c1 c2 hK aK am = t1.
+Proof. reflexivity. Qed.
+Lemma t2I_fun : AbstractInterpolation.t2 K nu c1 c2 hK aK am = t2.
+Proof. reflexivity. Qed.
+
+(*  On the diagonal the interpolation file's two x-components -- the trial    *)
+(*  slot's and the test slot's -- collapse to this file's single xu, again    *)
+(*  definitionally.                                                           *)
+Lemma AIxu_is_xu : AbstractInterpolation.xu Hs K cxu gpu = xu.
+Proof. reflexivity. Qed.
+Lemma AIxv_is_xu : AbstractInterpolation.xv Hs K cxu gpu = xu.
+Proof. reflexivity. Qed.
+
+(*  ---- the diagonal chunk T2 + T4 vanishes ------------------------------- *)
+(*  This is where -- and the ONLY place where -- the trusted base's two       *)
+(*  Green identities are consumed: splitting alpha X(U_h) into its            *)
+(*  convective and pressure-gradient parts turns T2 + T4 into                 *)
+(*  H_skew_diag + (H_ibp_diag + T4), i.e. 0 + 0.                              *)
+Lemma diag_zero :
+  Rsum Th (fun k => << (uu k) , (xu k) >>)
+  + Rsum Th (fun k => << (pp k) , (divu k) >>) = 0.
+Proof.
+  assert (Hext :
+    Rsum Th (fun k => << (uu k) , (xu k) >>)
+    = Rsum Th (fun k => << (uu k) , (cxu k) >> + << (uu k) , (gpu k) >>)).
+  { apply Rsum_ext. intro k. unfold xu. apply ip_add_r. }
+  rewrite Hext, Rsum_plus, H_skew_diag, H_ibp_diag. ring.
+Qed.
+
+(*  ---- the two residual-pairing groups, expanded ------------------------- *)
+Lemma momentum_group :
+  Rsum Th (fun k => t1 k * << (Lstar_m k) , (L_m k) >>)
+  = Rsum Th (fun k => t1 k * << (du k) , (du k) >>)
+    - 2 * sigma * Rsum Th (fun k => t1 k * << (du k) , (uu k) >>)
+    + sigma^2 * Rsum Th (fun k => t1 k * << (uu k) , (uu k) >>)
+    - Rsum Th (fun k => t1 k * << (xu k) , (xu k) >>).
+Proof.
+  rewrite <- (Rsum_scal K Th (2 * sigma) (fun k => t1 k * << (du k) , (uu k) >>)).
+  rewrite <- (Rsum_scal K Th (sigma^2) (fun k => t1 k * << (uu k) , (uu k) >>)).
+  rewrite <- !Rsum_minus, <- !Rsum_plus, <- !Rsum_minus.
+  apply Rsum_ext. intro k.
+  rewrite (momentum_pairing k), (Bv_expand k).
+  unfold Un, Xn.
+  ring.
+Qed.
+
+Lemma mass_group :
+  Rsum Th (fun k => t2 k * << (Lstar_c k) , (L_c k) >>)
+  = eps^2 * Rsum Th (fun k => t2 k * << (pp k) , (pp k) >>)
+    - Rsum Th (fun k => t2 k * << (divu k) , (divu k) >>).
+Proof.
+  rewrite <- (Rsum_scal K Th (eps^2) (fun k => t2 k * << (pp k) , (pp k) >>)).
+  rewrite <- !Rsum_minus.
+  apply Rsum_ext. intro k.
+  rewrite (mass_pairing k).
+  unfold Pn, Dn.
+  ring.
+Qed.
+
+(*  ---- symmetry identifications among the eighteen terms' atoms ---------- *)
+Lemma sym_uu_du :
+  Rsum Th (fun k => t1 k * << (uu k) , (du k) >>)
+  = Rsum Th (fun k => t1 k * << (du k) , (uu k) >>).
+Proof. apply Rsum_ext. intro k. rewrite (ip_sym Hs (uu k) (du k)). ring. Qed.
+
+Lemma sym_x_du :
+  Rsum Th (fun k => t1 k * << (xu k) , (du k) >>)
+  = Rsum Th (fun k => t1 k * << (du k) , (xu k) >>).
+Proof. apply Rsum_ext. intro k. rewrite (ip_sym Hs (xu k) (du k)). ring. Qed.
+
+Lemma sym_x_uu :
+  Rsum Th (fun k => t1 k * << (xu k) , (uu k) >>)
+  = Rsum Th (fun k => t1 k * << (uu k) , (xu k) >>).
+Proof. apply Rsum_ext. intro k. rewrite (ip_sym Hs (xu k) (uu k)). ring. Qed.
+
+Theorem HBS :
+  BS = 2 * nu * Rsum Th (fun k => << (gu k) , (gu k) >>)
+       + sigma * Rsum Th (fun k => << (uu k) , (uu k) >>)
+       + eps * Rsum Th (fun k => << (pp k) , (pp k) >>)
+       - Rsum Th (fun k => t1 k * << (Lstar_m k) , (L_m k) >>)
+       - Rsum Th (fun k => t2 k * << (Lstar_c k) , (L_c k) >>).
+Proof.
+  unfold BS, AbstractInterpolation.BS,
+    AbstractInterpolation.T1,  AbstractInterpolation.T2,  AbstractInterpolation.T3,
+    AbstractInterpolation.T4,  AbstractInterpolation.T5,  AbstractInterpolation.T6,
+    AbstractInterpolation.T7,  AbstractInterpolation.T8,  AbstractInterpolation.T9,
+    AbstractInterpolation.T10, AbstractInterpolation.T11, AbstractInterpolation.T12,
+    AbstractInterpolation.T13, AbstractInterpolation.T14, AbstractInterpolation.T15,
+    AbstractInterpolation.T16, AbstractInterpolation.T17, AbstractInterpolation.T18.
+  rewrite AIxu_is_xu, AIxv_is_xu, t1I_fun, t2I_fun.
+  rewrite momentum_group, mass_group.
+  rewrite sym_uu_du, sym_x_du, sym_x_uu.
+  pose proof diag_zero as Hd.
+  lra.
 Qed.
 
 (* ---------- Step 2: the inverse estimate, squared --------------------------- *)
