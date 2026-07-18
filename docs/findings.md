@@ -196,6 +196,40 @@ Source doc: `mms/p2-3d.md`. Diagnostic hooks (default-off): `smoke3d.jl` `ablati
 
 `theory/numerical_constants/c1_dimension_note.tex` gives the exact elementwise coercivity floor `c₁*(K) = 2ĉ²(K)` (pure shape constant); `test/extended/ManufacturedSolutions3D/element_c1.jl` transcribes it and **reproduces the note's Table to ~1e-14** (`ĉ²(Kuhn)=214` **is** the `C_inv²≈214` above; P1 ⇒ `c₁*≡0`). Measured on nested_red (`c1_distribution_probe.jl`), the red-refined **quality tail grows** so `c₁*/64` reaches p99 7.6 / max 14.9 at L2 (Kuhn is flat ≈2.87) ⇒ a fraction is elementwise sub-coercive at `×4`. **But the same-mesh study `smoke3d.jl c1study_nested_red` REFUTES that as the lever:** `×4`→`×14.9` moves the k=2 finest `L2u` rate by **Δ≈±0.05** (2.63–2.68; L2 byte-identical = the ILU-GMRES-uncertified interpolant). So the nested_red k=2 sub-optimality is **mesh-quality + hardware, not tail-coercivity** — `c₁` is the lever only for *uniform* sub-coercivity (Kuhn @ paper c₁). k=1 control: element-aware→`mult=1` is *worse* accuracy than `×4` ⇒ element-aware c₁ is the coercivity **floor**, not the accuracy optimum. Artifacts: `nested_red_<strategy>/` result leaves, `compare_c1study.py`. Source doc: `mms/p2-3d.md` §A.
 
+### Interpolation reference DECOMPOSES the 3D sub-optimality — direct confirmation (2026-07-17)
+
+The prior verdict ("irregular sub-optimality is mesh-quality, not coercivity") was reached indirectly (a
+`c₁` A/B). `test/extended/ManufacturedSolutions3D/run_interpolation_reference3d.jl` now measures it
+**directly**: the nodal-interpolation error of the exact fields on the *same* Kuhn and (committed-base)
+nested-red sequences, normalized identically to the solver rows (`calc_errors3d`), at the same quadrature
+(`4k+4`). Inserted as reference rows in `tab:3DL2`/`tab:3DH1`. At the tables' **adopted `c₁=16k⁴`**,
+`α₀=0.5`:
+
+- **Velocity is at the interpolation floor on both families, in value AND slope.** Efficiencies (method
+  FME / interpolant FME): ℙ₁ u H¹ 1.02/1.02 (reg), 0.91/0.93 (irr); ℙ₂ u L² 1.04/1.00 (reg), **1.03/1.00
+  (irr)**; ℙ₂ u H¹ 1.02/1.07 (reg), 0.93/0.91 (irr); ℙ₁ u L² 1.5/0.8 (reg) — the one case slightly above,
+  still same order. Where the method slope is sub-optimal the **interpolant slope is too**: irregular ℙ₂
+  u L² method 2.55/2.56 vs interpolant **2.67**; irregular ℙ₁ u H¹ method 0.83/0.85 vs interpolant
+  **0.71** (regular interpolant is 0.94 — the red-refined quality tail depresses the *best-approximation*
+  rate). ⇒ the 3D velocity sub-optimality is the mesh's approximation capacity, **not the formulation**.
+  This is the direct evidence the review's C6 (`docs/review_numerics_vs_theory.md`) said the paper's
+  "element-quality tail" attribution lacked; it can now be stated as a decomposition, not an assertion.
+- **Pressure is NOT at the floor** (13–770× above; OSGS H¹ reaches 1.29), but this is **not** a 3D or
+  element-quality defect: it is the expected viscous-regime one-order pressure loss, and the 2D viscous
+  baseline is *further* from its floor (ℚ₂ p L² 4964×, ℙ₁ p H¹ normalized 2.61>1). It appears equally on
+  regular and irregular families. So the pressure "sub-optimality" is theory-consistent (the working-norm
+  order loss), a different mechanism from the velocity.
+
+**Scope / still open.** This is at `c₁=16k⁴` (the tables' constant) — it does **not** address the
+`open-questions.md §3` caveats about whether plain `4k⁴` is fragile for 3D tets in general (Reading A vs
+B; the un-built well-shaped-tet positive test), which are a separate `c₁`-margin question. And it does
+not explain **C7**: the OSGS pressure H¹ = **1.29** printed *identically* on three different rows (regular
+ℙ₁, irregular ℙ₁, irregular ℙ₂) — different meshes, orders, slopes. The magnitude is unremarkable given
+the viscous baseline, but the exact triple is a coincidence to check against the raw data (transcription
+slip vs a genuine mesh-independent saturation); the in-progress 3D re-run (`smoke3d.jl sweep_structured`
+at `c₁=16k⁴`, 0 `success=false`, with per-mesh `success` flags now recorded) will settle it. Source doc:
+`docs/paper-revision-plan.md` §8.
+
 ---
 
 ## 4. OSGS reaction-dominated rate (high Da) — RESOLVED (pre-asymptotic; recovers by N=640)
