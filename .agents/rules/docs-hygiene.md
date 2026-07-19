@@ -17,6 +17,10 @@ toward the exact hard-to-navigate state this rule exists to prevent.
 
 Treat "commit without reconciling the docs" the same as "commit without running the verification gate."
 
+> **Companion skill:** `post-correction-docs-sync` applies this rule at the moment each fix lands
+> (not only at commit) — that is when it is most often skipped — and enforces checking every "done"
+> claim against the actual diff instead of asserting it from memory.
+
 ---
 
 ## The three tiers (know where each kind of content belongs)
