@@ -380,20 +380,26 @@ fixed, or invalid (§10.C).
 
 **✅ APPLIED 2026-07-19 (this session).** All 🟠 items in §10.A and the safe 🟡 items in §10.B
 were applied to `article.tex`/appendices, each change wrapped in `\amend{}`; build re-verified
-green (**67 pp** / 722 newlabels / 0 unresolved / 0 undefined citations — the 66→67 bump is the
+green (**68 pp** / 722 newlabels / 0 unresolved / 0 undefined citations / 0 bib warnings — the 66→68 bump is the
 added prose). **F1 and F2 are now additionally machine-checked** by the new
 `proof_verification/sympy/display_consistency_verification.py` (suite **115/115**); why the
 existing machinery missed them and how to close the gap is in
-`proof_verification/verification-gap-coverage.md`. **Deferred (flagged, not applied):** the four
-fragile notation nits — IA-5e (`Π^S=∇^S u`), F14c (`=`→`≈` in the SGS pull-out, exact for ASGS),
-F14d (`λ` eigenvalue rename), F14e (`U` scalar-vs-vector) — each in delicate `\scriptstyle`
-scoping or a multi-use symbol where forcing a change risks a build break or overriding a
-deliberate convention; and M5 (`Codina2015OnSM` booktitle), M8 (Codina/de-Pouplana emails),
-M6 (DOIs), which need bibliographic/contact data that must not be fabricated; and the nice-to-have 9b
-(how α is evaluated at quadrature in the MMS runs). These await author input. (F9a and F9c — the τ
+`proof_verification/verification-gap-coverage.md`. **Second no-re-run pass (2026-07-19) — now applied:**
+IA-5e (`Π^S∇u=∇^S u`), F14d (`λ`→`μ` eigenvalue), F14e (`U` disambiguated from the combined unknown), 9b (α and
+∇α evaluated analytically at the quadrature points in the 2D/3D MMS — code-verified in `run_test.jl` /
+`run_simulation.jl`), and M5 (retyped `Codina2015OnSM` as `@misc`; the empty-booktitle bib warning is gone).
+**F14c assessed and left unchanged** — the pull-out `Π̃[τ⁻¹Ũ]=τ⁻¹Ũ` is *exact* for ASGS (Π̃=I) and the step is an
+explicitly heuristic *motivation* ([article.tex L720]), so weakening it to `≈` is unwarranted (the AI's "≈ under
+either convention" is wrong for ASGS). **Still deferred, needing author data (not re-runs):** M6 (DOIs — SIAM
+tolerates their absence) and M8 (Codina/de-Pouplana emails). (F9a and F9c — the τ
 theory/practice gap and the stopping-tolerance sentence — **were applied** after an accuracy re-check of this banner.)
 
-### 10.A New — important (🟠)
+### 10.A New — important (🟠) — ✅ ALL 15 APPLIED & GREP-VERIFIED 2026-07-19 (none needs a re-run)
+
+> Every item below is a paper/prose edit built from the *existing* table data — no simulation re-run
+> required — and each was confirmed present in the committed `theory/paper/article.tex` by grepping its
+> distinctive phrase (F1 sign, F2 `\amend{2}\nu` ×3, F3, F5, F9a, F9c, F10, F11a/b, IA-1, IA-2, C2, C3,
+> C4, RW-3). Build green (68 pp / 722 newlabels / 0 unresolved / 0 undefined).
 
 - 🟠 **F1 — sign typo, eq:weak_form_eliminated_subscales ([512](../theory/paper/article.tex#L512)).** The subscale
   term is printed with a **minus** `- ⟨𝓛𝓛̃⁻¹𝓡U_h, V_h⟩`; the correct sign is **plus** (substituting
@@ -475,7 +481,11 @@ theory/practice gap and the stopping-tolerance sentence — **were applied** aft
   fragile estimate. Either add a pre-asymptotic/ratio-sensitivity clause, or (cheaper, stronger) reframe L1457 around
   the slope-noise-free FME-vs-interpolant match already in the tables.
 
-### 10.B New — nice-to-have (🟡)
+### 10.B New — nice-to-have (🟡) — ✅ APPLIED 2026-07-19 (F14c assessed → no change; M6/M8 need author data)
+
+> Two passes: the first applied F4, F6, F7a/b, F13-2, F14a/b/f/g, IA-3/4/5/7, C1/5/6, M7, M9, f8-4, RW-5; the
+> second (no re-runs) applied IA-5e, F14d, F14e, 9b, M5. F14c left as-is (assessed defensible). Only M6 (DOIs)
+> and M8 (author emails) remain — both need author-supplied data, not re-runs.
 
 - 🟡 **F4 — "optimal" for superoptimal slopes.** (a) fold para [1160](../theory/paper/article.tex#L1160): "converges
   at the optimal rates (P1 2.99–3.03 L²)" — P1-L² optimum is 2, so this is *superoptimal* pre-asymptotic; say "at or
@@ -569,6 +579,26 @@ theory/practice gap and the stopping-tolerance sentence — **were applied** aft
   already stated in the paper (delimitation [1098-1109](../theory/paper/article.tex#L1098)) and tracked (§1 D7).**
 - **Reorg of §7 / add a convergence figure / move tables to a supplement (AI): moot** — tables-only is the settled
   decision (§3) and `supplement.tex` is removed (§4).
+
+### 10.D Full-paper consistency + prose re-read (2026-07-19) — ✅ DONE
+
+An 8-agent section-by-section re-read (consistency vs tables/cross-refs + prose flow/elegance/clarity) *after* all
+the §10.A/§10.B edits. **Two real bugs in the review edits were caught and fixed:**
+- **F10** ([1660](../theory/paper/article.tex#L1660)) was self-contradictory ("*exceeding* both bounds … which it
+  therefore *obeys*"); rewritten to "grows more than the α₀^{-1/2} prefactor alone, the remainder via the
+  velocity-error coupling; not a clean α₀ probe given the α₀↔Da confound."
+- **RW-5** ([1683](../theory/paper/article.tex#L1683), the discriminating-test future-work sentence) had **inverted**
+  α-geometry — the weighted factor √(α_K/α₀) is **1 on the plateau** and **α₀^{-1/2} where α=1**, so my "plateau: bounds
+  coincide / α=1: weighted predicts no loss" was backwards and contradicted `rem:WeightedVsUnweighted`. Rewritten
+  correctly (plateau → weighted=1 vs uniform 1/α₀, both upper bounds; α=1 → weighted α₀^{-1/2} vs uniform 1/α₀, decidable).
+
+**Pre-existing consistency issues fixed:** L619 (τ_K nonlinearity wrongly scoped to OSGS-only — τ depends on u in both
+variants, only π_h is OSGS-specific), L820 (λ mislabeled "length scale" — it is velocity²), L1174 ("provable for OSGS"
+→ "the same coercivity argument would give for OSGS", since no OSGS estimate is proved). **Plus ~15 prose/clarity fixes**
+(test-first argument order in eq:weak_form_eliminated_subscales, R-operator argument, redundancies, the "In all rigor"
+calque, over-precise claims softened to what the tables support). Build green (68 pp / 722 / 0 unresolved / 0 undefined
+/ 0 bib warnings). **Still open (from the re-read):** the `\Guillermo`/`\Joaquin` macros wrap *retained* prose that
+renders red/blue — handled by the §4 flatten (redefine to `{#1}`), not a separate fix.
 
 ---
 
