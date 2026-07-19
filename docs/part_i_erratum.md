@@ -67,8 +67,8 @@ from the *definitions* but survived in the *assembly display*.
 ## 3. The fix (applied)
 
 ```
-K = [[ G_S + D_νD + V + R_σ ,  P + G_P ],
-     [ Q_D + G_αD           ,  P_Q     ]]  + K_S      # I-block, G_β, D_β removed
+K = [[ G_S + D_νD + V + R_σ ,  P + G_αP ],
+     [ Q_D + G_αD           ,  P_Q      ]]  + K_S      # I-block, G_β, D_β removed; flux block G_P→G_αP
 F = [ V_F + V_T ; 0 ] + F_S                            # V_T restored (marked \amend)
 ```
 
@@ -104,18 +104,23 @@ into `run_all.py`): parse the appendix and enforce the invariant
 
 Run against the pre-fix revision it reported exactly `named-but-undefined = {I,
 G_β, D_β}` and `defined-but-unused = {V_T}`; post-fix it is green (4/4). Suite
-total: **110/110 across 9 scripts.**
+total: **110/110 across 9 scripts.** (The later `G_P→G_αP` rename of commit
+8a644d2 wrapped the `G_αP` and `Q_φ` definition LHSs in `\amend{…}`, which briefly
+hid them from the parser and dropped the script to 3/4; `assembly_consistency_verification.py`
+now unwraps `\amend{…}` before parsing, restoring **4/4 / 110/110**, verified 2026-07-19.)
 
-## 5. Additional (pre-existing, cosmetic — not fixed here)
+## 5. Additional items surfaced by the audit (pre-existing, cosmetic)
 
-Surfaced by the audit; none is a correctness defect, all orthogonal to the four
-above:
+None is a correctness defect, all orthogonal to the four above:
 
-- **`G_P` name collision (benign).** The symbol `G_P` denotes two *different*
-  matrices: the Galerkin flux block `−∂_iα NᵃNᵇ` (`eq:PComponents`, in the
-  Galerkin `K_{V,P}` block) and the τ₂ stabilization block `τ₂ε NᵃNᵇ ∂_iα`
-  (`eq:GPLHSStabilizationTerm`, in `K_S`). Each is used exactly once and placed
-  correctly; the consistency check reports it as informational, not a failure.
+- **`G_P` name collision — ✅ RESOLVED (commit 8a644d2).** The symbol `G_P` used
+  to denote two *different* matrices: the Galerkin flux block `−∂_iα NᵃNᵇ`
+  (`eq:PComponents`) and the τ₂ stabilization block `τ₂ε NᵃNᵇ ∂_iα`
+  (`eq:GPLHSStabilizationTerm`, in `K_S`). The Galerkin flux block has been
+  renamed `G_αP` (after the sibling porosity-gradient term `G_αD`), so `G_P` now
+  names only the stabilization block. The rename is `\amend`-marked in both the
+  definition and the assembly display; `assembly_consistency_verification.py`
+  unwraps `\amend{…}` on the LHS so `G_αP` and `Q_φ` stay detected as defined (4/4).
 - **F_V prose enumeration undercount (l.283):** the sentence lists six
   stabilization contributions (`A_F…R_{σF}`) but the align below also defines
   `D_φ`; `V_φ, Q_φ` are then added in the next sentence. All are defined and

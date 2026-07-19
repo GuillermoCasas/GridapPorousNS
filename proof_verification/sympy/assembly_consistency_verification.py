@@ -171,6 +171,12 @@ def main():
     with open(APPENDIX, encoding="utf-8") as fh:
         text = fh.read()
 
+    # Tolerate the review \amend{...} markup on definition LHSs and assembly
+    # names (commit 8a644d2 wrapped e.g. \amend{\mathbf{G}_{\alpha P}}): unwrap
+    # it so the real matrix symbols are parsed. This checks the math content,
+    # not the review coloring, so the invariant is unchanged.
+    text = re.sub(r"\\amend\{((?:[^{}]|\{[^{}]*\})*)\}", r"\1", text)
+
     asm = slice_general_assembly(text)
     definitions_text = text[: text.index("Putting together the results")]
 
