@@ -247,20 +247,37 @@ predict ×10/×50/×116 — refuted as *sharp*.
   e.g. `\Guillermo{CITATIONS FOR THIS STRATEGY}` ([~659](../theory/paper/article.tex#L659)) will **not** be
   caught by "0 undefined citations" (there is no `\cite` yet) — and the "Add figures" note. Src: critique;
   `article.tex:115–122`.
-- 🟠 **open — `supplement.tex` / `\externaldocument{supplement}`** ([22](../theory/paper/article.tex#L22)):
-  SIAM boilerplate (`\lipsum`, `thm:bigthm`). Write the real supplement or remove the line and any `\cref` to it.
-- 🟡 **verify — `C_α` symbol clash (D11)** resolved (appendix constant → `C_{∇α}`; main text/Fourier keep `C_α`).
-- 🟡 **verify — Part I erratum fix in the submitted appendix**: phantom `I`/`G_β`/`D_β` removed, Neumann load
-  `V_T` restored; `assembly_consistency_verification.py` green (110/110); the `\amend V_T` marker accepted for
-  final. Note: the display should read `P + G_αP` (Galerkin flux block renamed to break the `G_P` collision,
-  commit 8a644d2) — update `part_i_erratum.md §3/§5` accordingly. Src: `part_i_erratum.md`.
-- 🟡 **open — author decision on `centered_encoding.tex`** (self-describes "not yet merged"; defines the
-  error-normalization convention the tables use). Merge or keep as companion note. Src: `open-questions.md §4`.
-- 🟡 **verify — notation D1/D2** (`α_K` "elemental minimum" → `α_{∞,K}` supremum at
-  [842](../theory/paper/article.tex#L842); `α` vs `α_K` unified across the §6 limits) and the Fourier appendix
-  A16/S45-1 fixes (general-`d` `K_ij`, `(2−2/d)` noting =1 for d=2). Src: review D1/D2, plan A16.
-- 🟡 **open — companion-note fixes (A17)** if the notes ship: `osgs_reaction_note` stray `α_K` in `τ₁`;
-  `velocity_floor_regularization §4` corrected `u_base` claim. Src: `paper-revision-plan.md A17`.
+- ✅ **DONE (2026-07-19) — supplement.tex removed.** It was pure SIAM template boilerplate (`\lipsum`,
+  "An Example Article", `thm:bigthm`, `tab:foo`) and `article.tex` made **no** `\cref` to any supplement label.
+  Removed the `\externaldocument{supplement}` line + comment from `article.tex`, dropped `supplement.tex` from
+  `latexmkrc` `@default_files` and the README dependency list, and **deleted `supplement.tex`**. Build re-verified
+  green (66 pp / 722 newlabels / 0 unresolved, no xr/supplement warning).
+- ✅ **VERIFIED (2026-07-19) — `C_α` symbol clash (D11) resolved.** In the compiled paper: field `C_α` = `eq:CAlpha`
+  in `article.tex` + `fourier_appendix.tex`; the porosity-resolution **constant** is `C_{∇α}` in
+  `continuity_appendix.tex` (no bare `C_α` there — grep-confirmed). Disjoint, no in-document collision. (The
+  standalone companion note + `c1_dimension_note` still use bare `C_α`, but they are separate documents not
+  `\input` by the paper — out of scope.)
+- ✅ **DONE (2026-07-19) — Part I erratum.** The submitted appendix is correct: phantom `I`/`G_β`/`D_β` removed,
+  `V_T` restored (`\amend`), display reads `P + G_αP`. **But** commit 8a644d2's `G_P→G_αP` rename wrapped the
+  `G_αP`/`Q_φ` definition LHSs in `\amend{…}`, defeating `assembly_consistency_verification.py`'s parser (it had
+  dropped to 3/4 → suite 109/110). **Fixed:** the script now unwraps `\amend{…}` before parsing (one-line `re.sub`,
+  invariant unchanged) → back to **4/4 / 110/110** (re-ran). Updated `part_i_erratum.md §3` (`G_P`→`G_αP`), §4
+  (rename note), §5 (collision marked **RESOLVED**). Src: `part_i_erratum.md`.
+- ✅ **DONE (2026-07-19) — centered_encoding: short section added** (author-directed). A new "Centered dimensional
+  encoding" paragraph in §7 ([~1151](../theory/paper/article.tex#L1151)) explains, at reproducibility level, that
+  each `(Re,Da,α₀)` cell has a free dimensional scale; a naive `U=1` drives `σ` to ~`10^12` (double-precision edge),
+  so the harness centers the coefficients (`√(νσ)=1`, `L=1` ⇒ `ν=1/√(α_∞Da)`, `σ=√(α_∞Da)`, `U=Re/√(α_∞Da)`), a
+  strict reparametrization that leaves the normalized errors unchanged. Full `centered_encoding.tex` stays a
+  companion note. Src: `open-questions.md §4`.
+- ✅ **VERIFIED (2026-07-19) — notation D1/D2 + Fourier (A16/S45-1).** `α_K = α_{∞,K}` (supremum) at
+  [842](../theory/paper/article.tex#L842), no "minimum" leftover; every elementwise `τ₁/τ₂/σ̃_α` in the three §6
+  limits reads `α_K` (reaction `τ₁∼1/σ` correctly α-free). Fourier appendix gives `K_ij` for general `d` (1/3, 2/3
+  relegated to the labeled d=3 instance) and `τ_{ν,1}^{-1}=(2−2/d)…` with the note it equals 1 for d=2;
+  `eq:StabilizationParameters` uses `(2−2/d)`, not a bare 4/3. Src: review D1/D2, plan A16.
+- ✅ **VERIFIED (2026-07-19) — companion-note fixes (A17).** `osgs_reaction_note` `eq:asymp` reads `τ₁∼1/σ` (no stray
+  `α_K`); `velocity_floor_regularization §4` correctly states the harness sets `h_floor_weight=0` and inherits
+  `u_base=1e-4` (not 0), making `ε_d` a no-op — confirmed against the code (`SmoothVelocityFloor` call sites,
+  `base_config.json`). Src: `paper-revision-plan.md A17`.
 
 ## 5. Build / LaTeX
 

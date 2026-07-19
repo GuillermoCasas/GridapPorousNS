@@ -44,12 +44,11 @@ low α; (b) for ASGS, a code change to strip σu from the stabilization residual
 [`cocquet/cocquet-form-mms-status.md`](cocquet/cocquet-form-mms-status.md) §4.3.
 
 ### 1c. Paper editorial items needing author judgment
-Mechanical-but-author-gated: merge `centered_encoding.tex` into `article.tex` (self-describes "not yet
-merged"; strip standalone preamble + `\end{document}`, drop `\Reyn`/`\Damk`/`\code` `\newcommand`s); decide
-`supplement.tex` (SIAM boilerplate — replace or drop the `\externaldocument{supplement}` line). (Results-section
-figures: **✅ tables-only settled 2026-07-19** — the `\Guillermo{Add figures}` note is gone, one porosity figure
-kept. The "Kratos Multiphysics" implementation claim: **✅ resolved 2026-07-19** — the paper reads Gridap, 0
-Kratos mentions.) Full list: [`open-questions.md`](open-questions.md) §4.
+All items resolved 2026-07-19: (`centered_encoding.tex` — a short reproducibility-level section was added to
+`article.tex`, the full note kept as a companion; `supplement.tex` — removed, SIAM boilerplate with no article
+cross-reference; results-section figures — **tables-only settled**, the `\Guillermo{Add figures}` note gone, one
+porosity figure kept; the "Kratos Multiphysics" claim — the paper reads Gridap, 0 Kratos mentions). Full list:
+[`open-questions.md`](open-questions.md) §4.
 
 ---
 
