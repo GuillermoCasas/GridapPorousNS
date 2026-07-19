@@ -14,7 +14,9 @@ python3 -m venv /tmp/sympy_venv && /tmp/sympy_venv/bin/pip install sympy numpy
 /tmp/sympy_venv/bin/python "run_all.py"
 ```
 
-Current status: **110/110 checks pass across 9 scripts.**
+Current status: **115/115 checks pass across 10 scripts.** See
+[`../verification-gap-coverage.md`](../verification-gap-coverage.md) for why the 2026-07
+review still caught two defects (F1/F2) despite this suite, and the plan that closes the gap.
 
 | Script | Paper location | What it verifies | Checks |
 |---|---|---|---|
@@ -27,6 +29,7 @@ Current status: **110/110 checks pass across 9 scripts.**
 | `elemental_bilinear_form_verification.py` | App. A stabilization LHS+RHS (`eq:StabilizationLVLU`, `eq:StabilizationLVF`) | **All ~60 stabilization matrix terms** (by family vs. the bilinear form) **plus the RHS vectors** `F_V` (`A_F…V_φ`) and `F_Q` (`Q_αF, Q_φ`). | 14 |
 | `assembly_consistency_verification.py` | App. A assembly (`\mathbf{K}, \mathbf{K}_S, \mathbf{F}, \mathbf{F}_S`) | **Structural (bookkeeping)** cross-check the two scripts above cannot see: every matrix *named* in the assembled `K/K_S/F/F_S` must be *defined*, and every *defined* matrix must appear in the assembly. Parses the appendix directly. | 4 |
 | `subscale_norm_verification.py` | §4 (`eq:BoundProjectionOfLBySubscales`, B9) | The operator-norm bound `|L̂û|²_Λ ≤ |L̂|²_Λ|û|²_{Λ⁻¹}` (Monte-Carlo, `n=3,4`), the B9 formula `|L̂|²_Λ=ρ_{Λ⁻¹}(L̂^†ΛL̂)`, and tightness at the maximizing eigenvector. | 8 |
+| `display_consistency_verification.py` | §4 (`eq:weak_form_eliminated_subscales`), App. A (`eq:StabilizationLVLU`, `eq:StabilizationLVF`) | The **β-factored strong-residual display** `(1/α)(−2 div(ανΠ̃∇u)) = −νΔ̄u − 2νΠ̃∇u·∇β` (the **F2** factor-2 gap, which sits *between* the un-factored operator and the assembled matrices, both checked elsewhere), and the **plus** sign of the eliminated fine-scale term on an exact static-condensation analogue (the **F1** sign gap, a motivational equation off the assembly path). Each check also asserts the pre-fix form *fails*. | 5 |
 
 ---
 

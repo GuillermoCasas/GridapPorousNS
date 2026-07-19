@@ -242,10 +242,12 @@ predict ×10/×50/×116 — refuted as *sharp*.
 ## 4. Editorial / prose
 
 - 🔴 **open — finalize ALL review markup.** True counts (verified): `\Guillermo`=14, `\Joaquin`=4 (=**18**
-  spans), `\amend` used **279×**. Two distinct tasks: (i) flatten the 279 `\amend` + 18 author spans (redefine
-  as `{#1}` for the final build); (ii) **resolve the macros that contain open TODOs**, not just decolor them —
-  e.g. `\Guillermo{CITATIONS FOR THIS STRATEGY}` ([~659](../theory/paper/article.tex#L659)) will **not** be
-  caught by "0 undefined citations" (there is no `\cite` yet) — and the "Add figures" note. Src: critique;
+  spans), `\amend` used **328×** (recorded 279 — **stale by ~49**; per-file: article 156, elemental 15, continuity 7,
+  fourier 3; audit 2026-07-19). Two distinct tasks: (i) flatten the 328 `\amend` + 18 author spans (redefine
+  as `{#1}` for the final build); (ii) decolor the 18 author spans. **CORRECTION (audit 2026-07-19):** the
+  TODO-bearing macros (`REVIEW: CHECK` L398, `JUSTIFY` L402, `CITATIONS` L644, `CITATIONS FOR THIS STRATEGY` L655)
+  are **all on commented-out lines** and will not ship, and the `\Guillermo{Add figures}` note **no longer exists**
+  (already removed — see §3) — so flattening/decoloring is sufficient; no TODO-authoring or citation work is needed. Src: critique;
   `article.tex:115–122`.
 - ✅ **DONE (2026-07-19) — supplement.tex removed.** It was pure SIAM template boilerplate (`\lipsum`,
   "An Example Article", `thm:bigthm`, `tab:foo`) and `article.tex` made **no** `\cref` to any supplement label.
@@ -286,7 +288,8 @@ predict ×10/×50/×116 — refuted as *sharp*.
   `allowdisplaybreaks` collapses display math to ~22 pp with all-`??` refs on TeX Live 2023/macOS. Src: MEMORY
   `paper-build-fragilities`.
 - 🔴 **verify — clean `latexmk` in BOTH review and final (review-off) mode**, each with **0 unresolved refs and
-  0 undefined citations**. Healthy final build = **66 pp / 722 newlabels / 0 unresolved**. Reconcile the stale
+  0 undefined citations**. Healthy final build = **68 pp / 722 newlabels / 0 unresolved** (was 66; the 2026-07-19 review pass added
+  ~2 pp of `\amend` prose — the page count drifts with prose, but **722 newlabels / 0 unresolved** is the invariant). Reconcile the stale
   "43 pp" in `theory/README.md:11` and `open-questions.md §4`.
 - 🔴 **open — produce the submission build with review markup OFF** (`\documentclass` without `[review]`,
   [article.tex:2](../theory/paper/article.tex#L2)) so `lineno` is off, `allowdisplaybreaks` activates,
@@ -314,13 +317,21 @@ predict ×10/×50/×116 — refuted as *sharp*.
 
 ## 7. References / citations
 
-- 🟠 **open — the c₁-derivation footnote** "a detailed derivation will be reported separately"
-  ([1450](../theory/paper/article.tex#L1450)). The derivation exists
-  (`theory/numerical_constants/c1_dimension_note.tex` → validated `element_c1.jl`, reproduces the `C_inv²` table
-  incl. Kuhn 214). Cite it as a preprint/report/companion, or defend the forward-reference. Src: review D8.
-- 🟠 **verify — 0 undefined citations** in the final build; all cited works resolve in `references.bib` (codina
-  2001/2008/2018, villota2019, cocquet2021, badia2020/verdugo2022 gridap, codina1993, nillama2022,
-  hughes2007). Src: `theory/README.md`.
+- ✅ **DONE (2026-07-19) — the c₁-derivation footnote no longer refers to a separate document.** Per author
+  direction (no unpublished separate documents referenced in the paper), the forward-reference *"a detailed
+  derivation will be reported separately"* ([1445](../theory/paper/article.tex#L1445)) was removed and replaced by
+  an explanation of the **checks** confirming ℙ₂ tetrahedra need the larger c₁: a numerical evaluation of the
+  discrete coercivity constant on the Kuhn meshes is negative at `c₁=4k⁴` (deepening under refinement) and positive
+  at `16k⁴`, and the convergence study stalls above the interpolation floor at `4k⁴` but recovers the optimal rates
+  at `16k⁴`. No absolute `ĉ²` values were added (they would complicate the "sits just below" framing).
+  `c1_dimension_note.tex` stays a companion note, unreferenced by the paper. **Whole-paper forward-reference scan:**
+  this was the *only* reference to unpublished separate work; the remaining "future work" mentions
+  ([237](../theory/paper/article.tex#L237) transient case, [826](../theory/paper/article.tex#L826),
+  [1681](../theory/paper/article.tex#L1681)) are standard and cite only published works. Build green. Src: review D8.
+- ✅ **VERIFIED (2026-07-19) — 0 undefined citations.** The build reports 0 undefined citations, and a key-by-key
+  reconciliation shows **34 cited keys ↔ 34 `\bibitem`s, exact match** — nothing cited-but-missing, nothing orphaned
+  (the 7 extra `\cite` matches were commented-out lines). All listed works resolve (codina 2001/2008/2018,
+  villota2019, cocquet2021, badia2020/verdugo2022 gridap, codina1993, nillama2022, hughes2007). Src: `theory/README.md`.
 
 ## 8. Formal proof (Coq)
 
@@ -356,6 +367,211 @@ predict ×10/×50/×116 — refuted as *sharp*.
 
 ---
 
+## 10. External AI revision (`docs/final_AI_revision.md`, 2026-07-19) — per-point assessment + new items
+
+A second external AI reviewed a **~2-h-stale** version of `article.tex`. Every point was re-verified against the
+**current** paper by a 19-agent workflow (each claim read against the source + appendices, plus an independent
+recheck pass that re-derived the math/arithmetic and read the driver code); the two math/numeric findings were
+additionally adjudicated by hand. **Headline: no new blockers.** The AI's two "blocking" items dissolve — the
+"missing Fourier appendix" is a non-issue (the reviewer lacked the file) and the "Damköhler off by 10⁵" is
+**false** of the current code (it describes an already-fixed bug); what survives there is an important *presentation*
+fix. Net: **~16 important + ~20 nice-to-have genuinely-new items** below; the rest were already tracked, already
+fixed, or invalid (§10.C).
+
+**✅ APPLIED 2026-07-19 (this session).** All 🟠 items in §10.A and the safe 🟡 items in §10.B
+were applied to `article.tex`/appendices, each change wrapped in `\amend{}`; build re-verified
+green (**67 pp** / 722 newlabels / 0 unresolved / 0 undefined citations — the 66→67 bump is the
+added prose). **F1 and F2 are now additionally machine-checked** by the new
+`proof_verification/sympy/display_consistency_verification.py` (suite **115/115**); why the
+existing machinery missed them and how to close the gap is in
+`proof_verification/verification-gap-coverage.md`. **Deferred (flagged, not applied):** the four
+fragile notation nits — IA-5e (`Π^S=∇^S u`), F14c (`=`→`≈` in the SGS pull-out, exact for ASGS),
+F14d (`λ` eigenvalue rename), F14e (`U` scalar-vs-vector) — each in delicate `\scriptstyle`
+scoping or a multi-use symbol where forcing a change risks a build break or overriding a
+deliberate convention; and M5 (`Codina2015OnSM` booktitle), M8 (Codina/de-Pouplana emails),
+M6 (DOIs), which need bibliographic/contact data that must not be fabricated; and the nice-to-have 9b
+(how α is evaluated at quadrature in the MMS runs). These await author input. (F9a and F9c — the τ
+theory/practice gap and the stopping-tolerance sentence — **were applied** after an accuracy re-check of this banner.)
+
+### 10.A New — important (🟠)
+
+- 🟠 **F1 — sign typo, eq:weak_form_eliminated_subscales ([512](../theory/paper/article.tex#L512)).** The subscale
+  term is printed with a **minus** `- ⟨𝓛𝓛̃⁻¹𝓡U_h, V_h⟩`; the correct sign is **plus** (substituting
+  `Ũ = 𝓛̃⁻¹𝓡U_h` into eq:weak_form_resolved gives `+`, matching the very next equation eq:simplified_weak_form_resolved
+  ([525](../theory/paper/article.tex#L525)) and eq:OSGSProblem). Motivational-only — does **not** propagate to the
+  method — but L518 asserts it "does not entail any approximation", so a referee will read it. Fix `−`→`+`. (Both
+  the primary and the independent-recheck agent, plus a hand derivation, agree.)
+- 🟠 **F2 — missing factor 2 in two appendix displays** (`elemental_matrices_appendix.tex`). In eq:StabilizationLVLU
+  the cross-terms `ν ϕ ∇v ∇β` (L14) and `ν ϕ ∇u ∇β` (L16), and the test-slot `ν ϕ ∇v ∇β` in eq:StabilizationLVF
+  (L28), should each read `2ν …`: from `2∇·(ανϕ∇u)=α[ν Δ̄u + 2ν ϕ∇u·∇β]` with `∇α=α∇β`, and `Δ̄` (L19) already
+  carries its 2's while `ϕ∇u` carries a ½. **Verified DISPLAY-ONLY** (hand-checked the assembly): the assembled
+  entries `A_Gβ` (L144, symmetrized two-term `(∂_i N^b ∂_j α + ∂_m α ∂_m N^b δ_ij)` = `2ν Π^S∇u∇β`), `A_Dβ` (L145,
+  the `2/3` deviatoric coefficient), and the whole `G_β/D_β` family **do** carry the factor 2 — so the
+  implementation/reference is correct; fix the 3 display coefficients only. *(The workflow recheck agent's claim
+  that the assembly is also wrong is itself a misread of the symmetrization — do not act on it.)*
+- 🟠 **F3 — DBF Da/σ presentation** ([1566](../theory/paper/article.tex#L1566); eq:DBFResistanceTerm
+  [266](../theory/paper/article.tex#L266); eq:CocquetMMSReaction [1563](../theory/paper/article.tex#L1563) vs
+  `Da=σL²/(α_∞ν)` [988](../theory/paper/article.tex#L988)). **The code is correct** — the harness scales the Ergun
+  coefficients by ν (`a_scale=ν/L²`, `b_scale=ν/(U L²)` in `CocquetFormMMS/run_test.jl`), so `Da(α₀)≈2, 40` is
+  genuinely Re-independent (the AI's "actual Da≈2e5/4e6" describes a *fixed* bug). Two real presentation defects
+  survive: (i) the printed `σ=a(α)+b(α)|u|` with dimensionless `C_a=0.30` **omits the ν-scaling** the code applies,
+  so a literal reader recovers the ν-free case where `Da∝Re` — state that `C_a,C_b` are dimensionless Damköhler
+  coefficients / that the dimensional drag carries ν; (ii) the clause "unlike the reference, in which `a` carries a
+  1/Re factor, we fix `C_a=0.30` so that Re and Da can be varied independently" is **backwards** — it is the
+  *retained* ν(∝1/Re) factor, not its removal, that keeps Da Re-independent; the real contrast with the reference is
+  the fixed numeric constant. Flagship comparison; a numerical-analysis referee will probe this.
+- 🟠 **F10 — DBF closing sentence overstates the α₀ attribution** ([1660](../theory/paper/article.tex#L1660)).
+  "consistent with the α₀^{-1/2} dependence" — but the L² pressure FME grows **~6.2–6.5×** as α₀:0.5→0.1 (ASGS 6.26,
+  OSGS 6.52, P2 6.45/6.21 — verified), exceeding **both** α₀^{-1/2}=2.24 **and** 1/α₀=5; the pressure interpolant
+  reference is α₀-independent so nothing absorbs the excess (unlike velocity, whose reference grows 3.47×). Also,
+  lowering α₀ here simultaneously raises Da ~2→40 (eq:CocquetMMSReaction), so the two rows **conflate α₀ and Da**.
+  Reword to the one-sided-bound spirit (bounded by, not equal to) OR note the α₀↔Da confound; the velocity part is fine.
+- 🟠 **F5 — define the OSGS/ASGS "excess"** ([1174](../theory/paper/article.tex#L1174)). "its absolute size agrees
+  to within 1% at α₀=0.5 and 0.05" holds **only** for the *quadrature* excess `√(e_OSGS²−e_ASGS²)` (0.1179 vs 0.1167,
+  ratio 1.010 — verified from tab:Linear2DH1); the naive difference is 0.0878 vs 0.035 (ratio 2.5), so a referee
+  subtracting sees an apparent falsehood. Add a one-clause definition, e.g. "defining the excess as `(e_OSGS²−e_ASGS²)^{1/2}`".
+- 🟠 **F9a — τ theory/practice gap missing from the scope paragraph** (~[1098-1113](../theory/paper/article.tex#L1098)).
+  The proofs assume τ₁ **elementwise-constant** (`continuity_appendix.tex:460`; the interior-face jump hypothesis at
+  [956](../theory/paper/article.tex#L956)); the runs use τ **variable within elements** ([828](../theory/paper/article.tex#L828)).
+  Both disclosed separately, but the delimitation list — whose job is to enumerate exactly these idealizations — omits
+  it. Add one clause.
+- 🟠 **F9c — nonlinear stopping tolerance not reported.** The solver paragraph (~[1124](../theory/paper/article.tex#L1124))
+  quotes no residual/stopping tolerance, yet FMEs are compared to interpolation references at the **3rd significant
+  digit** ([1164](../theory/paper/article.tex#L1164): "3.50 vs 3.499"). State the tolerance so the 3-sig-fig
+  comparisons are not attributable to solver noise. (Fits with the §9 solver-disclosure item.)
+- 🟠 **F11a — 3D irregular-mesh attribution** ([1457](../theory/paper/article.tex#L1457)). Replace/augment the
+  unverified "element-quality tail" with the paper's own stronger **in-table** argument: the nodal interpolant shows
+  the *same* depressed rates on the irregular sequence (P1 L²=1.83, H¹=0.71; P2 L²=2.67, H¹=1.52 vs regular
+  1.90/0.94/3.20/2.22) and the solver slopes track it — so the depression is a property of the mesh **sequence**, not
+  the formulation. Point at the interpolant rows of tab:3DL2/3DH1.
+- 🟠 **F11b — 3D OSGS-vs-ASGS pressure direction reversal** ([1457](../theory/paper/article.tex#L1457) + conclusions
+  [1673](../theory/paper/article.tex#L1673)). Unlike 2D, in 3D the OSGS pressure carries **larger** absolute errors
+  than ASGS despite comparable/better rates (regular P1 L²: OSGS 4.55e-2 vs ASGS 2.87e-2), its H¹ saturating at the
+  O(1) 1.29 floor. Add one honest sentence in §7.2-3D, and qualify the conclusions' "somewhat better pressure
+  convergence" with the matching 3D caveat so it does not read as unconditional.
+- 🟠 **IA-1 — abstract undersells** ([204](../theory/paper/article.tex#L204)). Methods-only: omits the
+  porosity-weighted a-priori stability/convergence analysis (robust in Re & Da), the 3D tetrahedral campaign, and the
+  equal-order-vs-Taylor-Hood DBF comparison. Add a clause each — those are the SIAM-reader selling points.
+- 🟠 **IA-2 — unhedged universal claim** ([241](../theory/paper/article.tex#L241)). "the only precedent of a
+  stabilized finite element method: the Local Projection Stabilization" contradicts the paper's own `nillama2022`
+  citation two paragraphs earlier (VMS *is* a stabilized FEM for porous NS). Hedge ("to our knowledge") and scope to
+  the **variable-porosity** problem.
+- 🟠 **C2 — conclusion robustness vs excluded corner** ([1669](../theory/paper/article.tex#L1669) vs
+  [1160](../theory/paper/article.tex#L1160)). "just as robust … as it is well-established to be" is unqualified while
+  §7 excludes the (Re,α₀)=(10⁶,0.05) corner as a coarse-mesh fold with **no discrete solution** on the coarser meshes.
+  Add one clause acknowledging the coarse-mesh solvability limit (framed as a resolution limit, per §7).
+- 🟠 **C3 — conclusions omit two headline contributions** ([1666-1673](../theory/paper/article.tex#L1666)). Add
+  (i) the empirical headline — both variants' velocity error sits on the nodal interpolant where no term dominates
+  ([1164](../theory/paper/article.tex#L1164), "stronger than optimality"), low-α₀ degradation inherited from the
+  exact solution; and (ii) the porosity-weighted elementwise `(α_K/α₀)^{1/2}` estimate as a **named** theoretical
+  result. L1671's "absolute errors are very stable" is only a vague gesture at (i).
+- 🟠 **C4 — conclusion velocity claim needs its exception** ([1673](../theory/paper/article.tex#L1673)). "the two
+  variants behave very similarly for the velocity" — but §7 ([1174](../theory/paper/article.tex#L1174)) calls the
+  reaction-dominated P1 ASGS/OSGS H¹ gap (~3.5×) "the largest velocity discrepancy … in the campaign" and leaves it
+  unresolved. Add one clause.
+- 🟠 **RW-3 — two-mesh-slope fragility not acknowledged** ([1457](../theory/paper/article.tex#L1457)). All tabulated
+  slopes are two-finest-mesh estimates; the regular 3D family's two finest meshes have **h-ratio ≈1.2** (verified
+  0.05964/0.04970), amplifying slope noise ~5.5×, so "essentially optimal L²/H¹ orders" for P2 velocity rests on a
+  fragile estimate. Either add a pre-asymptotic/ratio-sensitivity clause, or (cheaper, stronger) reframe L1457 around
+  the slope-noise-free FME-vs-interpolant match already in the tables.
+
+### 10.B New — nice-to-have (🟡)
+
+- 🟡 **F4 — "optimal" for superoptimal slopes.** (a) fold para [1160](../theory/paper/article.tex#L1160): "converges
+  at the optimal rates (P1 2.99–3.03 L²)" — P1-L² optimum is 2, so this is *superoptimal* pre-asymptotic; say "at or
+  above the optimal rates". (b) DBF corner [1662](../theory/paper/article.tex#L1662): "recovers accurate,
+  optimally-converging solutions" sits one sentence before the pre-asymptotic hedge — drop the rate qualifier.
+  (c) 3D [1457](../theory/paper/article.tex#L1457): "essentially optimal" is actually *accurate* (at/above optima) —
+  no fix needed, optional strengthening only (note the P2 velocity FMEs sit on the interpolant).
+- 🟡 **F6 — three-sig-digits scope + table precision** ([1164](../theory/paper/article.tex#L1164)). "agree to three
+  significant digits at α₀=0.5 … for both elements" overclaims for Q2 (4.29e-4 vs interp 4.28e-4, 3rd digit differs,
+  0.23%) — scope "three significant digits" to P1 (or "a fraction of a percent"). Separately, the quoted 3.499e-2
+  carries one more digit than the table prints (3.50e-2) — round it or note it is the unrounded reference.
+- 🟡 **F7a — projection wording** ([638](../theory/paper/article.tex#L638)). "their projection is exactly zero" is
+  imprecise: for constant σ the reaction term σu_h ∈ FE space, so `Π_h(σu_h)=σu_h`; what vanishes is the fluctuation
+  `(I−Π_h)(σu_h)`. Reword to "annihilated by (I−Π_h) …". Meaning is recovered by the adjacent clauses → precision-only.
+- 🟡 **F7b — footnote wording** ([610](../theory/paper/article.tex#L610)). "force the boundary DOFs to mirror the
+  prescribed Dirichlet data": by the paper's notation `𝒳_{h0}` (subscript 0) is the **homogeneous** zero-trace space,
+  so constraining forces the projection's velocity trace to **zero** on Γ_D, not to the prescribed data. Reword; the
+  O(1)-boundary-residual consequence stands.
+- 🟡 **F13-2 — Neumann-datum trace wording** ([465](../theory/paper/article.tex#L465)). "`g∈H^{-1/2}(Γ_N)^d`, dual of
+  the traces on Γ_N of H¹(Ω)" — on a proper boundary piece the constrained trace space is `H^{1/2}_{00}(Γ_N)`; the
+  `H^{-1/2}` label is acceptable shorthand but tighten it once the F13 `V₀` fix lands.
+- 🟡 **F14 batch — small alignment items.** (a) [1162](../theory/paper/article.tex#L1162) "the one appreciable
+  exception" undercounts — [1174](../theory/paper/article.tex#L1174) names **two** appreciable ASGS/OSGS velocity
+  discrepancies; reword to "the main exception". (b) [1164](../theory/paper/article.tex#L1164) "the strongly
+  reaction-dominated **column**" → "rows"/"regime" (tables vary Da down rows). (c) [556](../theory/paper/article.tex#L556)
+  the internal "=" in `ϕ[τ_K⁻¹Ũ]=τ_K⁻¹Ũ` is exact only for ASGS; for OSGS use the paper's "≈" (footnote L539).
+  (d) λ overloaded — Λ-weight scale ([711](../theory/paper/article.tex#L711)) vs eigenvalue in `spec_{Λ⁻¹}`
+  ([731](../theory/paper/article.tex#L731)); rename the eigenvalue (μ). (e) U overloaded — scalar velocity scale
+  ([990](../theory/paper/article.tex#L990)/[1114](../theory/paper/article.tex#L1114)) vs combined unknown `U=[u;p]`;
+  disambiguate. (f) [1114-1115](../theory/paper/article.tex#L1114) `\text{sin}/\text{cos}` → `\sin/\cos` (both occur).
+  (g) preamble [115](../theory/paper/article.tex#L115) amendcolor comment says "dark green" but `rgb{0.58,0,0.83}` is
+  violet — fix alongside §4 flattening.
+- 🟡 **IA-3 — intro advantages list** ([241](../theory/paper/article.tex#L241)) omits the key selling point:
+  residual-based stabilization cures LBB **and** convection-dominance simultaneously (an inf-sup pair alone controls
+  only LBB) — foreshadow §8's O(1)-stagnant TH velocity ([1662](../theory/paper/article.tex#L1662)).
+- 🟡 **IA-4 — dead stabilized-Darcy citations.** The commented sentence at [218](../theory/paper/article.tex#L218) is
+  the *only* use of {Masud2002ASM, Juanes2005AVM, Codina2015OnSM, Braack2011EqualorderFE}. Decide one way: reinstate
+  (adds Darcy context + activates 4 entries — these authors referee such papers) or drop the 4 from `references.bib`.
+- 🟡 **IA-5 — intro/abstract grammar batch.** "concentrate in"→"on" (L237); trim redundant "no need for revisiting the
+  theory was required" (L239); "associated to"→"associated with" (L204, L579); "(commutative)"→"commuting" (L256); the
+  operator/action conflation `Π^S = ∇^S u` (L262, L264); clarify "in its most recent form" (L243).
+- 🟡 **IA-7 — keywords** ([208-210](../theory/paper/article.tex#L208)): add "porous media" (domain/title) and "ASGS"
+  (currently only OSGS listed, though both variants are tested throughout).
+- 🟡 **C1 — conclusions calque** ([1669](../theory/paper/article.tex#L1669)): "robust **in front of** extreme
+  variations" (Spanish/Catalan *frente a*/*davant de*) → "under" / "in the face of".
+- 🟡 **C5 — 3D caveat on OSGS pressure** ([1673](../theory/paper/article.tex#L1673)): "in some regimes" partly covers
+  it, but note that in 3D "better convergence" means **rate**, not error (OSGS pressure FME larger; H¹ barely
+  converges — see F11b).
+- 🟡 **C6 — sharpen "absolute errors are very stable"** ([1671](../theory/paper/article.tex#L1671)) with the
+  interpolation-reference statement from §7 ([1164](../theory/paper/article.tex#L1164)).
+- 🟡 **9b — MMS α evaluation unspecified.** In the 2D/3D runs α is analytic (eq:PlateauBumpFunction); state whether
+  α/∇α are evaluated exactly at quadrature or interpolated (the Cocquet run says nodal interpolation,
+  [1568](../theory/paper/article.tex#L1568); the conclusion [1681](../theory/paper/article.tex#L1681) leans on
+  "interpolation of α does not spoil convergence").
+- 🟡 **M5 — `Codina2015OnSM` booktitle.** If the Darcy sentence (L218) is reinstated, add a `booktitle` to
+  `@inproceedings{Codina2015OnSM}` in `references.bib` (currently title/author/year/url only).
+- 🟡 **M6 — DOIs sparse.** Only ~5 `references.bib` entries carry a DOI. SIAM tolerates; add opportunistically for the
+  camera-ready.
+- 🟡 **M7 — lone `\eqref`.** The single `\eqref{eq:DimensionlessMomentumEquation}` at
+  [990](../theory/paper/article.tex#L990) amid 203 `\cref`/`\Cref` uses → change to `\cref` for uniformity.
+- 🟡 **M8 — author emails.** In `shared.tex:37-40` only Casas/González have `\email`; Codina and de-Pouplana have none.
+  Add them or designate a corresponding author (SIAM convention).
+- 🟡 **M9 — copy-edit.** "spatially-inhomogeneous"→"spatially inhomogeneous" (L249); "such term"→"such a term" (L862);
+  "applied and further developed to"→"extended to" (L697); rewrite the "since, given that … it is only important that"
+  stack (L828); complete the fragment footnote (~L226).
+- 🟡 **f8-4 — cleanup.** Delete the orphaned `theory/paper/supplement.pdf` (143 KB) + stale
+  `theory/paper/latex compilation/supplement/` intermediates left after `supplement.tex` was removed — untracked,
+  referenced by nothing, purely cosmetic.
+- 🟡 **RW-4 — response-letter prep (no paper change).** Pre-empt two likely referee objections: (a) the campaign is
+  entirely manufactured-solution based (an "engineering relevance" objection given the intro's applications framing);
+  (b) no computational-cost comparison (OSGS overhead vs ASGS / vs Taylor–Hood) — §7.3's practical conclusion (L1675)
+  is accuracy-only. Optional to address in-paper; sufficient to have a prepared response.
+- 🟡 **RW-5 — optional future-work sentence** (~[1682](../theory/paper/article.tex#L1682)): a *discriminating*
+  bound-sharpness test — support an oscillatory error component where α=1 (off the low-porosity plateau) — would turn
+  the "cannot select between the weighted and uniform α₀ bounds" remark into a decidable experiment for one
+  manufactured solution.
+
+### 10.C Assessed — no new action (invalid / moot / already tracked)
+
+- **Fourier appendix "missing" (AI finding 8): INVALID / moot.** `fourier_appendix.tex` exists (121 ln),
+  `\label{app:FourierTau}` resolves (App. B, p.52 in `article.aux`), and `\externaldocument{supplement}` is already
+  removed (§4). Only residual is the orphaned `supplement.pdf` → f8-4 above.
+- **F3 "Da actually ≈2e5/4e6, off by 10⁵": FALSE** of the current code (describes a *fixed* bug). Only the
+  presentation fix (§10.A F3) survives.
+- **~17 unused `.bib` keys "will ship" (AI): INVALID.** The paper uses BibTeX `\bibliography{references}` (L1693),
+  which emits only cited entries; the ~18 template leftovers never enter the `.bbl`. Optional cosmetic `.bib` tidy only.
+- **MSC codes (IA-6): already §9** — enrich that bullet to *replace* 65M60 (evolution — the paper is stationary) with
+  76S05 (flows in porous media) + 76M10 (FEM in fluids); consider 65N15; keep 65N30/65N12.
+- **Code/data-availability (9d): already §9.**  **34 cited ↔ 34 bibitems, 0 undefined (M4): already §7.**
+- **Analysis-scope weakness (linearized / constant-σ / all-Dirichlet / ASGS; ASGS pressure one order suboptimal):
+  already stated in the paper (delimitation [1098-1109](../theory/paper/article.tex#L1098)) and tracked (§1 D7).**
+- **Reorg of §7 / add a convergence figure / move tables to a supplement (AI): moot** — tables-only is the settled
+  decision (§3) and `supplement.tex` is removed (§4).
+
+---
+
 ### Suggested sequencing
 
 1. **Provenance/build blockers** (§5, §6): commit the modified files, confirm the certified 3D re-run and official
@@ -366,3 +582,7 @@ predict ×10/×50/×116 — refuted as *sharp*.
 3. **α₀-exponent rewrite** (§0) and the theory-claims pass (§1) — both **✅ DONE** (§0, §1).
 4. **Prose/markup/refs** (§4, §7), then the **final review-off build** (§5).
 5. **Reviewer-demand gaps** (§9).
+6. **External-revision items** (§10): work the 🟠 first — the two typos (F1 sign, F2 factor-2 display), the
+   presentation fixes (F3 Da/σ, F10 pressure attribution, F13 function space), and the abstract/conclusions
+   (IA-1/IA-2, C2/C3/C4) — before the final review-off build (§5); batch the 🟡 into the copy-edit + markup-flatten
+   pass (§4). Note §10.A F2 is **display-only** (assembly/implementation verified correct).

@@ -11,9 +11,9 @@ The different terms that stem from~\cref{eq:DiscretizedNonlinearStabilizedEquati
 \end{align}
 And the stabilization terms are
 \begin{align}
-  \HorSpace \smash{- \sum_K{\dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau} \mathcal{L}U_h}_K}} & = ( \tau_{1} \alpha^2 \left (\VertSpace (\boldsymbol{a} \cdot \nabla)\boldsymbol{v} + \nu \overline{\Delta}\boldsymbol{v} + \nu \ViscProj \nabla \boldsymbol{v} \nabla \beta \right. \notag                                                                                     \\
+  \HorSpace \smash{- \sum_K{\dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau} \mathcal{L}U_h}_K}} & = ( \tau_{1} \alpha^2 \left (\VertSpace (\boldsymbol{a} \cdot \nabla)\boldsymbol{v} + \nu \overline{\Delta}\boldsymbol{v} + \amend{2}\nu \ViscProj \nabla \boldsymbol{v} \nabla \beta \right. \notag                                                                                     \\
                                                                                                  & \HorSpace \left.+ \nabla q - \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{v} \right ),\, \notag                                                                                                                                                                               \\
-                                                                                                 & \HorSpace\hphantom{\big(\tau_{1}}\VertSpace (\boldsymbol{a} \cdot \nabla)\boldsymbol{u} - \nu \overline{\Delta}\boldsymbol{u} - \nu \ViscProj \nabla \boldsymbol{u} \nabla \beta + \nabla p + \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{u} ) \notag                        \\
+                                                                                                 & \HorSpace\hphantom{\big(\tau_{1}}\VertSpace (\boldsymbol{a} \cdot \nabla)\boldsymbol{u} - \nu \overline{\Delta}\boldsymbol{u} - \amend{2}\nu \ViscProj \nabla \boldsymbol{u} \nabla \beta + \nabla p + \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{u} ) \notag                        \\
                                                                                                  & \VertSpace + (\tau_{2} \alpha^2 \left( \nabla \cdot \boldsymbol{v} + \boldsymbol{v} \cdot \nabla \beta - \frac{\varepsilon}{\alpha} q \right),\, \nabla \cdot \boldsymbol{u} + \boldsymbol{u} \cdot \nabla \beta + \frac{\varepsilon}{\alpha} p ), \label{eq:StabilizationLVLU}
 \end{align}
 where $\overline{\Delta} \boldsymbol{w} \coloneqq 2 \nabla \cdot \left ( \nabla^\text{S}\boldsymbol{w} \right ) - \frac{2}{3} \nabla \left ( \nabla \cdot \boldsymbol{w} \right )$, and where we have introduced $\beta \coloneqq \log \alpha$ to simplify the expressions once we pull out the common factor $\alpha$. Note how this way the terms that are new with respect to the Navier{\hyp}Stokes formulation stand out more clearly.
@@ -25,7 +25,7 @@ The right-hand-side Galerkin terms are
 \end{align}
 and the right-hand side stabilization terms are
 \begin{align}
-  \smash{ - \sum_K{\dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau} \overline{F}}_K}} & = ( \tau_{1} \alpha \left ( \VertSpace(\boldsymbol{a} \cdot \nabla)\boldsymbol{v} + \nu \overline{\Delta}\boldsymbol{v} + \nu \ViscProj \nabla \boldsymbol{v} \nabla \beta \right. \notag    \\
+  \smash{ - \sum_K{\dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau} \overline{F}}_K}} & = ( \tau_{1} \alpha \left ( \VertSpace(\boldsymbol{a} \cdot \nabla)\boldsymbol{v} + \nu \overline{\Delta}\boldsymbol{v} + \amend{2}\nu \ViscProj \nabla \boldsymbol{v} \nabla \beta \right. \notag    \\
                                                                                         & \HorSpace \left. + \nabla q - \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{v} \right ),\, \overline{\boldsymbol{f}}) \notag                                                                \\
                                                                                         & \VertSpace + ( \tau_{2} \alpha \left( \nabla \cdot \boldsymbol{v} + \boldsymbol{v} \cdot \nabla \beta - \frac{\varepsilon}{\alpha} q\right),\, \overline{\phi}), \label{eq:StabilizationLVF}
 \end{align}
