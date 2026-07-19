@@ -465,11 +465,17 @@ consistency, + adversarial refutation) was run. It found more of the SAME qualif
 
 ### REMAINING — NOT yet applied (need author eyes; do not rush)
 
+> **✅ S6-4, its convection analog, and S6-1 APPLIED 2026-07-19** (re-derived independently, weighted form
+> adopted throughout §6, build green). See `pre-submission-checklist.md §0` for the full record — including the
+> one correction: the reaction pressure-gradient `eq:DominantReactionPressureGradientEstimate` keeps a
+> *legitimate* outer `1/α₀` (weak τ₁∼1/σ control ⇒ isolating ‖∇e_p‖ costs a genuine extra `α₀^{-1/2}`); its fix
+> was the inner `(α_∞/α₀)^{1/2}→α_∞^{1/2}`. **S6-3 and S45-3 remain open.**
+
 | id | severity | issue | proposed fix |
 |---|---|---|---|
-| **S6-4** | major | **eq:ConvergenceResultDominantViscosity (article.tex:1009): the 3rd LHS term coefficient is printed `1/α₀` but the same normalization gives `α₀^{-1/2}`.** τ₂=ν/α_K, min_K τ₂ = ν/α_∞ = ν (α_∞=1), so ‖τ₂^{1/2}∇·(αe_u)‖ ≥ ν^{1/2}‖·‖, and dividing by N=ν^{1/2}α₀^{1/2} gives α₀^{-1/2}. This also makes line 1011's "the third term partially balances this deterioration" *exactly* correct. **This is a displayed-equation math change — verify independently before applying.** | change `\frac{1}{\alpha_0}` → `\frac{1}{\alpha_0^{1/2}}` on the 3rd LHS term of eq:1009 only |
+| ~~**S6-4**~~ ✅ | ~~major~~ | **eq:ConvergenceResultDominantViscosity (article.tex:1009): the 3rd LHS term coefficient is printed `1/α₀` but the same normalization gives `α₀^{-1/2}`.** τ₂=ν/α_K, min_K τ₂ = ν/α_∞ = ν (α_∞=1), so ‖τ₂^{1/2}∇·(αe_u)‖ ≥ ν^{1/2}‖·‖, and dividing by N=ν^{1/2}α₀^{1/2} gives α₀^{-1/2}. This also makes line 1011's "the third term partially balances this deterioration" *exactly* correct. **This is a displayed-equation math change — verify independently before applying.** | change `\frac{1}{\alpha_0}` → `\frac{1}{\alpha_0^{1/2}}` on the 3rd LHS term of eq:1009 only |
 | **S6-3** | major | `Da = Da_h L²/h²` (lines ~1065, 1167) is imprecise: with the elementwise α_∞ convention, `Da/Da_h = (L²/h²)(α_K/α_∞)`. The h-subscripted numbers are read with α_∞ = α_{∞,K} = α_K. | state the convention once after line 998, OR write the exact identity |
-| **S6-1** | major | OSGS ℙ₁-L² method factor (3.48–4.13 sweep / 3.87–5.82 absolute at α₀=0.05) **exceeds** the weighted bound (α₀^{-1/2}=3.16 sweep / 4.47 absolute) in 3–4 of 4 rows. rem:WeightedVsUnweighted's "residual growth … of the order of the weighted prediction" is fair for ASGS but slightly generous for OSGS. | qualify: the weighted bound is met by ASGS; OSGS sits at or just above it |
+| ~~**S6-1**~~ ✅ | ~~major~~ | OSGS ℙ₁-L² method factor (3.48–4.13 sweep / 3.87–5.82 absolute at α₀=0.05) **exceeds** the weighted bound (α₀^{-1/2}=3.16 sweep / 4.47 absolute) in 3–4 of 4 rows. rem:WeightedVsUnweighted's "residual growth … of the order of the weighted prediction" is fair for ASGS but slightly generous for OSGS. | ✅ APPLIED: numerics prose now reads "the ASGS factor below it and the OSGS one marginally above" |
 | S45-1, S45-2, S72-5 | minor | small self-contradictions (τ₂ implicit/analysis form wording; a viscous-para phrasing) | see journal |
 
 ### Infrastructure still pending (unchanged from §4)
@@ -508,12 +514,15 @@ Full-text coherence audit (7 readers + cross-section + refutation) completed. Ad
 
 ### Remaining — flagged, NOT rushed (need author eyes / the 3D re-run)
 
+> **✅ S6-4 and S6-1 APPLIED 2026-07-19** (see the §6-table banner above and `pre-submission-checklist.md §0`).
+> S6-3, S45-3 still open.
+
 | id | severity | issue |
 |---|---|---|
-| **S6-4** | major | eq:ConvergenceResultDominantViscosity 3rd LHS coeff printed `1/α₀`, derivation gives `α₀^{-1/2}` (also makes line 1011's "partially balances" exact). **Displayed-equation math — verify independently.** |
+| ~~**S6-4**~~ ✅ | ~~major~~ | eq:ConvergenceResultDominantViscosity 3rd LHS coeff printed `1/α₀`, derivation gives `α₀^{-1/2}` (also makes line 1011's "partially balances" exact). **Displayed-equation math — verify independently.** |
 | **S45-3** | major | Lemma 1 (stability) hypotheses omit eq:SmallPorosityGradient (resolution) + mesh-nondegeneracy, which its own proof (line 880) uses and the appendix's prop:stability requires. Needs coordinated Lemma 1 + Lemma 2 hypothesis surgery. |
 | S6-3 | major | `Da = Da_h L²/h²` imprecise (misses α_K/α_∞ under the elementwise convention) |
-| S6-1 | major | OSGS ℙ₁-L² factor (3.5–4.1) slightly exceeds the weighted bound; rem:WeightedVsUnweighted "of the order of the weighted prediction" is fair for ASGS, generous for OSGS |
+| ~~S6-1~~ ✅ | ~~major~~ | OSGS ℙ₁-L² factor (3.5–4.1) slightly exceeds the weighted bound; **APPLIED** — numerics prose qualified ("ASGS below it, OSGS marginally above"); rem:WeightedVsUnweighted no longer claims "of the order of the weighted prediction" |
 | ~~73a, C6~~ | ~~major~~ | **RESOLVED by the 3D interpolation reference (§8; findings.md §3).** The velocity sub-optimality is the mesh's approximation capacity (interpolant itself sub-optimal on the irregular family: ℙ₁ H¹ slope 0.71, ℙ₂ L² 2.67; method at the floor, eff ~1.0); the pressure is the expected viscous one-order loss (both families, consistent with the 2D baseline). The "element-quality tail" attribution can now be stated as an *evidenced decomposition*. **A14 article rewrite pending author OK.** Still open: **C7** (the 1.29 triple — raw-data check via the re-run) and the separate `open-questions.md §3` `4k⁴`-fragility caveats. |
 | S72-5/8/10/11, T1–T6, 73d/e | minor | small wording/self-contradiction items — see journal |
 
