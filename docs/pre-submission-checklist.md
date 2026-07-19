@@ -220,15 +220,24 @@ predict ×10/×50/×116 — refuted as *sharp*.
   regenerate-and-diff (2D) both match every row (§2). **D4c proper — `\input` the generator instead of
   hand-copying — remains open**; until it lands the C7-/E1-class drift risk recurs on every table edit, so
   re-run both checks before submission. Src: `paper-revision-plan.md D4c`.
-- 🟡 **verify — all interpolation-reference rows** (12 in 2D, 8 in 3D, plus Cocquet ℙ₁/ℙ₂) match
-  `interp_reference.h5` to printed precision, use the two-finest-mesh slope rule stated in the caption, and share
-  the finest mesh + the shared `calculate_normalized_errors` functional with the data rows. Src: §5/§8/B1.
-- 🟡 **verify — first table caption (`tab:Linear2DL2`)** defines the parenthetical "(theoretical rate)"
-  convention + the regime-dependence caveat (parentheticals = viscous worst case). Src: review D4.
-- 🟡 **open — results-section figures.** `bump_plateau.pdf` is referenced
-  ([1151](../theory/paper/article.tex#L1151)) but `open-questions §4` records a standing `\Guillermo{Add figures}`
-  — convergence results are tables-only. Author decision: add convergence-plot figures or confirm tables-only;
-  verify the one figure renders (caption/axes/legend). Src: `open-questions.md §4`.
+- ✅ **VERIFIED (2026-07-19) — all interpolation-reference rows.** 3D (8): matched by `make_3d_tables.py --check`
+  against `interp_reference3d.json`. 2D (12) + Cocquet ℙ₁/ℙ₂ × α₀∈{0.5,0.1}: **freshly regenerated**
+  (`run_interpolation_reference.jl` — a pure interpolate-and-integrate pass, no solver) and matched to printed
+  precision — 16/16 for the main 2D set + Cocquet@0.5, plus the 4 Cocquet@0.1 velocity cells (ℙ₁ 1.13e-4 / 1.21e-1,
+  ℙ₂ 1.82e-6 / 4.19e-3) via a temp α₀=0.1 variant (valid because the Cocquet MMS reuses the main field — the @0.5
+  reference matched to the digit). The two-finest-mesh slope rule (stated in the caption **and** used in the
+  computation), the shared finest mesh (N=320 ladder), and the shared `calculate_normalized_errors` functional
+  (`mms_error_norms.jl`, D5c) are all confirmed. Src: §5/§8/B1.
+- ✅ **VERIFIED (2026-07-19) — first table caption (`tab:Linear2DL2`, [1176](../theory/paper/article.tex#L1176)).**
+  Defines the parenthetical "(theoretical rate)" convention (`k_v+1`/`k_p` in L², `k_v`/`k_p−1` in H¹, dash = no
+  guaranteed rate; same convention in the other three 2D tables), the **regime-dependence caveat** ("these are the
+  *viscosity-dominated worst case*; the reaction/convection regimes attain one order more for the pressure"), the
+  two-finest-mesh slope rule, and the interpolation-reference-row convention. Src: review D4.
+- ✅ **VERIFIED / tables-only settled (2026-07-19) — results-section figures.** The paper has exactly one figure —
+  `bump_plateau.pdf` (the 1−α porosity field), referenced at [1142](../theory/paper/article.tex#L1142) and present
+  on disk; it **renders correctly** (a labeled 3D surface, z-axis 0 / 1−α₀ / 1, caption matches). No standing
+  `\Guillermo{Add figures}` note remains and no convergence figures were added — **tables-only** is the settled
+  decision (the build succeeds at 66 pp with the figure included). Src: `open-questions.md §4`.
 
 ## 4. Editorial / prose
 

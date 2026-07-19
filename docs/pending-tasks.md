@@ -46,10 +46,10 @@ low α; (b) for ASGS, a code change to strip σu from the stabilization residual
 ### 1c. Paper editorial items needing author judgment
 Mechanical-but-author-gated: merge `centered_encoding.tex` into `article.tex` (self-describes "not yet
 merged"; strip standalone preamble + `\end{document}`, drop `\Reyn`/`\Damk`/`\code` `\newcommand`s); decide
-`supplement.tex` (SIAM boilerplate — replace or drop the `\externaldocument{supplement}` line); add the
-results-section figures (`article.tex` line 1436, currently tables only). (The "Kratos Multiphysics"
-implementation claim is **✅ resolved 2026-07-19** — the paper now reads Gridap, 0 Kratos mentions.) Full
-list: [`open-questions.md`](open-questions.md) §4.
+`supplement.tex` (SIAM boilerplate — replace or drop the `\externaldocument{supplement}` line). (Results-section
+figures: **✅ tables-only settled 2026-07-19** — the `\Guillermo{Add figures}` note is gone, one porosity figure
+kept. The "Kratos Multiphysics" implementation claim: **✅ resolved 2026-07-19** — the paper reads Gridap, 0
+Kratos mentions.) Full list: [`open-questions.md`](open-questions.md) §4.
 
 ---
 

@@ -399,8 +399,9 @@ reproducible until D1c/D3c land. B1 is independent and can start immediately.
   30 levels; **E1 + C7 closed** (see the top banner and `pre-submission-checklist.md §2`). (Historical note below.)
   Any row whose finest mesh did not converge will be recomputed or withdrawn: **no slope may be computed
   partly from an interpolant** (author instruction).
-- **B1b** — interpolation reference for the Cocquet variant (α₀ ∈ {0.5, **0.1**}, ℙ₁+ℙ₂ on TRI) and for the
-  3D regular Kuhn family.
+- **B1b — ✅ DONE (verified 2026-07-19):** the Cocquet interpolation reference (α₀∈{0.5,0.1}, ℙ₁+ℙ₂ on TRI) and
+  the 3D regular-Kuhn reference are computed, inserted in the tables, and fresh-verified to printed precision
+  (`pre-submission-checklist.md §3`).
 - **D4c** — wire `article.tex` tables to `make_results_tables.py` (currently hand-copied) and emit the
   reference rows from the generator.
 - **A8/A13** — first-table caption convention + regime caveat; C6/§7.2 redirect (needs the 3D re-run).
@@ -495,8 +496,9 @@ consistency, + adversarial refutation) was run. It found more of the SAME qualif
   success=false**; **C7's 1.29 confirmed genuine** and the ℙ₂-irregular convergence settled. (Was: ℙ₂/OSGS/nested-red
   still ahead, 0 success=false so far.) Still to action from this once-blocked item: A14/A15
   (C6 quality-tail redirect + the §7.2-vs-Conclusions c₁ reporting inconsistency).
-- **Cocquet reference rows** — data extracted and verified (ℙ₁/ℙ₂ TRI, α₀∈{0.5,0.1}); C9 confirmed
-  (Taylor-Hood pressure at the ℙ₁ floor 9.84e-6 while its velocity is n.c.). Rows not yet inserted.
+- **Cocquet reference rows — ✅ INSERTED + verified 2026-07-19.** ℙ₁/ℙ₂ TRI, α₀∈{0.5,0.1}; C9 confirmed
+  (Taylor-Hood pressure at the ℙ₁ floor 9.84e-6 while its velocity is n.c.). Rows are present in
+  `tab:CocquetMMSL2/H1` and match a fresh interpolation regen to printed precision.
 - **D4c** — wire tables to make_results_tables.py (still hand-copied).
 - **D6c** — ε_M/ε_C persistence: APPLIED to src/solvers/solver_core.jl + run_test.jl; proven inert
   (the 1 Quick error is a PRE-EXISTING SingularException in osgs_frozen_pi_jacobian_quick_test.jl:96,
