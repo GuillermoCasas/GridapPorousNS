@@ -32,17 +32,16 @@ $pdflatex = 'pdflatex -synctex=1 %O %S';
 
 # --- Search paths -------------------------------------------------------------
 #  ./siam//            : the SIAM class/bst (siamart190516.cls, siamplain.bst)
-#  latex compilation// : sibling per-target aux dirs, so article.tex's
-#                        \externaldocument{supplement} (xr-hyperref) resolves
-#                        supplement.aux across the split subfolders (and vice versa).
+#  latex compilation// : sibling per-target aux dirs, kept on the search path
+#                        for cross-references resolved across the split subfolders.
 $ENV{'TEXINPUTS'} = './siam//:latex compilation//:' . ($ENV{'TEXINPUTS'} // '');
 $ENV{'BSTINPUTS'} = './siam//:' . ($ENV{'BSTINPUTS'} // '');
 
 # Extra extensions for `latexmk -c/-C` to remove.
 $clean_ext = 'synctex.gz synctex\(busy\) thm bbl blg';
 
-# When invoked with no file argument, build the two real documents only
-# (the *_appendix.tex files are \input fragments, not standalone documents).
-@default_files = ('article.tex', 'supplement.tex');
+# When invoked with no file argument, build the article only (the *_appendix.tex
+# files are \input fragments, not standalone documents; there is no supplement).
+@default_files = ('article.tex');
 
 print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to './'\n";

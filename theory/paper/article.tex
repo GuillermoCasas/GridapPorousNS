@@ -16,10 +16,6 @@
 }
 \fi
 
-% The next statement enables references to information in the
-% supplement. See the xr-hyperref package for details.
-
-\externaldocument{supplement}
 \usepackage{mathtools, nccmath}
 \usepackage{mathabx}
 \usepackage{amsmath}
@@ -1148,7 +1144,15 @@ where $0 < r_1 < r_2 < 1$. \amend{In all the numerical experiments reported belo
 
 The objective of this example is to check the robustness of the empirical convergence rates obtained for the ASGS and OSGS formulations and to compare them to the analytical estimates derived in the previous sections. In particular, we will focus on the $L^2$-norm and the $H^1$-seminorm of the error, normalizing the velocity and pressure errors using their respective characteristic values $U$ and $P$.
 
-In order to cover a wide range of regimes, we will consider all the combinations resulting from taking $\Reyn,\Damk \in \{10^{-6},1,10^{6}\}$ and $\alpha_0 \in \{0.05,0.5\}$. The large separation between the different values taken by $\Reyn$ and $\Damk$ guarantees that the various flow regimes considered are approximately independent of the mesh refinement level, in the sense that the ordering and several-order-of-magnitude separation between the dimensionless numbers are preserved despite their values changing with $h$. As the characteristic velocity and length scales are fixed, we vary the value of $\Reyn$ by changing the viscosity. The value of $\Damk$ is varied through $\boldsymbol{\sigma}$. Doing so will allow us to \amend{analyze} the performance of our formulation in the three limiting cases of interest, i.e., convection, diffusion and reaction-dominated flows.
+In order to cover a wide range of regimes, we will consider all the combinations resulting from taking $\Reyn,\Damk \in \{10^{-6},1,10^{6}\}$ and $\alpha_0 \in \{0.05,0.5\}$. The large separation between the different values taken by $\Reyn$ and $\Damk$ guarantees that the various flow regimes considered are approximately independent of the mesh refinement level, in the sense that the ordering and several-order-of-magnitude separation between the dimensionless numbers are preserved despite their values changing with $h$. \amend{With the length scale fixed to the unit domain, the dimensional data realizing each cell are chosen by the \emph{centered encoding} described in the next paragraph.} Doing so will allow us to \amend{analyze} the performance of our formulation in the three limiting cases of interest, i.e., convection, diffusion and reaction-dominated flows.
+
+\amend{\paragraph{Centered dimensional encoding.} The solver is dimensional, whereas each case is specified by the dimensionless triple $(\Reyn,\Damk,\alpha_0)$; the dimensional data realizing it are therefore not unique. With the length scale fixed to the unit domain of the manufactured field ($L=1$), \cref{eq:DimensionlessParameters} still leaves one free scale, and a naive choice such as $U=1$ drives the coefficients to extreme magnitudes across the sweep---at the most reaction{\hyp}dominated cell $(\Reyn,\Damk)=(10^{-6},10^{6})$ it gives $\nu\sim10^{6}$ and $\sigma\sim10^{12}$, at the edge of double{\hyp}precision resolution. We instead spend the free scale to \emph{center} the two coefficients about unity by imposing $\sqrt{\nu\sigma}=1$, which yields
+\begin{equation*}
+  \nu=\frac{1}{\sqrt{\alpha_\infty\Damk}},\qquad
+  \sigma=\sqrt{\alpha_\infty\Damk},\qquad
+  U=\frac{\Reyn}{\sqrt{\alpha_\infty\Damk}},
+\end{equation*}
+with $\alpha_\infty$ the porosity supremum. The intrinsic spread $\sigma/\nu=\alpha_\infty\Damk$ is a property of the cell and cannot be removed, but no coefficient then exceeds its square root ($\sigma\le10^{3}$ in the case above). Being a strict reparametrization, this leaves the dimensionless problem---and hence the normalized errors reported below---unchanged; it only keeps the arithmetic well conditioned.}
 
 For both 2D and 3D tests, we have considered the problem defined by \cref{eq:ManufacturedProblem}. In the following subsections we present the particularities of the various simulations and the results obtained.
 

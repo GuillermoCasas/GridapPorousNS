@@ -10,7 +10,7 @@ Build from `theory/paper/` with its local `latexmkrc` (which adds `paper/siam/` 
 `TEXINPUTS`/`BSTINPUTS`). Verified clean: `latexmk` exit 0, 0 undefined refs/citations, 43 pp.
 
 - [`paper/article.tex`](paper/article.tex) — the paper; the authoritative theory anchor for the codebase.
-- [`paper/elemental_matrices_appendix.tex`](paper/elemental_matrices_appendix.tex), [`paper/shared.tex`](paper/shared.tex), [`paper/supplement.tex`](paper/supplement.tex), [`paper/references.bib`](paper/references.bib) — `\input`/bibliography dependencies.
+- [`paper/elemental_matrices_appendix.tex`](paper/elemental_matrices_appendix.tex), [`paper/shared.tex`](paper/shared.tex), [`paper/references.bib`](paper/references.bib) — `\input`/bibliography dependencies.
 - `paper/figures/bump_plateau.pdf` — the one figure the article references.
 - [`paper/siam/`](paper/siam/) — the SIAM class (`siamart190516.cls`) and bib style (`siamplain.bst`).
 - Open editorial items for the paper: [`../docs/open-questions.md`](../docs/open-questions.md) §5.
