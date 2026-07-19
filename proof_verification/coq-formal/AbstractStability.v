@@ -67,7 +67,7 @@
 From Coq Require Import Reals Lra Lia Psatz List.
 Import ListNotations.
 From PNSFormal Require Import StabilityAlgebra InnerSpace AbstractSums
-                              AbstractInterpolation.
+                              AbstractInterpolation InverseEstimates.
 Local Open Scope R_scope.
 
 (*  [known-fragility]  ContinuityAlgebra is deliberately NOT imported here,   *)
@@ -225,9 +225,14 @@ Hypothesis H_ibp_diag :
   Rsum Th (fun k => << (uu k) , (gpu k) >>)
   = - Rsum Th (fun k => << (pp k) , (divu k) >>).
 
-(*  (S3): the weighted inverse estimate eq:winv-divvisc.  *)
-Hypothesis S3 :
-  forall k, nrm (du k) <= (2 * nu * Cb / hK k) * sqrt (aK k) * nrm (gu k).
+(*  (S3): the weighted inverse estimate eq:winv-divvisc, through the          *)
+(*  NOTATIONAL schema winv_est (InverseEstimates.v).  It unfolds              *)
+(*  DEFINITIONALLY to  forall k, nrm (du k) <= (2 nu Cbar / hK k) sqrt(aK k)  *)
+(*  nrm (gu k)  -- the estimate it replaced -- so the trusted base is         *)
+(*  unchanged.  winv_est is notation over this single named hypothesis, not   *)
+(*  a hypothesis that supplants it; a forall-x inverse estimate would be      *)
+(*  unsound (see the InverseEstimates.v header).                             *)
+Hypothesis S3 : winv_est Hs K hK (2 * nu * Cb) (fun k => sqrt (aK k)) du gu.
 
 (*  eq:UpperBoundOnEpsilon, in its elementwise (infimum) form.  *)
 Hypothesis Heps :

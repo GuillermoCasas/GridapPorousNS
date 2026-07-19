@@ -445,3 +445,32 @@ not free reductions**:
   machine-checked to be consistent with the rest, not merely argued. (It sits
   outside `NonVacuity.v`'s own witness, which instantiates `abstract_stability`
   and does not mention `C_I`; before those two files, item 15 was unwitnessed.)
+
+One further change since the previous revision is **structural, not a change to
+the trusted base at all**:
+
+- **The nine weighted inverse estimates now share one schema.** The Class-I
+  `winv` family — `Hw_gu`, `Hw_gv`, `Hw_du`, `Hw_dv`, `Hw_cxu`, `Hw_cxv`,
+  `Hw_gpu`, `Hw_divu` (items 34–41) and the stability lemma's `S3` (item 33,
+  `≡ Hw_du`) — is now written through the single predicate
+  `winv_est C W A B := forall k, ‖A k‖ ≤ C / h_K k · W k · ‖B k‖` of the new
+  file `InverseEstimates.v`, and the "double" composites (`du` bounded directly
+  by `uu`, weight `√α_K·√α_K = α_K`, `h^{-1}·h^{-1} = h^{-2}`) are derived
+  generically by the proved lemma `winv_compose`, retiring the byte-for-byte
+  `double_inv_u`/`double_inv_v` block that stood **three times** (twice in
+  `AbstractContinuity.v`, once in `AbstractInterpolation.v`). This is
+  **notational, not a reduction of trust**: each hypothesis unfolds
+  *definitionally* to the estimate it always stated (six exactly; the three
+  `α_K|a|`/`α_K`-weight ones up to a re-association every `pose proof … nra`
+  consumer absorbs), so the nine remain **nine independent named hypotheses**
+  and the count stays **50** — `winv_est` names their common shape, it replaces
+  none of them and adds none. It is emphatically *not*, and must not become, a
+  single estimate `forall x, ‖D x‖ ≤ C/h · W · ‖x‖` quantified over an arbitrary
+  vector: the discrete atoms and the interpolation-error atoms inhabit the *same*
+  carrier, so a `forall`-`x` inverse estimate would license one for a
+  non-polynomial interpolation error, which is false — the polynomial /
+  interpolation-error firewall (§4, "true for polynomials, never for both") is
+  exactly what keeps the nine from collapsing to one. `winv_compose` is a proved
+  lemma, not a hypothesis (`Print Assumptions`: only the three stdlib axioms), so
+  §4's "double inverse estimate" tick (Appendix B, Step 4 above) is now
+  discharged through it rather than by hand, with no addition to the base.

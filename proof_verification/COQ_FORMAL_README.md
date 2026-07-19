@@ -8,7 +8,7 @@ de-Pouplana). It is the proof-assistant counterpart of the SymPy suite in
 computation, the files here prove them from the axioms of the real numbers,
 and the proofs are re-verified by Coq's trusted kernel (`coqchk`).
 
-**Status: 17 files, ~789 theorems, all proved. No `Admitted`, no `Axiom`,
+**Status: 18 files, ~789 theorems, all proved. No `Admitted`, no `Axiom`,
 no `admit` anywhere** (grep the sources to confirm — and, more strongly,
 `Print Assumptions`: every top-level theorem depends on exactly three axioms,
 all from the standard library's *construction* of the reals
@@ -450,7 +450,18 @@ the two facewise assembly identities, and `Horth`; (c) *inverse-type estimates*,
 items 33–50 — eq:winv-divvisc (S3) and the eight weighted inverse estimates of
 lem:winv, the seven `HI_*` interpolation estimates, plus (inside the two
 face-integral hypotheses) the L^∞ inverse estimate, meas(Γᵇ) ≤ Chᵈ⁻¹, and
-Hölder on the face. Classes (b) and (c) are textbook material
+Hölder on the face. The nine weighted inverse estimates (items 33–41 — `S3`,
+`Hw_gu`, `Hw_gv`, `Hw_du`, `Hw_dv`, `Hw_cxu`, `Hw_cxv`, `Hw_gpu`, `Hw_divu`) are
+now stated through the single schema `winv_est C W A B := forall k, ‖A k‖ ≤
+C/h_K · W k · ‖B k‖` of the file `InverseEstimates.v`, with the "double"
+composites derived generically by the proved lemma `winv_compose` (retiring
+three byte-identical `double_inv` derivations). This is **notational**: each row
+unfolds definitionally to the estimate it always stated, so the nine remain nine
+independent hypotheses and the total stays **50** — the schema names their common
+shape and is deliberately *not* a single `forall x` estimate, which would be
+unsound (the discrete and interpolation-error atoms share the carrier, so a
+`forall x` inverse estimate would apply to a non-polynomial interpolation error).
+Classes (b) and (c) are textbook material
 (Brenner–Scott; Ern–Guermond) verified by hand against the manuscript
 (AUDIT.md §4); their Lean 4 formalisation plan is `LEAN_ROADMAP.md` with
 statement skeleton `PorousNSToolbox.lean`. The interpolation estimates of

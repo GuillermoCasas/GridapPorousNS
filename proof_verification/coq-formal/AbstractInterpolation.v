@@ -37,7 +37,8 @@
 
 From Coq Require Import Reals Lra Lia Psatz List.
 Import ListNotations.
-From PNSFormal Require Import ContinuityAlgebra InnerSpace AbstractSums.
+From PNSFormal Require Import ContinuityAlgebra InnerSpace AbstractSums
+                              InverseEstimates.
 Local Open Scope R_scope.
 
 Section AbstractInterpolation.
@@ -203,13 +204,18 @@ Hypothesis H_mult2 :
   forall g : K -> R, (forall k, 0 <= g k) ->
     Rsum Fl (fun f => g (e2 f)) <= Nf * Rsum Th g.
 
-(*  V-side: the weighted inverse estimates of lem:winv (discrete argument).  *)
-Hypothesis Hw_gv :
-  forall k, nrm (gv k) <= Cinv / hK k * sqrt (aK k) * nrm (vv k).
-Hypothesis Hw_dv :
-  forall k, nrm (dv k) <= 2 * nu * Cb / hK k * sqrt (aK k) * nrm (gv k).
-Hypothesis Hw_cxv :
-  forall k, nrm (cxv k) <= Cinv / hK k * aK k * am k * nrm (vv k).
+(*  V-side: the weighted inverse estimates of lem:winv (discrete argument),  *)
+(*  through the NOTATIONAL schema winv_est (InverseEstimates.v):             *)
+(*  `winv_est Hs K hK C W A B' unfolds DEFINITIONALLY to                     *)
+(*  `forall k, nrm (A k) <= C / hK k * W k * nrm (B k)'.  Three independent  *)
+(*  named hypotheses -- winv_est is notation over them, not a hypothesis     *)
+(*  replacing them (a forall-x version would be unsound; see the             *)
+(*  InverseEstimates.v header).  Hw_cxv's (aK am) weight matches only        *)
+(*  propositionally; its consumers (`pose proof (Hw_cxv k); ... nra') and    *)
+(*  the abstract_continterp caller in AbstractConvergence.v absorb it.       *)
+Hypothesis Hw_gv  : winv_est Hs K hK Cinv          (fun k => sqrt (aK k)) gv  vv.
+Hypothesis Hw_dv  : winv_est Hs K hK (2 * nu * Cb) (fun k => sqrt (aK k)) dv  gv.
+Hypothesis Hw_cxv : winv_est Hs K hK Cinv          (fun k => aK k * am k) cxv vv.
 
 (*  E-side: the interpolation estimates of the appendix's replacement table  *)
 (*  (eq:interpdivvisc--eq:interpzero), one constant CI for all of them.      *)
@@ -1595,25 +1601,19 @@ Qed.
 Lemma double_inv_v : forall k,
   nrm (dv k) <= 2 * nu * Cb * Cinv * aK k / (hK k)^2 * nrm (vv k).
 Proof.
+  (*  eq:doubleinv via the generic winv_compose (InverseEstimates.v):
+      Hw_dv o Hw_gv, folding sqrt(aK)*sqrt(aK) = aK.  This is the third and
+      last copy of the double inverse estimate; it now shares the single
+      generic composition lemma with AbstractContinuity.double_inv_{u,v}. *)
   intro k.
-  pose proof (Hw_dv k) as H1. pose proof (Hw_gv k) as H2.
-  pose proof (hK_pos k) as Hh. pose proof (aK_pos k) as Ha.
-  pose proof (nrm_nonneg Hs (gv k)) as Hg.
-  pose proof (nrm_nonneg Hs (vv k)) as Hu.
-  assert (Hsa : 0 <= sqrt (aK k)) by apply sqrt_pos.
-  assert (Hcoef : 0 <= 2 * nu * Cb / hK k * sqrt (aK k)).
-  { assert (H3 : 0 < 2 * nu * Cb) by nra.
-    assert (H4 : 0 < 2 * nu * Cb / hK k) by (apply Rdiv_lt_0_compat; lra).
-    nra. }
-  assert (S1 : nrm (dv k)
-               <= (2 * nu * Cb / hK k * sqrt (aK k))
-                  * (Cinv / hK k * sqrt (aK k) * nrm (vv k))) by nra.
-  assert (E : (2 * nu * Cb / hK k * sqrt (aK k))
-              * (Cinv / hK k * sqrt (aK k) * nrm (vv k))
-              = 2 * nu * Cb * Cinv * (sqrt (aK k) * sqrt (aK k)) / (hK k)^2
-                * nrm (vv k)) by (field; lra).
-  rewrite E in S1. rewrite sqrt_sqrt in S1 by lra.
-  exact S1.
+  assert (HC1 : 0 <= 2 * nu * Cb) by nra.
+  assert (HW1 : forall j, 0 <= sqrt (aK j)) by (intro; apply sqrt_pos).
+  pose proof (winv_compose Hs K hK hK_pos (2 * nu * Cb) Cinv
+                (fun k => sqrt (aK k)) (fun k => sqrt (aK k)) dv gv vv
+                HC1 HW1 Hw_dv Hw_gv k) as H.
+  cbv beta in H.
+  rewrite sqrt_sqrt in H by (apply Rlt_le, aK_pos).
+  exact H.
 Qed.
 
 Lemma bound_T8 : Rabs T8 <= 2 * CI / sqrt c1 * (PsU * NV).

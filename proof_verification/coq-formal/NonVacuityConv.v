@@ -176,7 +176,8 @@ From Coq Require Import Reals Lra Lia Psatz List.
 Import ListNotations.
 From PNSFormal Require Import StabilityAlgebra ContinuityAlgebra InnerSpace
                               AbstractSums AbstractStability
-                              AbstractInterpolation AbstractConvergence.
+                              AbstractInterpolation AbstractConvergence
+                              InverseEstimates.
 Local Open Scope R_scope.
 
 (* ------------------------------------------------------------------------- *)
@@ -573,10 +574,15 @@ Qed.
 (*  the whole right-hand side: at |a| = 0 it reads |cxv| <= 0 and forces      *)
 (*  cxv = 0, which in turn makes H_skew_diag read 0 = 0 with no content.      *)
 (*  Here  |cxv(B)| = 1 = 2 * (1/4) * 2 * 1 : EQUALITY.                        *)
+(*  Restated through the winv_est schema so it discharges abstract_convergence's
+    (now winv_est) Hw_cxv slot.  The (aK am) weight matches only
+    propositionally, so this one must wear winv_est explicitly (the Shape-A
+    w_Hw_gv/w_Hw_dv above pass by conversion untouched); `unfold winv_est;
+    intro k; cbv beta' recovers the raw goal, closed by the same lra.  *)
 Lemma w_Hw_cxv :
-  forall k, nrm (wcxv k) <= wCinv / whK k * waK k * wam k * nrm (wvv k).
+  winv_est RPH bool whK wCinv (fun k => waK k * wam k) wcxv wvv.
 Proof.
-  intro k. rewrite !w_nrm.
+  unfold winv_est. intro k. cbv beta. rewrite !w_nrm.
   destruct k; unfold wcxv, wvv, wCinv, whK, waK, wam; rabs; lra.
 Qed.
 

@@ -73,7 +73,7 @@
 \title{\bfseries Machine-checked coverage map:\\
        from the paper's theory to the Coq formalisation}
 \author{Coverage note accompanying \file{proof_verification/coq-formal/}}
-\date{Revised 2026-07-17 \quad (17 files, $\approx$789 theorems; all compiled
+\date{Revised 2026-07-17 \quad (18 files, $\approx$789 theorems; all compiled
       and \coq{coqchk}-verified on Coq~8.18.0)}
 
 \begin{document}
@@ -129,11 +129,11 @@ guarantee is and where residual trust remains.
 The Coq development mirrors, file by file, the SymPy ``verification scripts''
 suite in \file{proof_verification/sympy/}: where SymPy checks an identity
 by symbolic computation, the Coq files \emph{prove} it. The suite is
-\textbf{17 files, $\approx 789$ theorems, all proved} --- there is no
+\textbf{18 files, $\approx 789$ theorems, all proved} --- there is no
 \coq{Admitted}, no \coq{Axiom} and no \coq{admit} anywhere in the sources
 (\coq{grep} confirms this, and so, more strongly, does \coq{Print Assumptions}:
 \S\ref{sec:stratum0}). It uses \emph{only} the standard library, and the whole
-suite has been compiled and independently kernel-checked on Coq~8.18.0: seventeen
+suite has been compiled and independently kernel-checked on Coq~8.18.0: eighteen
 \coq{[PASS]} lines followed by \emph{``coqchk: modules successfully checked by
 the trusted kernel''} (\S\ref{sec:repro}).
 
@@ -293,7 +293,7 @@ here:
     single one would let anything ``follow''.
   \item \coq{Axiom} postulates a statement as true without proof.
 \end{itemize}
-Neither appears anywhere in the seventeen files. Consequently every result below
+Neither appears anywhere in the eighteen files. Consequently every result below
 is reduced to the standard library's real numbers --- constructed, not
 postulated, but resting on a small fixed set of classical principles
 (\S\ref{sec:stratum0}) --- plus, for the four abstract theorems, the
@@ -502,7 +502,7 @@ exactly the standard, hand-audited facts it is labelled as.
 \section{The crosswalk: theory \texorpdfstring{$\to$}{->} Coq}\label{sec:crosswalk}
 % =====================================================================
 
-Dependency and topic map of the seventeen files. \file{Limits.v}/\file{DerivKit.v}
+Dependency and topic map of the eighteen files. \file{Limits.v}/\file{DerivKit.v}
 serve the concrete analytic files; \file{AbstractSums.v}/\file{InnerSpace.v}
 serve the four abstract-theorem files, which also import the closed algebraic
 theorems of \file{StabilityAlgebra.v}/\file{ContinuityAlgebra.v} and apply them
@@ -518,6 +518,7 @@ Coq file & Paper location & Role \\
 \file{DerivKit.v}    & --- & infrastructure: derivative toolkit \\
 \file{AbstractSums.v}  & --- & infrastructure: finite mesh/face sums, discrete C--S \\
 \file{InnerSpace.v}    & --- & infrastructure: abstract pre-Hilbert space \\
+\file{InverseEstimates.v} & \lbl{lem:winv} & infrastructure: inverse-estimate schema \& composition \\
 \file{StabilityAlgebra.v}  & \S\ref{sec:crossStab} (\S5)     & stability estimate, scalar algebra \\
 \file{ContinuityAlgebra.v} & \S\ref{sec:crossCont} (App.\ B) & continuity proof, scalar algebra \\
 \file{AbstractStability.v} & \S\ref{sec:crossAbsStab} (\S5) & \lbl{lemma:Stability}, complete theorem \\
@@ -535,7 +536,7 @@ Coq file & Paper location & Role \\
 \end{tabular}
 \end{center}
 
-\subsection{Infrastructure: \texttt{InnerSpace.v} and \texttt{AbstractSums.v}}\label{sec:crossInfra}
+\subsection{Infrastructure: \texttt{InnerSpace.v}, \texttt{InverseEstimates.v} and \texttt{AbstractSums.v}}\label{sec:crossInfra}
 
 \begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
 \toprule
@@ -549,6 +550,10 @@ Coq file & Paper location & Role \\
 \coq{nrm_triangle} & the triangle inequality. \\
 \coq{young_scalar}, \coq{young_vector} & the parametrized Young inequality at vector level. \\
 \coq{diff_of_squares} & $\langle -a+b,\,a+b\rangle=\lVert b\rVert^2-\lVert a\rVert^2$: the ASGS cancellation. \\
+\midrule
+\multicolumn{2}{@{}l}{\emph{\file{InverseEstimates.v} --- the \lbl{lem:winv} weighted inverse-estimate shape, named once (full account: \S\ref{sec:stratumI}, I1)}}\\
+\coq{winv_est}\,$C\,W\,A\,B$ & the common shape $\lVert A_K\rVert_K\le(C/h_K)\,W_K\,\lVert B_K\rVert_K$ that the nine \coq{Hw_*} hypotheses each instantiate; a \emph{notational} predicate, not a hypothesis --- it replaces none and adds none, so Table~\ref{tab:inventory} keeps its row count. \\
+\coq{winv_compose} & composes two \coq{winv_est} instances sharing a middle atom into the double estimate $\lVert A_K\rVert_K\le C_1C_2(W_1W_2)_K\,h_K^{-2}\,\lVert B_K\rVert_K$; the single proved lemma that retires the byte-identical \coq{double_inv_u}/\coq{double_inv_v} triplication. \\
 \midrule
 \multicolumn{2}{@{}l}{\emph{\file{AbstractSums.v} --- sums over the element / face list}}\\
 \coq{Rsum}, \coq{Rsum_plus/minus/opp/scal}, \coq{Rsum_le}, \coq{Rsum_nonneg} & linearity and monotonicity of $\sum_{k\in\mathrm{Th}}$. \\
@@ -921,7 +926,7 @@ Three things, and no more, sit under every theorem in the development.
 \emph{The logic.} The Calculus of Inductive Constructions, as implemented by the
 Coq/Rocq kernel and independently re-checked by \coq{coqchk}
 (\S\ref{sec:coq}). No \coq{Axiom}, no \coq{Admitted}, no \coq{admit} occurs in
-the seventeen files, so nothing has been postulated behind the reader's back.
+the eighteen files, so nothing has been postulated behind the reader's back.
 
 \emph{The real numbers.} The development imports \coq{Coq.Reals} (with
 \coq{Lra}, \coq{Lia}, \coq{Psatz}, \coq{List}) and nothing else --- no Mathcomp,
@@ -1999,6 +2004,36 @@ textual.
 
 \subsubsection{I1 --- The weighted inverse estimates}
 
+\emph{One schema, nine instances.} Every weighted inverse estimate in the
+development has the \emph{same shape} --- a bounded atom $A_K$ controlled by a
+source atom $B_K$, with an $h_K^{-1}$ and a porosity weight $W_K$ in between. The
+Coq layer names that shape once, in the infrastructure file
+\file{InverseEstimates.v}:
+\begin{lstlisting}
+Definition winv_est (C : R) (W : K -> R) (A B : K -> carrier Hs) : Prop :=
+  forall k, nrm (A k) <= C / hK k * W k * nrm (B k).
+\end{lstlisting}
+that is, $\lVert A_K\rVert_K\le (C/h_K)\,W_K\,\lVert B_K\rVert_K$ on every
+element $K$, with the weight
+$W_K\in\{\aK^{1/2},\,\aK,\,\aK|\mathbf a|_{\infty,K}\}$ and $C$ one of
+$\Cinv,2\nu\Cbar,\Cbar$. This predicate is \textbf{purely notational}: each of
+the nine hypotheses below is stated \emph{as} a \coq{winv_est} instance and
+unfolds \emph{definitionally} to exactly the estimate it always was (six of the
+nine to nothing more than $\beta$-reduction; the three $\aK|\mathbf a|/\aK$-weight
+ones re-associate and match propositionally, which every \coq{pose proof}$\,\ldots\,$\coq{nra}
+consumer absorbs). So \coq{winv_est} \emph{replaces no hypothesis} and adds none:
+the trusted base is the same nine propositions as before, only written through a
+common name --- the row count of Table~\ref{tab:inventory} is unchanged. The nine
+\emph{cannot} be collapsed into a single \coq{winv_est} quantified over an
+arbitrary vector (\coq{forall x, nrm (D x) <= ...}): that would be
+\emph{unsound}. The discrete atoms and the interpolation-error atoms inhabit the
+\emph{same} carrier, so a \coq{forall}-$x$ inverse estimate would license an
+inverse estimate for a \emph{non-polynomial} interpolation error --- false, and
+the very fact I2 turns on. The atoms are therefore kept as nine independent named
+hypotheses; the ``true for polynomials / true for interpolation errors, never
+both'' firewall is exactly what forbids the merge, and \coq{winv_est} is notation
+\emph{over} the nine, never a tenth hypothesis.
+
 The stability lemma needs exactly one of them:
 \begin{lstlisting}
 Hypothesis S3 :
@@ -2048,38 +2083,67 @@ relation is supplied.
 
 The continuity lemma needs eight instances --- and \emph{exactly} eight, one for
 each way the first or second argument enters the eighteen terms. They are the
-whole of \lbl{lem:winv}, instantiated:
+whole of \lbl{lem:winv}, instantiated. Read through the schema, each is a
+\coq{winv_est}$\ C\ W\ A\ B$ line --- bounded atom $A$, source atom $B$, constant
+$C$, weight $W$ --- so the family collapses to one display and a data table:
 
 \begin{center}
 \small
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}llllll@{}}
 \toprule
-Coq & Estimate & Paper \\
+Coq & bounded $A_K$ & source $B_K$ & $C$ & $W_K$ & Paper \\
 \midrule
 \coq{Hw_gu}, \coq{Hw_gv}
-  & $\lVert\alpha^{1/2}\mathcal P\nabla\mathbf w_h\rVert_K
-     \le \dfrac{\Cinv}{h_K}\aK^{1/2}\lVert\mathbf w_h\rVert_K$
-  & \lbl{eq:winv-grad} \\
-\coq{Hw_du}, \coq{Hw_dv}
-  & $\lVert 2\nu\nabla\!\cdot(\alpha\mathcal P\nabla\mathbf w_h)\rVert_K
-     \le \dfrac{2\nu\Cbar}{h_K}\aK^{1/2}
-     \lVert\alpha^{1/2}\mathcal P\nabla\mathbf w_h\rVert_K$
-  & \lbl{eq:winv-divvisc} \\
+  & $\alpha^{1/2}\mathcal P\nabla\mathbf w_h$ & $\mathbf w_h$
+  & $\Cinv$ & $\aK^{1/2}$ & \lbl{eq:winv-grad} \\
+\coq{Hw_du}, \coq{Hw_dv} ($\equiv$\,\coq{S3})
+  & $2\nu\nabla\!\cdot(\alpha\mathcal P\nabla\mathbf w_h)$
+  & $\alpha^{1/2}\mathcal P\nabla\mathbf w_h$
+  & $2\nu\Cbar$ & $\aK^{1/2}$ & \lbl{eq:winv-divvisc} \\
 \coq{Hw_cxu}, \coq{Hw_cxv}
-  & $\lVert\alpha\,\mathbf a\!\cdot\!\nabla\mathbf w_h\rVert_K
-     \le \dfrac{\Cinv}{h_K}\,\aK\,|\mathbf a|_{\infty,K}\lVert\mathbf w_h\rVert_K$
-  & \lbl{eq:winv-conv} \\
+  & $\alpha\,\mathbf a\!\cdot\!\nabla\mathbf w_h$ & $\mathbf w_h$
+  & $\Cinv$ & $\aK\,|\mathbf a|_{\infty,K}$ & \lbl{eq:winv-conv} \\
 \coq{Hw_gpu}
-  & $\lVert\alpha\nabla r_h\rVert_K
-     \le \dfrac{\Cinv}{h_K}\,\aK\,\lVert r_h\rVert_K$
-  & \lbl{eq:winv-gradp} \\
+  & $\alpha\nabla r_h$ & $r_h$
+  & $\Cinv$ & $\aK$ & \lbl{eq:winv-gradp} \\
 \coq{Hw_divu}
-  & $\lVert\nabla\!\cdot(\alpha\mathbf w_h)\rVert_K
-     \le \dfrac{\Cbar}{h_K}\,\aK\,\lVert\mathbf w_h\rVert_K$
-  & \lbl{eq:winv-divu} \\
+  & $\nabla\!\cdot(\alpha\mathbf w_h)$ & $\mathbf w_h$
+  & $\Cbar$ & $\aK$ & \lbl{eq:winv-divu} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\noindent
+Each row reads back to its full displayed norm by unfolding \coq{winv_est}: the
+\coq{Hw_du} row is $\lVert 2\nu\nabla\!\cdot(\alpha\mathcal P\nabla\mathbf
+w_h)\rVert_K\le(2\nu\Cbar/h_K)\,\aK^{1/2}\lVert\alpha^{1/2}\mathcal P\nabla\mathbf
+w_h\rVert_K$, i.e.\ \lbl{eq:winv-divvisc}, which is \emph{definitionally} the
+stability lemma's \coq{S3} \eqref{eq:S3-here} --- the same proposition, so
+\file{AbstractConvergence.v} discharges \coq{S3} from the $V$-side \coq{Hw_dv} by
+the kernel with no new assumption.
+
+\emph{Composition, once and for all.} Where the proof needs the \emph{double}
+inverse estimate --- $\mathtt{du}$ bounded directly by $\mathtt{uu}$ by chaining
+\coq{Hw_du} through \coq{Hw_gu}, so that $\aK^{1/2}\!\cdot\!\aK^{1/2}=\aK$ and
+$h_K^{-1}\!\cdot\!h_K^{-1}=h_K^{-2}$ --- the generic lemma \coq{winv_compose} of
+\file{InverseEstimates.v} derives it from \emph{any} two \coq{winv_est} instances
+sharing a middle atom:
+\[
+  \coq{winv_est}\ C_1\,W_1\,A\,M \ \text{ and } \
+  \coq{winv_est}\ C_2\,W_2\,M\,B
+  \ \Longrightarrow\
+  \lVert A_K\rVert_K \;\le\; \frac{C_1C_2\,(W_1W_2)_K}{h_K^{2}}\,\lVert B_K\rVert_K,
+\]
+giving $\lVert\mathtt{du}\rVert_K\le 2\nu\Cbar\Cinv\,\aK\,h_K^{-2}
+\lVert\mathtt{uu}\rVert_K$ at $C_1=2\nu\Cbar$, $C_2=\Cinv$ --- coefficient
+$2\nu\Cbar\Cinv\,\aK/h_K^2$, exactly the appendix's ``double'' estimate. This is
+the estimate the continuity and interpolation files formerly re-derived by hand
+in a $\approx20$-line block present \emph{byte-for-byte three times}
+(\coq{double_inv_u}, \coq{double_inv_v}, and its \file{AbstractInterpolation.v}
+twin); \coq{winv_compose} retires that triplication without changing a single
+conclusion. It is a \emph{proved lemma}, not a hypothesis --- it adds nothing to
+the trusted base, and \coq{Print Assumptions} on it returns only the three
+stdlib axioms.
 
 \noindent
 The minimality is itself a form of honesty: the trusted base contains the
@@ -2343,6 +2407,12 @@ class, its mathematical content, and the proof steps that consume it. It is the
 audit checklist: a reader who satisfies themselves that each of these $50$ lines
 is a true statement about the finite element objects has, by
 \S\ref{sec:complete}, satisfied themselves of the entire a priori theory.
+The nine weighted inverse estimates (items 33--41) are each listed in full but
+are all instances of the one \coq{winv_est} schema (\S\ref{sec:stratumI}, I1),
+and the ``double'' composites the proof needs are now derived generically by the
+\emph{proved} lemma \coq{winv_compose}, retiring three byte-identical hand
+derivations; the schema is notational, so those nine remain nine independent
+trusted items and the count stays $50$.
 
 \medskip
 \noindent\emph{How to read the table.}
@@ -2470,10 +2540,19 @@ and only those.
 \emph{The base is far narrower than the count suggests.} Of the $26$ analytic
 items, \emph{sixteen} (items 33--48) are instances of just two textbook facts ---
 the inverse estimate and the Bramble--Hilbert interpolation estimate --- applied
-to the particular fields the proof touches. Discharging those two primitives in
-Lean would remove sixteen rows at a stroke. A further \emph{seven} (items
-25--31) are the divergence theorem, its two diagonal instances, and finite face
-bookkeeping. What is left is genuinely two things: \coq{Horth}, and the face
+to the particular fields the proof touches. The inverse-estimate half of these,
+the nine rows 33--41, are now written through the \emph{single} \coq{winv_est}
+schema of \file{InverseEstimates.v} (\S\ref{sec:stratumI}, I1), with the
+``double'' composites derived generically by \coq{winv_compose}. That
+consolidation is \emph{notational}, not a reduction of trust: each row still
+instantiates \coq{winv_est} at its own atoms and unfolds to the same proposition,
+so the nine remain nine independent hypotheses --- they cannot be fused into one
+\coq{forall}-$x$ estimate precisely because of the polynomial/interpolation-error
+firewall (an inverse estimate is true for finite-element functions and false for
+the interpolation error, which shares the carrier). Discharging the two
+primitives in Lean would remove sixteen rows at a stroke. A further \emph{seven}
+(items 25--31) are the divergence theorem, its two diagonal instances, and finite
+face bookkeeping. What is left is genuinely two things: \coq{Horth}, and the face
 bundle \coq{H_face_p}/\coq{H_face_c}.
 
 \emph{One item is strict where the manuscript is not, and it buys two rows.}
@@ -3046,7 +3125,7 @@ and cannot be hurried, fatigued, or won over by plausibility. Here that check
 is then \emph{repeated by a second, independent program} (\coq{coqchk}) which
 re-derives everything from the compiled proof terms without trusting the first.
 
-The practical consequence: for every theorem in these seventeen files, the claim
+The practical consequence: for every theorem in these eighteen files, the claim
 \emph{``the stated conclusion follows from the stated hypotheses''} is no longer
 a matter of belief or of referee diligence. The only way such a statement could
 still be false is if the two independent kernels shared a soundness bug that
@@ -3212,10 +3291,10 @@ coqc: The Coq Proof Assistant, version 8.18.0
   [PASS] ContinuityAlgebra.v [PASS] TauDesign.v
   [PASS] AbstractSums.v      [PASS] Asymptotics.v
   [PASS] InnerSpace.v        [PASS] ManufacturedSolution.v
-  [PASS] AbstractStability.v [PASS] PlateauBump.v
-  [PASS] NonVacuity.v        [PASS] NonVacuityInterp.v
-                             [PASS] NonVacuityConv.v
-RESULT: all 17 files compiled; every theorem is proved.
+  [PASS] InverseEstimates.v  [PASS] PlateauBump.v
+  [PASS] AbstractStability.v [PASS] NonVacuityInterp.v
+  [PASS] NonVacuity.v        [PASS] NonVacuityConv.v
+RESULT: all 18 files compiled; every theorem is proved.
 Running coqchk (independent kernel re-verification) ...
   [PASS] coqchk: modules successfully checked by the trusted kernel.
 \end{lstlisting}

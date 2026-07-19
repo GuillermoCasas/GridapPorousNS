@@ -43,7 +43,7 @@ From Coq Require Import Reals Lra Lia Psatz List.
 Import ListNotations.
 From PNSFormal Require Import StabilityAlgebra ContinuityAlgebra InnerSpace
                               AbstractSums AbstractStability
-                              AbstractInterpolation.
+                              AbstractInterpolation InverseEstimates.
 Local Open Scope R_scope.
 
 (* ========================================================================= *)
@@ -253,13 +253,20 @@ Hypothesis H_mult2 :
   forall g : K -> R, (forall k, 0 <= g k) ->
     Rsum Fl (fun f => g (e2 f)) <= Nf * Rsum Th g.
 
-(*  V-side: the weighted inverse estimates of lem:winv (discrete argument).  *)
-Hypothesis Hw_gv :
-  forall k, nrm (gv k) <= Cinv / hK k * sqrt (aK k) * nrm (vv k).
-Hypothesis Hw_dv :
-  forall k, nrm (dv k) <= 2 * nu * Cb / hK k * sqrt (aK k) * nrm (gv k).
-Hypothesis Hw_cxv :
-  forall k, nrm (cxv k) <= Cinv / hK k * aK k * am k * nrm (vv k).
+(*  V-side: the weighted inverse estimates of lem:winv (discrete argument),  *)
+(*  through the NOTATIONAL schema winv_est (InverseEstimates.v):             *)
+(*  `winv_est Hs K hK C W A B' unfolds DEFINITIONALLY to                     *)
+(*  `forall k, nrm (A k) <= C / hK k * W k * nrm (B k)'.  Three independent  *)
+(*  named hypotheses -- winv_est is notation over them, not a hypothesis     *)
+(*  replacing them (a forall-x version would be unsound; see the             *)
+(*  InverseEstimates.v header).  These are exactly the estimates fed to      *)
+(*  abstract_continterp (Hw_gv/Hw_dv/Hw_cxv) and, via Hw_dv, to              *)
+(*  abstract_stability's S3 slot below.  Hw_cxv's (aK am) weight matches     *)
+(*  only propositionally, but callee (AbstractInterpolation.Hw_cxv) and      *)
+(*  caller now carry the SAME winv_est shape, so they meet definitionally.   *)
+Hypothesis Hw_gv  : winv_est Hs K hK Cinv          (fun k => sqrt (aK k)) gv  vv.
+Hypothesis Hw_dv  : winv_est Hs K hK (2 * nu * Cb) (fun k => sqrt (aK k)) dv  gv.
+Hypothesis Hw_cxv : winv_est Hs K hK Cinv          (fun k => aK k * am k) cxv vv.
 
 (*  E-side: the interpolation estimates of the appendix's replacement table  *)
 (*  (eq:interpdivvisc--eq:interpzero), one constant CI for all of them.      *)

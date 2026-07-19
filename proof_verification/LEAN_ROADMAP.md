@@ -78,6 +78,17 @@ chain (the alpha_infty / alpha_0 comparabilities under H:porosity) is
 *already machine-checked* in `ContinuityAlgebra.v`
 (`delta_alpha_bound`, `winv_ratio`) — only the norm-level gluing remains.
 
+The nine winv estimates now share a single Coq schema
+`winv_est C W A B := forall k, ‖A k‖ <= C/h_K · W k · ‖B k‖`
+(`InverseEstimates.v`), with the "double" composites derived generically by the
+proved lemma `winv_compose`. This is notational and does **not** change the
+target count: the nine stay nine independent hypotheses (the discrete and
+interpolation-error atoms share the carrier, so a single `forall x` inverse
+estimate would be unsound). But it sharpens the Lean plan — once T1/T2/T3 below
+land, each of the nine is discharged by instantiating the same `winv_est`-shaped
+Lean lemma at its atom/weight, and `winv_compose` ports as a one-line corollary,
+so the family closes together rather than one row at a time.
+
 ## State of the ecosystem (re-verified 16 July 2026 against cloned repositories)
 
 **The hard negative.** No proof assistant has the Bramble–Hilbert lemma or FE

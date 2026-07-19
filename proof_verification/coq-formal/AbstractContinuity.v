@@ -51,7 +51,8 @@
 
 From Coq Require Import Reals Lra Lia Psatz List.
 Import ListNotations.
-From PNSFormal Require Import ContinuityAlgebra InnerSpace AbstractSums.
+From PNSFormal Require Import ContinuityAlgebra InnerSpace AbstractSums
+                              InverseEstimates.
 Local Open Scope R_scope.
 
 Section AbstractContinuity.
@@ -202,23 +203,26 @@ Hypothesis H_mult2 :
   forall g : K -> R, (forall k, 0 <= g k) ->
     Rsum Fl (fun f => g (e2 f)) <= Nf * Rsum Th g.
 
-(*  The weighted inverse estimates of lem:winv, on the arguments used.       *)
-Hypothesis Hw_gu :
-  forall k, nrm (gu k) <= Cinv / hK k * sqrt (aK k) * nrm (uu k).
-Hypothesis Hw_gv :
-  forall k, nrm (gv k) <= Cinv / hK k * sqrt (aK k) * nrm (vv k).
-Hypothesis Hw_du :
-  forall k, nrm (du k) <= 2 * nu * Cb / hK k * sqrt (aK k) * nrm (gu k).
-Hypothesis Hw_dv :
-  forall k, nrm (dv k) <= 2 * nu * Cb / hK k * sqrt (aK k) * nrm (gv k).
-Hypothesis Hw_cxu :
-  forall k, nrm (cxu k) <= Cinv / hK k * aK k * am k * nrm (uu k).
-Hypothesis Hw_cxv :
-  forall k, nrm (cxv k) <= Cinv / hK k * aK k * am k * nrm (vv k).
-Hypothesis Hw_gpu :
-  forall k, nrm (gpu k) <= Cinv / hK k * aK k * nrm (pp k).
-Hypothesis Hw_divu :
-  forall k, nrm (divu k) <= Cb * aK k / hK k * nrm (uu k).
+(*  The weighted inverse estimates of lem:winv, on the arguments used --      *)
+(*  stated through the NOTATIONAL schema winv_est (InverseEstimates.v):       *)
+(*  `winv_est Hs K hK C W A B' unfolds DEFINITIONALLY to                       *)
+(*  `forall k, nrm (A k) <= C / hK k * W k * nrm (B k)'.  These stay EIGHT     *)
+(*  independent named hypotheses; winv_est is notation over them, NOT a       *)
+(*  hypothesis that replaces them, so the trusted base is unchanged.  A       *)
+(*  single estimate quantified over an ARBITRARY vector would be UNSOUND      *)
+(*  (the discrete atoms and the interpolation-error atoms share one carrier;  *)
+(*  see the InverseEstimates.v header).  The gu/gv/du/dv weights match up to  *)
+(*  beta; the cxu/cxv (aK am) and divu ((Cb aK)/h) weights re-associate and   *)
+(*  so match only propositionally -- absorbed by every consumer, each a       *)
+(*  `pose proof (Hw_x k); ... nra'.                                           *)
+Hypothesis Hw_gu   : winv_est Hs K hK Cinv        (fun k => sqrt (aK k)) gu   uu.
+Hypothesis Hw_gv   : winv_est Hs K hK Cinv        (fun k => sqrt (aK k)) gv   vv.
+Hypothesis Hw_du   : winv_est Hs K hK (2 * nu * Cb) (fun k => sqrt (aK k)) du gu.
+Hypothesis Hw_dv   : winv_est Hs K hK (2 * nu * Cb) (fun k => sqrt (aK k)) dv gv.
+Hypothesis Hw_cxu  : winv_est Hs K hK Cinv        (fun k => aK k * am k) cxu  uu.
+Hypothesis Hw_cxv  : winv_est Hs K hK Cinv        (fun k => aK k * am k) cxv  vv.
+Hypothesis Hw_gpu  : winv_est Hs K hK Cinv        aK                     gpu  pp.
+Hypothesis Hw_divu : winv_est Hs K hK Cb          aK                     divu uu.
 
 (*  eq:epscond, elementwise.  *)
 Hypothesis H_eps :
@@ -1413,49 +1417,34 @@ Qed.
 Lemma double_inv_u : forall k,
   nrm (du k) <= 2 * nu * Cb * Cinv * aK k / (hK k)^2 * nrm (uu k).
 Proof.
+  (*  eq:doubleinv via the generic winv_compose (InverseEstimates.v):
+      Hw_du o Hw_gu, then fold sqrt(aK)*sqrt(aK) = aK.  This retires the
+      ~20-line hand-written chain that used to be spelled out here (and,
+      byte-for-byte, in double_inv_v and its AbstractInterpolation.v twin). *)
   intro k.
-  pose proof (Hw_du k) as H1. pose proof (Hw_gu k) as H2.
-  pose proof (hK_pos k) as Hh. pose proof (aK_pos k) as Ha.
-  pose proof (nrm_nonneg Hs (gu k)) as Hg.
-  pose proof (nrm_nonneg Hs (uu k)) as Hu.
-  assert (Hsa : 0 <= sqrt (aK k)) by apply sqrt_pos.
-  assert (Hcoef : 0 <= 2 * nu * Cb / hK k * sqrt (aK k)).
-  { assert (H3 : 0 < 2 * nu * Cb) by nra.
-    assert (H4 : 0 < 2 * nu * Cb / hK k) by (apply Rdiv_lt_0_compat; lra).
-    nra. }
-  assert (S1 : nrm (du k)
-               <= (2 * nu * Cb / hK k * sqrt (aK k))
-                  * (Cinv / hK k * sqrt (aK k) * nrm (uu k))) by nra.
-  assert (E : (2 * nu * Cb / hK k * sqrt (aK k))
-              * (Cinv / hK k * sqrt (aK k) * nrm (uu k))
-              = 2 * nu * Cb * Cinv * (sqrt (aK k) * sqrt (aK k)) / (hK k)^2
-                * nrm (uu k)) by (field; lra).
-  rewrite E in S1. rewrite sqrt_sqrt in S1 by lra.
-  exact S1.
+  assert (HC1 : 0 <= 2 * nu * Cb) by nra.
+  assert (HW1 : forall j, 0 <= sqrt (aK j)) by (intro; apply sqrt_pos).
+  pose proof (winv_compose Hs K hK hK_pos (2 * nu * Cb) Cinv
+                (fun k => sqrt (aK k)) (fun k => sqrt (aK k)) du gu uu
+                HC1 HW1 Hw_du Hw_gu k) as H.
+  cbv beta in H.
+  rewrite sqrt_sqrt in H by (apply Rlt_le, aK_pos).
+  exact H.
 Qed.
 
 Lemma double_inv_v : forall k,
   nrm (dv k) <= 2 * nu * Cb * Cinv * aK k / (hK k)^2 * nrm (vv k).
 Proof.
+  (*  eq:doubleinv, V-side: the same winv_compose composition, Hw_dv o Hw_gv. *)
   intro k.
-  pose proof (Hw_dv k) as H1. pose proof (Hw_gv k) as H2.
-  pose proof (hK_pos k) as Hh. pose proof (aK_pos k) as Ha.
-  pose proof (nrm_nonneg Hs (gv k)) as Hg.
-  pose proof (nrm_nonneg Hs (vv k)) as Hu.
-  assert (Hsa : 0 <= sqrt (aK k)) by apply sqrt_pos.
-  assert (Hcoef : 0 <= 2 * nu * Cb / hK k * sqrt (aK k)).
-  { assert (H3 : 0 < 2 * nu * Cb) by nra.
-    assert (H4 : 0 < 2 * nu * Cb / hK k) by (apply Rdiv_lt_0_compat; lra).
-    nra. }
-  assert (S1 : nrm (dv k)
-               <= (2 * nu * Cb / hK k * sqrt (aK k))
-                  * (Cinv / hK k * sqrt (aK k) * nrm (vv k))) by nra.
-  assert (E : (2 * nu * Cb / hK k * sqrt (aK k))
-              * (Cinv / hK k * sqrt (aK k) * nrm (vv k))
-              = 2 * nu * Cb * Cinv * (sqrt (aK k) * sqrt (aK k)) / (hK k)^2
-                * nrm (vv k)) by (field; lra).
-  rewrite E in S1. rewrite sqrt_sqrt in S1 by lra.
-  exact S1.
+  assert (HC1 : 0 <= 2 * nu * Cb) by nra.
+  assert (HW1 : forall j, 0 <= sqrt (aK j)) by (intro; apply sqrt_pos).
+  pose proof (winv_compose Hs K hK hK_pos (2 * nu * Cb) Cinv
+                (fun k => sqrt (aK k)) (fun k => sqrt (aK k)) dv gv vv
+                HC1 HW1 Hw_dv Hw_gv k) as H.
+  cbv beta in H.
+  rewrite sqrt_sqrt in H by (apply Rlt_le, aK_pos).
+  exact H.
 Qed.
 
 Lemma bound_T8 : Rabs T8 <= 2 * Cb * Cinv / c1 * (NU * NV).

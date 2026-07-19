@@ -131,7 +131,7 @@
 From Coq Require Import Reals Lra Lia Psatz List.
 Import ListNotations.
 From PNSFormal Require Import ContinuityAlgebra InnerSpace AbstractSums
-                              AbstractInterpolation.
+                              AbstractInterpolation InverseEstimates.
 Local Open Scope R_scope.
 
 (* ------------------------------------------------------------------------- *)
@@ -454,9 +454,16 @@ Proof.
   rewrite sqrt_1, Rabs_R1, (Rabs_right 2) by lra. lra.
 Qed.
 
-Lemma w_cxv : forall k, nrm (wcxv k) <= wCinv / whK k * waK k * wam k * nrm (wvv k).
+(*  Restated through the winv_est schema so it discharges abstract_continterp's
+    (now winv_est) Hw_cxv slot.  The (aK am) weight matches only
+    propositionally, so -- unlike the Shape-A w_gv/w_dv, which pass by
+    conversion untouched -- this one must wear winv_est explicitly; `unfold
+    winv_est; intro k; cbv beta' recovers the raw goal (up to the harmless
+    (waK*wam) grouping, which the closing lra absorbs).  *)
+Lemma w_cxv : winv_est RPH bool whK wCinv (fun k => waK k * wam k) wcxv wvv.
 Proof.
-  intro k. rewrite !nrm_val. unfold wcxv, wvv. destruct k; unf; simpl.
+  unfold winv_est. intro k. cbv beta.
+  rewrite !nrm_val. unfold wcxv, wvv. destruct k; unf; simpl.
   - rewrite Rabs_R1. lra.
   - rewrite Rabs_R1, (Rabs_left (-1)) by lra. lra.
 Qed.
