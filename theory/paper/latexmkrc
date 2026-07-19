@@ -1,16 +1,48 @@
-# latexmk configuration file for porous_NS_with_Gridap theory folder
+# latexmk configuration file for porous_NS_with_Gridap — theory/paper
+#
+# Keep the build clean: route ALL auxiliary/intermediate files into a per-target
+# 'latex compilation/<basename>/' subfolder and leave ONLY the PDF beside the
+# source. See .agents/rules/clean-latex-compilation.md.
 
-# Route auxiliary files to a target-specific subdirectory
-$aux_dir = 'latex compilation/%B';
+# --- Per-target aux directory -------------------------------------------------
+# Some latexmk versions interpolate %B inside $aux_dir and some do NOT (TeX Live
+# 2023's v4.79 leaves it literal, scattering aux files) -- that version skew is
+# exactly what makes a shared checkout misbehave when you switch machines and
+# pull. Compute the target basename explicitly from @ARGV instead, so routing is
+# identical on every platform/latexmk version (same approach as
+# proof_verification/latexmkrc). e.g.  latexmk article.tex  ->  target "article".
+my $target = "";
+foreach my $arg (@ARGV) {
+    next if $arg =~ /^-/;
+    if ($arg =~ /^(.*)\.tex$/) { $target = $1; last; }
+    if (-e "$arg.tex")         { $target = $arg; last; }
+}
+$target =~ s/.*\///;
+$target = "default" if $target eq "";
 
-# Keep the output PDF in the source directory
-$out_dir = '.';
+$aux_dir = "latex compilation/$target";   # all intermediates go here
+$out_dir = '.';                            # the PDF stays next to the source
 
-# Set paths for the SIAM template (only applies to paper directory but safe to keep)
-$ENV{'TEXINPUTS'} = './siam//:' . ($ENV{'TEXINPUTS'} // '');
+# Emit .synctex.gz beside the PDF for editor forward/inverse (SyncTeX) search
+# (VS Code / LaTeX Workshop needs it). latexmk moves it next to the PDF (out_dir),
+# it is gitignored, and `latexmk -c` removes it. Enabled via the engine because this
+# latexmk does not honour the $synctex variable; %O still carries latexmk's own
+# -recorder / -output-directory. Drop -synctex=1 for a PDF-only source tree.
+$pdflatex = 'pdflatex -synctex=1 %O %S';
+
+# --- Search paths -------------------------------------------------------------
+#  ./siam//            : the SIAM class/bst (siamart190516.cls, siamplain.bst)
+#  latex compilation// : sibling per-target aux dirs, so article.tex's
+#                        \externaldocument{supplement} (xr-hyperref) resolves
+#                        supplement.aux across the split subfolders (and vice versa).
+$ENV{'TEXINPUTS'} = './siam//:latex compilation//:' . ($ENV{'TEXINPUTS'} // '');
 $ENV{'BSTINPUTS'} = './siam//:' . ($ENV{'BSTINPUTS'} // '');
 
-# Clean up intermediate files that latexmk knows about
+# Extra extensions for `latexmk -c/-C` to remove.
 $clean_ext = 'synctex.gz synctex\(busy\) thm bbl blg';
 
-print "latexmk: Routing auxiliary files to 'latex compilation/%B/' and PDF to './'\n";
+# When invoked with no file argument, build the two real documents only
+# (the *_appendix.tex files are \input fragments, not standalone documents).
+@default_files = ('article.tex', 'supplement.tex');
+
+print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to './'\n";

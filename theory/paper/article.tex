@@ -52,7 +52,17 @@
 % is what disfigured the elemental-matrices appendix). Blocks that must be kept
 % together override this locally with \allowdisplaybreaks[0] inside a \begingroup
 % (see eq:OSGSProblem and eq:LinearizedOSGSProblem).
-\allowdisplaybreaks
+%
+% CAVEAT: \allowdisplaybreaks is incompatible with the lineno package that the
+% SIAM [review] option loads. Together they collapse most display math (blank
+% equations, lost \label targets, ~22 pp instead of ~65) on some TeX builds
+% (reproduced with TeX Live 2023 on macOS; the gaps it fixes were only seen on
+% Linux). So enable it only when lineno is NOT active, i.e. in non-review/final
+% builds -- exactly the builds where the vertical voids matter and where it is
+% safe. Review-mode drafts compile correctly without it.
+\makeatletter
+\@ifpackageloaded{lineno}{}{\allowdisplaybreaks}
+\makeatother
 
 \newlength\mytemplena
 \newlength\mytemplenb
