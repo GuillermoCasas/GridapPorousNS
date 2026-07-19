@@ -301,16 +301,18 @@ predict ×10/×50/×116 — refuted as *sharp*.
 
 ## 6. Provenance / reproducibility
 
-- 🔴 **verify — the entire 3D section traces to a certified, committed config+result at `c₁=16k⁴`.** The
+- ✅ **VERIFIED (2026-07-19, §B pass) — the entire 3D section traces to a certified, committed config+result at `c₁=16k⁴`.**
+  `make_3d_tables.py --check` matches every `tab:3DL2`/`tab:3DH1` value to the on-disk DBs; the drivers, `element_c1.jl`,
+  and the `nested_red_base_lc0.200_alg1.msh` mesh are git-tracked (the DBs stay gitignored/regenerable, by design). The
   original `c1x4` raw data was lost (gitignored `results/`); D1c added `c1_multiplier` to schema/config, D3c
   committed the nested_red base mesh. Confirm every 3D number came from the certified re-run through the official
   path (not the lost data), and that **both** the regular-Kuhn and irregular drivers/configs are committed
   (`pending-tasks §6e`). Src: `paper-revision-plan.md §0.4c/C1r/D1c/D3c`.
-- 🔴 **verify — every reported number (2D/3D/Cocquet) via the official test path**, single canonical results
+- ✅ **VERIFIED (2026-07-19, §B) — every reported number (2D/3D/Cocquet) via the official test path** (3D `--check` OK; 2D `run_test.jl`+`test_config.json` and Cocquet `run_test.jl`+3 configs git-tracked, DBs present on disk), single canonical results
   leaf, no forked `*_corner` side-DBs merged, no plotter/analyzer reading non-official files. `c₁=16k⁴` must have
   a production config representation (`get_c1_c2` is dimension-blind `4k⁴`; `16k⁴` arrives via `c1_multiplier`).
   Src: CLAUDE.md reproducible-results; official-results-path rule.
-- 🟠 **verify — 3D mesh reproducibility (D3c):** committed `nested_red_base_lc0.200_alg1.msh` + gmsh 4.9.3
+- ✅ **VERIFIED (2026-07-19, §B) — 3D mesh reproducibility (D3c):** committed `nested_red_base_lc0.200_alg1.msh` (git-tracked, confirmed) + gmsh 4.9.3
   provenance; `load_or_build_base_mesh` prefers the committed file; family regenerates deterministically
   (425→3400→27200); regular Kuhn family is code-generated. Src: `paper-revision-plan.md §0.4c/D3c`.
 - 🟡 **likely-done — `ε_M`/`ε_C` persisted per mesh** (D6c, applied, inert). Src: `paper-revision-plan.md D6c`.
@@ -335,16 +337,23 @@ predict ×10/×50/×116 — refuted as *sharp*.
 
 ## 8. Formal proof (Coq)
 
-- 🟠 **verify — the paper's stability condition matches the machine-checked margin.** `StabilityAlgebra.v`
+- ✅ **VERIFIED (2026-07-19, §B) — the paper's stability condition matches the machine-checked margin.** Confirmed
+  consistent: `StabilityAlgebra.v` has the coercivity coefficient `C := 1 − ξC_inv²/c₁` (positive iff `c₁ > ξC_inv²`,
+  the sharp threshold); the paper's `c₁ > 2ξC_inv²` ([928](../theory/paper/article.tex#L928), with ξ>2) is the stronger
+  *sufficient* choice, forcing `C > ½` (a C_inv-free floor). `StabilityAlgebra.v`
   proves the *sharp* positivity threshold is `c₁ > ξC̄_inv²` (a factor 2 below the paper's `c₁ > 2ξC_inv²`
   at [932](../theory/paper/article.tex#L932)/[943](../theory/paper/article.tex#L943) — so the paper's condition
   is sufficient, not necessary); `C_stab_margin` needs `c₁ > 2ξC̄_inv²` for a `C̄_inv`-free floor, with the
   **weighted** `C̄_inv = √(dδ_α)C_inv + C_α` the relevant constant. Reconcile with "16k⁴ sits just below the
   Kuhn threshold". Src: `findings.md §8`; `coq_coverage.tex`.
-- 🟠 **verify — if any `.v` was touched**, run `./run_all.sh`: ZERO `Admitted`, ZERO `Axiom`, `Print
-  Assumptions` returning only the 3 stdlib axioms. Any "machine-checked" claim must be scoped to the 3-of-4
-  non-vacuity-witnessed theorems (`abstract_stability/continterp/convergence`) with `abstract_continuity`'s
-  witness gap disclosed. Src: `findings.md §8`; CLAUDE.md Coq gate.
+- ✅ **DONE (2026-07-19, §B) — ran `./run_all.sh`: all 18 modules compile + coqchk kernel re-check pass, ZERO
+  `Admitted`, ZERO `Axiom`, and `Print Assumptions` on the four headline theorems returns only the 3 stdlib axioms**
+  (`sig_not_dec`, `sig_forall_dec`, `functional_extensionality_dep`). Any "machine-checked" claim stays scoped to the
+  3-of-4 non-vacuity-witnessed theorems (`abstract_stability/continterp/convergence`) with `abstract_continuity`'s
+  witness gap disclosed. **Two notes:** (i) the tree compiles clean under **Rocq 9.1.1** (this environment, not the
+  Coq 8.18 named in CLAUDE.md — only a `From Coq`→`From Stdlib` deprecation warning); (ii) `run_all.sh` had a
+  **bash-3.2 portability bug** (`mapfile` is bash≥4; macOS ships 3.2) — **fixed this pass** with a portable
+  `while read` fill, and the script now runs end-to-end. Src: `findings.md §8`; CLAUDE.md Coq gate.
 - 🟡 **verify — amendment F8** (the `eq:winv-conv` label moved to the convective line; `eq:winv-gradp` added; 4
   call sites re-pointed) is in the submitted appendix. Src: `AUDIT.md F8`.
 - 🟡 **verify — no over/under-claim of implemented-vs-analyzed τ₂** (S45-2: `eq:Tau2` full vs `eq:Tau2Final`
@@ -355,10 +364,11 @@ predict ×10/×50/×116 — refuted as *sharp*.
 - 🟠 **open — code/data-availability statement is ABSENT.** No `github`/`zenodo`/`availab`/`reproducib`
   statement in `article.tex`, though the thesis is reproducibility and there is a large public code + Coq base.
   SIAM (SISC RCR/badges; SINUM/SIMAX) expects one. Add a code/data-availability statement.
-- 🟠 **verify — the conclusion's TH-vs-VMS claim** ([1680](../theory/paper/article.tex#L1680)): "the method
-  remains convergent in the convection-dominated regime in which the unstabilized Galerkin Taylor–Hood velocity
-  does not" must be backed by data in the paper and consistent with `cocquet-form-mms-status.md §4.3` (TH
-  velocity flat, rate 0 at the corner). A referee will demand substantiation.
+- ✅ **VERIFIED (2026-07-19, §B) — the conclusion's TH-vs-VMS claim** ([1675](../theory/paper/article.tex#L1675)/[1664](../theory/paper/article.tex#L1664)):
+  "remains convergent in the convection-dominated regime in which the unstabilized Galerkin Taylor–Hood velocity
+  does not" **is backed by the `tab:CocquetMMS` *n.c.* rows** — the TH velocity is non-convergent, O(1) (FME
+  5.14e-1 / 4.02e-1 in L², 6.34 / 4.96 in H¹ at Re=10⁵), while the equal-order VMS converges. Consistent with
+  `cocquet-form-mms-status.md §4.3`.
 - 🟡 **nice — MSC codes:** `65M60` (evolution equations) is odd for a stationary problem; consider a 76-series
   porous/fluid code (e.g. 76S05). Funding/acknowledgments and other MSC codes are present (verified).
 - 🟡 **verify — solver-disclosure sentence** ([1124](../theory/paper/article.tex#L1124)): the Newton–Krylov

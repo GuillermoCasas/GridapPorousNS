@@ -38,7 +38,10 @@ COQPROJECT=_CoqProject
 }
 
 #  The .v entries of _CoqProject, in order, with the .v suffix stripped.
-mapfile -t FILES < <(grep -oE '^[A-Za-z0-9_]+\.v[[:space:]]*$' "$COQPROJECT" | sed 's/\.v[[:space:]]*$//')
+#  (Portable fill instead of `mapfile`, which is bash>=4 only; macOS ships 3.2.)
+FILES=()
+while IFS= read -r _line; do FILES+=("$_line"); done \
+  < <(grep -oE '^[A-Za-z0-9_]+\.v[[:space:]]*$' "$COQPROJECT" | sed 's/\.v[[:space:]]*$//')
 [ "${#FILES[@]}" -gt 0 ] || {
   echo "ERROR: no .v files listed in $COQPROJECT." >&2
   exit 1
