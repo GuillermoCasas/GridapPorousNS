@@ -63,9 +63,8 @@ curved-interface-on-structured-mesh difficulty, not a regression.)
 - **k2 P2 memory guardrails on 32 GB.** P2 N=320 LU is multi-GB — use **≤2 concurrent shards** (4+ → OOM); kill
   orphaned processes before launch; **suspect an execution/OOM failure before a numerical one** (a killed shard
   masquerades as a numerical defect).
-- **Gridap-vs-Kratos magnitude offset (OPEN).** Gridap FME is 3–12× larger (norm-dependent) but *rates agree*, so
-  the discretization is valid; the absolute calibration is an open code-vs-code question — canonical in
-  [open-questions.md](../open-questions.md) §2.
+- **Gridap-vs-Kratos magnitude offset — REMOVED 2026-07-19.** No longer tracked: Kratos is not part of the paper
+  (all experiments are Gridap), so a Gridap-vs-Kratos magnitude comparison is moot. (`open-questions.md §2`.)
 - **Diagnostic recipe — is it the gate, the solver, or the inner tolerance?** (reusable, incl. for 3D): (1)
   per-segment rate old-vs-new; (2) re-run the degraded cell with the *old* solver on new code; (3) tighten the
   inner tol → no change ⇒ not the inner solve; (4) tighten the *outer gate* → recovery ⇒ the gate is the cause;

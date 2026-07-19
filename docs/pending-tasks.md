@@ -47,8 +47,8 @@ low α; (b) for ASGS, a code change to strip σu from the stabilization residual
 Mechanical-but-author-gated: merge `centered_encoding.tex` into `article.tex` (self-describes "not yet
 merged"; strip standalone preamble + `\end{document}`, drop `\Reyn`/`\Damk`/`\code` `\newcommand`s); decide
 `supplement.tex` (SIAM boilerplate — replace or drop the `\externaldocument{supplement}` line); add the
-results-section figures (`article.tex` line 1436, currently tables only); confirm the "Kratos Multiphysics"
-implementation claim (line 1015) — this is a Gridap.jl solver (do not silently flip — author call). Full
+results-section figures (`article.tex` line 1436, currently tables only). (The "Kratos Multiphysics"
+implementation claim is **✅ resolved 2026-07-19** — the paper now reads Gridap, 0 Kratos mentions.) Full
 list: [`open-questions.md`](open-questions.md) §4.
 
 ---
@@ -257,12 +257,7 @@ C.1 (`GMRESNotConvergedError`, landed 2026-06-26) changes only the 3D fine-mesh 
 `LUSolver`, inert). It is **expected to flip which fine-mesh OSGS solves report success** — that is the point.
 Re-run the 3D structured-Kuhn control before/after to record the flip.
 
-### 7e. Gridap-vs-Kratos magnitude offset — A/B sweeping the `element_size` knob
-Open *question* ([`open-questions.md`](open-questions.md) §2): normalized FME come out ~3–12× larger than the
-paper's Kratos values (norm-dependent), rates agreeing. The task: an A/B sweeping the candidate knobs —
-especially the new `stabilization.element_size` (`src/geometry.jl`) — against the paper's Kratos calibration.
-
-### 7f. CocquetTubeTest — run the remaining unified variants end-to-end (relocated 2026-07-11)
+### 7e. CocquetTubeTest — run the remaining unified variants end-to-end (relocated 2026-07-11)
 The 2026-07-08 refactor unified the nine sibling Cocquet tube tests into one config-driven harness, but only
 the `structured` variant has been run end-to-end (it reproduces the baseline: L²u 3.01e-4 / L²p 2.31e-5). The
 other variants — `alpha_one`, `deviatoric`, `linear_reaction`, `all_dirichlet`, `modified_corner`,

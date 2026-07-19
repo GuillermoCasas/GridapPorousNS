@@ -1,5 +1,11 @@
 # Theory–numerics consistency review of `article.tex` — v2, after full theory audit
 
+> **ARCHIVED INPUT (do not treat items below as open).** This is the external review that `paper-revision-plan.md`
+> responds to point-by-point; current resolution status lives in `paper-revision-plan.md` and
+> `pre-submission-checklist.md`. Notably now settled: **C7** (the 1.29 triple — genuine mesh-independent
+> saturation, verified 2026-07-19), and the v2 claim that the data *"empirically discriminate in favour of the
+> weighted form"* — **refuted** as logically unsound (one-sided upper bounds; see `pre-submission-checklist.md §0.2a`).
+
 *A stabilized finite element method for incompressible, inertial flows in inhomogeneous porous media* (Casas, González-Usúa, Codina, de-Pouplana)
 
 **Scope of v2.** This revision supersedes the first review. In addition to the main text, I have now audited the full theory bundle: the paper's three appendices (`continuity_appendix.tex`, `fourier_appendix.tex`, `elemental_matrices_appendix.tex`), and the companion notes (`osgs_reaction_note`, `c1_dimension_note` + its verification scripts' claims, `tau_saturation_note`, `scale_free_gate_note`, `centered_encoding`, `velocity_floor_regularization`, `pressure_recentering_note`, `osgs_algorithm`, and the Cocquet notes). The bundled `paper/article.tex` is byte-identical to the reviewed one, so all table references stand. The bundle **resolves every conditional** of the first review, in most cases decisively; the changes are flagged inline as **[v2]**.

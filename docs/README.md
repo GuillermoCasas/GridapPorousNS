@@ -23,7 +23,7 @@ must we never break again?* Read these first.
 | Doc | Purpose |
 |---|---|
 | **[findings.md](findings.md)** | **Settled results + the argument that makes each true.** The non-obvious conclusions, with the decisive measurement/proof, so they help future investigations. Also holds resolved code-correctness issues (§7). |
-| **[open-questions.md](open-questions.md)** | **Open theoretical/numerical questions** — the ones that survive investigation: the α=0.1 fold mechanism (σ̃_α), the Gridap↔Kratos magnitude offset, the 3D-P2 caveats, paper editorial items. Each states the leading hypothesis, what's ruled out, and what would settle it. |
+| **[open-questions.md](open-questions.md)** | **Open theoretical/numerical questions** — the ones that survive investigation: the α=0.1 fold mechanism (σ̃_α), the 3D-P2 caveats, paper editorial items. Each states the leading hypothesis, what's ruled out, and what would settle it. |
 | **[pending-tasks.md](pending-tasks.md)** | **The backlog, grouped by block** (theory · code–theory consistency · formulation · solver/numerics · post-processing · input/output · tests · cleanups). The *only* home for open code-correctness issues. |
 | **[theory-code-map.md](theory-code-map.md)** | **Paper ↔ code reference.** The algorithm-box→file map, the divergence ledger (`[paper-faithful]`/`[code-actual]`/…), and a scale-free convergence-gate summary (full proof now in `theory/scale_free_gate_note/`). |
 | **[lessons_learned.md](lessons_learned.md)** | **Append-only regression ledger** — the authority on anything "fixed"; read before touching `src/formulations/`, `src/stabilization/`, or `src/solvers/`. |

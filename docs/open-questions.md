@@ -34,21 +34,13 @@ For the full experiment-by-experiment evidence behind any entry, follow the link
 
 ---
 
-## 2. [OPEN] Gridap-vs-Kratos MMS magnitude offset (~3–12×)
+## 2. ~~Gridap-vs-Kratos MMS magnitude offset~~ — REMOVED 2026-07-19
 
-**Phenomenon (open since 2026-06-17).** When the high-Re/low-α corner cells are reproduced in Gridap, the normalized Free-Mesh-Error (FME) come out **~3–12× larger** than the paper's Kratos values, in a **norm-dependent** way: velocity L² ~7×, pressure L² ~5×, H¹ ~2.4×.
-
-**This is a code-vs-code calibration question, NOT a convergence failure.** Convergence *rates* agree (≈2–3), and the Gridap TRI numbers match the Gridap QUAD continuation to ~2%, so the discretization is **internally consistent**. It affects how literally `results/paper_tables.tex` can be read against the paper.
-
-**Candidate causes:**
-- Characteristic-scale `U_c`/`P_c` normalization.
-- Porosity-field definition.
-- MMS amplitude.
-- **Element-size `h` convention** (min-edge vs diameter). Note the new **`stabilization.element_size` config knob** — `StabilizationConfig.element_size`, implemented in [`src/geometry.jl`](../src/geometry.jl) (`element_size_field` / `element_size_convention`, valid conventions in `ELEMENT_SIZE_CONVENTIONS`; schema at `config/porous_ns.schema.json:222`) — which makes the h-convention a controllable variable and lets an A/B quantify how much of the offset it explains. (Related: in 3D-P2 the h-convention was tested and found to be a strong lever on the *margin* but **not** the root cause of that separate defect — see §3.)
-
-**What would settle it:** an A/B sweeping the candidate knobs (especially `stabilization.element_size`) against the paper's Kratos calibration, ideally with Kratos's actual normalization constants and mesh statistics.
-
-**Evidence:** canonical detail `docs/mms/convergence-2d.md` ("Current status & remaining work"); the A/B task is [`pending-tasks.md`](pending-tasks.md) §7e.
+No longer tracked. The Kratos implementation is not part of the paper — all experiments are run in Gridap — so a
+Gridap-vs-Kratos magnitude comparison is moot; the paper makes no magnitude-reproduction claim (verified
+`pre-submission-checklist.md §2`). *(Section number retained so that cross-references to §3/§4 stay valid.)* The
+`stabilization.element_size` h-convention knob (`src/geometry.jl`) remains a legitimate implemented feature,
+independent of this removed question.
 
 ---
 
@@ -74,7 +66,7 @@ For the full experiment-by-experiment evidence behind any entry, follow the link
 
 Items from the 2026-06-04 documentation audit that need an **author decision**, not a mechanical fix. Full list: this section (§4) — the former `docs/paper/errata.md` was folded here on 2026-07-10. (The paper compiles cleanly — `latexmk` exit 0, 0 undefined refs, 43 pages; the one unambiguous typo, the duplicate Fourier label `eq:728`, is already corrected.)
 
-- **"Kratos Multiphysics" implementation claim** ([`article.tex` line 1057](../theory/paper/article.tex#L1057)). This repository is a **Gridap.jl** solver. Confirm whether the paper's numerical experiments were run in Kratos (historical) or should now read Gridap.jl. **Do not silently flip — author call.** (This is the same Kratos-vs-Gridap boundary that underlies the §2 magnitude offset and the §3 first-author reconciliation.)
+- **✅ RESOLVED (2026-07-19) — "Kratos Multiphysics" implementation claim.** The paper now states the experiments were run in Gridap ([`article.tex` line 1115](../theory/paper/article.tex#L1115)); "Kratos"/"Multiphysics" appear **0×** anywhere in `article.tex`. The flip has been made.
 - **Results-section figures** ([`article.tex` line 1478](../theory/paper/article.tex#L1478), `\Guillermo{Add figures}`). Convergence results are currently tables; figure environments not yet added. (Staged convergence-plot PDFs were removed at the author's request as unreferenced.)
 - **`supplement.tex` is SIAM template boilerplate** (`\input{ex_shared}` / `\lipsum` / `thm:bigthm`). Either replace with the real supplement or drop the `\externaldocument{supplement}` line.
 - **Merge `centered_encoding.tex` into `article.tex`** (self-describes as "not yet merged"; no label clashes; strip its standalone preamble + trailing `\end{document}`, drop its `\Reyn`/`\Damk`/`\code` `\newcommand`s). Placement is the author's choice.

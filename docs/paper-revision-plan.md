@@ -9,6 +9,16 @@ appendices, the ten companion notes, the source code, and the archived result da
 three *independent* reimplementations of the review's interpolation computation (two numpy, one Gridap
 using the harness's own `calculate_normalized_errors`).
 
+> **⚠ STATUS UPDATE 2026-07-19 (supersedes the in-progress notes in §4–§8 below).** The 3D re-run **C1r is
+> done** — the four canonical DBs (`results/k{1,2}/TET/{structured,nested_red}/`) are on disk at `c₁=16k⁴`
+> with **0 `success=false`**. Consequently **E1, C7, and the §3 3D-table cell audit are CLOSED** (verified
+> 2026-07-19: `make_3d_tables.py --check` matches every 3D `\num`; E1's two camouflage cells moved off the
+> interpolant — ratios 1.617/1.006; the 1.29 triple is genuine saturation, raw 1.29198/1.28894/1.28954). The
+> full 2D/Cocquet numerics audit is likewise cleared. Any "C1r/E1/C7 in progress / 0 `success=false` *so far*
+> / will settle / re-run may change" wording in §4–§8 below is a **historical session log** — read
+> `docs/pre-submission-checklist.md` §2/§3 for current status. **Still genuinely open:** D4c (wire tables to
+> the generator).
+
 ---
 
 ## 0. Verdict on the review
@@ -385,7 +395,8 @@ reproducible until D1c/D3c land. B1 is independent and can start immediately.
 
 ### Still open
 
-- **C1r / E1** — 3D re-run in progress at the paper's c₁ on both families. Zero `success=false` so far.
+- **C1r / E1 — ✅ DONE (2026-07-19):** 3D re-run complete on both families, **0 `success=false`** across all
+  30 levels; **E1 + C7 closed** (see the top banner and `pre-submission-checklist.md §2`). (Historical note below.)
   Any row whose finest mesh did not converge will be recomputed or withdrawn: **no slope may be computed
   partly from an interpolant** (author instruction).
 - **B1b** — interpolation reference for the Cocquet variant (α₀ ∈ {0.5, **0.1**}, ℙ₁+ℙ₂ on TRI) and for the
@@ -480,8 +491,9 @@ consistency, + adversarial refutation) was run. It found more of the SAME qualif
 
 ### Infrastructure still pending (unchanged from §4)
 
-- **C1r / E1** — 3D re-run (ℙ₂ + OSGS + nested-red still ahead; **0 success=false so far**). Settles C7's 1.29
-  and the ℙ₂-irregular convergence. **Deliberately not blocking** (author: no time now). Once done: A14/A15
+- **C1r / E1 — ✅ DONE (2026-07-19):** 3D re-run complete (ℙ₁+ℙ₂, ASGS+OSGS, structured+nested-red), **0
+  success=false**; **C7's 1.29 confirmed genuine** and the ℙ₂-irregular convergence settled. (Was: ℙ₂/OSGS/nested-red
+  still ahead, 0 success=false so far.) Still to action from this once-blocked item: A14/A15
   (C6 quality-tail redirect + the §7.2-vs-Conclusions c₁ reporting inconsistency).
 - **Cocquet reference rows** — data extracted and verified (ℙ₁/ℙ₂ TRI, α₀∈{0.5,0.1}); C9 confirmed
   (Taylor-Hood pressure at the ℙ₁ floor 9.84e-6 while its velocity is n.c.). Rows not yet inserted.

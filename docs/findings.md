@@ -108,8 +108,6 @@ Both corners fill `results/paper_tables.tex` (zero `n.c.`). k=2 needs no extrapo
 ### Caveats / open
 
 - **OSGS slope inflation caveat:** the OSGS corner coupled solve converges slowly-linearly (frozen-π) and is stopped at the production residual, not a tight true root; the FME is reliable (warm-from-ASGS, OSGS≈ASGS) but the OSGS *slope* can be mildly inflated when the coarse (N=512) point is not fully settled (e.g. Da=1e6 reads 2.63 vs ASGS 2.11).
-- **OPEN — Gridap-vs-Kratos magnitude offset:** Gridap corner FME are **~3–12× larger** than the article's (Kratos) values, norm-dependent (vel L²: Gridap 7.9e-5 @N=768 vs paper 1.1e-5 @N=640; pressure L² ~5×; H¹ ~2.4×). **The rates agree** (≈2–3) and Gridap TRI matches Gridap QUAD continuation to ~2%, so the discretization is internally consistent — the offset is a code-vs-code calibration question (candidates: `U_c`/`P_c` normalization, porosity-field definition, MMS amplitude). Worth reconciling before the table is taken as a literal paper reproduction.
-
 Source doc: `mms/convergence-2d.md`.
 
 ---
@@ -225,10 +223,10 @@ nested-red sequences, normalized identically to the solver rows (`calc_errors3d`
 B; the un-built well-shaped-tet positive test), which are a separate `c₁`-margin question. And it does
 not explain **C7**: the OSGS pressure H¹ = **1.29** printed *identically* on three different rows (regular
 ℙ₁, irregular ℙ₁, irregular ℙ₂) — different meshes, orders, slopes. The magnitude is unremarkable given
-the viscous baseline, but the exact triple is a coincidence to check against the raw data (transcription
-slip vs a genuine mesh-independent saturation); the in-progress 3D re-run (`smoke3d.jl sweep_structured`
-at `c₁=16k⁴`, 0 `success=false`, with per-mesh `success` flags now recorded) will settle it. Source doc:
-`docs/paper-revision-plan.md` §8.
+the viscous baseline, and the exact triple is now confirmed a **genuine mesh-independent saturation, not a
+transcription slip** (✅ settled 2026-07-19 against the certified DBs via `make_3d_tables.py --check`: raw OSGS
+pressure-H¹ FMEs 1.29198 / 1.28894 / 1.28954 → 1.292/1.289/1.290, all rounding to 1.29; 0 `success=false`
+across all 30 solver levels). Source doc: `docs/paper-revision-plan.md` §8; `docs/pre-submission-checklist.md` §2.
 
 ---
 
