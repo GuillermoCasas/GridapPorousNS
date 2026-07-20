@@ -8,16 +8,32 @@ de-Pouplana). It is the proof-assistant counterpart of the SymPy suite in
 computation, the files here prove them from the axioms of the real numbers,
 and the proofs are re-verified by Coq's trusted kernel (`coqchk`).
 
-**Status: 18 files, ~789 theorems, all proved. No `Admitted`, no `Axiom`,
+**Status: 24 files, all proved. No `Admitted`, no `Axiom`,
 no `admit` anywhere** (grep the sources to confirm — and, more strongly,
 `Print Assumptions`: every top-level theorem depends on exactly three axioms,
 all from the standard library's *construction* of the reals
 (`ClassicalDedekindReals.sig_not_dec`, `ClassicalDedekindReals.sig_forall_dec`,
 `FunctionalExtensionality.functional_extensionality_dep`), and on nothing else).
-Compiled and independently kernel-checked (`coqchk`) on Coq 8.18.0 using **only
-the standard library** — no Mathcomp, no Coquelicot, no external packages. Every
-definition has been checked against the manuscript sources (`article.tex`,
+Compiled and independently kernel-checked (`coqchk`) on Coq 8.18 / Rocq 9.1 using
+**only the standard library** — no Mathcomp, no Coquelicot, no external packages.
+Every definition has been checked against the manuscript sources (`article.tex`,
 `continuity_appendix.tex`, July 2026 revision).
+
+The 18 files of the ASGS a priori chain are joined by **6 files for the OSGS
+(orthogonal-subgrid-scale) a priori chain** of the companion note
+`theory/osgs_a_priori/osgs_convergence.tex`: `OsgsParameters.v` (Lemma 3.1, the
+parameter inequalities (P1)–(P6), (K1)–(K3), including the Damköhler inequality
+(P5)), `OsgsNorm.v` (the OSGS triple norm and its domination of the ASGS norm,
+Lemma 3.5), `OsgsStability.v` (the inf–sup stability Theorem 4.1 — the
+special-test-function coefficient collection and triple-norm recovery, Steps 4–5),
+`OsgsInterpolation.v` (the consistency error Lemma 5.1 and interpolation continuity
+Lemma 5.2), `OsgsConvergence.v` (the convergence Theorem 5.4 with a *proved*
+OSGS-norm triangle inequality, plus Corollaries 5.5–5.6), and `NonVacuityOsgs.v`
+(consistency witnesses for three of the OSGS bundles, the stability one being a
+non-degenerate `7 ≥ 3/8` instance). These reuse the same abstract inner-product /
+mesh interface and the same closed `ContinuityAlgebra.v` parameter set (the OSGS
+`τ`'s *are* the companion's). The full paper↔Coq map for the OSGS chain is
+§"The OSGS a priori chain" of `../coq_coverage.tex`.
 
 **This revision reduces the named trusted base from 53 items to 50.** The count
 is the weakest part of the claim and is stated here first so it can be

@@ -73,8 +73,9 @@
 \title{\bfseries Machine-checked coverage map:\\
        from the paper's theory to the Coq formalisation}
 \author{Coverage note accompanying \file{proof_verification/coq-formal/}}
-\date{Revised 2026-07-17 \quad (18 files, $\approx$789 theorems; all compiled
-      and \coq{coqchk}-verified on Coq~8.18.0)}
+\date{Revised 2026-07-20 \quad (24 files; the ASGS a priori chain plus the OSGS
+      chain of \S\ref{sec:osgs}; all compiled and \coq{coqchk}-verified on
+      Coq~8.18 / Rocq~9.1)}
 
 \begin{document}
 \maketitle
@@ -100,7 +101,15 @@ manuscript's own hypotheses, $\sigma\ge0$ and $\varepsilon\ge0$ included, so
 that the reaction-free case $\sigma=0$ is a genuine instance; the convergence
 theorem is a genuine kernel-level \emph{composition} of the closed
 stability and interpolation-continuity lemmas, with the triple-norm
-triangle inequality proved rather than assumed. Section~\ref{sec:coq}
+triangle inequality proved rather than assumed. \textbf{A companion chain
+(\S\ref{sec:osgs}, six further files) does the same for the \emph{orthogonal}
+subgrid-scale (OSGS) variant} of the companion note
+\file{theory/osgs_a_priori/osgs_convergence.tex}: its parameter algebra
+(Lemma~3.1, including the Damk\"ohler inequality (P5)), norm comparison,
+inf--sup stability (Theorem~4.1), interpolation-continuity and consistency
+(Lemmas 5.1--5.2), and convergence (Theorem~5.4) with its two corollaries are
+machine-checked theorems over the same interface, with three of the OSGS
+hypothesis bundles machine-witnessed consistent. Section~\ref{sec:coq}
 is a primer on how Coq (now \emph{Rocq}) works and what ``machine-checked''
 buys. Section~\ref{sec:map} explains the translation convention --- including
 how a lemma with functional-analytic hypotheses is honestly encoded.
@@ -129,13 +138,14 @@ guarantee is and where residual trust remains.
 The Coq development mirrors, file by file, the SymPy ``verification scripts''
 suite in \file{proof_verification/sympy/}: where SymPy checks an identity
 by symbolic computation, the Coq files \emph{prove} it. The suite is
-\textbf{18 files, $\approx 789$ theorems, all proved} --- there is no
+\textbf{24 files, all proved} --- the eighteen ASGS-chain files and the six
+OSGS-chain files of \S\ref{sec:osgs} --- and there is no
 \coq{Admitted}, no \coq{Axiom} and no \coq{admit} anywhere in the sources
 (\coq{grep} confirms this, and so, more strongly, does \coq{Print Assumptions}:
 \S\ref{sec:stratum0}). It uses \emph{only} the standard library, and the whole
-suite has been compiled and independently kernel-checked on Coq~8.18.0: eighteen
-\coq{[PASS]} lines followed by \emph{``coqchk: modules successfully checked by
-the trusted kernel''} (\S\ref{sec:repro}).
+suite has been compiled and independently kernel-checked on Coq~8.18 / Rocq~9.1:
+twenty-four \coq{[PASS]} lines followed by \emph{``coqchk: all 24 modules
+successfully checked by the trusted kernel''} (\S\ref{sec:repro}).
 
 What changed since the previous revision is a step up in \emph{kind}, not just
 in count. Previously the Coq layer certified the \emph{algebraic skeleton} of
@@ -293,7 +303,7 @@ here:
     single one would let anything ``follow''.
   \item \coq{Axiom} postulates a statement as true without proof.
 \end{itemize}
-Neither appears anywhere in the eighteen files. Consequently every result below
+Neither appears anywhere in the twenty-four files. Consequently every result below
 is reduced to the standard library's real numbers --- constructed, not
 postulated, but resting on a small fixed set of classical principles
 (\S\ref{sec:stratum0}) --- plus, for the four abstract theorems, the
@@ -502,7 +512,8 @@ exactly the standard, hand-audited facts it is labelled as.
 \section{The crosswalk: theory \texorpdfstring{$\to$}{->} Coq}\label{sec:crosswalk}
 % =====================================================================
 
-Dependency and topic map of the eighteen files. \file{Limits.v}/\file{DerivKit.v}
+Dependency and topic map of the eighteen ASGS-chain files (the six OSGS-chain
+files are tabulated in \S\ref{sec:osgs}). \file{Limits.v}/\file{DerivKit.v}
 serve the concrete analytic files; \file{AbstractSums.v}/\file{InnerSpace.v}
 serve the four abstract-theorem files, which also import the closed algebraic
 theorems of \file{StabilityAlgebra.v}/\file{ContinuityAlgebra.v} and apply them
@@ -842,6 +853,243 @@ helpers and derivatives of $a\cdot t$, $\sin(at)$, $\cos(at)$, $c\cdot f(t)$,
 $e^{t-1}$. Neither is paper-specific.
 
 % =====================================================================
+\section{The OSGS a priori chain}\label{sec:osgs}
+% =====================================================================
+
+Everything above concerns the \emph{algebraic subgrid-scale} (ASGS) variant, the
+one whose a priori analysis the manuscript carries out. The companion note
+\file{theory/osgs_a_priori/osgs_convergence.tex} supplies the analogous analysis
+for the \emph{orthogonal subgrid-scale} (OSGS) variant --- the one that
+distinguishes itself by projecting the residual with the orthogonal projection
+$\pi_h$ rather than the algebraic subscale, deleting the reactive subscale
+identically. Its a priori chain is now a set of complete machine-checked theorems
+too, in \emph{six} new files that reuse the same abstract inner-product / mesh
+interface (\file{InnerSpace.v}, \file{AbstractSums.v}) and the same closed
+parameter algebra (\file{ContinuityAlgebra.v}); the OSGS variant is analysed with
+\emph{exactly} the companion's $\tau_1,\tau_2,\sigt$ (its \lbl{eq:TauDefs} is the
+manuscript's \lbl{eq:taus}), so the two developments share one parameter set,
+reconciled inside the kernel.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Coq file & Note location & Role \\
+\midrule
+\file{OsgsParameters.v}   & Lemma~3.1 (\lbl{lem:parameters}) & parameter inequalities (P1)--(P6), (K1)--(K3) \\
+\file{OsgsNorm.v}         & Lemma~3.5 (\lbl{lem:normcomparison}) & OSGS triple norm; ASGS-norm domination \\
+\file{OsgsStability.v}    & Theorem~4.1 (\lbl{th:stability}) & inf--sup stability, complete theorem \\
+\file{OsgsInterpolation.v}& Lemmas 5.1--5.2 & consistency error \& interpolation continuity \\
+\file{OsgsConvergence.v}  & Theorem~5.4 (\lbl{th:convergence}) + Cor.\ 5.5--5.6 & convergence, kernel-level composition \\
+\file{NonVacuityOsgs.v}   & \S\ref{sec:osgsvac} & consistency witnesses (three bundles) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The single structural difference between the two variants drives the whole note:
+the orthogonal projection annihilates the reactive residual identically
+(the note's Lemma~2.2), so \emph{no} renormalisation of $\sigma$ down to $\sigt$
+takes place. The OSGS triple norm therefore controls the \emph{full}
+$\lVert\sigma^{1/2}\mathbf u_h\rVert^2$ rather than the damped
+$\lVert\sigt^{1/2}\mathbf u_h\rVert_h^2$ (a strictly stronger left-hand side,
+\file{OsgsNorm.v}), but the price is a single elementwise Damk\"ohler factor
+$(1+\Dah)^{1/2}$, $\Dah=\sigma h_K^2/(\aK\nu)$, in the convergence estimate,
+whose sole algebraic source is inequality (P5).
+
+\subsection{\texttt{OsgsParameters.v} --- Lemma 3.1: the parameter inequalities}\label{sec:crossOsgsParam}
+
+Section hypotheses: $\nu,h,\aK,c_1,c_2,\Cinv,\gamma>0$, $\sigma\ge0$,
+$|\mathbf a|\ge0$; and the design condition \lbl{(A6)}
+$c_1\ge\gamma^2\Cinv^2$, $c_2\ge\gamma\Cinv$. Proved \emph{from} the closed
+$\tau_1,\tau_2,\sigt$ of \file{ContinuityAlgebra.v}, reused verbatim (the OSGS
+$\tau$'s are the companion's), so this file is the OSGS analogue of
+\file{ContinuityAlgebra.v}: everything below is a theorem over the real numbers,
+no trusted base beyond the $\tau$ formulas.
+
+\begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\midrule \endhead
+\coq{P1_sigma_tau1}, \coq{P1_alphaK_tau1} & (P1): $\sigma\tau_1\le1$ and $\aK\tau_1\le\tau_{1,\mathrm{NS}}$. \\
+\coq{P2} & (P2): $\tau_1\tau_2\le h_K^2/(c_1\aK^2)$. \\
+\coq{P3_id}, \coq{P3_sqrt} & (P3): $h_K^2\tau_{1,\mathrm{NS}}^{-1}=c_1\aK\tau_2$, and the square-root form. \\
+\coq{P4_nu}, \coq{P4b_sq}, \coq{P4b} & (P4): $\nu\le\aK\tau_2$ and $\tau_1^{1/2}|\mathbf a|\le(\sqrt{c_1}/c_2)\tau_2^{1/2}$. \\
+\coq{P5_prod}, \coq{P5_sqrt} & \textbf{(P5)}: $\aK^2\tau_1\tau_2\ge h_K^2/(c_1+\Dah)$ --- \emph{the sole source of the Damk\"ohler factor} --- and its square-root consequence $\tau_2^{-1/2}\le(c_1+\Dah)^{1/2}(\aK/h_K)\tau_1^{1/2}$. \\
+\coq{P6} & (P6): $\sigma^{1/2}\le\Dah^{1/2}(\aK/h_K)\tau_2^{1/2}$. \\
+\coq{K1}, \coq{K2}, \coq{K3} & (K1)--(K3): the porosity-weighted inverse-estimate coefficients, driven by \lbl{(A6)}: e.g.\ (K3) $\Cinv\aK(\tau_1\tau_2)^{1/2}/h_K\le1/\gamma$. \\
+\coq{Dah_id}, \coq{TNS_h2_id}, \coq{T1_inv} & the closed identities the proofs run on. \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{OsgsNorm.v} --- Lemma 3.5: the OSGS triple norm}\label{sec:crossOsgsNorm}
+
+\begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\midrule \endhead
+\coq{perN} & the per-element OSGS energy $2\nu\lVert\mathbf g\rVert^2+\sigma\lVert\mathbf v\rVert^2+\varepsilon\lVert q\rVert^2+\tau_1\lVert\alpha X(V)\rVert^2+\tau_2\lVert\mathrm{div}(\alpha\mathbf v)\rVert^2$ (\lbl{eq:TripleNorm}). \\
+\coq{perS} & the ASGS (``S'') per-element energy: viscous $\nu$ (not $2\nu$) and the damped $\sigt$. \\
+\coq{perS_le_perN}, \coq{NormS2_le_NN2} & \textbf{Lemma 3.5}: the OSGS norm dominates the ASGS norm term by term, from $\nu\le2\nu$ and $\sigt\le\sigma$ (\coq{P4_le_sigma}). \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{OsgsStability.v} --- Theorem 4.1: inf--sup stability}\label{sec:crossOsgsStab}
+
+Unlike the ASGS variant, which is \emph{coercive} (test $=$ trial), the OSGS
+variant is stable by an \emph{inf--sup} argument built on the special test
+function $W=U_h+V^0$ of the note. The theorem exhibits $W$ with
+$B_{\mathrm{osgs}}(U_h,W)\ge\beta_{\mathrm{stab}}|||U_h|||^2$ and
+$|||W|||^2\le C_W^2|||U_h|||^2$ --- exactly what the convergence composition
+consumes. Steps~1--3 of \lbl{th:stability} (the diagonal identity \lbl{eq:Diagonal}
+and the seven term estimates $T_1$--$T_7$ of the special test function, each
+packaging the smoothing lemma \lbl{lem:smoothing}, the coefficients (K1)--(K3)
+above, and elemental Cauchy--Schwarz / Young) are the named analytic trusted base;
+Steps~4--5 --- the coefficient collection and the recovery of the triple norm ---
+are proved in full.
+
+\begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\midrule \endhead
+\coq{coeff_O1}, \coq{coeff_O2}, \coq{coeff_P1}, \coq{coeff_P2} & \textbf{Step 4}: every collected coefficient $\ge1/8$ under $\gamma\ge10(1+M_2)$ and $\psi\le\min(1/8,\beta_0^2/16)$ --- the error-prone bookkeeping, checked term by term (e.g.\ the $P_1$ coefficient is $\ge1/8$ from six explicit rational sub-bounds). \\
+\coq{step4} & $B_{\mathrm{osgs}}(U_h,W)\ge\tfrac18(D_\nu+D_\sigma+D_\varepsilon+O_1+O_2+P_1+P_2)$ (\lbl{eq:Collected}), by the ring identity that regroups the seven term bounds into per-energy coefficients. \\
+\coq{beta_stab}, \coq{beta_stab_scaled} & $\beta_{\mathrm{stab}}=\min(1/8,\beta_0^2/16)>0$ and $\beta_{\mathrm{stab}}\cdot(2/\beta_0^2)\le1/8$. \\
+\coq{recovery} & \textbf{Step 5}: $B_{\mathrm{osgs}}(U_h,W)\ge\beta_{\mathrm{stab}}|||U_h|||^2$, using (A7) \coq{HA7} and the exact mass decomposition \coq{Hmass}. \\
+\coq{norm_W_bound} & $|||W|||^2\le2(1+C_{\mathrm{norm}})|||U_h|||^2$: the test function is bounded. \\
+\coq{abstract_osgs_stability} & \textbf{\lbl{th:stability}}: $0<\beta_{\mathrm{stab}}$, $B_{\mathrm{osgs}}(U_h,W)\ge\beta_{\mathrm{stab}}|||U_h|||^2$, $|||W|||^2\le2(1+C_{\mathrm{norm}})|||U_h|||^2$. \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{OsgsInterpolation.v} --- Lemmas 5.1--5.2: consistency and interpolation continuity}\label{sec:crossOsgsInterp}
+
+The OSGS error function \lbl{eq:ErrorFunction} $E(h)=\sum_K(\aK/h_K)(1+\Dah)^{1/2}
+(\tau_{2,K}^{1/2}E_{\mathrm{int},K}(\mathbf u)+\tau_{1,K}^{1/2}E_{\mathrm{int},K}(p))$
+--- the ASGS error function times the elementwise $(1+\Dah)^{1/2}$ --- is
+\emph{defined} here as a concrete mesh sum (\coq{Eh}). The seven per-term
+interpolation bounds (I1)--(I7) of \lbl{lem:interpolation} and the two
+consistency-slot bounds (S1),(S2) of \lbl{lem:consistency} --- each derived in the
+note from the interpolation estimates \lbl{eq:NodalInterp}, the best-approximation
+lemma \lbl{lem:bestapprox}, and the conversions (P3)--(P6) --- are the named
+analytic trusted base; the assembly (the triangle inequality over the terms,
+collecting them into $C\,E(h)\,|||V|||$) is proved in full.
+
+\begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\midrule \endhead
+\coq{Eh}, \coq{Eh_nonneg} & the concrete OSGS error function \lbl{eq:ErrorFunction} and its nonnegativity. \\
+\coq{abstract_osgs_continterp} & \textbf{Lemma 5.2}: $|B_{\mathrm{osgs}}(\widehat E,V_h)|\le C_{\mathrm{tot}}^{I}\,E(h)\,|||V_h|||$ from the decomposition into $I_1$--$I_7$ and the seven term bounds. \\
+\coq{abstract_osgs_consistency} & \textbf{Lemma 5.1}: $|B_{\mathrm{osgs}}(U-U_h,V_h)|\le C_{\mathrm{cons}}^{I}\,E(h)\,|||V_h|||$ from the split into $S_1(U,V_h)+S_2(U,V_h)$. \\
+\bottomrule
+\end{longtable}
+
+\subsection{\texttt{OsgsConvergence.v} --- Theorem 5.4: a kernel-level composition}\label{sec:crossOsgsConv}
+
+Because the OSGS argument is inf--sup rather than coercive, its test function $W$
+is \emph{not} the trial function $\eta$, so the four inputs are carried as
+hypotheses about a common $W$ rather than re-derived internally (they are the
+conclusions of \coq{abstract_osgs_stability} applied to $\eta$,
+\coq{abstract_osgs_continterp} at $(\widehat E,W)$, \coq{abstract_osgs_consistency}
+at $W$, and Lemma 5.3). The one genuinely new algebraic item is the bilinearity of
+$B_{\mathrm{osgs}}$ in its first argument (\coq{Hbilin}), the analogue of the ASGS
+\coq{Horth}. The triangle inequality and the whole gluing arithmetic are proved.
+
+\begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
+\toprule
+\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\midrule \endhead
+\coq{Qk_CS}, \coq{sumQ_CS}, \coq{NUU_triangle} & the triangle inequality for the OSGS triple norm, \emph{proved} from the pre-Hilbert axioms: per-element five-fold Cauchy--Schwarz over the five weights $(2\nu,\sigma,\varepsilon,\tau_1,\tau_2)$, then the discrete C--S over the mesh. \\
+\coq{Neta_bound} & $|||\eta|||\le((C_{\mathrm{cons}}+C_{\mathrm{int}})C_W/\beta_{\mathrm{stab}})E(h)$: the appendix's chain $\beta_{\mathrm{stab}}|||\eta|||^2\le B_{\mathrm{osgs}}(\eta,W)=B_{\mathrm{osgs}}(U-U_h,W)-B_{\mathrm{osgs}}(\widehat E,W)\le\dots$ \\
+\coq{abstract_osgs_convergence} & \textbf{\lbl{th:convergence}}: $|||U-U_h|||\le C_{\mathrm{conv}}\,E(h)$ (\lbl{eq:MainResult}), triangle inequality $+$ \coq{Neta_bound} $+$ interp-size. \\
+\coq{perSU_le_perU}, \coq{abstract_osgs_convergence_asgsnorm} & \textbf{Corollary 5.5} (\lbl{cor:asgsnorm}): the estimate holds verbatim in the ASGS norm, via Lemma 3.5. \\
+\coq{sig_vel_le_NUU}, \coq{abstract_osgs_convergence_Ltwo} & \textbf{Corollary 5.6} (\lbl{cor:Ltwo}): the $\sigma$-robust $L^2$ velocity estimate $\sqrt\sigma\,\lVert\mathbf u-\mathbf u_h\rVert\le C_{\mathrm{conv}}E(h)$, the reward for deleting the reactive subscale. \\
+\bottomrule
+\end{longtable}
+
+\subsection{The OSGS trusted base and what it adds over ASGS}\label{sec:osgsbase}
+
+The OSGS inf--sup route is not nested in the ASGS coercivity route: two ASGS
+hypotheses are \emph{dispensed with} (the interior-face jump condition \lbl{H:jump}
+on $\tau_1$ and the enlarged inverse estimate for
+$\nabla\!\cdot(\alpha\nu\Pi^{\mathrm{DS}}\nabla\mathbf u_h)$, since the analysed OSGS
+form has no viscous or reactive stabilisation term to integrate by parts), while
+\emph{one} genuinely new analytic hypothesis is added --- the projection-stability
+condition (A7), the exact analogue of Codina--Blasco's condition~(35), which has no
+ASGS counterpart. The residual OSGS trusted base, over and above the shared
+$\tau$-algebra, is:
+
+\begin{longtable}{@{}L{0.20\textwidth}L{0.52\textwidth}L{0.20\textwidth}@{}}
+\toprule
+\textbf{Coq hypothesis} & \textbf{Note statement} & \textbf{In; class} \\
+\midrule \endhead
+\coq{gam_ge}, \coq{psi_le_18}, \coq{psi_le_b} & \lbl{(A6)} $\gamma\ge10(1+M_2)$ and $h\le h_0$ (i.e.\ $\psi\le\min(1/8,\beta_0^2/16)$) & Stab; data (D) \\
+\coq{HA7} & \textbf{(A7)}, \lbl{eq:Hstab}: $\lVert z_h\rVert_{\tau_1}\le\beta_0^{-1}(\lVert\Pi_{1,0}z_h\rVert_{\tau_1}+\lVert\Pi_1^\perp z_h\rVert_{\tau_1})$, squared form. The one new class-(I)/(G) item, with no ASGS counterpart & Stab; (G/I) \\
+\coq{Hdiag_expand}, \coq{Hmass}, \coq{HP1nex} & \lbl{eq:Diagonal} (the diagonal identity, from Lemma~2.1 $+$ the psd structure of $S_1,S_2$); the exact $\tau_2$ decomposition; projection nonexpansiveness & Stab; Green (G) \\
+\coq{HT1}--\coq{HT7} & the seven Step-3 term estimates of the special test function (each packaging \lbl{lem:smoothing} $+$ (K1)--(K3) $+$ CS) & Stab; estimates (I) \\
+\coq{HdecompI}, \coq{HI1}--\coq{HI7} & the $I_1$--$I_7$ grouping of $B_{\mathrm{osgs}}(\widehat E,V_h)$ and its seven interpolation bounds (\lbl{eq:NodalInterp} $+$ \lbl{lem:bestapprox} $+$ (P3)--(P6)) & Interp; estimates (I) \\
+\coq{HdecompC}, \coq{HS1}, \coq{HS2} & \lbl{eq:ConsistencyId} and the two consistency-slot bounds & Consist; estimates (I) \\
+\coq{Hbilin} & bilinearity of $B_{\mathrm{osgs}}$ in its first argument (the analogue of \coq{Horth}) & Conv; Green (G) \\
+\coq{Hstab_lb}, \coq{HW_bound}, \coq{Hinterp}, \coq{Hcons}, \coq{Hinterpsize} & the conclusions of the four OSGS results, applied to $\eta$ / $(\widehat E,W)$ / $W$ (the composition inputs) & Conv; composition \\
+\bottomrule
+\end{longtable}
+
+\subsection{Are the OSGS hypotheses consistent? (Non-vacuity)}\label{sec:osgsvac}
+
+\file{NonVacuityOsgs.v} exhibits explicit concrete instances that discharge
+\emph{every} hypothesis of three of the OSGS theorems and apply the theorem
+inside the kernel, obtaining a non-degenerate numeric conclusion:
+
+\begin{itemize}[leftmargin=1.4em, itemsep=0.2ex]
+\item \coq{witness_osgs_stability} --- the crucial one, the novel inf--sup
+collection: a diagonal instance with $\beta_0=1$, $M_2=1$, $\gamma=20$ (the
+\emph{extremal} admissible $\gamma_0=10(1+M_2)$), $\psi=0$, $C_2=0$, every scalar
+energy $=1$ (so $|||U_h|||^2=6>0$) and the seven term estimates met with room,
+yielding $B_{\mathrm{osgs}}(U_h,W)=7\ge\beta_{\mathrm{stab}}|||U_h|||^2=\tfrac1{16}\cdot6=\tfrac38$,
+both sides strictly positive (\coq{osgs_stability_not_vacuous}).
+\item \coq{witness_osgs_continterp} and \coq{witness_osgs_consistency} --- a
+one-element mesh with $\tau_1=\tau_2=1$, $\Dah=0$, $E(h)=2$ (a clean rational,
+\coq{wEh_val}), giving $|B_{\mathrm{osgs}}(\widehat E,V_h)|=7\le C_{\mathrm{tot}}^{I}\cdot(E(h)\cdot|||V_h|||)=14$
+and $|B_{\mathrm{osgs}}(U-U_h,V_h)|=2\le4$, both non-degenerate.
+\end{itemize}
+
+\noindent
+So three of the OSGS bundles are provably \emph{consistent}. As with the ASGS
+witnesses, this settles consistency, not soundness --- that the finite element
+objects satisfy the hypotheses is the hand-audit direction, discharged for the
+ASGS chain in \file{AUDIT.md}~\S4 and, for the OSGS-specific items ((A7), the
+smoothing lemma, the best-approximation bounds), by the note's own proofs and its
+provenance in~\cite{codina2001stabilized} and the Codina--Blasco argument.
+
+\subsection{Honest scoping of the OSGS chain}\label{sec:osgsscope}
+
+Following the note's own ``Honest scoping'' paragraph, the analysed OSGS method is
+a first-order-consistent simplification of the implemented one (the orthogonal
+projection is applied to the first-order part of the residual, the adjoint test
+slot is truncated, and the weighted product is the $\boldsymbol\tau$-weighted one);
+the annihilation lemma (Lemma~2.2) shows the reactive and compressibility
+contributions vanish identically under the projection, so the only neglected pieces
+are the viscous ones and the force fluctuation --- exactly Method~I of
+\cite{codina2001stabilized}'s orthogonal-subscales program. Within that scope, the
+kernel-checked content is: the entire parameter algebra of Lemma 3.1 (including the
+Damk\"ohler inequality (P5)), the norm comparison of Lemma 3.5, the coefficient
+collection and triple-norm recovery of the inf--sup Theorem 4.1, the assembly of
+the interpolation-continuity and consistency Lemmas 5.1--5.2, and the composition
+of Theorem 5.4 together with its two corollaries and the OSGS-norm triangle
+inequality. The named analytic trusted base of \S\ref{sec:osgsbase} --- the
+projection-stability condition (A7), the smoothing lemma, the seven test-function
+term estimates and the interpolation/consistency term bounds --- is the OSGS
+counterpart of the ASGS \emph{Class-G / Class-I} rows of Table~\ref{tab:inventory},
+at the granularity the special-test-function argument requires; the note derives
+each from textbook interpolation theory and the projection structure. As in
+\cite{codina2001stabilized}, (A7) is assumed rather than proved; the note indicates
+how the Codina--Blasco argument verifies its unweighted counterpart for simplicial
+elements. What the analysis does \emph{not} cover is stated in the note's
+\lbl{rem:open}: the superior $L^2$ pressure convergence observed for $k\ge2$
+(a duality argument), the lagged-projection staggered iteration, and the nonlinear
+problem.
+
+% =====================================================================
 \section{The assumptions, read in full}\label{sec:assumptions}
 % =====================================================================
 
@@ -926,7 +1174,7 @@ Three things, and no more, sit under every theorem in the development.
 \emph{The logic.} The Calculus of Inductive Constructions, as implemented by the
 Coq/Rocq kernel and independently re-checked by \coq{coqchk}
 (\S\ref{sec:coq}). No \coq{Axiom}, no \coq{Admitted}, no \coq{admit} occurs in
-the eighteen files, so nothing has been postulated behind the reader's back.
+the twenty-four files, so nothing has been postulated behind the reader's back.
 
 \emph{The real numbers.} The development imports \coq{Coq.Reals} (with
 \coq{Lra}, \coq{Lia}, \coq{Psatz}, \coq{List}) and nothing else --- no Mathcomp,
@@ -3125,7 +3373,7 @@ and cannot be hurried, fatigued, or won over by plausibility. Here that check
 is then \emph{repeated by a second, independent program} (\coq{coqchk}) which
 re-derives everything from the compiled proof terms without trusting the first.
 
-The practical consequence: for every theorem in these eighteen files, the claim
+The practical consequence: for every theorem in these twenty-four files, the claim
 \emph{``the stated conclusion follows from the stated hypotheses''} is no longer
 a matter of belief or of referee diligence. The only way such a statement could
 still be false is if the two independent kernels shared a soundness bug that
@@ -3262,6 +3510,12 @@ genuine residue is two items: \coq{Horth} and the face bundle. Those, and the
 physical- and code-modelling questions that no symbolic proof can settle. The
 value of the exercise is precisely that it shrinks what must be taken on trust
 from ``the whole proof'' to that short list --- and puts the list in plain sight.
+The same is now true of the OSGS variant (\S\ref{sec:osgs}): its parameter
+algebra, norm comparison, inf--sup collection, interpolation/consistency assembly
+and convergence composition are machine-checked, over a named analytic trusted
+base (\S\ref{sec:osgsbase}) whose one addition over the ASGS list is the
+projection-stability condition (A7) --- against two ASGS hypotheses the OSGS route
+dispenses with --- and three of its bundles are machine-witnessed consistent.
 
 % =====================================================================
 \section{Reproducing the check}\label{sec:repro}
@@ -3280,23 +3534,29 @@ opam install coq
 
 \noindent
 A passing run prints one \coq{[PASS]} line per file, then the \coq{coqchk} line.
-The run recorded for this revision (Coq~8.18.0, Ubuntu~24.04, $\approx75$\,s
-wall clock) is:
+The run recorded for this revision (Rocq~9.1.1, macOS) is:
 \begin{lstlisting}[language=bash,keywordstyle=\color{black}]
 Coq formal verification suite (PNSFormal)
-coqc: The Coq Proof Assistant, version 8.18.0
-  [PASS] Limits.v            [PASS] AbstractContinuity.v
-  [PASS] DerivKit.v          [PASS] AbstractInterpolation.v
-  [PASS] StabilityAlgebra.v  [PASS] AbstractConvergence.v
-  [PASS] ContinuityAlgebra.v [PASS] TauDesign.v
-  [PASS] AbstractSums.v      [PASS] Asymptotics.v
-  [PASS] InnerSpace.v        [PASS] ManufacturedSolution.v
-  [PASS] InverseEstimates.v  [PASS] PlateauBump.v
-  [PASS] AbstractStability.v [PASS] NonVacuityInterp.v
-  [PASS] NonVacuity.v        [PASS] NonVacuityConv.v
-RESULT: all 18 files compiled; every theorem is proved.
+coqc: The Rocq Prover, version 9.1.1
+files: 24, in the dependency order given by _CoqProject
+  [PASS] Limits.v            [PASS] PlateauBump.v
+  [PASS] DerivKit.v          [PASS] NonVacuity.v
+  [PASS] StabilityAlgebra.v  [PASS] NonVacuityInterp.v
+  [PASS] ContinuityAlgebra.v [PASS] NonVacuityConv.v
+  [PASS] AbstractSums.v      [PASS] OsgsParameters.v
+  [PASS] InnerSpace.v        [PASS] OsgsNorm.v
+  [PASS] InverseEstimates.v  [PASS] OsgsStability.v
+  [PASS] AbstractContinuity.v[PASS] OsgsInterpolation.v
+  [PASS] AbstractInterpolation.v [PASS] OsgsConvergence.v
+  [PASS] AbstractStability.v [PASS] NonVacuityOsgs.v
+  [PASS] AbstractConvergence.v
+  [PASS] TauDesign.v
+  [PASS] Asymptotics.v
+  [PASS] ManufacturedSolution.v
+RESULT: all 24 files compiled; every theorem is proved
+        (no Admitted, no Axiom).
 Running coqchk (independent kernel re-verification) ...
-  [PASS] coqchk: modules successfully checked by the trusted kernel.
+  [PASS] coqchk: all 24 modules successfully checked by the trusted kernel.
 \end{lstlisting}
 (The sources keep the $8.16$--$8.20$-compatible \coq{From Coq} spelling on
 purpose; on Rocq~9 it merely emits a deprecation notice in favour of

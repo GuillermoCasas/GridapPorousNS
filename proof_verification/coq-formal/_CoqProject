@@ -17,3 +17,9 @@ PlateauBump.v
 NonVacuity.v
 NonVacuityInterp.v
 NonVacuityConv.v
+OsgsParameters.v
+OsgsNorm.v
+OsgsStability.v
+OsgsInterpolation.v
+OsgsConvergence.v
+NonVacuityOsgs.v
