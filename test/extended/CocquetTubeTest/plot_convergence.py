@@ -81,6 +81,14 @@ def plot_cocquet(h5_arg=None):
 
             err_u = np.array(group["errors_l2_u"]); err_p = np.array(group["errors_l2_p"])
             err_u_h1 = np.array(group["errors_h1_u"]); err_p_h1 = np.array(group["errors_h1_p"])
+            # Interpolation-reference (best-approximation) floor — always present for runs of the current
+            # driver; guarded for back-compat with pre-2026-07-19 HDF5 files. Same consistent metric as
+            # the FE rows, so FE/interp is a like-for-like efficiency.
+            has_interp = "interp_l2_u" in group
+            iu_l2 = np.array(group["interp_l2_u"]) if has_interp else None
+            ip_l2 = np.array(group["interp_l2_p"]) if has_interp else None
+            iu_h1 = np.array(group["interp_h1_u"]) if has_interp else None
+            ip_h1 = np.array(group["interp_h1_p"]) if has_interp else None
             # [2b] per-mesh converged flag (back-compat: absent -> all True). "success" here = the
             # nonlinear SOLVE converged (the tube uses a reference-solution error metric, not an MMS root).
             succ = (np.array(group["mesh_success"], dtype=bool) if "mesh_success" in group
@@ -103,10 +111,10 @@ def plot_cocquet(h5_arg=None):
             ax2.loglog(N_list, err_p_h1, color='red', marker=marker, linestyle=ls, lw=2, ms=8,
                        markerfacecolor='white', label=fr'{tag} $H_1$ Pre (opt {opt_p_h1})')
 
-            def annotate(ax, err, color, dy):
+            def annotate(ax, err, color, dy, succ_mask=succ):
                 for i in range(len(N_list) - 1):
                     # [2b] never fit a rate across / into a non-converged or non-finite mesh
-                    if not (succ[i] and succ[i+1] and np.isfinite(err[i]) and np.isfinite(err[i+1])
+                    if not (succ_mask[i] and succ_mask[i+1] and np.isfinite(err[i]) and np.isfinite(err[i+1])
                             and err[i] > 0 and err[i+1] > 0):
                         continue
                     raw = (np.log(err[i+1]) - np.log(err[i])) / (np.log(h[i+1]) - np.log(h[i]))
@@ -119,6 +127,24 @@ def plot_cocquet(h5_arg=None):
             annotate(ax1, err_p, 'red', -11)
             annotate(ax2, err_u_h1, 'blue', 7)
             annotate(ax2, err_p_h1, 'red', -11)
+
+            # Interpolation-reference floor: thin dotted, same hue as the FE curve, hollow markers. This
+            # is the best-approximation error I_h u_ref — the OPTIMAL slope/constant. The gap between the
+            # solid FE curve and this dotted floor is the method's inefficiency; when they coincide the
+            # solve is as accurate as the coarse space allows (see the console `eff L2(u)` ratio). Its
+            # slope is always fittable (pure interpolation never "fails"), so pass an all-true mask.
+            if has_interp:
+                all_ok = np.ones(len(N_list), dtype=bool)
+                ax1.loglog(N_list, iu_l2, color='blue', marker=marker, linestyle=(0, (1, 1)), lw=1.3, ms=5,
+                           alpha=0.75, markerfacecolor='none', label=fr'{tag} $L_2$ Vel INTERP (best-approx)')
+                ax1.loglog(N_list, ip_l2, color='red', marker=marker, linestyle=(0, (1, 1)), lw=1.3, ms=5,
+                           alpha=0.75, markerfacecolor='none', label=fr'{tag} $L_2$ Pre INTERP')
+                ax2.loglog(N_list, iu_h1, color='blue', marker=marker, linestyle=(0, (1, 1)), lw=1.3, ms=5,
+                           alpha=0.75, markerfacecolor='none', label=fr'{tag} $H_1$ Vel INTERP (best-approx)')
+                ax2.loglog(N_list, ip_h1, color='red', marker=marker, linestyle=(0, (1, 1)), lw=1.3, ms=5,
+                           alpha=0.75, markerfacecolor='none', label=fr'{tag} $H_1$ Pre INTERP')
+                annotate(ax1, iu_l2, '0.4', -11, succ_mask=all_ok)
+                annotate(ax2, iu_h1, '0.4', -11, succ_mask=all_ok)
             # [2b] mark non-converged-but-finite meshes with a distinct x (kept + flagged, not dropped)
             for ax, err, col in ((ax1, err_u, 'blue'), (ax1, err_p, 'red'),
                                  (ax2, err_u_h1, 'blue'), (ax2, err_p_h1, 'red')):

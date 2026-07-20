@@ -34,7 +34,8 @@ names the parallel results folder `results/<name>/`.
 | `deviatoric` | `deviatoric.json` | `viscous_operator_type=DeviatoricSymmetric` (the canonical/MMS operator) |
 | `linear_reaction` | `linear_reaction.json` | `sigma_nonlinear=0` (Forchheimer \|u\| term off, linear Darcy drag only) |
 | `modified_corner` | `paper_comparison_modified_corner.json` | `boundary_policy=modified_corner` (outlet-corner wall tags released) |
-| `unstructured_gmsh` | `paper_comparison_irregular.json` | `mesh_generator=UNSTRUCTURED` (gmsh Delaunay, uniform 1/N edges) |
+| `unstructured_gmsh` | `paper_comparison_irregular.json` | `mesh_generator=UNSTRUCTURED` (gmsh Delaunay `mesh_algorithm=5`, uniform 1/N edges) |
+| `unstructured_frontal` | `paper_comparison_frontal.json` | `mesh_algorithm=6` (gmsh **Frontal-Delaunay**, near-equilateral elements) — best-quality unstructured; recovers the Taylor-Hood O(h²) slope. Galerkin ordered first. |
 | `freefem_meshes` | `paper_comparison_freefem.json` | Cocquet's literal FreeFem `.msh` files from `meshes/` (`freefem_mesh_dir=meshes`) |
 | `freefem_divisions` | `paper_comparison_irregular_freefem_divs.json` | gmsh with `wall_divisions=freefem` (N-per-border, walls 2× coarser) |
 | `literal_picard` | `paper_comparison_literal_picard.json` | capped pure-Picard Cocquet protocol (`method=Galerkin_LiteralPicard`, `picard_iterations=10`) |
@@ -56,9 +57,19 @@ Beyond the strict solver schema, each config carries variant-selecting keys with
 ## Results layout (`results/<variant>/`, gitignored)
 
 - `convergence.h5` — one uniform schema for all variants: per `<method>/P<kv>P<kp>` group,
-  `errors_{l2,h1}_{u,p}` (consistent norms), `errors_*_trial` (trial-projection), S3 probes
+  `errors_{l2,h1}_{u,p}` (consistent norms), `errors_*_trial` (trial-projection),
+  `interp_{l2,h1}_{u,p}` (**interpolation-error floor** — see below), S3 probes
   (`chi_Omega_*`, `cellavg_frac_*`, `l2_cellavg_*`, `l2_domainmean_*`) and corner-excluded matrices
   (`{l2,h1}_e{u,p}_corner_excl`), plus timing/iteration counts.
+
+The **interpolation-error floor** `interp_{l2,h1}_{u,p}` is computed on every run (the MMS-harness
+practice — cf. `test/extended/ManufacturedSolutions/run_interpolation_reference.jl`): it is the error
+of the nodal interpolant of the N=200 reference onto each coarse space, `‖u_ref − I_h u_ref‖`, measured
+with the SAME consistent (fine-mesh) metric as the FE-solution error. Its slope is the OPTIMAL slope
+achievable on the mesh sequence and its magnitude the optimal constant, so each FE row becomes an
+efficiency ratio FE/interp (printed live as `eff L2(u)`; drawn as a thin dotted floor by
+`plot_convergence.py`). This turns a bare rate check into an efficiency check and separates a
+pre-asymptotic *solution-roughness* slope loss from a genuine *method* deficiency.
 - `config.json` — a copy of the exact config that produced the run (self-describing provenance).
 - `vtk/` — per-solve VTU exports.
 

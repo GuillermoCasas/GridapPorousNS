@@ -359,6 +359,17 @@ function run_convergence()
         # Trial-projection metric (reference projected onto the coarse TRIAL space).
         errors_l2_u_trial = Float64[]; errors_h1_u_trial = Float64[]
         errors_l2_p_trial = Float64[]; errors_h1_p_trial = Float64[]
+        # Interpolation-reference metric (MMS practice — always computed). The error of the NODAL
+        # INTERPOLANT of the reference onto the coarse FREE space, ‖u_ref − I_h u_ref‖, measured with
+        # the SAME consistent (fine-mesh) functional as the FE-solution error above. This is the
+        # best-approximation FLOOR: its slope is the OPTIMAL slope achievable on this mesh sequence and
+        # its magnitude the OPTIMAL constant, so the FE row becomes an efficiency ratio (FE / interp)
+        # rather than a bare rate check — exactly the reference the manufactured-solution harnesses
+        # print (test/extended/ManufacturedSolutions/run_interpolation_reference.jl). Because the tube
+        # flow has no closed-form solution, the reference plays the role of the exact field: I_h u_ref
+        # replaces I_h u_exact, and the same N=200 self-reference calibrates both the FE and interp rows.
+        interp_l2_u = Float64[]; interp_h1_u = Float64[]
+        interp_l2_p = Float64[]; interp_h1_p = Float64[]
         eval_times = Float64[]; eval_iters = Int[]; mesh_success = Bool[]
 
         # S3 magnitude-gap probes (see docs/cocquet):
@@ -423,6 +434,19 @@ function run_convergence()
             l2_eu_trial, h1_eu_trial = PorousNSSolver.compute_trial_projection_errors(u_h, iu_ref, U_h, dΩ_h; filter_func=bounding_rule)
             l2_ep_trial, h1_ep_trial = PorousNSSolver.compute_trial_projection_errors(p_h, ip_ref, P_h, dΩ_h; filter_func=bounding_rule)
 
+            # Interpolation-reference errors (best-approximation floor). I_h u_ref = nodal interpolant of
+            # the reference onto the coarse FREE space (interpolate matches every Lagrange node, boundary
+            # included — the same object the MMS harness compares against). Measured with the SAME
+            # consistent metric (`.l2_cons`/`.h1_cons`, integrated on the fine reference mesh) as the FE
+            # error `l2_eu`/`h1_eu` above, so FE/interp is a clean efficiency. The extra fine-mesh
+            # cross-interpolation is the price of a solver-independent optimal-rate reference on every run.
+            u_I = interpolate(iu_ref, V_h_free)
+            p_I = interpolate(ip_ref, Q_h_free)
+            res_iu = PorousNSSolver.compute_reference_errors_multimask(u_I, u_ref, iu_ref, V_h_free, dΩ_h, dΩ_ref; masks=[bounding_rule], search_method=ksearch)
+            res_ip = PorousNSSolver.compute_reference_errors_multimask(p_I, p_ref, ip_ref, Q_h_free, dΩ_h, dΩ_ref; masks=[bounding_rule], search_method=ksearch)
+            l2_iu = res_iu.per_mask[1].l2_cons; h1_iu = res_iu.per_mask[1].h1_cons
+            l2_ip = res_ip.per_mask[1].l2_cons; h1_ip = res_ip.per_mask[1].h1_cons
+
             # S3 mode decomposition (uses iu_ref/ip_ref, which carry the KDTree search).
             md_u = PorousNSSolver.compute_mode_decomposition(u_h, iu_ref, V_h_free, dΩ_h)
             md_p = PorousNSSolver.compute_mode_decomposition(p_h, ip_ref, Q_h_free, dΩ_h)
@@ -432,6 +456,9 @@ function run_convergence()
             println("   [+] L2-norms | L2(u): ", l2_eu, " | L2(p): ", l2_ep)
             println("   [+] H1-seminorms | semiH1(u): ", h1_eu, " | semiH1(p): ", h1_ep)
             println("   [+] TRIAL | L2(u): ", l2_eu_trial, " | L2(p): ", l2_ep_trial)
+            println("   [+] INTERP-REF | L2(u): ", l2_iu, " | L2(p): ", l2_ip,
+                    " | eff L2(u)=", round(l2_eu / max(l2_iu, eps()), sigdigits=3),
+                    " | eff H1(u)=", round(h1_eu / max(h1_iu, eps()), sigdigits=3))
             println("   [+] S3 χ_Ω | u: ", round(md_u.chi_Omega, sigdigits=4), " | p: ", round(md_p.chi_Omega, sigdigits=4))
             r_idx_show = min(2, n_radii)
             println("   [+] Corner-excluded L²(u) (R=$(corner_excl_radii[r_idx_show])): ", l2_eu_corner_excl[n_idx, r_idx_show],
@@ -441,6 +468,8 @@ function run_convergence()
             push!(errors_l2_p, l2_ep); push!(errors_h1_p, h1_ep)
             push!(errors_l2_u_trial, l2_eu_trial); push!(errors_h1_u_trial, h1_eu_trial)
             push!(errors_l2_p_trial, l2_ep_trial); push!(errors_h1_p_trial, h1_ep_trial)
+            push!(interp_l2_u, l2_iu); push!(interp_h1_u, h1_iu)
+            push!(interp_l2_p, l2_ip); push!(interp_h1_p, h1_ip)
             push!(eval_times, time_h); push!(eval_iters, iters_h); push!(mesh_success, ok_h)
             push!(cellavg_frac_u, md_u.fraction_cellavg); push!(cellavg_frac_p, md_p.fraction_cellavg)
             push!(chi_Omega_u, md_u.chi_Omega);   push!(chi_Omega_p, md_p.chi_Omega)
@@ -463,6 +492,10 @@ function run_convergence()
             g["errors_h1_u_trial"] = errors_h1_u_trial
             g["errors_l2_p_trial"] = errors_l2_p_trial
             g["errors_h1_p_trial"] = errors_h1_p_trial
+            g["interp_l2_u"] = interp_l2_u
+            g["interp_h1_u"] = interp_h1_u
+            g["interp_l2_p"] = interp_l2_p
+            g["interp_h1_p"] = interp_h1_p
             g["eval_times"] = eval_times
             g["eval_iters"] = eval_iters
             g["mesh_success"] = Int8.(mesh_success)   # [mesh_success] per-mesh converged flag (Int8 1/0), read by plot_convergence.py

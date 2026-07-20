@@ -1,0 +1,36 @@
+{
+    "_comment": "BEST-QUALITY UNSTRUCTURED flip of unstructured_gmsh/paper_comparison_irregular.json. ONLY difference: mesh_algorithm=6 (gmsh Frontal-Delaunay) instead of the default 5 (plain Delaunay). Motivation (2026-07-19): a mesh-quality screen showed Frontal-Delaunay produces near-equilateral triangles (gamma quality mean 0.998, min 0.87, sliver tail eliminated) vs plain Delaunay (mean 0.949, min 0.65) with FEWER cells; and the settled Cocquet finding is that the O(h^2) slope for the Taylor-Hood (Galerkin P2/P1) row is recovered on ANY unstructured mesh (the structured Cartesian mesh locks in the outlet-corner singularity). This variant tests whether the highest-quality isotropic unstructured mesh ALSO tightens the constant/magnitude, per the 3D-MMS lesson that Delaunay->Frontal fixes the element-quality tail. comparison_runs orders the Cocquet Galerkin P2/P1 (Taylor-Hood) FIRST so its convergence + interpolation-error reference stream before the VMS rows. Re=500, c_in=0.5, transverse porosity; N_ref=200 self-reference over coarse N in {10,20,40,80,100}. eps_val/physical_epsilon=1e-7 (paper eta). Run: julia --project=../../.. run_convergence.jl data/unstructured_frontal/paper_comparison_frontal.json ; python plot_convergence.py unstructured_frontal",
+    "Re": 500.0,
+    "c_in": 0.5,
+    "boundary_policy": "standard",
+    "alpha_profile": "exponential",
+    "mesh_generator": "UNSTRUCTURED",
+    "mesh_algorithm": 6,
+    "k_convergence_list": [1],
+    "comparison_runs": [
+        { "k_velocity": 2, "k_pressure": 1, "method": "Galerkin", "porosity_order": 1 },
+        { "k_velocity": 1, "k_pressure": 1, "method": "ASGS" },
+        { "k_velocity": 2, "k_pressure": 2, "method": "ASGS" }
+    ],
+    "element_pairs": [[1, 1], [2, 2]],
+    "physical_properties": {
+        "nu": 0.002, "physical_epsilon": 1e-7, "sigma_linear": 0.30, "sigma_nonlinear": 1.75,
+        "h_floor_weight": 0.0, "f_x": 0.0, "f_y": 0.0
+    },
+    "domain": { "alpha_0": 1.0, "r_1": 0.2, "r_2": 0.5, "bounding_box": [0.0, 2.0, 0.0, 1.0] },
+    "outlet_truncation_delta": 0.0,
+    "interpolate_solution_to_coarser_meshes": false,
+    "numerical_method": {
+        "viscous_operator_type": "SymmetricGradient",
+        "stabilization": { "method": ["ASGS"] },
+        "element_spaces": { "k_velocity": 2, "k_pressure": 1 },
+        "mesh": { "partition": [400, 200], "convergence_partitions": [10, 20, 40, 80, 100], "element_type": "TRI" },
+        "solver": {
+            "picard_iterations": 2, "newton_iterations": 10, "xtol": 1e-11, "ftol": 1e-11,
+            "stagnation_noise_floor": 1e-5, "max_increases": 3, "linesearch_alpha_min": 1e-10,
+            "armijo_c1": 1e-4, "divergence_merit_factor": 1.05, "max_linesearch_iterations": 25,
+            "linesearch_contraction_factor": 0.5
+        }
+    },
+    "output": { "directory": "results", "basename": "cocquet_frontal_cmp" }
+}

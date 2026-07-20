@@ -44,6 +44,51 @@ Five lateral hypotheses were raised to explain the ~30–300× magnitude gap on 
 
 ---
 
+## 1c — 2026-07-19 update: Frontal-Delaunay mesh + always-on interpolation-error floor
+
+Two additions this date, both of which **confirm and quantify** the §1 settlement rather than change it.
+
+**(1) Best-quality unstructured mesh (`unstructured_frontal`, `mesh_algorithm=6`).** A mesh-quality screen
+showed gmsh Frontal-Delaunay (alg 6) produces near-equilateral triangles (gamma quality mean 0.998,
+min 0.87, sliver tail gone) vs plain Delaunay (alg 5) mean 0.949 / min 0.65, with *fewer* cells; BAMG
+(alg 7) is unusable here (482 huge triangles at N=40 — reproduces the Phase-12 "half the domain in one
+triangle"). On the Frontal mesh **all three methods recover the optimal O(h²) L²(u) slope** at the finest
+segment (Re=500, c_in=0.5, N∈{10,20,40,80,100}, ref N=200): Cocquet Galerkin P2/P1 → **2.20**, ASGS
+P2/P2 → **2.27**, ASGS P1/P1 → **2.33** (vs the structured cap of ~1.1–1.5). The Taylor-Hood and our
+VMS P2/P2 are neck-and-neck in magnitude (L²(u) @N=100 = 7.94e-5 vs 9.24e-5).
+
+**(2) The interpolation-error floor is now computed on every run** (`interp_{l2,h1}_{u,p}`, the MMS
+practice: `‖u_ref − I_h u_ref‖`, same consistent metric as the FE error). It sharpens two prior
+qualitative claims into numbers:
+
+- **The structured L² cap is corner POLLUTION through the solve, NOT a representation limit — the
+  Frontal mesh lifts it.** The floor separates the two mechanisms per norm (numbers = Galerkin P2/P1):
+  - **L²**: the *structured* best-approximation floor is near-optimal (interp slope **1.7–1.9**), yet the
+    structured FE L² slope is only ~1.5 with efficiency FE/interp **GROWING 1.2→3.8** — the corner
+    singularity, locked by the corner-aligned diagonals, pollutes L² through the solve. On *Frontal* the
+    FE L² slope recovers to ~2.2 with efficiency **SHRINKING 30→9** (the isotropic mesh does not lock the
+    corner). The two meshes *represent* the solution comparably at coarse N (floor 2.56e-4 structured vs
+    1.82e-4 Frontal at N=10); the ~18× magnitude difference there is almost entirely a solve-efficiency
+    gap (eff 1.2 vs 30), not a representation gap.
+  - **H¹ (energy)**: on the *structured* mesh the FE sits on its floor (eff **≈1.15, constant**) and BOTH
+    are capped at slope **~0.78** — the corner singularity genuinely limits the H¹ best-approximation on a
+    quasi-uniform mesh; only corner-graded refinement would move it. *Frontal* FE H¹ reaches ~1.30
+    (eff 7→1.7; its H¹ floor is pre-asymptotic too, slope 0.4–0.8). Pressure efficiency ≈1 on both.
+  - **Mesh QUALITY is not the magnitude lever**: Frontal (near-perfect quality) gave essentially the same
+    magnitude as plain Delaunay (5.52e-3 vs Phase-11 5.86e-3 at N=10). (Correction to a first reading that
+    said "structured eff ≈1": that holds only for H¹ and only at coarse N in L² — the L² efficiency grows.)
+- **The magnitude gap is reinforced as a measurement difference in Cocquet's solver.** Our Frontal
+  interpolation floor is itself **5–56× above Cocquet's reported L²(u)** (1.82e-4 vs ~3.7e-5 at N=10;
+  8.48e-6 vs ~1.5e-7 at N=100). A Galerkin solution cannot beat its own best interpolant, so Cocquet's
+  numbers sitting *below our achievable best-approximation floor* means the residual ~150–530× gap cannot
+  be a defect in our discretization — it is a representation/measurement difference (H-D, §1a/§7).
+
+Canonical result files: `test/extended/CocquetTubeTest/results/unstructured_frontal/` (config +
+`convergence.h5` + `convergence.png`). Paper Fig-2 magnitudes re-verified from 400-DPI PDF crops:
+L²(u) ≈ 3.7e-5 (N=10) → ~1.5e-7 (N=100, floor); Err_tot ≈ 4.5e-4 → ~3.5e-6, slope ≈ −2.
+
+---
+
 ## 2 — Headline numbers
 
 > **Read through the §1 correction.** The "320×–845×" ratios in this section are from the `freefem-divs` mesh — slope-aligned but not magnitude-best. The **settled** magnitude gap is **~30× (coarse) → ~300× (fine)** (§1). These rows are kept for provenance.
