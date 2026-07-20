@@ -85,6 +85,7 @@ latex\ compilation/
 /theory/paper/supplement.pdf
 /theory/paper/shared.pdf
 /theory/paper/elemental_matrices_appendix.pdf
+/theory/paper novelties/paper_novelties.pdf
 /theory/cocquet/cocquet_formulation.pdf
 /theory/cocquet/cocquet_form_mms_manufactured_solution.pdf
 /proof_verification/coq_coverage.pdf

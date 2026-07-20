@@ -1,0 +1,32 @@
+# latexmk configuration file for porous_NS_with_Gridap — theory/paper novelties
+# Keep the build clean: route all auxiliary/intermediate files into a per-target
+# 'latex compilation/<basename>/' subfolder and leave ONLY the PDF beside the
+# source. See .agents/rules/clean-latex-compilation.md.
+
+# Route auxiliary files to a target-specific subdirectory.
+# Compute the basename explicitly from @ARGV rather than relying on latexmk's %B
+# interpolation: some latexmk versions (e.g. TeX Live's v4.79/4.83) leave %B
+# literal inside $aux_dir, scattering intermediates into a stray 'latex
+# compilation/%B/' folder. The @ARGV approach routes identically on every
+# platform/latexmk version (same as ../paper/latexmkrc and proof_verification/latexmkrc).
+my $target = "";
+foreach my $arg (@ARGV) {
+    next if $arg =~ /^-/;
+    if ($arg =~ /^(.*)\.tex$/) { $target = $1; last; }
+    if (-e "$arg.tex")         { $target = $arg; last; }
+}
+$target =~ s/.*\///;
+$target = "paper_novelties" if $target eq "";
+
+$aux_dir = "latex compilation/$target";   # all intermediates go here
+
+# Keep the output PDF in the source directory
+$out_dir = '.';
+
+# Emit .synctex.gz beside the PDF for editor forward/inverse search
+$pdflatex = 'pdflatex -synctex=1 %O %S';
+
+# Clean up intermediate files that latexmk knows about
+$clean_ext = 'synctex.gz synctex\(busy\) thm bbl blg';
+
+print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to './'\n";

@@ -1,0 +1,1274 @@
+\documentclass[11pt]{article}
+
+% =====================================================================
+%  Changelog: original submission (AMMOD-S-25-00784) vs. current article.tex
+%  Self-contained standalone document. Compile with pdflatex/latexmk.
+% =====================================================================
+
+\usepackage[a4paper,margin=2.3cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage[strings]{underscore}  % let _ print literally in text (e.g. eq:foo_bar) and stay subscript in math
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{microtype}
+\usepackage[colorlinks=true,linkcolor=linkc,urlcolor=linkc,citecolor=linkc]{hyperref}
+\usepackage{titlesec}
+
+% ---- colours --------------------------------------------------------
+\definecolor{origc}{rgb}{0.70,0.20,0.10}   % rust: "original / submitted"
+\definecolor{newc}{rgb}{0.10,0.35,0.65}    % blue: "current / article.tex"
+\definecolor{locc}{rgb}{0.35,0.35,0.35}
+\definecolor{linkc}{rgb}{0.15,0.30,0.55}
+\definecolor{amend}{rgb}{0.58,0.0,0.83}    % same violet used by \amend in the paper
+\definecolor{headc}{rgb}{0.12,0.22,0.40}
+
+\titleformat{\section}{\color{headc}\large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\color{headc}\normalsize\bfseries}{}{0em}{}
+
+% ---- paper projection-operator shorthands (from the paper's shared macros) ---
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\text{DS}}}{\Pi}}
+\newcommand{\DPi}{\overset{\scriptscriptstyle{\text{D}}}{\Pi}}
+\newcommand{\SPi}{\overset{\scriptscriptstyle{\text{S}}}{\Pi}}
+
+% ---- reference tags -------------------------------------------------
+\newcommand{\Orig}{\textcolor{origc}{\footnotesize\textsc{orig}}}
+\newcommand{\New}{\textcolor{newc}{\footnotesize\textsc{new}}}
+\newcommand{\code}[1]{\textcolor{newc}{\ttfamily\small #1}}
+\newcommand{\pdfp}[1]{PDF~p.\,#1}
+\newcommand{\artl}[1]{art.\ L#1}       % article.tex line
+\newcommand{\appl}[2]{#1~L#2}          % appendix-file line
+
+% ---- one change entry ----------------------------------------------
+% \ch{title}{orig-ref}{new-ref}{gist}
+\newcommand{\ch}[4]{%
+  \item \textbf{#1}\newline
+    {\footnotesize\Orig\ #2 \ \textcolor{locc}{$\longmapsto$} \ \New\ #3}\newline
+    #4}
+
+\setlist[itemize]{leftmargin=1.4em,itemsep=0.55em,topsep=0.3em}
+
+% =====================================================================
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries\color{headc} Changes since the original submission}\\[4pt]
+  {\large A stabilized finite element method for incompressible, inertial\\
+   flows in inhomogeneous porous media}\\[8pt]
+  {\normalsize Casas, Gonz\'alez-Us\'ua, Codina, de-Pouplana}\\[6pt]
+  {\small An exhaustive, classified list of every difference between the
+   \textbf{originally submitted manuscript} and the \textbf{current} \code{article.tex}.}
+\end{center}
+
+\vspace{0.4em}
+\hrule
+\vspace{0.8em}
+
+\noindent\textbf{What is being compared.}
+The ``original'' is the manuscript submitted to \emph{Applied Mathematical Modelling}
+(\texttt{AMMOD-S-25-00784.pdf}, 14/02/2025): a $33$-page body plus $32$ references,
+\emph{with no appendices}. The ``current'' is today's \code{article.tex} together with its
+three inlined appendices. Both were checked source-to-source (the submitted PDF corresponds
+byte-for-content to the source at that date), so nothing here is inferred from OCR.
+
+\noindent\textbf{How to read a reference.}
+Each entry carries two pointers:
+\ \Orig\ points into the submitted PDF (section, submitted equation number, and \pdfp{$\cdot$}
+for the page you navigate to in the PDF viewer; the manuscript body starts at \pdfp{5});
+\ \New\ points into the current source (section, \code{equation-label}, and \artl{$\cdot$}
+$=$ line in \code{article.tex}, or \appl{file}{$\cdot$} for a line in an appendix file).
+Equation \emph{labels} are quoted because they are stable across both versions; submitted
+equation \emph{numbers} (e.g.\ ``eq.~(4.24)'') are what a co-author sees in the PDF.
+
+\noindent\textbf{Two global, non-itemized conventions} (each would otherwise generate dozens of
+trivial rows, so they are stated once here and not repeated):
+\begin{itemize}[itemsep=2pt,topsep=2pt]
+  \item \emph{Notation.} Every bold symbol was re-typeset \verb|\pmb{...}| $\to$
+        \verb|\boldsymbol{...}| throughout ($368$ occurrences). Purely cosmetic.
+  \item \emph{Review markup.} The current source introduces a violet \verb|\amend{...}| macro
+        flagging the deliberate 2026 correction pass; \textcolor{amend}{most substantive
+        changes below are wrapped in it}. It coexists with the pre-existing red
+        \verb|\Guillermo| / blue \verb|\Joaquin| author-annotation macros, which were
+        \emph{resolved} (accepted or deleted) in this revision.
+\end{itemize}
+
+\vspace{0.5em}
+\noindent\textbf{Totals.} $190$ distinct changes, classified below as:
+\begin{center}\small
+\begin{tabular}{lccccccc}
+\toprule
+ & New parts & New analysis & Parts removed & Formula corr. & Text errata & Others & \textbf{Total}\\
+\midrule
+count & 35 & 45 & 4 & 57 & 17 & 32 & \textbf{190}\\
+\bottomrule
+\end{tabular}
+\end{center}
+\emph{(``Parts removed'' counts only pure deletions of content. Several formula corrections
+are themselves deletions of a term or a table row; those are listed under Formula corrections
+and cross-referenced from \S3.)}
+
+% =====================================================================
+\section*{The ten headline changes}
+\addcontentsline{toc}{section}{The ten headline changes}
+\begin{enumerate}[leftmargin=1.7em,itemsep=3pt]
+\item \textbf{A brand-new Appendix~C} ($\sim$1000 lines) gives the \emph{complete} a~priori
+  \emph{continuity} and $O(h^{k+1})$ \emph{convergence} proof that the submitted \S5 only asserted
+  (``convergence follows as in [Codina 2001]''). This is the paper's central new rigour.
+\item \textbf{A brand-new \S7.3} compares the method against Cocquet et al.'s inf--sup-stable
+  Taylor--Hood discretization on the DBF equations; headline result: unstabilized Taylor--Hood
+  \emph{velocity fails to converge} at high Reynolds number while the stabilized method stays optimal.
+\item \textbf{All numerical experiments were re-run.} The finest 2D mesh changed $640^2\to320^2$,
+  the 3D meshes were regenerated with two new Gridap families, and \emph{every} value in Tables~1--6
+  changed. Nodal-interpolant reference rows were added everywhere.
+\item \textbf{Porosity-weighted sharpening.} The convergence/robustness estimates were re-derived
+  in a sharper form: the crude prefactor $1/\alpha_0$ became $\alpha_0^{-1/2}$ throughout \S6, and an
+  $\alpha_K$ weight was threaded through \S5's continuity/convergence statements.
+\item \textbf{Three appendices are now inlined} (elemental matrices, Fourier design, continuity);
+  the submitted manuscript had none. Appendix~B ($\sim$120 lines) is a new term-by-term Fourier
+  derivation of $\tau$; Appendix~A was corrected and framed as the linearized (fixed-point) system.
+\item \textbf{Genuine formula errors were fixed} in the core operators, e.g.\ the deviatoric
+  constant $2/3\to2/d$, a missing factor $2$ in the Neumann traction, a missing $|k_0|^2$ and the
+  wrong coefficient in $\tau_{\nu,1}$, absolute-value bars in $\tau_{c,1}$, an equality that should
+  have been an inequality, and a missing factor $5$ in the summed-norm bound.
+\item \textbf{The tentative $(1/\alpha)\nabla\!\cdot\!(\alpha a)\,v$ adjoint term was deleted}
+  (it had been under discussion in red markup), consistent with keeping the $A^2-B^2$ symmetry of
+  the stability estimate.
+\item \textbf{The 3D coercivity constant was corrected}: quadratic tetrahedra need $c_1=16k^4$
+  (not $4k^4$), a genuine finding of the revision, confirmed numerically.
+\item \textbf{Scope was honestly delimited and the implementation disclosed.} New paragraphs state
+  exactly what the estimates cover (linearized/ASGS/constant-$\sigma$/all-Dirichlet) versus what is
+  computed, and document the Gridap implementation and Newton--Krylov solver.
+\item \textbf{The abstract, keywords and MSC codes were updated} to advertise the new a~priori
+  analysis and the expanded experiments, and to reclassify the paper as porous-media stationary FE.
+\end{enumerate}
+
+\vspace{0.4em}\hrule\vspace{0.2em}
+
+% #####################################################################
+\section{New parts}
+\emph{Wholly new subsections, paragraphs, remarks, equations, tables, footnotes or appendices
+that did not exist in the submitted manuscript.}
+
+\subsection{Introduction}
+\begin{itemize}
+\ch{Restored ``Darcy flows / stabilized FE'' paragraph}
+   {\S1, \pdfp{5} (present only as a commented-out line, not rendered)}
+   {\S1, \artl{218}}
+   {A sentence cluster motivating stabilized FE methods for Darcy flows was un-commented and
+    restored to visible text, adding four citations (Masud, Juanes, Codina, Braack).}
+\ch{New argument: residual stabilization controls convection \emph{and} reaction}
+   {\S1, \pdfp{6} (did not exist)}
+   {\S1, \artl{241}}
+   {A new closing sentence argues that, unlike an inf--sup-stable pair, residual-based
+    stabilization simultaneously controls convection- and reaction-dominance, forward-referencing
+    the new \S7.3 where Taylor--Hood velocity fails to converge.}
+\end{itemize}
+
+\subsection{\S3 Variational multiscale approach}
+\begin{itemize}
+\ch{New footnote justifying projection on \emph{unconstrained} spaces}
+   {n/a (new)}
+   {\S3.2, footnote on \code{eq:NonlinearResidualProjection}, \artl{610}}
+   {Explains that the residual projection $\pi_h$ is taken over the velocity/pressure spaces
+    \emph{without} Dirichlet constraints; projecting on the constrained space would inject an
+    $O(1)$ boundary residual that spoils optimal $O(h^{k+1})$ convergence.}
+\ch{New algebraic system $F(U)=0$ and Picard framing}
+   {\S3.3, one lead-in sentence, \pdfp{13}}
+   {\S3.3, \code{eq:AlgebraicNonlinearSystem} + two paragraphs, \artl{615}--634}
+   {The terse lead-in is replaced by a displayed nonlinear algebraic system, an itemization of
+    its nonlinearity sources ($\text{convection},\tau_K,\pi_h$), and an explicit justification of
+    the staggered iteration as a fixed-point (Picard) linearization.}
+\ch{New paragraph pointing to the elemental-matrices appendix}
+   {n/a (new)}
+   {\S3.3, \artl{636}}
+   {States that all worked-out elemental-matrix entries of the linearized stabilized form are
+    given in the new \code{app:ElementalMatrices}.}
+\end{itemize}
+
+\subsection{\S4 Stabilization design}
+\begin{itemize}
+\ch{Pointer to the new Fourier appendix}
+   {\S4, \pdfp{16} (no appendix existed)}
+   {\S4, \artl{790}; appendix \code{app:FourierTau}}
+   {A sentence directs the reader to the new appendix holding the term-by-term derivation of the
+    stabilization parameters from the Fourier symbols.}
+\end{itemize}
+
+\subsection{\S5 Stability and convergence}
+\begin{itemize}
+\ch{New remark: $\tau_2$ (final) vs.\ full $\tau_2$ equivalence}
+   {\S5, after \code{eq:Tau2Final}, \pdfp{19} (did not exist)}
+   {\S5, remark at \artl{840}--842}
+   {Justifies using $\tau_2$ without its $\varepsilon h^2$ term: under \code{eq:UpperBoundOnEpsilon}
+    the two differ by at most $1+C_2<2$, so every estimate transfers with constants inflated by
+    $\le 1+C_2$. Closes a previously unaddressed gap.}
+\ch{New paragraph explaining the porosity-weighted convergence bound}
+   {\S5, after \code{eq:InterpolationError}, \pdfp{22} (did not exist)}
+   {\S5, \artl{975}}
+   {States that \code{eq:ConvergenceResult} is now in its sharpest porosity-weighted form
+    ($\alpha_K\le1$ tightens the bound at low porosity) and points to the complete proof in
+    \code{app:Continuity}.}
+\end{itemize}
+
+\subsection{\S7 Numerical examples (2D/3D) and the new comparison}
+\begin{itemize}
+\ch{New scope-delimiting opening paragraph}
+   {\S7 intro, \pdfp{26} (absent)}
+   {\S7, \artl{1080}--1091}
+   {Honestly frames what the numerics validate: the estimates apply verbatim only to the
+    linearized problem, ASGS, constant $\sigma$ and all-Dirichlet BCs, whereas the experiments solve
+    the nonlinear problem with ASGS \emph{and} OSGS (and velocity-dependent $\sigma$ in \S7.3); no
+    estimate covers OSGS, and the bounds are one-sided.}
+\ch{New ``centered dimensional encoding'' paragraph}
+   {\S7 intro, \pdfp{26} (absent)}
+   {\S7, \artl{1131}--1137}
+   {A displayed reparametrization ($\nu=1/\sqrt{\alpha_\infty Da}$, $\sigma=\sqrt{\alpha_\infty Da}$,
+    $U=Re/\sqrt{\alpha_\infty Da}$) centers the coefficients about unity via $\sqrt{\nu\sigma}=1$,
+    avoiding the $\sim\!10^{12}$ magnitudes a naive $U{=}1$ would produce; leaves normalized errors
+    unchanged.}
+\ch{New excluded-corner (turning point) paragraph}
+   {\S7.1, \pdfp{26} (absent)}
+   {\S7.1, \artl{1142}}
+   {Explains that of the eighteen $(Re,\alpha_0)$ cells the strongly convective, low-porosity corner
+    $(10^6,0.05)$ is excluded (fifteen remain): the discrete problem has no solution on coarse meshes
+    there --- a fold where Newton/Picard stall --- that recedes under refinement.}
+\ch{New nodal-interpolant reference discussion}
+   {\S7.1, \pdfp{26} (absent)}
+   {\S7.1, \artl{1146}}
+   {Introduces the error of the exact solution's nodal interpolant as an absolute yardstick
+    (independent of $Re,Da$, method), shows the velocity error sits on it in $H^1$ away from
+    convection/reaction, and notes the $\mathbb{P}_1$ interpolant is not the best $L^2$
+    approximation (factor $\sqrt6$).}
+\ch{New ASGS/OSGS reaction-gap paragraph}
+   {\S7.1, \pdfp{26} (absent)}
+   {\S7.1, \artl{1156}}
+   {Analyses the campaign's largest velocity discrepancy ($\mathbb{P}_1$, $H^1$, $Da{=}10^6$): the
+    permitted $Da^{1/2}$ deterioration does not materialize ($\sim$3.5 vs.\ $\sim$$10^3$), the OSGS
+    excess is porosity-independent, decays under refinement, and vanishes at $Re{=}10^6$ ---
+    a pre-asymptotic effect the analysis does not resolve.}
+\ch{New paragraph on the 3D viscous constant $c_1=16k^4$}
+   {n/a (new)}
+   {\S7.2, \artl{1427}}
+   {Explains (with a footnote of direct numerical confirmation) that tetrahedra need a larger
+    viscous constant: $\mathbb{P}_2$ loses elementwise coercivity unless $c_1\ge2\hat c^2(K)$,
+    $\sim$4.5$\times$ larger on the Kuhn tetrahedron than the right triangle, so all 3D runs use
+    $c_1=16k^4$ (four times the 2D value), keeping $c_2=2k^2$.}
+\ch{\textbf{New subsection \S7.3}: comparison with an inf--sup-stable formulation}
+   {n/a (new); the submitted \S7 spanned only \pdfp{26}--29}
+   {\S7.3 \code{sec:NumericalExampleFromLiterature}, \artl{1540}--1646}
+   {A whole new final numerical subsection compares the equal-order stabilized method
+    ($\mathbb{P}_1/\mathbb{P}_1$, $\mathbb{P}_2/\mathbb{P}_2$, ASGS and OSGS) against Cocquet et al.'s
+    inf--sup-stable Taylor--Hood $\mathbb{P}_2/\mathbb{P}_1$ element on the DBF equations, using
+    manufactured solutions so both meet the exact-error standard over $Re\in\{1,10^5\}$,
+    $\alpha_0\in\{0.5,0.1\}$.}
+\ch{New Ergun-type resistance definition}
+   {n/a (new)}
+   {\S7.3, \code{eq:CocquetMMSReaction}, \artl{1544}}
+   {New displayed law $a(\alpha)=C_a((1-\alpha)/\alpha)^2$, $b(\alpha)=C_b((1-\alpha)/\alpha)$,
+    $C_a{=}0.30$, $C_b{=}1.75$, with a note on the shared-$\nu$ scaling that renders $Da$
+    independent of $Re$.}
+\ch{New convergence table (L$^2$)}
+   {n/a (new)}
+   {\S7.3, \code{tab:CocquetMMSL2}, \artl{1552}--1595}
+   {Observed slopes and finest-mesh error in the $L^2$-norm for all three discretizations plus
+    interpolation references across the four $(Re,\alpha_0)$ corners.}
+\ch{New convergence table (H$^1$)}
+   {n/a (new)}
+   {\S7.3, \code{tab:CocquetMMSH1}, \artl{1597}--1640}
+   {Companion table in the $H^1$-seminorm, reinforcing the $L^2$ findings.}
+\ch{New finding: Taylor--Hood velocity non-convergence at high $Re$}
+   {n/a (new)}
+   {\S7.3, \artl{1644}}
+   {At $Re{=}10^5$ the unstabilized Galerkin Taylor--Hood velocity stagnates at $O(1)$ (``n.c.'')
+    for lack of control of the dominant convective term, while the equal-order stabilized method
+    stays optimal.}
+\end{itemize}
+
+\subsection{\S8 Conclusions}
+\begin{itemize}
+\ch{New paragraph on the 3D constant and the Cocquet result}
+   {n/a (new)}
+   {\S8, \artl{1657}}
+   {Highlights two takeaways: (i) the a~priori condition predicts, and 3D experiments confirm, that
+    quadratic tetrahedra need $c_1=16k^4$; (ii) \S7.3 shows the method matches Taylor--Hood accuracy
+    without a compatible pair and stays convergent where Galerkin Taylor--Hood does not.}
+\end{itemize}
+
+\subsection{Appendix A --- Elemental matrices (\code{elemental\_matrices\_appendix.tex})}
+\begin{itemize}
+\ch{Appendix A is now compiled into the paper}
+   {absent from the submitted PDF (no appendices existed); it lived only as an uncompiled file}
+   {App.~A \code{app:ElementalMatrices}, \appl{elemental\_matrices\_appendix.tex}{1}--378}
+   {The full elemental-matrices derivation (all sub-blocks, boundary terms, assembled matrices)
+    is included in the revised paper.}
+\ch{New remark on the iterative-penalty mass term}
+   {n/a (new)}
+   {\appl{elemental\_matrices\_appendix.tex}{39}--41}
+   {States that in the penalty variant of \S7.2 the mass component of $F$ is $\varepsilon p^{m-1}$
+    (not zero), so $\overline\phi=\varepsilon p^{m-1}-\pi_{\text{mass}}$ and the Galerkin RHS gains a
+    $(q,\varepsilon p^{m-1})$ term. Cleanly separates the general case from the penalty variant.}
+\end{itemize}
+
+\subsection{Appendix B --- Fourier design details (\code{fourier\_appendix.tex}, new file)}
+\begin{itemize}
+\ch{New Appendix B: term-by-term $\tau$ derivation from the Fourier symbol}
+   {n/a (new); expands the \S4 sketch after \code{eq:StabilizationParameters}, \pdfp{14}--18}
+   {App.~B \code{app:FourierTau}, \appl{fourier\_appendix.tex}{1}--121}
+   {A new $\sim$120-line appendix deriving each parameter block from the Fourier symbol: the viscous
+    double-contraction and its eigenpairs, the convective spectral radius, the pressure/divergence
+    coupling via a diagonal generalized eigenproblem, the zeroth-order reaction/porosity blocks, and
+    reassembly (with the choice of $\lambda$) recovering \code{eq:Tau1}/\code{eq:Tau2}. This is
+    \emph{new} derivation --- \S4 previously jumped straight from the Fourier operators to the final
+    parameters --- and \S4 is retained, now pointing here.}
+\end{itemize}
+
+\subsection{Appendix C --- Continuity / convergence proofs (\code{continuity\_appendix.tex}, new file)}
+\begin{itemize}
+\ch{New Appendix C: self-contained continuity + convergence proof}
+   {\S5 stated \code{lemma:Continuity} and \code{th:Convergence} \emph{without proof}, \pdfp{22}}
+   {App.~C \code{app:Continuity}, \appl{continuity\_appendix.tex}{1}--1019}
+   {A $\sim$1000-line appendix supplying the complete rigorous proof of $B_{\mathrm S}$ continuity and
+    of the $O(h^{k+1})$ convergence theorem the submitted paper only asserted. This closes the
+    paper's central analytical gap.}
+\ch{Formalized setting and five named assumptions}
+   {\S5, \pdfp{19}--22 (only informal hypotheses)}
+   {\S C.1, \appl{continuity\_appendix.tex}{147}--216 (\code{H:data}, \code{H:porosity},
+    \code{H:advection}, \code{H:mesh}, \code{H:jump})}
+   {The vague hypotheses ($\alpha a$ weakly div-free, $\nabla\alpha$ bounded, non-degenerate mesh)
+    become five precise, auditable assumptions with explicit constants ($\delta_\alpha$,
+    $C_{\!\nabla\alpha}$, the penalty smallness, and the $\tau_1$ jump condition).}
+\ch{New lemma: parameter inequalities (P1--P5)}
+   {n/a (new)}
+   {\code{lem:parameters}, \appl{continuity\_appendix.tex}{220}--271}
+   {Consolidates all $\tau_1/\tau_2/\varphi_1/\tilde\sigma/\varepsilon$ algebraic inequalities the
+    proof relies on (e.g.\ $\sigma\tau_1\le1$, $\varepsilon\tau_2\le C_2<1$) --- bookkeeping that was
+    implicit and unstated in \S5.}
+\ch{New lemma: weighted inverse estimates with enlarged constant}
+   {\S5's single inverse estimate \code{eq:InverseEstimateFiniteOrderNorm}, \pdfp{20}}
+   {\code{lem:winv}, \appl{continuity\_appendix.tex}{273}--353}
+   {Proves five $\alpha$-weighted inverse estimates and identifies the correct enlarged constant
+    $C_{\mathrm{inv},\alpha}=\sqrt{d\,\delta_\alpha}\,C_{\mathrm{inv}}+C_{\!\nabla\alpha}$ (since
+    $\alpha$ is not piecewise polynomial); a remark reconciles it with the main text's abuse of
+    notation.}
+\ch{New lemma: jump of $\tau_1$ across interior faces}
+   {n/a (new; analogue of Codina 2001 cond.~(39))}
+   {\code{lem:jump}, \appl{continuity\_appendix.tex}{355}--377}
+   {Bounds $[\![\tau_1]\!]$ by $\tilde\sigma\tau_1$, the estimate that controls the $\sigma>0$
+    inter-element face terms; absent from the original sketch.}
+\ch{Full continuity proof (18-term decomposition, Steps 0--9)}
+   {\S5 \code{lemma:Continuity}, stated only, \pdfp{22}}
+   {\code{lem:continuity}, \appl{continuity\_appendix.tex}{381}--817}
+   {$B_{\mathrm S}$ is split into 18 terms mirroring Codina (2001) (42)--(59), each bounded by the
+    triple norm through nine explicit steps, incl.\ the convective-pressure integration-by-parts
+    group and facewise jump bookkeeping. The appendix's core result.}
+\ch{New interpolation estimates and error functional $\psi(h)$}
+   {\S5 \code{eq:InterpolationError} only, \pdfp{22}}
+   {\S C.4.1, \appl{continuity\_appendix.tex}{841}--890}
+   {States the standard Lagrange $L^2/H^1/L^\infty$ interpolation estimates and defines the
+    porosity-weighted error functional $\psi(h)$ that packages the final rate.}
+\ch{New lemma: continuity for the interpolation error}
+   {\S5 mentioned only ``a modified version of \code{lemma:Continuity}'', \pdfp{22}}
+   {\code{lem:continterp}, \appl{continuity\_appendix.tex}{894}--977}
+   {Re-runs the continuity proof with the interpolation error as first argument, giving
+    $B_{\mathrm S}(a;U-\widehat U_h,V_h)\le C\,\psi(h)\,|\!|\!|V_h|\!|\!|$ --- the exact piece the
+    convergence theorem needs.}
+\ch{Convergence theorem with full proof}
+   {\S5 \code{th:Convergence}, ``follows as in Codina 2001'', \pdfp{22}}
+   {\code{thm:convergence}, \appl{continuity\_appendix.tex}{989}--1013}
+   {Proves convergence from stability $+$ consistency $+$ \code{lem:continterp} via a C\'ea-type
+    argument, delivering the sharp porosity-weighted $O(h^{k+1})$ bound $|\!|\!|U-U_h|\!|\!|\le
+    C\,\psi(h)$.}
+\end{itemize}
+
+\subsection{References}
+\begin{itemize}
+\ch{Added the two Gridap software citations}
+   {References, \pdfp{35} (absent)}
+   {\code{badia2020gridap}, \code{verdugo2022gridap}; cited \artl{1093}}
+   {New entries for the Gridap.jl library, cited in the new \S7 paragraph disclosing that all
+    experiments were run with a Gridap implementation --- reproducible software provenance.}
+\ch{Added Ern \& Guermond FE textbook}
+   {References, \pdfp{35} (absent)}
+   {\code{ernguermond}; cited \appl{continuity\_appendix.tex}{863}}
+   {New entry backing the standard interpolation-theory estimate used in Appendix~C.}
+\end{itemize}
+
+% #####################################################################
+\section{New analysis within existing parts}
+\emph{Added derivation, justification, clarification or explanation that deepens material already
+present --- as opposed to a wholly new structural piece.}
+
+\subsection{Abstract \& Introduction}
+\begin{itemize}
+\ch{Abstract: new a~priori-analysis sentence}
+   {Abstract, \pdfp{1}}
+   {Abstract, \artl{204}}
+   {A new sentence announces the a~priori stability/convergence analysis of the linearized method,
+    with $Re$/$Da$-robust estimates and a porosity-weighted norm making the dependence on the minimum
+    porosity explicit --- advertising the paper's new theoretical contribution.}
+\ch{Abstract: expanded description of the experiments}
+   {Abstract, \pdfp{1}}
+   {Abstract, \artl{204}}
+   {A new em-dash clause itemizes the experiments as 2D/3D manufactured solutions plus a Taylor--Hood
+    comparison on the DBF equations, where the original said only ``a selection of numerical
+    experiments''.}
+\ch{Clarification of ``reaction-dominated''}
+   {\S1, \pdfp{6}}
+   {\S1, \artl{233}}
+   {Adds a parenthetical: reaction-dominated means dominated by the term proportional to the fluid
+    velocity, by analogy with classical convection--diffusion--reaction.}
+\ch{Scope statement: single-phase, time-independent}
+   {\S1, \pdfp{6}}
+   {\S1, \artl{237}}
+   {The goals now specify ``single-phase'' flows and explicitly restrict scope to the
+    time-independent problem, deferring time dependence to future work.}
+\end{itemize}
+
+\subsection{\S2 Continuous problem}
+\begin{itemize}
+\ch{Precise physical meaning of the resistance tensor $\sigma$; $\nu$ defined}
+   {\S2, prose after \code{eq:StrongMassEquation}, \pdfp{7}}
+   {\S2, \artl{254}}
+   {``(the inverse of the permeability tensor)'' is replaced by the more accurate ``(equal, in the
+    linear Darcy limit, to the kinematic viscosity times the inverse permeability)'', and $\nu$ is
+    defined --- fixing an imprecise statement and supplying a previously-undefined symbol.}
+\ch{$\alpha\equiv1$ limit reidentified}
+   {\S2, \pdfp{7}}
+   {\S2, \artl{260}}
+   {``the incompressible Navier--Stokes system is recovered'' becomes ``the model of
+    \code{codina2001stabilized} is recovered'', i.e.\ NS \emph{with} a viscous resistance term
+    --- clarifying that the reaction term persists in the limit.}
+\end{itemize}
+
+\subsection{\S3 Variational multiscale approach}
+\begin{itemize}
+\ch{Linearized form tied to the \S5 analysis}
+   {\S3.3, \pdfp{14}}
+   {\S3.3, \artl{634}}
+   {The closing sentence now states this lagged/linearized form is the one on which the \S5 analysis
+    is carried out, with $u^{m-1}$ replaced by a prescribed field $a$ satisfying
+    $\nabla\!\cdot\!(\alpha a)=0$.}
+\ch{Reaction-projection trim scoped to constant vs.\ velocity-dependent $\sigma$}
+   {\S3.3, \pdfp{14}}
+   {\S3.3, \artl{638}}
+   {The paragraph on omitting reaction terms from the orthogonal projection now specifies it applies
+    only when $\sigma$ is constant (the manufactured examples); for the velocity-dependent $\sigma$
+    of \code{eq:DBFResistanceTerm} the full residual is projected and the implementation coincides
+    with \code{eq:OSGSProblem}.}
+\end{itemize}
+
+\subsection{\S4 Stabilization design}
+\begin{itemize}
+\ch{Definition of the operator norm $|\widehat{\mathcal L}|_\Lambda$ added}
+   {\S4, after \code{eq:BoundProjectionOfLBySubscales} (eq.~(4.4)), \pdfp{15}}
+   {\S4, \artl{725}}
+   {A new sentence defines $|\widehat{\mathcal L}|_\Lambda$ as the operator norm from
+    $(\mathbb C^n,|\cdot|_{\Lambda^{-1}})$ to $(\mathbb C^n,|\cdot|_\Lambda)$, coinciding with
+    $\rho_{\Lambda^{-1}}(\widehat{\mathcal L}^\dagger\Lambda\widehat{\mathcal L})^{1/2}$ --- making the
+    previously-implicit norm precise.}
+\ch{Operator-decomposition rationale expanded and cited}
+   {\S4, before eq.~(4.6), \pdfp{16}}
+   {\S4, \artl{733}}
+   {Adds citations and replaces the vague ``decompose the matrices into similar physical effects''
+    with a precise grouping criterion (derivative order, momentum vs.\ mass conservation,
+    integration by parts).}
+\ch{Dimension-dependence of the dropped viscous factor spelled out}
+   {\S4, after the $\lambda$ definition, \pdfp{17}}
+   {\S4, \artl{805}}
+   {Consistent with the $4/3\to(2-2/d)$ correction, the text now says the $O(1)$ factor $2-2/d$ is
+    ignored --- $4/3$ for $d{=}3$ but exactly $1$ for $d{=}2$, so for the 2D experiments there is
+    nothing to drop.}
+\end{itemize}
+
+\subsection{\S5 Stability and convergence (sharpenings)}
+\begin{itemize}
+\ch{Inverse estimate applied to the non-polynomial porosity term}
+   {\S5, after \code{eq:InverseEstimateFiniteOrderNorm} (eq.~(5.8)), \pdfp{20}}
+   {\S5, \artl{886}}
+   {New paragraph: because $\alpha$ is not piecewise polynomial the inverse estimate does not apply
+    directly to $\nabla\!\cdot\!(\alpha\nu\Pi\nabla u_h)$; expanding the divergence recovers the same
+    elemental estimates with a modified constant $\overline C_{\mathrm{inv}}$ --- filling a rigor gap.}
+\ch{Pressure-term coefficient made explicit; margin justified}
+   {\S5, \code{eq:PressureTermStabilityBound} (eq.~(5.11)), \pdfp{20}}
+   {\S5, \artl{901}--905}
+   {The loose $\varepsilon(1-\varepsilon\tau_2)>C\varepsilon$ becomes
+    $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon=:C\varepsilon$, with prose noting the bare
+    strict inequality $\varepsilon\tau_2<1$ gives no uniform margin when $\sigma=0$.}
+\ch{$c_1{=}4k^4$ remark extended to 2D vs.\ 3D meshes}
+   {\S5, remark after \code{eq:conditions_on_num_param} (Rem.~5.1), \pdfp{21}}
+   {\S5, remark at \artl{932}--933}
+   {The choice $c_1{=}4k^4$, $c_2{=}2k^2$ is now restricted to the 2D experiments; for 3D tetrahedra
+    $C_{\mathrm{inv}}$ is markedly larger, so a larger $c_1$ is required (value in \S7.2). Reflects the
+    new 3D examples.}
+\ch{Continuity intro rewritten; proof relocated}
+   {\S5, before \code{lemma:Continuity}, \pdfp{22}}
+   {\S5, \artl{953}}
+   {The vague ``it is possible to show'' is replaced by a statement that, adapting each estimate to
+    the porosity field, one proves continuity, with a complete proof now in \code{app:Continuity}.}
+\ch{Continuity lemma hypotheses rewritten and weakened}
+   {\S5, \code{lemma:Continuity} (Lem.~5.4), \pdfp{22}}
+   {\S5, \artl{956}}
+   {Continuity is now stated to need only $c_1,c_2>0$ (not the coercivity condition
+    $c_1>2\xi C_{\mathrm{inv}}^2$), with $a$ continuous and elementwise $W^{1,\infty}$, plus a
+    $\tau_1$ jump condition when $\sigma>0$ (analogue of Codina 2001 Eq.~(39)).}
+\ch{Convergence lead-in cites the interpolation-error lemma}
+   {\S5, before \code{th:Convergence}, \pdfp{22}}
+   {\S5, \artl{963}}
+   {``the modified version of \code{lemma:Continuity}'' is expanded to name the new appendix lemma
+    \code{lem:continterp} that supplies the interpolation-error continuity estimate.}
+\ch{Convergence theorem gains an explicit regularity hypothesis}
+   {\S5, \code{th:Convergence} (Thm.~5.5), \pdfp{22}}
+   {\S5, \artl{966}}
+   {Now explicitly assumes $u\in H^{k_u+1}$, $p\in H^{k_p+1}$ (the smoothness the interpolation
+    estimate needs), rather than a loose ``sufficiently smooth''.}
+\ch{Note on the $\alpha_K$ choice and $\delta_\alpha$ factors}
+   {\S5, after \code{eq:Tau2Final}, \pdfp{19}}
+   {\S5, \artl{838}}
+   {Clarifies that the coefficient bounds are written for $\alpha_K=\alpha_{\inf,K}$, and any other
+    admissible representative works after inserting bounded $\delta_\alpha$ factors.}
+\end{itemize}
+
+\subsection{\S6 Robustness (re-derivations)}
+\begin{itemize}
+\ch{Macroscopic/elemental Damk\"ohler relation added}
+   {\S6, after \code{eq:GeneralAsymptoticBehaviourOfParameters}, \pdfp{23}}
+   {\S6, \artl{1013}}
+   {The parenthetical ``(i.e.\ $L{=}h$)'' is expanded into an explicit
+    $Da=Da_h(L^2/h^2)(\alpha_K/\alpha_\infty)$ with $\alpha_K/\alpha_\infty\le1$ a fixed bounded
+    factor.}
+\ch{Rewritten viscous-limit discussion}
+   {\S6.1, after \code{eq:ConvergenceResultDominantViscosity} (eq.~(6.5)), \pdfp{24}}
+   {\S6.1, \artl{1017}}
+   {Replaces ``the error is inversely proportional to $\alpha_0$'' with the corrected account: the
+    gradient controls carry $\alpha_0^{-1/2}$ while the porous-divergence term has the weight on both
+    sides (no loss as $\alpha_0\to0$); introduces the $\alpha_0^{-1/2}$ vs.\ $1/\alpha_0$ distinction.}
+\ch{Why the reaction pressure-gradient estimate keeps $1/\alpha_0$}
+   {n/a (new)}
+   {\S6.3, after \code{eq:DominantReactionPressureGradientEstimate}, \artl{1077}}
+   {Explains this is the only estimate carrying $1/\alpha_0$ rather than $\alpha_0^{-1/2}$: in the
+    reaction limit $\tau_1\!\sim\!1/\sigma$ makes the pressure control weakest, and isolating
+    $\|\nabla e_p\|$ costs a further $\alpha_0^{-1/2}$.}
+\ch{Corrected mesh-(in)dependence of the reaction mitigation}
+   {\S6.3, last paragraph (``except for the very finest meshes''), \pdfp{25}}
+   {\S6.3, \artl{1077}--1078}
+   {The claim that pressure mitigation fails ``for the very finest meshes'' is reversed: rewriting
+    $Da^{-1/2}=Da_h^{-1/2}\,h/L$ shows the factor is mesh-independent since $Da_h\propto h^2$.}
+\ch{Clarification of scalar $U$ vs.\ combined unknown; $Re/Da$ naming}
+   {\S6, after \code{eq:DimensionlessParameters} (eq.~(6.2)), \pdfp{23}}
+   {\S6, \artl{990}}
+   {Adds a parenthetical distinguishing the velocity scale $U$ from the combined unknown $U=[u;p]$,
+    and names $Re$, $Da$ as the Reynolds and Damk\"ohler numbers.}
+\end{itemize}
+
+\subsection{\S7 Numerical examples (rewritten discussions)}
+\begin{itemize}
+\ch{Gridap implementation and Newton--Krylov solver note}
+   {\S7 intro, \pdfp{26} (absent)}
+   {\S7, \artl{1093}}
+   {Documents that the experiments use Gridap and that the staggered fixed-point of the algorithm was
+    replaced by an accelerated globalized Newton method recovering the OSGS coupling matrix-free,
+    with the residual tolerance ($\sim$$10^{-9}$) tightened until finest-mesh errors were solver-insensitive.}
+\ch{Specify $r_1,r_2$, $U{=}L{=}1$ and porosity evaluation}
+   {\S7 intro, after \code{eq:PlateauBumpFunction}, \pdfp{26} (absent)}
+   {\S7, \artl{1118}}
+   {Fixes the previously-unstated bump parameters $r_1{=}0.2$, $r_2{=}0.4$, the scales $U{=}L{=}1$,
+    and states $\alpha$ is evaluated analytically at quadrature points (interpolated nodally only in
+    \S7.3) --- making the manufactured problem fully reproducible.}
+\ch{Rewritten regime-independence justification}
+   {\S7 intro, \pdfp{26}}
+   {\S7, \artl{1129}}
+   {Replaces ``we vary $Re$ by changing the viscosity\dots'' with a statement that the ordering and
+    multi-order separation of the dimensionless numbers are preserved under refinement, with the
+    dimensional data fixed by the new centered encoding.}
+\ch{Rewritten overall-results summary}
+   {\S7.1, \pdfp{26}}
+   {\S7.1, \artl{1144}}
+   {The blanket ``no significant differences between ASGS and OSGS'' becomes nuanced: optimal velocity
+    rates throughout (bar a pre-asymptotic convective $\mathbb{Q}_2$ shortfall), close velocity errors
+    except the reaction-dominated corner, OSGS giving cleaner/higher pressure rates.}
+\ch{$1/\alpha$ porosity-scaling analysis}
+   {\S7.1, \pdfp{26}}
+   {\S7.1, \artl{1148}}
+   {The brief ``half an order of magnitude'' remark becomes quantitative: a div-free velocity scales
+    as $1/\alpha$, so its interpolation error grows by $\times5.0$ ($\mathbb{P}_1$), $\times11.6$
+    ($\mathbb{Q}_2$) from $\alpha_0{=}0.5$ to $0.05$; observed errors grow by exactly these factors and
+    the residual method effect stays near the $\alpha_0^{-1/2}$ weighted prediction.}
+\ch{Rewritten viscosity-dominated discussion}
+   {\S7.1, \pdfp{26}}
+   {\S7.1, \artl{1150}}
+   {Details that ASGS pressure attains the working-norm rate (one order below optimal) for
+    $\mathbb{Q}_2$ while OSGS is interpolation-optimal, attributing the pattern to the orthogonal
+    projection removing resolvable residual components --- confirming the predicted one-order pressure
+    loss is real, not a proof artifact.}
+\ch{Convection-dominated: ``n.c.'' removed, elemental $Re_h$ added}
+   {\S7.1, \pdfp{26}}
+   {\S7.1, \artl{1152}}
+   {Replaces the old ``not converged'' explanation with recovered pressure rates for both elements and
+    attributes the slightly sub-nominal $\mathbb{Q}_2$ velocity rate to the finest mesh not yet being
+    asymptotic at $Re_h\!\sim\!3.1\times10^3$.}
+\ch{Rewritten reaction-dominated discussion + updated numbers}
+   {\S7.1, \pdfp{26} ($Da_h\!\sim\!2.44$, ``$\sim$64 times smaller'')}
+   {\S7.1, \artl{1154}}
+   {Numbers updated for the $320$ mesh ($Da_h$ reduction $64\to\sim\!10^3$; $Da_h\!\sim\!9.8$), with new
+    discussion of the low-porosity plateau and a residual factor-1.85 sensitivity surviving in $L^2$.}
+\ch{Table captions: rate convention + interpolant note}
+   {Table 1 caption, \pdfp{27}}
+   {\code{tab:Linear2DL2} caption, \artl{1162}}
+   {A caption addition defines the parenthetical rate convention ($k_v{+}1/k_p$ in $L^2$,
+    $k_v/k_p{-}1$ in $H^1$, dash $=$ no guaranteed rate) and explains the new interpolant reference rows.}
+\ch{Well-posedness/compressibility justification sharpened (3D)}
+   {\S7.2, \pdfp{27}}
+   {\S7.2, \artl{1429}}
+   {The vague ``unstructured nature of the mesh'' is replaced by precise reasons: with all-Dirichlet
+    data the pressure is fixed only up to a constant, and on irregular meshes the boundary data is not
+    exactly compatible with discrete mass conservation, so the $\varepsilon{=}0$ problem is ill-posed.}
+\ch{Mesh setup rewritten: two Gridap families}
+   {\S7.2, \pdfp{27}}
+   {\S7.2, \artl{1425}}
+   {The single commercial unstructured sequence is replaced by two explicit tetrahedral families
+    generated with Gridap (a regular Kuhn-tetrahedra grid and an irregular red-refined mesh) with
+    stated element counts and $N$ values --- a full, reproducible re-run adding the regular-mesh results.}
+\ch{Results discussion expanded from one sentence to full analysis (3D)}
+   {\S7.2, \pdfp{27}}
+   {\S7.2, \artl{1439}}
+   {The single ``optimal, very similar'' sentence becomes a detailed discussion (two-mesh slope
+    caveats, reliance on finest-mesh vs.\ interpolant errors, a reversal of the 2D ASGS/OSGS pressure
+    ordering, and a footnote explaining the recurring $1.29$ value is a genuine coincidence).}
+\end{itemize}
+
+\subsection{\S8 Conclusions}
+\begin{itemize}
+\ch{Extreme-corner reservation added}
+   {\S8, 2nd paragraph, \pdfp{29}}
+   {\S8, \artl{1651}}
+   {The robustness sentence gains a reservation: at the simultaneously convective, low-porosity corner
+    $(10^6,0.05)$ the discrete problem has no solution on coarser meshes --- a resolution limitation
+    that recedes under refinement, not a formulation failure.}
+\ch{Porosity-weighted norm and nodal-interpolant claims}
+   {\S8, 3rd paragraph, \pdfp{29}}
+   {\S8, \artl{1653}}
+   {Adds that the error constants degrade at worst like $\alpha_0^{-1/2}$ (not at all on the plateau),
+    and replaces ``absolute errors are very stable'' with the sharper fact that both variants' errors
+    sit essentially on the nodal-interpolant error.}
+\ch{ASGS/OSGS nuance on the reaction-dominated regime}
+   {\S8, 4th paragraph, \pdfp{29}}
+   {\S8, \artl{1655}}
+   {``both variants have very similar properties'' becomes a nuanced claim: similar for velocity except
+    the strongly reaction-dominated regime, where the OSGS linear element carries a larger velocity
+    error, while OSGS tends to give better pressure convergence.}
+\end{itemize}
+
+\subsection{Appendix A}
+\begin{itemize}
+\ch{Intro paragraph: expressions are the linearized (fixed-point) system}
+   {App.~A opening (no such paragraph before)}
+   {\appl{elemental\_matrices\_appendix.tex}{3}}
+   {A new paragraph states the collected expressions are the linearized equation with
+    $a{:=}u^{m-1}$ and $\tau_K,\pi_h$ frozen at the previous iterate, so exact-Newton derivative
+    contributions are deliberately absent --- removing ambiguity about which linearization the matrices
+    implement.}
+\ch{Second-order-neglect condition given a concrete example}
+   {App.~A, before \code{eq:FirstOrdertabilizationMatrices} (was a placeholder annotation)}
+   {\appl{elemental\_matrices\_appendix.tex}{356}}
+   {The ``CITATION'' placeholder becomes the concrete clarification ``for example, if only linear
+    finite elements are used'', explaining when second-order contributions vanish.}
+\end{itemize}
+
+\subsection{Appendix B / Appendix C}
+\begin{itemize}
+\ch{General-$d$ generalization of the viscous term}
+   {\S4, \code{eq:StabilizationParameters} first row (eq.~(4.22), $d{=}3$ only), \pdfp{16}}
+   {App.~B \S ftViscous, \appl{fourier\_appendix.tex}{37}--52}
+   {Inside the new appendix, the diffusion-matrix entries $K_{ij}$ are generalized to arbitrary $d$,
+    giving the longitudinal factor $(2-2/d)$ and hence
+    $\tau_{\nu,1}^{-1}=(2-2/d)\alpha\nu|k_0|^2/h^2$ (the old $4/3$ is the $d{=}3$ case).}
+\ch{Amend-flagged refinements inside the porosity/advection assumptions}
+   {n/a (new)}
+   {\appl{continuity\_appendix.tex}{164}--182}
+   {Clarify the convexity/chunkiness dependence of $\delta_\alpha$ and prove that the continuous FE
+    advection field makes $\nabla\!\cdot\!(\alpha a)=0$ hold a.e.\ elementwise --- the exact form used
+    later in the elementwise integration by parts.}
+\ch{Sharper porosity-weighted continuity estimate ($\alpha_K$ factor)}
+   {\S5 \code{lemma:Continuity} bound (no $\alpha_K$ weight), \pdfp{22}}
+   {\code{eq:sharpcont}, \appl{continuity\_appendix.tex}{393}--402; \code{rem:sharper} L819}
+   {The proof yields a strictly sharper bound carrying the weight $\alpha_K$ (tighter where porosity
+    is small); the coarser $\alpha\le1$ form recovers the original statement. This propagated into the
+    main-text $\alpha_K$ factors.}
+\end{itemize}
+
+% #####################################################################
+\section{Parts removed}
+\emph{Pure deletions of content. (Formula corrections that also delete a term or a table row are
+listed under \S4 Corrections to formulas and cross-referenced below.)}
+
+\begin{itemize}
+\ch{Removed \texttt{\textbackslash externaldocument\{supplement\}}}
+   {Preamble, orig.\ ll.19--22 (xr-hyperref cross-ref to a separate supplement)}
+   {Preamble, \artl{18} (deleted)}
+   {The external-supplement cross-reference and its comments were removed because the
+    appendices/supplement content are now inlined into the article.}
+\ch{Dropped citation \code{Codina2004ApproximationOT} from \S1}
+   {\S1, ``successfully addressed in the past~[\dots,Codina2004]'', \pdfp{5}}
+   {\S1, \artl{235} (now cites only \code{codina2001stabilized}, \code{codina2002stabilized})}
+   {Trimmed the citation list for VMS-addressed NS issues to the two directly relevant works; the bib
+    entry survives but is now uncited, so it drops out of the printed reference list.}
+\ch{Deleted leftover author-placeholder annotations (App.~A)}
+   {App.~A, orig.\ file (e.g.\ a red ``CHECK THIS AND RELATE TO THE L2 INNER PRODUCT'' note)}
+   {resolved throughout \code{elemental\_matrices\_appendix.tex}}
+   {Tentative review placeholders wrapped in \code{\textbackslash Guillermo}/\code{\textbackslash Joaquin}
+    were removed or resolved, cleaning the final text.}
+\end{itemize}
+
+\noindent\emph{See also (deletions that are classified as formula corrections in \S4):} the
+convective-adjoint term $(1/\alpha)\nabla\!\cdot\!(\alpha a)v$ removed from Appendix~A [\S4, item
+``Removed convective-adjoint term'']; the tentative $\varepsilon p^{m-1}$ mass term and the redundant
+$\overline U^n$ line removed [\S4, ``Mass-source $\overline\phi$ redefined'']; the spurious identity
+block $[[\mathbb I,0],[0,0]]$ and undefined $G_\beta,D_\beta$ terms removed from the assembled matrix
+[\S4, ``Assembled $K$ cleaned''\,]; and the entire $(Re,\alpha_0){=}(10^6,0.05)$ table rows removed
+across Tables~1--4 [\S4, table-recomputation items].
+
+% #####################################################################
+\section{Corrections to formulas}
+\emph{Mathematical corrections: signs, factors, indices, missing/spurious terms, changed
+definitions, corrected limits, and recomputed numerical tables.}
+
+\subsection{\S2 Continuous problem}
+\begin{itemize}
+\ch{Deviatoric split constant $2/3 \to 2/d$}
+   {\S2, deviatoric-split eq.~(2.3), \pdfp{7} (had $\tfrac23$)}
+   {\S2, \artl{258} (now $\tfrac2d$)}
+   {$+\tfrac23\nabla(\alpha\nu\nabla\!\cdot\!u)$ was valid only in 3D; corrected to $\tfrac2d$ so the
+    deviatoric/symmetric decomposition is dimensionally correct for $d{=}2$ as well (the 2D tests would
+    otherwise use the wrong constant).}
+\ch{Symmetric-projection identity fixed (operator applied to gradient)}
+   {\S2, inline after the DBF footnote, \pdfp{7} (two occurrences)}
+   {\S2, \artl{262} and \artl{264}}
+   {The ill-formed ``$\SPi=\nabla^{\mathrm S}u$'' (a projection set equal to a tensor) becomes
+    ``$\SPi\nabla u=\nabla^{\mathrm S}u$'' --- fixing a type/dimension mismatch in the DBF-recovery
+    statement.}
+\ch{Missing factor $2$ added to the viscous Neumann traction}
+   {\S2.1, eq:neumann\_bc (eq.~(2.11)), \pdfp{9} (had $\nu\Pi\nabla u$)}
+   {\S2.1, \code{eq:neumann\_bc}, \artl{367} (now \textcolor{amend}{$2$}$\nu\Pi\nabla u$)}
+   {The traction $\alpha(\nu\Pi\nabla u-p\mathbb I)\!\cdot\!n$ gained the factor $2$, making the
+    natural boundary stress consistent with the viscous term $2\nabla\!\cdot\!(\alpha\nu\Pi\nabla u)$
+    in \code{eq:StrongMomentumEquation}.}
+\ch{Trace-operator codomain $\mathbb R^3 \to \mathbb R^d$}
+   {\S2.1, eqs.~(2.7),(2.10),(2.11), \pdfp{9} (three occurrences)}
+   {\S2.1, \artl{348}, \artl{361}, \artl{366}}
+   {The trace/BC operators mapping to $\mathbb R^3$ were generalized to $\mathbb R^d$, consistent with
+    $d\in\{2,3\}$.}
+\end{itemize}
+
+\subsection{\S2.2 Weak form \& \S3 VMS}
+\begin{itemize}
+\ch{Velocity space redefined for a genuine Neumann boundary}
+   {\S2.2, def.\ of $\mathcal V_0$, \pdfp{7}--8}
+   {\S2.2, \artl{459}}
+   {$\mathcal V_0:=H^1_0(\omega)^d$ (full homogeneous Dirichlet, wrong domain symbol) becomes
+    $\{v\in H^1(\Omega)^d:v|_{\Gamma_{\mathrm D}}=0\}$, reducing to $H^1_0$ only when
+    $\Gamma_{\mathrm N}$ is empty.}
+\ch{Corrected trace/dual space for $g$}
+   {\S2.2, after \code{eq:WeakForm} (eq.~(2.13)), \pdfp{8}}
+   {\S2.2, \artl{465}}
+   {The stray subscript in $H_1^{-1/2}$ is fixed to $H^{-1/2}$, now specified as the dual of
+    $H^{1/2}_{00}(\Gamma_{\mathrm N})^d$ (traces of $\mathcal V_0$) rather than the vague ``traces of
+    $H^1(\Omega)$''.}
+\ch{Sign and pairing order fixed in the eliminated-subscales equation}
+   {\S3.1, \code{eq:weak\_form\_eliminated\_subscales} (eq.~(3.6)), \pdfp{11}}
+   {\S3.1, \artl{512}}
+   {$-\langle\mathcal L\widetilde{\mathcal L}^{-1}\mathcal R U_h,V_h\rangle$ becomes
+    $+\langle V_h,\mathcal L\widetilde{\mathcal L}^{-1}\mathcal R U_h\rangle$: sign flipped to $+$ and
+    the test function moved first, matching the pairing convention used elsewhere.}
+\ch{Residual operator applied to its operand}
+   {\S3.1, def.\ of $\mathcal R$, \pdfp{11}}
+   {\S3.1, \artl{514}}
+   {$\mathcal R_w:=F-\mathcal L_wU$ becomes $\mathcal R_wU:=F-\mathcal L_wU$, making explicit that
+    $\mathcal R$ acts on $U$.}
+\ch{Removed stray subscript on the residual operator}
+   {\S3.2, \code{eq:simplified\_weak\_form\_subscales} chain (eq.~(3.13)), \pdfp{13}}
+   {\S3.2, first line, $\sim$\artl{556}}
+   {$\widetilde\Pi[\mathcal R_UU_h]$ had a spurious ``$U$'' subscript on $\mathcal R$; removed to give
+    $\widetilde\Pi[\mathcal R U_h]$.}
+\ch{$B_{\mathrm S}$ argument and missing element subscript fixed}
+   {\S3.2, def.\ of $B_{\mathrm S}$ (eq.~(3.19)), \pdfp{13}}
+   {\S3.2, \artl{606}}
+   {In $B_{\mathrm S}(w,U,V)$ the RHS wrongly wrote $B(u,U,V)$; corrected to $B(w,U,V)$, and the
+    missing element-restriction subscript $_K$ was added to the stabilization pairing under the
+    sum over $K$.}
+\end{itemize}
+
+\subsection{\S4 Stabilization design}
+\begin{itemize}
+\ch{Projection step: equality demoted to inequality}
+   {\S4, \code{eq:BoundProjectionOfLBySubscales} (eq.~(4.4)), \pdfp{15}}
+   {\S4, \artl{721}}
+   {The step to $\int|\mathcal L\widehat U|_\Lambda^2$ was written ``$=$''; corrected to
+    ``$\le$'' since the orthogonal projection can only reduce the norm.}
+\ch{Eigenvalue symbol $\lambda\to\mu$}
+   {\S4, $\mathrm{spec}_{\Lambda^{-1}}$ definition, \pdfp{15}}
+   {\S4, \artl{731}}
+   {The generalized-eigenvalue $\lambda$ collided with the scaling factor $\lambda$ used throughout;
+    renamed $\mu$.}
+\ch{Factor $5$ added to the summed operator-norm bound}
+   {\S4, \code{eq:FTOfDifferentialOperator} (eq.~(4.15)), \pdfp{16}}
+   {\S4, \artl{775}--778}
+   {$|\tau_K^{-1}|_\Lambda^2\le\sum_i|\tau_i^{-1}|_\Lambda^2$ was corrected to
+    $\le5\sum_i(\cdot)$, following the triangle and Cauchy--Schwarz inequalities over the five
+    contributions; the original was not valid in general.}
+\ch{Duplicated $\mathcal L_\sigma$ Fourier symbol fixed to $\mathcal L_{\nabla\alpha}$}
+   {\S4, Fourier-transformed operators list (eqs.~(4.17)--(4.21)), \pdfp{16}}
+   {\S4, \artl{786}}
+   {The list gave $\widehat{\mathcal L}_\sigma\approx S_\sigma$ and then
+    $\widehat{\mathcal L}_\sigma\approx S_{\nabla\alpha}$ (subscript repeated); the last was corrected
+    to $\widehat{\mathcal L}_{\nabla\alpha}$.}
+\ch{$\tau_{\nu,1}^{-1}$: coefficient $\tfrac43\to(2-\tfrac2d)$ and missing $|k_0|^2$}
+   {\S4, \code{eq:StabilizationParameters} (eq.~(4.22)), \pdfp{16}}
+   {\S4, \artl{793}}
+   {From $\tfrac43\alpha\nu|k_0|/h^2$ to $(2-\tfrac2d)\alpha\nu|k_0|^2/h^2$: the constant is
+    generalized to the $d$-dependent $(2-\tfrac2d)$ and the numerator gains its missing square
+    $|k_0|^2$.}
+\ch{$\tau_{c,1}^{-1}$: absolute-value bars added}
+   {\S4, \code{eq:StabilizationParameters} (eq.~(4.22)), \pdfp{16}}
+   {\S4, \artl{794}}
+   {$\alpha(w\!\cdot\!k_0)/h$ corrected to $\alpha|w\!\cdot\!k_0|/h$; without the bars the (inverse)
+    parameter could be negative.}
+\ch{$\alpha$ evaluation corrected: elemental minimum $\to$ maximum}
+   {\S4, final paragraph, \pdfp{18}}
+   {\S4, \artl{828}}
+   {The text said to evaluate $\alpha$ at its elemental \emph{minimum}, contradicting the section's own
+    earlier statement; corrected to elemental \emph{maximum}, $\alpha_K=\alpha_{\infty,K}$, consistent
+    with \code{eq:Tau1Final}/\code{eq:Tau2Final} and \code{app:Continuity}.}
+\end{itemize}
+
+\subsection{\S5 Stability and convergence}
+\begin{itemize}
+\ch{Diagonal coercivity form: $\mathcal L^*V_h \to \mathcal L^*U_h$}
+   {\S5, expansion of $B_{\mathrm S}(a,U_h,U_h)$ (eq.~(5.5)), \pdfp{19}}
+   {\S5, \artl{857}}
+   {The stabilization dual pairing had the wrong test argument $\mathcal L^*V_h$; corrected to
+    $\mathcal L^*U_h$, which the diagonal (test $=$ trial $=U_h$) computation requires.}
+\ch{Broken $h$-norm redefined as root-sum-of-squares}
+   {\S5, def.\ of $\|\cdot\|_h$, \pdfp{19}}
+   {\S5, \artl{862}}
+   {$\|\cdot\|_h:=\sum_K\|\cdot\|_{L^2(K)}$ was inconsistent with its squared use elsewhere;
+    corrected to $\big(\sum_K\|\cdot\|_{L^2(K)}^2\big)^{1/2}$.}
+\ch{Compressibility bound: explicit slack constant $C_2$, $h_K$}
+   {\S5, \code{eq:UpperBoundOnEpsilon} (eq.~(5.10)), \pdfp{20}}
+   {\S5, \artl{896}--899}
+   {The strict $\varepsilon<c_1\inf_K\{\alpha_K^2\tau_{1,K}/h^2\}$ becomes
+    $\varepsilon\le C_2\,c_1\inf_K\{\alpha_K^2\tau_{1,K}/h_K^2\}$ with $0\le C_2<1$ fixed independent
+    of mesh/physics ($h\to h_K$), supplying the uniform margin needed below.}
+\ch{Convective-field norm $|w|_\infty \to \|a\|_\infty$}
+   {\S5, viscous- and velocity-coefficient displays, \pdfp{21}}
+   {\S5, \artl{906} and \artl{914}}
+   {The convective speed $c_2|w|_{\infty,K}/h$ was replaced by $c_2\|a\|_{\infty,K}/h$, matching the
+    given convective field $a$ used throughout $B(a,\cdot,\cdot)$.}
+\ch{$\tilde\sigma_\alpha$ notation $\tau_{\mathrm{NS}}\to\tau_{1,\mathrm{NS}}$}
+   {\S5, \code{eq:SigmaAlpha} (eq.~(5.15)), \pdfp{21}}
+   {\S5, \artl{919}}
+   {Both occurrences of $\tau_{\mathrm{NS}}^{-1}$ corrected to $\tau_{1,\mathrm{NS}}^{-1}$.}
+\ch{Triple-norm: reaction term made elementwise}
+   {\S5, def.\ of the triple norm (eq.~(5.19)), \pdfp{22}}
+   {\S5, \artl{946}}
+   {The reaction contribution changed from the global
+    $\|\tilde\sigma_\alpha^{1/2}u_h\|^2$ to the broken elementwise $\|\cdot\|_h^2$, consistent with
+    $\tilde\sigma_\alpha$ being an elementwise ($\alpha_K$-dependent) quantity.}
+\ch{Continuity estimate: test arg $U_h\to V_h$ and $\alpha_K$ weights}
+   {\S5, \code{lemma:Continuity} display (eq.~(5.20)), \pdfp{22}}
+   {\S5, \artl{958}}
+   {$B_{\mathrm S}(a,U_h,U_h)$ (though the RHS carried $|\!|\!|V_h|\!|\!|$) corrected to
+    $B_{\mathrm S}(a,U_h,V_h)$; and an $\alpha_K$ factor inserted in both RHS terms, giving the sharper
+    porosity-weighted bound.}
+\ch{Convergence estimate gains porosity weight $\alpha_K/h_K$}
+   {\S5, \code{eq:ConvergenceResult} (eq.~(5.21)), \pdfp{22}}
+   {\S5, \artl{967}--968}
+   {The prefactor $\sum_K(1/h_K)(\cdot)$ became $\sum_K(\alpha_K/h_K)(\cdot)$ --- the sharper
+    porosity-weighted a~priori bound ($\alpha_K\le1$ tightens it at low porosity), used downstream in
+    \S6.}
+\end{itemize}
+
+\subsection{\S6 Robustness}
+\begin{itemize}
+\ch{Porosity prefactor $1/\alpha_0 \to \alpha_0^{-1/2}$ throughout the estimates}
+   {\S6, eqs.~(6.5)--(6.13) (all three limits), \pdfp{23}--25}
+   {\S6, same labels, \artl{1015}, 1023, 1027, 1060, 1064, 1069, 1073, 1084}
+   {Every leading $1/\alpha_0$ (and the porous-divergence weight on the LHS) corrected to
+    $\alpha_0^{-1/2}$, reflecting the sharper weighted convergence bound. The central math correction
+    of the section --- it halves the predicted rate of deterioration as $\alpha_0\to0$.}
+\ch{Missing factor $\alpha_K$ restored in the $\tilde\sigma_\alpha$ estimates}
+   {\S6, \code{eq:GeneralAsymptoticBehaviourOfParameters} (eq.~(6.4)) + per-regime blocks, \pdfp{23}--25}
+   {\S6, \artl{997}--1011 and the three limits}
+   {The reactive estimate $\tilde\sigma_\alpha$ gained a prefactor $\alpha_K$ in all four places
+    (general form and the three limits), restoring the correct elemental porosity weighting.}
+\ch{Reaction-limit $\tau_1$: $\alpha/\sigma \to 1/\sigma$}
+   {\S6.3, $\tau_1$ estimate and downstream, \pdfp{25}}
+   {\S6.3, \artl{1078}, 1084--1085}
+   {$\tau_1\!\sim\!\alpha/\sigma$ corrected to $1/\sigma$; consequently the $\sigma^{1/2}\nu^{1/2}$
+    coupling weights change ($\alpha_0\to\alpha_0^{1/2}$ on the pressure LHS), fixing the porosity
+    scaling of the pressure control in the strong-reaction limit.}
+\ch{Dimensionless force scaling inverted}
+   {\S6, def.\ of the dimensionless force, after eq.~(6.2), \pdfp{23}}
+   {\S6, \artl{990}}
+   {$f=L^2/(\alpha_\infty\nu U)\,f^*$ was the reciprocal; corrected to
+    $f=(\alpha_\infty\nu U/L^2)\,f^*$, with a new footnote verifying it by back-substitution.}
+\ch{Elemental $\alpha\to\alpha_K$ in the convection-limit $\tau$ estimates}
+   {\S6.2, $\tau_1,\tau_2$ (eqs.\ in \S6.2), \pdfp{24}}
+   {\S6.2, \artl{1054}--1055}
+   {$\tau_1,\tau_2$ in the convection limit now use the elemental $\alpha_K$ rather than the generic
+    $\alpha$, consistent with the elementwise interpretation.}
+\ch{\code{eq:DominantReactionVelocityGradientEstimate}: $\alpha_\infty\!\to\!(\alpha_0\alpha_\infty)$; $P\!\sim\!Da\,U\nu/h\!\to\!/L$}
+   {\S6.3, eq.~(6.12) and the $P$-scaling line, \pdfp{25}}
+   {\S6.3, \artl{1068}--1070, 1074}
+   {The $Da^{1/2}/\alpha_\infty^{1/2}$ term corrected to $Da^{1/2}/(\alpha_0\alpha_\infty)^{1/2}$, and
+    the reaction-limit pressure scaling from $P\!\sim\!Da\,U\nu/h$ to $/L$ (proper macroscopic length).}
+\ch{\code{eq:DominantReactionPressureGradientEstimate} rewritten}
+   {\S6.3, eq.~(6.13), \pdfp{25}}
+   {\S6.3, \artl{1075}}
+   {The inner factor $(1+Re_h)^{1/2}/\alpha_0\cdot Da_h^{-1/2}\cdot L/h$ became
+    $(1+Re_h)^{1/2}\alpha_\infty^{1/2}Da^{-1/2}$, re-expressed in the macroscopic $Da$ and removing a
+    spurious extra $1/\alpha_0$.}
+\ch{Viscous pressure-gradient estimate inner factor $U\nu/h\to U\nu/(Ph)$}
+   {\S6.1, \code{eq:DominantViscosityPressureGradientEstimate} (eq.~(6.7)), \pdfp{24}}
+   {\S6.1, \artl{1027}}
+   {Corrected to the dimensionless ratio $U\nu/(Ph)$, which reduces to $L/h$ after inserting
+    $P\!\sim\!U\nu/L$; a new sentence spells out the reduction.}
+\end{itemize}
+
+\subsection{\S7 Numerical examples}
+\begin{itemize}
+\ch{Boundary condition is the trace of $u$, not null}
+   {\S7 intro, \pdfp{26} (``null Dirichlet on all sides'')}
+   {\S7, \artl{1093}}
+   {The manufactured velocity is nonzero on the boundary, so ``null Dirichlet'' was wrong; corrected
+    to Dirichlet data ``given by the trace of the manufactured velocity''.}
+\ch{Reynolds/Darcy swept set typo fixed}
+   {\S7 intro, \pdfp{26} ($Re,Da\in\{10^{-6},1,10^{-6}\}$)}
+   {\S7, \artl{1129} ($\{10^{-6},1,10^{6}\}$)}
+   {The repeated $10^{-6}$ was corrected to $10^{6}$ --- the intended three-decade range actually used.}
+\ch{Table 1 (\code{tab:Linear2DL2}) recomputed + rows restructured}
+   {Table 1, \pdfp{27} (18 rows; e.g.\ velocity FME $8.48/6.38\!\times\!10^{-6}$)}
+   {\code{tab:Linear2DL2}, \artl{1223}}
+   {Every slope/FME entry recomputed (e.g.\ FME $\to6.95/3.62\!\times\!10^{-5}$; pressure slopes
+    $1.00/1.83\to2.20/2.20$); the three $(10^6,0.05)$ rows removed and nodal-interpolant reference rows
+    added.}
+\ch{Table 2 (\code{tab:Linear2DH1}) recomputed + rows restructured}
+   {Table 2, \pdfp{27} (e.g.\ velocity FME $9.86\!\times\!10^{-3}$)}
+   {\code{tab:Linear2DH1}, \artl{1289}}
+   {All entries recomputed (e.g.\ velocity FME $\to3.50\!\times\!10^{-2}$; pressure slopes
+    $0.53/0.56\to1.56/1.60$); $(10^6,0.05)$ rows removed, interpolant rows added.}
+\ch{Table 3 (\code{tab:Quadratic2DL2}) recomputed; ``n.c.'' resolved}
+   {Table 3, \pdfp{28} (``n.c.'' at $(10^6,0.5)$)}
+   {\code{tab:Quadratic2DL2}, \artl{1355}}
+   {All $\mathbb{Q}_2$ $L^2$ entries recomputed (e.g.\ velocity FME $5.60\!\times\!10^{-9}\to2.06\!\times\!10^{-7}$);
+    the formerly n.c.\ $(10^6,0.5)$ rows now carry values, the $(10^6,0.05)$ rows removed as the
+    excluded corner, interpolant rows added.}
+\ch{Table 4 (\code{tab:Quadratic2DH1}) recomputed; ``n.c.'' resolved}
+   {Table 4, \pdfp{28} (``n.c.'' at $(10^6,0.5)$)}
+   {\code{tab:Quadratic2DH1}, \artl{1421}}
+   {All $\mathbb{Q}_2$ $H^1$ entries recomputed (e.g.\ velocity FME $2.78\!\times\!10^{-5}\to4.29\!\times\!10^{-4}$;
+    pressure slopes $1.04/1.00\to0.87/1.97$); rows restructured as above.}
+\ch{Table 5 (\code{tab:3DL2}) restructured and fully re-run}
+   {Table 5, \pdfp{28}}
+   {\code{tab:3DL2}, \artl{1487}}
+   {Now split into ``regular'' and ``irregular'' mesh blocks with interpolation rows; every number
+    changed (e.g.\ $\mathbb{P}_1$ velocity slope $2.01/2.07\to$ regular $1.75/1.91$, irregular
+    $1.70/1.63$; $\mathbb{P}_2$ $3.18/3.22\to$ regular $3.33/3.34$).}
+\ch{Table 6 (\code{tab:3DH1}) restructured and fully re-run}
+   {Table 6, \pdfp{28}}
+   {\code{tab:3DH1}, \artl{1537}}
+   {Likewise split into regular/irregular blocks with all numbers changed (e.g.\ $\mathbb{P}_1$
+    velocity $1.04/1.03\to$ regular $0.95/0.97$, irregular $0.83/0.85$; $\mathbb{P}_2$ pressure
+    $0.95/1.23\to$ regular $1.18/1.77$).}
+\ch{Iteration index $n{-}1 \to m{-}1$ with definition (3D penalty)}
+   {\S7.2, iterative-penalty paragraph ($\varepsilon p^{n-1}$), \pdfp{27}}
+   {\S7.2, \artl{1437}}
+   {The previous-step compressibility term corrected to $\varepsilon p^{m-1}$, with $m$ defined as the
+    nonlinear iteration counter of \code{eq:LinearizedOSGSProblem}.}
+\end{itemize}
+
+\subsection{Appendix A --- Elemental matrices}
+\begin{itemize}
+\ch{Removed the convective-adjoint term $(1/\alpha)\nabla\!\cdot\!(\alpha a)\,v$}
+   {\code{eq:StabilizationLVLU} and \code{eq:StabilizationLVF} (was red markup)}
+   {\appl{elemental\_matrices\_appendix.tex}{14} and L28}
+   {The tentative extra convective-adjoint term was deleted from both operators, consistent with the
+    paper's decision to keep it out to preserve the $A^2-B^2$ symmetry of the stability estimate.}
+\ch{Factor $2$ inserted in the viscous-projection stabilization term}
+   {\code{eq:StabilizationLVLU}/\code{eq:StabilizationLVF} ($\nu\Pi\nabla\!\bullet\nabla\beta$)}
+   {\appl{elemental\_matrices\_appendix.tex}{14} (\textcolor{amend}{$2$}$\nu\Pi\nabla\!\bullet\nabla\beta$)}
+   {Corrected to $2\nu\Pi\nabla\!\bullet\nabla\beta$, consistent with the $2\mu\nabla^{\mathrm S}$
+    deviatoric operator.}
+\ch{Wrong test/trial function in the RHS viscous stabilization ($u\to v$)}
+   {\code{eq:StabilizationLVF} ($\nu\Pi\nabla u\,\nabla\beta$)}
+   {\appl{elemental\_matrices\_appendix.tex}{28}}
+   {In the adjoint operator $\mathcal L^*V_h$ (a function of $v$ only) the term acted on $\nabla u$;
+    corrected to act on the test function $\nabla v$.}
+\ch{Stray closing parenthesis removed}
+   {\code{eq:StabilizationLVF} operator bracket}
+   {\appl{elemental\_matrices\_appendix.tex}{28}}
+   {A spurious ``)'' inside the summed operator was removed.}
+\ch{Mass-source $\overline\phi$ redefined; $\varepsilon p^{n-1}$ and $\overline U^n$ line removed}
+   {\code{eq:DefinitionOfMassSourceTerm} ($\overline\phi=-\pi_{\text{mass}}+\varepsilon p^{n-1}$)}
+   {\appl{elemental\_matrices\_appendix.tex}{32}--37}
+   {General mass source now $\overline\phi=-\pi_{\text{mass}}$ (tentative $\varepsilon p^{n-1}$
+    removed), the redundant $\overline U^n=[u^n;p^n]$ line deleted, with the penalty case moved to the
+    new remark.}
+\ch{Source equation cross-reference corrected}
+   {App.~A first sentence (from \code{eq:NonlinearStabilizedEquation})}
+   {\appl{elemental\_matrices\_appendix.tex}{5}}
+   {Now derives the terms from the \emph{discretized} \code{eq:DiscretizedNonlinearStabilizedEquation},
+    matching the linearized/discrete matrices actually expanded.}
+\ch{$N_c \to N^c$ typos in $G_{\mathrm S}$ and $D_{\nu D}$}
+   {\code{eq:GSComponents}, \code{eq:DDComponents}}
+   {\appl{elemental\_matrices\_appendix.tex}{119} and L125}
+   {Two shape-function factors mistyped with a subscript node index corrected to the superscript
+    convention used everywhere.}
+\ch{Missing index on $\partial\beta$ in $L_{G\beta}$}
+   {\code{eq:LGBetaLHSStabilizationTerm}}
+   {\appl{elemental\_matrices\_appendix.tex}{154}}
+   {$\partial\beta$ (no contracted index) corrected to $\partial_m\beta$, matching the summed index.}
+\ch{Missing $\tau_1$ in $G_{\mathrm R}$}
+   {\code{eq:GRLHSStabilizationTerm}}
+   {\appl{elemental\_matrices\_appendix.tex}{225}}
+   {The $G_{\mathrm R}$ integrand was missing the $\tau_1$ factor that appears in its result; inserted
+    for consistency.}
+\ch{Missing $\alpha$ factor in $D_{\mathrm U}$}
+   {\code{eq:DULHSStabilizationTerm}}
+   {\appl{elemental\_matrices\_appendix.tex}{197}}
+   {The result gained a missing $\alpha$: $\tau_2\,\alpha\,\partial_iN^a\partial_j\alpha N^b$,
+    correcting the scaling of the $\tau_2$ divergence-stabilization term.}
+\ch{$G_{\mathrm P}$ stabilization integrand and result corrected}
+   {\code{eq:GPLHSStabilizationTerm}}
+   {\appl{elemental\_matrices\_appendix.tex}{251}}
+   {A missing $N^a$ factor and a spurious $\alpha$ fixed:
+    $\tau_2\,\varepsilon\,\partial_i\alpha\,N^aN^cP^c$.}
+\ch{Wrong cross-reference in the $K_{V,P}$ generic-component sentence}
+   {\code{sec:KVPComponents} (pointed to \code{eq:GenericMatrixVP})}
+   {\appl{elemental\_matrices\_appendix.tex}{231}}
+   {Corrected to reference \code{eq:GenericMatrixVU} rather than the equation being introduced.}
+\ch{Corrected index contraction in the $G_{\beta F}$ force term}
+   {\code{eq:GBetaFTerm} (both bracket terms contracted with $\bar f_k$)}
+   {\appl{elemental\_matrices\_appendix.tex}{289}}
+   {Corrected so the first term contracts with $\bar f_k$ and the second with $\bar f_i$, fixing the
+    free/summed index bookkeeping.}
+\ch{$Q_\phi$ relocated to $F_{\mathrm Q}$ with corrected index and sign}
+   {was in $F_{\mathrm V}$ as $Q_{\phi(ia)}=\tau_2\varepsilon N^a\overline\phi$}
+   {\code{eq:QPhiTerm}, \appl{elemental\_matrices\_appendix.tex}{308}}
+   {Moved from $F_{\mathrm V}$ to $F_{\mathrm Q}$, index corrected from vector $(ia)$ to scalar $a$
+    (a mass-row term), and sign flipped: $Q_{\phi a}=-\tau_2\varepsilon N^a\overline\phi$.}
+\ch{Assembled $K$ cleaned: spurious identity block and undefined $G_\beta,D_\beta$ removed}
+   {final assembly ($[[\mathbb I,0],[0,0]]+\dots+G_\beta+D_\beta+\dots$)}
+   {\appl{elemental\_matrices\_appendix.tex}{318}--322}
+   {The leading identity block was deleted, the undefined leftover $+G_\beta+D_\beta$ removed,
+    $G_{\mathrm P}\to G_{\alpha P}$, and $P_{\mathrm Q}$ un-annotated.}
+\ch{Boundary term $V_{\mathrm T}$ added to the assembled force vector}
+   {assembled $F=[V_{\mathrm F};0]+F_{\mathrm S}$}
+   {\appl{elemental\_matrices\_appendix.tex}{325}}
+   {The Neumann boundary contribution $V_{\mathrm T}$ is now actually included in the momentum row:
+    $V_{\mathrm F}+V_{\mathrm T}$.}
+\ch{First-order $F_{\mathrm S}$ mass row corrected $Q_{\mathrm P}\to Q_\phi$}
+   {\code{eq:FirstOrdertabilizationMatrices} $F_{\mathrm S}$}
+   {\appl{elemental\_matrices\_appendix.tex}{375}}
+   {The simplified stabilization vector wrongly listed $Q_{\mathrm P}$ (a $K$-matrix term); corrected
+    to $Q_\phi$.}
+\end{itemize}
+
+% #####################################################################
+\section{Text errata}
+\emph{Typos, grammar, wrong words, punctuation, and broken cross-references.}
+
+\begin{itemize}
+\ch{Abstract: ``associated to'' $\to$ ``associated with''}
+   {Abstract, \pdfp{1}}{Abstract, \artl{204}}{Preposition fix.}
+\ch{\S1: ``most recent form'' $\to$ ``generalized form considered here''}
+   {\S1, roadmap paragraph, \pdfp{6}}{\S1, \artl{243}}
+   {Precisely describes what the Fourier-based design argument had not previously been applied to.}
+\ch{\S1: bundled wording/typo fixes}
+   {\S1, various, \pdfp{5}--6}{\S1, \artl{218}, 222, 237, 241}
+   {``modelled''$\to$``modeled''; a footnote fragment repaired; reference disambiguation
+    ``in this work''$\to$``in that work''; ``successively''$\to$``successfully''; a duplicated
+    ``associated'' removed.}
+\ch{\S2: grammar and cross-reference cleanups}
+   {\S2/\S2.1, \pdfp{7}--8}{\S2, \artl{264}, 286; footnote \artl{262}}
+   {``of resulting problem''$\to$``of the resulting problem''; ``as done in this work''$\to$``in that
+    work''; a redundant ``Equations'' before \code{\textbackslash cref} removed; a stray trailing
+    period.}
+\ch{\S3.2: A.3 footnote grammar}
+   {\S3.2, footnote on Assumption A.3, \pdfp{12}}{\S3.2, \artl{539}}
+   {``in definition the numerical method''$\to$``in defining''; ``should later backed up''$\to$``should
+    later be backed up.''}
+\ch{\S3.2: duplicated ``associated to associated to'' removed}
+   {\S3.2, before \code{eq:TauInnerProduct}, \pdfp{13}}{\S3.2, \artl{579}}
+   {Now reads ``associated with the inner product''.}
+\ch{\S3.2: missing-word grammar fixes}
+   {\S3.2, \pdfp{12}--13}{\S3.2, $\sim$\artl{542} and $\sim$\artl{552}}
+   {``that problem ceases''$\to$``that the problem''; ``where $\widetilde\Pi$ a projection''$\to$
+    ``$\widetilde\Pi$ \emph{is} a projection''.}
+\ch{\S3.2: ``modelling'' $\to$ ``modeling'' in the subsection title}
+   {\S3.2 heading, \pdfp{11}}{\S3.2 \code{sec:FEDiscretization}}
+   {US-English spelling in the heading.}
+\ch{\S4: ``length scale'' $\to$ ``scaling factor'' for $\lambda$}
+   {\S4, after \code{eq:TauNavierStokes} (eq.~(4.27)), \pdfp{17}}{\S4, \artl{820}}
+   {$\lambda$ has units of velocity squared, not a length.}
+\ch{\S4: ``large of $\varepsilon$'' $\to$ ``large values of $\varepsilon$''}
+   {\S4, \pdfp{17}}{\S4, \artl{820}}{Missing noun supplied.}
+\ch{\S4: ``the expression for the both'' $\to$ ``the expressions for both''}
+   {\S4, before \code{eq:Tau1}/\code{eq:Tau2}, \pdfp{17}}{\S4, \artl{809}}{Grammar fix.}
+\ch{\S5: bundled grammar fixes}
+   {\S5, various, \pdfp{19}--22}{\S5, \artl{838}, 862, 921, 927, \code{lemma:Stability}}
+   {``yields to simplified''$\to$``yields simplified''; ``such term''$\to$``such a term''; ``It turns
+    out this not to be the case''$\to$``this is not the case''; ``there exist a positive
+    constant''$\to$``exists''; ``$C$'' set in math mode.}
+\ch{\S6: cross-reference, typo, grammar, and $Da_h\!\to\!Da$ fixes}
+   {\S6, \pdfp{23}--25}{\S6, \artl{980}, 1071, 1023, 1077}
+   {Added the missing \code{\textbackslash cref\{eq:StrongMomentumEquation\}} pointer;
+    ``reaction-dominanted''$\to$``reaction-dominated''; ``where in the second estimate''$\to$``where the
+    second estimate''; subscript ``$Da_h$''$\to$``$Da$''.}
+\ch{\S7: ``fluid fields'' $\to$ ``velocity fields''}
+   {\S7 intro, \pdfp{26}}{\S7, \artl{1093}}{``fluid'' was the wrong word for the velocity field.}
+\ch{\S7.2: ``anlyzed'' $\to$ ``analyzed''}
+   {\S7.2, \pdfp{27}}{\S7.2, \artl{1437}}{Spelling.}
+\ch{App.~A: duplicated equation label fixed}
+   {$L_{\mathrm C}$ term (mislabeled \code{eq:SCLHSStabilizationTerm})}
+   {\code{eq:LCLHSStabilizationTerm}, \appl{elemental\_matrices\_appendix.tex}{153}}
+   {Renamed to match the $L_\bullet$ naming scheme.}
+\ch{App.~A: minor language fixes}
+   {App.~A (``make use of following notation''; ``$G_{\mathrm S}$, and is given by'')}
+   {\appl{elemental\_matrices\_appendix.tex}{43}, L117}
+   {Inserted missing ``the''; removed a stray ``and''.}
+\end{itemize}
+
+% #####################################################################
+\section{Others}
+\emph{Renamings, retitlings, local notation choices, structural/formatting changes, changed
+metadata, and infrastructure --- worth listing but not fitting the categories above.}
+
+\subsection{Front matter, metadata \& LaTeX infrastructure}
+\begin{itemize}
+\ch{Keywords re-curated}
+   {Keywords, \pdfp{1}}{keywords env., \artl{208}--210}
+   {Added ``ASGS'' and ``porous media''; removed ``particle-laden flows'' --- aligning with the actual
+    scope (both stabilizations, porous-media focus).}
+\ch{AMS subject-classification codes changed}
+   {AMS env., \pdfp{1} (65Z05, 65M60, 65N30, 65N12)}{AMS env., \artl{213}--215}
+   {To 76S05, 76M10, 65N30, 65N12, 65N15, 65Z05: added porous-media/FE-fluids/error-bound codes,
+    dropped the time-dependent 65M60 --- reclassifying the paper as porous-media stationary FE with
+    a~priori bounds.}
+\ch{New \texttt{\textbackslash amend} review-markup macro}
+   {n/a (new)}{Preamble, \artl{114}--118}
+   {Defines the violet \code{\textbackslash amend\{\}} flag for the 2026 correction pass (flatten to
+    accept all corrections). Markup infrastructure.}
+\ch{New continuity-appendix macro block}
+   {n/a (new)}{Preamble, \artl{168}--194}
+   {A block of macros and an Assumption theorem environment supporting the inlined Appendix~C.}
+\ch{Conditional \texttt{\textbackslash allowdisplaybreaks} enabled}
+   {Preamble, orig.\ commented out}{Preamble, \artl{45}--61}
+   {Activated only when the review \texttt{lineno} package is absent (they conflict), fixing large
+    vertical voids in the elemental-matrices appendix. Layout only.}
+\ch{Minor preamble notation-macro rewrites}
+   {Preamble, orig.\ \code{\textbackslash innpargsaux}, \code{\textbackslash triplenorm}}
+   {Preamble, \artl{121}, 136--140, 150--154}
+   {Inner-product spacing rewritten; \code{\textbackslash triplenorm} changed to fixed-size bars so
+    its height is constant; \code{\textbackslash emergencystretch} set to 3em. No mathematical effect.}
+\ch{Appendices moved into the article via \texttt{\textbackslash input}}
+   {appendices external/separate in the submission}{\artl{1677}--1683 (\texttt{\textbackslash appendix} + three inputs)}
+   {The three appendices are now \texttt{\textbackslash input} after the bibliography --- the structural
+    change that makes them part of the compiled article.}
+\ch{Global \texttt{\textbackslash pmb}$\to$\texttt{\textbackslash boldsymbol} \& \texttt{\textbackslash amend} markup}
+   {throughout}{throughout}
+   {The two global conventions stated in the header, recorded once here for completeness.}
+\end{itemize}
+
+\subsection{Body renamings, local notation \& structural edits}
+\begin{itemize}
+\ch{Local Projection Stabilization descriptor rephrased}
+   {\S1, advantages paragraph, \pdfp{6}}{\S1, \artl{241}}
+   {Skrzypacz's LPS is now qualified as ``to our knowledge the only previously proposed stabilized FE
+    method for the variable-porosity problem'', in an em-dash clause.}
+\ch{New equation label \code{eq:RHS\_neumann}}
+   {\S2.1, unlabeled $g(x)$ piecewise eq.~(2.12), \pdfp{9}}{\S2.1, \artl{371}}
+   {The boundary-data definition received a label so it can be cross-referenced.}
+\ch{Retained author annotations: ``spatially inhomogeneous'', ``commuting''}
+   {\S2, \pdfp{7}}{\S2, \artl{249}, 256}
+   {$\alpha$ now ``spatially inhomogeneous''; the projections called ``commuting'' rather than
+    ``(commutative)''.}
+\ch{Algorithm caption rewritten}
+   {\S3.3, \code{alg:StationarySystem} caption, \pdfp{15}}{\S3.3, \artl{688}}
+   {From ``Solving the nonlinear problem'' to a descriptive caption naming the staggered fixed-point
+    iteration and noting ASGS is the $\pi_h^m\equiv0$ special case.}
+\ch{\S3 wording clarifications}
+   {\S3 opening + \S3.1, \pdfp{10}--11}{\S3 \artl{490}, \S3.1 $\sim$\artl{518}}
+   {``nonessential parts''$\to$``most basic parts''; ``is exact''$\to$``does not entail any
+    approximation''; ``must be providing''$\to$``must provide''. No math change.}
+\ch{Notation-consistency and label edits (\S2.2--\S3)}
+   {throughout \S2.2--\S3, \pdfp{7}--15}{\artl{456}--689}
+   {Roman-subscript consistency $A_{c,i}\to A_{\text c,i}$, $A_{f,i}\to A_{\text f,i}$;
+    commented-equation label renames; a paragraph reflow.}
+\ch{\S4 minor wording/citation}
+   {\S4, various, \pdfp{14}--18}{\S4, \artl{697}, 733, 760, 780, 828}
+   {``applied and further developed to''$\to$``extended to''; ``any of the operators''$\to$``any one
+    of''; an added comma; a reworded evaluation sentence.}
+\ch{Space notation $\mathcal X_h\to\mathcal X_{h0}$; two new equation labels (\S5)}
+   {\S5, lemma spaces / coefficient displays, \pdfp{21}--22}
+   {\S5, \artl{939}, 960; \code{eq:ViscousCoefficientBound} L906, \code{eq:VelocityCoefficientBound} L914}
+   {Trial/test space written $\mathcal X_{h0}$ (marking homogeneous Dirichlet); two coefficient-bound
+    displays labeled for reference from Appendix~C; \code{eq:Tau1}$\to$\code{eq:Tau1Final}.}
+\ch{$\varepsilon$-compressibility terms accepted (unwrapped from blue markup, App.~A)}
+   {\code{eq:ReactionTerm}, stabilization/matrix blocks (were tentative)}
+   {\appl{elemental\_matrices\_appendix.tex}{10}, 17, 30, 216, 226--266}
+   {All $\varepsilon$-penalty contributions ($(\varepsilon q,p)$, $\pm(\varepsilon/\alpha)q/p$, $Q_{\varepsilon D}$, etc.) are now kept as
+    accepted parts of the formulation.}
+\ch{$G_{\mathrm P}\to G_{\alpha P}$ rename to resolve a name clash (App.~A)}
+   {\code{eq:PComponents} ($G_{\mathrm P}$)}{\code{sec:KVPComponents}, \appl{elemental\_matrices\_appendix.tex}{235}}
+   {The Galerkin porosity-gradient flux term was renamed, eliminating a collision with the distinct
+    stabilization term $G_{\mathrm P}$ in the same subsection.}
+\ch{$F_{\mathrm V}$ stabilization terms split into $\tau_1$/$\tau_2$ blocks (App.~A)}
+   {\code{sec:FVComponents}}{\appl{elemental\_matrices\_appendix.tex}{283}--298}
+   {The RHS-force stabilization terms were reorganized into separate $\tau_1$ and $\tau_2$ blocks,
+    with $D_\phi$ moved into the $\tau_2$ block.}
+\ch{Codina2015 bib entry type $\to$ \texttt{@misc}}
+   {\code{@inproceedings\{Codina2015OnSM\}}, \pdfp{35}}{\code{references.bib} (\code{@misc})}
+   {Reclassified (a Semantic-Scholar entry with no venue); also newly cited in the \S2 amend sentence
+    on stabilized Darcy methods.}
+\end{itemize}
+
+\subsection{Subsection retitlings \& appendix-provenance notes}
+\begin{itemize}
+\ch{\S7.1 retitled ``Manufactured solutions: 2D cases''}
+   {\S7.1 ``2D cases'', \pdfp{26}}{\S7.1, \artl{1141}}
+   {Distinguishes it from the new literature-comparison example.}
+\ch{\S7.2 retitled ``Manufactured solutions: 3D cases''}
+   {\S7.2 ``3D cases'', \pdfp{27}}{\S7.2, \artl{1424}}{Parallel retitling.}
+\ch{Finest 2D mesh changed $640{\times}640\to320{\times}320$}
+   {\S7.1, \pdfp{26}}{\S7.1, \artl{1142}}
+   {Reduces the finest structured mesh; underlies the recomputation of every 2D table value and the
+    mesh-dependent estimates in the text. (Listed here as it drives, rather than is, the numeric
+    changes.)}
+\ch{Symbolic (sympy) verification of the Fourier identities (App.~B)}
+   {n/a (new)}{App.~B header, \appl{fourier\_appendix.tex}{1}--12}
+   {States every matrix identity/eigenvalue/limit is checked by a new script
+    \code{fourier\_tau\_verification.py}, and namespaces its labels \code{eq:ft*}. Supporting
+    provenance.}
+\ch{Scholarly note: sign typo in Codina (2001) Eq.~(66) (App.~C)}
+   {n/a (new)}{\appl{continuity\_appendix.tex}{612}--614}
+   {Records that the inter-element term carries a minus sign whereas the reference prints a plus ---
+    harmless, since the term is estimated in absolute value.}
+\ch{Inlining transformations recorded (App.~C header)}
+   {standalone source (not in submitted PDF)}{\appl{continuity\_appendix.tex}{1}--12}
+   {Documents the mechanical inlining: citation keys unified to \code{references.bib}, section levels
+    demoted one, and the standalone ``Amendments'' section dropped (its amendments now applied directly
+    in the article body).}
+\end{itemize}
+
+\vfill
+\begin{center}\footnotesize\itshape
+Generated from a source-to-source comparison of \texttt{AMMOD-S-25-00784.pdf} (submitted 14/02/2025)
+against the current \texttt{article.tex} and its three appendices.
+Line numbers refer to the current sources; submitted equation numbers and PDF pages refer to the
+submitted manuscript.
+\end{center}
+
+\end{document}
