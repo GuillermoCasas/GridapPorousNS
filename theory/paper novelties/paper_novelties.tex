@@ -205,12 +205,53 @@ that did not exist in the submitted manuscript.}
    {Justifies using $\tau_2$ without its $\varepsilon h^2$ term: under \code{eq:UpperBoundOnEpsilon}
     the two differ by at most $1+C_2<2$, so every estimate transfers with constants inflated by
     $\le 1+C_2$. Closes a previously unaddressed gap.}
-\ch{New paragraph explaining the porosity-weighted convergence bound}
-   {\S5, after \code{eq:InterpolationError}, \pdfp{22} (did not exist)}
-   {\S5, \artl{975}}
-   {States that \code{eq:ConvergenceResult} is now in its sharpest porosity-weighted form
-    ($\alpha_K\le1$ tightens the bound at low porosity) and points to the complete proof in
-    \code{app:Continuity}.}
+\ch{Convergence theorem promoted to the sharp $\ell^2$ form ($\ell^1$ as corollary)}
+   {\S5 \code{eq:ConvergenceResult} + App.\ C \code{thm:convergence}/\code{eq:convergence}, \pdfp{22},\,App.\ C}
+   {\S5 \artl{968}, 975; App.\ C \code{eq:psih}, \code{thm:convergence}, its proof, and the closing remark}
+   {External-audit finding (2026-07, M01): the theorem was stated as an \emph{elementwise $\ell^1$ sum}
+    although the appendix (\code{eq:Enorm}) derives, and the Coq development (\code{AbstractConvergence.abstract\_convergence})
+    machine-proves, the sharper porosity-weighted \emph{$\ell^2$} functional
+    $\Psi(h)=\big(\sum_K\alpha_K^2 h_K^{-2}(\tau_{2,K}\mathrm E_{\mathrm{int},K}(\boldsymbol u)^2+\tau_{1,K}\mathrm E_{\mathrm{int},K}(p)^2)\big)^{1/2}$.
+    Both \code{eq:ConvergenceResult} and \code{eq:convergence} now state $\Psi(h)$; the $\ell^1$ bound is
+    a one-line corollary via $\ell^2\!\subset\!\ell^1$, reducing (for $\alpha\equiv1$) to the form of
+    \code{codina2001stabilized}. The global interpolation functional
+    $\mathrm E_{\mathrm{int}}(\psi)=(\sum_K\mathrm E_{\mathrm{int},K}(\psi)^2)^{1/2}$ used in \S6 is now
+    defined (audit M02), and \code{lem:continterp}'s proof is noted to deliver $\Psi(h)$. The false
+    ``$\ell^1$ is the sharpest'' wording is removed. No Coq change was needed---the $\ell^2$ proof already exists.}
+\end{itemize}
+
+\subsection{External-audit response (2026-07-21)}
+A second external audit (82 issues; register + narrative under \code{docs/ChatGPT audit/}) was
+validity-checked against the current source: 1 refuted, 3 editorial-opinion, and the rest valid but
+mostly small text edits already partly absorbed by the tracked revision. Beyond \code{M01}/\code{M02}
+(above) and the \S6 algebra fix \code{M03} (logged under Corrections to formulas, \S6 Robustness), the
+following were applied as \code{\textbackslash amend} changes; each is a scope/accuracy/wording correction
+requiring no rerun:
+\begin{itemize}\setlength\itemsep{0pt}
+\item \textbf{N01} (\artl{1143}, 1647, 1654): ``no solution''/``fold''/``turning point'' softened to
+  tested-solver non-convergence (a discrete root is not claimed absent without branch continuation).
+\item \textbf{C01} (\artl{268}): the viscous operator was said to \emph{remove} the deviatoric part;
+  corrected---it \emph{removes the spherical/trace part} and retains the deviatoric (hence the deviatoric
+  Korn requirement).
+\item \textbf{M09} (\artl{1656}) / \textbf{D04} (\artl{1660}): the conclusion now states the $1/\alpha_0$
+  reaction-pressure exception to the $\alpha_0^{-1/2}$ rule, and restricts the Taylor--Hood match to
+  \emph{velocity} (the inf--sup pair being more accurate in pressure).
+\item \textbf{I07} (\artl{1666}): the porosity-interpolation claim, previously attributed to experiments
+  (all of which evaluate $\alpha$ analytically), restated as an expectation / future work.
+\item \textbf{I02}/\textbf{I03}/\textbf{I05}/\textbf{I06} (\artl{237}, 241, 243, 1654): intro/conclusion
+  scoped to the linearized ASGS setting; ``only previously proposed''$\to$``a relevant prior'';
+  ``battery of tests''$\to$``numerical study''; unsupported data-structure-complexity rhetoric dropped.
+\item \textbf{N02} (\artl{1119}): the flat ``$U=L=1$'' reconciled with the centered dimensional encoding
+  ($U$ varies per cell); only $L=1$ is fixed.
+\item \textbf{C09} (\artl{833}) $\sigma\boldsymbol 1_3\!\to\!\sigma\mathbb I$; \textbf{C10} (\artl{990})
+  Damk\"ohler-vs-Darcy note; \textbf{N10} (\artl{1147}, 1165) ``absolute reference''$\to$``nodal-interpolation
+  benchmark''; \textbf{N15} (\artl{1163}) OSGS ``error component''$\to$``quadratic excess indicator'';
+  \textbf{N19} (\artl{1428}) ``genuinely 3D test''$\to$``3D \emph{discretization} test'';
+  \textbf{N13} (\artl{1654}) ``corroborated''$\to$``consistent with''; \textbf{S03}/\textbf{S07} source/caption.
+\item \textbf{Verification hardening}: every displayed equation (369 across the four files) was audited for
+  proof-verification coverage---\emph{zero} further algebra errors---and the SymPy suite grew $115\!\to\!233$
+  checks (five new \code{coverage\_*} modules) plus a mirror \code{Isolation} section in \code{Asymptotics.v};
+  see \code{proof\_verification/EQUATION\_COVERAGE\_LEDGER.md}.
 \end{itemize}
 
 \subsection{\S7 Numerical examples (2D/3D) and the new comparison}
@@ -935,6 +976,19 @@ definitions, corrected limits, and recomputed numerical tables.}
    {\S6.1, \artl{1027}}
    {Corrected to the dimensionless ratio $U\nu/(Ph)$, which reduces to $L/h$ after inserting
     $P\!\sim\!U\nu/L$; a new sentence spells out the reduction.}
+\ch{Convective pressure-gradient estimate inner factor $\|\boldsymbol{a}\|_\infty/\sqrt{P}\to\|\boldsymbol{a}\|_\infty U/P$}
+   {\S6.2, \code{eq:DominantPressureGradientXTermEstimate} (the convective analogue of eq.~(6.7)), \pdfp{24}}
+   {\S6.2, \artl{1052}}
+   {External-audit finding (2026-07): the printed factor $\|\boldsymbol{a}\|_\infty/\sqrt P+1$ does \emph{not}
+    follow from \code{eq:DominantConvectionEstimate}; corrected to $\|\boldsymbol{a}\|_\infty U/P+1$ (the exact
+    convective analogue of the viscous fix directly above), obtained by isolating $\|\nabla e_p\|_h$ and
+    writing $\mathrm E_{\rm int}(p)=P\,\mathrm E^*_{\rm int}(p)$. Both forms are $O(1)$ under
+    $P\!\sim\!U^2$, $\|\boldsymbol{a}\|_\infty\!\sim\!U$, so the final $\sim\!\alpha_0^{-1/2}\mathrm E_{\rm int}(p)/h$
+    is unchanged; a clause was added spelling out the reduction. The error slipped through because the
+    per-term isolation displays of \S6 were verified only for their $\tau$ inputs and limits, not
+    reconstructed --- now machine-checked in both layers
+    (\code{sympy/robustness\_isolation\_verification.py}, and \code{Asymptotics.v} \code{iso\_1052\_*},
+    with a discriminating check that refutes the printed $\sqrt P$ form).}
 \end{itemize}
 
 \subsection{\S7 Numerical examples}

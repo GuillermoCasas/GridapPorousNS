@@ -2,7 +2,7 @@
 % Appendix C: self-contained continuity proof (inlined June 2026).
 % Source: theory/continuity appendix/continuity_appendix.tex (standalone).
 % Transformations applied when inlining:
-%   - standalone preamble / title / abstract / thebibliography / nd{document} stripped;
+%   - standalone preamble / title / abstract / thebibliography / \end{document} stripped;
 %   - section levels demoted by one (\section->\subsection, \subsection->\subsubsection);
 %   - citation keys unified to references.bib (codina2001->codina2001stabilized,
 %     brennerscott->brenner2008mathematical; ernguermond added to references.bib);
@@ -880,14 +880,21 @@ which are the analogues of Eqs.~(78)--(79) of~\cite{codina2001stabilized}. We ab
 $E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
 \begin{equation}\label{eq:psih}
 \begin{aligned}
-  \psi(h)
+  \Psi(h)
+  &\coloneqq \Bigl(\sum_{K\in\Th}\alpha_K^2\,h_K^{-2}
+  \bigl(\tau_{2,K}\,\Eint{K}{\bu}^2+\tau_{1,K}\,\Eint{K}{p}^2\bigr)\Bigr)^{1/2}
+  \;\le\;
+  \psi(h) \\
   &\coloneqq \sum_{K\in\Th}\alpha_K\,h_K^{-1}
-  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr) \\
-  &\;\le\;
+  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr)
+  \;\le\;
   \sum_{K\in\Th}h_K^{-1}
-  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr).
+  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr),
 \end{aligned}
 \end{equation}
+the first inequality being the discrete $\ell^2\subset\ell^1$ bound (using
+$a^2+b^2\le(a+b)^2$ elementwise); $\Psi(h)$ is the porosity{\hyp}weighted $\ell^2$
+functional in which the sharp estimate is stated, $\psi(h)$ its coarser $\ell^1$ majorant.
 
 \subsubsection{Continuity with respect to the interpolation error}
 
@@ -989,31 +996,41 @@ $\BS(\ba;U_h,U_h)\ge C\,\triplenorm{U_h}^2$ for all $U_h\in\Xh$.
 \begin{theorem}[Convergence]\label{thm:convergence}
 Under the hypotheses of \cref{prop:stability,lem:continterp},
 \begin{equation}\label{eq:convergence}
-\begin{aligned}
   \triplenorm{U-U_h}
-  &\le C\,\psi(h)
-  = C\sum_{K\in\Th}\alpha_K\,h_K^{-1}
-  \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr).
-\end{aligned}
+  \le C\,\Psi(h)
+  = C\Bigl(\sum_{K\in\Th}\alpha_K^2\,h_K^{-2}
+  \bigl(\tau_{2,K}\,\Eint{K}{\bu}^2+\tau_{1,K}\,\Eint{K}{p}^2\bigr)\Bigr)^{1/2}
+  \;\le\; C\,\psi(h),
 \end{equation}
+with $\Psi(h)\le\psi(h)$ the porosity{\hyp}weighted $\ell^2$ functional of \eqref{eq:psih}.
 \end{theorem}
 
 \begin{proof}
 Let $\Delta_h\coloneqq\widehat{U}_h-U_h\in\Xh$ (not to be confused with the total error
-$E_h = U-U_h$ of \cref{th:Convergence}). By \cref{prop:stability}, consistency
-\eqref{eq:consistency} and \cref{lem:continterp},
+$E_h = U-U_h$ of \cref{th:Convergence}). The estimate of \cref{lem:continterp} holds with
+$\Psi(h)$ in place of its majorant $\psi(h)$: the interpolation norms entering its proof are
+mesh $\ell^2${\hyp}norms [the bracketed terms bounded through \eqref{eq:interpzero}], which
+its final step only afterwards enlarges to $\psi(h)$; retaining them gives
+$\BS(\ba;U-\widehat{U}_h,V_h)\le C\,\Psi(h)\,\triplenorm{V_h}$. By \cref{prop:stability},
+consistency \eqref{eq:consistency} and this estimate,
 \begin{equation*}
   C\,\triplenorm{\Delta_h}^2
   \le \BS(\ba;\Delta_h,\Delta_h)
   = \BS\bigl(\ba;\widehat{U}_h-U,\Delta_h\bigr)
-  \le C\,\psi(h)\,\triplenorm{\Delta_h},
+  \le C\,\Psi(h)\,\triplenorm{\Delta_h},
 \end{equation*}
-so $\triplenorm{\Delta_h}\le C\psi(h)$. The triangle inequality and \eqref{eq:Enorm} give
-$\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{\Delta_h}\le C\psi(h)$.
+so $\triplenorm{\Delta_h}\le C\Psi(h)$. Since \eqref{eq:Enorm} bounds
+$\triplenorm{U-\widehat{U}_h}$ by the same $\Psi(h)$, the triangle inequality gives
+$\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{\Delta_h}\le C\,\Psi(h)\le C\,\psi(h)$.
 \end{proof}
 
-\noindent The bound \eqref{eq:convergence}, which is the porosity{\hyp}weighted form of
-the main-text estimate \eqref{eq:ConvergenceResult}, is the sharpest afforded by the
-present argument; the coarser bound with the weight $\alpha_K$ replaced by $1$ follows at
-once from $\alpha_K\le1$ and matches the form found, without the porosity field,
-in~\cite{codina2001stabilized}.
+\noindent The bound \eqref{eq:convergence} is stated in the sharpest form afforded by the
+present argument: the porosity{\hyp}weighted $\ell^2$ functional $\Psi(h)$, which coincides
+with the main-text estimate \eqref{eq:ConvergenceResult}. Two successive relaxations recover
+weaker but more familiar forms. First, the discrete $\ell^2\subset\ell^1$ inequality gives
+the $\ell^1$ bound $C\,\psi(h)$. Second, replacing the elementwise weight $\alpha_K\le1$ by
+$1$ throughout yields the porosity{\hyp}free estimate, which reduces (for $\alpha\equiv1$) to
+the form found in~\cite{codina2001stabilized}. Both relaxations only enlarge the bound, so
+the $\Psi(h)$ statement is the tightest; in particular the local factor $\alpha_K$ makes it
+sharper in regions of low porosity, consistently with the robustness analysis of
+\cref{sec:Robustness}.
