@@ -40,8 +40,16 @@ curved-interface-on-structured-mesh difficulty, not a regression.)
   solver/Jacobian bug: Exact-Newton `J·v` vs FD of the residual ≈ **4.8e-12**.
 - **It recedes with refinement.** α-fold ≈ 0.24 (N=10) → 0.16 (N=40) → 0.106 (N=80). Once the target α is above
   the fold, the solve converges directly — clears at **N≥512 for P1/TRI, N≥160 for Q2/QUAD** (Q2 resolves the
-  porosity layer ~2× better per direction). Past the fold: optimal **H¹ ≈ 1.0–1.04**, super-convergent **L² ≈
-  2.99–3.03**.
+  porosity layer ~2× better per direction). Past the fold (P1 corner, N=512→768, two-finest slope): **L² velocity
+  ≈ 3.03** (ASGS) / **3.09** (OSGS) for Da∈{1e-6,1}, dropping to **≈ 2.1** (ASGS) / **2.6** (OSGS) for the Da=1e6
+  reaction cell; **H¹ velocity ≈ 1.0–1.06** throughout. (The older "L² ≈ 2.99–3.03 / H¹ ≈ 1.0–1.04" shorthand
+  was a loose approximation — it omitted the reaction cell and the OSGS variant; use the per-cell numbers.)
+- **Corner FME vs interpolation floor (P1, N=768, α₀=0.05).** Nodal-interpolant floor on that mesh (computed
+  directly, not extrapolated): velocity L²=2.85e-5, H¹=7.31e-2; pressure L²=1.71e-6, H¹=4.54e-3. Corner FME:
+  velocity L²=7.94e-5 (Da≤1) / 1.21e-5 (Da=1e6), H¹=7.33e-2; pressure L²=7.38e-6 / 9.10e-7, H¹=4.55e-3. So the
+  corner error **sits on the interpolation floor in H¹** (≤0.3% for all three Da) and is a pre-asymptotic ~2.8×
+  (velocity) / ~4× (pressure) above it in L², dropping to the floor for the reaction cell — i.e. once resolved,
+  the excluded corner is as accurate as the interpolant (resolution limit, not a formulation defect).
 - **Trouble axis is `Re×α₀`, not `Re×Da`** — constant `σ` is a benign, coercive knob (bit-identical roots at
   Da=1e6 vs 1e-6 for the same `(Re, α₀)`).
 - **α-continuation is the only viable continuation axis** (Da-/Re-continuation stall — they hold α=0.05 fixed, so
