@@ -237,3 +237,94 @@ Theorem forcing_coefficient : (alpha_inf * nu * U / L^2) * mult = 1.
 Proof. exact viscous_coefficient. Qed.
 
 End Nondimensionalization.
+
+(* ========================================================================= *)
+(*  (4)  Per-term ISOLATION displays of Section 6.                           *)
+(*                                                                           *)
+(*  The tau-limit theorems above (parts 1-2) verify the INPUTS of the        *)
+(*  robustness estimates (the tau closed forms and their regime limits) but  *)
+(*  NOT the per-term isolation displays -- the steps that take a coupled     *)
+(*  regime bound, isolate a single left-hand term, and re-express it through  *)
+(*      E_int(u) = U E*_int,   E_int(p) = P E*_int   (equal order).           *)
+(*  That is the exact blind spot in which the external audit (2026-07) found  *)
+(*  an ALGEBRAIC ERROR in eq:DominantPressureGradientXTermEstimate (~l.1052): *)
+(*      printed   ||a||_inf / sqrt(P) + 1     (WRONG, does not follow)        *)
+(*      correct   ||a||_inf * U / P + 1       (follows from eq:1043).         *)
+(*  Both reduce to O(1) under P ~ U^2, so the final "~" is unchanged, but the *)
+(*  intermediate display was wrong.  These theorems close the Coq-side gap    *)
+(*  (mirror of sympy/robustness_isolation_verification.py).  The isolation    *)
+(*  mechanic: a coupled bound  m_coup * ||T|| <~ (1/a0^q) * RHScoef * Es/h,   *)
+(*  printed as  m_prt * ||T|| <~ (1/a0^q) * factor * E_target/h, gives        *)
+(*      factor = (m_prt/m_coup) * RHScoef / target_scale.                     *)
+(*  Below we prove each printed 'factor' (the bracketed part; the common      *)
+(*  a0^{-1/2} prefactor is carried unchanged, a0^{-1} for eq:1075).           *)
+(* ========================================================================= *)
+
+Section Isolation.
+
+(* U,P: velocity/pressure scales; amag = ||a||_inf; s_sig,s_nu,rr stand for   *)
+(* sqrt(sigma), sqrt(nu), sqrt(1+Re_h) (kept opaque -- no sqrt reasoning       *)
+(* needed for the pure coefficient algebra).                                   *)
+Variables (U P amag nu h s_sig s_nu rr : R).
+Hypothesis U_pos    : 0 < U.
+Hypothesis P_pos    : 0 < P.
+Hypothesis amag_pos : 0 < amag.
+Hypothesis nu_pos'  : 0 < nu.
+Hypothesis h_pos'   : 0 < h.
+Hypothesis ssig_pos : 0 < s_sig.
+Hypothesis snu_pos  : 0 < s_nu.
+Hypothesis rr_pos   : 0 < rr.
+
+(* --- Dominant viscosity.  Coupled RHS coefficient of Es/h is (U + P h/nu). --- *)
+(* eq:DominantViscosityVelocityGradientEstimate (~l.1023): m_coup=m_prt=1, scale U. *)
+Theorem iso_1023 : (U + P*h/nu)/U = 1 + P*h/(U*nu).
+Proof. field. repeat split; nra. Qed.
+
+(* eq:DominantViscosityPressureGradientEstimate (~l.1027): m_coup=h/nu,m_prt=1, scale P. *)
+Theorem iso_1027 : (U + P*h/nu)/(h/nu)/P = U*nu/(P*h) + 1.
+Proof. field. repeat split; nra. Qed.
+
+(* --- Dominant convection.  Coupled RHS coefficient of Es/h is (U + P/amag). --- *)
+(* eq:DominantConvectionXTermEstimate (~l.1048): 1/||a|| kept on both sides, scale U. *)
+Theorem iso_1048 : (U + P/amag)/U = 1 + P/(U*amag).
+Proof. field. repeat split; nra. Qed.
+
+(* eq:DominantPressureGradientXTermEstimate (~l.1052), CORRECTED: m_coup=1/amag,      *)
+(* m_prt=1 (multiply through by ||a||), scale P  =>  factor = ||a|| U/P + 1.          *)
+Theorem iso_1052_correct : (U + P/amag)/(1/amag)/P = amag*U/P + 1.
+Proof. field. repeat split; nra. Qed.
+
+(* eq:1052 DISCRIMINATING: the printed factor ||a||/sqrt(P)+1 does NOT equal the       *)
+(* correct ||a|| U/P + 1 in general.  Concrete counterexample U=1,P=4,amag=1:          *)
+(* printed = 1/sqrt 4 + 1 = 3/2, correct = 1*1/4 + 1 = 5/4. *)
+Theorem iso_1052_printed_differs : 1 / sqrt 4 + 1 <> 1 * 1 / 4 + 1.
+Proof.
+  assert (H4 : sqrt 4 = 2).
+  { replace 4 with (Rsqr 2) by (unfold Rsqr; lra). apply sqrt_Rsqr; lra. }
+  rewrite H4. lra.
+Qed.
+
+(* eq:1052 under the stated scaling P = U^2: printed and correct COINCIDE (= amag/U+1), *)
+(* which is why the final "~ a0^{-1/2} E_int(p)/h" conclusion is unaffected. *)
+Theorem iso_1052_agree_under_PU2 :
+  amag * U / (U^2) + 1 = amag / U + 1
+  /\ amag / sqrt (U^2) + 1 = amag / U + 1.
+Proof.
+  split.
+  - field; lra.
+  - assert (Hs : sqrt (U^2) = U).
+    { replace (U^2) with (Rsqr U) by (unfold Rsqr; ring). apply sqrt_Rsqr; lra. }
+    rewrite Hs. field; lra.
+Qed.
+
+(* --- Dominant reaction.  Coupled RHS coef of Es/h is (rr U + P/(s_sig s_nu)). --- *)
+(* eq:DominantReactionVelocityGradientEstimate (~l.1068): m_coup=m_prt=1, scale U. *)
+Theorem iso_1068 : (rr*U + P/(s_sig*s_nu))/U = rr + P/(U*s_sig*s_nu).
+Proof. field. repeat split; nra. Qed.
+
+(* eq:DominantReactionPressureGradientEstimate (~l.1075): m_coup=a0^{1/2}/(s_sig s_nu), *)
+(* m_prt=1, scale P.  The bracketed factor (the a0^{-1} prefactor is carried apart) is: *)
+Theorem iso_1075 : (rr*U + P/(s_sig*s_nu))*(s_sig*s_nu)/P = s_sig*s_nu*rr*U/P + 1.
+Proof. field. repeat split; nra. Qed.
+
+End Isolation.

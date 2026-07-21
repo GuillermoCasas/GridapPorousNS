@@ -14,9 +14,14 @@ python3 -m venv /tmp/sympy_venv && /tmp/sympy_venv/bin/pip install sympy numpy
 /tmp/sympy_venv/bin/python "run_all.py"
 ```
 
-Current status: **115/115 checks pass across 10 scripts.** See
+Current status: **233/233 checks pass across 16 scripts.** See
 [`../verification-gap-coverage.md`](../verification-gap-coverage.md) for why the 2026-07
-review still caught two defects (F1/F2) despite this suite, and the plan that closes the gap.
+review still caught three defects (F1/F2 and the §6 isolation error F3/M03) despite this
+suite, and the plan that closes the gap. A **2026-07-21 every-equation coverage audit**
+(369 displayed equations across all four `.tex` files, adversarially cross-checked in
+SymPy) found **zero further algebra errors** and drove the five new `coverage_*` scripts
+below, which encode the previously displayed-but-unchecked identities; the per-equation
+map is in [`../EQUATION_COVERAGE_LEDGER.md`](../EQUATION_COVERAGE_LEDGER.md).
 
 | Script | Paper location | What it verifies | Checks |
 |---|---|---|---|
@@ -24,11 +29,17 @@ review still caught two defects (F1/F2) despite this suite, and the plan that cl
 | `fourier_tau_verification.py` | §4 / App. C (`eq:StabilizationParameters`, `eq:Tau1`, `eq:Tau2`) | The Fourier symbols of each operator piece, the viscous eigenvalues (`4/3` at `d=3`), the `√λ` design pair, and the assembly recovering `τ₁`, `τ₂`. | 19 |
 | `stability_estimate_verification.py` | §5 (`eq:SigmaAlpha`, `eq:StabilityEstimateFinal`, `eq:UpperBoundOnEpsilon`) | The four forms of `σ̃_α`; the Young perfect square; the viscous & velocity coefficient expansions and their reduction to `Cν`, `Cσ̃_α`; the `ε`-smallness chain (`ετ₂ ≤ C₂`). | 9 |
 | `robustness_asymptotics_verification.py` | §6 (`eq:GeneralAsymptoticBehaviourOfParameters`, regime blocks, `eq:DimensionlessMomentumEquation`) | The exact `τ₁,τ₂,σ̃_α` forms and every dominant-regime limit (incl. the A6 corrections); the nondimensionalization coefficients (incl. the A7 forcing scaling). | 14 |
+| `robustness_isolation_verification.py` | §6 per-term **isolation displays** (`eq:DominantViscosity/Convection/ReactionVelocity/PressureGradientEstimate`, l.1023/1027/1043/1048/1052/1068/1075) | Reconstructs the algebra the asymptotics script does NOT touch: isolating one term of each coupled regime bound and re-expressing it via `E_int(u)=U E*_int`, `E_int(p)=P E*_int`. This is the blind spot that let the **F3/M03** error survive (`eq:DominantPressureGradientXTermEstimate` printed `‖a‖/√P+1` for the correct `‖a‖U/P+1`); the 1052 check is **discriminating** (asserts the corrected form holds, the printed form does *not* follow, and both coincide under `P~U²`). | 11 |
 | `manufactured_solution_verification.py` | §7 (`eq:ManufacturedProblem`, `eq:PlateauBumpFunction`, `eq:Gamma`, `eq:EpsilonRef`, literature example) | `∇·(αu)=0` (2D and the 3D z-extruded field); the boundary-trace point (A11); the plateau-bump `dγ/dη>0`, limits/monotonicity/`C^∞` joining; the `eq:EpsilonRef` chain and that `ε=10⁻⁴ε_ref` meets A1 with `C₂=10⁻²`; the literature DBF `a(α),b(α)≥0` and porosity profile. | 17 |
 | `elemental_matrices_verification.py` | App. A Galerkin terms | Each Galerkin elemental component `T_(ai)(bj)=∂T/∂U_j^b` re-derived by symbolic differentiation and matched to the printed formula. | 19 |
 | `elemental_bilinear_form_verification.py` | App. A stabilization LHS+RHS (`eq:StabilizationLVLU`, `eq:StabilizationLVF`) | **All ~60 stabilization matrix terms** (by family vs. the bilinear form) **plus the RHS vectors** `F_V` (`A_F…V_φ`) and `F_Q` (`Q_αF, Q_φ`). | 14 |
 | `assembly_consistency_verification.py` | App. A assembly (`\mathbf{K}, \mathbf{K}_S, \mathbf{F}, \mathbf{F}_S`) | **Structural (bookkeeping)** cross-check the two scripts above cannot see: every matrix *named* in the assembled `K/K_S/F/F_S` must be *defined*, and every *defined* matrix must appear in the assembly. Parses the appendix directly. | 4 |
 | `subscale_norm_verification.py` | §4 (`eq:BoundProjectionOfLBySubscales`, B9) | The operator-norm bound `|L̂û|²_Λ ≤ |L̂|²_Λ|û|²_{Λ⁻¹}` (Monte-Carlo, `n=3,4`), the B9 formula `|L̂|²_Λ=ρ_{Λ⁻¹}(L̂^†ΛL̂)`, and tightness at the maximizing eigenvector. | 8 |
+| `coverage_param_algebra_verification.py` | App. C parameter algebra (`P:27`, `P:sigmatilde`, l.248 chain) | Reconstructs the `τ₁,τ₂,φ₁,σ̃_α` identities from `eq:taus`/`eq:phi1` (`φ₁h²=c₁α_K²τ₂`; `σ−σ̃=σ²τ₁`; `σ̃≤min(σ,φ₁)`); 3 discriminating negatives (dropped `α_K`, dropped `σ` in the denominator). | 19 |
+| `coverage_weighted_inverse_verification.py` | App. C weighted-inverse estimates (`eq:winv-divu/-divvisc/-gradp`, `eq:absorb5`, `eq:interpdivvisc`) | The exact product-rule splits `div(αw)=α div w+∇α·w` (and the tensor/interpolation analogues) with the `C̄_inv=√(d δ_α)C_inv+C_∇α` constant; rejects dropping the `∇α` term and wrong `h`/`α` powers. | 26 |
+| `coverage_ibp_verification.py` | App. C integration-by-parts (`eq:skew`, `eq:globalibp`, `eq:elemibp`) | The pointwise Leibniz identities + their integrated forms on periodic/box cells with a divergence-free `αa`; rejects sign flips, dropped `α`, and non-solenoidal `αa` (which leaves a residual term). | 13 |
+| `coverage_vms_operators_verification.py` | §2 deviatoric split (l.258), App. B `eq:ftSplit`, `eq:FTOfDifferentialOperator` | `Π^{DS}∇u=∇ˢu−(1/d)(∇·u)I` split for d=2,3; `A_c+A_f=A_v+A_b`; the factor-5 triangle/power-mean τ bound (sharp at coincidence); rejects a wrong `1/d` and a 4-term bound. (Two nonlinear subscale identities `eq:ExplicitExactSubscales`, `eq:NonlinearStabilizedEquation` left documented-PARTIAL — need the full discrete residual model.) | 15 |
+| `coverage_coercivity_numeric_verification.py` | §5 Galerkin coercivity `eq:StabilityEstimate` (l.850, the "verifiable-not-yet-encoded" item), centered encoding (l.1132), 3D `c₁` threshold (l.1430) | `B(a;U,U)=2ν‖α^{1/2}Π∇u‖²+‖σ^{1/2}u‖²+ε‖p‖²` on a stream-function `αa` (convective & pressure cross-terms cancel by `div(αa)=0`); the `U=Re/√(α_∞Da)` centering solve; `c₁*(K)=2ĉ²(K)`. Discriminating negatives on every cancellation (non-solenoidal `αa`, dropped `α`, missing projector, dropped factor-2). | 34 |
 | `display_consistency_verification.py` | §4 (`eq:weak_form_eliminated_subscales`), App. A (`eq:StabilizationLVLU`, `eq:StabilizationLVF`) | The **β-factored strong-residual display** `(1/α)(−2 div(ανΠ̃∇u)) = −νΔ̄u − 2νΠ̃∇u·∇β` (the **F2** factor-2 gap, which sits *between* the un-factored operator and the assembled matrices, both checked elsewhere), and the **plus** sign of the eliminated fine-scale term on an exact static-condensation analogue (the **F1** sign gap, a motivational equation off the assembly path). Each check also asserts the pre-fix form *fails*. | 5 |
 
 ---
@@ -82,12 +93,17 @@ review still caught two defects (F1/F2) despite this suite, and the plan that cl
   `G_β, D_β` were mathematically spurious rather than mere typos. Full write-up:
   [`docs/part_i_erratum.md`](../../docs/part_i_erratum.md).
 
-### Verifiable, not yet encoded (one remaining)
-- **The Galerkin coercivity identity `eq:StabilityEstimate` itself** (the
-  integration-by-parts that turns `B_S(a;U_h,U_h)` into the sum of squares plus
-  cross terms) — doable with the periodic-cell / box-IBP technique already in
-  `cdr_operator_verification.py`. Its algebraic *consequences* are already
-  covered by `stability_estimate_verification.py`.
+### Verifiable, not yet encoded (the residual boundary)
+- **`eq:ExplicitExactSubscales`** (the Hughes fine-scale Green operator
+  `Ũ = L̃⁻¹ r` with `Π_h Ũ = 0`) and **`eq:NonlinearStabilizedEquation`**
+  (`B_S = L_S` involving the `L²` projection `Π_h`) — both were re-derived and
+  confirmed CORRECT during the 2026-07-21 coverage audit, but a *permanent* check
+  needs the full discrete residual model (not a self-contained matrix identity),
+  so they remain documented-PARTIAL rather than encoded.
+- ~~The Galerkin coercivity identity `eq:StabilityEstimate`~~ — **now encoded**
+  in `coverage_coercivity_numeric_verification.py` (the box / stream-function
+  reconstruction, with discriminating negatives). This closes the previously
+  "verifiable, not yet encoded" item.
 
 ### Out of scope for symbolic verification (verified elsewhere or non-symbolic)
 - **Convergence-rate tables (§7).** These are *numerical* results; they are

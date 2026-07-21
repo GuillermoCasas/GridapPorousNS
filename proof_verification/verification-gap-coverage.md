@@ -5,6 +5,35 @@
 *precisely why* they slipped through, and proposes a layered plan so no further errors of
 that class survive. Layer 0 is already implemented (this session).
 
+> **Addendum 2026-07-21 — F3/M03 (a §6 isolation-display error), diagnosed and closed.**
+> A second external audit found a *third* defect of exactly the predicted class: in
+> `eq:DominantPressureGradientXTermEstimate` (article ~l.1052) the printed convective
+> pressure-gradient factor `‖a‖_∞/√P + 1` does **not** follow from its predecessor
+> `eq:DominantConvectionEstimate`; the algebraically correct factor is `‖a‖_∞ U/P + 1`
+> (both reduce to `O(1)` under `P~U²`, so the final `~` conclusion is unchanged — a
+> cosmetically harmless but genuine error). **Why it survived:** `Asymptotics.v` and
+> `robustness_asymptotics_verification.py` verify the τ *inputs* and their regime *limits*
+> but never reconstruct the per-term **isolation displays** (article eqs 1023/1027/1043/
+> 1048/**1052**/1063–75) — the steps that isolate one term of a coupled regime bound and
+> substitute `E_int(ψ)=<scale>·E*_int`. That is precisely a *PARTIAL-coverage* /
+> displayed-but-unchecked blind spot, the same category as F1/F2. **Closed** by
+> `sympy/robustness_isolation_verification.py` (11 checks) and a mirror `Isolation` section
+> in `coq-formal/Asymptotics.v` (`iso_1023…iso_1075`, incl. a *discriminating* 1052 check
+> that asserts the corrected form, refutes the printed `√P` form, and proves both coincide
+> under `P~U²`). A hand check of **all seven** other isolation displays confirmed 1052 is
+> the *sole* error (1023/1027/1043/1048/1068/1069/1075 are correct). The paper equation was
+> corrected in the same pass. Suite now **126/126**.
+>
+> **Follow-through — the Layer-1 "every displayed equation" sweep was then executed in full.** All 369
+> displayed equations across the four `.tex` files were classified for coverage and every uncovered checkable
+> one was adversarially re-derived in SymPy: **no further algebra errors**. The 23 verified-correct but
+> unchecked displays were closed with five new `sympy/coverage_*_verification.py` modules (parameter algebra,
+> weighted-inverse estimates, IBP identities, VMS operator splits, and the Galerkin coercivity identity +
+> numerical-setup solves) — **suite now 233/233 across 16 scripts**. This also discharges the Layer-5 item
+> (`eq:StabilityEstimate` is now encoded). Per-equation map: `EQUATION_COVERAGE_LEDGER.md`. Residual
+> documented-PARTIAL: `eq:ExplicitExactSubscales`, `eq:NonlinearStabilizedEquation` (need the full discrete
+> residual model). The Coq side gained a mirror `Isolation` section in `Asymptotics.v`.
+
 ## What is already machine-checked
 
 Three independent layers already cover most of the paper:
