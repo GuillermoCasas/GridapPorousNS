@@ -2,12 +2,25 @@
 
 **Purpose.** The final read-through checklist before submitting *"A stabilized finite element method for
 incompressible, inertial flows in inhomogeneous porous media."* Built 2026-07-18 from the living docs
-(`paper-revision-plan.md`, `review_numerics_vs_theory.md`, `open-questions.md`, `pending-tasks.md`,
+(`paper-revision-plan.md`, `archive/review_numerics_vs_theory.md`, `open-questions.md`, `pending-tasks.md`,
 `findings.md`, `theory-code-map.md`, `part_i_erratum.md`), the newest results, and a full theory-vs-numerics
 re-derivation of the α₀-exponent estimates.
 
 Each item: **severity** (🔴 blocker / 🟠 important / 🟡 nice-to-have), **status** (open / verify / likely-done),
 and the source. Work the 🔴 first. "verify" = believed done but must be eyeballed in the final PDF/data.
+
+> **2026-07-21 audit-response addendum.** A systematic external audit (`docs/ChatGPT audit/`,
+> per-issue disposition in `validity_verdicts.csv`) was validity-checked and applied as `\amend` changes; many
+> items below are now DONE (paper builds clean, ~69 pp, 0 undefined refs). Cross-cutting completions:
+> **M03** (§6 `eq:DominantPressureGradientXTermEstimate` factor `‖a‖/√P`→`‖a‖U/P` — fixed + the eight §6
+> isolation displays machine-checked); **M01** (convergence theorem promoted to the sharp ℓ² form Ψ(h), ℓ¹ as
+> corollary — matches the Coq); **coverage audit** (all 369 displays checked, 0 further errors, SymPy 242/242);
+> **N01** (fold/"no solution"→solver non-convergence); **C01** (deviatoric→spherical wording); **M09** (conclusion
+> now states the `1/α₀` reaction-pressure exception → resolves F10); **D04** (Taylor–Hood match is velocity-only
+> → the §9 TH item); **I07** (α-interpolation claim → future work; the 9b MMS-α item; R2 ablation now runnable);
+> **C09/C10** (σ𝟏₃→σ𝕀; Damköhler≠Darcy → F3); **N02** (U=L=1 reconciled); **N10/N13/N15/N19/S03/S07** wording.
+> Still open: strip `\amend`/author-notes (final markup pass), raw-data + reproducibility supplement, bibliography
+> clean-up. The 3D-OSGS 1.29 (C7/E1) is confirmed a *genuine* under-stabilization (rerun R10), not stale data.
 
 ---
 
@@ -377,7 +390,7 @@ predict ×10/×50/×116 — refuted as *sharp*.
 
 ---
 
-## 10. External AI revision (`docs/final_AI_revision.md`, 2026-07-19) — per-point assessment + new items
+## 10. External AI revision (`docs/archive/final_AI_revision.md`, 2026-07-19) — per-point assessment + new items
 
 A second external AI reviewed a **~2-h-stale** version of `article.tex`. Every point was re-verified against the
 **current** paper by a 19-agent workflow (each claim read against the source + appendices, plus an independent
@@ -392,7 +405,7 @@ fixed, or invalid (§10.C).
 were applied to `article.tex`/appendices, each change wrapped in `\amend{}`; build re-verified
 green (**68 pp** / 722 newlabels / 0 unresolved / 0 undefined citations / 0 bib warnings — the 66→68 bump is the
 added prose). **F1 and F2 are now additionally machine-checked** by the new
-`proof_verification/sympy/display_consistency_verification.py` (suite **115/115**); why the
+`proof_verification/sympy/display_consistency_verification.py` (suite **242/242 across 17 scripts (2026-07-21 coverage audit; zero further algebra errors across all 369 displays)**); why the
 existing machinery missed them and how to close the gap is in
 `proof_verification/verification-gap-coverage.md`. **Second no-re-run pass (2026-07-19) — now applied:**
 IA-5e (`Π^S∇u=∇^S u`), F14d (`λ`→`μ` eigenvalue), F14e (`U` disambiguated from the combined unknown), 9b (α and

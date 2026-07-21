@@ -210,7 +210,7 @@ nested-red sequences, normalized identically to the solver rows (`calc_errors3d`
   u L² method 2.55/2.56 vs interpolant **2.67**; irregular ℙ₁ u H¹ method 0.83/0.85 vs interpolant
   **0.71** (regular interpolant is 0.94 — the red-refined quality tail depresses the *best-approximation*
   rate). ⇒ the 3D velocity sub-optimality is the mesh's approximation capacity, **not the formulation**.
-  This is the direct evidence the review's C6 (`docs/review_numerics_vs_theory.md`) said the paper's
+  This is the direct evidence the review's C6 (`docs/archive/review_numerics_vs_theory.md`) said the paper's
   "element-quality tail" attribution lacked; it can now be stated as a decomposition, not an assertion.
 - **Pressure is NOT at the floor** (13–770× above; OSGS H¹ reaches 1.29), but this is **not** a 3D or
   element-quality defect: it is the expected viscous-regime one-order pressure loss, and the 2D viscous
@@ -409,6 +409,14 @@ code-correctness items now live in [`pending-tasks.md`](pending-tasks.md) (§2 c
 ### A defect it found in the manuscript (amendment F8)
 
 In `lem:winv` the label `eq:winv-conv` sat on the **last** line of the display (the pressure-gradient estimate), while the **convective** line above it had none — so two of the four references to `eq:winv-conv` pointed at the *wrong estimate* (Step 5's "first contribution" and Step 9's "velocity part" are both convective). Fixed: the convective line now carries `eq:winv-conv`, the pressure-gradient line the new `eq:winv-gradp`, and the call sites are re-pointed. Surfaced only because the Coq audit had to cite the two estimates separately (`Hw_cxu`/`Hw_cxv` vs `Hw_gpu`). Recorded in [`proof_verification/AUDIT.md`](../proof_verification/AUDIT.md) F8.
+
+### The SymPy suite hardened, and three manuscript items settled (2026-07-21)
+
+An external audit plus a full every-equation coverage sweep this session settled three paper items and closed a verification blind spot:
+
+- **M03 — a real §6 algebra error, fixed.** `article eq:DominantPressureGradientXTermEstimate` printed the factor `‖a‖_∞/√P`; the correct isolation factor is `‖a‖_∞·U/P` (both are `O(1)` under `P∼U²`, so the final `∼` conclusion was unchanged, but the intermediate display did not follow from its predecessor). It is the **sole** error among the eight §6 per-term isolation displays — 1023/1027/1043/1048/1068/1069/1075 were re-derived and are correct. It survived because the suite reconstructed the τ *inputs* and their regime *limits* but never the per-term **isolation** displays — the same "displayed-but-not-reconstructed" blind spot as the App. A assembly erratum ([`part_i_erratum.md`](part_i_erratum.md)) and F1/F2. Closed in **both** layers: `sympy/robustness_isolation_verification.py` (11 discriminating checks — it refutes the `√P` form) and `coq-formal/Asymptotics.v` (`iso_*`).
+- **Every-equation coverage audit — zero further errors.** All **369** displayed equations across the four `.tex` files were classified for verification coverage and every uncovered checkable one re-derived symbolically: no other algebra error exists. 21 verified-correct-but-unchecked gaps were closed with five new `coverage_*_verification.py` modules (incl. the Galerkin coercivity identity `eq:StabilityEstimate`, the long-standing "verifiable, not yet encoded" item). SymPy suite **115 → 242/242 across 17 scripts**; per-equation map in [`proof_verification/EQUATION_COVERAGE_LEDGER.md`](../proof_verification/EQUATION_COVERAGE_LEDGER.md).
+- **M01 — the paper now matches the Coq on the convergence norm.** Until this session `eq:ConvergenceResult` / appendix `eq:convergence` stated the weak elementwise ℓ¹ sum and wrongly called it "sharpest," although the appendix's own `eq:Enorm` derives — and `abstract_convergence` already **proves** — the sharper porosity-weighted ℓ² functional Ψ(h). The paper was promoted to state Ψ(h), keeping the ℓ¹ sum as a corollary (reducing to Codina for α≡1); the global interpolation functionals were defined (M02). No Coq change was needed — the ℓ² proof already existed.
 
 ---
 

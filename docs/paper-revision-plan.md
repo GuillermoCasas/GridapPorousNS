@@ -1,4 +1,4 @@
-# Paper revision plan — response to `review_numerics_vs_theory.md` (v2)
+# Paper revision plan — response to `archive/review_numerics_vs_theory.md` (v2)
 
 **Status:** APPROVED and being applied (author instruction 2026-07-17: *"change them or solve the issues,
 but never keep them for appearance"*; and: do not compute any slope partly from an interpolant).
@@ -328,7 +328,7 @@ method. This is precisely what the curves exist to separate.
 | **E1** | **⚠ Irregular ℙ₂ finest solve** (0.4b) | Did every mesh in the production `nested_red` sweep have `success=true`? If the finest returned the exact-guess interpolant, `tab:3DL2`'s 2.55/2.56 must be recomputed or withdrawn. **Blocking for submission.** Resolved by C1r. |
 | E2 | Coercivity hypothesis at the coarse end | `c₁ > 2ξC̄_inv²` with `C̄_inv = √(dδ_α)C_inv + C_α`. With the paper's own `C_inv ~ k²` this is violated by `c₁=4k⁴` **even at uniform α** — so `C_inv ~ k²` is a *scaling*, not a usable value, and `c₁=4k⁴` is explicitly empirical. **The review's §0.B "the assumptions are satisfied" audits only Assumption *Porosity* and never checks the `c₁` hypothesis the theorem also requires.** Not necessarily actionable; do not overclaim in §0.B-style language. |
 | E3 | C6 root cause | Element-quality tail vs pre-asymptotics vs the paper-admitted boundary incompatibility (0.4e). A quality histogram / per-element error map would settle it; otherwise hedge (A14). |
-| E4 | C7 if 1.29 survives C1r | If the triple is genuine, explain the mesh- and order-independent saturation (ceiling 1.21673 is close but does not predict 1.29). |
+| ~~E4~~ | **CLOSED 2026-07-21 (rerun R10)** | The 1.29 triple is a **genuine pressure under-stabilization** of the equal-order OSGS discretization at `c₁=16k⁴` (not a solver artifact): reruns reproduce identical numbers, the on-disk `results/k*/TET/*/` MATCH the paper tables to the printed digits (so C1r "regenerate the 3D section" is *not* needed for correctness — the data is not gone), and the H¹ pressure saturation persists even under the solution-preserving `c₁`-precond knob. The mesh/order-independence is exactly the fingerprint of an `O(1)` under-stabilization ceiling; a saddle-point/MG preconditioner (pending-tasks 4d), not `c₁`, is the real fix. |
 | E5 | Kuhn threshold under the runs' actual h-convention | The note's Table 1 uses `h_K = diam`; the harnesses use grid-spacing-like conventions (2D `√(2A)`, 3D `(6√2V)^{1/3}`). Under those, `c₁` sits **above** the elementwise threshold, inverting §7.2's "just below" claim. Also 2D and 3D use *different* conventions. `article.tex` never states which `h_K` feeds τ. |
 
 ---

@@ -107,3 +107,9 @@ trusted base, plus non-vacuity witnesses. The paper↔Coq map and the trusted-ba
 [`../proof_verification/coq_coverage.tex`](../proof_verification/coq_coverage.tex); that tree is
 self-documenting (its own `AUDIT.md` / `README.md`), so `docs/` only points to it. See `CLAUDE.md` for the
 verification gate.
+
+Beyond the Coq chain, a **SymPy suite** machine-checks the paper's *displayed algebra* — every matrix identity,
+τ closed form, robustness estimate, and elemental matrix — at **242 checks across 17 scripts**
+([`../proof_verification/sympy/`](../proof_verification/sympy/)). A 2026-07-21 every-equation coverage audit
+classified all 369 displayed equations and found zero further algebra errors; the per-equation map is
+[`../proof_verification/EQUATION_COVERAGE_LEDGER.md`](../proof_verification/EQUATION_COVERAGE_LEDGER.md).

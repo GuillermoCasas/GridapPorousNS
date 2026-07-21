@@ -137,7 +137,11 @@ Exact-Newton (CLAUDE.md invariant).
 
 ### 4d. A real saddle-point / MG preconditioner for the OSGS coupled tangent — OPTIONAL upgrade
 Downgraded 2026-07-09 (was "REQUIRED for P2-OSGS-3D"): P2-OSGS-3D is solved by the preconditioner-only c₁×4
-inflation (`osgs_jfnk_precond_c1_mult`, [`findings.md`](findings.md) §5). A real **block/Schur (PCD/LSC/SIMPLE)
+inflation (`osgs_jfnk_precond_c1_mult`, [`findings.md`](findings.md) §5). _Re-motivated 2026-07-21 (rerun R10):
+this is now the ONLY route to fix the 3D-OSGS H¹-pressure ≈1.29 saturation — R10 confirmed that defect is a
+genuine, reproducible pressure under-stabilization at `c₁=16k⁴` (paper tables match on-disk; the solution-preserving
+`c₁` knob cannot cure it), so a real block/Schur preconditioner or more pressure stabilization is the actual fix._
+A real **block/Schur (PCD/LSC/SIMPLE)
 or Vanka/MG** preconditioner stays an optional upgrade for guess-independent robustness and to remove the
 c₁-tuning. `τ₁` already seeds a discrete pressure-Laplacian in the (2,2) block; `τ~h` ⇒ rediscretize per MG
 level. Do **not** pre-build it for 2D (equal-order 2D needs none — Phase-0 verdict). See
@@ -263,6 +267,21 @@ other variants — `alpha_one`, `deviatoric`, `linear_reaction`, `all_dirichlet`
 `unstructured_gmsh`, `freefem_meshes`, `freefem_divisions`, `literal_picard` — still need a full run to
 confirm behavior-preservation (each: `julia --project=. test/extended/CocquetTubeTest/run_convergence.jl data/<name>/…`).
 See [`cocquet/cocquet-tube-test-unification-status.md`](cocquet/cocquet-tube-test-unification-status.md).
+
+### 7f. Audit-response reruns — consolidate + fold into the paper (2026-07-21) 🔴 in progress
+Three audit-driven reruns were implemented this session; analyze each as it lands and integrate into the paper:
+- **R5 — stabilized Taylor–Hood P2/P1 control** (audit D05): `cocquet_form_mms_taylorhood_stabilized.json`
+  (smoke gave optimal L²u≈3.0; full grid running). Add a stabilized-TH column to the DBF tables
+  (`tab:CocquetMMSL2/H1`) so the comparison isolates space-pair vs. convection-stabilization.
+- **R6 — genuinely-3D MMS** (audit N19): `smoke3d.jl sweep_genuine3d` → `results/k*/TET/genuine3d/`
+  (field verified: SymPy 242/242, FD, blitz 22/22). Run the regular Kuhn ℙ₁+ℙ₂ sweep; decide add-alongside
+  vs. replace-extruded for the 3D section, then table it.
+- **R2 — α-interpolation ablation** (audit I07): `cocquet_form_mms_alpha_interp_p1.json` (P1-interp α in the
+  formulation, analytic α in the oracle). Compare to the analytic VMS baseline; if errors track, restore the
+  conclusion's α-interpolation claim (currently softened to future work), else keep as future work.
+- Dropped (analysis, no run): **R10** (3D-OSGS pressure = genuine under-stab, see 4d/7c), **R1** (fold
+  continuation — wording softened), **R3** (c₁-eigenvalue study — see `open-questions.md` §3), **R4** (pointwise
+  vs elementwise τ — N09 text fallback stands; a moderate code change if ever pursued).
 
 ---
 

@@ -13,9 +13,11 @@ harness); the physical Cocquet benchmark is `docs/cocquet/investigation-synthesi
 `theory/tau_saturation_note/tau_saturation_note.tex`.
 
 **Last updated: 2026-07-07.** Moderate-porosity results are complete and clean. The low-porosity
-high-Re corner (α=0.1 × Re=1e5) is **RESOLVED for k=1: it is a genuine coarse-mesh
-solution-branch fold — no discrete root exists for N≤80, but a TRUE root appears at N≥160 and is
-FE-OPTIMAL there** (see §4.1). This is the same fold-recedes-with-mesh phenomenon the sister
+high-Re corner (α=0.1 × Re=1e5) is **RESOLVED for k=1: it behaves as a coarse-mesh
+solution-branch fold — the tested solvers (exact-guess init, perturbation homotopy, heavy Newton/Picard)
+do not converge for N≤80, while a root is found and is FE-OPTIMAL at N≥160** (see §4.1). _Nonexistence for
+N≤80 is inferred from solver behaviour, not proved by branch continuation; the paper's wording was
+correspondingly softened to "the tested solvers did not converge" (audit N01)._ This is the same fold-recedes-with-mesh phenomenon the sister
 `ManufacturedSolutions` harness diagnosed decisively for its α=0.05 corner
 (`docs/mms/convergence-2d.md`), and it matches that harness's corner rates (H¹≈1.0, L²≈3.0) — so the
 fold is not a stabilization defect but the paper's intrinsic 1/α₀ degradation pushing the coarse-mesh
@@ -36,8 +38,12 @@ fold ~2× earlier); extending it to N=160 to firm the rate is a cheap remaining 
 | Reaction | `Forchheimer_Ergun`, `σ_lin=0.3`, `σ_nl=1.75` (the Cocquet-et-al. coefficients) |
 | Gate | `eps_tol_momentum = 1e-9` (tight; required to recover the k=2 finest-segment rate — a fixed 1e-6 stops k=2 solves early; don't over-tighten, 1e-12 → NaN) |
 
-Configs: `data/cocquet_form_mms_vms.json` (VMS k=1,2 ASGS+OSGS) and
-`data/cocquet_form_mms_taylorhood.json` (the Cocquet element). Plot:
+Configs: `data/cocquet_form_mms_vms.json` (VMS k=1,2 ASGS+OSGS),
+`data/cocquet_form_mms_taylorhood.json` (the Cocquet element, unstabilized Galerkin P2/P1),
+`data/cocquet_form_mms_taylorhood_stabilized.json` (**R5/D05, 2026-07-21**: the SAME P2/P1 pair with ASGS
+stabilization — the convection-stabilized-TH control that isolates space-pair vs. stabilization), and
+`data/cocquet_form_mms_alpha_interp_p1.json` (**R2/I07, 2026-07-21**: the α-interpolation ablation via the new
+harness knob `numerical_method.porosity_interpolation_order`). Plot:
 `plot_combined_all.py` (k=1 ○, k=2 □, TH ✕; ASGS blue/solid, OSGS red/dashed, TH black/dotted;
 velocity filled, pressure hollow; L² and H¹ split) → `results/combined/`.
 
@@ -211,6 +217,13 @@ load-bearing measurements.
 ---
 
 ## 5. Open items / next steps
+- **NEW (2026-07-21) — audit-response reruns on this harness:** (i) **R5** stabilized Taylor–Hood P2/P1 control
+  (`cocquet_form_mms_taylorhood_stabilized.json`, audit D05) — smoke gave optimal rates (L²u≈3.0), full grid
+  running; isolates the space-pair effect from the convection-stabilization effect vs. the unstabilized-TH
+  baseline. (ii) **R2** α-interpolation ablation (`cocquet_form_mms_alpha_interp_p1.json`, audit I07) via the new
+  `porosity_interpolation_order` knob — P1-interpolated α in the formulation, analytic α in the oracle (isolates
+  the model error). Compare against the analytic VMS baseline; if errors track, the conclusion's α-interpolation
+  claim (softened to future work by I07) is substantiated.
 - **✅ DONE — recovering the α=0.1 × Re=1e5 corner (k=1):** extend the mesh ladder above the fold
   (N=[160,320]). Both ASGS & OSGS reach FE-optimal roots (H¹u ≈ 1.07/1.10, L²u ≈ 3.0); see §4.1. Cheap
   remaining: k=2 corner → N=160; optional k=1 → N=640 for a 3-point slope.
@@ -224,8 +237,10 @@ load-bearing measurements.
   (start at α=0.5 or Re=1, walk to α=0.1 / Re=1e5), the device the regular harness's Phase-2
   `run_continuation.jl` uses. The direct exact-guess mesh-ladder (§4.1) superseded it for k=1; keep
   continuation in reserve if a future push hits a mesh where the exact-guess basin narrows.
-- **Config state:** `data/` now holds only the 3 designed configs
-  `cocquet_form_mms_{vms,vms_k2,taylorhood}.json` (per `.agents/rules/official-results-path.md`).
+- **Config state:** `data/` now holds the 5 designed configs — the 3 original
+  `cocquet_form_mms_{vms,vms_k2,taylorhood}.json` plus the 2026-07-21
+  `cocquet_form_mms_{taylorhood_stabilized (R5),alpha_interp_p1 (R2)}.json` (per
+  `.agents/rules/official-results-path.md` — one canonical config per designed test).
 - **Diagnostic harness change left in place:** `run_test.jl` now gates the `Constant_Sigma` reaction
   trim on `experimental_reaction_mode` (mirroring `src/run_simulation.jl:57`); it does not affect the
   Forchheimer path the real sweep uses.
