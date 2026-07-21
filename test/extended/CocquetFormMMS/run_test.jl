@@ -370,6 +370,11 @@ function run_mms(config_file="test_config.json")
     
     
     nm_dict = test_dict["numerical_method"]
+    # [harness-frame, audit R2/I07] Porosity-interpolation ablation: 0 (default) => alpha is evaluated
+    # ANALYTICALLY at the quadrature points, as in the paper. p>0 => the FORMULATION uses a degree-p
+    # Lagrangian FE interpolant of alpha, while the oracle keeps the analytic alpha, so the run isolates
+    # the MODEL error introduced by interpolating the porosity (the forcing stays exact).
+    porosity_interp_order = Int(get(nm_dict, "porosity_interpolation_order", 0))
     elem_dict = nm_dict["element_spaces"]
     mesh_dict = nm_dict["mesh"]
     stab_dict = get(nm_dict, "stabilization", Dict("method" => ["ASGS", "OSGS"]))
@@ -621,7 +626,15 @@ function run_mms(config_file="test_config.json")
                                 Y = MultiFieldFESpace([V, Q])
 
                                 alpha_field = build_porosity_field(config, alpha_0, alpha_infty, L)
-                                alpha_cf = CellField(x -> PorousNSSolver.alpha(alpha_field, x), Ω)
+                                # [audit R2/I07] Formulation porosity: analytic (default) or a degree-p FE
+                                # interpolant. The oracle below (PaperMMS) always keeps the analytic alpha_field,
+                                # so a p>0 run measures ONLY the model error from interpolating alpha (exact forcing).
+                                alpha_cf = if porosity_interp_order > 0
+                                    V_alpha = TestFESpace(model, ReferenceFE(lagrangian, Float64, porosity_interp_order); conformity=:H1)
+                                    interpolate(x -> PorousNSSolver.alpha(alpha_field, x), V_alpha)
+                                else
+                                    CellField(x -> PorousNSSolver.alpha(alpha_field, x), Ω)
+                                end
 
                                 form = build_mms_formulation(config, Da, Re, U_amp, L, alpha_infty)
                                 
