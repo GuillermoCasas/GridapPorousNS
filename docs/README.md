@@ -54,9 +54,11 @@ blow-by-blow. Each topic has **one canonical dossier**.
 
 | Role | Doc | Notes |
 |---|---|---|
-| **Canonical** | [cocquet/investigation-synthesis.md](cocquet/investigation-synthesis.md) | Settled: the convergence cap is **mesh-topology**; the residual **magnitude gap is ~30–300×**. The chronological hypothesis ledger is folded in as its Appendix. |
+| **Canonical** | [cocquet/investigation-synthesis.md](cocquet/investigation-synthesis.md) | Settled: the slope cap is a **structured-mesh corner artifact**; the **Frontal-Delaunay** mesh recovers O(h²) for all three methods (§1c). Boundary/formulation **audited exactly faithful** to Cocquet Eq 1/2/4 (§1d). Open, in-repo & testable: the **bulk** magnitude gap + pre-asymptotic climb (our best-approx interpolation floor is itself 5–56× above the paper's numbers). |
 | **MMS sibling** | [cocquet/cocquet-form-mms-status.md](cocquet/cocquet-form-mms-status.md) | Canonical `CocquetFormMMS` doc: moderate-α clean; the high-Re×low-α corner folds then converges optimally above the fold (k=1); exact fold mechanism open. |
-| Test-harness status | [cocquet/cocquet-tube-test-unification-status.md](cocquet/cocquet-tube-test-unification-status.md) | Status of the 2026-07-08 refactor that unified nine sibling Cocquet tube tests into one config-driven harness (verification of the 9 variants pending). |
+
+The test-harness layout/variant record (formerly `cocquet-tube-test-unification-status.md`, deleted 2026-07-20)
+now lives in the test's own [`README.md`](../test/extended/CocquetTubeTest/README.md).
 
 **`solver/` — algorithm decision record (process, not paper theory)**
 
@@ -76,11 +78,13 @@ Kept for traceability; conclusions long since folded into the living docs / evid
 current.
 
 - [archive/cocquet-convergence-analysis.md](archive/cocquet-convergence-analysis.md) — the 12-phase Cocquet slope
-  diary (later phases self-withdrew; superseded by `investigation-synthesis.md`).
-- [archive/cocquet-replicating-transcript.md](archive/cocquet-replicating-transcript.md),
-  [archive/cocquet-corner-singularity-transcript.md](archive/cocquet-corner-singularity-transcript.md) — raw
-  session transcripts (the corner-untag recommendation was falsified, H1).
-- [archive/cocquet-email-questions.md](archive/cocquet-email-questions.md) — an unsent draft email to the authors.
+  diary (later phases self-withdrew; superseded by `investigation-synthesis.md`). Unique provenance: the h-floor
+  bug + √2 h-consistency fixes and the per-phase evidence tables.
+- [archive/cocquet-replicating-transcript.md](archive/cocquet-replicating-transcript.md) — raw session transcript;
+  uniquely holds the five lateral hypotheses H-A…H-E and the "paper is below the interpolation floor" argument
+  (since **confirmed + quantified** by the always-on interpolation floor — synthesis §1c/§1d).
+  (The `corner-singularity-transcript` and `email-questions` drafts were deleted 2026-07-20 — falsified /
+  superseded; the email's 7 open author-questions were salvaged into `investigation-synthesis.md` §7.)
 - [archive/osgs-reaction-dominated-rate.md](archive/osgs-reaction-dominated-rate.md) — the high-Da OSGS
   velocity-rate-loss investigation (**RESOLVED**: pre-asymptotic, recovers at N=640; settled verdict in
   `findings.md` §4, mechanism in `theory/osgs_reaction_note/`).
