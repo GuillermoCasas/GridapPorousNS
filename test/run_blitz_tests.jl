@@ -21,6 +21,7 @@ files = [
     "nonlinear_blitz_test.jl",
     "anderson_accelerator_blitz_test.jl",
     "mms_exactness_blitz_test.jl",
+    "mms_genuine3d_exactness_blitz_test.jl",
     "mms_unit_length_blitz_test.jl",
     "config_strict_loader_blitz_test.jl",
     "config_validation_blitz_test.jl",

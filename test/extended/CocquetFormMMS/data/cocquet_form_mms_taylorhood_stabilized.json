@@ -1,0 +1,107 @@
+{
+  "mms_dynamic_budget": {
+    "newton_re_iterations": 150
+  },
+  "_comment": "Convection-STABILIZED Taylor-Hood control: the same inf-sup-stable P2/P1 pair as the unstabilized-Galerkin baseline (cocquet_form_mms_taylorhood.json), but with the ASGS residual stabilization active. This isolates the two effects the DBF comparison otherwise conflates: (unstabilized-TH -> stabilized-TH) is the effect of residual convection/reaction stabilization on a FIXED space pair; (stabilized-TH -> stabilized equal-order, cocquet_form_mms_vms.json) is the effect of the velocity/pressure space pair under the SAME stabilization. Same Cocquet formulation (SymmetricGradient viscous + full Forchheimer-Ergun reaction, sigma_linear=0.3/sigma_nonlinear=1.75), same (Re,alpha) MMS grid (Re=[1,1e5], alpha_0=[0.5,0.1], Da held at 1.0 = no-op under fixed Forchheimer coefficients), same meshes N=10..320. Note the stabilization constants are the equal-order calibration c1=4*kv^4=64, c2=2*kv^2=8 at kv=2; for the LBB-stable pair the tau_2 pressure block is redundant-but-harmless and the tau_1 momentum block supplies the convection/reaction stabilization being isolated. Audit response R5/D05.",
+  "erase_past_results": true,
+  "epsilon_pert": [
+    1.0
+  ],
+  "max_n_pert": 5,
+  "mms_verification_enabled": true,
+  "mms_tau_err": 0.0001,
+  "h5_filename": "cocquet_form_mms_taylorhood_stabilized.h5",
+  "physical_properties": {
+    "Re": [
+      1.0,
+      100000.0
+    ],
+    "Da": [
+      1.0
+    ],
+    "physical_epsilon": [
+      0.0
+    ],
+    "numerical_epsilon_coefficient": [
+      0.0001
+    ],
+    "reaction_model": "Forchheimer_Ergun",
+    "sigma_linear": 0.3,
+    "sigma_nonlinear": 1.75,
+    "f_x": 0.0,
+    "f_y": 0.0
+  },
+  "domain": {
+    "alpha_0": [
+      0.5,
+      0.1
+    ],
+    "r_1": 0.2,
+    "r_2": 0.4,
+    "bounding_box": [
+      -0.5,
+      0.5,
+      -0.5,
+      0.5
+    ]
+  },
+  "numerical_method": {
+    "viscous_operator_type": "SymmetricGradient",
+    "element_spaces": {
+      "k_velocity": [
+        2
+      ],
+      "k_pressure": [
+        1
+      ],
+      "equal_order_only": false
+    },
+    "mesh": {
+      "partition": [
+        10,
+        10
+      ],
+      "convergence_partitions": [
+        10,
+        20,
+        40,
+        80,
+        160,
+        320
+      ],
+      "element_type": [
+        "TRI"
+      ]
+    },
+    "solver": {
+      "picard_iterations": 15,
+      "newton_iterations": 150,
+      "noise_floor_success_max_ftol_multiple": 10.0,
+      "xtol": 1e-12,
+      "ftol": 1e-12,
+      "eps_tol_momentum": 1e-09,
+      "stagnation_noise_floor": 1e-05,
+      "linesearch_alpha_min": 0.0001,
+      "max_linesearch_iterations": 25,
+      "linesearch_contraction_factor": 0.5,
+      "max_increases": 3,
+      "divergence_merit_factor": 1.05,
+      "armijo_c1": 0.0001,
+      "newton_residual_divergence_patience": 2,
+      "pingpong_enabled": true,
+      "pingpong_max_swaps": 4,
+      "pingpong_picard_gain_orders": 1.5
+    },
+    "stabilization": {
+      "method": [
+        "ASGS"
+      ]
+    }
+  },
+  "output": {
+    "directory": "test/extended/CocquetFormMMS/results",
+    "basename": "cocquet_form_mms_taylorhood_stabilized"
+  },
+  "write_vtk": false,
+  "trace_convergence_norms": true
+}

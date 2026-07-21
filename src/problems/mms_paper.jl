@@ -102,6 +102,9 @@ struct PaperMMS{D, F<:AbstractFormulation}
     alpha_field::AbstractPorosityField
     L::Float64
     alpha_infty::Float64
+    # Manufactured-field family: :extruded (default, the z-invariant 2D field zero-padded in z)
+    # or :genuine3d (u = U α₀ curl(A)/α, all components depending on x,y,z with u_z ≠ 0; 3D only).
+    field_variant::Symbol
 end
 
 # Spatial dimension carried by the type parameter.
@@ -156,9 +159,13 @@ so an inadmissible configuration fails at construction rather than mid-sweep. `d
 spatial dimension (2 or 3); the 3D field is the z-extrusion of the 2D one (see file header).
 """
 function PaperMMS(form::AbstractFormulation, U::Float64, alpha_field::AbstractPorosityField;
-                  L=1.0, alpha_infty=1.0, dim::Integer=2)
+                  L=1.0, alpha_infty=1.0, dim::Integer=2, field_variant::Symbol=:extruded)
     (dim == 2 || dim == 3) || throw(ArgumentError("PaperMMS dim must be 2 or 3. Passed: $dim"))
-    mms = PaperMMS{Int(dim), typeof(form)}(form, U, alpha_field, L, alpha_infty)
+    (field_variant == :extruded || field_variant == :genuine3d) ||
+        throw(ArgumentError("PaperMMS field_variant must be :extruded or :genuine3d. Passed: $field_variant"))
+    (field_variant == :extruded || dim == 3) ||
+        throw(ArgumentError("field_variant=:genuine3d requires dim=3."))
+    mms = PaperMMS{Int(dim), typeof(form)}(form, U, alpha_field, L, alpha_infty, field_variant)
     check_mms_parameters(mms)
     return mms
 end
@@ -268,8 +275,128 @@ function grad_div_u_ex(f::UExFunc{D}, x) where {D}
 end
 
 # Build the callable exact velocity u_ex for this MMS instance (dimension D of the bundle).
-get_u_ex(mms::PaperMMS{D}) where {D} =
-    UExFunc{D}(mms.U, mms.alpha_field.alpha_0, mms.alpha_field, mms.L)
+# ============================================================================
+# GENUINELY 3D manufactured field (audit response R6 / N19).
+#
+# Unlike the default z-extruded field, this one is genuinely three-dimensional:
+# all velocity components depend on x, y, z and u_z ≢ 0. It is built so the
+# weighted flux q = α u equals the curl of a smooth vector potential A, whence
+# div(α u) = div(curl A) = 0 EXACTLY for any α. With equal wavenumber k = π/L in
+# every direction (so the thin-z variation is as well resolved as the in-plane
+# one) and amplitudes (a₁,a₂,a₃) = (1,2,3), v ≔ curl(A) is
+#     v_x = −k c₁ s₂ s₃,   v_y = 2k s₁ c₂ s₃,   v_z = −k s₁ s₂ c₃
+# (sᵢ = sin(kxᵢ), cᵢ = cos(kxᵢ)); div v = 0 and Δv = −3k² v (a Laplacian
+# eigenfunction, exploited below). The exact velocity is u = U α₀ v/α, so it
+# inherits div(α u) = 0. Field + derivatives are verified symbolically
+# (sympy/genuine3d_mms_verification.py) and against ForwardDiff
+# (test/blitz/mms_genuine3d_exactness_blitz_test.jl). [must-test][known-fragility]
+# ============================================================================
+struct UExFuncGenuine3D <: Function
+    U::Float64
+    alpha_0::Float64
+    alpha_field::AbstractPorosityField
+    L::Float64              # spatial frequency k = π/L (equal in x, y, z)
+end
+
+# v = curl(A) (divergence-free, genuinely 3D) and ∇v with T[i,j] = ∂ᵢvⱼ, in the same
+# component order as _shape_gradS: (∂₁v₁,∂₂v₁,∂₃v₁, ∂₁v₂,∂₂v₂,∂₃v₂, ∂₁v₃,∂₂v₃,∂₃v₃).
+@inline function _v3(k, x)
+    s1=sin(k*x[1]); s2=sin(k*x[2]); s3=sin(k*x[3])
+    c1=cos(k*x[1]); c2=cos(k*x[2]); c3=cos(k*x[3])
+    VectorValue(-k*c1*s2*s3, 2.0*k*s1*c2*s3, -k*s1*s2*c3)
+end
+@inline function _grad_v3(k, x)
+    s1=sin(k*x[1]); s2=sin(k*x[2]); s3=sin(k*x[3])
+    c1=cos(k*x[1]); c2=cos(k*x[2]); c3=cos(k*x[3])
+    k2 = k*k
+    TensorValue( k2*s1*s2*s3,     -k2*c1*c2*s3,    -k2*c1*s2*c3,      # ∂₁v₁,∂₂v₁,∂₃v₁
+                 2.0*k2*c1*c2*s3, -2.0*k2*s1*s2*s3, 2.0*k2*s1*c2*c3,  # ∂₁v₂,∂₂v₂,∂₃v₂
+                 -k2*c1*s2*c3,    -k2*s1*c2*c3,     k2*s1*s2*s3)      # ∂₁v₃,∂₂v₃,∂₃v₃
+end
+
+function (f::UExFuncGenuine3D)(x)
+    A = f.alpha_field(x)
+    k = pi / f.L
+    return f.U * f.alpha_0 * (1.0 / A) * _v3(k, x)
+end
+
+# ∇u = U α₀ [ α⁻¹ ∇v − α⁻² (∇α ⊗ v) ]  (quotient rule; ∇α padded to 3D, α z-invariant).
+function grad_u_ex(f::UExFuncGenuine3D, x)
+    A = f.alpha_field(x)
+    grad_A = _grad_alpha_d(Val(3), f.alpha_field, x)
+    k = pi / f.L
+    v = _v3(k, x); grad_v = _grad_v3(k, x)
+    return f.U * f.alpha_0 * ( (1.0 / A) * grad_v - (1.0 / A^2) * outer(grad_A, v) )
+end
+∇(f::UExFuncGenuine3D) = x -> grad_u_ex(f, x)
+
+# Δu = P Δv + 2 (∇P·∇)v + (ΔP) v with P = U α₀ α⁻¹ and Δv = −3k² v (eigenfunction).
+function lap_u_ex(f::UExFuncGenuine3D, x)
+    A = f.alpha_field(x)
+    grad_A = _grad_alpha_d(Val(3), f.alpha_field, x)
+    lap_A = PorousNSSolver.lap_alpha(f.alpha_field, x)
+    k = pi / f.L
+    v = _v3(k, x); grad_v = _grad_v3(k, x)
+    lap_v = -3.0 * k^2 * v
+    U_a0 = f.U * f.alpha_0
+    P = U_a0 / A
+    grad_P = -(U_a0 / A^2) * grad_A
+    lap_P  = -(U_a0 / A^2) * lap_A + 2.0 * (U_a0 / A^3) * (grad_A ⋅ grad_A)
+    return P * lap_v + 2.0 * (grad_P ⋅ grad_v) + lap_P * v
+end
+Δ(f::UExFuncGenuine3D) = x -> lap_u_ex(f, x)
+
+# ∇(∇·u), FULL 3D. Since div v = 0 and α is z-invariant, div u = −U α₀ (v·∇α)/α² with
+# v·∇α = v_x α_x + v_y α_y (the v_z α_z term vanishes). This depends on z, so ∇(∇·u) has a
+# nonzero z-component (unlike the extruded field). With φ ≔ v·∇α:
+function grad_div_u_ex(f::UExFuncGenuine3D, x)
+    c = f.U * f.alpha_0
+    A = f.alpha_field(x)
+    gA = PorousNSSolver.grad_alpha(f.alpha_field, x)   # in-plane 2-vector (α_x, α_y)
+    H  = PorousNSSolver.hess_alpha(f.alpha_field, x)   # in-plane 2×2
+    Ax = gA[1]; Ay = gA[2]
+    Axx = H[1,1]; Axy = H[1,2]; Ayy = H[2,2]
+    k = pi / f.L
+    s1=sin(k*x[1]); s2=sin(k*x[2]); s3=sin(k*x[3])
+    c1=cos(k*x[1]); c2=cos(k*x[2]); c3=cos(k*x[3])
+    k2 = k*k
+    vx = -k*c1*s2*s3; vy = 2.0*k*s1*c2*s3
+    vx_x =  k2*s1*s2*s3;    vx_y = -k2*c1*c2*s3;    vx_z = -k2*c1*s2*c3   # ∂ⱼ v_x
+    vy_x =  2.0*k2*c1*c2*s3; vy_y = -2.0*k2*s1*s2*s3; vy_z = 2.0*k2*s1*c2*c3   # ∂ⱼ v_y
+    φ  = vx*Ax + vy*Ay
+    φx = vx_x*Ax + vx*Axx + vy_x*Ay + vy*Axy
+    φy = vx_y*Ax + vx*Axy + vy_y*Ay + vy*Ayy
+    φz = vx_z*Ax + vy_z*Ay
+    gx = -c*(φx/A^2 - 2.0*φ*Ax/A^3)
+    gy = -c*(φy/A^2 - 2.0*φ*Ay/A^3)
+    gz = -c*(φz/A^2)
+    return VectorValue(gx, gy, gz)
+end
+
+# Genuinely-3D exact pressure p = P c₁ s₂ c₃ (zero mean on the box), analytic ∇p registered.
+struct PExFuncGenuine3D <: Function
+    P::Float64
+    L::Float64
+end
+function (f::PExFuncGenuine3D)(x)
+    k = pi / f.L
+    return f.P * cos(k*x[1]) * sin(k*x[2]) * cos(k*x[3])
+end
+function grad_p_ex(f::PExFuncGenuine3D, x)
+    k = pi / f.L
+    s1=sin(k*x[1]); s2=sin(k*x[2]); s3=sin(k*x[3])
+    c1=cos(k*x[1]); c2=cos(k*x[2]); c3=cos(k*x[3])
+    return VectorValue(-f.P*k*s1*s2*c3, f.P*k*c1*c2*c3, -f.P*k*c1*s2*s3)
+end
+∇(f::PExFuncGenuine3D) = x -> grad_p_ex(f, x)
+
+# Build the callable exact velocity u_ex for this MMS instance (dimension D of the bundle).
+function get_u_ex(mms::PaperMMS{D}) where {D}
+    if mms.field_variant == :genuine3d
+        return UExFuncGenuine3D(mms.U, mms.alpha_field.alpha_0, mms.alpha_field, mms.L)
+    end
+    return UExFunc{D}(mms.U, mms.alpha_field.alpha_0, mms.alpha_field, mms.L)
+end
 
 # Pick physically sensible amplitudes for the manufactured fields. The velocity scale is just
 # U; the pressure scale P is sized so it stays comparable to the dominant momentum term across
@@ -330,6 +457,9 @@ end
 # k = π/L. Returned as a PExFunc (one source of truth, with a registered analytic ∇).
 function get_p_ex(mms::PaperMMS{D}) where {D}
     _, P_amp = get_characteristic_scales(mms)
+    if mms.field_variant == :genuine3d
+        return PExFuncGenuine3D(P_amp, mms.L)
+    end
     return PExFunc{D}(P_amp, mms.L)
 end
 

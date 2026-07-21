@@ -174,6 +174,7 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                    jfnk_maxiter=nothing, jfnk_restart=nothing, jfnk_reltol=nothing, jfnk_precond_c1_mult=nothing, iterative_penalty::Bool=true,
                    osgs_skip_boot::Bool=false, eps_pert_base::Float64=1.0, max_n_pert::Int=5,
                    ablation::String="full", h_conv::String="regular_tet", study=default_study3d(),
+                   field_variant::Symbol=:extruded,   # :extruded (default) or :genuine3d (all-xyz, u_z≠0)
                    # [element-aware-c1] c1_mode="fixed" ⇒ legacy scalar c1_mult (and c2_mult, default = c1_mult).
                    # c1_mode="element_aware" ⇒ per-element coercivity floor c₁*(K) (element_c1.jl) reduced over
                    # the mesh by (c1_percentile, c1_safety), applied c₁-ONLY (c₂ stays at paper — only the
@@ -220,8 +221,9 @@ function solve_one(kv::Int, method::String, model; visc::String="Deviatoric", ep
                                        PNS.ConstantSigmaLaw(sigma_c), proj, reg, nu, eps_phys;
                                        numerical_epsilon=eps_num)
 
-    # dim=3 → z-extruded field; the oracle g reads ε_phys from form.physical_epsilon (0 ⇒ incompressible source).
-    mms = PNS.PaperMMS(form, U_AMP, alpha_field; L=L, alpha_infty=ALPHAINF, dim=3)
+    # dim=3 → z-extruded field (default); field_variant=:genuine3d selects the all-xyz curl(A)/α field.
+    # The oracle g reads ε_phys from form.physical_epsilon (0 ⇒ incompressible source).
+    mms = PNS.PaperMMS(form, U_AMP, alpha_field; L=L, alpha_infty=ALPHAINF, dim=3, field_variant=field_variant)
     U_c, P_c = PNS.get_characteristic_scales(mms)
     u_ex = PNS.get_u_ex(mms); p_ex = PNS.get_p_ex(mms)
 
@@ -482,7 +484,8 @@ end
 # Records the per-cell `eps_used` (largest perturbation it converged from) as the robustness map. Constant-aspect
 # (1.2) Kuhn ladders, all LU-feasible: P1 (8,8,2)→(16,16,4)→(24,24,6)→(32,32,8); P2 (12,12,3)→(16,16,4)→(20,20,5)→(24,24,6)
 # (4 P2 meshes: the finest reaches the asymptotic P2 rate, which the 3-mesh ladder's small refinement steps understate).
-function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=4.0, recenter::Bool=true)
+function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=4.0, recenter::Bool=true,
+                              field_variant::Symbol=:extruded, seq::String="structured")
     ladders = Dict(1 => [(8,8,2),(16,16,4),(24,24,6),(32,32,8)], 2 => [(12,12,3),(16,16,4),(20,20,5),(24,24,6)])
     # c1_mult>1 ⇒ ROBUST c₁×N in the RESIDUAL (c₁-only; c₂ stays at paper — only the viscous constant gates
     # coercivity). SINGLE canonical channel per test: always the `structured` leaf. The recipe (c1_mult,
@@ -497,7 +500,7 @@ function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=4.0, recenter::Bo
     # while a default run silently produced 2D-constant results that would be mislabelled as the paper's.
     # c₁ is element-family-dependent through the coercivity condition c₁ > 2ξ·C̄_inv² (C̄_inv is markedly
     # larger for tets), so the 2D value is not a safe default for a tet sweep.
-    seq = "structured"
+    # seq is a parameter: "structured" (extruded field, default) or "genuine3d" (all-xyz field).
     archdir = joinpath(@__DIR__, "previous_results", "convergence3d"); mkpath(archdir)
     stamp = Dates.format(Dates.now(), "yyyymmdd_HHMMSS")
     outdirs  = Dict(kv => joinpath(@__DIR__, "results", "k$(kv)", "TET", seq) for kv in (1, 2))
@@ -532,6 +535,7 @@ function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=4.0, recenter::Bo
                 t0 = time()
                 model = structured_kuhn_model(part; domain=DOMAIN)
                 r = solve_one(kv, method, model; visc="Deviatoric", linsolver="LU", max_n_pert=max_n_pert,
+                              field_variant=field_variant,
                               c1_mult=c1_mult, c2_mult=1.0,   # robust c₁×N in the residual, c₁-ONLY (c₂ at paper)
                               recenter=recenter,              # zero-mean the lagged pressure each penalty pass (honest gauge)
                               jfnk=osgs_recipe, osgs_skip_boot=osgs_recipe,
@@ -559,6 +563,7 @@ function run_sweep_structured(; max_n_pert=3, c1_mult::Float64=4.0, recenter::Bo
                                "viscous_operator"=>"Deviatoric", "reaction"=>"Constant_Sigma")
             push!(results_by_kv[kv], Dict("kv"=>kv, "kp"=>kv, "method"=>method, "element_type"=>"TET",
                                 "mesh"=>"structured_kuhn", "mesh_sequence"=>seq, "c1_mult"=>c1_mult,
+                                "field_variant"=>String(field_variant),
                                 "alpha_0"=>ALPHA0, "Re"=>RE, "Da"=>DA, "numerical_epsilon"=>eps_num_used,
                                 "solver"=>solver_prov,
                                 "hs"=>hs, "l2u"=>l2us, "l2p"=>l2ps, "h1u"=>h1us, "h1p"=>h1ps, "levels"=>levels))
@@ -1042,6 +1047,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
         mnp = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
         c1m = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 4.0
         run_sweep_structured(; max_n_pert=mnp, c1_mult=c1m)
+    elseif length(ARGS) >= 1 && ARGS[1] == "sweep_genuine3d"
+        # smoke3d.jl sweep_genuine3d [max_n_pert] [c1_mult]  — full §5.2 sweep on the STRUCTURED Kuhn family
+        # but with the GENUINELY 3D manufactured field (u = U α₀ curl(A)/α; all components depend on x,y,z,
+        # u_z ≠ 0), the audit-response test for N19. Distinct manufactured solution ⇒ its OWN channel
+        # results/k*/TET/genuine3d/ (does not orphan the extruded `structured` results). Same c₁ = 16k⁴.
+        mnp = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 3
+        c1m = length(ARGS) >= 3 ? parse(Float64, ARGS[3]) : 4.0
+        run_sweep_structured(; max_n_pert=mnp, c1_mult=c1m, field_variant=:genuine3d, seq="genuine3d")
     elseif length(ARGS) >= 1 && ARGS[1] == "sweep_nested_red"
         # smoke3d.jl sweep_nested_red [c1_mult] [max_n_pert] [nlevels_p1] [nlevels_p2] [osgs_p2_precond_c1_mult]
         #   — full §5.2 sweep on the IRREGULAR nested-red (unstructured-base + red-refined) family at the
