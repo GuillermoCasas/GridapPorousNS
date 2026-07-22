@@ -1,7 +1,7 @@
 % =====================================================================
 %  coq_coverage.tex
 %
-%  A reader's map from the paper's theory (theory/paper/article.tex and
+%  A reader's map from the paper's theory (theory/paper/article_v2.tex and
 %  its appendices) to the machine-checked Coq development in
 %  proof_verification/coq-formal/.
 %
@@ -73,9 +73,9 @@
 \title{\bfseries Machine-checked coverage map:\\
        from the paper's theory to the Coq formalisation}
 \author{Coverage note accompanying \file{proof_verification/coq-formal/}}
-\date{Revised 2026-07-20 \quad (24 files; the ASGS a priori chain plus the OSGS
-      chain of \S\ref{sec:osgs}; all compiled and \coq{coqchk}-verified on
-      Coq~8.18 / Rocq~9.1)}
+\date{Revised 2026-07-22 \quad (retargeted to \file{article_v2.tex}: the ASGS chain
+      maps to \S5 $+$ Appendix~C, the OSGS chain of \S\ref{sec:osgs} to Appendix~D;
+      24 Coq files, all compiled and \coq{coqchk}-verified on Coq~8.18 / Rocq~9.1)}
 
 \begin{document}
 \maketitle
@@ -103,11 +103,12 @@ theorem is a genuine kernel-level \emph{composition} of the closed
 stability and interpolation-continuity lemmas, with the triple-norm
 triangle inequality proved rather than assumed. \textbf{A companion chain
 (\S\ref{sec:osgs}, six further files) does the same for the \emph{orthogonal}
-subgrid-scale (OSGS) variant} of the companion note
-\file{theory/osgs_a_priori/osgs_convergence.tex}: its parameter algebra
-(Lemma~3.1, including the Damk\"ohler inequality (P5)), norm comparison,
-inf--sup stability (Theorem~4.1), interpolation-continuity and consistency
-(Lemmas 5.1--5.2), and convergence (Theorem~5.4) with its two corollaries are
+subgrid-scale (OSGS) variant} of Appendix~D of \file{theory/paper/article_v2.tex}
+(\file{osgs_appendix.tex}, mirroring the companion note
+\file{theory/osgs_a_priori/osgs_convergence.tex}): its parameter algebra
+(Lemma~D.3, including the Damk\"ohler inequality (P5)), norm comparison,
+inf--sup stability (Theorem~D.9), consistency and interpolation-continuity
+(Lemmas D.11 and D.13), and convergence (Theorem~D.15) with its two corollaries are
 machine-checked theorems over the same interface, with three of the OSGS
 hypothesis bundles machine-witnessed consistent. Section~\ref{sec:coq}
 is a primer on how Coq (now \emph{Rocq}) works and what ``machine-checked''
@@ -423,7 +424,7 @@ $\tau_1$ (\lbl{eq:Tau1Final})       & \coq{tau1}       & $\varphi_1=\aK\,\tau_{1
 $\tau_2$ (\lbl{eq:Tau2Final})       & \coq{tau2}       & $\tau_{1,\mathrm{NS}}$ (\lbl{eq:TauNavierStokes}) & \coq{tau1NS} \\
 $\sigt$ (\lbl{eq:SigmaAlpha})       & \coq{sigt}/\coq{sg} & $\bar C_{\mathrm{inv}}$ (\lbl{lem:winv}) & \coq{Cb} \\
 $\aK$                               & \coq{alphaK}/\coq{aK}     & $|\mathbf a|_{\infty,K}$   & \coq{am} \\
-$\Cinv$ (\lbl{eq:inverse})          & \coq{Cinv}       & $\xi$ (Young parameter)   & \coq{xi} \\
+$\Cinv$ (\lbl{eq:InverseEstimateFiniteOrderNorm}) & \coq{Cinv}       & $\xi$ (Young parameter)   & \coq{xi} \\
 $\Reh,\Dah$                         & \coq{Re},\coq{Da} & $\varepsilon$ (mass penalty) & \coq{eps} \\
 $B_S(U_h,U_h)$                      & \coq{BS}         & $|||U_h|||^2$ (\lbl{eq:triplenorm}) & \coq{NormSq} \\
 \bottomrule
@@ -434,7 +435,8 @@ $B_S(U_h,U_h)$                      & \coq{BS}         & $|||U_h|||^2$ (\lbl{eq:
 
 The sharpest scalar statement of the stability section is the \emph{velocity
 slack identity}: the gap between the velocity coefficient of the final
-stability estimate (\lbl{eq:VelocityCoefficientBound}) and $C_u\,\sigt$ is not
+stability estimate (the collected coefficients \lbl{eq:coerccollect} of Appendix~C's
+coercivity lemma \lbl{lem:coercivity}) and $C_u\,\sigt$ is not
 merely non-negative --- it equals a specific product \emph{exactly}. In Coq:
 
 \begin{lstlisting}
@@ -530,13 +532,13 @@ Coq file & Paper location & Role \\
 \file{AbstractSums.v}  & --- & infrastructure: finite mesh/face sums, discrete C--S \\
 \file{InnerSpace.v}    & --- & infrastructure: abstract pre-Hilbert space \\
 \file{InverseEstimates.v} & \lbl{lem:winv} & infrastructure: inverse-estimate schema \& composition \\
-\file{StabilityAlgebra.v}  & \S\ref{sec:crossStab} (\S5)     & stability estimate, scalar algebra \\
-\file{ContinuityAlgebra.v} & \S\ref{sec:crossCont} (App.\ B) & continuity proof, scalar algebra \\
-\file{AbstractStability.v} & \S\ref{sec:crossAbsStab} (\S5) & \lbl{lemma:Stability}, complete theorem \\
-\file{AbstractContinuity.v}& \S\ref{sec:crossAbsCont} (App.\ B) & \lbl{lemma:Continuity}, complete theorem \\
-\file{AbstractInterpolation.v}& \S\ref{sec:crossAbsInterp} (App.\ B) & \lbl{lem:continterp}, complete theorem \\
-\file{AbstractConvergence.v}& \S\ref{sec:crossAbsConv} (App.\ B) & \lbl{thm:convergence}, complete theorem \\
-\file{TauDesign.v}   & \S\ref{sec:crossTau} (\S4 + App.\ C) & Fourier design of $\tau_1,\tau_2$ \\
+\file{StabilityAlgebra.v}  & \S\ref{sec:crossStab} (\S5 $+$ App.\ C) & stability estimate, scalar algebra \\
+\file{ContinuityAlgebra.v} & \S\ref{sec:crossCont} (App.\ C) & continuity proof, scalar algebra \\
+\file{AbstractStability.v} & \S\ref{sec:crossAbsStab} (\S5 $+$ App.\ C) & \lbl{lemma:Stability}, complete theorem \\
+\file{AbstractContinuity.v}& \S\ref{sec:crossAbsCont} (App.\ C) & \lbl{lemma:Continuity}, complete theorem \\
+\file{AbstractInterpolation.v}& \S\ref{sec:crossAbsInterp} (App.\ C) & \lbl{lem:continterp}, complete theorem \\
+\file{AbstractConvergence.v}& \S\ref{sec:crossAbsConv} (App.\ C) & \lbl{thm:convergence}, complete theorem \\
+\file{TauDesign.v}   & \S\ref{sec:crossTau} (\S4 + App.\ B) & Fourier design of $\tau_1,\tau_2$ \\
 \file{Asymptotics.v} & \S\ref{sec:crossAsym} (\S6)     & robustness in $(\Reh,\Dah)$ \\
 \file{ManufacturedSolution.v} & \S\ref{sec:crossMMS} (\S7) & manufactured solution \\
 \file{PlateauBump.v} & \S\ref{sec:crossBump} (\S7)     & plateau bump, through $C^1$ \\
@@ -574,7 +576,7 @@ Coq file & Paper location & Role \\
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{StabilityAlgebra.v} --- \S5: the stability estimate (scalar algebra)}\label{sec:crossStab}
+\subsection{\texttt{StabilityAlgebra.v} --- \S5 / Appendix C: the stability estimate (scalar algebra)}\label{sec:crossStab}
 
 Section hypotheses: $\nu,h,\aK>0$, $\sigma\ge0$, $|\mathbf a|\ge 0$,
 $c_1,c_2,\Cinv,\xi>0$; and, in its second section, $\varepsilon\ge0$,
@@ -585,8 +587,8 @@ Mirrors \file{stability_estimate_verification.py}.
 \coq{Cinv}, but it is a \emph{slot}: every use in the abstract layer fills it
 with \coq{Cb} $=\Cbar$ (every instantiation in \file{AbstractStability.v} does
 so). The constants below are therefore written with $\Cbar$ --- which is exactly the
-substitution \lbl{rem:winvconst} prescribes, and what \lbl{prop:stability}
-states. (Renaming the Coq variable to \coq{Cb} would remove the trap.)
+substitution \lbl{rem:winvconst} prescribes, and what the coercivity lemma
+\lbl{lem:coercivity} (Appendix~C) states. (Renaming the Coq variable to \coq{Cb} would remove the trap.)
 
 \begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
 \toprule
@@ -594,8 +596,8 @@ states. (Renaming the Coq variable to \coq{Cb} would remove the trap.)
 \midrule \endhead
 \coq{sigt_form_phi}, \coq{sigt_form_tau1}, \coq{sigt_form_key} & The three forms of $\sigt$ (\lbl{eq:SigmaAlpha}). \\
 \coq{young_perfect_square}, \coq{young_inequality} & Young's step $-2xy\ge -x^2/\xi-\xi y^2$. \\
-\coq{viscous_coefficient_expansion} & Viscous coefficient of \lbl{eq:StabilityEstimateFinal} $=$ the expanded \lbl{eq:ViscousCoefficientBound}. \\
-\coq{velocity_coefficient_expansion}, \coq{velocity_slack_identity}, \coq{velocity_coefficient_lower_bound}, \coq{u_final_lower_bound} & \lbl{eq:VelocityCoefficientBound} and its \emph{exact} slack over $C_u\sigt$, $C_u=1-\xi\Cbar^2/c_1$. \\
+\coq{viscous_coefficient_expansion} & Viscous coefficient of the collected coercivity bound \lbl{eq:coerccollect} $=$ the expanded viscous-absorption step \lbl{eq:viscabsorb} (Appendix~C, \lbl{lem:coercivity}). \\
+\coq{velocity_coefficient_expansion}, \coq{velocity_slack_identity}, \coq{velocity_coefficient_lower_bound}, \coq{u_final_lower_bound} & the velocity coefficient of the collected coercivity bound \lbl{eq:coerccollect} (via the reaction renormalisation \lbl{eq:reactrenorm}) and its \emph{exact} slack over $C_u\sigt$, $C_u=1-\xi\Cbar^2/c_1$. \\
 \coq{eps_max_tau2_identity}, \coq{eps_tau2_le_C2}, \coq{pressure_term_coercive}, \coq{epsilon_smallness_chain} & The $\varepsilon$-smallness chain (\lbl{eq:UpperBoundOnEpsilon}): $\varepsilon\tau_2\le C_2$, pressure coeff $\ge(1-C_2)\varepsilon$. \\
 \coq{viscous_coefficient_lower_bound}, \coq{visc_final_lower_bound} & Viscous bracket $\ge C_{\mathrm{visc}}\nu$, $C_{\mathrm{visc}}=\min\{2-4\Cbar^2/c_1,2(1-2/\xi)\}$. \\
 \coq{stability_constants_positive_sharp} & $c_1>\xi\Cbar^2$, $\xi>2$ $\Rightarrow$ coefficients positive: the \emph{sharp} form of \lbl{eq:conditions_on_num_param} (a factor two weaker than the manuscript's). \\
@@ -605,7 +607,7 @@ states. (Renaming the Coq variable to \coq{Cb} would remove the trap.)
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{ContinuityAlgebra.v} --- Appendix B: the continuity proof (scalar algebra)}\label{sec:crossCont}
+\subsection{\texttt{ContinuityAlgebra.v} --- Appendix C: the continuity proof (scalar algebra)}\label{sec:crossCont}
 
 Section hypotheses: $\nu,h,\aK,c_1,c_2>0$, $\aK\le 1$, $\sigma\ge 0$,
 $|\mathbf a|\ge 0$. Explicit constants wherever the appendix writes a generic
@@ -643,10 +645,10 @@ file imports \file{AbstractInterpolation.v}.
 \toprule
 \textbf{Coq statement} & \textbf{Paper content (all machine-checked)} \\
 \midrule \endhead
-\coq{momentum_pairing}, \coq{mass_pairing} & the adjoint / difference-of-squares expansions of the residual pairings (\lbl{eq:StabilityEstimate}). \\
-\coq{Bv_expand}, \coq{du_sq_bound} & expansion of $\lVert G(u)\rVert^2$; the Young step with the exact cancellation of the inverse-estimate constant $\bar C_{\mathrm{inv}}$ (\lbl{eq:BoundOfCrossedTerm}). \\
+\coq{momentum_pairing}, \coq{mass_pairing} & the adjoint / difference-of-squares expansions of the residual pairings (the stabilisation-diagonal expansion \lbl{eq:stabdiag1}). \\
+\coq{Bv_expand}, \coq{du_sq_bound} & expansion of $\lVert G(u)\rVert^2$ (\lbl{eq:Gexpand}); the Young step with the exact cancellation of the inverse-estimate constant $\bar C_{\mathrm{inv}}$ (\lbl{eq:crossbound}). \\
 \coq{element_lower_bound}, \coq{element_coercive} & the per-element coercivity, importing \coq{elemental_coercivity}. \\
-\coq{diag_zero}, \coq{momentum_group}, \coq{mass_group}, \coq{HBS} & the tested identity $B_S(U_h,U_h)$ of \lbl{eq:StabilityEstimate}, \textbf{proved} (was the hypothesis \coq{HBS}): the eighteen-term $B_S$ at the diagonal is re-assembled into the stability form, the $T_2+T_4$ remainder vanishing by the two diagonal Green identities. \\
+\coq{diag_zero}, \coq{momentum_group}, \coq{mass_group}, \coq{HBS} & the tested identity $B_S(U_h,U_h)$ of the coercivity display \lbl{eq:coercivity}, \textbf{proved} (was the hypothesis \coq{HBS}): the eighteen-term $B_S$ at the diagonal is re-assembled into the stability form, the $T_2+T_4$ remainder vanishing by the two diagonal Green identities. \\
 \coq{BS_as_sum} & re-summation of the tested form over the mesh. \\
 \coq{abstract_stability} & \textbf{\lbl{lemma:Stability}}: $0<\Cstab$ and $B_S(U_h,U_h)\ge\Cstab\,|||U_h|||^2$. \\
 \bottomrule
@@ -724,7 +726,7 @@ theorems inside Coq --- not by re-deriving them and not by assuming their
 conclusions. \coq{abstract_stability} is instantiated at the discrete
 error $E_h=\widehat U_h-U_h$ (its inverse-estimate input is literally the
 V-side hypothesis \coq{Hw_dv}; its $\varepsilon$-condition is
-definitionally the same \lbl{eq:epscond}), \coq{abstract_continterp} at
+definitionally the same \lbl{eq:UpperBoundOnEpsilon}), \coq{abstract_continterp} at
 the pair $(E,E_h)$. The only trusted additions over the union of the two
 prior files are the two \emph{diagonal} Green identities \coq{H_skew_diag} and
 \coq{H_ibp_diag} --- and those are not new to the development either, being
@@ -764,12 +766,12 @@ mesh. \\
 \coq{abstract_convergence} & \textbf{\lbl{thm:convergence}}:
 $|||U-U_h|||\le(K_{\mathrm{abs}}^{I}+C_{\mathrm{tot}}^{I}/\Cstab)
 (\Psi_U+\Psi_P)$ --- the porosity-weighted sharp form of
-\lbl{rem:sharperconv}. \\
+\lbl{rem:sharper}. \\
 \coq{abstract_convergence_l1} & \lbl{eq:convergence}'s $\ell^1$ line. \\
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{TauDesign.v} --- \S4 / Appendix C: Fourier design of \texorpdfstring{$\tau$}{tau}}\label{sec:crossTau}
+\subsection{\texttt{TauDesign.v} --- \S4 / Appendix B: Fourier design of \texorpdfstring{$\tau$}{tau}}\label{sec:crossTau}
 
 Mirrors \file{fourier_tau_verification.py}. Section hypotheses: $\nu,\alpha,h>0$.
 
@@ -857,8 +859,11 @@ $e^{t-1}$. Neither is paper-specific.
 % =====================================================================
 
 Everything above concerns the \emph{algebraic subgrid-scale} (ASGS) variant, the
-one whose a priori analysis the manuscript carries out. The companion note
-\file{theory/osgs_a_priori/osgs_convergence.tex} supplies the analogous analysis
+one whose a priori analysis the manuscript carries out in the main text and
+Appendix~C. \emph{Appendix~D} of \file{theory/paper/article_v2.tex}
+(\file{osgs_appendix.tex}, ``Convergence analysis of the OSGS method'', which mirrors
+the standalone companion note \file{theory/osgs_a_priori/osgs_convergence.tex}
+proof-for-proof) supplies the analogous analysis
 for the \emph{orthogonal subgrid-scale} (OSGS) variant --- the one that
 distinguishes itself by projecting the residual with the orthogonal projection
 $\pi_h$ rather than the algebraic subscale, deleting the reactive subscale
@@ -866,30 +871,31 @@ identically. Its a priori chain is now a set of complete machine-checked theorem
 too, in \emph{six} new files that reuse the same abstract inner-product / mesh
 interface (\file{InnerSpace.v}, \file{AbstractSums.v}) and the same closed
 parameter algebra (\file{ContinuityAlgebra.v}); the OSGS variant is analysed with
-\emph{exactly} the companion's $\tau_1,\tau_2,\sigt$ (its \lbl{eq:TauDefs} is the
-manuscript's \lbl{eq:taus}), so the two developments share one parameter set,
+\emph{exactly} the same $\tau_1,\tau_2,\sigt$ (Appendix~D quotes the main-text
+definitions \lbl{eq:Tau1Final}, \lbl{eq:Tau2Final}, i.e.\ the manuscript's
+\lbl{eq:taus}), so the two developments share one parameter set,
 reconciled inside the kernel.
 
 \begin{center}
 \small
 \begin{tabular}{@{}lll@{}}
 \toprule
-Coq file & Note location & Role \\
+Coq file & App~D location & Role \\
 \midrule
-\file{OsgsParameters.v}   & Lemma~3.1 (\lbl{lem:parameters}) & parameter inequalities (P1)--(P6), (K1)--(K3) \\
-\file{OsgsNorm.v}         & Lemma~3.5 (\lbl{lem:normcomparison}) & OSGS triple norm; ASGS-norm domination \\
-\file{OsgsStability.v}    & Theorem~4.1 (\lbl{th:stability}) & inf--sup stability, complete theorem \\
-\file{OsgsInterpolation.v}& Lemmas 5.1--5.2 & consistency error \& interpolation continuity \\
-\file{OsgsConvergence.v}  & Theorem~5.4 (\lbl{th:convergence}) + Cor.\ 5.5--5.6 & convergence, kernel-level composition \\
+\file{OsgsParameters.v}   & Lemma~D.3 (\lbl{oa:lem:parameters}) & parameter inequalities (P1)--(P6), (K1)--(K3) \\
+\file{OsgsNorm.v}         & Lemma~D.8 (\lbl{oa:lem:normcomparison}) & OSGS triple norm; ASGS-norm domination \\
+\file{OsgsStability.v}    & Theorem~D.9 (\lbl{oa:th:stability}) & inf--sup stability, complete theorem \\
+\file{OsgsInterpolation.v}& Lemmas D.11, D.13 & consistency error \& interpolation continuity \\
+\file{OsgsConvergence.v}  & Theorem~D.15 (\lbl{oa:th:convergence}) + Cor.\ D.16--D.17 & convergence, kernel-level composition \\
 \file{NonVacuityOsgs.v}   & \S\ref{sec:osgsvac} & consistency witnesses (three bundles) \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \noindent
-The single structural difference between the two variants drives the whole note:
+The single structural difference between the two variants drives the whole appendix:
 the orthogonal projection annihilates the reactive residual identically
-(the note's Lemma~2.2), so \emph{no} renormalisation of $\sigma$ down to $\sigt$
+(Appendix~D's Lemma~D.1, \lbl{oa:lem:annihilation}), so \emph{no} renormalisation of $\sigma$ down to $\sigt$
 takes place. The OSGS triple norm therefore controls the \emph{full}
 $\lVert\sigma^{1/2}\mathbf u_h\rVert^2$ rather than the damped
 $\lVert\sigt^{1/2}\mathbf u_h\rVert_h^2$ (a strictly stronger left-hand side,
@@ -897,19 +903,19 @@ $\lVert\sigt^{1/2}\mathbf u_h\rVert_h^2$ (a strictly stronger left-hand side,
 $(1+\Dah)^{1/2}$, $\Dah=\sigma h_K^2/(\aK\nu)$, in the convergence estimate,
 whose sole algebraic source is inequality (P5).
 
-\subsection{\texttt{OsgsParameters.v} --- Lemma 3.1: the parameter inequalities}\label{sec:crossOsgsParam}
+\subsection{\texttt{OsgsParameters.v} --- Lemma D.3: the parameter inequalities}\label{sec:crossOsgsParam}
 
 Section hypotheses: $\nu,h,\aK,c_1,c_2,\Cinv,\gamma>0$, $\sigma\ge0$,
-$|\mathbf a|\ge0$; and the design condition \lbl{(A6)}
+$|\mathbf a|\ge0$; and the design condition \lbl{(O1)} ($=$\lbl{H:design})
 $c_1\ge\gamma^2\Cinv^2$, $c_2\ge\gamma\Cinv$. Proved \emph{from} the closed
 $\tau_1,\tau_2,\sigt$ of \file{ContinuityAlgebra.v}, reused verbatim (the OSGS
-$\tau$'s are the companion's), so this file is the OSGS analogue of
+$\tau$'s are the main text's), so this file is the OSGS analogue of
 \file{ContinuityAlgebra.v}: everything below is a theorem over the real numbers,
 no trusted base beyond the $\tau$ formulas.
 
 \begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
 \toprule
-\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\textbf{Coq statement} & \textbf{App~D content (all machine-checked)} \\
 \midrule \endhead
 \coq{P1_sigma_tau1}, \coq{P1_alphaK_tau1} & (P1): $\sigma\tau_1\le1$ and $\aK\tau_1\le\tau_{1,\mathrm{NS}}$. \\
 \coq{P2} & (P2): $\tau_1\tau_2\le h_K^2/(c_1\aK^2)$. \\
@@ -917,93 +923,106 @@ no trusted base beyond the $\tau$ formulas.
 \coq{P4_nu}, \coq{P4b_sq}, \coq{P4b} & (P4): $\nu\le\aK\tau_2$ and $\tau_1^{1/2}|\mathbf a|\le(\sqrt{c_1}/c_2)\tau_2^{1/2}$. \\
 \coq{P5_prod}, \coq{P5_sqrt} & \textbf{(P5)}: $\aK^2\tau_1\tau_2\ge h_K^2/(c_1+\Dah)$ --- \emph{the sole source of the Damk\"ohler factor} --- and its square-root consequence $\tau_2^{-1/2}\le(c_1+\Dah)^{1/2}(\aK/h_K)\tau_1^{1/2}$. \\
 \coq{P6} & (P6): $\sigma^{1/2}\le\Dah^{1/2}(\aK/h_K)\tau_2^{1/2}$. \\
-\coq{K1}, \coq{K2}, \coq{K3} & (K1)--(K3): the porosity-weighted inverse-estimate coefficients, driven by \lbl{(A6)}: e.g.\ (K3) $\Cinv\aK(\tau_1\tau_2)^{1/2}/h_K\le1/\gamma$. \\
+\coq{K1}, \coq{K2}, \coq{K3} & (K1)--(K3): the porosity-weighted inverse-estimate coefficients, driven by \lbl{(O1)}: e.g.\ (K3) $\Cinv\aK(\tau_1\tau_2)^{1/2}/h_K\le1/\gamma$. \\
 \coq{Dah_id}, \coq{TNS_h2_id}, \coq{T1_inv} & the closed identities the proofs run on. \\
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{OsgsNorm.v} --- Lemma 3.5: the OSGS triple norm}\label{sec:crossOsgsNorm}
+\subsection{\texttt{OsgsNorm.v} --- Lemma D.8: the OSGS triple norm}\label{sec:crossOsgsNorm}
 
 \begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
 \toprule
-\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\textbf{Coq statement} & \textbf{App~D content (all machine-checked)} \\
 \midrule \endhead
-\coq{perN} & the per-element OSGS energy $2\nu\lVert\mathbf g\rVert^2+\sigma\lVert\mathbf v\rVert^2+\varepsilon\lVert q\rVert^2+\tau_1\lVert\alpha X(V)\rVert^2+\tau_2\lVert\mathrm{div}(\alpha\mathbf v)\rVert^2$ (\lbl{eq:TripleNorm}). \\
+\coq{perN} & the per-element OSGS energy $2\nu\lVert\mathbf g\rVert^2+\sigma\lVert\mathbf v\rVert^2+\varepsilon\lVert q\rVert^2+\tau_1\lVert\alpha X(V)\rVert^2+\tau_2\lVert\mathrm{div}(\alpha\mathbf v)\rVert^2$ (\lbl{oa:eq:TripleNorm}). \\
 \coq{perS} & the ASGS (``S'') per-element energy: viscous $\nu$ (not $2\nu$) and the damped $\sigt$. \\
-\coq{perS_le_perN}, \coq{NormS2_le_NN2} & \textbf{Lemma 3.5}: the OSGS norm dominates the ASGS norm term by term, from $\nu\le2\nu$ and $\sigt\le\sigma$ (\coq{P4_le_sigma}). \\
+\coq{perS_le_perN}, \coq{NormS2_le_NN2} & \textbf{Lemma D.8}: the OSGS norm dominates the ASGS norm term by term, from $\nu\le2\nu$ and $\sigt\le\sigma$ (\coq{P4_le_sigma}). \\
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{OsgsStability.v} --- Theorem 4.1: inf--sup stability}\label{sec:crossOsgsStab}
+\subsection{\texttt{OsgsStability.v} --- Theorem D.9: inf--sup stability}\label{sec:crossOsgsStab}
 
 Unlike the ASGS variant, which is \emph{coercive} (test $=$ trial), the OSGS
 variant is stable by an \emph{inf--sup} argument built on the special test
-function $W=U_h+V^0$ of the note. The theorem exhibits $W$ with
+function $W=U_h+V^0$ of Appendix~D. The theorem exhibits $W$ with
 $B_{\mathrm{osgs}}(U_h,W)\ge\beta_{\mathrm{stab}}|||U_h|||^2$ and
 $|||W|||^2\le C_W^2|||U_h|||^2$ --- exactly what the convergence composition
-consumes. Steps~1--3 of \lbl{th:stability} (the diagonal identity \lbl{eq:Diagonal}
+consumes. Steps~1--3 of \lbl{oa:th:stability} (the diagonal identity \lbl{oa:eq:Diagonal}
 and the seven term estimates $T_1$--$T_7$ of the special test function, each
-packaging the smoothing lemma \lbl{lem:smoothing}, the coefficients (K1)--(K3)
+packaging the smoothing lemma \lbl{oa:lem:smoothing}, the coefficients (K1)--(K3)
 above, and elemental Cauchy--Schwarz / Young) are the named analytic trusted base;
 Steps~4--5 --- the coefficient collection and the recovery of the triple norm ---
 are proved in full.
 
 \begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
 \toprule
-\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\textbf{Coq statement} & \textbf{App~D content (all machine-checked)} \\
 \midrule \endhead
 \coq{coeff_O1}, \coq{coeff_O2}, \coq{coeff_P1}, \coq{coeff_P2} & \textbf{Step 4}: every collected coefficient $\ge1/8$ under $\gamma\ge10(1+M_2)$ and $\psi\le\min(1/8,\beta_0^2/16)$ --- the error-prone bookkeeping, checked term by term (e.g.\ the $P_1$ coefficient is $\ge1/8$ from six explicit rational sub-bounds). \\
-\coq{step4} & $B_{\mathrm{osgs}}(U_h,W)\ge\tfrac18(D_\nu+D_\sigma+D_\varepsilon+O_1+O_2+P_1+P_2)$ (\lbl{eq:Collected}), by the ring identity that regroups the seven term bounds into per-energy coefficients. \\
+\coq{step4} & $B_{\mathrm{osgs}}(U_h,W)\ge\tfrac18(D_\nu+D_\sigma+D_\varepsilon+O_1+O_2+P_1+P_2)$ (\lbl{oa:eq:Collected}), by the ring identity that regroups the seven term bounds into per-energy coefficients. \\
 \coq{beta_stab}, \coq{beta_stab_scaled} & $\beta_{\mathrm{stab}}=\min(1/8,\beta_0^2/16)>0$ and $\beta_{\mathrm{stab}}\cdot(2/\beta_0^2)\le1/8$. \\
-\coq{recovery} & \textbf{Step 5}: $B_{\mathrm{osgs}}(U_h,W)\ge\beta_{\mathrm{stab}}|||U_h|||^2$, using (A7) \coq{HA7} and the exact mass decomposition \coq{Hmass}. \\
+\coq{recovery} & \textbf{Step 5}: $B_{\mathrm{osgs}}(U_h,W)\ge\beta_{\mathrm{stab}}|||U_h|||^2$, using (O2) \coq{HA7} and the exact mass decomposition \coq{Hmass}. \\
 \coq{norm_W_bound} & $|||W|||^2\le2(1+C_{\mathrm{norm}})|||U_h|||^2$: the test function is bounded. \\
-\coq{abstract_osgs_stability} & \textbf{\lbl{th:stability}}: $0<\beta_{\mathrm{stab}}$, $B_{\mathrm{osgs}}(U_h,W)\ge\beta_{\mathrm{stab}}|||U_h|||^2$, $|||W|||^2\le2(1+C_{\mathrm{norm}})|||U_h|||^2$. \\
+\coq{abstract_osgs_stability} & \textbf{\lbl{oa:th:stability}}: $0<\beta_{\mathrm{stab}}$, $B_{\mathrm{osgs}}(U_h,W)\ge\beta_{\mathrm{stab}}|||U_h|||^2$, $|||W|||^2\le2(1+C_{\mathrm{norm}})|||U_h|||^2$. \\
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{OsgsInterpolation.v} --- Lemmas 5.1--5.2: consistency and interpolation continuity}\label{sec:crossOsgsInterp}
+\subsection{\texttt{OsgsInterpolation.v} --- Lemmas D.11, D.13: consistency and interpolation continuity}\label{sec:crossOsgsInterp}
 
-The OSGS error function \lbl{eq:ErrorFunction} $E(h)=\sum_K(\aK/h_K)(1+\Dah)^{1/2}
+The OSGS error function \lbl{oa:eq:ErrorFunction} $E(h)=\sum_K(\aK/h_K)(1+\Dah)^{1/2}
 (\tau_{2,K}^{1/2}E_{\mathrm{int},K}(\mathbf u)+\tau_{1,K}^{1/2}E_{\mathrm{int},K}(p))$
 --- the ASGS error function times the elementwise $(1+\Dah)^{1/2}$ --- is
-\emph{defined} here as a concrete mesh sum (\coq{Eh}). The seven per-term
-interpolation bounds (I1)--(I7) of \lbl{lem:interpolation} and the two
-consistency-slot bounds (S1),(S2) of \lbl{lem:consistency} --- each derived in the
-note from the interpolation estimates \lbl{eq:NodalInterp}, the best-approximation
-lemma \lbl{lem:bestapprox}, and the conversions (P3)--(P6) --- are the named
+\emph{defined} here as a concrete mesh sum (\coq{Eh}).
+\footnote{Appendix~D (like the note) states \lbl{oa:th:convergence} in the sharper porosity-weighted broken
+$\ell^2$ functional $\Psi_{\mathrm O}(h)=\bigl(\sum_K(c_1+\Dah)(\aK^2/h_K^2)(\tau_{2,K}
+E_{\mathrm{int},K}(\mathbf u)^2+\tau_{1,K}E_{\mathrm{int},K}(p)^2)\bigr)^{1/2}$, of which
+$\mathcal E(h)$ is the $\ell^1$ majorant ($\Psi_{\mathrm O}\le c_1^{1/2}\mathcal E$). The
+machine-checked assembly here is agnostic to the choice of error functional---the per-term
+bounds \coq{HI1}--\coq{HS2} enter as abstract hypotheses, and \file{OsgsConvergence.v}
+composes them in broken $\ell^2$ norms (\coq{NE},\coq{Neta},\coq{NUU})---so it certifies the
+$\ell^1$ form directly; the sharper $\ell^2$ form follows from the \emph{same}
+functional-agnostic assembly (the mechanical mirror below), not as a logical consequence
+of the $\ell^1$ statement. Re-stating the
+Coq error functional as $\Psi_{\mathrm O}$ (redefining \coq{Eh} and the single concrete
+witness \coq{wEh\_val} of \file{NonVacuityOsgs.v}) is a purely mechanical mirror, left as a
+follow-up.} The seven per-term
+interpolation bounds (I1)--(I7) of \lbl{oa:lem:interpolation} and the two
+consistency-slot bounds (S1),(S2) of \lbl{oa:lem:consistency} --- each derived in
+Appendix~D from the interpolation estimates \lbl{oa:eq:NodalInterp}, the best-approximation
+lemma \lbl{oa:lem:bestapprox}, and the conversions (P3)--(P6) --- are the named
 analytic trusted base; the assembly (the triangle inequality over the terms,
 collecting them into $C\,E(h)\,|||V|||$) is proved in full.
 
 \begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
 \toprule
-\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\textbf{Coq statement} & \textbf{App~D content (all machine-checked)} \\
 \midrule \endhead
-\coq{Eh}, \coq{Eh_nonneg} & the concrete OSGS error function \lbl{eq:ErrorFunction} and its nonnegativity. \\
-\coq{abstract_osgs_continterp} & \textbf{Lemma 5.2}: $|B_{\mathrm{osgs}}(\widehat E,V_h)|\le C_{\mathrm{tot}}^{I}\,E(h)\,|||V_h|||$ from the decomposition into $I_1$--$I_7$ and the seven term bounds. \\
-\coq{abstract_osgs_consistency} & \textbf{Lemma 5.1}: $|B_{\mathrm{osgs}}(U-U_h,V_h)|\le C_{\mathrm{cons}}^{I}\,E(h)\,|||V_h|||$ from the split into $S_1(U,V_h)+S_2(U,V_h)$. \\
+\coq{Eh}, \coq{Eh_nonneg} & the concrete OSGS error function \lbl{oa:eq:ErrorFunction} and its nonnegativity. \\
+\coq{abstract_osgs_continterp} & \textbf{Lemma D.13}: $|B_{\mathrm{osgs}}(\widehat E,V_h)|\le C_{\mathrm{tot}}^{I}\,E(h)\,|||V_h|||$ from the decomposition into $I_1$--$I_7$ and the seven term bounds. \\
+\coq{abstract_osgs_consistency} & \textbf{Lemma D.11}: $|B_{\mathrm{osgs}}(U-U_h,V_h)|\le C_{\mathrm{cons}}^{I}\,E(h)\,|||V_h|||$ from the split into $S_1(U,V_h)+S_2(U,V_h)$. \\
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{OsgsConvergence.v} --- Theorem 5.4: a kernel-level composition}\label{sec:crossOsgsConv}
+\subsection{\texttt{OsgsConvergence.v} --- Theorem D.15: a kernel-level composition}\label{sec:crossOsgsConv}
 
 Because the OSGS argument is inf--sup rather than coercive, its test function $W$
 is \emph{not} the trial function $\eta$, so the four inputs are carried as
 hypotheses about a common $W$ rather than re-derived internally (they are the
 conclusions of \coq{abstract_osgs_stability} applied to $\eta$,
 \coq{abstract_osgs_continterp} at $(\widehat E,W)$, \coq{abstract_osgs_consistency}
-at $W$, and Lemma 5.3). The one genuinely new algebraic item is the bilinearity of
+at $W$, and Lemma D.14). The one genuinely new algebraic item is the bilinearity of
 $B_{\mathrm{osgs}}$ in its first argument (\coq{Hbilin}), the analogue of the ASGS
 \coq{Horth}. The triangle inequality and the whole gluing arithmetic are proved.
 
 \begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
 \toprule
-\textbf{Coq statement} & \textbf{Note content (all machine-checked)} \\
+\textbf{Coq statement} & \textbf{App~D content (all machine-checked)} \\
 \midrule \endhead
 \coq{Qk_CS}, \coq{sumQ_CS}, \coq{NUU_triangle} & the triangle inequality for the OSGS triple norm, \emph{proved} from the pre-Hilbert axioms: per-element five-fold Cauchy--Schwarz over the five weights $(2\nu,\sigma,\varepsilon,\tau_1,\tau_2)$, then the discrete C--S over the mesh. \\
 \coq{Neta_bound} & $|||\eta|||\le((C_{\mathrm{cons}}+C_{\mathrm{int}})C_W/\beta_{\mathrm{stab}})E(h)$: the appendix's chain $\beta_{\mathrm{stab}}|||\eta|||^2\le B_{\mathrm{osgs}}(\eta,W)=B_{\mathrm{osgs}}(U-U_h,W)-B_{\mathrm{osgs}}(\widehat E,W)\le\dots$ \\
-\coq{abstract_osgs_convergence} & \textbf{\lbl{th:convergence}}: $|||U-U_h|||\le C_{\mathrm{conv}}\,E(h)$ (\lbl{eq:MainResult}), triangle inequality $+$ \coq{Neta_bound} $+$ interp-size. \\
-\coq{perSU_le_perU}, \coq{abstract_osgs_convergence_asgsnorm} & \textbf{Corollary 5.5} (\lbl{cor:asgsnorm}): the estimate holds verbatim in the ASGS norm, via Lemma 3.5. \\
-\coq{sig_vel_le_NUU}, \coq{abstract_osgs_convergence_Ltwo} & \textbf{Corollary 5.6} (\lbl{cor:Ltwo}): the $\sigma$-robust $L^2$ velocity estimate $\sqrt\sigma\,\lVert\mathbf u-\mathbf u_h\rVert\le C_{\mathrm{conv}}E(h)$, the reward for deleting the reactive subscale. \\
+\coq{abstract_osgs_convergence} & \textbf{\lbl{oa:th:convergence}}: $|||U-U_h|||\le C_{\mathrm{conv}}\,E(h)$ (\lbl{oa:eq:MainResult}), triangle inequality $+$ \coq{Neta_bound} $+$ interp-size. \\
+\coq{perSU_le_perU}, \coq{abstract_osgs_convergence_asgsnorm} & \textbf{Corollary D.16} (\lbl{oa:cor:asgsnorm}): the estimate holds verbatim in the ASGS norm, via Lemma D.8. \\
+\coq{sig_vel_le_NUU}, \coq{abstract_osgs_convergence_Ltwo} & \textbf{Corollary D.17} (\lbl{oa:cor:Ltwo}): the $\sigma$-robust $L^2$ velocity estimate $\sqrt\sigma\,\lVert\mathbf u-\mathbf u_h\rVert\le C_{\mathrm{conv}}E(h)$, the reward for deleting the reactive subscale. \\
 \bottomrule
 \end{longtable}
 
@@ -1015,20 +1034,20 @@ on $\tau_1$ and the enlarged inverse estimate for
 $\nabla\!\cdot(\alpha\nu\Pi^{\mathrm{DS}}\nabla\mathbf u_h)$, since the analysed OSGS
 form has no viscous or reactive stabilisation term to integrate by parts), while
 \emph{one} genuinely new analytic hypothesis is added --- the projection-stability
-condition (A7), the exact analogue of Codina--Blasco's condition~(35), which has no
+condition (O2), the exact analogue of Codina--Blasco's condition~(35), which has no
 ASGS counterpart. The residual OSGS trusted base, over and above the shared
 $\tau$-algebra, is:
 
 \begin{longtable}{@{}L{0.20\textwidth}L{0.52\textwidth}L{0.20\textwidth}@{}}
 \toprule
-\textbf{Coq hypothesis} & \textbf{Note statement} & \textbf{In; class} \\
+\textbf{Coq hypothesis} & \textbf{App~D statement} & \textbf{In; class} \\
 \midrule \endhead
-\coq{gam_ge}, \coq{psi_le_18}, \coq{psi_le_b} & \lbl{(A6)} $\gamma\ge10(1+M_2)$ and $h\le h_0$ (i.e.\ $\psi\le\min(1/8,\beta_0^2/16)$) & Stab; data (D) \\
-\coq{HA7} & \textbf{(A7)}, \lbl{eq:Hstab}: $\lVert z_h\rVert_{\tau_1}\le\beta_0^{-1}(\lVert\Pi_{1,0}z_h\rVert_{\tau_1}+\lVert\Pi_1^\perp z_h\rVert_{\tau_1})$, squared form. The one new class-(I)/(G) item, with no ASGS counterpart & Stab; (G/I) \\
-\coq{Hdiag_expand}, \coq{Hmass}, \coq{HP1nex} & \lbl{eq:Diagonal} (the diagonal identity, from Lemma~2.1 $+$ the psd structure of $S_1,S_2$); the exact $\tau_2$ decomposition; projection nonexpansiveness & Stab; Green (G) \\
-\coq{HT1}--\coq{HT7} & the seven Step-3 term estimates of the special test function (each packaging \lbl{lem:smoothing} $+$ (K1)--(K3) $+$ CS) & Stab; estimates (I) \\
-\coq{HdecompI}, \coq{HI1}--\coq{HI7} & the $I_1$--$I_7$ grouping of $B_{\mathrm{osgs}}(\widehat E,V_h)$ and its seven interpolation bounds (\lbl{eq:NodalInterp} $+$ \lbl{lem:bestapprox} $+$ (P3)--(P6)) & Interp; estimates (I) \\
-\coq{HdecompC}, \coq{HS1}, \coq{HS2} & \lbl{eq:ConsistencyId} and the two consistency-slot bounds & Consist; estimates (I) \\
+\coq{gam_ge}, \coq{psi_le_18}, \coq{psi_le_b} & \lbl{(O1)} $\gamma\ge10(1+M_2)$ and $h\le h_0$ (i.e.\ $\psi\le\min(1/8,\beta_0^2/16)$) & Stab; data (D) \\
+\coq{HA7} & \textbf{(O2)}, \lbl{eq:ProjectionStability}: $\lVert z_h\rVert_{\tau_1}\le\beta_0^{-1}(\lVert\Pi_{1,0}z_h\rVert_{\tau_1}+\lVert\Pi_1^\perp z_h\rVert_{\tau_1})$, squared form. The one new class-(I)/(G) item, with no ASGS counterpart & Stab; (G/I) \\
+\coq{Hdiag_expand}, \coq{Hmass}, \coq{HP1nex} & \lbl{oa:eq:Diagonal} (the diagonal identity, from the coercivity identity \lbl{oa:eq:CoercivityIdentity} $+$ the psd structure of $S_1,S_2$); the exact $\tau_2$ decomposition; projection nonexpansiveness & Stab; Green (G) \\
+\coq{HT1}--\coq{HT7} & the seven Step-3 term estimates of the special test function (each packaging \lbl{oa:lem:smoothing} $+$ (K1)--(K3) $+$ CS) & Stab; estimates (I) \\
+\coq{HdecompI}, \coq{HI1}--\coq{HI7} & the $I_1$--$I_7$ grouping of $B_{\mathrm{osgs}}(\widehat E,V_h)$ and its seven interpolation bounds (\lbl{oa:eq:NodalInterp} $+$ \lbl{oa:lem:bestapprox} $+$ (P3)--(P6)) & Interp; estimates (I) \\
+\coq{HdecompC}, \coq{HS1}, \coq{HS2} & \lbl{oa:eq:ConsistencyId} and the two consistency-slot bounds & Consist; estimates (I) \\
 \coq{Hbilin} & bilinearity of $B_{\mathrm{osgs}}$ in its first argument (the analogue of \coq{Horth}) & Conv; Green (G) \\
 \coq{Hstab_lb}, \coq{HW_bound}, \coq{Hinterp}, \coq{Hcons}, \coq{Hinterpsize} & the conclusions of the four OSGS results, applied to $\eta$ / $(\widehat E,W)$ / $W$ (the composition inputs) & Conv; composition \\
 \bottomrule
@@ -1057,35 +1076,36 @@ and $|B_{\mathrm{osgs}}(U-U_h,V_h)|=2\le4$, both non-degenerate.
 So three of the OSGS bundles are provably \emph{consistent}. As with the ASGS
 witnesses, this settles consistency, not soundness --- that the finite element
 objects satisfy the hypotheses is the hand-audit direction, discharged for the
-ASGS chain in \file{AUDIT.md}~\S4 and, for the OSGS-specific items ((A7), the
-smoothing lemma, the best-approximation bounds), by the note's own proofs and its
+ASGS chain in \file{AUDIT.md}~\S4 and, for the OSGS-specific items ((O2), the
+smoothing lemma, the best-approximation bounds), by Appendix~D's own proofs and its
 provenance in~\cite{codina2001stabilized} and the Codina--Blasco argument.
 
 \subsection{Honest scoping of the OSGS chain}\label{sec:osgsscope}
 
-Following the note's own ``Honest scoping'' paragraph, the analysed OSGS method is
+Following Appendix~D's own ``Honest scoping'' discussion (\lbl{oa:sec:discussion}),
+the analysed OSGS method is
 a first-order-consistent simplification of the implemented one (the orthogonal
 projection is applied to the first-order part of the residual, the adjoint test
 slot is truncated, and the weighted product is the $\boldsymbol\tau$-weighted one);
-the annihilation lemma (Lemma~2.2) shows the reactive and compressibility
+the annihilation lemma (\lbl{oa:lem:annihilation}, Lemma~D.1) shows the reactive and compressibility
 contributions vanish identically under the projection, so the only neglected pieces
 are the viscous ones and the force fluctuation --- exactly Method~I of
 \cite{codina2001stabilized}'s orthogonal-subscales program. Within that scope, the
-kernel-checked content is: the entire parameter algebra of Lemma 3.1 (including the
-Damk\"ohler inequality (P5)), the norm comparison of Lemma 3.5, the coefficient
-collection and triple-norm recovery of the inf--sup Theorem 4.1, the assembly of
-the interpolation-continuity and consistency Lemmas 5.1--5.2, and the composition
-of Theorem 5.4 together with its two corollaries and the OSGS-norm triangle
+kernel-checked content is: the entire parameter algebra of Lemma D.3 (including the
+Damk\"ohler inequality (P5)), the norm comparison of Lemma D.8, the coefficient
+collection and triple-norm recovery of the inf--sup Theorem D.9, the assembly of
+the interpolation-continuity and consistency Lemmas D.11, D.13, and the composition
+of Theorem D.15 together with its two corollaries and the OSGS-norm triangle
 inequality. The named analytic trusted base of \S\ref{sec:osgsbase} --- the
-projection-stability condition (A7), the smoothing lemma, the seven test-function
+projection-stability condition (O2), the smoothing lemma, the seven test-function
 term estimates and the interpolation/consistency term bounds --- is the OSGS
 counterpart of the ASGS \emph{Class-G / Class-I} rows of Table~\ref{tab:inventory},
-at the granularity the special-test-function argument requires; the note derives
+at the granularity the special-test-function argument requires; Appendix~D derives
 each from textbook interpolation theory and the projection structure. As in
-\cite{codina2001stabilized}, (A7) is assumed rather than proved; the note indicates
+\cite{codina2001stabilized}, (O2) is assumed rather than proved; Appendix~D indicates
 how the Codina--Blasco argument verifies its unweighted counterpart for simplicial
-elements. What the analysis does \emph{not} cover is stated in the note's
-\lbl{rem:open}: the superior $L^2$ pressure convergence observed for $k\ge2$
+elements. What the analysis does \emph{not} cover is stated in Appendix~D's
+\lbl{oa:rem:open} (Remark~D.23): the superior $L^2$ pressure convergence observed for $k\ge2$
 (a duality argument), the lagged-projection staggered iteration, and the nonlinear
 problem.
 
@@ -1544,7 +1564,7 @@ anyone would cite is excluded.
 
 \emph{Exactly the manuscript's hypotheses --- and this was not always so.}
 An earlier revision of the development asked for $\sigma>0$, $\varepsilon>0$ and
-$C_2>0$ \emph{strictly}, where \lbl{H:data} and \lbl{eq:epscond} allow
+$C_2>0$ \emph{strictly}, where \lbl{H:data} and \lbl{eq:UpperBoundOnEpsilon} allow
 $\sigma\ge0$, $\varepsilon\ge0$ and $C_2\ge0$. The reaction-free case
 $\sigma=0$ --- pure Navier--Stokes, no Darcy term --- was therefore not
 literally an instance of the machine-checked theorems. That was an artefact, not
@@ -1586,7 +1606,7 @@ but it appears nowhere in \file{AbstractContinuity.v},
 \file{AbstractInterpolation.v} or \file{AbstractConvergence.v}. The reason is
 that those files prove the \emph{sharp}, porosity-weighted forms --- with the
 local weight $\aK$ retained: \lbl{eq:sharpcont} for continuity and
-interpolation, \lbl{rem:sharperconv} for convergence --- and the step that
+interpolation, \lbl{rem:sharper} for convergence --- and the step that
 discards the weight is exactly the step that needs $\aK\le1$. The abstract
 theorems are therefore strictly stronger than the manuscript's displayed
 estimates, and they need one hypothesis fewer.
@@ -1599,7 +1619,7 @@ Hypothesis Heps  : forall k, eps <= eps_max nu (hK k) (aK k) sigma (am k) c1 c2 
 \end{lstlisting}
 Both lines say the same thing --- \coq{eps_max} \emph{is} the right-hand side of
 the first --- and both are the elementwise (equivalently, infimum) form of the
-manuscript's \lbl{eq:epscond}:
+manuscript's \lbl{eq:UpperBoundOnEpsilon}:
 \begin{equation}\label{eq:epscond-here}
   \varepsilon \;\le\; C_2\,c_1 \min_{K\in\Th}
   \frac{\aK^{2}\,\tau_{1,K}}{h_K^{2}},\qquad 0\le C_2<1 .
@@ -1705,7 +1725,7 @@ Hypothesis H_jump :
 Hypothesis cJ_pos : 0 < cJ.   Hypothesis cJ_le_1 : cJ <= 1.
 Hypothesis one_le_cJ' : 1 <= cJ'.
 \end{lstlisting}
-This is \lbl{H:jump} (the manuscript's \lbl{eq:jumpcond}): for every interior face
+This is \lbl{H:jump} (the manuscript's \lbl{eq:JumpCondition}): for every interior face
 shared by $K_1,K_2$,
 \begin{equation}\label{eq:jumpcond-here}
   c_J\,\varphi_{1,K_1}\ \le\ \varphi_{1,K_2}\ \le\ c_J'\,\varphi_{1,K_1},
@@ -1849,11 +1869,11 @@ $\mathcal L_c^{*} = -\nabla\!\cdot(\alpha\mathbf u_h)+\varepsilon p_h$:
   - \sum_{K}\tau_{1,K}\bigl\langle \mathcal L_m^{*},\mathcal L_m\bigr\rangle_K
   - \sum_{K}\tau_{2,K}\bigl\langle \mathcal L_c^{*},\mathcal L_c\bigr\rangle_K .
 \end{equation}
-This is the manuscript's stability display \lbl{eq:StabilityEstimate} taken at
-its \emph{first} line,
+This is the manuscript's stabilised bilinear form \lbl{eq:Bstab} evaluated on
+the diagonal,
 $B_S(\mathbf a;U_h,U_h)=B(\mathbf a;U_h,U_h)-\sum_K\langle\mathcal L^{*}U_h,
-\boldsymbol\tau\mathcal LU_h\rangle$, composed with the Galerkin identity that
-precedes it in the manuscript,
+\boldsymbol\tau\mathcal LU_h\rangle$, composed with the Galerkin coercivity
+identity \lbl{eq:GalerkinCoercivityIdentity} that precedes it in the manuscript,
 \begin{equation}\label{eq:galerkin-here}
   B(\mathbf a;U_h,U_h)
   = 2\nu\bigl\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\bigr\rVert^2
@@ -1931,7 +1951,7 @@ the reason to care is the reconciliation, not the count.
 
 \emph{Role.} It is the \emph{starting line} of the stability proof. Everything
 downstream is proved in Coq \emph{from} \eqref{eq:HBS-here} --- including, it is
-worth stressing, the rest of \lbl{eq:StabilityEstimate} itself: the
+worth stressing, the difference-of-squares diagonal \lbl{eq:stabdiag1} itself: the
 manuscript's displayed right-hand side, the difference-of-squares form
 $\dots+\lVert\tau_1^{1/2}\alpha\mathcal X(U_h)\rVert_h^2
 -\lVert\tau_1^{1/2}G(\mathbf u_h)\rVert_h^2
@@ -2516,7 +2536,7 @@ every interior face $\Gamma$ shared by $K_1,K_2$,
 face; (ii) the face-measure bound $\operatorname{meas}(\Gamma)\le C\,h_K^{d-1}$
 (\lbl{H:mesh}); (iii) the $L^\infty$ inverse estimate
 $\lVert\psi_h\rVert_{L^\infty(K)}\le \Cinv h_K^{-d/2}\lVert\psi_h\rVert_K$
-(\lbl{eq:inverse}) applied on \emph{both} neighbours --- replaced, on the
+(\lbl{eq:InverseEstimateFiniteOrderNorm}) applied on \emph{both} neighbours --- replaced, on the
 first-argument side in \file{AbstractInterpolation.v}, by the $L^\infty$
 interpolation estimate \lbl{eq:interpinftyE}; (iv) $\alpha\le\alpha_K$ on the
 face; and (v) the comparability of neighbouring diameters (\lbl{H:mesh}). All
@@ -2563,7 +2583,7 @@ assumes only positivity together with \lbl{H:data}'s $\sigma,\varepsilon,C_2\ge0
 premises of \coq{stability_constants_positive_sharp};
 \file{ContinuityAlgebra.v} adds $\aK\le1$ (\coq{alphaK_le_1} --- the one
 hypothesis the abstract files shed, \S\ref{sec:stratumD}), the
-$\varepsilon$-condition (\coq{eps_le}, which \emph{is} \lbl{eq:epscond}),
+$\varepsilon$-condition (\coq{eps_le}, which \emph{is} \lbl{eq:UpperBoundOnEpsilon}),
 $C_2<1$, the jump bounds of \lbl{H:jump} (\coq{jump_low}, \coq{jump_high}) and
 the porosity-resolution increment of \lbl{H:porosity} (\coq{increment}). Every
 one of these has already been audited above as a Class-D item; they reappear
@@ -2598,7 +2618,7 @@ joint limit $(\Reh,\Dah)\to(\infty,\infty)$, and none is claimed.
 
 \emph{(3) The Fourier design of $\tau$ is a design computation, faithfully
 formalised --- not a proof of optimality.} \file{TauDesign.v} certifies the
-symbol algebra of Appendix~C exactly: the viscous spectrum
+symbol algebra of Appendix~B exactly: the viscous spectrum
 $\tfrac43\alpha\nu|k|^2$ and $\alpha\nu|k|^2$, the convective spectral radius
 $(\alpha/h)|w\!\cdot\!k|$, the coupling spectrum $\{0,\pm|k|\}$, and the
 uniqueness of the positive pair solving $XY=c^2$, $X/Y=\lambda$. What it does
@@ -2723,7 +2743,7 @@ mentions it.
 5 & \coq{c2_pos} (D) & $c_2>0$ & S,C,I,V; everywhere \\
 6 & \coq{C2_nonneg} (D) & $C_2\ge0$ & S,C,I,V; (P5), Steps~3,\,7 \\
 7 & \coq{C2_lt_1} (D) & $C_2<1$ & S,C,I,V; (P5) (\coq{L_P5}); the $1-C_2$ branch of $\Cstab$ \\
-8 & \coq{Cinv_pos} (D) & $\Cinv>0$ \quad(constant of \lbl{eq:inverse}) & C,I,V; carried by the \coq{Hw_*} \\
+8 & \coq{Cinv_pos} (D) & $\Cinv>0$ \quad(constant of \lbl{eq:InverseEstimateFiniteOrderNorm}) & C,I,V; carried by the \coq{Hw_*} \\
 9 & \coq{Cb_pos} (D) & $\Cbar>0$ \quad(constant of \lbl{lem:winv}) & S,C,I,V; carried by \coq{S3}, \coq{Hw_du/dv} \\
 10 & \coq{cJ_pos} (D) & $c_J>0$ & C,I,V; \lbl{lem:jump} (\coq{F_base}) \\
 11 & \coq{cJ_le_1} (D) & $c_J\le1$ & C,I,V; \lbl{lem:jump} (\coq{F_base}) \\
@@ -2736,7 +2756,7 @@ mentions it.
 18 & \coq{am_nonneg} (D) & $|\mathbf a|_{\infty,K}\ge0$ for every $K\in\Th$ (it is a norm) & S,C,I,V; Steps~5,\,9 \\
 19 & \coq{xi_large} (D) & $\xi>2$ \quad(Young parameter; \lbl{eq:conditions_on_num_param}) & S,V; $\Cstab>0$ (\coq{stability_constants_positive_sharp}) \\
 20 & \coq{c1_large} (D) & $c_1>\xi\,\Cbar^{2}$ \quad(the \emph{sharp} form; the manuscript's $c_1>2\xi\Cbar^2$ implies it and additionally buys the margin of \coq{C_stab_margin}) & S,V; $\Cstab>0$, \emph{and nowhere else} \\
-21 & \coq{H_eps} / \coq{Heps} (D) & $\displaystyle \varepsilon \;\le\; C_2\,c_1\,\frac{\aK^{2}\,\tau_{1,K}}{h_K^{2}}$ \ for every $K\in\Th$ \quad(\lbl{eq:epscond}; the two spellings are definitionally equal) & S,C,I,V; (P5), Steps~3,\,7,\,9 \\
+21 & \coq{H_eps} / \coq{Heps} (D) & $\displaystyle \varepsilon \;\le\; C_2\,c_1\,\frac{\aK^{2}\,\tau_{1,K}}{h_K^{2}}$ \ for every $K\in\Th$ \quad(\lbl{eq:UpperBoundOnEpsilon}; the two spellings are definitionally equal) & S,C,I,V; (P5), Steps~3,\,7,\,9 \\
 22 & \coq{H_jump} (D) & $c_J\,\varphi_{1,K_1}\le\varphi_{1,K_2}\le c_J'\,\varphi_{1,K_1}$ \ for every interior face $\Gamma$ \quad(\lbl{H:jump}; needed only when $\sigma>0$) & C,I,V; \lbl{lem:jump}, Steps~6b,\,6d \\
 23 & \coq{H_mult1} (D) & $\displaystyle \sum_{\Gamma}g\bigl(K_1(\Gamma)\bigr)\;\le\;N_f\sum_{K\in\Th}g(K)$ \ for every $g\ge0$ \quad(bounded face multiplicity, \emph{and} conformity: $K_i(\Gamma)\in\Th$; \lbl{H:mesh}) & C,I,V; Steps~6b,\,6d (\coq{bound_JmpP}, \coq{bound_III}) \\
 24 & \coq{H_mult2} (D) & the same with $K_2(\Gamma)$ & C,I,V; Steps~6b,\,6d \\
@@ -2772,7 +2792,7 @@ mentions it.
 46 & \coq{HI_divu} (I) & $\lVert\nabla\!\cdot(\alpha\mathbf e_{\mathbf u})\rVert_K\le C_I\,\aK\,h_K^{-1}E_{\mathrm{int},K}(\mathbf u)$ & I,V; Step~9 \\
 47 & \coq{HI_uu} (I) & $\lVert\mathbf e_{\mathbf u}\rVert_K\le C_I\,E_{\mathrm{int},K}(\mathbf u)$ \quad(\lbl{eq:interpzero}; \emph{no} \coq{Hw_} counterpart --- a discrete field needs no zeroth-order bound) & I,V; Steps~6c,\,9 \\
 48 & \coq{HI_pp} (I) & $\lVert e_p\rVert_K\le C_I\,E_{\mathrm{int},K}(p)$ \quad(\lbl{eq:interpzero}; likewise) & I,V; Steps~6b,\,9 \\
-49 & \coq{H_face_p} (I,G) & $\displaystyle\Bigl|\int_\Gamma\alpha\,(\mathbf n\!\cdot\!\mathbf v)\,p\Bigr|\le C_{\mathrm{face}}\!\!\sum_{i,j\in\{1,2\}}\!\!\frac{\alpha_{K_j}}{h_{K_j}}\lVert\mathbf v\rVert_{K_i}\,\pi_j$, \ with $\pi_j=\lVert p_h\rVert_{K_j}$ in \textbf{C} and $\pi_j=E_{\mathrm{int},K_j}(p)$ in \textbf{I},\textbf{V}. \emph{Bundles five facts}: H\"older on $\Gamma$, $\mathrm{meas}(\Gamma)\le Ch_K^{d-1}$, the $L^\infty$ inverse estimate \lbl{eq:inverse} (resp.\ the $L^\infty$ interpolation estimate \lbl{eq:interpinftyE}), $\alpha\le\aK$, and comparability of neighbouring diameters & C,I,V; Step~6b (\coq{face6b}). \textbf{The coarsest bundle} (\S\ref{sec:stratumI}) \\
+49 & \coq{H_face_p} (I,G) & $\displaystyle\Bigl|\int_\Gamma\alpha\,(\mathbf n\!\cdot\!\mathbf v)\,p\Bigr|\le C_{\mathrm{face}}\!\!\sum_{i,j\in\{1,2\}}\!\!\frac{\alpha_{K_j}}{h_{K_j}}\lVert\mathbf v\rVert_{K_i}\,\pi_j$, \ with $\pi_j=\lVert p_h\rVert_{K_j}$ in \textbf{C} and $\pi_j=E_{\mathrm{int},K_j}(p)$ in \textbf{I},\textbf{V}. \emph{Bundles five facts}: H\"older on $\Gamma$, $\mathrm{meas}(\Gamma)\le Ch_K^{d-1}$, the $L^\infty$ inverse estimate \lbl{eq:InverseEstimateFiniteOrderNorm} (resp.\ the $L^\infty$ interpolation estimate \lbl{eq:interpinftyE}), $\alpha\le\aK$, and comparability of neighbouring diameters & C,I,V; Step~6b (\coq{face6b}). \textbf{The coarsest bundle} (\S\ref{sec:stratumI}) \\
 50 & \coq{H_face_c} (I,G) & $\displaystyle\Bigl|\int_\Gamma\alpha\,(\mathbf n\!\cdot\!\mathbf a)(\mathbf u\!\cdot\!\mathbf v)\Bigr|\le C_{\mathrm{face}}\!\!\sum_{i,j\in\{1,2\}}\!\!\frac{\alpha_{K_j}|\mathbf a|_{\infty,K_j}}{h_{K_j}}\,\mu_i\,\lVert\mathbf v\rVert_{K_j}$, \ with $\mu_i=\lVert\mathbf u_h\rVert_{K_i}$ in \textbf{C} and $\mu_i=E_{\mathrm{int},K_i}(\mathbf u)$ in \textbf{I},\textbf{V}; same five ingredients as item~49 & C,I,V; Step~6d (\coq{face6d}) \\
 \end{longtable}
 
@@ -3150,7 +3170,7 @@ $\xi>0$ (\coq{xi_pos}) alongside $\xi>2$
 $\aK\le1$ \emph{not} assumed
   & ---
   & Not a gap but a bonus: the abstract theorems prove the sharp
-    porosity-weighted forms (\lbl{eq:sharpcont}, \lbl{rem:sharperconv}), which
+    porosity-weighted forms (\lbl{eq:sharpcont}, \lbl{rem:sharper}), which
     do not need it. \\
 
 Non-vacuity (\S\ref{sec:vacuity})
@@ -3219,7 +3239,7 @@ against the manuscript in \file{AUDIT.md}~\S4.
 \textbf{Coq hypothesis} & \textbf{Paper} & \textbf{Class} & \textbf{Status} \\
 \midrule \endhead
 \coq{S3} & \lbl{eq:winv-divvisc} (\lbl{lem:winv}) & I & hand-audited \\
-\coq{Heps}, \coq{H_eps} & \lbl{eq:UpperBoundOnEpsilon} / \lbl{eq:epscond} & D & assumption \\
+\coq{Heps}, \coq{H_eps} & \lbl{eq:UpperBoundOnEpsilon} & D & assumption \\
 \coq{H_skew} & \lbl{eq:skew}, identity (i) & G & hand-audited \\
 \coq{H_ibp_vp}, \coq{H_ibp_qu} & \lbl{eq:globalibp}, identity (ii) & G & hand-audited \\
 \coq{H_skew_diag}, \coq{H_ibp_diag} & \lbl{eq:skew}/\lbl{eq:globalibp} on the \emph{diagonal}; they replace both former tested-identity items: \coq{HBS} is \emph{proved} from them, and \coq{HBS_W} needs no item at all & G & hand-audited \\
@@ -3227,12 +3247,12 @@ against the manuscript in \file{AUDIT.md}~\S4.
 \coq{H_face_p}, \coq{H_face_c} & \lbl{eq:jumpest}/face estimates: H\"older $+$ $\mathrm{meas}\le Ch^{d-1}$ $+$ $L^\infty$ inverse $+$ $\alpha\le\aK$ & I,G & hand-audited \\
 \coq{H_jump} & \lbl{H:jump} & D & assumption \\
 \coq{H_mult1}, \coq{H_mult2} & bounded face multiplicity (\lbl{H:mesh}) & D & assumption \\
-\coq{Hw_gu} \dots \coq{Hw_divu} (8) & weighted inverse estimates of \lbl{lem:winv} (\lbl{eq:inverse}); \lbl{lem:continterp} keeps only the three V-side ones & I & hand-audited \\
+\coq{Hw_gu} \dots \coq{Hw_divu} (8) & weighted inverse estimates of \lbl{lem:winv} (\lbl{eq:InverseEstimateFiniteOrderNorm}); \lbl{lem:continterp} keeps only the three V-side ones & I & hand-audited \\
 \coq{HI_gu} \dots \coq{HI_pp} (7) & interpolation estimates \lbl{eq:interp}/\lbl{eq:interpinfty} via the replacement table \lbl{eq:interpdivvisc}--\lbl{eq:interpzero} (Bramble--Hilbert) & I & hand-audited \\
 \coq{Horth} & Galerkin orthogonality \lbl{eq:consistency} $+$ bilinearity of $B_S$ in its first argument & G & hand-audited \\
 \midrule
 \multicolumn{4}{@{}l}{\emph{No longer in the base (were hypotheses at the previous revision; now theorems):}}\\
-\coq{HBS} & now \emph{proved} from \coq{H_skew_diag}/\coq{H_ibp_diag}: the Galerkin/adjoint identity (\lbl{eq:StabilityEstimate} testing) at the diagonal (\S\ref{sec:stratumG}, G1) & --- & \textbf{discharged} \\
+\coq{HBS} & now \emph{proved} from \coq{H_skew_diag}/\coq{H_ibp_diag}: the Galerkin/adjoint identity (\lbl{eq:coercivity} testing) at the diagonal (\S\ref{sec:stratumG}, G1) & --- & \textbf{discharged} \\
 \coq{HBS_W} & \emph{eliminated}: \coq{abstract_stability}, applied at the $W$ atoms, carries the tested identity (\S\ref{sec:stratumG}, G1) & --- & \textbf{discharged} \\
 \coq{H_elem_conv_ibp}, \coq{H_elem_p_ibp} & now \emph{proved}: their face terms are \coq{Definition}s, the integration-by-parts defect (\S\ref{sec:stratumG}, G5) & --- & \textbf{discharged} \\
 \coq{IU_nonneg}, \coq{IP_nonneg} & now \emph{proved}: with $\lVert\cdot\rVert\ge0$ and $C_I>0$, \coq{HI_uu}/\coq{HI_pp} force them --- a \emph{trade}, since it strengthens item~15 to \coq{CI_pos} (\S\ref{sec:inventory}) & --- & \textbf{discharged} \\
@@ -3242,7 +3262,7 @@ against the manuscript in \file{AUDIT.md}~\S4.
 \noindent
 Interface integrity is itself machine-checked: stability's
 inverse-estimate input is literally the hypothesis \coq{Hw_dv}, its
-$\varepsilon$-condition is definitionally \lbl{eq:epscond}
+$\varepsilon$-condition is definitionally \lbl{eq:UpperBoundOnEpsilon}
 (\coq{Heps_W}), and the $\tau_1,\tau_2,\sigt$ formulas of the two
 scalar-algebra modules are proved to agree
 (\coq{tau1_agree}/\coq{tau2_agree}/\coq{sigt_agree}), so the composed
@@ -3342,7 +3362,7 @@ the manuscript's \verb|\amend{}| review macro.
 \midrule \endhead
 F1 & \lbl{H:advection} now grants $\mathbf a|_K\in W^{1,\infty}(K)^d$ elementwise (with the localisation of $\nabla\!\cdot(\alpha\mathbf a)=0$ to each $K$), which identity (iii)/\lbl{eq:elemibp} --- the Coq hypothesis \coq{H_elem_conv_ibp} --- actually uses. & applied \\
 F2 & \lbl{H:porosity}'s derived bound $\alpha_{\infty,K}\le\delta_\alpha\alpha_{0,K}$ now states the element-convexity it relies on (matching \coq{delta_alpha_bound}/\coq{winv_ratio}). & applied \\
-F3 & the two previously-unlabelled coefficient displays after \lbl{eq:UpperBoundOnEpsilon} now carry stable labels \lbl{eq:ViscousCoefficientBound} and \lbl{eq:VelocityCoefficientBound} (the anchors of \coq{visc_final}/\coq{u_855}); the SymPy headers were updated to match. & applied \\
+F3 & the coefficient displays of the stability estimate --- the viscous and velocity coefficients that anchor \coq{visc_final}/\coq{u_855} --- carry stable labels; in \file{article_v2.tex} they were relocated into the collected coercivity bound \lbl{eq:coerccollect} (with the viscous-absorption step \lbl{eq:viscabsorb}) of Appendix~C's \lbl{lem:coercivity}, and the SymPy headers were updated to match. & applied \\
 F4 & the main-text triple norm now writes the elementwise-weighted term $\lVert\sigt_\alpha^{1/2}\mathbf u_h\rVert_h^2$ with the broken-norm subscript, matching \lbl{eq:triplenorm}. & applied \\
 F6 & a remark after \lbl{eq:Tau2Final} records that the analysis $\tau_2$ and the implemented \lbl{eq:Tau2} are equivalent up to $1+C_2<2$ (machine-checked: \coq{tau2impl_le_tau2}, \coq{tau2_le_scaled_impl}). & applied \\
 F7 & a clause notes that the coefficient bounds are written for $\aK=\alpha_{\infty,K}$; other representatives cost factors of $\delta_\alpha$. & applied \\
@@ -3427,7 +3447,7 @@ $\tau_1,\tau_2,\sigt$ identities, the coefficient expansions, the Fourier and
 coupling spectra, the asymptotic limits, the manufactured-solution divergence
 identity, and the plateau bump's $C^1$ behaviour. Under the Class-D conditions
 of \S\ref{sec:stratumD} as \emph{explicit premises} --- $\varepsilon\le
-\varepsilon_{\max}$ (\lbl{eq:epscond}), $c_1>\xi\Cbar^2$ with $\xi>2$ (sharp; the
+\varepsilon_{\max}$ (\lbl{eq:UpperBoundOnEpsilon}), $c_1>\xi\Cbar^2$ with $\xi>2$ (sharp; the
 manuscript's $2\xi\Cbar^2$ additionally buys the \coq{C_stab_margin} floor),
 $C_2<1$, $\aK\le1$, the jump bounds of \lbl{H:jump} --- the $\varepsilon$-smallness
 chain, the coefficient lower bounds, and the parameter and jump inequalities. &
@@ -3514,7 +3534,7 @@ The same is now true of the OSGS variant (\S\ref{sec:osgs}): its parameter
 algebra, norm comparison, inf--sup collection, interpolation/consistency assembly
 and convergence composition are machine-checked, over a named analytic trusted
 base (\S\ref{sec:osgsbase}) whose one addition over the ASGS list is the
-projection-stability condition (A7) --- against two ASGS hypotheses the OSGS route
+projection-stability condition (O2) --- against two ASGS hypotheses the OSGS route
 dispenses with --- and three of its bundles are machine-witnessed consistent.
 
 % =====================================================================
@@ -3567,9 +3587,10 @@ purpose; on Rocq~9 it merely emits a deprecation notice in favour of
 mapping: \file{README.md} in the \file{coq-formal/} directory. The step-by-step
 audit of the analytic steps and the F1--F8 findings: \file{AUDIT.md}. The Lean~4
 plan for the residual base: \file{LEAN_ROADMAP.md} and \file{PorousNSToolbox.lean}.
-The authoritative theory: \file{theory/paper/article.tex} and its appendices
-(\file{continuity_appendix.tex}, \file{fourier_appendix.tex},
-\file{elemental_matrices_appendix.tex}).
+The authoritative theory: \file{theory/paper/article_v2.tex} and its appendices
+(\file{elemental_matrices_appendix.tex} = App.~A, \file{fourier_appendix.tex} = App.~B,
+\file{continuity_appendix.tex} = App.~C, \file{osgs_appendix.tex} = App.~D), the last
+mirroring the companion note \file{theory/osgs_a_priori/osgs_convergence.tex}.
 
 % =====================================================================
 \begin{thebibliography}{9}
