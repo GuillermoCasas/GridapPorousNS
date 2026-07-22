@@ -1708,7 +1708,7 @@ We compare three discretizations on the same sequence of structured triangular m
 
 \begin{table}[!htbp]
     \centering
-    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$ is the unstabilized Galerkin Taylor{\hyp}Hood element. \amend{The optimal slope is given in parentheses next to each observed value: $k_v+1$ for the velocity, and for the pressure $k_p$ for the equal{\hyp}order pairs and $k_p+1$ for the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair.} \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text).}
+    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$~TH is the unstabilized Galerkin Taylor{\hyp}Hood element\amend{, and $\mathbb{P}_2/\mathbb{P}_1$~ASGS is the \emph{same} inf{\hyp}sup{\hyp}stable pair with the residual stabilization active (a convection{\hyp}stabilized Taylor{\hyp}Hood control, so that the effect of the stabilization can be separated from that of the velocity{\hyp}pressure pair)}. \amend{The optimal slope is given in parentheses next to each observed value: $k_v+1$ for the velocity, and for the pressure $k_p$ for the equal{\hyp}order pairs and $k_p+1$ for the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair.} \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text).}
     \begin{tabular}{c c l r r r r}
     \toprule
     & & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
@@ -1720,6 +1720,7 @@ We compare three discretizations on the same sequence of structured triangular m
         &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.18}~(3) & \num{3.42e-7} & \num{2.02}~(2) & \num{1.83e-4} \\
         &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.02}~(3) & \num{2.88e-7} & \num{1.90}~(2) & \num{1.77e-4} \\
         &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{3.24}~(3) & \num{2.85e-7} & \num{2.92}~(2) & \num{4.17e-6} \\
+        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{3.01}~(3)} & \amend{\num{3.12e-6}} & \amend{\num{2.82}~(2)} & \amend{\num{3.52e-5}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{2.00}} & \amend{\num{3.26e-5}} & \amend{\num{2.00}} & \amend{\num{9.84e-6}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{2.99}} & \amend{\num{2.86e-7}} & \amend{\num{3.00}} & \amend{\num{8.60e-9}} \\
     \midrule
@@ -1728,6 +1729,7 @@ We compare three discretizations on the same sequence of structured triangular m
         &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.10}~(3) & \num{2.44e-6} & \num{2.04}~(2) & \num{1.18e-3} \\
         &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.03}~(3) & \num{1.85e-6} & \num{1.80}~(2) & \num{1.10e-3} \\
         &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{2.97}~(3) & \num{1.83e-6} & \num{3.73}~(2) & \num{9.52e-6} \\
+        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{2.84}~(3)} & \amend{\num{2.12e-5}} & \amend{\num{2.85}~(2)} & \amend{\num{2.97e-4}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{1.99}} & \amend{\num{1.13e-4}} & \amend{\num{2.00}} & \amend{\num{9.84e-6}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{2.99}} & \amend{\num{1.82e-6}} & \amend{\num{3.00}} & \amend{\num{8.60e-9}} \\
     \midrule
@@ -1736,6 +1738,7 @@ We compare three discretizations on the same sequence of structured triangular m
            &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.02}~(3) & \num{4.20e-7} & \num{2.86}~(2) & \num{9.95e-8} \\
            &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.04}~(3) & \num{4.23e-7} & \num{3.05}~(2) & \num{1.07e-7} \\
            &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{5.14e-1} & \num{2.00}~(2) & \num{9.84e-6} \\
+        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{2.41}~(3)} & \amend{\num{2.87e-5}} & \amend{\num{2.01}~(2)} & \amend{\num{1.61e-5}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{2.00}} & \amend{\num{3.26e-5}} & \amend{\num{2.00}} & \amend{\num{9.84e-6}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{2.99}} & \amend{\num{2.86e-7}} & \amend{\num{3.00}} & \amend{\num{8.60e-9}} \\
     \midrule
@@ -1744,6 +1747,7 @@ We compare three discretizations on the same sequence of structured triangular m
            &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.98}~(3) & \num{2.70e-6} & \num{2.73}~(2) & \num{5.96e-7} \\
            &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.00}~(3) & \num{2.72e-6} & \num{3.00}~(2) & \num{6.87e-7} \\
            &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.02e-1} & \num{2.00}~(2) & \num{9.84e-6} \\
+        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{3.00}~(3)} & \amend{\num{2.18e-5}} & \amend{\num{2.53}~(2)} & \amend{\num{4.81e-6}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{1.99}} & \amend{\num{1.13e-4}} & \amend{\num{2.00}} & \amend{\num{9.84e-6}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{2.99}} & \amend{\num{1.82e-6}} & \amend{\num{3.00}} & \amend{\num{8.60e-9}} \\
     \bottomrule
@@ -1765,6 +1769,7 @@ We compare three discretizations on the same sequence of structured triangular m
         &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.08}~(2) & \num{7.12e-4} & \num{0.98}~(1) & \num{5.10e-1} \\
         &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01}~(2) & \num{6.62e-4} & \num{0.91}~(1) & \num{4.98e-1} \\
         &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.99}~(2) & \num{6.59e-4} & \num{1.05}~(1) & \num{1.09e-2} \\
+        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{2.00}~(2)} & \amend{\num{3.06e-3}} & \amend{\num{1.61}~(1)} & \amend{\num{2.27e-2}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{1.00}} & \amend{\num{3.50e-2}} & \amend{\num{1.00}} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{1.99}} & \amend{\num{6.59e-4}} & \amend{\num{2.00}} & \amend{\num{2.11e-5}} \\
     \midrule
@@ -1773,6 +1778,7 @@ We compare three discretizations on the same sequence of structured triangular m
         &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.04}~(2) & \num{4.78e-3} & \num{0.97}~(1) & \num{3.24} \\
         &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01}~(2) & \num{4.23e-3} & \num{0.82}~(1) & \num{3.08} \\
         &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.98}~(2) & \num{4.19e-3} & \num{1.48}~(1) & \num{1.10e-2} \\
+        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{1.89}~(2)} & \amend{\num{2.02e-2}} & \amend{\num{3.15}~(1)} & \amend{\num{4.70e-2}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{0.99}} & \amend{\num{1.21e-1}} & \amend{\num{1.00}} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{1.99}} & \amend{\num{4.19e-3}} & \amend{\num{2.00}} & \amend{\num{2.11e-5}} \\
     \midrule
@@ -1781,6 +1787,7 @@ We compare three discretizations on the same sequence of structured triangular m
            &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.06}~(2) & \num{1.02e-3} & \num{1.84}~(1) & \num{2.47e-4} \\
            &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.07}~(2) & \num{1.02e-3} & \num{2.01}~(1) & \num{2.64e-4} \\
            &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{6.34}    & \num{1.00}~(1) & \num{1.09e-2} \\
+        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{1.26}~(2)} & \amend{\num{3.68e-2}} & \amend{\num{1.00}~(1)} & \amend{\num{2.18e-2}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{1.00}} & \amend{\num{3.50e-2}} & \amend{\num{1.00}} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{1.99}} & \amend{\num{6.59e-4}} & \amend{\num{2.00}} & \amend{\num{2.11e-5}} \\
     \midrule
@@ -1789,6 +1796,7 @@ We compare three discretizations on the same sequence of structured triangular m
            &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.01}~(2) & \num{6.59e-3} & \num{1.66}~(1) & \num{1.46e-3} \\
            &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.04}~(2) & \num{6.60e-3} & \num{1.93}~(1) & \num{1.68e-3} \\
            &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.96}    & \num{1.00}~(1) & \num{1.09e-2} \\
+        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{1.65}~(2)} & \amend{\num{3.14e-2}} & \amend{\num{1.00}~(1)} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{0.99}} & \amend{\num{1.21e-1}} & \amend{\num{1.00}} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{1.99}} & \amend{\num{4.19e-3}} & \amend{\num{2.00}} & \amend{\num{2.11e-5}} \\
     \bottomrule
@@ -1798,7 +1806,7 @@ We compare three discretizations on the same sequence of structured triangular m
 
 \paragraph{\amend{Viscosity{\hyp}dominated flows}} In this regime ($\Reyn = 1$) the three discretizations behave alike: the velocity converges at the optimal rate for all of them and at both porosities, and the equal{\hyp}order stabilized method matches the accuracy of the more elaborate Taylor{\hyp}Hood pair in the velocity, with the inf{\hyp}sup{\hyp}stable pair being more accurate in the pressure, as befits a discretization with a dedicated pressure space. As in the previous examples, the ASGS and OSGS variants are practically indistinguishable. \amend{Lowering $\alpha_0$ from $0.5$ to $0.1$ degrades the accuracy: the velocity error grows in step with its interpolation reference, while the $L^2$ pressure error grows by about a factor of six---some $2.8$ times the factor $\alpha_0^{-1/2}\approx2.2$ that the porosity weight of \cref{sec:Robustness} predicts on its own. The excess is carried by the velocity{\hyp}error coupling that the same estimate contains (the $\tau_2^{1/2}\mathrm{E}_{\textup{int}}(\boldsymbol{u})$ term, whose interpolation error grows at low porosity), just as in the two{\hyp}dimensional experiments of \cref{sec:NumericalExamplesStationaryCase2D}, where the same excess over $\alpha_0^{-1/2}$ appears at \emph{fixed} $\Damk$. The porosity is not cleanly isolated here---\cref{eq:CocquetMMSReaction} ties $\Damk$ to $\alpha_0$, raising it from $\approx2$ to $\approx40$ as $\alpha_0$ falls---but that stronger drag would, by the mitigation factor of \cref{eq:DominantReactionPressureGradientEstimate}, if anything \emph{reduce} the pressure error, so it does not account for the growth observed.}
 
-\paragraph{\amend{Convection{\hyp}dominated flows}} This regime ($\Reyn = 10^5$) is where the two approaches part ways. The unstabilized Taylor{\hyp}Hood velocity fails to converge: although the $\mathbb{P}_2/\mathbb{P}_1$ pair is inf{\hyp}sup stable, the Galerkin form provides no control over the dominant convective term, and the velocity error stagnates at an $O(1)$ value on every mesh (marked \emph{n.c.}\ in the tables); \amend{its pressure nonetheless remains on the interpolation benchmark at the optimal $L^2$ rate---notable, since the standard mixed a priori estimate would let a non-convergent velocity pollute it}. The equal{\hyp}order stabilized method, in contrast, retains optimal velocity and pressure convergence at $\alpha_0 = 0.5$, which is precisely the robustness that the stabilization is designed to provide. At the most demanding corner, $(\Reyn,\alpha_0) = (10^5, 0.1)$, the combination of strong drag and high Reynolds number prevents the tested nonlinear solvers from converging on the coarser meshes: the stabilized nonlinear iteration does not converge there (whether a discrete root is absent or merely hard to reach is not determined here), but once these are refined enough to resolve the solution (the two finest meshes here) it recovers accurate solutions, whereas Taylor{\hyp}Hood does not converge at this corner either. The tabulated slopes at this corner are therefore two{\hyp}mesh estimates in a pre{\hyp}asymptotic range and should be read as such; the pertinent observation is that the stabilized method delivers an accurate solution there while the unstabilized one does not.
+\paragraph{\amend{Convection{\hyp}dominated flows}} This regime ($\Reyn = 10^5$) is where the two approaches part ways. The unstabilized Taylor{\hyp}Hood velocity fails to converge: although the $\mathbb{P}_2/\mathbb{P}_1$ pair is inf{\hyp}sup stable, the Galerkin form provides no control over the dominant convective term, and the velocity error stagnates at an $O(1)$ value on every mesh (marked \emph{n.c.}\ in the tables); \amend{its pressure nonetheless remains on the interpolation benchmark at the optimal $L^2$ rate---notable, since the standard mixed a priori estimate would let a non-convergent velocity pollute it}. The equal{\hyp}order stabilized method, in contrast, retains optimal velocity and pressure convergence at $\alpha_0 = 0.5$, which is precisely the robustness that the stabilization is designed to provide. \amend{To confirm that this gain comes from the residual stabilization rather than from the choice of velocity{\hyp}pressure pair, we also apply the ASGS stabilization to the \emph{same} inf{\hyp}sup{\hyp}stable $\mathbb{P}_2/\mathbb{P}_1$ pair ($\mathbb{P}_2/\mathbb{P}_1$~ASGS in the tables): it converges at optimal velocity and pressure rates at $\Reyn=10^5$, exactly where the unstabilized Taylor{\hyp}Hood pair stagnates. In the viscosity{\hyp}dominated regime, by contrast, this stabilized Taylor{\hyp}Hood control is about an order of magnitude \emph{less} accurate than the unstabilized one---the residual stabilization, calibrated for the equal{\hyp}order (inf{\hyp}sup{\hyp}unstable) case, is a redundant perturbation on an already stable pair. The high{\hyp}Reynolds gain is therefore attributable to the convection stabilization itself, not to the equal{\hyp}order spaces.} At the most demanding corner, $(\Reyn,\alpha_0) = (10^5, 0.1)$, the combination of strong drag and high Reynolds number prevents the tested nonlinear solvers from converging on the coarser meshes: the stabilized nonlinear iteration does not converge there (whether a discrete root is absent or merely hard to reach is not determined here), but once these are refined enough to resolve the solution (the two finest meshes here) it recovers accurate solutions, whereas Taylor{\hyp}Hood does not converge at this corner either. The tabulated slopes at this corner are therefore two{\hyp}mesh estimates in a pre{\hyp}asymptotic range and should be read as such; the pertinent observation is that the stabilized method delivers an accurate solution there while the unstabilized one does not.
 
 Overall, the equal{\hyp}order stabilized method attains \amend{comparable velocity accuracy to} the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood element \amend{in the reported DBF cases---Taylor{\hyp}Hood being more accurate in the pressure where it converges, i.e.\ in the viscosity{\hyp}dominated regime---}without requiring a compatible velocity{\hyp}pressure pair, and it remains robust in the convection{\hyp}dominated regime in which the unstabilized Galerkin method loses stability. \amend{This comparison does not isolate the effect of the element pair, since the equal{\hyp}order method additionally carries residual convection stabilization that is absent from the Taylor{\hyp}Hood comparator.}
 
