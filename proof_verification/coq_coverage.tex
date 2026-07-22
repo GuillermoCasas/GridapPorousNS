@@ -1026,6 +1026,12 @@ $B_{\mathrm{osgs}}$ in its first argument (\coq{Hbilin}), the analogue of the AS
 \bottomrule
 \end{longtable}
 
+\noindent Coq keeps the right-hand side as the abstract functional $E(h)=\Psi_{\mathrm O}(h)$; the
+manuscript's \emph{closed-form} version of this corollary --- which unfolds $\sigma^{-1}\Psi_{\mathrm O}^2$
+into the elementwise $(1+c_1/\mathrm{Da}_h)\bigl[(1+\tfrac{c_2}{c_1}\mathrm{Re}_h)E_{u}^2+\tfrac{\alpha_K}{\sigma\nu}E_p^2\bigr]$ display --- is therefore not part of the Coq statement and is checked symbolically by
+\file{osgs_display_consistency_verification.py} (see \S\ref{sec:absexample} on the abstract/closed-form
+boundary, and the ``Deliberately delegated to the SymPy suite'' note).
+
 \subsection{The OSGS trusted base and what it adds over ASGS}\label{sec:osgsbase}
 
 The OSGS inf--sup route is not nested in the ASGS coercivity route: two ASGS
@@ -3322,6 +3328,23 @@ The Appendix~A elemental matrices
 symbolic differentiation of shape functions --- a computer-algebra task where a
 proof assistant adds cost but no assurance. They are left to SymPy.
 
+\emph{Appendix display consistency (added 2026-07-22).} The abstract theorems keep their
+right-hand sides as opaque functionals ($\Psi_{\mathrm S},\Psi_{\mathrm O},E(h)$); the
+manuscript's \emph{closed-form} appendix displays that unfold those functionals are therefore
+outside the Coq statements and are checked in SymPy. Two scripts, prompted by the 2026-07-22
+external audit, extend the body$\leftrightarrow$appendix display-consistency net (previously
+\file{display_consistency_verification.py}, which reached only \S4/Appendix~A) into the two
+analytical appendices: \file{osgs_display_consistency_verification.py} re-derives the
+$\sigma$-robust $L^2$ velocity corollary \lbl{oa:cor:Ltwo} and verifies that its
+$(1+c_1/\mathrm{Da}_h)$ factor is genuinely produced by the $\sigma^{-1}$ normalization of
+$\Psi_{\mathrm O}$ (the factor that \coq{abstract_osgs_convergence_Ltwo} carries only
+abstractly, see \S\ref{sec:crossOsgsConv}), and \file{continuity_grouping_verification.py}
+checks the term-accounting of the ASGS continuity proof's collected display \lbl{eq:groupstep}
+(the analogue of \file{assembly_consistency_verification.py} for the $T_{13}/N$ block --- it
+caught, and now guards against, an $|T_{13}|+|N|$ that double-counted the absorbed subterm
+$R$; corrected to $|T_{13}^{\mathrm c}|+|N|$). Each carries a discriminating negative. Suite
+total: $253$ checks across $19$ scripts.
+
 \subsection{Out of scope for standard-library Coq}
 
 Two items need machinery absent from stdlib Coq (natural in Lean~4 + Mathlib),
@@ -3350,7 +3373,7 @@ theory), and the CDR adjoint / Green's-identity computation of
 
 Formalising the proofs surfaced a few points where the manuscript's hypotheses
 or notation were slightly looser than what the proofs consume. The following
-amendments (catalogued in \file{proof_verification/AUDIT.md}, findings F1--F8)
+amendments (catalogued in \file{proof_verification/AUDIT.md}, findings F1--F9)
 have been \textbf{applied} to \file{theory/paper/} so the manuscript is
 $100\%$ compatible with the verified statements. None changes a mathematical
 result; each closes a precision or hygiene gap. The added text is marked with
@@ -3367,6 +3390,7 @@ F4 & the main-text triple norm now writes the elementwise-weighted term $\lVert\
 F6 & a remark after \lbl{eq:Tau2Final} records that the analysis $\tau_2$ and the implemented \lbl{eq:Tau2} are equivalent up to $1+C_2<2$ (machine-checked: \coq{tau2impl_le_tau2}, \coq{tau2_le_scaled_impl}). & applied \\
 F7 & a clause notes that the coefficient bounds are written for $\aK=\alpha_{\infty,K}$; other representatives cost factors of $\delta_\alpha$. & applied \\
 F8 & in \lbl{lem:winv} the label \lbl{eq:winv-conv} sat on the \emph{last} line of the display (the pressure-gradient estimate), while the convective line above it had none --- so two of the four references to \lbl{eq:winv-conv} pointed at the wrong estimate. The convective line now carries \lbl{eq:winv-conv} and the pressure-gradient line the new \lbl{eq:winv-gradp}; the four call sites were re-pointed accordingly (the Step-9 ``pressure part'' now cites \lbl{eq:winv-gradp}). Found by the Coq audit, which needed to cite the two estimates separately (\coq{Hw_cxu}/\coq{Hw_cxv} vs \coq{Hw_gpu}). & applied \\
+F9 & in Appendix~C's continuity proof the collected display \lbl{eq:groupstep} wrote its left-hand side as $|T_{13}|+|N|$ after Step~5 split $T_{13}=T_{13}^{\mathrm c}+R$ and Step~6 formed $N:=R+T_2+T_4+T_{11}$, double-counting the absorbed subterm $R$; corrected to $|T_{13}^{\mathrm c}|+|N|$ (the right-hand side and the assembled bound \lbl{eq:assembly} were already correct). Found by the 2026-07-22 external audit (M14); now guarded by \file{continuity_grouping_verification.py}. & applied \\
 \midrule
 F5 & \file{supplement.tex} is untouched SIAM template boilerplate --- a submission-set decision for the authors, left unchanged. & deferred \\
 \bottomrule
@@ -3585,7 +3609,7 @@ purpose; on Rocq~9 it merely emits a deprecation notice in favour of
 \bigskip
 \noindent\emph{Cross-references.} File-level detail and the SymPy$\leftrightarrow$Coq
 mapping: \file{README.md} in the \file{coq-formal/} directory. The step-by-step
-audit of the analytic steps and the F1--F8 findings: \file{AUDIT.md}. The Lean~4
+audit of the analytic steps and the F1--F9 findings: \file{AUDIT.md}. The Lean~4
 plan for the residual base: \file{LEAN_ROADMAP.md} and \file{PorousNSToolbox.lean}.
 The authoritative theory: \file{theory/paper/article_v2.tex} and its appendices
 (\file{elemental_matrices_appendix.tex} = App.~A, \file{fourier_appendix.tex} = App.~B,

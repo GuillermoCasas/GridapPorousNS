@@ -4,11 +4,18 @@ _Generated 2026-07-21 from an automated coverage audit (15 region agents over al
 
 > **STATUS 2026-07-21 — gaps closed.** Of the 23 `CONFIRMED_UNCHECKED` equations the cross-check confirmed
 > correct-but-unverified, **21 now carry a permanent SymPy check** (five new `sympy/coverage_*_verification.py`
-> modules; suite now **233/233 across 16 scripts**). The **2 remaining** — `eq:ExplicitExactSubscales` and
+> modules). The **2 remaining** — `eq:ExplicitExactSubscales` and
 > `eq:NonlinearStabilizedEquation` — were re-derived and confirmed correct but need the full discrete residual
 > model for a self-contained check, so they stay documented-PARTIAL (see `sympy/README.md`). The rows below
 > that show `UNCHECKED`/`PARTIAL` for those 21 reflect the *pre-closure* audit snapshot; consult the
 > `coverage_*` modules for their now-encoded checks._
+>
+> **STATUS 2026-07-22 — appendix display coverage added.** The 2026-07-22 audit of the harmonized `article_v2`
+> exposed that the body↔appendix display-consistency net stopped at §4/App. A. Two scripts now extend it to the
+> appendices: `sympy/osgs_display_consistency_verification.py` (App. D `oa:cor:Ltwo` L²-velocity display, the
+> `(1+c₁/Da_h)` factor) and `sympy/continuity_grouping_verification.py` (App. C `eq:groupstep` `T₁₃/N`
+> term-accounting; the `|T₁₃|+|N|→|T₁₃^c|+|N|` fix). Suite now **253/253 across 19 scripts**. See
+> `verification-gap-coverage.md` (addendum 2026-07-22) and `docs/ChatGPT audit/latest_audit_response.md`._
 
 ## Summary
 

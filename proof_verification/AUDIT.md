@@ -220,6 +220,33 @@ Surfaced by the Coq audit, which has to cite the two estimates *separately*
 one) and so could not use a single label for both. The paper rebuilds clean
 (0 errors, 0 undefined references). No mathematical content changes.
 
+### F9 (defect — APPLIED) — continuity Step 6: a double-counted subterm in the collected display
+
+In `continuity_appendix.tex`, the continuity proof splits `T₁₃ = T₁₃^c + R`
+(Step 5: convective part plus `R := σ(τ₁u, α∇q)_h`) and then forms the group
+`N := R + T₂ + T₄ + T₁₁` (Step 6), so that the four terms of the block sum to
+`T₁₃ + T₂ + T₄ + T₁₁ = T₁₃^c + N`. The collected display `eq:groupstep`
+originally wrote its **left-hand side** as `|T₁₃| + |N|`. Since `T₁₃ = T₁₃^c + R`
+and `R` is already inside `N`, this **double-counts `R`**; the estimates actually
+collected bound `|T₁₃^c|` (`eq:T13conv`) and `|N|`, so the correct LHS is
+`|T₁₃^c| + |N|`. The right-hand side and the final assembled bound `eq:assembly`
+are unaffected — an exposition/bookkeeping slip in an intermediate display, not a
+wrong result.
+
+Fixed by naming the convective contribution `T₁₃^c` in Step 5 (chosen to avoid
+clashing with the generic constant `C` in `≤ C⦀V⦀(…)`) and writing the collected
+LHS as `|T₁₃^c| + |N|`. Both `article.tex` and `article_v2.tex` rebuild clean
+(0 errors, 0 undefined references; 70/90 pp).
+
+Surfaced not by the Coq audit but by the **2026-07-22 external audit** of the
+harmonized `article_v2` (`docs/ChatGPT audit/latest_audit/`, issue M14) — the
+Coq assembles the eighteen terms individually (`AbstractContinuity.v`, Step 8)
+and never forms the `|T₁₃|+|N|` grouping, so it proved the correct statement and
+structurally could not reproduce the slip. Now **guarded durably** by
+`sympy/continuity_grouping_verification.py` (term-accounting, with a
+discriminating negative that flags the double-count). Full response:
+`docs/ChatGPT audit/latest_audit_response.md`.
+
 ---
 
 ## 3. What was *not* audited

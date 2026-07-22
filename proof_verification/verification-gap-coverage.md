@@ -34,6 +34,30 @@ that class survive. Layer 0 is already implemented (this session).
 > documented-PARTIAL: `eq:ExplicitExactSubscales`, `eq:NonlinearStabilizedEquation` (need the full discrete
 > residual model). The Coq side gained a mirror `Isolation` section in `Asymptotics.v`.
 
+> **Addendum 2026-07-22 — the display-consistency net did not reach the appendices; two more gaps closed.**
+> A *third* external audit (of the harmonized `article_v2`, `docs/ChatGPT audit/latest_audit/`) found two more
+> displayed-but-unchecked defects — the same class as F1/F2/F3, now shown to recur **once per appendix the net
+> never entered**:
+> - **M14 (App. C, `continuity_appendix.tex`).** The continuity proof's collected display `eq:groupstep`
+>   printed `|T₁₃|+|N|` after Step 5 split `T₁₃=T₁₃^c+R` and Step 6 formed `N:=R+T₂+T₄+T₁₁`, so `R` (inside `N`)
+>   was **double-counted**; the correct LHS is `|T₁₃^c|+|N|`. The RHS and the final `eq:assembly` were
+>   unaffected (an LHS mislabel). **Why it survived:** `assembly_consistency_verification.py` does term-accounting
+>   only for the **App. A** elemental matrices — the App. C `T`-term groupings were never parsed. **Closed** by
+>   `sympy/continuity_grouping_verification.py` (5 checks; discriminating negative asserts `|T₁₃|+|N|`
+>   double-counts `R`). Paper LHS corrected in the same pass.
+> - **M15 (App. D, `osgs_appendix.tex`).** The **entire OSGS appendix had zero SymPy display coverage** — the
+>   `display_consistency_verification.py` net (F1/F2) stopped at §4/App. A. The body's reaction-limit
+>   L²-velocity display drops the `(1+c₁/Da_h)` factor its corollary `oa:cor:Ltwo` carries (defensible as the
+>   `Da_h≫c₁` asymptotic form, but unguarded); the Coq proves the corollary only *abstractly*
+>   (`abstract_osgs_convergence_Ltwo: √σ·‖e_u‖≤Cconv·Ψ_O`) and never unfolds the closed form, so **neither
+>   machine layer saw it**. **Closed** by `sympy/osgs_display_consistency_verification.py` (6 checks;
+>   re-derives the factor from the `σ⁻¹` normalization, discriminating on both a silent appendix drop and the
+>   asymptotic-limit equality). No paper change needed (the body form is a legitimate asymptotic).
+>
+> **Suite now 253/253 across 19 scripts.** LESSON (`docs/lessons_learned.md §1`, 2026-07-22): the
+> display-consistency net must extend to **every** appendix, and every collected/grouped proof display needs
+> term-accounting like `assembly_consistency`. Full per-item audit response: `docs/ChatGPT audit/latest_audit_response.md`.
+
 ## What is already machine-checked
 
 Three independent layers already cover most of the paper:

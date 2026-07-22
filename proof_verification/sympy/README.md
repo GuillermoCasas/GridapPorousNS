@@ -14,14 +14,19 @@ python3 -m venv /tmp/sympy_venv && /tmp/sympy_venv/bin/pip install sympy numpy
 /tmp/sympy_venv/bin/python "run_all.py"
 ```
 
-Current status: **233/233 checks pass across 16 scripts.** See
-[`../verification-gap-coverage.md`](../verification-gap-coverage.md) for why the 2026-07
-review still caught three defects (F1/F2 and the §6 isolation error F3/M03) despite this
-suite, and the plan that closes the gap. A **2026-07-21 every-equation coverage audit**
+Current status: **253/253 checks pass across 19 scripts.** See
+[`../verification-gap-coverage.md`](../verification-gap-coverage.md) for why successive 2026-07
+external reviews still caught displayed-but-unchecked defects (F1/F2, the §6 isolation error
+F3/M03, and — 2026-07-22 — the App. C `T₁₃` bookkeeping and the App. D display coverage gap)
+despite this suite, and the plan that closes each. A **2026-07-21 every-equation coverage audit**
 (369 displayed equations across all four `.tex` files, adversarially cross-checked in
-SymPy) found **zero further algebra errors** and drove the five new `coverage_*` scripts
+SymPy) found **zero further algebra errors** and drove the five `coverage_*` scripts
 below, which encode the previously displayed-but-unchecked identities; the per-equation
-map is in [`../EQUATION_COVERAGE_LEDGER.md`](../EQUATION_COVERAGE_LEDGER.md).
+map is in [`../EQUATION_COVERAGE_LEDGER.md`](../EQUATION_COVERAGE_LEDGER.md). The **2026-07-22
+audit of the harmonized `article_v2`** then exposed that the display-consistency net stopped at
+§4/App. A: `osgs_display_consistency_verification.py` (App. D body↔appendix) and
+`continuity_grouping_verification.py` (App. C `T₁₃/N` term-accounting) close that gap. The
+suite now covers `article.tex`, `article_v2.tex`, and all four appendices.
 
 | Script | Paper location | What it verifies | Checks |
 |---|---|---|---|
@@ -41,6 +46,9 @@ map is in [`../EQUATION_COVERAGE_LEDGER.md`](../EQUATION_COVERAGE_LEDGER.md).
 | `coverage_vms_operators_verification.py` | §2 deviatoric split (l.258), App. B `eq:ftSplit`, `eq:FTOfDifferentialOperator` | `Π^{DS}∇u=∇ˢu−(1/d)(∇·u)I` split for d=2,3; `A_c+A_f=A_v+A_b`; the factor-5 triangle/power-mean τ bound (sharp at coincidence); rejects a wrong `1/d` and a 4-term bound. (Two nonlinear subscale identities `eq:ExplicitExactSubscales`, `eq:NonlinearStabilizedEquation` left documented-PARTIAL — need the full discrete residual model.) | 15 |
 | `coverage_coercivity_numeric_verification.py` | §5 Galerkin coercivity `eq:StabilityEstimate` (l.850, the "verifiable-not-yet-encoded" item), centered encoding (l.1132), 3D `c₁` threshold (l.1430) | `B(a;U,U)=2ν‖α^{1/2}Π∇u‖²+‖σ^{1/2}u‖²+ε‖p‖²` on a stream-function `αa` (convective & pressure cross-terms cancel by `div(αa)=0`); the `U=Re/√(α_∞Da)` centering solve; `c₁*(K)=2ĉ²(K)`. Discriminating negatives on every cancellation (non-solenoidal `αa`, dropped `α`, missing projector, dropped factor-2). | 34 |
 | `display_consistency_verification.py` | §4 (`eq:weak_form_eliminated_subscales`), App. A (`eq:StabilizationLVLU`, `eq:StabilizationLVF`) | The **β-factored strong-residual display** `(1/α)(−2 div(ανΠ̃∇u)) = −νΔ̄u − 2νΠ̃∇u·∇β` (the **F2** factor-2 gap, which sits *between* the un-factored operator and the assembled matrices, both checked elsewhere), and the **plus** sign of the eliminated fine-scale term on an exact static-condensation analogue (the **F1** sign gap, a motivational equation off the assembly path). Each check also asserts the pre-fix form *fails*. | 5 |
+| `osgs_display_consistency_verification.py` | App. D (`oa:eq:LtwoVelocity` / `oa:cor:Ltwo`) vs body (`article_v2.tex` reaction-limit L² display) | **Closes the 2026-07-22 gap (M15): the OSGS appendix had NO display coverage.** Re-derives the σ-robust L²-velocity corollary from `Ψ_O`, verifying the `(1+c₁/Da_h)` factor is genuinely produced by the `σ⁻¹` normalization (`C1`–`C4`), and that the body's factor-free form is the legitimate `Da_h→∞` asymptotic — **discriminating**: fails if the appendix drops the factor (`C5a`), confirms body/appendix agree only in the limit (`C5b`). | 6 |
+| `continuity_grouping_verification.py` | App. C continuity proof (`eq:groupstep`, Steps 5–8) | **Closes the 2026-07-22 gap (M14): term-accounting of a collected proof display** (the `assembly_consistency` analogue for the `T₁₃/N` block). Encodes `T₁₃=T₁₃^c+R`, `N=R+T₂+T₄+T₁₁`; asserts the corrected LHS `\|T₁₃^c\|+\|N\|` counts each atom once and — **discriminating** — that the pre-fix `\|T₁₃\|+\|N\|` double-counts `R`. | 5 |
+| `genuine3d_mms_verification.py` | §7.2 rerun R6 (genuinely-3D field `u=Uα₀·curl(A)/α`) | The genuinely-3D manufactured field satisfies `∇·(αu)=0` exactly with all components x/y/z-dependent and `u_z≠0` (audit-response N19). | 9 |
 
 ---
 
