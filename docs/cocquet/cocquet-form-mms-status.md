@@ -12,7 +12,7 @@ harness); the physical Cocquet benchmark is `docs/cocquet/investigation-synthesi
 τ-saturation mechanism referenced below is written up in
 `theory/tau_saturation_note/tau_saturation_note.tex`.
 
-**Last updated: 2026-07-07.** Moderate-porosity results are complete and clean. The low-porosity
+**Last updated: 2026-07-21.** Moderate-porosity results are complete and clean. The low-porosity
 high-Re corner (α=0.1 × Re=1e5) is **RESOLVED for k=1: it behaves as a coarse-mesh
 solution-branch fold — the tested solvers (exact-guess init, perturbation homotopy, heavy Newton/Picard)
 do not converge for N≤80, while a root is found and is FE-OPTIMAL at N≥160** (see §4.1). _Nonexistence for
@@ -217,13 +217,16 @@ load-bearing measurements.
 ---
 
 ## 5. Open items / next steps
-- **NEW (2026-07-21) — audit-response reruns on this harness:** (i) **R5** stabilized Taylor–Hood P2/P1 control
-  (`cocquet_form_mms_taylorhood_stabilized.json`, audit D05) — smoke gave optimal rates (L²u≈3.0), full grid
-  running; isolates the space-pair effect from the convection-stabilization effect vs. the unstabilized-TH
-  baseline. (ii) **R2** α-interpolation ablation (`cocquet_form_mms_alpha_interp_p1.json`, audit I07) via the new
-  `porosity_interpolation_order` knob — P1-interpolated α in the formulation, analytic α in the oracle (isolates
-  the model error). Compare against the analytic VMS baseline; if errors track, the conclusion's α-interpolation
-  claim (softened to future work by I07) is substantiated.
+- **DONE (2026-07-21) — audit-response reruns on this harness** (both grids completed; results on disk):
+  (i) **R5** stabilized Taylor–Hood P2/P1 control (`cocquet_form_mms_taylorhood_stabilized.json`, audit D05) —
+  the full α×Re grid ran: it **converges at optimal velocity + pressure rates at Re=10⁵** (L²u rate 2.41 at
+  α₀=0.5) exactly where unstabilized-TH velocity stagnates, but is ~10× *less* accurate than unstabilized TH in
+  the viscous regime — isolating the high-Re gain to the **stabilization**, not the space pair. Ported into
+  `article_v2.tex` as the `P2/P1 ASGS` rows of `tab:CocquetMMSL2/H1`. (ii) **R2** α-interpolation ablation
+  (`cocquet_form_mms_alpha_interp_p1.json`, audit I07, `porosity_interpolation_order` knob) — **P1-α is benign
+  for P1 elements** (~1.1× the analytic baseline) but **caps P2 convergence** (48–73× worse), i.e. FE
+  interpolation of α preserves convergence only when interpolated at (≥) the velocity order. See
+  [`findings.md`](../findings.md) §8 (audit-response reruns) for both verdicts.
 - **✅ DONE — recovering the α=0.1 × Re=1e5 corner (k=1):** extend the mesh ladder above the fold
   (N=[160,320]). Both ASGS & OSGS reach FE-optimal roots (H¹u ≈ 1.07/1.10, L²u ≈ 3.0); see §4.1. Cheap
   remaining: k=2 corner → N=160; optional k=1 → N=640 for a 3-point slope.
@@ -237,10 +240,12 @@ load-bearing measurements.
   (start at α=0.5 or Re=1, walk to α=0.1 / Re=1e5), the device the regular harness's Phase-2
   `run_continuation.jl` uses. The direct exact-guess mesh-ladder (§4.1) superseded it for k=1; keep
   continuation in reserve if a future push hits a mesh where the exact-guess basin narrows.
-- **Config state:** `data/` now holds the 5 designed configs — the 3 original
-  `cocquet_form_mms_{vms,vms_k2,taylorhood}.json` plus the 2026-07-21
-  `cocquet_form_mms_{taylorhood_stabilized (R5),alpha_interp_p1 (R2)}.json` (per
-  `.agents/rules/official-results-path.md` — one canonical config per designed test).
+- **Config state:** `data/` now holds 6 tracked configs — the 3 original
+  `cocquet_form_mms_{vms,vms_k2,taylorhood}.json`, the 2026-07-21
+  `cocquet_form_mms_{taylorhood_stabilized (R5),alpha_interp_p1 (R2)}.json`, plus
+  `cocquet_form_mms_taylorhood_stabilized_corner.json` (the R5 corner-provenance config, committed `20617e5`).
+  (per `.agents/rules/official-results-path.md` — one canonical config per designed test; the R5 corner is a
+  distinct designed provenance record, **not** a debug `*_corner` scrap like the removed `vms` corner in §4.1.)
 - **Diagnostic harness change left in place:** `run_test.jl` now gates the `Constant_Sigma` reaction
   trim on `experimental_reaction_mode` (mirroring `src/run_simulation.jl:57`); it does not affect the
   Forchheimer path the real sweep uses.

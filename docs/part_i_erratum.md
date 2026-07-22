@@ -107,7 +107,8 @@ G_β, D_β}` and `defined-but-unused = {V_T}`; post-fix it is green (4/4). Suite
 total: **242/242 across 17 scripts (2026-07-21).** (The later `G_P→G_αP` rename of commit
 8a644d2 wrapped the `G_αP` and `Q_φ` definition LHSs in `\amend{…}`, which briefly
 hid them from the parser and dropped the script to 3/4; `assembly_consistency_verification.py`
-now unwraps `\amend{…}` before parsing, restoring **4/4 / 110/110**, verified 2026-07-19.)
+now unwraps `\amend{…}` before parsing, restoring this script to **4/4** — verified 2026-07-19, when the
+suite total stood at 110/110; the total is now **242/242** after the 2026-07-21 every-equation coverage audit.)
 
 ## 5. Additional items surfaced by the audit (pre-existing, cosmetic)
 

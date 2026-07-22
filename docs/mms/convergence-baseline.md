@@ -67,4 +67,5 @@ root; it clears by ≈N=512, after which a direct exact-guess Newton solve conve
 - **`continuation_c24.json` / `continuation_c24_rate.json`** — α+mesh continuation for the high-Re/low-α fold
   (the three skipped `Re=10⁶, α₀=0.05` cells). Superseded 2026-06-17 by the direct exact-guess solve
   (`run_corner_article.jl` / `run_corner_osgs.jl`, N≥512) — see [convergence-2d.md](convergence-2d.md).
-- **`test_config.json`** — the small CLAUDE.md "single simulation" example; not a convergence study.
+- **`test_config.json`** — the minimal MMS-*sweep* example config (CLAUDE.md's sweep section runs it via
+  `run_test.jl test_config.json`); the true "single simulation" example is `config/base_config.json`.

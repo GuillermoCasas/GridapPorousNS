@@ -270,17 +270,21 @@ after the interpolation-floor diagnostic was added — FE errors within ≤1.7e-
 settled** in [`cocquet/investigation-synthesis.md`](cocquet/investigation-synthesis.md) — re-running them is
 optional provenance bookkeeping, not a blocker. Command if ever needed: `run_convergence.jl data/<name>/…`.
 
-### 7f. Audit-response reruns — consolidate + fold into the paper (2026-07-21) 🔴 in progress
-Three audit-driven reruns were implemented this session; analyze each as it lands and integrate into the paper:
-- **R5 — stabilized Taylor–Hood P2/P1 control** (audit D05): `cocquet_form_mms_taylorhood_stabilized.json`
-  (smoke gave optimal L²u≈3.0; full grid running). Add a stabilized-TH column to the DBF tables
-  (`tab:CocquetMMSL2/H1`) so the comparison isolates space-pair vs. convection-stabilization.
-- **R6 — genuinely-3D MMS** (audit N19): `smoke3d.jl sweep_genuine3d` → `results/k*/TET/genuine3d/`
-  (field verified: SymPy 242/242, FD, blitz 22/22). Run the regular Kuhn ℙ₁+ℙ₂ sweep; decide add-alongside
-  vs. replace-extruded for the 3D section, then table it.
-- **R2 — α-interpolation ablation** (audit I07): `cocquet_form_mms_alpha_interp_p1.json` (P1-interp α in the
-  formulation, analytic α in the oracle). Compare to the analytic VMS baseline; if errors track, restore the
-  conclusion's α-interpolation claim (currently softened to future work), else keep as future work.
+### 7f. Audit-response reruns — grids done; paper integration partial (2026-07-22) 🟠 mostly done
+Three audit-driven reruns were run and analyzed; verdicts recorded in [`findings.md`](findings.md) §8. Paper
+integration status:
+- **R5 — stabilized Taylor–Hood P2/P1 control** (audit D05): **✅ DONE + ported into `article_v2.tex`** as the
+  `P2/P1 ASGS` rows of `tab:CocquetMMSL2/H1` (commit `384362f`). Verdict: converges at optimal rates at Re=10⁵
+  where unstabilized-TH velocity stagnates, but ~10× less accurate in the viscous regime — isolates the high-Re
+  gain to the **stabilization**, not the space pair. (Not yet ported into `article.tex` v1 — only relevant if v1
+  is submitted.)
+- **R6 — genuinely-3D MMS** (audit N19): grid ran (`results/k*/TET/genuine3d/`), verdict optimal rates for both
+  orders + OSGS pressure H¹ converges (slope 2.0, unlike the extruded field's 1.29 plateau). Drop-in table
+  `theory/paper/genuine3d_table.tex` **exists but is NOT yet `\input` into either article** — author decision
+  pending: add-alongside vs replace-extruded for §7.2.
+- **R2 — α-interpolation ablation** (audit I07): **✅ analyzed.** P1-α is benign for P1 elements (~1.1×) but caps
+  P2 convergence (48–73× worse) — FE interpolation of α preserves convergence only when interpolated at (≥) the
+  velocity order. Refines the conclusion's I07 claim (currently softened to future work).
 - Dropped (analysis, no run): **R10** (3D-OSGS pressure = genuine under-stab, see 4d/7c), **R1** (fold
   continuation — wording softened), **R3** (c₁-eigenvalue study — see `open-questions.md` §3), **R4** (pointwise
   vs elementwise τ — N09 text fallback stands; a moderate code change if ever pursued).

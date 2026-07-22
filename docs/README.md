@@ -70,6 +70,21 @@ The **Anderson acceleration** record was merged into [findings.md](findings.md) 
 solver dossiers were archived to `archive/` (Tier 3): the OSGS reaction-dominated-rate investigation and the
 coupled-only-leaning decision record.
 
+**Paper preparation & external audit** (the manuscript work — active)
+
+| Role | Doc | Notes |
+|---|---|---|
+| **Submission checklist** | [pre-submission-checklist.md](pre-submission-checklist.md) | The final read-through checklist against the article. Most items ✅ done (2026-07-19 audit-response pass). Its line anchors are `article.tex` (v1); the paper's harmonized form is now `article_v2.tex`. |
+| Revision plan | [paper-revision-plan.md](paper-revision-plan.md) | Point-by-point response to `archive/review_numerics_vs_theory.md`; largely applied — its own banner defers current status to the checklist. |
+| Part-I erratum | [part_i_erratum.md](part_i_erratum.md) | The elemental-matrix assembly-display fix (RESOLVED 2026-07-12) + the durable `assembly_consistency_verification.py` guard. |
+| **External audit dossier** | [`ChatGPT audit/`](ChatGPT%20audit/) | Two rounds of external manuscript audit + the round-2 response plans that drive `article_v2.tex` (`revision_plan_v2.md`, `harmonization_plan_v2.md` — **in execution**). See the folder's own `README.md` for round-1 (done) vs round-2 (active). |
+
+> **Paper version note.** The docs were written against [`../theory/paper/article.tex`](../theory/paper/article.tex)
+> (the original) and cite its line numbers. A harmonized [`../theory/paper/article_v2.tex`](../theory/paper/article_v2.tex)
+> now integrates the OSGS theory as Appendix D with symmetric ASGS/OSGS appendices; `coq_coverage.tex` already
+> targets it. Both compile and share `continuity_appendix.tex`. **Prefer citing labels/section names over raw
+> `article.tex` line numbers** — the numbers drift on every `\amend` pass and are ambiguous across the two files.
+
 ---
 
 ## Tier 3 — Archive (`archive/`) — dead ends & raw transcripts (provenance only)
@@ -91,6 +106,11 @@ current.
 - [archive/coupled-only-leaning-and-jfnk-plan.md](archive/coupled-only-leaning-and-jfnk-plan.md) — the decision
   record for collapsing OSGS to the single `coupled` route (lessons canonical in `lessons_learned.md`; its §3
   dead-config list is stale).
+- [archive/review_numerics_vs_theory.md](archive/review_numerics_vs_theory.md) — the archived external numerics-vs-theory
+  review that `paper-revision-plan.md` responds to point-by-point (carries an "ARCHIVED INPUT" header; current status
+  lives in the checklist).
+- [archive/final_AI_revision.md](archive/final_AI_revision.md) — a raw v1-era external AI review of `article.tex`,
+  folded into `pre-submission-checklist.md` §10 (kept as provenance for a few reviewer items — quadrature-excess, √6 nodal factor).
 
 ---
 
@@ -106,8 +126,11 @@ move it to LaTeX — not something to grow here.
 ## Where the machine-checked proofs live (not here)
 
 The paper's a priori chain (stability, continuity, interpolation, convergence) is machine-checked in Coq
-under [`../proof_verification/`](../proof_verification/): four abstract theorems proved from a ~50-hypothesis
-trusted base, plus non-vacuity witnesses. The paper↔Coq map and the trusted-base inventory are in
+under [`../proof_verification/`](../proof_verification/): the **ASGS** abstract theorems (four, proved from a
+~50-hypothesis trusted base, plus non-vacuity witnesses) **and** the **OSGS** abstract theorems (inf–sup
+stability, interpolation, consistency, convergence — `abstract_osgs_*`). The tree is now **24 `.v` files**,
+0 `Admitted` / 0 `Axiom`. The paper↔Coq map (ASGS = App. C, OSGS = App. D of `article_v2.tex`) and the
+trusted-base inventory are in
 [`../proof_verification/coq_coverage.tex`](../proof_verification/coq_coverage.tex); that tree is
 self-documenting (its own `AUDIT.md` / `README.md`), so `docs/` only points to it. See `CLAUDE.md` for the
 verification gate.

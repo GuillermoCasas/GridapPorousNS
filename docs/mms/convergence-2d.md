@@ -8,8 +8,10 @@
 
 The 2D **k=1 and k=2 QUAD** sweeps are complete (N=10→640) and **fully optimal** — velocity L² is `O(h^{k+1})`,
 H¹ is `O(h^k)`; pressure meets or beats its nominal equal-order order (often super-optimal, 1.5–2.4×). **OSGS is
-~2× more accurate than ASGS** at the same rate. (k=1 TRI has 2 pre-existing NaN cells at the α=0.05 corner — a
-curved-interface-on-structured-mesh difficulty, not a regression.)
+~2× more accurate than ASGS** at the same rate. (k=1 TRI has 2 pre-existing NaN cells at α₀=0.05 — a
+curved-interface-on-structured-mesh difficulty that was NaN in the baseline too, not a regression. These are
+**distinct** from the high-Re × α₀=0.05 corner family — `Re=1e6`, 3 cells — which is RESOLVED by direct
+exact-guess solve at `N≥512` once the fold clears; see the fold resolution below and `findings.md` §2.)
 
 ## 1. The convergence gate — how the solver decides "converged"
 

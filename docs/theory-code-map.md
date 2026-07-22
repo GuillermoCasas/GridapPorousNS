@@ -9,14 +9,16 @@ de-Pouplana) — plus the algorithm boxes of
 When implementation appears to diverge from the paper, this doc is the ledger that classifies the
 divergence and justifies it. Update it whenever code and paper drift.
 
-> **Line-anchor caveat (2026-07-21).** The `article.tex#L###` fragment anchors below were captured before the
-> 2026-07-21 external-audit `\amend` pass, which grew `article.tex` from ~1300 to ~1692 lines — so the anchors
-> are now offset (by ≈ +60 near the theorems, more further down) and should be resolved by **searching the
-> quoted text**, not the line number, until a full re-anchor pass is done. The audit changed no *divergence
-> ledger* entry (the code↔paper contracts are unchanged), but note two quote refreshes: the §6 pressure-gradient
-> factor is now `‖a‖_∞·U/P` (M03 fix), the convergence theorem now states the sharp ℓ² form Ψ(h) with the ℓ¹
-> sum as a corollary (M01), and the §2.7 pressure-gauge phrasing was reworded ("imposes a zero mean") by the N02
-> edit. The 3D `c₁=16k⁴` note (§2.5) is unchanged in substance.
+> **Line-anchor caveat (updated 2026-07-22).** The `article.tex#L###` fragment anchors below were captured before
+> the 2026-07-21 `\amend` pass and are now **offset** — resolve them by **searching the quoted text**, not the line
+> number. More importantly, the paper now exists in **two files**: `article.tex` (v1, ≈1681 lines) and the
+> harmonized `article_v2.tex` (v2, ≈1851 lines — OSGS integrated as App. D, symmetric ASGS/OSGS appendices, a
+> main-text §5.1 "Common setting"). Both compile and share `continuity_appendix.tex`. **Prefer citing labels
+> (`eq:`, `lem:`, `sec:`) over raw line numbers** — a label is unambiguous across both files; a line number is
+> not. The divergence-ledger *contracts* below are unchanged by either the audit or the v2 refactor; only the
+> anchors drift. Quote refreshes to remember: the §6 pressure-gradient factor is `‖a‖_∞·U/P` (M03), the
+> convergence theorem states the sharp ℓ² form Ψ(h) with the ℓ¹ sum as a corollary (M01), and the 3D `c₁=16k⁴`
+> note (§2.5) is unchanged in substance.
 
 This doc consolidates four former solver docs (paper-code divergences ledger, algorithm↔code mapping,
 the scale-free convergence-criterion spec, and the normalization/encoding-invariance audit). The

@@ -53,7 +53,8 @@ harness/reporting, and (iii) hygiene/fragility gaps.
   `−p(α∇·v + ∇α·v)` (= `−∫ p ∇·(αv)`) and `∇·(αu) = α∇·u + u·∇α`.
 - **Adjoint sign discipline.** `strong_adjoint_momentum` returns `+α(∇v)'·u` and `B_S` subtracts the
   adjoint; the `σv` term is subtracted. Matches Eq.39/Eq.50 and the documented A²−B² symmetry. The
-  `(1/α)∇·(αa)v` omission is the paper's own simplification (article.tex ~L800).
+  `(1/α)∇·(αa)v` omission is the paper's own simplification (disclosed in the stability-estimate discussion;
+  see [`theory-code-map.md`](theory-code-map.md) §2.1).
 - **Viscous operators** (`viscous_operators.jl`). `∇·ε^d(u)=½Δu+(½−1/d)∇(∇·u)` with coefficient `0` in
   2D and `+1/6` in 3D; `∇·ε(u)=½Δu+½∇(∇·u)`. The 2αν factor (μ=αν), the weak Jacobian (linear ⇒ `du`
   for `u`), and the self-adjoint reuse on `v` are all correct. The 3D MMS oracle (`src/problems/mms_paper.jl`, the dimension-generic oracle) uses the
@@ -77,12 +78,13 @@ harness/reporting, and (iii) hygiene/fragility gaps.
 - The JSON schema declares `required` for exactly one object (`linear_solver`); presence is enforced in
   practice by the no-default `@kwdef` structs, but the schema does not encode it
   ([porous_ns.schema.json](config/porous_ns.schema.json)). Add `required` arrays mirroring the structs.
-- `config/base_config.json` omits the now-required `eps_val` and fails `load_frozen_config`
-  (documented; **DRIV-01**). Either add `eps_val` to the canonical example or document that it is
-  intentionally incomplete.
-- Doc bug: the `PhysicalProperties` struct docstring ([config.jl:23](src/config.jl#L23)) calls `eps_val`
-  *"porosity ε of the medium (>0)"* — it is the compressibility/pressure-penalty ε (α is porosity), and
-  it may be 0. The inline field comment is correct; the struct docstring is not.
+  *(This schema-`required` gap is the only still-open A.4 item — see [`pending-tasks.md`](pending-tasks.md) §6c.)*
+
+> **Resolved since this audit (2026-07-04, removed here to keep only still-standing findings):** the
+> `base_config.json` "missing `eps_val`" and the `PhysicalProperties` docstring "porosity ε" mislabel are both
+> **fixed** — the field was renamed `eps_val`→`physical_epsilon` (base_config now carries `"physical_epsilon": 0.0`
+> and loads cleanly; the docstring now reads "physical compressibility ε_phys … NOT the porosity"). See
+> [`findings.md`](findings.md) §7.
 
 ---
 
@@ -245,7 +247,7 @@ formulation's `eps_phys` agree (or document why they differ).
 The structured-Kuhn control (uniform, refinement-invariant quality) ran P2 ASGS+OSGS at paper c₁ and
 ASGS at c₁×4; the c₁×1-fails/grows vs c₁×4-collapses-L²u-~40× numbers are real Gridap data. The c₁ root
 cause and the OSGS-P2-3D coupling are **RESOLVED** — see findings.md section 3 and open-questions.md
-section 4. (This audit's earlier c1-discrepancy / element-family-coercivity-deficit framing is
+section 3. (This audit's earlier c1-discrepancy / element-family-coercivity-deficit framing is
 SUPERSEDED.)
 
 ### B.6 [Med] A failed OSGS solve silently reports the ASGS Stage-I state under the OSGS label

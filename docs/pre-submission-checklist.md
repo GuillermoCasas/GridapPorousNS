@@ -296,10 +296,9 @@ predict ×10/×50/×116 — refuted as *sharp*.
 
 ## 5. Build / LaTeX
 
-- 🔴 **verify + commit — the `\@ifpackageloaded{lineno}{}{\allowdisplaybreaks}` guard**
-  ([article.tex:56–64](../theory/paper/article.tex#L56), currently uncommitted). Without it, `[review]` +
-  `allowdisplaybreaks` collapses display math to ~22 pp with all-`??` refs on TeX Live 2023/macOS. Src: MEMORY
-  `paper-build-fragilities`.
+- ✅ **committed — the `\@ifpackageloaded{lineno}{}{\allowdisplaybreaks}` guard** (present at `article.tex:60`;
+  the working tree is clean, so it is under version control). Without it, `[review]` + `allowdisplaybreaks`
+  collapses display math to ~22 pp with all-`??` refs on TeX Live 2023/macOS. Src: MEMORY `paper-build-fragilities`.
 - 🔴 **verify — clean `latexmk` in BOTH review and final (review-off) mode**, each with **0 unresolved refs and
   0 undefined citations**. Healthy final build = **68 pp / 722 newlabels / 0 unresolved** (was 66; the 2026-07-19 review pass added
   ~2 pp of `\amend` prose — the page count drifts with prose, but **722 newlabels / 0 unresolved** is the invariant). Reconcile the stale
@@ -359,14 +358,17 @@ predict ×10/×50/×116 — refuted as *sharp*.
   is sufficient, not necessary); `C_stab_margin` needs `c₁ > 2ξC̄_inv²` for a `C̄_inv`-free floor, with the
   **weighted** `C̄_inv = √(dδ_α)C_inv + C_α` the relevant constant. Reconcile with "16k⁴ sits just below the
   Kuhn threshold". Src: `findings.md §8`; `coq_coverage.tex`.
-- ✅ **DONE (2026-07-19, §B) — ran `./run_all.sh`: all 18 modules compile + coqchk kernel re-check pass, ZERO
-  `Admitted`, ZERO `Axiom`, and `Print Assumptions` on the four headline theorems returns only the 3 stdlib axioms**
-  (`sig_not_dec`, `sig_forall_dec`, `functional_extensionality_dep`). Any "machine-checked" claim stays scoped to the
-  3-of-4 non-vacuity-witnessed theorems (`abstract_stability/continterp/convergence`) with `abstract_continuity`'s
-  witness gap disclosed. **Two notes:** (i) the tree compiles clean under **Rocq 9.1.1** (this environment, not the
-  Coq 8.18 named in CLAUDE.md — only a `From Coq`→`From Stdlib` deprecation warning); (ii) `run_all.sh` had a
-  **bash-3.2 portability bug** (`mapfile` is bash≥4; macOS ships 3.2) — **fixed this pass** with a portable
-  `while read` fill, and the script now runs end-to-end. Src: `findings.md §8`; CLAUDE.md Coq gate.
+- ✅ **DONE — ran `./run_all.sh`: the whole tree compiles + coqchk kernel re-check pass, ZERO `Admitted`, ZERO
+  `Axiom`.** The tree is now **24 modules** (the 2026-07-19 note said 18 — the **OSGS Coq chain** `Osgs*.v` +
+  `NonVacuityOsgs.v` was added alongside the article_v2 App-D integration), so there are now **eight** headline
+  abstract theorems — the four ASGS (`abstract_stability/continuity/continterp/convergence`) **and** the four OSGS
+  (`abstract_osgs_stability/continterp/consistency/convergence`). `Print Assumptions` on the ASGS headlines returns
+  only the 3 stdlib axioms (`sig_not_dec`, `sig_forall_dec`, `functional_extensionality_dep`). "Machine-checked"
+  non-vacuity is witnessed for 3-of-4 ASGS theorems (`abstract_continuity`'s witness gap disclosed) plus the OSGS
+  chain (`NonVacuityOsgs.v`). **Two notes:** (i) the tree compiles clean under **Rocq 9.1.1** (this environment,
+  not the Coq 8.18 named in CLAUDE.md — only a `From Coq`→`From Stdlib` deprecation warning); (ii) `run_all.sh` had
+  a **bash-3.2 portability bug** (`mapfile` is bash≥4; macOS ships 3.2) — **fixed** with a portable `while read`
+  fill. Src: `findings.md §8`; CLAUDE.md Coq gate.
 - 🟡 **verify — amendment F8** (the `eq:winv-conv` label moved to the convective line; `eq:winv-gradp` added; 4
   call sites re-pointed) is in the submitted appendix. Src: `AUDIT.md F8`.
 - 🟡 **verify — no over/under-claim of implemented-vs-analyzed τ₂** (S45-2: `eq:Tau2` full vs `eq:Tau2Final`
