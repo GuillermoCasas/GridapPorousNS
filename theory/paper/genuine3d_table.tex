@@ -1,0 +1,42 @@
+% Drop-in genuinely-3D MMS convergence table (audit response R6 / N19).
+% The paper's §7.2 3D test uses the z-EXTRUDED field (u_z = 0, z-invariant). This table is the
+% GENUINELY three-dimensional field u = U*alpha_0*curl(A)/alpha (all components depend on x,y,z,
+% u_z != 0, div(alpha*u)=0 exactly), run on the SAME regular Kuhn family at c_1 = 16k^4, on the
+% same (alpha_0,Re,Da) = (0.5,1,1) as the extruded case. Generated from
+% test/extended/ManufacturedSolutions3D/results/k{1,2}/TET/genuine3d/convergence3d_results.json
+% (smoke3d.jl sweep_genuine3d). \input this where you want it, or paste the tabular; adjust the
+% label/caption/\num style to match tab:3DL2 / tab:3DH1. Rates are two-mesh estimates from the two
+% finest of the 4-mesh ladder (P1: N in {8,16,24,32}; P2: N in {12,16,20,24}).
+\begin{table}[!htbp]
+    \centering
+    \caption{Genuinely three-dimensional manufactured solution ($u = U\alpha_0\,\mathrm{curl}(A)/\alpha$, all
+    components depending on $x,y,z$, $u_z\neq0$; regular Kuhn tetrahedra, $c_1=16k^4$, $(\alpha_0,\Reyn,\Damk)=(0.5,1,1)$):
+    observed convergence rate (slope) and finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm and $H^1${\hyp}seminorm,
+    from the two finest meshes. Optimal slopes: velocity $k_v{+}1$ ($L^2$) / $k_v$ ($H^1$); pressure $k_p$ ($L^2$)
+    / $k_p{-}1$ ($H^1$), equal order $k_v=k_p$.}
+    \begin{tabular}{l l r r r r r r r r}
+    \toprule
+    & & \multicolumn{4}{c}{$L^2${\hyp}norm} & \multicolumn{4}{c}{$H^1${\hyp}seminorm} \\
+    \cmidrule(lr){3-6}\cmidrule(lr){7-10}
+    & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
+    \cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(lr){9-10}
+    element & method & slope & FME & slope & FME & slope & FME & slope & FME \\
+    \midrule
+    $\mathbb{P}_1/\mathbb{P}_1$ & ASGS & \num{1.88}~(2) & \num{7.30e-3} & \num{1.34}~(1) & \num{7.43e-2} & \num{0.98}~(1) & \num{3.75e-1} & \num{0.42}~(0) & \num{2.11} \\
+                                & OSGS & \num{1.95}~(2) & \num{5.20e-3} & \num{1.88}~(1) & \num{9.11e-2} & \num{0.98}~(1) & \num{3.74e-1} & \num{0.82}~(0) & \num{2.97} \\
+    \midrule
+    $\mathbb{P}_2/\mathbb{P}_2$ & ASGS & \num{3.55}~(3) & \num{5.34e-4} & \num{2.36}~(2) & \num{1.34e-2} & \num{2.34}~(2) & \num{5.08e-2} & \num{1.18}~(1) & \num{1.22} \\
+                                & OSGS & \num{3.53}~(3) & \num{5.15e-4} & \num{3.15}~(2) & \num{3.33e-2} & \num{2.35}~(2) & \num{5.09e-2} & \num{2.00}~(1) & \num{2.86} \\
+    \bottomrule
+    \end{tabular}
+    \label{tab:Genuine3D}
+\end{table}
+
+% Suggested accompanying sentence:
+% "On a genuinely three-dimensional manufactured solution (all velocity components depending on
+%  $x,y,z$, with $u_z\neq0$), the method attains its optimal convergence rates for both element
+%  orders and both stabilizations (\cref{tab:Genuine3D}); in particular the OSGS pressure now
+%  converges in the $H^1$-seminorm (slope $2.0$ for $\mathbb{P}_2$), rather than saturating as it did
+%  on the $z$-invariant extruded field of \cref{sec:...}, indicating that the extruded pressure
+%  plateau was tied to the degeneracy of the extruded field. (The finest-mesh $H^1$ pressure errors
+%  are still $O(1)$ because the genuinely-3D ladder is coarse---only four meshes.)"
