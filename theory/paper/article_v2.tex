@@ -171,12 +171,12 @@
 \newsiamremark{assumption}{Assumption}
 \crefname{assumption}{Assumption}{Assumptions}
 \Crefname{assumption}{Assumption}{Assumptions}
-% The standing assumptions (A1)-(A8) are enumitem list items with a custom ref format
-% "(A1)". By default cleveref prefixes the enumi type name ("Item"), giving the clunky
-% "Item (A1)". Suppress the name for \cref (mid-sentence: "(A1)") and use "Assumption(s)"
-% for \Cref (sentence-start). Only the H:* assumptions use \cref on enumi items; the P:*
-% parameter items use \ref and are unaffected. (Remove these four lines to restore the
-% "Item (A1)" rendering.)
+% The standing assumptions (A1)-(A6),(S1)-(S2),(O1)-(O2) are enumitem list items with a
+% custom ref format "(A1)". By default cleveref prefixes the enumi type name ("Item"),
+% giving the clunky "Item (A1)". Suppress the name for \cref (mid-sentence: "(A1)") and use
+% "Assumption(s)" for \Cref (sentence-start). Only the H:* assumptions use \cref on enumi
+% items; the P:* parameter items and the VMS assumptions use \ref/\labelcref and are
+% unaffected. (Remove these four lines to restore the "Item (A1)" rendering.)
 \crefformat{enumi}{#2#1#3}
 \crefrangeformat{enumi}{#3#1#4--#5#2#6}
 \Crefformat{enumi}{Assumption~#2#1#3}
@@ -201,8 +201,29 @@
 \newcommand{\jump}[1]{[\![#1]\!]}
 \DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
 \newcommand{\sigmatilde}{\widetilde{\sigma}_{\alpha}}
-\newcommand{\Eint}[2]{\mathrm{E}_{\mathrm{int},#1}(#2)}
+\newcommand{\Eint}[2]{\mathrm{E}^{#1}_{\mathrm{int}}(#2)}
 
+
+% ===== OSGS companion macros (for the integrated OSGS theory and \cref{app:osgs}) =====
+\usepackage{amssymb}          % \eqsim, \circledast used by the OSGS analysis
+\providecommand{\qedhere}{}   % SIAM class proof env has no \qedhere
+\providecommand{\R}{\mathbb{R}}
+\newcommand{\bw}{\boldsymbol{w}}
+\providecommand{\norm}[1]{\lVert #1 \rVert}
+\providecommand{\normK}[1]{\lVert #1 \rVert_{K}}
+\newcommand{\tnorm}[1]{\triplenorm{#1}}
+\newcommand{\Xhz}{\Xh}
+\newcommand{\tns}{\tau_{1,\mathrm{NS}}}
+\newcommand{\Dah}{\mathrm{Da}_{h,K}}
+\newcommand{\Reh}{\mathrm{Re}_{h,K}}
+\newcommand{\smul}{\circledast}
+\newcommand{\pmul}{\circ}
+\newcommand{\Pone}{\Pi_{1}}
+\newcommand{\Ptwo}{\Pi_{2}}
+\newcommand{\Ponez}{\Pi_{1,0}}
+\newcommand{\Poneo}{\Pi_{1}^{\perp}}
+\newcommand{\Ptwoo}{\Pi_{2}^{\perp}}
+\renewcommand{\Eint}[2]{\mathrm{E}_{\mathrm{int},#1}(#2)}
 
 \begin{document}
 \def\mystrut(#1,#2){\vrule height #1pt depth #2pt width 0pt}
@@ -211,7 +232,7 @@
 
 % REQUIRED
 \begin{abstract}
-We present a finite element method for a generalized version of the Navier{\hyp}Stokes equations that is applicable to (highly permeable) porous media flows. We rely on the variational multiscale (VMS) framework to produce a stabilized numerical method that allows the use of equal{\hyp}order finite element spaces for all the problem unknowns, while also preventing the instabilities associated \amend{with} convection{\hyp}dominated flows or strong reaction terms. \amend{We carry out an a priori stability and convergence analysis of the linearized method whose error estimates are robust with respect to the Reynolds and Damk\"ohler numbers, making explicit through a porosity{\hyp}weighted norm how the constants depend on the minimum porosity.} Two variants of the basic algorithm are considered and tested in a selection of numerical experiments\amend{---two{\hyp} and three{\hyp}dimensional manufactured solutions, together with a comparison against an inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood discretization on the Darcy{\hyp}Brinkman{\hyp}Forchheimer equations---}designed to examine their performance when changing the relative magnitudes of the different terms in the momentum balance equation.
+We present a finite element method for a generalized version of the Navier{\hyp}Stokes equations that is applicable to (highly permeable) porous media flows. We rely on the variational multiscale (VMS) framework to produce a stabilized numerical method that allows the use of equal{\hyp}order finite element spaces for all the problem unknowns, while also preventing the instabilities associated \amend{with} convection{\hyp}dominated flows or strong reaction terms. \amend{We carry out an a priori stability and convergence analysis of the linearized method, establishing separate results for the two variants---coercivity for the ASGS variant and a discrete inf{\hyp}sup estimate for the OSGS variant---with error estimates that are robust with respect to the Reynolds and Damk\"ohler numbers, making explicit through a porosity{\hyp}weighted norm how the constants depend on the minimum porosity.} Two variants of the basic algorithm are considered and tested in a selection of numerical experiments\amend{---two{\hyp} and three{\hyp}dimensional manufactured solutions, together with a comparison against an inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood discretization on the Darcy{\hyp}Brinkman{\hyp}Forchheimer equations---}designed to examine their performance when changing the relative magnitudes of the different terms in the momentum balance equation.
 \end{abstract}
 
 % REQUIRED
@@ -244,13 +265,13 @@ From the numerical standpoint, the generalized equations bring about all the wel
 
 For the Navier{\hyp}Stokes system, all of these numerical issues have been successfully addressed in the past~\cite{codina2001stabilized,codina2002stabilized} using the Variational Multi-scale (VMS) framework~\cite{Hughes1998TheVM} to design stabilized methods. In~\cite{codina2001stabilized}, the so-called Algebraic Sub{\hyp}Grid Scale (ASGS) formulation is applied to the Navier{\hyp}Stokes system, including a reactive term (as well as additional terms related to Coriolis forces which we will not consider here), where optimal error estimates are proven for the linearized problem.
 
-Our goal in this work is to present a numerical method \Guillermo{for single-phase, highly permeable porous media flows. We will concentrate on the time-independent problem here, leaving time dependence considerations (e.g., of the porosity field) to future work}. To accomplish this, we generalize the formulation presented in~\cite{codina2001stabilized}, allowing for the presence of an externally-imposed porosity field, and analyze the extent to which the various results obtained in \Guillermo{that} work carry over to the present setting. Indeed, \amend{for the linearized ASGS problem with constant scalar reaction and homogeneous Dirichlet data,} our analysis shows that essentially the same stability and convergence properties are preserved \amend{provided} the porosity field is smooth \amend{with} bounded gradients \amend{that are} sufficiently resolved by the mesh. This analysis is \amend{complemented by a numerical study of the nonlinear ASGS and OSGS schemes---which explore behavior beyond the setting of the theorem---across a wide range of physical parameters}. Over the course of drafting the present paper, we came across the work \cite{nillama2022explicit}, which applies VMS to the so-called Navier{\hyp}Stokes{\hyp}Brinkman system, applicable to highly-permeable porous media flows with a \emph{uniform} porosity field. Except for the presence of a nonlinear reaction term, the theory in~\cite{codina2001stabilized} fully applies to this case, so \amend{no revision of the theory was necessary} there.
+Our goal in this work is to present a numerical method \Guillermo{for single-phase, highly permeable porous media flows. We will concentrate on the time-independent problem here, leaving time dependence considerations (e.g., of the porosity field) to future work}. To accomplish this, we generalize the formulation presented in~\cite{codina2001stabilized}, allowing for the presence of an externally-imposed porosity field, and analyze the extent to which the various results obtained in \Guillermo{that} work carry over to the present setting. Indeed, \amend{for the linearized ASGS problem with constant scalar reaction and homogeneous Dirichlet data,} our analysis shows that essentially the same stability and convergence properties are preserved \amend{provided} the porosity field is smooth \amend{with} bounded gradients \amend{that are} sufficiently resolved by the mesh. This analysis is \amend{complemented by a numerical study of the nonlinear ASGS and OSGS schemes---which explore behavior beyond the setting of the theorem---across a wide range of physical parameters}. \amend{The OSGS variant is given its own linear theory---a discrete inf{\hyp}sup stability estimate and the corresponding convergence result (\cref{sec:StabilityOSGS}, with proofs in \cref{app:osgs})---so that both stabilized formulations exercised in the experiments are covered by a linearized analysis, and the analyses of the two variants can be compared directly.} Over the course of drafting the present paper, we came across the work \cite{nillama2022explicit}, which applies VMS to the so-called Navier{\hyp}Stokes{\hyp}Brinkman system, applicable to highly-permeable porous media flows with a \emph{uniform} porosity field. Except for the presence of a nonlinear reaction term, the theory in~\cite{codina2001stabilized} fully applies to this case, so \amend{no revision of the theory was necessary} there.
 
 The formulation presented here is general enough to encompass alternative variants of the VMS formulation, defined by different choices of the space where the sub{\hyp}grid scales (SGS) live (see \cref{sec:FEDiscretization}). This generality can be useful for researchers or engineers looking to explore alternative possibilities to the basic method. In particular, we consider the so-called Orthogonal Sub{\hyp}Grid Scale (OSGS)~\cite{codina2002stabilized,codina2008analysis} alongside the ASGS in all our numerical tests.
 
 Our approach has some advantages over previous efforts that were able to successfully address the numerical challenges mentioned above, including the use of inf-sup stable element pairs~\cite{cocquet2021error}, \amend{which require a compatible velocity{\hyp}pressure discretization}; or the Local Projection Stabilization~\cite{skrzypacz}\amend{---a relevant prior stabilized finite element method for the variable{\hyp}porosity problem---}which, apart from requiring the use of special enrichment functions, introduces some constraints on the mesh topology. \amend{Beyond enabling equal{\hyp}order interpolation, the residual{\hyp}based stabilization adopted here controls convection{\hyp} and reaction{\hyp}dominance simultaneously, something an inf{\hyp}sup{\hyp}stable velocity{\hyp}pressure pair does not by itself achieve, as \cref{sec:NumericalExampleFromLiterature} illustrates with the non-convergent Taylor{\hyp}Hood velocity at high Reynolds number.}
 
-The rest of the paper is organized as follows. The continuous problem is introduced in \cref{sec:TheContinuousProblem}. In \cref{sec:StationaryProblem} we rewrite the strong problem in standard form and apply the VMS approach. In \cref{sec:StabilizationDesign} we provide a rationale behind the design of the unspecified algorithmic parameters. Their design is motivated by an argument based on the Fourier transform that can be found in~\cite{codina2002stabilized,Roa2016VariationalMF,Codina2008FiniteEA} but that, to our knowledge, had not yet been applied to the Navier{\hyp}Stokes system \amend{in the generalized form considered here}. In \cref{sec:StabilityASGS} the convergence analysis in~\cite{codina2001stabilized} is extended to the current setting, \amend{supporting the asymptotic scaling of our stabilization parameters in that linearized, elementwise{\hyp}constant setting}. In \cref{sec:Robustness}, we analyze the robustness of the formulation with respect to variations in the physical parameters. Finally, in \cref{sec:NumericalExamples} we present the results from the numerical experiments, followed by the main conclusions of our work in \cref{sec:Conclusions}.
+The rest of the paper is organized as follows. The continuous problem is introduced in \cref{sec:TheContinuousProblem}. In \cref{sec:StationaryProblem} we rewrite the strong problem in standard form and apply the VMS approach. In \cref{sec:StabilizationDesign} we provide a rationale behind the design of the unspecified algorithmic parameters. Their design is motivated by an argument based on the Fourier transform that can be found in~\cite{codina2002stabilized,Roa2016VariationalMF,Codina2008FiniteEA} but that, to our knowledge, had not yet been applied to the Navier{\hyp}Stokes system \amend{in the generalized form considered here}. In \cref{sec:StabilityASGS} we carry out the stability and convergence analysis of the linearized ASGS and OSGS methods: the convergence analysis of~\cite{codina2001stabilized} is extended to the current setting for the ASGS variant (by coercivity), and a discrete inf{\hyp}sup stability estimate is established for the OSGS variant, \amend{supporting the asymptotic scaling of our stabilization parameters in that linearized, elementwise{\hyp}constant setting}. In \cref{sec:Robustness}, we analyze the robustness of the formulation with respect to variations in the physical parameters. Finally, in \cref{sec:NumericalExamples} we present the results from the numerical experiments, followed by the main conclusions of our work in \cref{sec:Conclusions}.
 
 \section{The porous Navier{\hyp}Stokes problem}\label{sec:TheContinuousProblem}
 \newcommand{\ViscProj}{\overset{\scriptscriptstyle{\text{DS}}}{\Pi}}
@@ -837,10 +858,13 @@ That is, if the porosity changes are well resolved by the mesh. We will assume t
 
 It is not clear from the analysis above how one must evaluate the varying parameters $\alpha, \boldsymbol{w}$\amend{. Since we are solely interested in their asymptotic properties as the physical parameters take extreme values, it is only important that} their values remain \amend{of the same order as the varying fields they represent within each element}. A common criterion is to evaluate the velocity modulus to its elemental maximum (a straightforward way to avoid setting it to zero when the velocity does not exactly vanish within the element). For simplicity, we will take this route in the theoretical considerations that follow, \amend{as well as evaluating $\alpha$ to its elemental maximum, $\alpha_K = \alpha_{\infty,K}$, consistently with \cref{eq:Tau1Final,eq:Tau2Final} and with \cref{app:Continuity}}. However, while the optimization problem is trivial for some types of elements (e.g., linear elements), it can be cumbersome for others. Thus, in practice, the stabilization parameters can be taken as variable within the elements without altering their performance. This is what we have done in all the simulations presented.
 
-\section{Stability and convergence for the linearized problem and the ASGS method}\label{sec:StabilityASGS} \hfill\\
-In this section we analyze the stabilization brought about by the method in a simplified setting. The idea is to highlight why the generalization of the stabilization parameters given by \cref{eq:Tau1,eq:Tau2} with respect to the case $\alpha\equiv 1$ (standard Navier{\hyp}Stokes) still provides the necessary stability in the generic case. This stability is proved in a slightly weaker norm when $\alpha \neq 1$, although the numerical tests presented in \cref{sec:NumericalExamples} indicate that, in practice, the accuracy of the method does not significantly deteriorate in this case.
+\section{Stability and convergence for the linearized problem: the ASGS and OSGS methods}\label{sec:StabilityASGS} \hfill\\
+In this section we analyze the stability of the two stabilized methods---ASGS (\cref{sec:StabilityASGSvariant}) and OSGS (\cref{sec:StabilityOSGS})---in a simplified setting. The idea is to highlight why the generalization of the stabilization parameters given by \cref{eq:Tau1,eq:Tau2} with respect to the case $\alpha\equiv 1$ (standard Navier{\hyp}Stokes) still provides the necessary stability in the generic case. For the ASGS variant this stability is proved in a slightly weaker (damped{\hyp}reaction) norm when $\alpha \neq 1$, whereas the OSGS analysis of \cref{sec:StabilityOSGS} controls the full reaction term; the numerical tests presented in \cref{sec:NumericalExamples} indicate that, in practice, the accuracy of the methods does not significantly deteriorate in this case.
 
-\amend{The linearized problem analyzed here has a prescribed advection field $\boldsymbol{a}$ satisfying $\nabla\cdot(\alpha\boldsymbol{a})=0$, a constant scalar reaction $\boldsymbol{\sigma}=\sigma\mathbb{I}$ with $\sigma\ge0$, and homogeneous Dirichlet boundary conditions on the whole of $\partial\Omega$; $\Omega\subset\mathbb{R}^d$, $d\in\{2,3\}$, is a bounded polyhedral domain. The stability and convergence results below (\cref{lemma:Stability,lemma:Continuity,th:Convergence}) hold only under the following standing assumptions; the proofs of these results are developed in \cref{app:Continuity}:}
+\subsection{Common setting and standing assumptions}\label{sec:CommonSetting} \hfill\\
+\amend{Both stabilized variants are analyzed for the \emph{linearized} problem, in which the advection field $\boldsymbol{a}$ is prescribed (the frozen velocity of the previous nonlinear iteration) and satisfies $\nabla\cdot(\alpha\boldsymbol{a})=0$, the reaction is a constant scalar $\boldsymbol{\sigma}=\sigma\mathbb{I}$ with $\sigma\ge0$, and the boundary conditions are homogeneous Dirichlet on the whole of $\partial\Omega$; throughout, $\Omega\subset\mathbb{R}^d$, $d\in\{2,3\}$, is a bounded polyhedral domain. The stability and convergence theorems stated below---\cref{lemma:Stability,th:Convergence} for the ASGS method and \cref{th:StabilityOSGS,th:ConvergenceOSGS} for the OSGS method---hold only under the following standing assumptions, which we collect here once; the proofs are developed in \cref{app:Continuity} (ASGS) and \cref{app:osgs} (OSGS). The OSGS analysis refers to the common and OSGS{\hyp}specific assumptions by the labels $(\textup{A}1)$--$(\textup{A}6)$ and $(\textup{O}1)$--$(\textup{O}5)$ used below.}
+
+\amend{The standing assumptions fall into three groups: those common to both methods, those specific to the ASGS method, and those specific to the OSGS method. \emph{Common to both methods}:}
 \begin{enumerate}[label=\textup{(A\arabic*)},ref=\textup{(A\arabic*)},leftmargin=3.4em]
   \item\label{H:mesh} \emph{Meshes.} The family of partitions is conforming, shape{\hyp}regular and locally quasi{\hyp}uniform, so that the inverse estimate \cref{eq:InverseEstimateFiniteOrderNorm} holds with a constant $C_\text{inv}$ independent of the mesh size.
   \item\label{H:data} \emph{Coefficients.} $\nu>0$, $\sigma\ge0$ and $\varepsilon\ge0$ are constant, the reaction tensor is isotropic, $\boldsymbol{\sigma}=\sigma\mathbb{I}$, the force $\boldsymbol{f}\in L^2(\Omega)^d$, and the penalty parameter satisfies \cref{eq:UpperBoundOnEpsilon}.
@@ -851,16 +875,38 @@ In this section we analyze the stabilization brought about by the method in a si
   which sharpens the heuristic requirement \cref{eq:SmallPorosityGradient}. Here $\alpha_{0,K}\coloneqq\inf_K\alpha$, $\alpha_{\infty,K}\coloneqq\sup_K\alpha$, $\alpha_K$ is a representative value with $\alpha_{0,K}\le\alpha_K\le\alpha_{\infty,K}$, and $\delta_\alpha\coloneqq 1+C_{\nabla\alpha}$, so that $\alpha_{\infty,K}\le\delta_\alpha\,\alpha_{0,K}$.
   \item\label{H:advection} \emph{Advection.} $\boldsymbol{a}\in C^0(\overline{\Omega})^d$, elementwise $W^{1,\infty}$, with $\nabla\cdot(\alpha\boldsymbol{a})=0$ in the weak sense.
   \item\label{H:spaces} \emph{Discrete spaces.} The velocity and pressure spaces are continuous, of degrees $k_u,k_p\ge1$ with $k_p\le k_u+1$ and with constants belonging to the pressure space; the stabilization parameters $\tau_1,\tau_2$ (\cref{eq:Tau1Final,eq:Tau2Final}) are taken elementwise constant.
-  \item\label{H:coercivity} \emph{Coercivity.} $c_1>2\xi\,C_\text{inv}^2$ for some $\xi>2$ (\cref{eq:conditions_on_num_param}); here $C_\text{inv}$ is understood as the porosity{\hyp}enlarged inverse constant of \cref{eq:InverseEstimateFiniteOrderNorm}, the abuse of notation made precise later in this section.
+  \item\label{H:regularity} \emph{Regularity.} The exact solution satisfies $\boldsymbol{u}\in H^{k_u+1}(\Omega)^d$ and $p\in H^{k_p+1}(\Omega)$.
+\end{enumerate}
+
+\amend{\emph{Specific to the ASGS method}:}
+\begin{enumerate}[label=\textup{(S\arabic*)},ref=\textup{(S\arabic*)},leftmargin=3.4em]
+  \item\label{H:coercivity} \emph{Coercivity.} $c_1>2\xi\,C_\text{inv}^2$ for some $\xi>2$ (\cref{eq:conditions_on_num_param}); here $C_\text{inv}$ is understood as the porosity{\hyp}enlarged inverse constant of \cref{eq:InverseEstimateFiniteOrderNorm}, the abuse of notation made precise in \cref{sec:StabilityASGSvariant}.
   \item\label{H:jump} \emph{Interior{\hyp}face jump condition} (only when $\sigma>0$). Any two elements $K_1,K_2$ sharing a face satisfy
   \begin{equation}\label{eq:JumpCondition}
     c_J\,\alpha_{K_1}\tau_{1,\text{NS}}^{-1}\big|_{K_1}\le\alpha_{K_2}\tau_{1,\text{NS}}^{-1}\big|_{K_2}\le c_J'\,\alpha_{K_1}\tau_{1,\text{NS}}^{-1}\big|_{K_1},\qquad 0<c_J\le1\le c_J',
   \end{equation}
   which, by \cref{H:porosity,H:mesh}, reduces to a mild comparability of $\lVert\boldsymbol{a}\rVert_{\infty}$ across the face relative to $\nu/h_K$, as in~\cite{codina2001stabilized}.
-  \item\label{H:regularity} \emph{Regularity.} The exact solution satisfies $\boldsymbol{u}\in H^{k_u+1}(\Omega)^d$ and $p\in H^{k_p+1}(\Omega)$.
 \end{enumerate}
 
-\amend{Under the standing assumptions above, the stabilization parameters reduce to}
+\amend{\emph{Specific to the OSGS method}. The design and projection{\hyp}stability conditions \cref{H:design,H:projection} are proper to the orthogonal formulation; the mesh, porosity and advection conditions \cref{H:patch,H:porositysmooth,H:advectionsmooth} are technical strengthenings of the common assumptions \cref{H:mesh,H:porosity,H:advection}, used only by the OSGS analysis:}
+\begin{enumerate}[label=\textup{(O\arabic*)},ref=\textup{(O\arabic*)},leftmargin=3.4em]
+  \item\label{H:design} \emph{Design constants.} There is $\gamma\ge\gamma_0$ with $c_1\ge\gamma^2 C_\text{inv}^2$ and $c_2\ge\gamma\,C_\text{inv}$ (an admissible $\gamma_0$, and a small{\hyp}mesh threshold $h\le h_0$, are given in \cref{app:osgs}); moreover $\varepsilon\tau_{2,K}\le C_2<1$ on every element, consistently with \cref{H:data}.
+  \item\label{H:projection} \emph{Projection stability.} Let $\Pi_1$ and $\Pi_{1,0}$ be the $\tau_1${\hyp}weighted $L^2$ projections of a velocity field onto the unconstrained and the constrained velocity spaces, and $\Pi_1^{\perp}\coloneqq I-\Pi_1$. There is $\beta_0>0$, independent of $h$, such that for all $V_h=[\boldsymbol{v}_h;q_h]\in\Xh$, writing $\boldsymbol{z}_h\coloneqq\alpha(\boldsymbol{a}\cdot\nabla\boldsymbol{v}_h+\nabla q_h)$,
+  \begin{equation}\label{eq:ProjectionStability}
+    \bigl\lVert\tau_1^{1/2}\boldsymbol{z}_h\bigr\rVert_h \le \frac{1}{\beta_0}\Bigl(\bigl\lVert\tau_1^{1/2}\Pi_{1,0}\boldsymbol{z}_h\bigr\rVert_h+\bigl\lVert\tau_1^{1/2}\Pi_1^{\perp}\boldsymbol{z}_h\bigr\rVert_h\Bigr).
+  \end{equation}
+  This is the Codina--Blasco{\hyp}type inf{\hyp}sup condition~(35) of~\cite{Codina2008FiniteEA}.
+  \item\label{H:patch} \emph{Mesh (patch structure and element{\hyp}size surrogates)}, strengthening \cref{H:mesh}. The element patches $S_K$ (the union of the elements sharing at least a vertex with $K$) are quasi{\hyp}uniform: there are constants $0<\underline{C}\le\overline{C}$, independent of $h$, with
+  \begin{equation}\label{eq:PatchQuasiUniformity}
+    \underline{C}\,h_K\le h_{K'}\le\overline{C}\,h_K\qquad\forall\,K'\subset S_K,\ \forall\,K.
+  \end{equation}
+  Moreover, mesh nondegeneracy furnishes continuous element{\hyp}size surrogates $\chi_1(\cdot,h),\chi_2(\cdot,h)\in C^0(\overline{\Omega})$ with $\chi_1(\boldsymbol{x}_K,h)\le h_K\le\chi_2(\boldsymbol{x}_K,h)$ at the element barycenters $\boldsymbol{x}_K$ and $\sup_h\sup_{\boldsymbol{x}}\chi_2/\chi_1\le\chi_0<\infty$; the element length entering $\tau_1,\tau_2$ is taken as $h_K\coloneqq\chi_1(\boldsymbol{x}_K,h)$.
+  \item\label{H:porositysmooth} \emph{Porosity smoothness}, strengthening \cref{H:porosity}. For the OSGS consistency estimate at interpolation order $m=\max(k_u,k_p)\ge2$, additionally $\alpha\in W^{m,\infty}(\Omega)$, and we set $C_{\alpha,m}\coloneqq 1+\sum_{j=1}^{m}\norm{D^j\alpha}_{L^\infty(\Omega)}/\alpha_0$.
+  \item\label{H:advectionsmooth} \emph{Advection smoothness}, strengthening \cref{H:advection}. For the OSGS consistency estimate, additionally $\lVert D^j\boldsymbol{a}\rVert_{L^\infty(K)}\le C_D\,\lVert\boldsymbol{a}\rVert_{\infty,K}$ for $1\le j\le k_u$ and every $K$.
+\end{enumerate}
+
+\subsection{The ASGS variant: stability and convergence}\label{sec:StabilityASGSvariant} \hfill\\
+Under the standing assumptions of \cref{sec:CommonSetting}, the stabilization parameters reduce to
 \begin{align}
     \tau_1 &= \frac{1}{\alpha_K \tau_{1, \text{NS}}^{-1} + \sigma} \label{eq:Tau1Final}, \\
     \tau_2 &= \frac{h^2}{c_1 \alpha_K \tau_{1, \text{NS}}} \label{eq:Tau2Final},
@@ -868,7 +914,7 @@ In this section we analyze the stabilization brought about by the method in a si
 where $\alpha_K$ is the representative porosity of \cref{H:porosity} ($\alpha_{0,K}\leq\alpha_K\leq\alpha_{\infty,K}$). As with the convective velocity in the definition of $\tau_{1, \text{NS}}$, we take $\alpha_K = \alpha_{\infty,K}$, the natural choice for the analysis presented below, as it yields simplified estimates. \amend{The coefficient bounds below are written for this choice; any other admissible representative works after inserting factors of $\delta_\alpha$, bounded under \cref{H:porosity}.}
 
 \begin{remark}
-\amend{Both the analysis below and the numerical experiments use $\tau_2$ as in \cref{eq:Tau2Final}, i.e.\ without the $\varepsilon h^2$ term of \cref{eq:Tau2}. Under \cref{eq:UpperBoundOnEpsilon} (with $0\le C_2<1$ the constant introduced there) the two definitions are equivalent up to the factor $1+C_2<2$: writing $\tau_2^{\mathrm{full}}$ for \cref{eq:Tau2}, $\tau_2/\tau_2^{\mathrm{full}} = 1+\varepsilon\tau_2 \le 1+C_2$, so that $\tau_2^{\mathrm{full}}\le\tau_2\le(1+C_2)\,\tau_2^{\mathrm{full}}$, and every estimate below transfers to the fuller parameter \cref{eq:Tau2} with constants inflated by at most $1+C_2$.}
+\amend{Both the analysis below and the numerical experiments use $\tau_2$ as in \cref{eq:Tau2Final}, i.e.\ without the $\varepsilon h^2$ term of \cref{eq:Tau2}. Under \cref{eq:UpperBoundOnEpsilon} the two definitions are equivalent up to the factor $1+C_2<2$: writing $\tau_2^{\mathrm{full}}$ for \cref{eq:Tau2}, $\tau_2/\tau_2^{\mathrm{full}} = 1+\varepsilon\tau_2 \le 1+C_2$, so that $\tau_2^{\mathrm{full}}\le\tau_2\le(1+C_2)\,\tau_2^{\mathrm{full}}$, and every estimate below transfers to the fuller parameter \cref{eq:Tau2} with constants inflated by at most $1+C_2$.}
 \end{remark}
 
 First, let us look at the stability of the Galerkin method for the linearized problem. Let us begin by expressing its associated bilinear form in terms of the velocity and pressure unknowns $\boldsymbol{u}_h$ and $p_h$ as well as a given convective field $\boldsymbol{a}$:
@@ -877,7 +923,7 @@ First, let us look at the stability of the Galerkin method for the linearized pr
   & + \innerprod{\boldsymbol{v}_h, \alpha \nabla p_h} + \innerprod{\boldsymbol{v}_h, \sigma \boldsymbol{u}_h} + \innerprod{q_h, \varepsilon p_h} + \innerprod{q_h, \nabla \cdot \left( \alpha \boldsymbol{u}_h \right)}.
 \end{align}
 Using the finite element unknown as the test function and assuming $\nabla \cdot (\alpha \boldsymbol{a}) = 0$ and $\boldsymbol{u}_h = \boldsymbol{0}$ on $\partial \Omega$, we obtain
-\begin{equation}
+\begin{equation}\label{eq:GalerkinCoercivityIdentity}
   B(\boldsymbol{a}, U_h, U_h) = 2 \nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \big\| \sigma^{1/2} \boldsymbol{u}_h \big\|^2 + \varepsilon \big\| p_h \big\|^2,
 \end{equation}
 which generalizes the stability estimate obtained for the Galerkin method for the standard Navier{\hyp}Stokes equations. Note that, for very small viscosities or fluid volume fractions, the first term above will provide almost no control over the gradient of the velocity, leading to oscillations on the solution. This is what happens in the standard case, but here the problem is aggravated for small porosities.
@@ -898,15 +944,14 @@ For the coercivity argument to close, $\varepsilon$ must be small; in particular
 \end{equation}
 \amend{for some fixed constant $0 \leq C_2 < 1$, independent of the mesh and of the physical parameters.}
 
-Under \cref{eq:UpperBoundOnEpsilon} the compressibility coefficient remains stabilizing, $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon>0$; the strict inequality $\varepsilon\tau_2<1$ alone would not suffice, as it gives no uniform margin when $\sigma=0$. \amend{As carried out in detail in \cref{lem:coercivity} of \cref{app:Continuity}, the coefficients of $\|\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\|_K^2$ and of $\|\boldsymbol{u}_h\|_K^2$ in $B_\text{S}(\boldsymbol{a}, U_h, U_h)$ are then bounded below by a positive multiple of $\nu$ and of the damped reaction coefficient}
+\amend{Under \cref{eq:UpperBoundOnEpsilon} the compressibility coefficient remains stabilizing, $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon>0$; the strict inequality $\varepsilon\tau_2<1$ alone would not suffice, as it gives no uniform margin when $\sigma=0$. As carried out in detail in \cref{lem:coercivity} of \cref{app:Continuity}, the coefficients of $\|\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\|_K^2$ and of $\|\boldsymbol{u}_h\|_K^2$ in $B_\text{S}(\boldsymbol{a}, U_h, U_h)$ are then bounded below by a positive multiple of $\nu$ and of the damped reaction coefficient}
 \begin{equation} \label{eq:SigmaAlpha}
     \widetilde{\sigma}_\alpha \coloneqq \frac{\tau_{1, \text{NS}}^{-1} \sigma}{\tau_{1, \text{NS}}^{-1} + \sigma/\alpha_K },
 \end{equation}
-respectively, both strictly positive provided, for some $\xi>2$, the condition
+\amend{respectively, both strictly positive provided, for some $\xi>2$,}
 \begin{equation} \label{eq:conditions_on_num_param}
     c_1 > 2\xi C_\text{inv}^2.
 \end{equation}
-is met.
 
 \begin{remark}
     Condition \cref{eq:conditions_on_num_param} implies that the optimal value of $c_1$ depends on the element types involved through the inverse estimate constant. In particular, for elements of the same polynomial order $k$ for the velocity and the pressure, taking $c_1 = 4 k^4, c_2 = 2 k^2$ turns out to be effective~\cite{codina2018hp,villota2019aproximacion} \amend{for the two-dimensional (triangular and quadrilateral) meshes, and is the choice made in the two-dimensional experiments of \cref{sec:NumericalExamplesStationaryCase2D}. For the three-dimensional tetrahedral meshes the inverse-estimate constant $C_\text{inv}$ is markedly larger, so a correspondingly larger $c_1$ is required by \cref{eq:conditions_on_num_param}; the value used there is specified in \cref{sec:NumericalExamplesStationaryCase3D}}. This scaling is consistent with the quadratic dependence of $C_\text{inv}$ on the polynomial order, which is known to grow as $k^2$ (see~\cite{codina2018hp} for details). It is also consistent with the interpretation given above of $c_1$ as the square of the characteristic wave number of the oscillations produced by the \emph{unresolved} part of the solution in terms of their contribution to $|\mathcal{L}U|_\Lambda^2$; see \cref{eq:BoundProjectionOfLBySubscales}.
@@ -915,14 +960,14 @@ is met.
 The stability of the stabilized method is then expressed by the following bound, proved in \cref{lem:coercivity} of \cref{app:Continuity}:
 
 \begin{lemma} \label{lemma:Stability}
-  \amend{Under the standing assumptions of \cref{sec:StabilityASGS}---in particular the coercivity condition \cref{H:coercivity} ($c_1 > 2\xi C_\text{inv}^2$ for some $\xi > 2$)---there exists} a positive constant $C$ such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_{h0}$ it holds that
+  \amend{Under the standing assumptions of \cref{sec:CommonSetting}---in particular the coercivity condition \cref{H:coercivity} ($c_1 > 2\xi C_\text{inv}^2$ for some $\xi > 2$)---there exists} a positive constant $C$ such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_{h0}$ it holds that
   \begin{equation}
-    B_\text{S}(\boldsymbol{a}, U_h, U_h) \geq C \triplenorm{U_h}^2,
+    B_\text{S}(\boldsymbol{a}, U_h, U_h) \geq C \triplenorm{U_h}_{\mathrm{S}}^2,
   \end{equation}
 \end{lemma}
 where
 \begin{equation}
-  \triplenorm{U_h} \coloneqq \bigg(\nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \Big\| \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \Big\|_h^2 + \varepsilon\big\| p_h \big\|^2 + \Big\| \tau_1^{1/2} \alpha X(U_h) \Big\|_h^2 + \Big\| \tau_2^{1/2} \nabla \cdot ( \alpha \boldsymbol{u}_h ) \Big\|_h^2 \bigg)^{1/2},
+  \triplenorm{U_h}_{\mathrm{S}} \coloneqq \bigg(\nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \Big\| \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \Big\|_h^2 + \varepsilon\big\| p_h \big\|^2 + \Big\| \tau_1^{1/2} \alpha X(U_h) \Big\|_h^2 + \Big\| \tau_2^{1/2} \nabla \cdot ( \alpha \boldsymbol{u}_h ) \Big\|_h^2 \bigg)^{1/2},
 \end{equation}
 with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
 \begin{remark}
@@ -932,9 +977,9 @@ with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
 \amend{Following the process used in the proof of Lemma 2 in~\cite{codina2001stabilized}, adapting every estimate to the presence of the porosity field, one can prove the following continuity result for the bilinear form $B_\text{S}$ (a complete proof is given in \cref{app:Continuity}):}
 
 \begin{lemma} \label{lemma:Continuity}
-    \amend{Under the standing assumptions of \cref{sec:StabilityASGS}, but requiring of the design constants only $c_1,c_2>0$ (not the coercivity condition \cref{H:coercivity}; the complete proof in \cref{app:Continuity} uses these weaker hypotheses, though the mesh non-degeneracy and porosity resolution are still needed), and including the jump condition \cref{H:jump} when $\sigma>0$, there exists} a positive constant $C$, such that
+    \amend{Under the standing assumptions of \cref{sec:CommonSetting}, but requiring of the design constants only $c_1,c_2>0$ (not the coercivity condition \cref{H:coercivity}; the complete proof in \cref{app:Continuity} uses these weaker hypotheses, though the mesh non-degeneracy and porosity resolution are still needed), and including the jump condition \cref{H:jump} when $\sigma>0$, there exists} a positive constant $C$, such that
     \begin{equation}
-        \bigl| B_\text{S}(\boldsymbol{a}, U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h},
+        \bigl| B_\text{S}(\boldsymbol{a}, U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h}_{\mathrm{S}},
     \end{equation}
     for all $U_h, V_h \in \mathcal{X}_{h\amend{0}}$.
 \end{lemma}
@@ -944,21 +989,135 @@ Using \cref{lemma:Stability} and \amend{a modified version of \cref{lemma:Contin
 \begin{theorem} \label{th:Convergence}
  Let $U$ be the exact solution of the linearized problem corresponding to \cref{eq:DiscretizedNonlinearStabilizedEquation}, where $\boldsymbol{u}^{m-1}$ is replaced by a given $\boldsymbol{a}$ such that $\nabla \cdot (\alpha\boldsymbol{a})=0$ and where $\boldsymbol{\pi}_h^m=\boldsymbol{0}$ (ASGS method). Then, under the assumptions of \cref{lemma:Stability,lemma:Continuity}\amend{ and the regularity \cref{H:regularity}}, there exists a positive constant $C$, such that
  \begin{equation}\label{eq:ConvergenceResult}
-    \triplenorm{E_h} \leq C \amend{\left[ \sum_K \frac{\alpha_K^2}{h_K^2} \left( \tau_{2,K}\,\mathrm{E}_{\textup{int},K}(\boldsymbol{u})^2 + \tau_{1,K}\,\mathrm{E}_{\textup{int},K}(p)^2 \right) \right]^{1/2}},
+    \triplenorm{E_h}_{\mathrm{S}} \leq C \amend{\left[ \sum_K \frac{\alpha_K^2}{h_K^2} \left( \tau_{2,K}\,\mathrm{E}_{\textup{int},K}(\boldsymbol{u})^2 + \tau_{1,K}\,\mathrm{E}_{\textup{int},K}(p)^2 \right) \right]^{1/2}},
  \end{equation}
 \end{theorem}
 where $E_h \coloneqq U - U_h$ and where the interpolation error is defined as
 \begin{equation} \label{eq:InterpolationError}
     \mathrm{E}_{\text{int},K}(\psi) \coloneqq h_K^{k_\psi + 1} \| \psi \|_{H^{k_\psi + 1}(K)},
 \end{equation}
-where $\psi$ is the field being interpolated and $k_\psi$ the corresponding polynomial order of the interpolation. \amend{We write $\mathrm{E}_{\textup{int}}(\psi) \coloneqq \big(\sum_{K\in\mathcal{T}_h}\mathrm{E}_{\textup{int},K}(\psi)^2\big)^{1/2}$ for the associated global (mesh) interpolation error, the quantity used in the robustness analysis of \cref{sec:Robustness}. The estimate \cref{eq:ConvergenceResult} is stated in the strongest, porosity{\hyp}weighted $\ell^2$ form afforded by the present argument (it is derived as \cref{eq:Enorm} in \cref{app:Continuity}); the local factor $\alpha_K \le 1$ makes the bound tighter in regions of low porosity, consistently with \cref{sec:Robustness}. The coarser $\ell^1$ estimate
+where $\psi$ is the field being interpolated and $k_\psi$ the corresponding polynomial order of the interpolation. \amend{We write $\mathrm{E}_{\textup{int}}(\psi) \coloneqq \big(\sum_{K\in\mathcal{T}_h}\mathrm{E}_{\textup{int},K}(\psi)^2\big)^{1/2}$ for the associated global (mesh) interpolation error, the quantity used in the robustness analysis of \cref{sec:Robustness}. We denote by $\Psi_{\mathrm{S}}(h)$ the porosity{\hyp}weighted $\ell^2$ functional multiplying $C$ on the right of \cref{eq:ConvergenceResult}; it is the strongest form afforded by the present argument (it is derived as \cref{eq:Enorm} in \cref{app:Continuity}), and the local factor $\alpha_K \le 1$ makes the bound tighter in regions of low porosity, consistently with \cref{sec:Robustness}. The OSGS convergence theorem of \cref{sec:StabilityOSGS} is stated in the parallel functional $\Psi_{\mathrm{O}}(h)$. The coarser $\ell^1$ estimate
  \begin{equation*}
-    \triplenorm{E_h} \leq C \sum_K \frac{\alpha_K}{h_K} \left( \tau_{2,K}^{1/2}\mathrm{E}_{\textup{int},K}(\boldsymbol{u}) + \tau_{1,K}^{1/2} \mathrm{E}_{\textup{int},K}(p) \right)
+    \triplenorm{E_h}_{\mathrm{S}} \leq C \sum_K \frac{\alpha_K}{h_K} \left( \tau_{2,K}^{1/2}\mathrm{E}_{\textup{int},K}(\boldsymbol{u}) + \tau_{1,K}^{1/2} \mathrm{E}_{\textup{int},K}(p) \right)
  \end{equation*}
  follows at once by the discrete $\ell^2\subset\ell^1$ inequality and reduces, for $\alpha\equiv1$, to the form obtained in~\cite{codina2001stabilized}. A complete proof, following the process of~\cite{codina2001stabilized} adapted to the porosity field, is given in \cref{app:Continuity}.}
 
 % Section on variational crimes:
 %\input{variational_crimes}
+
+\subsection{The OSGS variant: stability and convergence}\label{sec:StabilityOSGS} \hfill\\
+The orthogonal subgrid{\hyp}scale (OSGS) variant replaces the algebraic subscale by the
+fluctuation $\Pi_i^{\perp}=I-\Pi_i$ of the finite{\hyp}element residual with respect to the
+$\boldsymbol{\tau}${\hyp}weighted $L^2$ projection $\Pi_i$ onto the unconstrained
+finite{\hyp}element spaces. For the
+linearized, constant{\hyp}coefficient problem analyzed here the resulting bilinear form is
+\begin{equation}\label{eq:BosgsMain}
+  B_{\mathrm{osgs}}(\boldsymbol{a};U,V)
+  = B(\boldsymbol{a};U,V)
+  + \bigl(\Pi_1^{\perp}[\alpha X(U)],\,\alpha X(V)\bigr)_{\tau_1}
+  + \bigl(\Pi_2^{\perp}[\nabla\cdot(\alpha\boldsymbol{u})],\,\nabla\cdot(\alpha\boldsymbol{v})\bigr)_{\tau_2},
+\end{equation}
+where $B$ is the Galerkin form and $X(U)=\boldsymbol{a}\cdot\nabla\boldsymbol{u}+\nabla p$ is
+the first{\hyp}order momentum operator. For constant $\sigma$ and $\varepsilon$ the reactive
+and compressibility residuals belong to the finite{\hyp}element space and are annihilated by
+the projection (\cref{oa:lem:annihilation}), so they do not appear in \cref{eq:BosgsMain}. Here
+$(f,g)_{\tau_i}\coloneqq\sum_K\tau_{i,K}\,(f,g)_K$ and
+$\norm{f}_{\tau_i}\coloneqq(f,f)_{\tau_i}^{1/2}=\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h$ denote the
+$\boldsymbol{\tau}${\hyp}weighted broken product and norm. The
+analysis is carried out in the OSGS triple norm
+\begin{equation}\label{eq:TripleNormOSGS}
+  \triplenorm{V}_{\mathrm{O}}
+  \coloneqq
+  \Bigl(
+  2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\boldsymbol{v} \bigr\rVert^2
+  + \norm{\sigma^{1/2}\boldsymbol{v}}^2
+  + \varepsilon\norm{q}^2
+  + \norm{\alpha X(V)}_{\tau_1}^2
+  + \norm{\nabla\cdot(\alpha\boldsymbol{v})}_{\tau_2}^2
+  \Bigr)^{1/2},
+\end{equation}
+which, unlike the ASGS norm $\triplenorm{\cdot}_{\mathrm{S}}$ of \cref{lemma:Stability}, controls
+the \emph{full} reaction term $\norm{\sigma^{1/2}\boldsymbol{v}}$ rather than the damped
+$\lVert\sigmatilde^{1/2}\boldsymbol{v}\rVert_h$ (indeed
+$\triplenorm{V}_{\mathrm{S}}\le\triplenorm{V}_{\mathrm{O}}$ term by term,
+\cref{oa:lem:normcomparison}); it is a genuine norm on $\Xh$ under full Dirichlet data and
+pressure normalization (\cref{oa:lem:definiteness}). Beyond the standing assumptions of the
+ASGS analysis, the OSGS route requires two conditions proper to the orthogonal
+formulation---the design{\hyp}constant condition \cref{H:design} (which, unlike the ASGS
+coercivity condition, constrains both $c_1$ and $c_2$) and a Codina--Blasco{\hyp}type
+projection stability \cref{H:projection}---together with mild technical strengthenings of the
+mesh, porosity and advection assumptions (\cref{H:patch,H:porositysmooth,H:advectionsmooth}),
+the last two entering only the higher{\hyp}order consistency estimate.
+
+\begin{theorem}[Inf--sup stability of the OSGS method]\label{th:StabilityOSGS}
+Under the standing assumptions of \cref{sec:CommonSetting} there exist $h_0>0$ and $\beta_{\mathrm{osgs}}>0$,
+depending only on the projection{\hyp}stability constant, the compressibility bound~$C_2$, and
+the mesh and porosity{\hyp}resolution constants, such that for all $h\le h_0$
+\begin{equation}\label{eq:InfSupMain}
+  \inf_{U_h\in\Xh\setminus\{0\}}\ \sup_{V_h\in\Xh\setminus\{0\}}\
+  \frac{B_{\mathrm{osgs}}(\boldsymbol{a};U_h,V_h)}{\triplenorm{U_h}_{\mathrm{O}}\,\triplenorm{V_h}_{\mathrm{O}}}
+  \ \ge\ \beta_{\mathrm{osgs}};
+\end{equation}
+in particular the linearized OSGS problem has a unique discrete solution.
+\end{theorem}
+
+\noindent The proof (\cref{oa:th:stability}) is by an inf--sup argument rather than
+coercivity: a special test function built from smoothed weighted projections recovers the
+projected components not controlled by the diagonal. The sufficient conditions on $c_1,c_2$
+that it uses are far from sharp, and in particular do \emph{not} certify the values
+$c_1=4k^4$ (or $16k^4$), $c_2=2k^2$ used in the experiments; the threshold $h_0$ likewise
+depends on the coefficient data. The result is a conditional stability theorem, not a
+calibration of the stabilization constants.
+
+\begin{theorem}[Convergence of the OSGS method]\label{th:ConvergenceOSGS}
+Under the standing assumptions of \cref{sec:CommonSetting} (including the regularity \cref{H:regularity}) and for $h\le h_0$ as in \cref{th:StabilityOSGS}, the OSGS solution satisfies
+\begin{equation}\label{eq:ConvergenceOSGS}
+  \triplenorm{U-U_h}_{\mathrm{O}}
+  \ \le\ C\,\Psi_{\mathrm{O}}(h)
+  = C\Bigl(\sum_K (c_1+\Dah)\,\frac{\alpha_K^2}{h_K^2}
+  \bigl(\tau_{2,K}\,\Eint{K}{\boldsymbol{u}}^2 + \tau_{1,K}\,\Eint{K}{p}^2\bigr)\Bigr)^{1/2},
+\end{equation}
+that is, the porosity{\hyp}weighted $\ell^2$ error functional of the ASGS convergence theorem
+\cref{eq:ConvergenceResult}, in a norm at least as strong, weighted elementwise by
+$(c_1+\Dah)^{1/2}$, with $\Dah\coloneqq\sigma h_K^2/(\alpha_K\nu)$ the elemental mesh
+Damk\"ohler number.
+\end{theorem}
+
+\noindent The factor is a fixed $O(1)$ constant that degrades to $1+O(h_K^2)$ once the design
+constant $c_1$ is absorbed into $C$, but permits a pre{\hyp}asymptotic excess of order
+$\Dah^{1/2}$ in strongly reaction{\hyp}dominated regimes;
+it arises because the orthogonal projection deletes the reactive subscale that, in the ASGS
+variant, renormalizes $\sigma$ down to $\sigmatilde$ (\cref{oa:rem:mechanism}). A
+$\sigma${\hyp}robust, optimal{\hyp}order $L^2$ velocity estimate follows as
+\cref{oa:cor:Ltwo}. \Cref{tab:ASGSvsOSGS} summarizes the comparison.
+
+\begin{table}[!htbp]
+  \centering
+  \caption{The linearized ASGS and OSGS analyses compared. Both concern the linearized
+  problem with prescribed weighted{\hyp}solenoidal advection, constant scalar reaction and
+  full Dirichlet data; neither covers the nonlinear DBF computations directly.}
+  \label{tab:ASGSvsOSGS}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Feature & ASGS & OSGS \\
+    \midrule
+    Stability mechanism      & coercivity (test $=$ trial)          & discrete inf--sup \\
+    Working norm             & $\triplenorm{\cdot}_{\mathrm{S}}$: damped $\sigmatilde$ & $\triplenorm{\cdot}_{\mathrm{O}}$: full $\sigma$ \\
+    Consistency              & exact for the analyzed form           & high{\hyp}order consistency defect \\
+    Extra assumption         & face{\hyp}jump condition \cref{H:jump} when $\sigma>0$ & weighted projection stability \cref{H:projection} \\
+    Error functional         & $\Psi_{\mathrm{S}}(h)$                & $\Psi_{\mathrm{O}}(h)=(c_1+\Dah)^{1/2}$--weighted \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The two theorems concern \emph{linearized} schemes with prescribed weighted{\hyp}solenoidal
+advection, constant scalar reaction, full Dirichlet velocity data, elementwise{\hyp}constant
+stabilization parameters and, for OSGS, $\boldsymbol{\tau}${\hyp}weighted orthogonal
+projections and the first{\hyp}order (Method~I) residual. The computations of
+\cref{sec:NumericalExamples} use nonlinear advection, pointwise parameters, ordinary $L^2$
+projection and, in the DBF tests, nonlinear reaction; they therefore explore nearby methods
+that lie beyond both theorems, and the numerical agreement with the OSGS estimate
+(\cref{oa:rem:numerics}) is read as consistency in order of magnitude, not verification.
 
 \section{Robustness of the formulation with respect to changes in the physical parameters}\label{sec:Robustness}
 Let us investigate how our convergence results are affected when the physical parameters take extreme values. We begin by writing down a dimensionless version of the momentum conservation equation \cref{eq:StrongMomentumEquation}:
@@ -976,7 +1135,7 @@ where the constants $L$, $U$, are the (problem-dependent) characteristic length 
 \end{equation}
 Clearly, such a scaling is not universally valid for all the solutions of \cref{eq:StrongMomentumEquation,eq:StrongMassEquation} (e.g., at sufficiently low Reynolds numbers, one can pick the force term to achieve a null pressure field), but is valid in most flows of interest.
 
-\Cref{eq:DimensionlessMomentumEquation} is particularly convenient for analyzing the relative weight of the various terms involved, given by their respective coefficients. In particular, we will study next the robustness of the convergence result \cref{eq:ConvergenceResult} by considering different combinations of limiting values for $\Reyn$ and $\Damk$. For that, note the following asymptotic dependencies (as $h \rightarrow 0$):
+\Cref{eq:DimensionlessMomentumEquation} is particularly convenient for analyzing the relative weight of the various terms involved, given by their respective coefficients. In particular, we will study next the robustness of the convergence results \cref{eq:ConvergenceResult,eq:ConvergenceOSGS} by considering different combinations of limiting values for $\Reyn$ and $\Damk$. For that, note the following asymptotic dependencies (as $h \rightarrow 0$):
 \begin{align}\label{eq:GeneralAsymptoticBehaviourOfParameters}
     \begin{split}
         \tau_1 &\sim \frac{1}{\alpha_K (1 + \Reyn_h + \Damk_h)} \, \frac{h^2}{\nu}, \\
@@ -987,6 +1146,8 @@ Clearly, such a scaling is not universally valid for all the solutions of \cref{
 where the $h$ subindices refer to the fact that the element is considered the \emph{domain of interest}, so that $L$ is replaced by $h$ and the porosity supremum $\alpha_\infty$ by its elemental value $\alpha_K$. \amend{The macroscopic and elemental Damk\"ohler numbers are thus related by $\Damk = \Damk_h\,(L^2/h^2)\,(\alpha_K/\alpha_\infty)$, with the ratio $\alpha_K/\alpha_\infty \le 1$ bounded and independent of the mesh size; in particular $\Damk \propto \Damk_h\,L^2/h^2$, which is all that the scaling arguments below use.}
 
 \amend{Two logically distinct regimes must be kept separate in what follows. For \emph{fixed} physical data the elemental numbers scale as $\Reyn_h = \Reyn\,h/L = O(h)$ and $\Damk_h = \Damk\,h^2/L^2 = O(h^2)$, so both tend to zero under refinement and the genuine asymptotic ($h\to0$) regime is always the viscosity{\hyp}dominated one. The convection{\hyp} and reaction{\hyp}dominated cases treated below are therefore \emph{pre{\hyp}asymptotic}, parameter{\hyp}dependent regimes---realized on a fixed mesh, or in a simultaneous parameter{\hyp}mesh limit in which $\Reyn$ or $\Damk$ grows fast enough to keep $\Reyn_h$ or $\Damk_h$ large---rather than alternative fixed{\hyp}data limits as $h\to0$. Accordingly, each estimate below describes the local behavior of the error \emph{functional} in its regime; the qualifiers `optimal', `uniform' and `robust' are to be read against the stated regime (fixed data with $h\to0$, or a prescribed parameter regime on a given mesh), and, where the estimate is a weighted elementwise sum, under the global quasi{\hyp}uniformity of the mesh family assumed throughout.}
+
+\amend{These asymptotics, and hence the whole analysis, are shared by the two variants. The OSGS convergence estimate \cref{eq:ConvergenceOSGS} is the ASGS one \cref{eq:ConvergenceResult} with the error functional inflated elementwise by $(c_1+\Damk_h)^{1/2}$ and the damped reaction weight $\sigmatilde$ of the working norm replaced by the full $\sigma$. Both modifications are governed by the elemental Damk\"ohler number: $c_1$ is a fixed $O(1)$ design constant, so $(c_1+\Damk_h)^{1/2}=O(1)$ whenever $\Damk_h\lesssim 1$, while the reaction weights obey $\sigmatilde/\sigma = 1/\bigl(1+\Damk_h/(c_1+c_2\Reyn_h)\bigr)\to 1$ in the same range. Consequently the estimates of the viscous{\hyp} and convection{\hyp}dominated regimes below hold \emph{verbatim} for the OSGS method up to a constant, and the two variants part company only in the reaction{\hyp}dominated limit of \cref{sec:DominantReaction}, where both effects are examined side by side.}
 
 \subsection{Dominant viscous diffusion ($\Reyn_h, \Damk_h \rightarrow 0$)} \hfill\\
 In this case we have that
@@ -1062,14 +1223,22 @@ Let us thus derive estimates for the norm of the gradient of the pressure. In th
 \end{equation}
 \amend{This is the only estimate of the section carrying the prefactor $1/\alpha_0$ rather than $\alpha_0^{-1/2}$: in the reaction limit $\tau_1 \sim 1/\sigma$, so the pressure{\hyp}gradient control $\tau_1^{1/2}\alpha\lVert \nabla e_p \rVert$ is at its weakest, and isolating $\lVert \nabla e_p \rVert$ from it costs a further factor $\alpha_0^{-1/2}$.} Here the situation is reversed with respect to the dependence on $\amend{\Damk}$. The loss of one order in the pressure accuracy is greatly mitigated by the \amend{factor $\Damk^{-1/2} \propto \Damk_h^{-1/2}\, h/L$} in reaction-dominated flows\amend{. Note that this mitigation factor is independent of the mesh size, since $\Damk_h \propto h^2$}.
 
+\amend{This is the regime in which the OSGS estimate departs from the ASGS one, through the two features anticipated above---now both active. The error functional of \cref{eq:ConvergenceOSGS} carries the elementwise factor $(c_1+\Damk_h)^{1/2}\sim\Damk_h^{1/2}$, so the OSGS velocity{\hyp} and pressure{\hyp}gradient bounds are exactly \cref{eq:DominantReactionVelocityGradientEstimate,eq:DominantReactionPressureGradientEstimate} inflated by $\Damk_h^{1/2}$; since $\Damk_h\propto h^2$ this excess is $O(h)$ and is recovered under refinement. In exchange, the OSGS working norm controls the \emph{full} reaction term $\lVert\sigma^{1/2}\boldsymbol{e}_u\rVert$ instead of the damped $\lVert\sigmatilde^{1/2}\boldsymbol{e}_u\rVert$, stronger by exactly the factor $(\sigma/\sigmatilde)^{1/2}=\bigl(1+\Damk_h/(c_1+c_2\Reyn_h)\bigr)^{1/2}\sim(\Damk_h/(1+\Reyn_h))^{1/2}$. The two cancel in the $L^2$ velocity error: dividing the OSGS bound by $\sigma^{1/2}$ and using $\sigma^{-1}(c_1+\Damk_h)\,\alpha_K^2/h^2=(1+c_1/\Damk_h)\,\alpha_K/\nu$ with $1+c_1/\Damk_h\to1$ removes the $\Damk_h^{1/2}$ inflation and leaves the $\sigma${\hyp}robust, optimal{\hyp}order estimate}
+\begin{equation}\label{eq:DominantReactionOSGSVelocity}
+    \lVert\boldsymbol{e}_u\rVert \lesssim \biggl(\sum_K \Bigl(1+\tfrac{c_2}{c_1}\Reyn_h\Bigr)\,\mathrm{E}_{\text{int},K}(\boldsymbol{u})^2 + \frac{\alpha_K}{\sigma\nu}\,\mathrm{E}_{\text{int},K}(p)^2\biggr)^{1/2}
+\end{equation}
+\amend{(\cref{oa:cor:Ltwo}), whose pressure contribution moreover \emph{decreases} as $(\sigma\nu)^{-1/2}$ as the reaction strengthens. The $\Damk_h^{1/2}$ price is therefore confined to the gradient and energy{\hyp}norm controls and is absent from the $L^2$ velocity error; this is the analytical counterpart of the numerical finding, in \cref{sec:NumericalExamplesStationaryCase2D}, that the two variants have closely matching $L^2$ velocity errors while the OSGS $H^1$ velocity error carries an excess that vanishes slowly under refinement at strong reaction.}
+
 \section{Numerical examples}\label{sec:NumericalExamples}
 \amend{Before presenting the results, it is worth delimiting what they can and cannot be compared
 against. The estimates of \cref{sec:StabilityASGS,sec:Robustness} apply verbatim only to the
-\emph{linearized} problem with a prescribed solenoidal advection field, to the \emph{ASGS} method, and
-under all{\hyp}Dirichlet boundary conditions. The experiments below solve the \emph{nonlinear} problem,
-with both the ASGS and the OSGS variants, and---in \cref{sec:NumericalExampleFromLiterature}---with the
+\emph{linearized} problem with a prescribed solenoidal advection field and under all{\hyp}Dirichlet
+boundary conditions; within that setting they cover \emph{both} the ASGS variant
+(\cref{lemma:Stability,th:Convergence}) and the OSGS variant
+(\cref{th:StabilityOSGS,th:ConvergenceOSGS}). The experiments below solve the \emph{nonlinear} problem,
+with both variants, and---in \cref{sec:NumericalExampleFromLiterature}---with the
 velocity{\hyp}dependent resistance \cref{eq:DBFResistanceTerm} in place of the constant $\boldsymbol\sigma$
-the analysis assumes; no estimate in this work covers the OSGS method. The analysis further takes the stabilization parameters to be constant on each element---as the elementwise integration by parts and interior-face jump estimates behind \cref{sec:StabilityASGS} require---whereas the simulations evaluate them pointwise within the elements, which was observed not to alter the results. The manufactured field does satisfy
+the analysis assumes, so neither linear estimate applies to them directly. The analysis further takes the stabilization parameters to be constant on each element---as the elementwise integration by parts and interior-face jump estimates behind \cref{sec:StabilityASGS} require---whereas the simulations evaluate them pointwise within the elements, which was observed not to alter the results. The manufactured field does satisfy
 $\nabla \cdot (\alpha \boldsymbol{u}) = 0$ exactly, so the advection assumption holds at the continuous
 level, though not for the discrete iterates. The purpose of the comparison is therefore to probe the
 extent to which the analysis describes the nonlinear problem and the OSGS variant as well, and the
@@ -1539,7 +1708,7 @@ We compare three discretizations on the same sequence of structured triangular m
 
 \begin{table}[!htbp]
     \centering
-    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$~TH is the unstabilized Galerkin Taylor{\hyp}Hood element\amend{, and $\mathbb{P}_2/\mathbb{P}_1$~ASGS is the \emph{same} inf{\hyp}sup{\hyp}stable pair with the residual stabilization active (a convection{\hyp}stabilized Taylor{\hyp}Hood control, so that the effect of the stabilization can be separated from that of the velocity{\hyp}pressure pair)}. \amend{The optimal slope is given in parentheses next to each observed value: $k_v+1$ for the velocity, and for the pressure $k_p$ for the equal{\hyp}order pairs and $k_p+1$ for the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair.} \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text).}
+    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$ is the unstabilized Galerkin Taylor{\hyp}Hood element. \amend{The optimal slope is given in parentheses next to each observed value: $k_v+1$ for the velocity, and for the pressure $k_p$ for the equal{\hyp}order pairs and $k_p+1$ for the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair.} \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text).}
     \begin{tabular}{c c l r r r r}
     \toprule
     & & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
@@ -1551,7 +1720,6 @@ We compare three discretizations on the same sequence of structured triangular m
         &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.18}~(3) & \num{3.42e-7} & \num{2.02}~(2) & \num{1.83e-4} \\
         &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.02}~(3) & \num{2.88e-7} & \num{1.90}~(2) & \num{1.77e-4} \\
         &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{3.24}~(3) & \num{2.85e-7} & \num{2.92}~(2) & \num{4.17e-6} \\
-        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{3.01}~(3)} & \amend{\num{3.12e-6}} & \amend{\num{2.82}~(2)} & \amend{\num{3.52e-5}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{2.00}} & \amend{\num{3.26e-5}} & \amend{\num{2.00}} & \amend{\num{9.84e-6}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{2.99}} & \amend{\num{2.86e-7}} & \amend{\num{3.00}} & \amend{\num{8.60e-9}} \\
     \midrule
@@ -1560,7 +1728,6 @@ We compare three discretizations on the same sequence of structured triangular m
         &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.10}~(3) & \num{2.44e-6} & \num{2.04}~(2) & \num{1.18e-3} \\
         &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.03}~(3) & \num{1.85e-6} & \num{1.80}~(2) & \num{1.10e-3} \\
         &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{2.97}~(3) & \num{1.83e-6} & \num{3.73}~(2) & \num{9.52e-6} \\
-        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{2.84}~(3)} & \amend{\num{2.12e-5}} & \amend{\num{2.85}~(2)} & \amend{\num{2.97e-4}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{1.99}} & \amend{\num{1.13e-4}} & \amend{\num{2.00}} & \amend{\num{9.84e-6}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{2.99}} & \amend{\num{1.82e-6}} & \amend{\num{3.00}} & \amend{\num{8.60e-9}} \\
     \midrule
@@ -1569,7 +1736,6 @@ We compare three discretizations on the same sequence of structured triangular m
            &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.02}~(3) & \num{4.20e-7} & \num{2.86}~(2) & \num{9.95e-8} \\
            &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.04}~(3) & \num{4.23e-7} & \num{3.05}~(2) & \num{1.07e-7} \\
            &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{5.14e-1} & \num{2.00}~(2) & \num{9.84e-6} \\
-        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{2.41}~(3)} & \amend{\num{2.87e-5}} & \amend{\num{2.01}~(2)} & \amend{\num{1.61e-5}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{2.00}} & \amend{\num{3.26e-5}} & \amend{\num{2.00}} & \amend{\num{9.84e-6}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{2.99}} & \amend{\num{2.86e-7}} & \amend{\num{3.00}} & \amend{\num{8.60e-9}} \\
     \midrule
@@ -1578,7 +1744,6 @@ We compare three discretizations on the same sequence of structured triangular m
            &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.98}~(3) & \num{2.70e-6} & \num{2.73}~(2) & \num{5.96e-7} \\
            &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.00}~(3) & \num{2.72e-6} & \num{3.00}~(2) & \num{6.87e-7} \\
            &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.02e-1} & \num{2.00}~(2) & \num{9.84e-6} \\
-        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{3.00}~(3)} & \amend{\num{2.18e-5}} & \amend{\num{2.53}~(2)} & \amend{\num{4.81e-6}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{1.99}} & \amend{\num{1.13e-4}} & \amend{\num{2.00}} & \amend{\num{9.84e-6}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{2.99}} & \amend{\num{1.82e-6}} & \amend{\num{3.00}} & \amend{\num{8.60e-9}} \\
     \bottomrule
@@ -1600,7 +1765,6 @@ We compare three discretizations on the same sequence of structured triangular m
         &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.08}~(2) & \num{7.12e-4} & \num{0.98}~(1) & \num{5.10e-1} \\
         &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01}~(2) & \num{6.62e-4} & \num{0.91}~(1) & \num{4.98e-1} \\
         &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.99}~(2) & \num{6.59e-4} & \num{1.05}~(1) & \num{1.09e-2} \\
-        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{2.00}~(2)} & \amend{\num{3.06e-3}} & \amend{\num{1.61}~(1)} & \amend{\num{2.27e-2}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{1.00}} & \amend{\num{3.50e-2}} & \amend{\num{1.00}} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{1.99}} & \amend{\num{6.59e-4}} & \amend{\num{2.00}} & \amend{\num{2.11e-5}} \\
     \midrule
@@ -1609,7 +1773,6 @@ We compare three discretizations on the same sequence of structured triangular m
         &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.04}~(2) & \num{4.78e-3} & \num{0.97}~(1) & \num{3.24} \\
         &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01}~(2) & \num{4.23e-3} & \num{0.82}~(1) & \num{3.08} \\
         &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.98}~(2) & \num{4.19e-3} & \num{1.48}~(1) & \num{1.10e-2} \\
-        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{1.89}~(2)} & \amend{\num{2.02e-2}} & \amend{\num{3.15}~(1)} & \amend{\num{4.70e-2}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{0.99}} & \amend{\num{1.21e-1}} & \amend{\num{1.00}} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{1.99}} & \amend{\num{4.19e-3}} & \amend{\num{2.00}} & \amend{\num{2.11e-5}} \\
     \midrule
@@ -1618,7 +1781,6 @@ We compare three discretizations on the same sequence of structured triangular m
            &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.06}~(2) & \num{1.02e-3} & \num{1.84}~(1) & \num{2.47e-4} \\
            &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.07}~(2) & \num{1.02e-3} & \num{2.01}~(1) & \num{2.64e-4} \\
            &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{6.34}    & \num{1.00}~(1) & \num{1.09e-2} \\
-        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{1.26}~(2)} & \amend{\num{3.68e-2}} & \amend{\num{1.00}~(1)} & \amend{\num{2.18e-2}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{1.00}} & \amend{\num{3.50e-2}} & \amend{\num{1.00}} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{1.99}} & \amend{\num{6.59e-4}} & \amend{\num{2.00}} & \amend{\num{2.11e-5}} \\
     \midrule
@@ -1627,7 +1789,6 @@ We compare three discretizations on the same sequence of structured triangular m
            &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.01}~(2) & \num{6.59e-3} & \num{1.66}~(1) & \num{1.46e-3} \\
            &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.04}~(2) & \num{6.60e-3} & \num{1.93}~(1) & \num{1.68e-3} \\
            &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.96}    & \num{1.00}~(1) & \num{1.09e-2} \\
-        &       & \amend{$\mathbb{P}_2/\mathbb{P}_1$ ASGS} & \amend{\num{1.65}~(2)} & \amend{\num{3.14e-2}} & \amend{\num{1.00}~(1)} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_1$ interp.} & \amend{\num{0.99}} & \amend{\num{1.21e-1}} & \amend{\num{1.00}} & \amend{\num{1.09e-2}} \\
         &       & \amend{$\mathbb{P}_2$ interp.} & \amend{\num{1.99}} & \amend{\num{4.19e-3}} & \amend{\num{2.00}} & \amend{\num{2.11e-5}} \\
     \bottomrule
@@ -1637,14 +1798,14 @@ We compare three discretizations on the same sequence of structured triangular m
 
 \paragraph{\amend{Viscosity{\hyp}dominated flows}} In this regime ($\Reyn = 1$) the three discretizations behave alike: the velocity converges at the optimal rate for all of them and at both porosities, and the equal{\hyp}order stabilized method matches the accuracy of the more elaborate Taylor{\hyp}Hood pair in the velocity, with the inf{\hyp}sup{\hyp}stable pair being more accurate in the pressure, as befits a discretization with a dedicated pressure space. As in the previous examples, the ASGS and OSGS variants are practically indistinguishable. \amend{Lowering $\alpha_0$ from $0.5$ to $0.1$ degrades the accuracy: the velocity error grows in step with its interpolation reference, while the $L^2$ pressure error grows by about a factor of six---some $2.8$ times the factor $\alpha_0^{-1/2}\approx2.2$ that the porosity weight of \cref{sec:Robustness} predicts on its own. The excess is carried by the velocity{\hyp}error coupling that the same estimate contains (the $\tau_2^{1/2}\mathrm{E}_{\textup{int}}(\boldsymbol{u})$ term, whose interpolation error grows at low porosity), just as in the two{\hyp}dimensional experiments of \cref{sec:NumericalExamplesStationaryCase2D}, where the same excess over $\alpha_0^{-1/2}$ appears at \emph{fixed} $\Damk$. The porosity is not cleanly isolated here---\cref{eq:CocquetMMSReaction} ties $\Damk$ to $\alpha_0$, raising it from $\approx2$ to $\approx40$ as $\alpha_0$ falls---but that stronger drag would, by the mitigation factor of \cref{eq:DominantReactionPressureGradientEstimate}, if anything \emph{reduce} the pressure error, so it does not account for the growth observed.}
 
-\paragraph{\amend{Convection{\hyp}dominated flows}} This regime ($\Reyn = 10^5$) is where the two approaches part ways. The unstabilized Taylor{\hyp}Hood velocity fails to converge: although the $\mathbb{P}_2/\mathbb{P}_1$ pair is inf{\hyp}sup stable, the Galerkin form provides no control over the dominant convective term, and the velocity error stagnates at an $O(1)$ value on every mesh (marked \emph{n.c.}\ in the tables); \amend{its pressure nonetheless remains on the interpolation benchmark at the optimal $L^2$ rate---notable, since the standard mixed a priori estimate would let a non-convergent velocity pollute it}. The equal{\hyp}order stabilized method, in contrast, retains optimal velocity and pressure convergence at $\alpha_0 = 0.5$, which is precisely the robustness that the stabilization is designed to provide. \amend{To confirm that this gain comes from the residual stabilization rather than from the choice of velocity{\hyp}pressure pair, we also apply the ASGS stabilization to the \emph{same} inf{\hyp}sup{\hyp}stable $\mathbb{P}_2/\mathbb{P}_1$ pair ($\mathbb{P}_2/\mathbb{P}_1$~ASGS in the tables): it converges at optimal velocity and pressure rates at $\Reyn=10^5$, exactly where the unstabilized Taylor{\hyp}Hood pair stagnates. In the viscosity{\hyp}dominated regime, by contrast, this stabilized Taylor{\hyp}Hood control is about an order of magnitude \emph{less} accurate than the unstabilized one---the residual stabilization, calibrated for the equal{\hyp}order (inf{\hyp}sup{\hyp}unstable) case, is a redundant perturbation on an already stable pair. The high{\hyp}Reynolds gain is therefore attributable to the convection stabilization itself, not to the equal{\hyp}order spaces.} At the most demanding corner, $(\Reyn,\alpha_0) = (10^5, 0.1)$, the combination of strong drag and high Reynolds number prevents the tested nonlinear solvers from converging on the coarser meshes: the stabilized nonlinear iteration does not converge there (whether a discrete root is absent or merely hard to reach is not determined here), but once these are refined enough to resolve the solution (the two finest meshes here) it recovers accurate solutions, whereas Taylor{\hyp}Hood does not converge at this corner either. The tabulated slopes at this corner are therefore two{\hyp}mesh estimates in a pre{\hyp}asymptotic range and should be read as such; the pertinent observation is that the stabilized method delivers an accurate solution there while the unstabilized one does not.
+\paragraph{\amend{Convection{\hyp}dominated flows}} This regime ($\Reyn = 10^5$) is where the two approaches part ways. The unstabilized Taylor{\hyp}Hood velocity fails to converge: although the $\mathbb{P}_2/\mathbb{P}_1$ pair is inf{\hyp}sup stable, the Galerkin form provides no control over the dominant convective term, and the velocity error stagnates at an $O(1)$ value on every mesh (marked \emph{n.c.}\ in the tables); \amend{its pressure nonetheless remains on the interpolation benchmark at the optimal $L^2$ rate---notable, since the standard mixed a priori estimate would let a non-convergent velocity pollute it}. The equal{\hyp}order stabilized method, in contrast, retains optimal velocity and pressure convergence at $\alpha_0 = 0.5$, which is precisely the robustness that the stabilization is designed to provide. At the most demanding corner, $(\Reyn,\alpha_0) = (10^5, 0.1)$, the combination of strong drag and high Reynolds number prevents the tested nonlinear solvers from converging on the coarser meshes: the stabilized nonlinear iteration does not converge there (whether a discrete root is absent or merely hard to reach is not determined here), but once these are refined enough to resolve the solution (the two finest meshes here) it recovers accurate solutions, whereas Taylor{\hyp}Hood does not converge at this corner either. The tabulated slopes at this corner are therefore two{\hyp}mesh estimates in a pre{\hyp}asymptotic range and should be read as such; the pertinent observation is that the stabilized method delivers an accurate solution there while the unstabilized one does not.
 
 Overall, the equal{\hyp}order stabilized method attains \amend{comparable velocity accuracy to} the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood element \amend{in the reported DBF cases---Taylor{\hyp}Hood being more accurate in the pressure where it converges, i.e.\ in the viscosity{\hyp}dominated regime---}without requiring a compatible velocity{\hyp}pressure pair, and it remains robust in the convection{\hyp}dominated regime in which the unstabilized Galerkin method loses stability. \amend{This comparison does not isolate the effect of the element pair, since the equal{\hyp}order method additionally carries residual convection stabilization that is absent from the Taylor{\hyp}Hood comparator.}
 
 \section{Conclusions}\label{sec:Conclusions}
 We have applied the VMS framework to generalize the formulation and analysis presented in~\cite{codina2001stabilized} to the porous Navier{\hyp}Stokes system, in such a way that the original method is recovered when $\alpha\equiv1$. By using the abstract notation introduced in later works on VMS~\cite{codina2018variational}, we have strived to make it clearer to the less versed reader how the whole process is largely systematic once the particular equations are fit to the general framework.
 
-\amend{For the linearized ASGS discretization, our analysis establishes that} the convergence properties of the original Navier{\hyp}Stokes formulation are essentially preserved in the generalized setting. \amend{The nonlinear ASGS and OSGS experiments, which lie beyond the setting of that theorem, are consistent with this behavior and} show that the method remains \amend{essentially as} robust \amend{under} extreme variations in the physical parameters in the general case as it is well-established to be for the original problem\amend{. The one reservation is that at the most extreme corner tested---the simultaneously convection-dominated and low-porosity case $(\Reyn,\alpha_0)=(10^6,0.05)$---the nonlinear solvers tested here do not converge on the coarser meshes of the sequence; without branch{\hyp}continuation evidence we do not claim the discrete problem has no solution there, and the difficulty in any case recedes under refinement}.
+\amend{For the linearized ASGS discretization, our analysis establishes that} the convergence properties of the original Navier{\hyp}Stokes formulation are essentially preserved in the generalized setting. \amend{For the linearized OSGS discretization, a discrete inf{\hyp}sup argument (\cref{sec:StabilityOSGS}, \cref{app:osgs}) yields a companion convergence estimate in a norm that controls the full reaction term rather than the damped one, differing from the ASGS estimate by a single elementwise factor $(c_1+\mathrm{Da}_{h,K})^{1/2}$ that is asymptotically harmless but permits a pre{\hyp}asymptotic excess at strong reaction. Both linear analyses are conditional on prescribed weighted{\hyp}solenoidal advection, constant scalar reaction and full Dirichlet data, and neither covers the nonlinear DBF computations directly.} \amend{The nonlinear ASGS and OSGS experiments, which lie beyond the setting of that theorem, are consistent with this behavior and} show that the method remains \amend{essentially as} robust \amend{under} extreme variations in the physical parameters in the general case as it is well-established to be for the original problem\amend{. The one reservation is that at the most extreme corner tested---the simultaneously convection-dominated and low-porosity case $(\Reyn,\alpha_0)=(10^6,0.05)$---the nonlinear solvers tested here do not converge on the coarser meshes of the sequence; without branch{\hyp}continuation evidence we do not claim the discrete problem has no solution there, and the difficulty in any case recedes under refinement}.
 
 The specialization of the robustness analysis to equal{\hyp}order polynomial elements presented in \cref{sec:Robustness} shows a few details previously not discussed, such as the mechanism of pressure error improvement with growing $\amend{\Damk}$ or the (very weak in practice) deterioration of the velocity error with $\Damk$\amend{; it also makes explicit, through a porosity-weighted norm, how the error constants depend on the minimum porosity, degrading at worst like $\alpha_0^{-1/2}$\amend{, with the single exception of the pressure{\hyp}gradient control in the strongly reaction{\hyp}dominated limit, which carries the stronger factor $1/\alpha_0$ (\cref{eq:DominantReactionPressureGradientEstimate})}}. By normalizing all the variables adequately, we have \amend{further found a sharper empirical fact: wherever no single term dominates, the errors of both variants sit essentially on the error of the nodal interpolant of the exact solution---a stronger statement than optimality of the convergence rate alone---with the residual growth at low porosity inherited from the exact solution rather than introduced by the stabilization}.
 
@@ -1677,5 +1838,6 @@ R. Codina acknowledges the support received from the ICREA Acad\`emia Research P
 \input{elemental_matrices_appendix.tex}
 \input{fourier_appendix.tex}
 \input{continuity_appendix.tex}
+\input{osgs_appendix.tex}
 
 \end{document}
