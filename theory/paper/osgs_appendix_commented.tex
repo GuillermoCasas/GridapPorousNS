@@ -1,0 +1,2149 @@
+% ===========================================================================
+% osgs_appendix_commented.tex --- osgs_appendix.tex + pedagogical commentary
+% ---------------------------------------------------------------------------
+% The mathematical content below is VERBATIM osgs_appendix.tex: no statement,
+% proof, equation or label has been altered, and the numbering is unchanged
+% (the commentary adds no numbered objects). To use, replace
+%       \input{osgs_appendix.tex}
+% by    \input{osgs_appendix_commented.tex}
+% in article_v2.tex. To hide the commentary without switching files, change
+% \pedagogyshowtrue to \pedagogyshowfalse below (the boxes are then typeset
+% into a discarded box, so pagination-independent content is unaffected).
+%
+% The commentary layer is addressed to a reader fluent in the ASGS analysis
+% (app:Continuity) who is meeting the OSGS proof for the first time. Boxes
+% marked "Audit note" flag wording the commentator believes could be
+% tightened; they are suggestions about the prose, not applied corrections.
+% ===========================================================================
+\makeatletter
+\newif\ifpedagogyshow
+\pedagogyshowtrue % <-- change to \pedagogyshowfalse to hide every box
+\@ifundefined{definecolor}{%
+  \providecommand{\pedagogy@color}{}%
+}{%
+  \definecolor{PedagogyColor}{rgb}{0.05,0.32,0.60}%
+  \providecommand{\pedagogy@color}{\color{PedagogyColor}}%
+}
+\newsavebox{\pedagogy@bin}
+\ifpedagogyshow
+\newenvironment{pedagogy}[1][Commentary]{%
+  \par\medskip
+  \begingroup\pedagogy@color\small
+  \list{}{\leftmargin 1.4em \rightmargin 0.4em \topsep 0pt
+          \parsep 0.4\baselineskip \listparindent 0pt \itemindent 0pt}%
+  \item[]\textbf{\textsf{#1.}}\enspace\ignorespaces
+}{%
+  \endlist\endgroup\par\medskip
+}
+\else
+\newenvironment{pedagogy}[1][Commentary]{%
+  \begingroup\setbox\pedagogy@bin\vbox\bgroup\small
+}{%
+  \egroup\endgroup
+}
+\fi
+\makeatother
+
+\section{Convergence analysis of the OSGS method}\label{app:osgs}
+
+This appendix establishes, for the linearized OSGS variant, the stability
+(\cref{oa:th:stability}) and convergence (\cref{oa:th:convergence}) results stated as
+\cref{th:StabilityOSGS,th:ConvergenceOSGS} in \cref{sec:StabilityOSGS}. It follows the orthogonal-subscale template
+of~\cite{Codina2008FiniteEA}, transported to the porosity-weighted operator, the Darcy
+reaction term, and the artificial-compressibility perturbation. The proof is developed in
+full; only the material shared with the ASGS analysis is not re-derived. Specifically, the
+continuous problem, the Galerkin bilinear form and its coercivity identity, the stabilization
+parameters, the mesh and interpolation-error setting, and the common standing assumptions are
+stated once in the main text (\cref{sec:CommonSetting,sec:StabilizationDesign}) and, for the
+ASGS route, in \cref{app:Continuity}; here they are only recalled and referenced, so that this
+appendix develops the ingredients specific to the OSGS route---the orthogonal projection, the
+weighted best-approximation and smoothing lemmas, the inf--sup argument, and the
+Damk\"ohler-weighted error functional. Differences from the ASGS analysis of
+\cref{app:Continuity} are flagged where they arise.
+
+\begin{pedagogy}[How to read this appendix]
+These colored boxes form a commentary layer addressed to a reader who knows the
+ASGS analysis of \cref{app:Continuity} in detail and is meeting the OSGS analysis
+for the first time; they can be removed without altering any numbered content.
+Both analyses follow the three-act structure common to all quasi-optimal finite
+element error analyses: \emph{stability} (the discrete bilinear form does not
+shrink any discrete direction), \emph{consistency} (inserting the exact solution
+into the discrete equations leaves only a small defect), and \emph{continuity
+with respect to the interpolation error} (the form applied to the interpolation
+error is bounded by interpolation quantities times the test norm). Given the
+three, convergence follows by a two-line argument (\cref{oa:th:convergence}),
+identical in shape to \cref{thm:convergence}. The routes differ in how each act
+is performed. For ASGS: stability is \emph{coercivity} (\cref{lem:coercivity}),
+obtained by testing with the solution itself; consistency is \emph{exact}
+(\cref{eq:consistency}), because the stabilization is built from the full
+residual, which vanishes at the exact solution; continuity is the long
+\cref{lem:continterp}, with the telescopings, the elementwise integrations by
+parts and the jump machinery. For OSGS all three change, and for a single
+structural reason established first (\cref{oa:lem:annihilation}): the
+orthogonal projection deletes the reactive (and viscous) pieces from residual
+and test slots. Consequences: (a)~the $\sigma \to \sigmatilde$ renormalization
+of \cref{eq:sigmatilde}/\cref{eq:reactrenorm} never happens, so the working norm
+keeps the \emph{full} reaction $\norm{\sigma^{1/2}\bv}$---a stronger norm;
+(b)~testing with $U_h$ no longer produces the full residual square, so
+coercivity in that stronger norm fails, and stability must be rebuilt as an
+\emph{inf--sup} bound with a hand-built test function (\cref{oa:th:stability});
+(c)~exact consistency fails, and is replaced by the principle that
+\emph{fluctuations of smooth functions are small}
+(\cref{oa:lem:bestapprox,oa:lem:consistency}). A suggested reading order:
+\cref{oa:lem:annihilation} first, then the norm (\cref{oa:sec:norm}), then
+stability, then convergence, consulting \cref{oa:sec:technical} on demand.
+\end{pedagogy}
+
+\subsection{The linearized problem and the OSGS method}
+\label{oa:sec:setting}
+
+\subsubsection{Continuous problem and Galerkin form}
+\label{oa:sec:continuous}
+
+The analyzed linearized problem, the Galerkin bilinear form $B(\ba;U,V)$
+(\cref{eq:BilinearForm}) and the composite first-order quantity
+$X(V) \coloneqq \ba\cdot\nabla\bv + \nabla q$ are those of the common setting
+(\cref{sec:CommonSetting}) and of the ASGS analysis (\cref{sec:setting} of
+\cref{app:Continuity}, where $X$ is denoted as in \cref{eq:XG}); we use them without
+restatement. We recall only that, in the porous setting, the momentum residual carries the
+weight $\alpha$, so the natural stabilized quantity is $\alpha X(V)$, and that
+$(\nabla\bv, \alpha\nu\ViscProj\nabla\bu) = (\ViscProj\nabla\bv, \alpha\nu\ViscProj\nabla\bu)$
+since $\ViscProj$ is a pointwise orthogonal projection and $\alpha\nu$ is scalar. We write
+$(\cdot,\cdot)$ and $\norm{\cdot}$ for the $L^2(\Omega)$ inner product and norm (of scalars,
+vectors or tensors), $\normK{\cdot} \coloneqq \norm{\cdot}_{L^2(K)}$,
+$\norm{\cdot}_{m,K} \coloneqq \norm{\cdot}_{H^m(K)}$; the velocity and pressure spaces are
+$V_0 \coloneqq H_0^1(\Omega)^d$ and $Q_0$ (the zero-mean subspace of $L^2(\Omega)$; for
+$\varepsilon > 0$ the zero mean is automatic, since integrating the mass equation
+$\varepsilon p + \nabla\cdot(\alpha\bu) = 0$ over $\Omega$ and using $\bu \in V_0$ gives
+$\varepsilon\int_\Omega p = 0$), and $\mathcal{X}_0 \coloneqq V_0\times Q_0$.
+
+Testing $B$ with $V = U$ and using $\nabla\cdot(\alpha\ba) = 0$ together with
+$\bu|_{\partial\Omega} = \boldsymbol{0}$---so that the pressure--divergence pair cancels by
+integration by parts and the convective term vanishes---gives the Galerkin coercivity
+identity of the main text: for every $U \in \mathcal{X}_0$ with $\bu \in H^1_0(\Omega)^d$,
+\begin{equation}
+  \label{oa:eq:CoercivityIdentity}
+  B(\ba; U, U)
+  = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu \bigr\rVert^2
+  + \norm{\sigma^{1/2}\bu}^2
+  + \varepsilon\norm{p}^2 .
+\end{equation}
+This is \cref{eq:GalerkinCoercivityIdentity} of the main text, recalled here in the notation
+of this appendix; the derivation is given there.
+
+\begin{pedagogy}[The energy identity is the shared floor]
+Identity \cref{oa:eq:CoercivityIdentity} is the same Galerkin energy budget both
+methods start from (\cref{eq:GalerkinCoercivityIdentity}). Its mechanism, worth
+keeping in mind: with $V = U$, the convective term
+$(\bu, \alpha\ba\cdot\nabla\bu) = \tfrac12\int_\Omega \alpha\ba\cdot\nabla|\bu|^2$
+integrates by parts to zero using $\nabla\cdot(\alpha\ba) = 0$ and the no-slip
+data, and the pressure--divergence pair cancels by the same integration by
+parts; what survives are the genuinely dissipative or reactive squares. Two
+details matter downstream. First, only the \emph{deviatoric} part
+$\ViscProj\nabla\bu$ of the gradient is dissipated---this is why proving that
+\cref{oa:eq:TripleNorm} is a norm needs a Korn-type argument
+(\cref{oa:lem:definiteness}) rather than being immediate. Second, everything a
+stabilized method adds sits \emph{on top} of this identity: the ASGS addition is
+indefinite and must be dominated (\cref{eq:stabdiag1}--\cref{eq:viscabsorb}); the
+OSGS addition is a sum of squares for free (\cref{oa:eq:Diagonal})---but of the
+\emph{wrong} squares, as discussed at \cref{oa:th:stability} below.
+\end{pedagogy}
+
+\subsubsection{Meshes, finite element spaces and interpolation}
+\label{oa:sec:meshes}
+
+The mesh nondegeneracy, the inverse estimate \cref{eq:InverseEstimateFiniteOrderNorm} and the
+finite element spaces are the common ones of the analysis (\cref{sec:CommonSetting}), shared
+with the ASGS setting of \cref{app:Continuity}; the OSGS route additionally uses the patch
+structure and element{\hyp}size surrogates of \cref{H:patch} and the interpolation operators
+recalled below.
+
+We write $\mathcal{F} = \{\mathcal{T}_h\}_{h>0}$ for the (nondegenerate, shape-regular) mesh
+family, $h_K \coloneqq \operatorname{diam}(K)$, $h \coloneqq \max_K h_K$; the continuous
+degree-$k_u,k_p$ spaces $V_h \subset H^1(\Omega)^d$ and
+$Q_h \subset H^1(\Omega)\cap C^0(\overline\Omega)$ (constants in $Q_h$, $k_p \le k_u+1$); and
+the constrained subspaces $V_{h0} \coloneqq V_h \cap H^1_0(\Omega)^d$,
+$Q_{h0} \coloneqq Q_h \cap Q_0$, $\Xhz \coloneqq V_{h0}\times Q_{h0}$.
+
+\emph{Patch structure and element{\hyp}size surrogates} (\cref{H:patch}). We use the patch
+quasi{\hyp}uniformity $\underline{C}\, h_{K} \le h_{K'} \le \overline{C}\, h_K$ for all
+$K' \subset S_K$~\cite{AinsworthOden} and the continuous surrogates $\chi_1(\cdot,h),
+\chi_2(\cdot,h)$ of \cref{H:patch}, with the element length taken as
+$h_{K} \coloneqq \chi_1(\boldsymbol{x}_K, h)$ (as in~\cite[Lemma~1]{Codina2008FiniteEA}); this
+last choice alters each stabilization parameter by a bounded factor ($\le \chi_0^2$) relative
+to the raw diameter and is immaterial to every estimate, so we do not distinguish the two
+notationally.
+
+\emph{Interpolation operators.} For $v \in H^{r}(\Omega)$ with $r \ge 2$ (hence
+$v \in C^0(\overline\Omega)$ for $d \le 3$) the nodal interpolant $\hat v_h$ satisfies
+\begin{equation}
+  \label{oa:eq:NodalInterp}
+  \norm{v - \hat v_h}_{m,K} \le C_I\, h_K^{n-m}\norm{v}_{n,K},
+  \qquad 0 \le m \le n \le \min(r,\, k+1),
+\end{equation}
+with $k$ the polynomial degree of the target space, and it preserves homogeneous Dirichlet
+data (this is the estimate of the ASGS analysis, \cref{eq:interp} of \cref{app:Continuity},
+in the norm form used below). For $v \in H^{r}(\Omega)$ with $r \ge 1$ the Scott--Zhang
+quasi-interpolant~\cite{ScottZhang} satisfies the same estimate with $\norm{v}_{n,K}$
+replaced by $\norm{v}_{H^n(S_K)}$ and also preserves homogeneous boundary values.
+
+\begin{pedagogy}[Two interpolants, and why both are needed]
+Background. The \emph{nodal} interpolant evaluates the target function at the
+finite element nodes; this requires point values, hence continuity, which is why
+$\bu \in H^{k_u+1}(\Omega)^d$ is paired with the Sobolev embedding
+$H^{s} \hookrightarrow C^0$ for $s > d/2$ (here $k_u+1 \ge 2 > 3/2$ suffices for
+$d \le 3$). Its virtues are locality and exact preservation of Dirichlet data
+(boundary nodes receive the exact boundary values), which is what licenses the
+boundary-term-free global integrations by parts in (I2) and (I5) of
+\cref{oa:lem:interpolation}. The \emph{Scott--Zhang} quasi-interpolant replaces
+point evaluation by local averages, so it is defined for any $H^1$ function---in
+particular for the products $\alpha z$ fed to it in \cref{oa:lem:bestapprox}---at
+the price that its error over $K$ is measured on the \emph{patch} $S_K$. That
+price is the reason patches appear in this analysis at all: patch
+quasi-uniformity (\cref{H:patch}) and patch equivalence of the parameters
+(\cref{oa:lem:patch}) are exactly what converts patch-indexed sums back into
+element-indexed sums with bounded overlap. Finally, the continuous surrogate
+$\chi_1(\cdot,h)$ exists because the smoothing operation of \cref{oa:eq:SmulDef}
+must evaluate ``the element size at a node'', and a node belongs to several
+elements; \cite[Lemma~1]{Codina2008FiniteEA} builds a continuous field uniformly
+equivalent to the local mesh size, and adopting it changes each $\tau$ by a
+bounded factor only. None of this machinery has an ASGS counterpart: the
+coercivity route never builds test functions from $\tau$, and its interpolation
+lemma \cref{lem:continterp} uses only the nodal interpolant.
+\end{pedagogy}
+
+\subsubsection{Stabilization parameters}
+\label{oa:sec:parameters}
+
+The stabilization parameters $\tns$, $\tau_{1,K}$ and $\tau_{2,K}$ are those of the main text
+(\cref{eq:TauNavierStokes,eq:Tau1Final,eq:Tau2Final}), shared with \cref{app:Continuity}, with
+$\alpha_K \coloneqq \sup_K \alpha$, $|\ba|_{\infty,K} \coloneqq \norm{\ba}_{L^\infty(K)}$ and
+design constants $c_1, c_2 > 0$ subject to \cref{H:design} of \cref{sec:CommonSetting}. Specific to the OSGS analysis are the
+two dimensionless numbers and the $\boldsymbol{\tau}$-weighted broken products introduced now.
+Expanding $\tau_2$,
+\begin{equation}
+  \label{oa:eq:Tau2Expanded}
+  \tau_{2,K}
+  = \frac{\nu}{\alpha_K}\Bigl( 1 + \frac{c_2}{c_1}\,\Reh \Bigr),
+  \qquad
+  \Reh \coloneqq \frac{|\ba|_{\infty,K}\, h_K}{\nu},
+\end{equation}
+so that $\tau_{2,K} \ge \nu/\alpha_K$ always. We will also use the elementwise mesh
+Damk\"ohler number $\Dah \coloneqq \sigma h_K^2/(\alpha_K\nu)$. Weighted broken inner
+products and norms are defined, for $i = 1,2$, by
+\begin{equation}
+  \label{oa:eq:TauInner}
+  (f, g)_{\tau_i} \coloneqq \sum_K \tau_{i,K}\,(f, g)_{K},
+  \qquad
+  \norm{f}_{\tau_i} \coloneqq (f,f)_{\tau_i}^{1/2},
+\end{equation}
+for functions that need only be square integrable elementwise; note
+$\norm{f}_{\tau_i} = \lVert \tau_i^{1/2} f\rVert_h$ in the broken-norm notation
+of~the main text.
+
+\begin{pedagogy}[Fixing the units the whole analysis is measured in]
+This short subsection does one job: it fixes the currency in which every later
+bound is paid. \cref{oa:eq:Tau2Expanded} rewrites the pressure parameter as
+$\tau_{2,K} = (\nu/\alpha_K)\bigl(1 + (c_2/c_1)\Reh\bigr)$. Since the design
+constants satisfy $c_1,c_2>0$ (\cref{H:design}) and $\Reh\ge 0$, the bracket is at
+least $1$; hence $\tau_{2,K}\ge \nu/\alpha_K$ always---a floor the parameter
+inequalities lean on repeatedly. The two dimensionless numbers each compare two
+competing effects \emph{on one element, at that element's own length} $h_K$: the
+mesh Reynolds number $\Reh = |\ba|_{\infty,K}h_K/\nu$ weighs advection against
+diffusion, and the mesh Damk\"ohler number $\Dah = \sigma h_K^2/(\alpha_K\nu)$
+weighs reaction against diffusion. Watch $\Dah$: it is the Damk\"ohler factor that
+will price almost every convergence constant to come, all the way to the main
+estimate \cref{oa:eq:MainResult}. Finally, ``broken'' in \cref{oa:eq:TauInner}
+means summed element by element with no inter-element continuity demanded (the
+inputs need only be square integrable on each $K$), each term weighted by the
+local $\tau_{i,K}$; the identity $\norm{f}_{\tau_i}=\lVert\tau_i^{1/2}f\rVert_h$
+just records that this weight can be folded into the function. These
+$\boldsymbol{\tau}$-weighted norms are the natural currency here because the
+stabilization terms are themselves $\tau$-weighted.
+\end{pedagogy}
+
+\subsubsection{Projections and the analyzed OSGS method}
+\label{oa:sec:method}
+
+Let $\Pone$ denote the $\tau_1$-weighted $L^2$ projection onto the
+\emph{unconstrained} velocity space $V_h$ (acting componentwise), $\Ptwo$ the
+$\tau_2$-weighted projection onto the unconstrained pressure space $Q_h$, and
+$\Poneo \coloneqq I - \Pone$, $\Ptwoo \coloneqq I - \Ptwo$ the complementary
+(fluctuation) operators. We will also need $\Ponez$, the $\tau_1$-weighted projection
+onto the \emph{constrained} space $V_{h0}$, which enters only the stability proof
+through the special test function, exactly as in~\cite{Codina2008FiniteEA}. Projecting onto the
+unconstrained spaces in the method matches both the implementation described
+in~the main text (footnote to the OSGS system there) and the discussion
+in~\cite[Remark~1]{Codina2008FiniteEA}: projecting onto the constrained spaces would simplify
+the analysis (assumption \cref{H:projection} would not be needed) but produces spurious numerical
+boundary layers.
+
+The \emph{analyzed} OSGS method reads: find $U_h \in \Xhz$ such that
+\begin{equation}
+  \label{oa:eq:Method}
+  B_{\mathrm{osgs}}(\ba; U_h, V_h) = L(V_h) \coloneqq (\bff, \bv_h)
+  \qquad \forall\, V_h \in \Xhz,
+\end{equation}
+with
+\begin{equation}
+  \label{oa:eq:Bosgs}
+  B_{\mathrm{osgs}}(\ba; U, V)
+  \coloneqq
+  B(\ba; U, V) + S_1(U, V) + S_2(U, V),
+\end{equation}
+\begin{equation}
+  \label{oa:eq:Sdefs}
+  \begin{aligned}
+    S_1(U, V) &\coloneqq \bigl( \Poneo[\alpha X(U)],\, \alpha X(V) \bigr)_{\tau_1}, \\
+    S_2(U, V) &\coloneqq \bigl( \Ptwoo[\nabla\cdot(\alpha\bu)],\, \nabla\cdot(\alpha\bv) \bigr)_{\tau_2}.
+  \end{aligned}
+\end{equation}
+Since $(\Poneo z, \Pone w)_{\tau_1} = 0$ for all $z, w$, both stabilization terms are
+symmetric and positive semidefinite:
+\begin{equation}
+  \label{oa:eq:Ssym}
+\begin{aligned}
+  S_1(U, V) &= \bigl( \Poneo[\alpha X(U)],\, \Poneo[\alpha X(V)] \bigr)_{\tau_1},
+  \qquad \\
+  S_2(U, V) &= \bigl( \Ptwoo[\nabla\cdot(\alpha\bu)],\, \Ptwoo[\nabla\cdot(\alpha\bv)] \bigr)_{\tau_2}.
+\end{aligned}
+\end{equation}
+In particular, with \cref{oa:eq:CoercivityIdentity},
+\begin{equation}
+  \label{oa:eq:Diagonal}
+  B_{\mathrm{osgs}}(\ba; U_h, U_h)
+  = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu_h \bigr\rVert^2
+  + \norm{\sigma^{1/2}\bu_h}^2
+  + \varepsilon\norm{p_h}^2
+  + \norm{\Poneo \xi_h}_{\tau_1}^2
+  + \norm{\Ptwoo \delta_h}_{\tau_2}^2,
+\end{equation}
+where here and below we abbreviate
+\begin{equation}
+  \label{oa:eq:XiDelta}
+  \xi_h \coloneqq \alpha X(U_h) = \alpha\bigl(\ba\cdot\nabla\bu_h + \nabla p_h\bigr),
+  \qquad
+  \delta_h \coloneqq \nabla\cdot(\alpha\bu_h).
+\end{equation}
+
+\begin{pedagogy}[Reading the fluctuation stabilization]
+$\Pone$ is the $\tau_1$-weighted $L^2$ projection onto the velocity space $V_h$: it returns the finite element field closest to its argument in the weighted product $(\cdot,\cdot)_{\tau_1}$ of \cref{oa:eq:TauInner}; $\Ptwo$ does the same in pressure. The complements $\Poneo = I - \Pone$ and $\Ptwoo = I - \Ptwo$ therefore extract the \emph{fluctuation}---the part of a field the mesh cannot represent. The method \cref{oa:eq:Method} adds the terms $S_1, S_2$ of \cref{oa:eq:Sdefs}, which weigh the fluctuation of the first-order residual ($\xi_h$ in momentum, $\delta_h$ in mass; these are just shorthand, \cref{oa:eq:XiDelta}) against the test slot. Since a fluctuation is $\tau_i$-orthogonal to every projected field, $(\Poneo z, \Pone w)_{\tau_1} = 0$, only the fluctuation of the test slot survives; this is \cref{oa:eq:Ssym}, exhibiting $S_1, S_2$ as symmetric and positive semidefinite. Taking $V = U_h$ then gives \cref{oa:eq:Diagonal}: the Galerkin energy \cref{oa:eq:CoercivityIdentity} plus two fluctuation squares, gained for free---though the ``wrong'' squares, as \cref{oa:th:stability} shows.
+\end{pedagogy}
+
+The next elementary observation locates the analyzed method precisely relative to the
+implemented one, in which the orthogonal projection is applied to the \emph{full}
+residual and the test slot is the full adjoint.
+
+\begin{lemma}[Exact annihilations]
+\label{oa:lem:annihilation}
+Let $\sigma$ and $\varepsilon$ be constant. Then, for all $U_h, V_h \in \Xhz$:
+\begin{enumerate}[label=\textup{(\roman*)}, itemsep=0.2ex]
+  \item $\Poneo(\sigma\bu_h) = \boldsymbol{0}$ and $\Ptwoo(\varepsilon p_h) = 0$
+        (reactive and compressibility parts of the residual have no fluctuation);
+  \item $\bigl( \Poneo z,\, \sigma\bv_h \bigr)_{\tau_1} = 0$ and
+        $\bigl( \Ptwoo w,\, \varepsilon q_h \bigr)_{\tau_2} = 0$ for any $z, w$
+        (reactive and compressibility parts of the adjoint test slot are invisible to
+        the fluctuations).
+\end{enumerate}
+Consequently, the formulation obtained from the implemented OSGS method by projecting
+the full residual and testing with the full adjoint differs from
+\cref{oa:eq:Method}--\cref{oa:eq:Sdefs} only through (a) the fluctuations of the viscous
+residual term $2\nabla\cdot(\alpha\nu\ViscProj\nabla\bu_h)$ and of the force $\bff$,
+and (b) the viscous part of the adjoint test slot---exactly the Method~I simplification
+of~\cite{Codina2008FiniteEA}.
+\end{lemma}
+
+\begin{proof}
+For (i), $\sigma\bu_h \in V_h$ and $\varepsilon p_h \in Q_h$, and the fluctuation of
+any element of the projection space vanishes. For (ii), $\sigma\bv_h \in V_h$ and
+$\varepsilon q_h \in Q_h$, and fluctuations are $\tau_i$-orthogonal to the projection
+spaces. The final statement follows by expanding the implemented stabilization
+term by linearity.
+\end{proof}
+
+\begin{pedagogy}[Why the projection erases the reactive term---in both slots]
+This short lemma is the hinge the whole appendix turns on, so read it slowly. One
+fact does all the work: the projection $\Pone$ reproduces anything already in $V_h$,
+so its fluctuation $\Poneo = I - \Pone$ kills every element of $V_h$. Now if $\sigma$
+is \emph{constant}, then $\sigma\bu_h$ is just a fixed multiple of $\bu_h \in V_h$ and
+hence lies in $V_h$ itself; therefore $\Poneo(\sigma\bu_h) = \boldsymbol{0}$, and
+identically $\Ptwoo(\varepsilon p_h) = 0$---that is part~(i). Part~(ii) is the same
+fact seen from the \emph{test} slot: fluctuations are $\tau_i$-orthogonal to the
+projection space by construction, and $\sigma\bv_h$, $\varepsilon q_h$ live in that
+space, so both pairings vanish. Constancy is essential---a variable $\sigma$ would
+carry $\sigma\bu_h$ out of $V_h$. Significance: the reactive and compressibility
+pieces drop from residual \emph{and} test slots, so---unlike ASGS---the OSGS route
+never renormalizes $\sigma$ to $\sigmatilde$. That is exactly why the working norm
+keeps the full $\norm{\sigma^{1/2}\bv}$ and why coercivity must give way to the
+inf--sup argument of \cref{oa:th:stability} (see \cref{oa:rem:mechanism}).
+\end{pedagogy}
+
+\begin{remark}[Analyzed versus implemented formulation]
+\label{oa:rem:analyzed}
+For later reference we list the exact distance between \cref{oa:eq:Method} and the OSGS
+method as implemented in~the main text. (i)~\emph{Weighted versus plain projection}:
+the analysis uses the $\boldsymbol{\tau}$-weighted projections of
+\cref{oa:eq:TauInner}; the implementation uses the plain $L^2$ projection. The two
+coincide when $\tau_i$ is globally constant; otherwise the weighted product is the one
+for which the best-approximation property of \cref{oa:lem:bestapprox} holds, which is
+essential to the consistency estimate (cf.~\cite[Remark~4]{Codina2008FiniteEA}).
+(ii)~\emph{First-order truncation}: residual and test slots are truncated to their
+first-order parts; by \cref{oa:lem:annihilation} the only genuinely neglected pieces are
+the viscous fluctuation, the force fluctuation, and the viscous test term. For $k_u = 1$
+and elementwise-constant $\alpha\nu$ the viscous residual vanishes on element interiors;
+with variable $\alpha$ it contributes $2\nu(\ViscProj\nabla\bu_h)\nabla\alpha$, which is
+small under the resolution condition of \cref{H:porosity}. (iii)~\emph{Converged versus lagged
+projection}: the analysis takes the projection equation solved exactly (the coupled
+system), whereas the implementation lags the projection along the nonlinear iteration.
+(iv)~\emph{Unconstrained projection space}: analyzed and implemented formulations
+agree (both project onto $V_h\times Q_h$ without Dirichlet constraints); note that the
+display defining the OSGS projection in~the main text shows the projection onto
+$\Xhz$, while the accompanying footnote states the implemented choice, which is the one
+analyzed here and the one recommended by~\cite[Remark~1]{Codina2008FiniteEA}.
+(v)~\emph{Elementwise-constant versus pointwise parameters}: as for the ASGS analysis
+of~the main text, $\tau_{i}$ is elementwise constant in the analysis and pointwise
+variable in the computations.
+\end{remark}
+
+\subsection{Standing assumptions and notation}
+\label{oa:sec:hypotheses}
+
+Throughout, $C$ denotes a generic positive constant, independent of $h$, $\nu$,
+$\sigma$, $\varepsilon$ and of $\alpha$ and $\ba$ except through the constants named
+below; its value may change between appearances. The analysis is carried out under the
+standing assumptions collected in \cref{sec:CommonSetting}: the assumptions
+\cref{H:mesh}--\cref{H:regularity} common to both methods, and the OSGS{\hyp}specific
+assumptions \cref{H:design}--\cref{H:advectionsmooth}---namely the design constants
+\cref{H:design} (with the compressibility bound $\varepsilon\tau_{2,K}\le C_2$), the projection
+stability \cref{H:projection} (\cref{eq:ProjectionStability}), and the technical strengthenings
+\cref{H:patch} (patch structure and element{\hyp}size surrogates), \cref{H:porositysmooth}
+(porosity smoothness) and \cref{H:advectionsmooth} (advection smoothness) of the common mesh,
+porosity and advection assumptions. The strengthenings \cref{H:porositysmooth,H:advectionsmooth}
+enter only the consistency estimate. The ASGS analysis of \cref{app:Continuity} instead requires
+the interior{\hyp}face jump condition \cref{H:jump}; the two hypothesis sets are therefore not
+nested (see \cref{oa:rem:dispensed}). We use the abbreviations $\Ponez z_h$ and $\Poneo z_h$ of
+\cref{oa:sec:method} for the constrained projection and the fluctuation appearing in
+\cref{H:projection}, and, for \cref{H:porositysmooth}, $C_{\alpha,m}$ ($m\ge2$) as defined there,
+setting $C_{\alpha,1}\coloneqq 1+\norm{\nabla\alpha}_{L^\infty(\Omega)}/\alpha_0$ for the
+first{\hyp}order case.
+
+\begin{pedagogy}[A map of the hypotheses]
+Before the technical work, a one-glance grouping of the assumptions this
+subsection collects. \Cref{H:mesh}--\cref{H:regularity} are the \emph{common}
+ones, shared with the ASGS analysis: mesh nondegeneracy, coefficient and
+solution regularity, and the finite element spaces. The rest are
+\emph{OSGS-specific}, \cref{H:design}--\cref{H:advectionsmooth}. Among these,
+note how little some are asked to do: \cref{H:porositysmooth} and
+\cref{H:advectionsmooth}---extra derivatives of $\alpha$ and $\ba$---enter
+\emph{only} the consistency estimate, where the Leibniz rule differentiates the
+products handed to the projection, and play no part in stability. The single
+assumption that is \emph{not} an automatic consequence of the common
+mesh-and-data setting is the projection stability \cref{H:projection}, a genuine
+property of the finite element pair; the stability proof draws on it twice
+(Steps~2 and~5 of \cref{oa:th:stability}). The ASGS route pays instead with the
+interior-face jump condition \cref{H:jump}, so the two hypothesis sets are not
+nested---the precise anatomy of that non-nesting, and why \cref{H:jump} is
+nonetheless dispensable here, is deferred to \cref{oa:rem:dispensed}.
+\end{pedagogy}
+
+\subsection{Technical results}
+\label{oa:sec:technical}
+
+\subsubsection{Parameter inequalities}
+
+Items (P1)--(P3) below are elementary parameter bounds shared with the ASGS analysis: they are
+recalled from \cref{lem:parameters} of \cref{app:Continuity}---in the notation of this appendix,
+through $\varphi_1=\alpha_K\tns^{-1}$---and are not re-derived. Items (P4)--(P6) and the
+inverse{\hyp}estimate inequalities (K1)--(K3) are specific to the OSGS route (they feed the
+special test function of \cref{oa:th:stability} and the Damk\"ohler-weighted conversions of the
+convergence proof).
+
+\begin{lemma}[Parameter inequalities]
+\label{oa:lem:parameters}
+Under \cref{H:design}, the parameters \cref{eq:Tau1Final,eq:Tau2Final} satisfy, on every element $K$
+(element subscripts omitted inside the formulas):
+\begin{align}
+  &\sigma\tau_1 \le 1,
+  \qquad
+  \alpha_K \tau_1 \le \tns,
+  \qquad
+  \varepsilon \le C_2\, \tau_2^{-1},
+  \tag{P1}\label{oa:eq:P1}\\
+  &\tau_1\,\tau_2 \le \frac{h_K^2}{c_1\,\alpha_K^2},
+  \tag{P2}\label{oa:eq:P2}\\
+  &h_K^2\,\tns^{-1} = c_1\,\alpha_K\,\tau_2,
+  \quad\implies\quad
+  \bigl(\alpha_K\,\tns^{-1}\bigr)^{1/2} = \sqrt{c_1}\,\frac{\alpha_K}{h_K}\,\tau_2^{1/2},
+  \tag{P3}\label{oa:eq:P3}\\
+  &\nu \le \alpha_K\,\tau_2,
+  \qquad
+  \tau_1^{1/2}\,|\ba|_{\infty,K} \le \frac{\sqrt{c_1}}{c_2}\,\tau_2^{1/2},
+  \tag{P4}\label{oa:eq:P4}\\
+  &\alpha_K^2\,\tau_1\,\tau_2 \;\ge\; \frac{h_K^2}{c_1 + \Dah},
+  \quad\implies\quad
+  \tau_2^{-1/2} \le \bigl(c_1 + \Dah\bigr)^{1/2}\,\frac{\alpha_K}{h_K}\,\tau_1^{1/2},
+  \tag{P5}\label{oa:eq:P5}\\
+  &\sigma^{1/2} \;\le\; \Dah^{1/2}\,\frac{\alpha_K}{h_K}\,\tau_2^{1/2}.
+  \tag{P6}\label{oa:eq:P6}
+\end{align}
+Moreover, with $\gamma$ as in \cref{H:design},
+\begin{align}
+  &C_{\mathrm{inv}}\,\frac{(\alpha_K\nu)^{1/2}}{h_K} \le \frac{1}{\gamma}\,\tau_1^{-1/2},
+  \tag{K1}\label{oa:eq:K1}\\
+  &C_{\mathrm{inv}}\,\frac{\alpha_K\,|\ba|_{\infty,K}}{h_K} \le \frac{1}{\gamma}\,\tau_1^{-1},
+  \tag{K2}\label{oa:eq:K2}\\
+  &C_{\mathrm{inv}}\,\frac{\alpha_K\,(\tau_1\tau_2)^{1/2}}{h_K} \le \frac{1}{\gamma}.
+  \tag{K3}\label{oa:eq:K3}
+\end{align}
+\end{lemma}
+
+\begin{pedagogy}[Deriving (P5) and (P6): substitute the definitions, then bound once]
+These are the only two conversions that carry a Damk\"ohler premium, and each is
+just a substitution followed by a single inequality. For \cref{oa:eq:P5}, insert the
+relation $\tau_1^{-1}=\alpha_K\tns^{-1}+\sigma$ and, from \cref{oa:eq:P3}, the
+rewriting $\tau_2=h_K^2/(c_1\alpha_K\tns)$:
+\[
+  \alpha_K^2\tau_1\tau_2
+  = \frac{\alpha_K^2}{\alpha_K\tns^{-1}+\sigma}\cdot\frac{h_K^2}{c_1\alpha_K\tns}
+  = \frac{h_K^2}{c_1\bigl(1+\sigma\tns/\alpha_K\bigr)}.
+\]
+So far this is an identity. Only now does an inequality enter, the bound
+$\tns\le h_K^2/(c_1\nu)$ that the proof invokes: it makes
+$\sigma\tns/\alpha_K\le\sigma h_K^2/(c_1\alpha_K\nu)=\Dah/c_1$, so the denominator
+is at most $c_1+\Dah$, and---because it sits in a denominator---the whole quantity
+is at least $h_K^2/(c_1+\Dah)$. For \cref{oa:eq:P6}, the equality
+$\sigma^{1/2}=\Dah^{1/2}(\alpha_K\nu)^{1/2}/h_K$ is nothing but the definition
+$\Dah=\sigma h_K^2/(\alpha_K\nu)$ solved for $\sigma^{1/2}$; then the first
+inequality of \cref{oa:eq:P4}, $\nu\le\alpha_K\tau_2$, replaces $(\alpha_K\nu)^{1/2}$
+by $\alpha_K\tau_2^{1/2}$.
+\end{pedagogy}
+
+\begin{proof}
+The first two inequalities of \cref{oa:eq:P1} ($\sigma\tau_1\le1$ and $\alpha_K\tau_1\le\tns$)
+and the identity \cref{oa:eq:P3} are established in \cref{lem:parameters} of
+\cref{app:Continuity} (with $\varphi_1=\alpha_K\tns^{-1}$) and are not re-derived here; the
+third inequality of \cref{oa:eq:P1}, $\varepsilon\le C_2\tau_2^{-1}$, is \cref{H:design}, and
+\cref{oa:eq:P2} follows on combining $\alpha_K\tau_1\le\tns$ with the definition of $\tau_2$.
+
+We prove the OSGS{\hyp}specific items:
+\begin{itemize}[leftmargin=*]
+  \item \cref{oa:eq:P4}: The first inequality is \cref{oa:eq:Tau2Expanded}; for the second, $\tau_1 \le \tns/\alpha_K \le h_K/(c_2\alpha_K|\ba|_{\infty,K})$ gives $\tau_1|\ba|_{\infty,K}^2 \le |\ba|_{\infty,K}h_K/(c_2\alpha_K)$, while \cref{oa:eq:Tau2Expanded} gives $\tau_2 \ge (c_2/c_1)\,|\ba|_{\infty,K}h_K/\alpha_K$; divide.
+  \item \cref{oa:eq:P5}: Using $\tns \le h_K^2/(c_1\nu)$,
+\[
+\begin{aligned}
+  \alpha_K^2\tau_1\tau_2
+  &= \frac{\alpha_K^2}{\alpha_K\tns^{-1}+\sigma}\cdot\frac{h_K^2}{c_1\alpha_K\tns}
+  = \frac{h_K^2}{c_1\bigl(1 + \sigma\tns/\alpha_K\bigr)} \\
+  &\ \ge\ \frac{h_K^2}{c_1\bigl(1 + \sigma h_K^2/(c_1\alpha_K\nu)\bigr)}
+  \ =\ \frac{h_K^2}{c_1 + \Dah}.
+\end{aligned}
+\]
+  \item \cref{oa:eq:P6}: $\sigma^{1/2} = \Dah^{1/2}(\alpha_K\nu)^{1/2}/h_K \le \Dah^{1/2}\alpha_K\tau_2^{1/2}/h_K$ by the first inequality of \cref{oa:eq:P4}.
+  \item \cref{oa:eq:K1}: $\tau_1^{-1} \ge \alpha_K\tns^{-1} \ge c_1\alpha_K\nu/h_K^2$, so $C_{\mathrm{inv}}(\alpha_K\nu)^{1/2}/h_K \le (C_{\mathrm{inv}}/\sqrt{c_1})\tau_1^{-1/2} \le \gamma^{-1}\tau_1^{-1/2}$ by \cref{H:design}.
+  \item \cref{oa:eq:K2}: $\tau_1^{-1} \ge \alpha_K\tns^{-1} \ge c_2\alpha_K|\ba|_{\infty,K}/h_K$ and $c_2 \ge \gamma C_{\mathrm{inv}}$.
+  \item \cref{oa:eq:K3}: Combine \cref{oa:eq:P2} with $c_1 \ge \gamma^2C_{\mathrm{inv}}^2$.
+\end{itemize}
+\end{proof}
+
+\begin{pedagogy}[Reading (K1)--(K3): a two-step lower bound in $\tau$-currency]
+Each $(\mathrm{K})$-inequality is proved by the same elementary move: bound
+$\tau_1^{-1}$ from below, then let a design constant of \cref{H:design} absorb the
+rest. Take \cref{oa:eq:K1}. First drop the nonnegative reaction,
+$\tau_1^{-1}=\alpha_K\tns^{-1}+\sigma\ge\alpha_K\tns^{-1}$; then use
+$\tns^{-1}\ge c_1\nu/h_K^2$ (the same bound $\tns\le h_K^2/(c_1\nu)$ as above) to get
+$\tau_1^{-1}\ge c_1\alpha_K\nu/h_K^2$. Taking square roots and dividing,
+$C_{\mathrm{inv}}(\alpha_K\nu)^{1/2}/h_K\le(C_{\mathrm{inv}}/\sqrt{c_1})\,\tau_1^{-1/2}$,
+and the choice $c_1\ge\gamma^2 C_{\mathrm{inv}}^2$ makes $C_{\mathrm{inv}}/\sqrt{c_1}\le1/\gamma$.
+\Cref{oa:eq:K2} is identical with the convective floor
+$\tns^{-1}\ge c_2|\ba|_{\infty,K}/h_K$ and $c_2\ge\gamma C_{\mathrm{inv}}$;
+\cref{oa:eq:K3} instead feeds \cref{oa:eq:P2} into
+$\alpha_K(\tau_1\tau_2)^{1/2}/h_K\le1/\sqrt{c_1}$, whence the same $c_1\ge\gamma^2 C_{\mathrm{inv}}^2$
+closes it. In every case it is the design constant, not the geometry, that buys the
+factor $1/\gamma$---which is exactly why \cref{H:design} is stated the way it is.
+\end{pedagogy}
+
+\begin{pedagogy}[Reading (P1)--(P6) and (K1)--(K3) as exchange rates]
+A useful way to hold this lemma in mind: the convergence proof is a sequence of
+currency conversions. Interpolation errors arrive in raw sizes ($h^{k+1}$ in
+$L^2$, $h^{k}$ in $H^1$, per element); the test norm only pays in the five
+weighted currencies of \cref{oa:eq:TripleNorm}; each estimate of
+\cref{oa:lem:consistency,oa:lem:interpolation} converts the former into the
+latter at a posted rate. (P3) is an \emph{exact} rate: the weight
+$(\alpha_K\tns^{-1})^{1/2}$, ubiquitous because
+$\tau_1^{-1} = \alpha_K\tns^{-1}+\sigma$, equals
+$\sqrt{c_1}\,(\alpha_K/h_K)\tau_2^{1/2}$ identically. (P4) converts convective
+weights into $\tau_2$-currency at rate $\sqrt{c_1}/c_2$. The only two rates that
+cost a Damk\"ohler premium are (P5), which prices the pressure weight
+$\tau_2^{-1/2}$, and (P6), which prices the raw reaction weight $\sigma^{1/2}$;
+\emph{every} occurrence of $(c_1+\Dah)^{1/2}$ in this appendix is one
+application of (P5) or (P6) and nothing else, so the final constant can be
+audited by counting their uses ((I2)--(I5) of \cref{oa:lem:interpolation} and
+the $\varepsilon$-part of \cref{oa:lem:consistency}). For the ASGS-fluent
+reader: \cref{lem:parameters} plays the same role there, with
+\cref{lem:parameters}\ref{P:sigmatilde} (the $\sigmatilde$ identities) as the
+star; (P4)--(P6) have no ASGS counterpart because the ASGS norm never pays in
+the currencies $\sigma^{1/2}$ or $\tau_2^{-1/2}$---its reactive currency is the
+damped $\sigmatilde^{1/2}$, which \cref{eq:sigmatilde} keeps commensurate with
+$(\alpha_K/h_K)\tau_2^{1/2}$. The (K)-inequalities are different in kind: they
+are \emph{calibrations} of the inverse estimate against the design constants,
+each stating that a specific inverse-estimate factor costs at most $1/\gamma$
+in $\tau$-currency; they exist so that in the stability proof every
+perturbation term appears with a coefficient that \cref{H:design} can make as
+small as needed. Background, for completeness: inverse estimates such as
+\cref{eq:InverseEstimateFiniteOrderNorm} hold because on the fixed reference
+element all norms on the finite-dimensional polynomial space are equivalent,
+and mapping to a physical element of size $h_K$ converts each derivative into a
+factor $h_K^{-1}$; they are properties of \emph{discrete} functions only, which
+is why they may be applied to $\bv_h$ or $\bw_h$ but never to $\bu$ or
+$\hat{\boldsymbol e}_u$.
+\end{pedagogy}
+
+\subsubsection{Patch equivalence and the smoothing operation}
+
+\begin{lemma}[Patch equivalence]
+\label{oa:lem:patch}
+Under \cref{H:mesh}, \cref{H:porosity}, \cref{H:advection} and \cref{H:patch} there are constants
+$0 < \underline{c} \le \overline{c}$, independent of $h$, such that for $i = 1,2$,
+\begin{equation}
+  \label{oa:eq:PatchEquivalence}
+  \underline{c}\;\tau_{i,K} \le \tau_{i,K'} \le \overline{c}\;\tau_{i,K},
+  \qquad
+  \underline{c}\;\alpha_{K} \le \alpha_{K'} \le \overline{c}\;\alpha_{K},
+  \qquad \forall\, K' \subset S_K,\ \forall\, K.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Patch quasi-uniformity gives $h_{K'} \eqsim h_K$. Since $\alpha$ is Lipschitz and
+bounded below by $\alpha_0 > 0$, and $\operatorname{diam}(S_K) \le C h_K$, one has
+$|\alpha_{K'} - \alpha_K| \le C h_K\norm{\nabla\alpha}_{L^\infty(S_K)} \le
+C\,C_{\nabla\alpha}\,\max_{K''\subset S_K}\alpha_{K''}$, from which the uniform equivalence of
+the $\alpha_{K}$ over the patch follows for $C\,C_{\nabla\alpha}$ bounded (and, in general, from
+$\alpha_{K'}/\alpha_K \le \alpha_\infty/\alpha_0$; the sharper route through $C_{\nabla\alpha}$
+keeps the constant independent of $\alpha_\infty/\alpha_0$). Likewise
+$\ba \in C^0(\overline\Omega)$ implies $|\ba|_{\infty,K'} \le |\ba|_{\infty,K} +
+\omega_{\ba}(Ch_K)$, where $\omega_{\ba}$ is the modulus of continuity, and the
+resulting perturbations of $\tns^{-1}$, $\tau_1^{-1}$ and $\tau_2$ are controlled as
+in the proof of \cref{oa:lem:smoothing} below. The claim follows from the explicit
+formulas \cref{eq:Tau1Final,eq:Tau2Final}.
+\end{proof}
+
+\begin{pedagogy}[Why patches; a bridge to the ASGS jump condition]
+This lemma says the parameters are \emph{locally flat}: across a patch,
+$\tau_i$ and $\alpha_K$ vary by bounded factors, uniformly in $h$. It is
+consumed twice: to re-sum Scott--Zhang patch errors into element sums
+(\cref{oa:lem:bestapprox}), and, in nodal form, in the smoothing lemma below.
+For the reader coming from \cref{app:Continuity}, one identification is worth
+making explicit. Restricted to two elements sharing a face, the comparability
+proved here is precisely the content of the jump condition \cref{H:jump} used
+in the ASGS continuity proof (there through \cref{lem:jump}): both assert
+facewise comparability of $\varphi_1 = \alpha_K\tns^{-1}$, and $\sigma$ cancels
+in the jump of $\tau_1^{-1} = \varphi_1 + \sigma$, so neither constrains the
+reaction. The proof here derives that comparability from the standing
+hypotheses---the porosity-resolution argument for $\alpha_K$, mesh
+nondegeneracy for $h_K$, continuity of $\ba$ with the viscous term as a floor
+for the advective part. The same regularity substrate is therefore available to
+both analyses; the ASGS text states it as a hypothesis where needed, the OSGS
+text consumes it as a lemma (see also the commentary at
+\cref{oa:rem:dispensed}). Note the quiet appearance of the floor $\nu > 0$: the
+advective oscillation is absorbed \emph{relative to} the viscous part of
+$\tns^{-1}$; the same floor returns, more visibly, as the $\nu$-dependence of
+$\psi(h)$ in \cref{oa:lem:smoothing} and of the threshold $h_0$ in
+\cref{oa:th:stability}.
+\end{pedagogy}
+
+Following~\cite{Codina2008FiniteEA}, for $\tau \in \{\tau_1, \tau_2\}$ and a finite element
+function $v_h$ (scalar or vector) we define the discontinuous and the smoothed
+products
+\begin{equation}
+  \label{oa:eq:SmulDef}
+  (\tau \pmul v_h)\big|_K \coloneqq \tau_{K}\, v_h\big|_K,
+  \qquad
+  (\tau \smul v_h)\big|_K \coloneqq \sum_{a \in N_K} N_a(\boldsymbol{x})\big|_K\,
+  \bar\tau_{a}\, v_a,
+\end{equation}
+where $N_a$ are the nodal shape functions, $v_a$ the nodal values of $v_h$, and the
+nodal parameters $\bar\tau_{i,a}$ are obtained by evaluating the formulas
+\cref{eq:Tau1Final,eq:Tau2Final} with $h_K$ replaced by $\chi_1(\boldsymbol{x}_a, h)$,
+$\alpha_K$ by $\alpha(\boldsymbol{x}_a)$ and $|\ba|_{\infty,K}$ by
+$|\ba(\boldsymbol{x}_a)|$. Thus $\tau \smul v_h$ is a continuous finite element
+function, whereas $\tau \pmul v_h$ is not.
+
+\begin{pedagogy}[Why a smoothed product must exist at all]
+The natural test velocity for harvesting the momentum residual would be
+$\tau_1 \pmul \Ponez\xi_h$---multiply the projected residual by the parameter,
+elementwise. But $\tau_1$ is elementwise constant, so $\tau_1 \pmul v_h$ jumps
+across interior faces and is \emph{not} an element of $V_h$: a conforming
+method requires test functions in $H^1$, and for piecewise polynomials
+$H^1$-conformity is interelement continuity (a jump would put a surface Dirac
+into the distributional gradient). The smoothed product $\smul$ repairs this in
+the only way available: rebuild $\tau v_h$ as a genuine finite element function
+by sampling parameter and function at the \emph{nodes} and expanding in the
+shape functions. This is legal (the result lies in $V_h$ by construction and
+preserves nodal zeros, hence homogeneous boundary values) but no longer exact:
+$\smul \ne \pmul$, and the entire purpose of \cref{oa:lem:smoothing} is to
+certify that the discrepancy is a uniform relative factor $\psi(h) \to 0$. The
+ASGS analysis has no counterpart to any of this---coercivity tests with $U_h$
+itself, and no $\tau$-weighted test function is ever built. The comparison
+worth internalizing: the discontinuity of the elementwise $\tau$ taxes
+\emph{both} analyses, each at the point where its own manoeuvre touches
+faces---the ASGS proof pays through the $[\tau_1]$ face terms of its elementwise
+integrations by parts (\cref{eq:jumptotal}, \cref{eq:IIIface}), the OSGS proof
+pays through the smoothing discrepancy $\psi(h)$ here.
+\end{pedagogy}
+
+\begin{lemma}[Smoothing; adaptation of~{\cite[Lemma~2]{Codina2008FiniteEA}}]
+\label{oa:lem:smoothing}
+Under \cref{H:mesh}, \cref{H:porosity}, \cref{H:advection} and \cref{H:patch} there is a function $\psi(h) \to 0$
+as $h \to 0$ such that, for $\tau \in \{\tau_1, \tau_2\}$ and any finite element
+function $v_h$,
+\begin{equation}
+  \label{oa:eq:Smoothing}
+  \norm{\tau\pmul v_h - \tau\smul v_h}_{K} \le \tau_K\,\psi(h)\,\normK{v_h},
+  \quad\implies\quad
+  \norm{\tau\smul v_h}_{K} \le (1+\psi(h))\,\tau_K\,\normK{v_h}.
+\end{equation}
+If, in addition, $\ba$ is Lipschitz on $\overline\Omega$, then $\psi(h) = O(h)$.
+\end{lemma}
+
+\begin{proof}
+As in~\cite[Lemma~2]{Codina2008FiniteEA}, the equivalence
+$C_1 h_K^{d/2}\norm{w_h}_{L^\infty(K)} \le \normK{w_h} \le
+C_2 h_K^{d/2}\norm{w_h}_{L^\infty(K)}$ for finite element functions on nondegenerate
+meshes reduces \cref{oa:eq:Smoothing} to the statement
+$\max_{a\in N_K} |\bar\tau_a/\tau_K - 1| \le C\,\psi(h)$ with $\psi(h)\to 0$
+uniformly in $K$. Write $\Delta(\cdot)$ for the difference between the nodal and the
+elemental value of a quantity. For $\tau_1$,
+$\tau_{1}|\Delta(\tau_1^{-1})| \le
+\tau_1\bigl[\,|\Delta\alpha|\,\tns^{-1}
++ \alpha_\infty\, c_2\,|\Delta|\ba||/h_K
++ \alpha_K\, c_1\nu\,|\Delta(h^{-2})| + \alpha_K c_2 |\ba|_{\infty,K}|\Delta(h^{-1})|\,\bigr]$.
+Using $\tau_1 \le \tns/\alpha_0$ and $\tau_1 \le h_K^2/(c_1\alpha_0\nu)$,
+the first term is bounded by $\omega_\alpha(Ch)/\alpha_0$, the second by
+$\alpha_\infty\,(c_2/(c_1\alpha_0\nu))\,h\,\omega_{\ba}(Ch)$, and the last two by
+$C\,\omega_{\chi}(h)$, where $\omega_\alpha, \omega_{\ba}$ are the moduli of
+continuity of $\alpha$ and $\ba$ and $\omega_\chi(h)\to 0$ quantifies the relative
+oscillation of $\chi_1(\cdot,h)$ over an element, which vanishes as $h \to 0$ by the
+construction of~\cite[Lemma~1]{Codina2008FiniteEA}. All right-hand sides tend to zero
+uniformly; here the strict positivity $\alpha_0 > 0$ and $\nu > 0$ are used, and for
+Lipschitz data all moduli are $O(h)$. Then
+$|\bar\tau_{1,a}/\tau_{1,K} - 1| = \bar\tau_{1,a}\,|\Delta(\tau_1^{-1})|
+\le (1+o(1))\,\tau_{1,K}|\Delta(\tau_1^{-1})|$, which proves the claim for $\tau_1$;
+the same computation applied to the explicit form \cref{oa:eq:Tau2Expanded} of $\tau_2$
+(a continuous, positive expression in $\alpha$, $|\ba|$ and $h$, bounded away from
+zero by $\nu/\alpha_\infty$) proves it for $\tau_2$.
+\end{proof}
+
+\begin{pedagogy}[What $\psi(h)$ measures, and what degrades it]
+The proof has two moves. First, for finite element functions the $L^2$ and
+$L^\infty$ norms on one element are equivalent up to the volume factor
+$h_K^{d/2}$ (finite dimensionality again---the same mechanism as the inverse
+estimates), which reduces a norm statement to a statement about \emph{nodal
+versus elemental parameter values}. Second, the relative deviation of
+$\tau^{-1}$ is expanded source by source: porosity contributes its modulus of
+continuity over the floor $\alpha_0$; advection contributes $h\,\omega_{\ba}(Ch)$
+over the viscous floor $c_1\nu$; the surrogate mesh-size field contributes its
+own vanishing relative oscillation. Hence $\psi(h) \to 0$ always, and
+$\psi(h) = O(h)$ for Lipschitz data---but \emph{not uniformly} in $\nu$ or
+$\alpha_0$: at fixed $h$, shrinking $\nu$ inflates $\psi$. This is the honest
+content of the caveat in \cref{oa:th:stability} that $h_0$ depends on the
+coefficient data, and it is the same viscous floor already met in
+\cref{oa:lem:patch}. Note also what is absent: $\sigma$ appears in no bound
+here---large reaction does \emph{not} degrade $\psi$, because $\sigma$ enters
+$\tau_1^{-1}$ as a global constant and cancels from every nodal-versus-elemental
+difference.
+\end{pedagogy}
+
+\subsubsection{Best approximation by the weighted projections}
+
+\begin{lemma}[Best approximation and weighted residual approximation]
+\label{oa:lem:bestapprox}
+Let $i \in \{1,2\}$ and let $\Pi_i$ be as in \cref{oa:sec:method}. Then, for any
+elementwise square-integrable $z$ and any finite element function $z_h$ in the
+corresponding projection space,
+\begin{equation}
+  \label{oa:eq:BestApprox}
+  \norm{\Pi_i^{\perp} z}_{\tau_i} \le \norm{z - z_h}_{\tau_i}.
+\end{equation}
+Moreover, let $z \in H^{r}(\Omega)^s$ with $1 \le r \le k_u+1$ (for $i = 1$) or
+$1 \le r \le k_p + 1$ (for $i = 2$), and let $\alpha$ satisfy \cref{H:porositysmooth} with
+$m \ge r$ wherever $r \ge 2$. Then
+\begin{equation}
+  \label{oa:eq:WeightedApprox}
+  \norm{\Pi_i^{\perp}(\alpha z)}_{\tau_i}
+  \;\le\;
+  C\, C_{\alpha,r}
+  \Bigl( \sum_K \tau_{i,K}\,\alpha_K^2\, h_K^{2r}\,\norm{z}_{H^{r}(K)}^2 \Bigr)^{1/2},
+\end{equation}
+with $C$ depending only on the interpolation constant, the patch-overlap constant and
+the constants of \cref{oa:lem:patch}, and $C_{\alpha,r}$ as in \cref{H:porositysmooth}
+(with $C_{\alpha,1} \coloneqq 1 + \norm{\nabla\alpha}_{L^\infty(\Omega)}/\alpha_0$).
+\end{lemma}
+
+\begin{proof}
+\cref{oa:eq:BestApprox} is the minimizing property of orthogonal projections in their own
+inner product, cf.~\cite[Remark~4]{Codina2008FiniteEA}. For \cref{oa:eq:WeightedApprox}, take
+$z_h$ to be the Scott--Zhang interpolant of $\alpha z$ in the projection space, so that
+$\norm{\alpha z - z_h}_{K} \le C h_K^{r} \norm{\alpha z}_{H^{r}(S_K)}$
+(here $r \le k+1$ for the relevant degree $k$, by \cref{H:spaces} and the stated restrictions on
+$r$; in particular the case $i=1$, $z = \nabla p$, $r = k_p$ uses $k_p \le k_u+1$).
+By the Leibniz rule and \cref{H:porositysmooth},
+$\norm{\alpha z}_{H^{r}(S_K)}
+\le \bigl( \alpha_{\infty,S_K} + \sum_{j=1}^{r}\binom{r}{j}\norm{D^j\alpha}_{L^\infty}\bigr)
+\norm{z}_{H^{r}(S_K)}
+\le C\,C_{\alpha,r}\,\alpha_{\infty,S_K}\norm{z}_{H^{r}(S_K)}$,
+using $\norm{D^j\alpha}_{L^\infty} \le (C_{\alpha,r}-1)\alpha_0 \le
+(C_{\alpha,r}-1)\alpha_{\infty,S_K}$. Insert this into \cref{oa:eq:BestApprox}, replace
+$\alpha_{\infty,S_K}$ and $\tau_{i,S_K}$-values by their values on $K$ using
+\cref{oa:lem:patch}, and re-sum over patches using the bounded overlap implied by
+nondegeneracy, absorbing $\norm{z}_{H^r(S_K)}$ into element contributions.
+\end{proof}
+
+\begin{pedagogy}[The two halves of the best-approximation lemma]
+Both halves are short; neither is decorative. Half one, \cref{oa:eq:BestApprox},
+is the Pythagorean minimizing property of orthogonal projections---
+$\norm{\Pi^\perp z}_{\tau} \le \norm{z - z_h}_{\tau}$ for any competitor $z_h$
+in the projection space, since $z - \Pi z \perp_\tau (\Pi z - z_h)$. Trivial as
+it looks, it is the reason the \emph{analysis} uses $\tau$-weighted projections
+while the \emph{code} uses the plain $L^2$ projection
+(\cref{oa:rem:analyzed}(i)): the minimizing property must hold in the same
+weighted product in which the stabilization pays, or the consistency estimate
+below collapses; cf.~\cite[Remark~4]{Codina2008FiniteEA}. Half two,
+\cref{oa:eq:WeightedApprox}, is the engine of the whole consistency argument:
+\emph{fluctuations of smooth functions are as small as interpolation errors}.
+The proof pattern is worth absorbing once: to bound $\Poneo(\alpha z)$ or
+$\Ptwoo(\alpha z)$, insert the best competitor available in closed form---the
+Scott--Zhang interpolant of $\alpha z$---then handle the product by the Leibniz
+rule (this is the \emph{only} place \cref{H:porositysmooth} is used, through
+$C_{\alpha,r}$), and convert patch sums to element sums by \cref{oa:lem:patch}
+plus bounded patch overlap (each element lies in a uniformly bounded number of
+patches, by shape regularity). The ASGS analysis needs no analogue: its
+stabilization is residual-based and exactly consistent (\cref{eq:consistency}),
+so the exact solution never leaves a stabilization footprint to estimate. Here
+the projection destroys exact consistency, and this lemma is precisely what is
+received in exchange.
+\end{pedagogy}
+
+\subsubsection{The OSGS triple norm}
+\label{oa:sec:norm}
+
+The stability and convergence analysis is carried out in the mesh-dependent OSGS norm of the
+main text (\cref{eq:TripleNormOSGS}), recalled here for convenience,
+\begin{equation}
+  \label{oa:eq:TripleNorm}
+  \tnorm{V}_{\mathrm O}
+  \coloneqq
+  \Bigl(
+  2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv \bigr\rVert^2
+  + \norm{\sigma^{1/2}\bv}^2
+  + \varepsilon\norm{q}^2
+  + \norm{\alpha X(V)}_{\tau_1}^2
+  + \norm{\nabla\cdot(\alpha\bv)}_{\tau_2}^2
+  \Bigr)^{1/2}.
+\end{equation}
+Throughout this appendix we keep the method subscripts of the main text:
+$\tnorm{\cdot}_{\mathrm O}$ denotes this OSGS norm (\cref{eq:TripleNormOSGS}), while
+$\tnorm{\cdot}_{\mathrm S}$ denotes the ASGS norm of \cref{lemma:Stability} of the main text,
+which controls only the damped reaction $\sigmatilde$ (\cref{oa:lem:normcomparison}). The bare
+triple bar is not used.
+
+\begin{lemma}[Definiteness]
+\label{oa:lem:definiteness}
+Under \cref{H:mesh}--\cref{H:porosity}, and with the pressure normalized to zero mean when
+$\varepsilon = 0$, \cref{oa:eq:TripleNorm} is a norm on $\Xhz$; in particular $\tnorm{V}_{\mathrm{O}} = 0$
+implies $V = 0$.
+\end{lemma}
+
+\begin{proof}
+Homogeneity, symmetry and the triangle inequality are immediate; only definiteness needs an
+argument, and it is here that the full Dirichlet data enter. Let $\tnorm{V}_{\mathrm{O}} = 0$ for
+$V = [\bv; q] \in \Xhz$. Then $\ViscProj\nabla\bv \equiv 0$, i.e.\ the symmetric gradient of
+$\bv$ is spherical almost everywhere; since $\bv \in H^1_0(\Omega)^d$, the deviatoric
+(conformal) Korn inequality on the bounded domain $\Omega$---whose conformal--Killing kernel
+is excluded by the homogeneous boundary data---gives $\norm{\nabla\bv} \le
+C\,\bigl\lVert\ViscProj\nabla\bv\bigr\rVert = 0$, so $\bv \equiv 0$. With $\bv = 0$, the term
+$\norm{\alpha X(V)}_{\tau_1} = 0$ reduces to $\norm{\alpha\nabla q}_{\tau_1} = 0$; as
+$\alpha \ge \alpha_0 > 0$ and $\tau_1 > 0$, this forces $\nabla q \equiv 0$, so $q$ is
+constant, and the normalization ($\varepsilon\norm{q} = 0$ when $\varepsilon > 0$, or the
+zero-mean constraint when $\varepsilon = 0$) forces $q \equiv 0$. Hence $\tnorm{\cdot}_{\mathrm{O}}$ is
+definite. (Absent full Dirichlet data or pressure normalization it is only a seminorm.)
+\end{proof}
+
+\begin{lemma}[Comparison with the ASGS norm]
+\label{oa:lem:normcomparison}
+Let $\tnorm{\cdot}_{\mathrm{S}}$ denote the triple norm of the ASGS stability lemma
+of~the main text,
+\[
+\begin{aligned}
+  \tnorm{V}_{\mathrm{S}}^2
+  &= \nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv \bigr\rVert^2
+  + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2}\bv \bigr\rVert_h^2
+  + \varepsilon\norm{q}^2
+  + \norm{\alpha X(V)}_{\tau_1}^2
+  + \norm{\nabla\cdot(\alpha\bv)}_{\tau_2}^2,
+  \qquad \\
+  \widetilde{\sigma}_\alpha
+  &= \frac{\tns^{-1}\sigma}{\tns^{-1} + \sigma/\alpha_K}.
+\end{aligned}
+\]
+Then $\tnorm{V}_{\mathrm{S}} \le \tnorm{V}_{\mathrm{O}}$ for all $V$.
+\end{lemma}
+
+\begin{proof}
+Term by term: $\nu \le 2\nu$; on each element
+$\widetilde{\sigma}_\alpha = \sigma\,\tns^{-1}/(\tns^{-1}+\sigma/\alpha_K) \le \sigma$;
+the remaining three terms coincide.
+\end{proof}
+
+\begin{pedagogy}[Anatomy of the norm; the Korn subtlety; a one-way comparison]
+Read \cref{oa:eq:TripleNorm} as a price list: its five components are the only
+currencies the analysis can pay estimates with. Four coincide (up to the factor
+$2$ on the viscous term) with the ASGS norm \cref{eq:triplenorm}; the single
+substantive difference is the reactive component---full $\norm{\sigma^{1/2}\bv}$
+here, damped $\lVert\sigmatilde^{1/2}\bv\rVert_h$ there. By
+\cref{eq:sigmatilde}, $\sigmatilde = \sigma\varphi_1/(\varphi_1+\sigma) \le
+\min(\sigma, \varphi_1)$: in the reaction-dominated regime $\sigmatilde$
+saturates at $\varphi_1 = c_1\alpha_K^2\tau_2/h_K^2 \ll \sigma$, so the OSGS
+norm is genuinely, unboundedly stronger there, and \cref{oa:lem:normcomparison}
+is the precise one-way street ($\tnorm{\cdot}_{\mathrm S} \le
+\tnorm{\cdot}_{\mathrm O}$, never the reverse with a uniform constant). Keep
+this asymmetry in mind when comparing the two convergence theorems: they bound
+different left-hand sides. On definiteness: the point needing proof is that the
+viscous term sees only the \emph{deviatoric symmetric} gradient. Velocity
+fields with $\ViscProj\nabla\bv \equiv 0$ form the finite-dimensional
+conformal-Killing kernel (infinitesimal rigid motions and dilation-like
+fields), and the deviatoric Korn inequality states that once the boundary data
+exclude that kernel---as homogeneous Dirichlet data do---the full gradient is
+controlled by its deviatoric symmetric part. Without full Dirichlet data (or
+another kernel-excluding constraint), \cref{oa:eq:TripleNorm} degrades to a
+seminorm, as the parenthetical in the proof warns.
+\end{pedagogy}
+
+\subsection{Stability}
+\label{oa:sec:stability}
+
+\begin{theorem}[Inf--sup stability]
+\label{oa:th:stability}
+Under \cref{H:mesh}--\cref{H:spaces}, \cref{H:design}--\cref{H:patch} there exist $h_0 > 0$ and $\beta_{\mathrm{osgs}} > 0$,
+depending only on $\beta_0$, $C_2$, $C_{\nabla\alpha}/C_{\mathrm{inv}}$ and the constants of
+\cref{oa:sec:technical}, such that for all $h \le h_0$,
+\begin{equation}
+  \label{oa:eq:InfSup}
+  \inf_{U_h \in \Xhz\setminus\{0\}}\;
+  \sup_{V_h \in \Xhz\setminus\{0\}}\;
+  \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{U_h}_{\mathrm{O}}\,\tnorm{V_h}_{\mathrm{O}}}
+  \;\ge\; \beta_{\mathrm{osgs}} .
+\end{equation}
+An admissible choice of the constants in \cref{H:design} is
+$\gamma_0 = 10\,(1 + M_2)$ with $M_2 \coloneqq 1 + C_{\nabla\alpha}/C_{\mathrm{inv}}$,
+together with $h_0$ small enough that
+$\psi(h_0) \le \min\{1/8,\ \beta_0^2/16\}$, where $\psi$ is the function of
+\cref{oa:lem:smoothing}. These are \emph{sufficient} conditions, and $\gamma_0$ is not claimed
+sharp: with $\gamma_0 \ge 20$ they demand $c_1 \gtrsim 400\,C_{\mathrm{inv}}^2$ and
+$c_2 \gtrsim 20\,C_{\mathrm{inv}}$, well above the values $c_1 = 4k^4$ (or $16k^4$),
+$c_2 = 2k^2$ used in the experiments of~the main text, which are not shown to satisfy
+them. The result is thus a \emph{conditional} inf--sup stability theorem, not a calibration
+or validation of the stabilization constants employed in the computations; the
+threshold~$h_0$ likewise depends on the coefficient data through $\psi$
+(\cref{oa:lem:smoothing}) and is not uniform in $\alpha_0$, $\nu$ or the moduli of continuity
+of $\alpha$ and $\ba$.
+\end{theorem}
+
+\begin{pedagogy}[What inf--sup means, and why coercivity is unavailable here]
+Background, in finite dimensions. For a square discrete system,
+\emph{coercivity} $B(U,U) \ge c\norm{U}^2$ gives solvability and stability by
+testing each $U$ with itself. The \emph{inf--sup} condition \cref{oa:eq:InfSup}
+is the general sufficient condition: for every $U_h$ there exists a
+\emph{witness} $V_h$ with $B(U_h,V_h) \ge \beta\,\tnorm{U_h}_{\mathrm
+O}\tnorm{V_h}_{\mathrm O}$; equivalently, the system matrix is injective with a
+quantitative bound, and a square injective matrix is invertible. Coercivity is
+the special case in which the witness is always $U_h$ itself. Why that special
+case fails here \emph{in this norm}: the diagonal identity \cref{oa:eq:Diagonal}
+is a sum of squares, so $B_{\mathrm{osgs}}$ \emph{is} nonnegative on the
+diagonal---but of the wrong quantities. Splitting $\norm{\xi_h}_{\tau_1}^2 =
+\norm{\Pone\xi_h}_{\tau_1}^2 + O_1$ (Pythagoras for the unconstrained
+projection), the norm \cref{oa:eq:TripleNorm} contains the \emph{full}
+$\norm{\xi_h}_{\tau_1}^2$, while the diagonal delivers only the fluctuation
+parts $O_1$, $O_2$: the projected components are invisible to
+$B_{\mathrm{osgs}}(U_h,U_h)$, and no constant relates them to what the diagonal
+controls. Contrast with the ASGS diagonal, familiar from \cref{lem:coercivity}:
+there the stabilization at $V=U$ produces the \emph{full} residual square minus
+a viscous--reactive penalty (\cref{eq:stabdiag1}--\cref{eq:Gexpand}); the
+penalty is absorbed by the design conditions (\cref{eq:viscabsorb}) and, for
+the reactive part, absorbed \emph{exactly} at the price of renormalizing
+$\sigma$ down to $\sigmatilde$ (\cref{eq:reactrenorm}). Deleting the reactive
+and viscous slots (\cref{oa:lem:annihilation}) removes both the penalty and the
+renormalization: the full $D_\sigma$ survives on the diagonal---which is why the
+stronger norm is attainable at all---but the projected residual components must
+now be \emph{harvested} by a purpose-built witness. That is the entire business
+of the proof below. On the statement's honesty paragraph: the constants are
+sufficient-side only ($\gamma_0 = 10(1+M_2)$ demands $c_1 \gtrsim
+400\,C_{\mathrm{inv}}^2$, far above the values used in the computations), and
+$h_0$ inherits the data-dependence of $\psi$; the theorem certifies the
+mechanism, it does not calibrate the code.
+\end{pedagogy}
+
+\begin{proof}
+Fix $U_h = [\bu_h; p_h] \in \Xhz$ and recall the abbreviations \cref{oa:eq:XiDelta}.
+Write $\psi \coloneqq \psi(h)$ and set
+\[
+  D_\nu \coloneqq 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu_h \bigr\rVert^2,
+  \quad
+  D_\sigma \coloneqq \norm{\sigma^{1/2}\bu_h}^2,
+  \quad
+  D_\varepsilon \coloneqq \varepsilon\norm{p_h}^2,
+\]
+\[
+  O_1 \coloneqq \norm{\Poneo\xi_h}_{\tau_1}^2,
+  \quad
+  O_2 \coloneqq \norm{\Ptwoo\delta_h}_{\tau_2}^2,
+  \quad
+  P_1 \coloneqq \norm{\Ponez\xi_h}_{\tau_1}^2,
+  \quad
+  P_2 \coloneqq \norm{\Ptwo\delta_h}_{\tau_2}^2 .
+\]
+
+\medskip\noindent\emph{Step 1: the special test function.}
+Define
+\[
+  \bw_h \coloneqq \tau_1 \smul \Ponez(\xi_h) \;\in\; V_{h0},
+  \qquad
+  r_h \coloneqq \tau_2 \smul \Ptwo(\delta_h) - m_h \;\in\; Q_{h0},
+\]
+where $m_h$ is the mean of $\tau_2\smul\Ptwo(\delta_h)$ over $\Omega$ whenever
+$Q_{h0}$ consists of zero-mean functions, and $m_h \coloneqq 0$ otherwise. Note that
+$\bw_h$ is an admissible velocity test function ($\Ponez\xi_h \in V_{h0}$ vanishes on
+$\partial\Omega$, and the smoothed product preserves nodal zeros), and $r_h$ an
+admissible pressure test function since constants belong to $Q_h$ by \cref{H:spaces}. Set
+$V^0 \coloneqq [\bw_h; r_h]$ and take as test function $W \coloneqq U_h + V^0$.
+By \cref{oa:eq:Diagonal},
+\begin{equation}
+  \label{oa:eq:StepDiag}
+  B_{\mathrm{osgs}}(\ba; U_h, U_h) = D_\nu + D_\sigma + D_\varepsilon + O_1 + O_2 ,
+\end{equation}
+and it remains to bound $B_{\mathrm{osgs}}(\ba; U_h, V^0)$ from below. Expanding
+\cref{eq:BilinearForm} and \cref{oa:eq:Sdefs},
+\begin{align}
+  B_{\mathrm{osgs}}(\ba; U_h, V^0)
+  ={}& 2\nu\,(\alpha\,\ViscProj\nabla\bu_h, \ViscProj\nabla\bw_h)
+  \tag{T1}\label{oa:eq:T1}\\
+  &+ (\bw_h, \xi_h)
+  \tag{T2}\label{oa:eq:T2}\\
+  &+ \sigma(\bu_h, \bw_h)
+  \tag{T3}\label{oa:eq:T3}\\
+  &+ \varepsilon(p_h, r_h)
+  \tag{T4}\label{oa:eq:T4}\\
+  &+ (r_h, \delta_h)
+  \tag{T5}\label{oa:eq:T5}\\
+  &+ \bigl(\Poneo\xi_h,\ \alpha(\ba\cdot\nabla\bw_h + \nabla r_h)\bigr)_{\tau_1}
+  \tag{T6}\label{oa:eq:T6}\\
+  &+ \bigl(\Ptwoo\delta_h,\ \nabla\cdot(\alpha\bw_h)\bigr)_{\tau_2},
+  \tag{T7}\label{oa:eq:T7}
+\end{align}
+where in \cref{oa:eq:T2} we used
+$(\bw_h, \alpha\ba\cdot\nabla\bu_h) + (\bw_h, \alpha\nabla p_h) = (\bw_h, \xi_h)$.
+The constant shift $m_h$ is invisible throughout: it does not affect $\nabla r_h$ in
+\cref{oa:eq:T6}; in \cref{oa:eq:T5} it contributes $-m_h\int_\Omega \delta_h = 0$ because
+$\int_\Omega \nabla\cdot(\alpha\bu_h) = 0$ by the divergence theorem and
+$\bu_h \in V_{h0}$; and in \cref{oa:eq:T4} it contributes
+$-\varepsilon\, m_h \int_\Omega p_h = 0$, since either $m_h = 0$ or $p_h$ has zero
+mean. We now estimate \cref{oa:eq:T1}--\cref{oa:eq:T7} term by term. Throughout,
+\cref{oa:eq:Smoothing} is used in the form
+$\normK{\bw_h} \le (1+\psi)\,\tau_{1,K}\normK{\Ponez\xi_h}$ and
+$\normK{r_h + m_h} \le (1+\psi)\,\tau_{2,K}\normK{\Ptwo\delta_h}$ (recall also that
+subtracting the mean does not increase the $L^2$ norm, so the same bound holds
+globally for $r_h$).
+
+\begin{pedagogy}[Step 1 read slowly: the witness, component by component]
+The design recipe (from~\cite{Codina2008FiniteEA}) is: \emph{to harvest a
+square $\norm{z}_w^2$, test with $w\,z$}---the Galerkin pairing of the
+corresponding equation against that test function then produces the square.
+Here the two quantities missing from the diagonal are the projected momentum
+residual and the projected mass residual, so the witness has one component for
+each: $\bw_h = \tau_1\smul\Ponez\xi_h$ and $r_h = \tau_2\smul\Ptwo\delta_h -
+m_h$. Each ingredient is forced. The \emph{constrained} projection $\Ponez$
+(not $\Pone$): test velocities must vanish on the boundary, and
+$\Ponez\xi_h \in V_{h0}$ does; the gap between $\Ponez$ and $\Pone$ is exactly
+what \cref{H:projection} will price. The smoothing $\smul$ (not $\pmul$):
+conformity, as prepared in \cref{oa:lem:smoothing}. The mean shift $m_h$:
+membership in $Q_{h0}$; it is then checked to be invisible in every
+pairing---note the small pleasure of the argument that $\int_\Omega\delta_h = 0$
+by the divergence theorem, so even \cref{oa:eq:T5} ignores it. Why no pressure
+analogue of \cref{H:projection} is needed is explained at the end of Step~2:
+$\delta_h$ already has zero mean and constants belong to $Q_h$, so projecting
+onto the \emph{unconstrained} space and shifting the test function costs
+nothing---``$\beta_0 = 1$'' for the mass slot
+(\cref{oa:rem:proofstructure}(iv)). Finally, the expansion
+\cref{oa:eq:T1}--\cref{oa:eq:T7} is the campaign map: \cref{oa:eq:T2} and
+\cref{oa:eq:T5} are the \emph{productive} terms (they will yield $P_1$ and
+$P_2$); \cref{oa:eq:T1}, \cref{oa:eq:T3}, \cref{oa:eq:T4} are Galerkin
+cross-talk between $U_h$ and the witness; \cref{oa:eq:T6}, \cref{oa:eq:T7} are
+stabilization cross-talk. The ledger to be established: every cross term is at
+most a small multiple of a quantity the diagonal already controls, plus a
+fraction strictly less than one of the freshly harvested $P$'s.
+\end{pedagogy}
+
+\medskip\noindent\emph{Step 2: the two productive terms \cref{oa:eq:T2} and \cref{oa:eq:T5}.}
+Splitting $\tau_1\smul(\cdot) = \tau_1\pmul(\cdot) + (\tau_1\smul - \tau_1\pmul)(\cdot)$
+and using the $\tau_1$-orthogonality
+$(\xi_h, \Ponez\xi_h)_{\tau_1} = \norm{\Ponez\xi_h}_{\tau_1}^2$,
+\[
+\begin{aligned}
+  (\bw_h, \xi_h)
+  &= P_1 + \bigl((\tau_1\smul - \tau_1\pmul)\Ponez\xi_h,\ \xi_h\bigr) \\
+  &\;\ge\; P_1 - \psi\,\norm{\Ponez\xi_h}_{\tau_1}\norm{\xi_h}_{\tau_1}
+  \;\ge\; P_1 - \frac{2\psi}{\beta_0^2}\,(P_1 + O_1),
+\end{aligned}
+\]
+where the last step used the nonexpansiveness of $\Ponez$ in $\norm{\cdot}_{\tau_1}$
+together with \cref{H:projection}, in the form
+$\norm{\xi_h}_{\tau_1}^2 \le (2/\beta_0^2)(P_1 + O_1)$. For \cref{oa:eq:T5}, since
+$\delta_h$ has zero mean the shift is invisible as noted, and by the exact
+$\tau_2$-orthogonal decomposition of $\delta_h$ with respect to $Q_h$,
+$\norm{\delta_h}_{\tau_2}^2 = P_2 + O_2$; hence
+\[
+  (r_h, \delta_h)
+  = P_2 + \bigl((\tau_2\smul - \tau_2\pmul)\Ptwo\delta_h,\ \delta_h\bigr)
+  \;\ge\; P_2 - \psi\,(P_2 + O_2).
+\]
+This is the point where the mass slot enjoys the exact analogue of \cref{H:projection} with
+constant one: because $\delta_h$ has zero mean, projecting onto $Q_h$ and correcting
+the test function by a constant replaces the constrained projection
+$\Pi_{2,0}$ of~\cite{Codina2008FiniteEA} at no cost.
+
+\begin{pedagogy}[Step 2 read slowly: the harvest, and the first bite of \cref{H:projection}]
+Splitting $\smul = \pmul + (\smul-\pmul)$: the $\pmul$-part of \cref{oa:eq:T2}
+is $(\tau_1\pmul\Ponez\xi_h,\ \xi_h) = (\Ponez\xi_h,\ \xi_h)_{\tau_1} = P_1$,
+the promised square, by $\tau_1$-orthogonality
+($\xi_h - \Ponez\xi_h \perp_{\tau_1} V_{h0} \ni \Ponez\xi_h$); the
+$(\smul-\pmul)$-part is priced by $\psi$ (\cref{oa:lem:smoothing}) times
+$\norm{\Ponez\xi_h}_{\tau_1}\norm{\xi_h}_{\tau_1}$. To convert the second
+factor into ledger currency, \cref{H:projection} is used in squared form:
+\cref{eq:ProjectionStability} plus $(a+b)^2 \le 2(a^2+b^2)$ give
+$\norm{\xi_h}_{\tau_1}^2 \le (2/\beta_0^2)(P_1+O_1)$. This is the exact point
+of the hypothesis: it quantifies \emph{how much of the momentum residual the
+constrained projection can see}. If $\beta_0$ could degenerate with $h$, the
+harvest $P_1$ could be an arbitrarily small fraction of
+$\norm{\Pone\xi_h}_{\tau_1}$, and Step~5 could not reconstruct the norm. This
+Codina--Blasco-type condition is the one hypothesis of this appendix that is a
+genuine, method-specific property of the finite element pair rather than a
+consequence of the standing mesh and data assumptions (see the commentary at
+\cref{oa:rem:dispensed}). The mass computation is the same but cleaner: the
+decomposition $\norm{\delta_h}_{\tau_2}^2 = P_2 + O_2$ is \emph{exact}
+(unconstrained projection, genuine Pythagoras), so only the smoothing penalty
+$\psi\,(P_2+O_2)$ appears.
+\end{pedagogy}
+
+\medskip\noindent\emph{Step 3: the perturbation terms.}
+For \cref{oa:eq:T1}, by Cauchy--Schwarz, $|\alpha| \le \alpha_K$ elementwise,
+$|\ViscProj \boldsymbol{M}| \le |\boldsymbol{M}|$ pointwise, the inverse estimate
+\cref{eq:InverseEstimateFiniteOrderNorm}, \cref{oa:eq:Smoothing} and \cref{oa:eq:K1},
+\begin{align*}
+  \text{\cref{oa:eq:T1}}
+  &\ \ge\ -\,2\sum_K \nu^{1/2}\,\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bu_h\bigr\rVert_K
+  \cdot \nu^{1/2}\alpha_K^{1/2}\,\frac{C_{\mathrm{inv}}}{h_K}\,(1+\psi)\,\tau_{1,K}
+  \norm{\Ponez\xi_h}_K\\
+  &\ \ge\ -\,2 M_1 \Bigl(\frac{D_\nu}{2}\Bigr)^{1/2} P_1^{1/2},
+\end{align*}
+with $M_1 \coloneqq (1+\psi)/\gamma$, whence, by Young's inequality,
+\[
+  \text{\cref{oa:eq:T1}} \ \ge\ -\frac{D_\nu}{4} - 2M_1^2\, P_1 .
+\]
+For \cref{oa:eq:T3}, using $\sigma\tau_1 \le 1$ from \cref{oa:eq:P1},
+\begin{align*}
+  \text{\cref{oa:eq:T3}}
+  &\ \ge\ -(1+\psi)\sum_K \sigma\,\tau_{1,K}\normK{\bu_h}\,\normK{\Ponez\xi_h}\\
+  &\ \ge\ -(1+\psi)\, D_\sigma^{1/2} P_1^{1/2}
+  \ \ge\ -\frac{D_\sigma}{2} - \frac{(1+\psi)^2}{2}\,P_1 .
+\end{align*}
+For \cref{oa:eq:T4}, using $\varepsilon\tau_2 \le C_2$ from \cref{oa:eq:P1},
+\begin{align*}
+  \text{\cref{oa:eq:T4}}
+  &\ \ge\ -(1+\psi)\sum_K \varepsilon\,\tau_{2,K}\normK{p_h}\normK{\Ptwo\delta_h}\\
+  &\ \ge\ -(1+\psi)\,C_2^{1/2}\, D_\varepsilon^{1/2} P_2^{1/2}
+  \ \ge\ -\frac{D_\varepsilon}{2} - \frac{(1+\psi)^2 C_2}{2}\,P_2 .
+\end{align*}
+For \cref{oa:eq:T6} we bound the two contributions to
+$\alpha X(V^0) = \alpha\ba\cdot\nabla\bw_h + \alpha\nabla r_h$ elementwise. By the
+inverse estimate, \cref{oa:eq:Smoothing} and \cref{oa:eq:K2},
+\[
+\begin{aligned}
+  \tau_{1,K}^{1/2}\normK{\alpha\,\ba\cdot\nabla\bw_h}
+  &\le \tau_{1,K}^{1/2}\,\alpha_K |\ba|_{\infty,K}\frac{C_{\mathrm{inv}}}{h_K}
+  (1+\psi)\,\tau_{1,K}\normK{\Ponez\xi_h} \\
+  &\le \frac{1+\psi}{\gamma}\,\tau_{1,K}^{1/2}\normK{\Ponez\xi_h},
+\end{aligned}
+\]
+and by \cref{oa:eq:K3},
+\[
+  \tau_{1,K}^{1/2}\normK{\alpha\nabla r_h}
+  \le \tau_{1,K}^{1/2}\,\alpha_K\,\frac{C_{\mathrm{inv}}}{h_K}(1+\psi)\,
+  \tau_{2,K}\normK{\Ptwo\delta_h}
+  \le \frac{1+\psi}{\gamma}\,\tau_{2,K}^{1/2}\normK{\Ptwo\delta_h}.
+\]
+Hence, by Cauchy--Schwarz over the elements and $ab \le (a^2+b^2)/2$,
+\[
+  \text{\cref{oa:eq:T6}}
+  \ \ge\ -\frac{1+\psi}{\gamma}\, O_1^{1/2}\bigl( P_1^{1/2} + P_2^{1/2} \bigr)
+  \ \ge\ -\frac{1+\psi}{\gamma}\Bigl( O_1 + \frac{P_1 + P_2}{2} \Bigr).
+\]
+For \cref{oa:eq:T7}, expanding
+$\nabla\cdot(\alpha\bw_h) = \alpha\,\nabla\cdot\bw_h + \nabla\alpha\cdot\bw_h$ and
+using \cref{H:porosity} in the form
+$\norm{\nabla\alpha}_{L^\infty(K)} \le C_{\nabla\alpha}\,\alpha_K/h_K$,
+\[
+\begin{aligned}
+  \tau_{2,K}^{1/2}\normK{\nabla\cdot(\alpha\bw_h)}
+  &\le \Bigl(1 + \frac{C_{\nabla\alpha}}{C_{\mathrm{inv}}}\Bigr)
+  \tau_{2,K}^{1/2}\,\alpha_K\,\frac{C_{\mathrm{inv}}}{h_K}\,
+  (1+\psi)\,\tau_{1,K}\normK{\Ponez\xi_h} \\
+  &\le \frac{M_2(1+\psi)}{\gamma}\,\tau_{1,K}^{1/2}\normK{\Ponez\xi_h},
+\end{aligned}
+\]
+by \cref{oa:eq:K3}, with $M_2 = 1 + C_{\nabla\alpha}/C_{\mathrm{inv}}$; hence
+\[
+  \text{\cref{oa:eq:T7}}
+  \ \ge\ -\frac{M_2(1+\psi)}{\gamma}\, O_2^{1/2} P_1^{1/2}
+  \ \ge\ -\frac{M_2(1+\psi)}{2\gamma}\,\bigl( O_2 + P_1 \bigr).
+\]
+
+\begin{pedagogy}[Step 3 read slowly: the perturbation ledger and the Young workhorse]
+Every estimate here has the same shape: $|\text{cross}| \le \kappa\,A^{1/2}
+P^{1/2}$ with $A$ a quantity the diagonal controls and $\kappa$ a coefficient
+made small by design, followed by Young's inequality $ab \le
+\tfrac{\lambda}{2}a^2 + \tfrac{1}{2\lambda}b^2$, with $\lambda$ chosen to
+sacrifice only a \emph{fraction} of $A$ (for \cref{oa:eq:T1}, a quarter of
+$D_\nu$) against a controlled multiple of $P$. Where each $\kappa$'s smallness
+comes from is the content of the (K)-inequalities: \cref{oa:eq:K1} for the
+viscous cross-talk---note, per \cref{oa:rem:proofstructure}(i), that only the
+\emph{plain} inverse estimate is needed, because the analyzed OSGS form
+contains no viscous stabilization, so the enlarged constant of
+\cref{eq:winv-divvisc} and its calibration burden never appear here;
+\cref{oa:eq:K2} and \cref{oa:eq:K3} for the two halves of the witness's own
+first-order quantity in \cref{oa:eq:T6}; \cref{oa:eq:K3} again, with the
+porosity surcharge $M_2 = 1 + C_{\nabla\alpha}/C_{\mathrm{inv}}$, for
+\cref{oa:eq:T7}, where $\nabla\cdot(\alpha\bw_h)$ picks up
+$\nabla\alpha\cdot\bw_h$---the only entry point of porosity \emph{variation}
+into stability, priced by the resolution condition of \cref{H:porosity}. The
+exception to the pattern is deliberately the most important two lines of the
+appendix: \cref{oa:eq:T3}, the reactive cross-talk $\sigma(\bu_h,\bw_h)$, is
+bounded using nothing but $\sigma\tau_1 \le 1$ and absorbed by the \emph{full}
+Galerkin reaction $D_\sigma$ at rate one half. The reader coming from
+\cref{app:Continuity} should pause here: this is the pairing whose ASGS
+analogue is renormalized by the stabilization partner $T_{14}$ into the damped
+$\sigmatilde$-pairing (\cref{eq:reactivestep}); the OSGS projection deleted
+that partner, and the full-strength diagonal $D_\sigma$---the very term the
+deletion preserved---absorbs it instead. The stronger norm is paid for at
+exactly this spot, and the price is only a Young split.
+\end{pedagogy}
+
+\medskip\noindent\emph{Step 4: collection.}
+Adding \cref{oa:eq:StepDiag} and the bounds of Steps~2--3,
+\begin{align*}
+  B_{\mathrm{osgs}}(\ba; U_h, W)
+  \ \ge\ & \tfrac34\, D_\nu + \tfrac12\, D_\sigma + \tfrac12\, D_\varepsilon\\
+  &+ \Bigl( 1 - \frac{2\psi}{\beta_0^2} - \frac{1+\psi}{\gamma} \Bigr)\, O_1
+  + \Bigl( 1 - \psi - \frac{M_2(1+\psi)}{2\gamma} \Bigr)\, O_2\\
+  &+ \Bigl( 1 - \frac{2\psi}{\beta_0^2} - 2M_1^2 - \frac{(1+\psi)^2}{2}
+  - \frac{1+\psi}{2\gamma} - \frac{M_2(1+\psi)}{2\gamma} \Bigr)\, P_1\\
+  &+ \Bigl( 1 - \psi - \frac{(1+\psi)^2 C_2}{2} - \frac{1+\psi}{2\gamma} \Bigr)\, P_2 .
+\end{align*}
+With $\gamma \ge \gamma_0 = 10(1+M_2)$ and
+$\psi \le \psi_0 = \min\{1/8, \beta_0^2/16\}$ (so that $2\psi/\beta_0^2 \le 1/8$ and
+$1+\psi \le 9/8$), a direct evaluation shows that every coefficient is at least
+$1/8$ (for $P_1$: $1 - 0.125 - 0.007 - 0.633 - 0.029 - 0.057 \ge 0.14$; for $P_2$,
+using $C_2 \le 1$: $1 - 0.125 - 0.633 - 0.029 \ge 0.21$; the others are larger).
+Hence, with $C_0 = 1/8$,
+\begin{equation}
+  \label{oa:eq:Collected}
+  B_{\mathrm{osgs}}(\ba; U_h, W)
+  \ \ge\ C_0\,\bigl( D_\nu + D_\sigma + D_\varepsilon + O_1 + O_2 + P_1 + P_2 \bigr).
+\end{equation}
+
+\begin{pedagogy}[Step 4: the audit]
+Nothing conceptual happens here; it is the audit that the seven balances stay
+positive. The arithmetic worth internalizing: with $\gamma \ge 10(1+M_2)$,
+every $(1+\psi)/\gamma$-type coefficient is a few percent;
+$\psi \le \min\{1/8,\beta_0^2/16\}$ caps both $\psi$ and $2\psi/\beta_0^2$ at
+$1/8$; the dominant bite on $P_1$ is the $0.633 = (1+\psi)^2/2$ from the Young
+split of \cref{oa:eq:T3}---the cost of absorbing the reactive cross-talk at
+rate one half---and even so the $P_1$ balance closes at $0.14$. The uniform
+floor is $C_0 = 1/8$. Note what the collection does \emph{not} contain: any
+$\sigma$-, $\nu$-, $\varepsilon$- or $\Dah$-dependent coefficient. Stability is
+unconditional in the physical parameters; all parameter sensitivity of the
+final convergence estimate enters later, through the interpolation
+conversions.
+\end{pedagogy}
+
+\medskip\noindent\emph{Step 5: recovery of the triple norm and boundedness of the test
+function.}
+By \cref{H:projection} and the exact decomposition of the mass slot,
+\[
+  \tnorm{U_h}_{\mathrm{O}}^2
+  = D_\nu + D_\sigma + D_\varepsilon + \norm{\xi_h}_{\tau_1}^2 + \norm{\delta_h}_{\tau_2}^2
+  \le D_\nu + D_\sigma + D_\varepsilon + \frac{2}{\beta_0^2}(P_1 + O_1) + (P_2 + O_2),
+\]
+so \cref{oa:eq:Collected} yields
+$B_{\mathrm{osgs}}(\ba; U_h, W) \ge C_0 \min\{1, \beta_0^2/2\}\,\tnorm{U_h}_{\mathrm{O}}^2$.
+It remains to bound $\tnorm{W}_{\mathrm{O}} \le \tnorm{U_h}_{\mathrm{O}} + \tnorm{V^0}_{\mathrm{O}}$. Using
+\cref{oa:eq:Smoothing} elementwise together with \cref{oa:eq:K1} for the viscous term,
+$\sigma\tau_1 \le 1$ for the reactive term, $\varepsilon\tau_2 \le C_2$ for the
+compressibility term, and the bounds of Step~3 for
+$\norm{\alpha X(V^0)}_{\tau_1}$ and $\norm{\nabla\cdot(\alpha\bw_h)}_{\tau_2}$,
+\begin{align*}
+  \tnorm{V^0}_{\mathrm{O}}^2
+  &\le \Bigl[ \frac{2(1+\psi)^2}{\gamma^2}
+  + (1+\psi)^2
+  + \frac{2(1+\psi)^2}{\gamma^2}
+  + \frac{M_2^2(1+\psi)^2}{\gamma^2} \Bigr] P_1 \\
+  &+ \Bigl[ (1+\psi)^2 C_2 + \frac{2(1+\psi)^2}{\gamma^2} \Bigr] P_2\\
+  &\le C\,(P_1 + P_2),
+\end{align*}
+and $P_1 \le \norm{\xi_h}_{\tau_1}^2$, $P_2 \le \norm{\delta_h}_{\tau_2}^2$ give
+$\tnorm{V^0}_{\mathrm{O}} \le C\,\tnorm{U_h}_{\mathrm{O}}$, hence $\tnorm{W}_{\mathrm{O}} \le C\,\tnorm{U_h}_{\mathrm{O}}$. Combining,
+\[
+  \sup_{V_h\in\Xhz} \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{V_h}_{\mathrm{O}}}
+  \ \ge\ \frac{B_{\mathrm{osgs}}(\ba; U_h, W)}{\tnorm{W}_{\mathrm{O}}}
+  \ \ge\ \beta_{\mathrm{osgs}}\, \tnorm{U_h}_{\mathrm{O}}
+\]
+with $\beta_{\mathrm{osgs}} = C_0\min\{1,\beta_0^2/2\}/C > 0$, which is
+\cref{oa:eq:InfSup}.
+\end{proof}
+
+\begin{pedagogy}[Step 5: reconstruction and boundedness---the two closing duties]
+An inf--sup proof has two closing obligations that a coercivity proof does not.
+(a)~\emph{Reconstruction}: the collected lower bound is in the bookkeeping
+variables $D$, $O$, $P$, but the norm contains $\norm{\xi_h}_{\tau_1}^2$ and
+$\norm{\delta_h}_{\tau_2}^2$; the passage back is a second (and final)
+application of \cref{H:projection} for the momentum slot and the exact
+Pythagoras for the mass slot. (b)~\emph{Boundedness of the witness}: the
+inf--sup quotient divides by $\tnorm{W}_{\mathrm O}$, so a witness of unbounded
+size would prove nothing; the estimate $\tnorm{V^0}_{\mathrm O} \le
+C\,\tnorm{U_h}_{\mathrm O}$ deliberately reuses the elementwise bounds of
+Step~3---an economy worth noticing: the same (K)-conversions price both the
+cross-talk and the witness's size. The final constant $\beta_{\mathrm{osgs}} =
+C_0\min\{1,\beta_0^2/2\}/C$ assembles the three ingredients: collection floor,
+reconstruction rate, witness size. Two structural notes. First, the pattern
+``test with $U_h$ plus a weighted correction, harvest, absorb, reconstruct,
+bound the witness'' is the standard template for inf--sup proofs of stabilized
+and mixed methods; met once here, it will be recognized throughout that
+literature. Second, well-posedness of \cref{oa:eq:Method} is a footnote in
+finite dimensions: the system is square, and \cref{oa:eq:InfSup} makes its
+matrix injective, hence invertible---the statement at the head of
+\cref{oa:sec:convergence}.
+\end{pedagogy}
+
+\begin{remark}[On the structure of the proof]
+\label{oa:rem:proofstructure}
+The proof is that of~\cite[Theorem~1]{Codina2008FiniteEA} with four modifications. (i)~All
+inverse-estimate steps carry the porosity weight, absorbed through
+\cref{oa:eq:K1}--\cref{oa:eq:K3}; only the plain inverse estimate
+\cref{eq:InverseEstimateFiniteOrderNorm} is used---in contrast with the ASGS stability proof
+of~the main text, no estimate for $\nabla\cdot(\alpha\nu\ViscProj\nabla\bv_h)$ is
+needed, because the analyzed OSGS form contains no viscous stabilization term.
+(ii)~The reactive pairing \cref{oa:eq:T3} is new; it is absorbed by the \emph{full}
+Galerkin reaction term $D_\sigma$ at the price of half of $P_1$, using nothing more
+than $\sigma\tau_1 \le 1$. This is where the OSGS analysis retains
+$\norm{\sigma^{1/2}\bu_h}$ in the norm, where the ASGS analysis retains only the
+damped $\widetilde{\sigma}_\alpha$. (iii)~The compressibility pairing \cref{oa:eq:T4} is
+new and is controlled by the same condition $\varepsilon\tau_2 \le C_2$ assumed
+in~the main text. (iv)~The constrained pressure projection $\Pi_{2,0}$
+of~\cite{Codina2008FiniteEA} is replaced by the unconstrained projection plus a mean
+correction of the test function, which is invisible in every term; this makes the
+mass-slot stability constant exactly one and is the reason no analogue of
+\cref{H:projection} is required for the divergence.
+\end{remark}
+
+\begin{pedagogy}[Cross-walk to the ASGS stability proof]
+A dictionary, for the reader holding both proofs in mind. \emph{Test function}:
+$U_h$ itself (\cref{lem:coercivity}) versus $U_h + V^0$ here. \emph{Diagonal}:
+full residual square minus an indefinite penalty (\cref{eq:stabdiag1}) versus
+fluctuation squares with no penalty (\cref{oa:eq:Diagonal}).
+\emph{Absorptions}: viscous penalty via the enlarged inverse estimate and
+$c_1 > 2\xi C_{\mathrm{inv}}^2$ (\cref{eq:viscabsorb}, \cref{H:coercivity})
+versus none needed. \emph{Reaction}: renormalized to $\sigmatilde$
+(\cref{eq:reactrenorm}) versus retained in full, at the cost of item~(ii)
+here. \emph{Extra machinery}: none versus smoothing, patches, constrained
+projection. \emph{Extra hypothesis}: none versus \cref{H:projection}.
+\emph{Output norm}: \cref{eq:triplenorm} with $\sigmatilde$ versus
+\cref{oa:eq:TripleNorm} with $\sigma$. The trade is clean: one page and a
+heavier constants condition buy the damped norm; five steps and one genuinely
+non-automatic hypothesis buy the full norm.
+\end{pedagogy}
+
+\subsection{Convergence}
+\label{oa:sec:convergence}
+
+Throughout this section, $U = [\bu; p]$ denotes the solution of
+the linearized problem (\cref{sec:CommonSetting}) under the regularity \cref{H:regularity}, and $U_h \in \Xhz$ the solution of
+\cref{oa:eq:Method}. That solution exists and is unique: for $h \le h_0$ the inf--sup estimate
+\cref{oa:eq:InfSup} of \cref{oa:th:stability}, on the square linear system with equal trial and
+test spaces $\Xhz$, makes the system operator injective and hence invertible, so
+\cref{oa:eq:Method} is well posed. We use the local interpolation{\hyp}error quantities
+$\Eint{K}{\bu}$ and $\Eint{K}{p}$ of the main text (\cref{eq:InterpolationError}), and state
+the convergence estimate in the porosity-weighted broken $\ell^2$ functional
+\begin{equation}
+  \label{oa:eq:ErrorFunctionL2}
+  \Psi_{\mathrm O}(h)
+  \coloneqq
+  \Bigl( \sum_K \bigl( c_1 + \Dah \bigr)\,\frac{\alpha_K^2}{h_K^2}
+  \bigl( \tau_{2,K}\,\Eint{K}{\bu}^2 + \tau_{1,K}\,\Eint{K}{p}^2 \bigr) \Bigr)^{1/2},
+\end{equation}
+whose coarser $\ell^1$ majorant is the error function
+\begin{equation}
+  \label{oa:eq:ErrorFunction}
+  \mathcal{E}(h)
+  \coloneqq
+  \sum_K \frac{\alpha_K}{h_K}\,\bigl(1 + \Dah\bigr)^{1/2}
+  \Bigl( \tau_{2,K}^{1/2}\,\Eint{K}{\bu} + \tau_{1,K}^{1/2}\,\Eint{K}{p} \Bigr),
+\end{equation}
+i.e., the error function of the ASGS convergence theorem of~the main text with the
+local factor $(1+\Dah)^{1/2}$ inserted. The two are related by
+$\Psi_{\mathrm O}(h) \le c_1^{1/2}\,\mathcal{E}(h)$ (the discrete $\ell^2\subset\ell^1$
+inequality together with $c_1+\Dah \le c_1(1+\Dah)$). We state the theorem in
+$\Psi_{\mathrm O}$: the $\ell^1$ passage to $\mathcal{E}$ can lose a mesh-cardinality
+factor $\sim h^{-d/2}$ on a quasi-uniform family, so the optimal-order corollaries
+must be read off the $\ell^2$ functional.
+
+\begin{pedagogy}[Two error functionals; how to read orders]
+$\Psi_{\mathrm O}$ is what the proofs naturally produce: every estimate ends in
+Cauchy--Schwarz over elements, i.e.\ a broken $\ell^2$ sum. $\mathcal E$ exists
+only to display the result in the same $\ell^1$ format as the ASGS theorem of
+the main text. The warning deserves amplification, because convergence orders
+are easily misread otherwise: passing from $\ell^2$ to $\ell^1$ over
+$N \sim h^{-d}$ elements can inflate by $N^{1/2} \sim h^{-d/2}$
+(Cauchy--Schwarz is sharp when elementwise contributions are equidistributed,
+the generic case for smooth solutions on quasi-uniform meshes). So optimal
+orders---and the corollaries below---must be read from $\Psi_{\mathrm O}$;
+$\mathcal E$ is a display convention, not the sharp quantity. The ASGS appendix
+makes the same distinction with its $\ell^2$ functional in \cref{eq:psih}
+versus the $\ell^1$ display of \cref{thm:convergence}, so
+\cref{oa:cor:asgsnorm} below compares like with like. Also note the cosmetic
+difference between $(c_1+\Dah)$ here and $(1+\Dah)$ in
+\cref{oa:eq:ErrorFunction}: they differ by a bounded factor, absorbed into $C$;
+the functional keeps $c_1$ visible because that is what (P5) actually
+produces.
+\end{pedagogy}
+
+\subsubsection{Consistency}
+
+The analyzed method is not consistent in the classical variational sense
+(cf.~\cite[Eq.~(44)]{Codina2008FiniteEA}); its consistency error is the value of the
+stabilization terms at the exact solution, and it is of the order of the error
+function:
+
+\begin{lemma}[Consistency error]
+\label{oa:lem:consistency}
+Under \cref{H:mesh}--\cref{H:regularity}, \cref{H:design}--\cref{H:advectionsmooth}, for all $V_h \in \Xhz$,
+\begin{equation}
+  \label{oa:eq:ConsistencyId}
+  B_{\mathrm{osgs}}(\ba;\, U - U_h,\, V_h)
+  = S_1(U, V_h) + S_2(U, V_h),
+\end{equation}
+and
+\begin{equation}
+  \label{oa:eq:ConsistencyBound}
+  \bigl| B_{\mathrm{osgs}}(\ba;\, U - U_h,\, V_h) \bigr|
+  \;\le\; C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}_{\mathrm{O}}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Since $U$ solves the linearized problem of \cref{sec:CommonSetting} with the stated regularity, testing the
+strong equations against $V_h \in \Xhz$ and integrating the viscous term by parts
+gives $B(\ba; U, V_h) = L(V_h)$; adding $S_1(U,V_h) + S_2(U,V_h)$ to both sides and
+subtracting \cref{oa:eq:Method} yields \cref{oa:eq:ConsistencyId}.
+
+For the momentum part, split $\alpha X(U) = \alpha(\ba\cdot\nabla\bu) + \alpha\nabla p$
+and use, respectively, Cauchy--Schwarz in $(\cdot,\cdot)_{\tau_1}$, linearity of
+$\Poneo$ and \cref{oa:lem:bestapprox} with $z = \ba\cdot\nabla\bu$, $r = k_u$ and with
+$z = \nabla p$, $r = k_p$:
+\[
+  |S_1(U, V_h)|
+  \le \Bigl( \norm{\Poneo[\alpha\,\ba\cdot\nabla\bu]}_{\tau_1}
+  + \norm{\Poneo[\alpha\nabla p]}_{\tau_1} \Bigr)\,\norm{\alpha X(V_h)}_{\tau_1}.
+\]
+By \cref{H:advectionsmooth} and the Leibniz rule,
+$\norm{\ba\cdot\nabla\bu}_{H^{k_u}(K)} \le C(1+C_D)\,|\ba|_{\infty,K}\,
+\norm{\bu}_{H^{k_u+1}(K)}$, so \cref{oa:eq:WeightedApprox} and the second inequality of
+\cref{oa:eq:P4} give
+\[
+\begin{aligned}
+  \norm{\Poneo[\alpha\,\ba\cdot\nabla\bu]}_{\tau_1}
+  &\le C \Bigl( \sum_K \tau_{1,K}\,\alpha_K^2\,|\ba|_{\infty,K}^2\, h_K^{2k_u}
+  \norm{\bu}_{H^{k_u+1}(K)}^2 \Bigr)^{1/2} \\
+  &\le C \Bigl( \sum_K \Bigl(\frac{\alpha_K}{h_K}\Bigr)^{2} \tau_{2,K}\,
+  \Eint{K}{\bu}^2 \Bigr)^{1/2},
+\end{aligned}
+\]
+while $\norm{\nabla p}_{H^{k_p}(K)} \le \norm{p}_{H^{k_p+1}(K)}$ and
+\cref{oa:eq:WeightedApprox} give directly
+\[
+\begin{aligned}
+  \norm{\Poneo[\alpha\nabla p]}_{\tau_1}
+  &\le C \Bigl( \sum_K \tau_{1,K}\,\alpha_K^2\, h_K^{2k_p}
+  \norm{p}_{H^{k_p+1}(K)}^2 \Bigr)^{1/2} \\
+  &= C \Bigl( \sum_K \Bigl(\frac{\alpha_K}{h_K}\Bigr)^{2} \tau_{1,K}\,
+  \Eint{K}{p}^2 \Bigr)^{1/2}.
+\end{aligned}
+\]
+Both right-hand sides are bounded by $C\,\Psi_{\mathrm O}(h)$ (with room to spare, since
+$c_1+\Dah \ge 1$ and no Damk\"ohler factor arises here), and
+$\norm{\alpha X(V_h)}_{\tau_1} \le \tnorm{V_h}_{\mathrm{O}}$.
+
+For the mass part, the exact mass equation \cref{eq:StrongMassEquation} gives
+$\nabla\cdot(\alpha\bu) = -\varepsilon p$, hence, by \cref{oa:lem:annihilation}-style
+linearity,
+\[
+  S_2(U, V_h) = -\varepsilon\,\bigl( \Ptwoo p,\ \nabla\cdot(\alpha\bv_h)
+  \bigr)_{\tau_2},
+\]
+which vanishes when $\varepsilon = 0$. For $\varepsilon > 0$, by Cauchy--Schwarz,
+\cref{oa:lem:bestapprox} (with $\alpha$ replaced by $1$, $z = p$, $r = k_p+1$),
+$\varepsilon\tau_{2} \le C_2 \le 1$ and $\varepsilon \le C_2\tau_2^{-1}$ from
+\cref{oa:eq:P1}, and finally \cref{oa:eq:P5},
+\begin{align*}
+  |S_2(U, V_h)|
+  &\le \varepsilon \norm{\Ptwoo p}_{\tau_2}\,\norm{\nabla\cdot(\alpha\bv_h)}_{\tau_2}
+  \le C \Bigl( \sum_K \varepsilon^2 \tau_{2,K}\, h_K^{2(k_p+1)}
+  \norm{p}_{H^{k_p+1}(K)}^2 \Bigr)^{1/2} \tnorm{V_h}_{\mathrm{O}}\\
+  &\le C\,C_2 \Bigl( \sum_K \tau_{2,K}^{-1}\, \Eint{K}{p}^2 \Bigr)^{1/2}
+  \tnorm{V_h}_{\mathrm{O}}\\
+  &\le C \Bigl( \sum_K \bigl(c_1 + \Dah\bigr)
+  \Bigl(\frac{\alpha_K}{h_K}\Bigr)^{2}\tau_{1,K}\,\Eint{K}{p}^2 \Bigr)^{1/2}
+  \tnorm{V_h}_{\mathrm{O}}
+\end{align*}
+(in the last step, $\varepsilon\tau_2 \le C_2 \le 1$ was applied once more, followed
+by \cref{oa:eq:P5}),
+which is exactly $C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}_{\mathrm{O}}$. Each of the two broken $\ell^2$
+right-hand sides is thus dominated by $\Psi_{\mathrm O}(h)$, so summing the two parts
+proves \cref{oa:eq:ConsistencyBound} in the $\ell^2$ functional (with no $\ell^2\subset\ell^1$
+enlargement).
+\end{proof}
+
+\begin{pedagogy}[What ``consistency error'' means here, and why it is small]
+For the ASGS method, consistency is \emph{exact} (\cref{eq:consistency}): the
+stabilization is assembled from the full residual, the exact solution's
+residual vanishes, hence the exact solution satisfies the discrete equations
+and Galerkin orthogonality holds. Here it fails, for a reason visible in
+\cref{oa:eq:Sdefs}: the stabilized quantity is the truncated first-order
+expression $\alpha X(U)$, which does \emph{not} vanish at the exact solution
+(it is not the residual). Identity \cref{oa:eq:ConsistencyId} quantifies the
+failure: the defect is exactly the stabilization evaluated at $U$. Salvation
+comes from the symmetric form \cref{oa:eq:Ssym}: only the \emph{fluctuation}
+$\Poneo[\alpha X(U)]$ enters, and by \cref{oa:lem:bestapprox} fluctuations of
+smooth functions are interpolation-small. Three observations on the proof.
+(1)~The momentum part needs \cref{H:advectionsmooth} only to
+Leibniz-differentiate $\ba\cdot\nabla\bu$ up to order $k_u$---this, and
+\cref{H:porositysmooth} inside \cref{oa:lem:bestapprox}, is the entire role of
+the two smoothness strengthenings, and it carries no Damk\"ohler cost (``room
+to spare''). (2)~The mass part is an $\varepsilon$-effect \emph{exactly}: the
+strong mass equation gives $\nabla\cdot(\alpha\bu) = -\varepsilon p$, so
+$S_2(U,\cdot)$ vanishes identically for $\varepsilon = 0$; for
+$\varepsilon > 0$ its estimate is the one place a Damk\"ohler factor enters
+consistency, through (P5) pricing the $\tau_2$-weights. (3)~The estimate lands
+directly in the $\ell^2$ functional---no $\ell^1$ enlargement---which is what
+permits stating \cref{oa:th:convergence} in $\Psi_{\mathrm O}$. The take-away
+principle, stated once: orthogonal-subscale methods trade exact consistency
+for consistency-up-to-fluctuations; at the level of convergence rates the
+trade is free, but it is paid for in data-smoothness hypotheses.
+\end{pedagogy}
+
+\subsubsection{Interpolation estimates}
+
+Let $\hat U_h = [\hat\bu_h; \hat p_h]$ where $\hat\bu_h \in V_{h0}$ is the nodal
+interpolant of $\bu$ (well defined since $\bu \in H^{k_u+1} \subset
+C^0(\overline\Omega)$ for $d\le 3$, and boundary-value preserving) and
+$\hat p_h \in Q_{h0}$ is the nodal interpolant of $p$, shifted by its mean when
+$Q_{h0}$ consists of zero-mean functions. Write
+$\hat E \coloneqq U - \hat U_h = [\hat{\boldsymbol e}_u; \hat e_p]$.
+
+\begin{remark}[The pressure mean shift]
+\label{oa:rem:meanshift}
+Since $\int_\Omega p = 0$, the shift constant is bounded by the raw interpolation
+error, $|\Omega|^{1/2}|m| = |\int_\Omega (\hat p_h - p)|\,|\Omega|^{-1/2}
+\le \norm{p - \hat p_h}$, so all interpolation estimates for $\hat e_p$ hold with at
+most doubled constants. Moreover the constant part of $\hat e_p$ is invisible in the
+pairings below: against $\nabla\cdot(\alpha\bv_h)$ it integrates to zero by the
+divergence theorem, against $\varepsilon q_h$ it vanishes because $q_h$ has zero mean
+(or no shift was performed), and it has no gradient. We therefore do not distinguish
+the shifted interpolant notationally.
+\end{remark}
+
+\begin{pedagogy}[Why the mean shift deserves a remark]
+A bookkeeping point that would otherwise nag: the pressure interpolant must
+live in $Q_{h0}$, and shifting by the mean could in principle pollute every
+estimate. The remark disposes of this once: the shift is itself
+interpolation-small (because $p$ has zero mean), and the \emph{constant} part
+of $\hat e_p$ is invisible in each pairing it meets---by the divergence
+theorem, by the zero mean of $q_h$, or by differentiation. The same three-way
+check was performed for $m_h$ inside the stability proof; it is the standard
+tax of working in zero-mean pressure spaces.
+\end{pedagogy}
+
+\begin{lemma}[Interpolation continuity]
+\label{oa:lem:interpolation}
+Under \cref{H:mesh}--\cref{H:regularity}, \cref{H:design}--\cref{H:advectionsmooth}, for all $V_h \in \Xhz$,
+\begin{equation}
+  \label{oa:eq:InterpolationBound}
+  \bigl| B_{\mathrm{osgs}}(\ba;\, \hat E,\, V_h) \bigr|
+  \;\le\; C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}_{\mathrm{O}}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Expand $B_{\mathrm{osgs}}(\ba; \hat E, V_h)$ into the Galerkin terms and the
+stabilization terms and estimate each. Below, all interpolation estimates are
+\cref{oa:eq:NodalInterp} with $n = k_u+1$ or $n = k_p+1$ and $m \in \{0,1\}$.
+
+\smallskip\noindent
+\emph{(I1) Viscous term.} Using \cref{oa:eq:P4} ($\nu \le \alpha_K\tau_{2,K}$),
+\begin{align*}
+  2\nu(\alpha\ViscProj\nabla\hat{\boldsymbol e}_u, \ViscProj\nabla\bv_h)
+  &\le \sqrt{2}\,\tnorm{V_h}_{\mathrm{O}}\Bigl( \sum_K 2\nu\alpha_K\,
+  \norm{\nabla\hat{\boldsymbol e}_u}_K^2 \Bigr)^{1/2}\\
+  &\le C\,\tnorm{V_h}_{\mathrm{O}}\Bigl( \sum_K
+  \Bigl(\frac{\alpha_K}{h_K}\Bigr)^2\tau_{2,K}\,\Eint{K}{\bu}^2 \Bigr)^{1/2}.
+\end{align*}
+
+\smallskip\noindent
+\emph{(I2) Convective and mass--divergence terms, jointly.} Using
+$\nabla\cdot(\alpha\ba) = 0$, $\hat{\boldsymbol e}_u \in H^1_0(\Omega)^d$
+(nodal interpolation preserves the boundary values of $\bu$) and the continuity of the
+pressure space, global integration by parts gives
+\[
+  (\bv_h, \alpha\ba\cdot\nabla\hat{\boldsymbol e}_u)
+  + (q_h, \nabla\cdot(\alpha\hat{\boldsymbol e}_u))
+  = -\bigl( \hat{\boldsymbol e}_u,\ \alpha\bigl(\ba\cdot\nabla\bv_h + \nabla q_h\bigr)
+  \bigr)
+  = -\bigl( \hat{\boldsymbol e}_u,\ \alpha X(V_h) \bigr).
+\]
+Hence, splitting $\tau_{1,K}^{-1/2} \le (\alpha_K\tns^{-1})^{1/2} + \sigma^{1/2}$ and
+using \cref{oa:eq:P3} for the first part and \cref{oa:eq:P6} for the second,
+\[
+\begin{aligned}
+  \bigl|\bigl(\hat{\boldsymbol e}_u, \alpha X(V_h)\bigr)\bigr|
+  &\le \tnorm{V_h}_{\mathrm{O}} \Bigl( \sum_K \tau_{1,K}^{-1} \norm{\hat{\boldsymbol e}_u}_K^2
+  \Bigr)^{1/2} \\
+  &\le C\,\tnorm{V_h}_{\mathrm{O}}\Bigl( \sum_K \bigl(c_1 + \Dah\bigr)
+  \Bigl(\frac{\alpha_K}{h_K}\Bigr)^2 \tau_{2,K}\,\Eint{K}{\bu}^2 \Bigr)^{1/2}.
+\end{aligned}
+\]
+This is the first of the two places where the Damk\"ohler factor enters.
+
+\begin{pedagogy}[(I2) read slowly: one integration by parts, two terms at once]
+Watch the opening move of (I2) in slow motion. The idea is to shift each
+derivative off the interpolation error $\hat{\boldsymbol e}_u$ and onto the
+smooth discrete field. For the convective term, $\nabla\cdot(\alpha\ba)=0$ makes
+the weighted advection skew-adjoint, so
+$(\bv_h,\alpha\ba\cdot\nabla\hat{\boldsymbol e}_u) =
+-(\hat{\boldsymbol e}_u,\alpha\ba\cdot\nabla\bv_h)$; the mass term becomes
+$(q_h,\nabla\cdot(\alpha\hat{\boldsymbol e}_u)) =
+-(\hat{\boldsymbol e}_u,\alpha\nabla q_h)$. Both boundary integrals vanish
+because $\hat{\boldsymbol e}_u\in H^1_0(\Omega)^d$: $\bu$ carries the no-slip
+data and the nodal interpolant reproduces it exactly at boundary nodes. Adding
+the two recombines them into the single pairing
+$-(\hat{\boldsymbol e}_u,\alpha X(V_h))$ against the composite first-order
+quantity $X(V_h)$---and that is the point, since $\alpha X(V_h)$ is exactly what the
+$\tau_1$-part of $\tnorm{V_h}_{\mathrm O}$ controls (\cref{oa:eq:TripleNorm}), leaving the whole
+convective-plus-mass block one weighted Cauchy--Schwarz from the test norm.
+(Term~(I5) repeats the manoeuvre for the pressure gradient, its boundary term
+vanishing instead because $\bv_h\in V_{h0}$.)
+\end{pedagogy}
+
+\smallskip\noindent
+\emph{(I3) Reactive term.} Using the full reactive control in the norm
+\cref{oa:eq:TripleNorm} and \cref{oa:eq:P6},
+\[
+\begin{aligned}
+  \sigma(\hat{\boldsymbol e}_u, \bv_h)
+  &\le \norm{\sigma^{1/2}\bv_h}\Bigl( \sum_K \sigma\,
+  \norm{\hat{\boldsymbol e}_u}_K^2 \Bigr)^{1/2} \\
+  &\le C\,\tnorm{V_h}_{\mathrm{O}}\Bigl( \sum_K \Dah
+  \Bigl(\frac{\alpha_K}{h_K}\Bigr)^2\tau_{2,K}\,\Eint{K}{\bu}^2 \Bigr)^{1/2}.
+\end{aligned}
+\]
+
+\smallskip\noindent
+\emph{(I4) Compressibility term.} Using $\varepsilon \le C_2\tau_2^{-1}$ and
+\cref{oa:eq:P5},
+\[
+\begin{aligned}
+  \varepsilon(\hat e_p, q_h)
+  &\le \varepsilon^{1/2}\norm{\varepsilon^{1/2}q_h}
+  \Bigl( \sum_K \norm{\hat e_p}_K^2 \Bigr)^{1/2} \\
+  &\le C\,\tnorm{V_h}_{\mathrm{O}}\Bigl( \sum_K \bigl(c_1+\Dah\bigr)
+  \Bigl(\frac{\alpha_K}{h_K}\Bigr)^2\tau_{1,K}\,\Eint{K}{p}^2 \Bigr)^{1/2}.
+\end{aligned}
+\]
+
+\smallskip\noindent
+\emph{(I5) Pressure-gradient term.} Global integration by parts
+($\bv_h \in V_{h0}$) and \cref{oa:eq:P5} give
+\[
+\begin{aligned}
+  (\bv_h, \alpha\nabla\hat e_p)
+  &= -(\hat e_p, \nabla\cdot(\alpha\bv_h)) \\
+  &\le \norm{\nabla\cdot(\alpha\bv_h)}_{\tau_2}
+  \Bigl( \sum_K \tau_{2,K}^{-1}\norm{\hat e_p}_K^2 \Bigr)^{1/2} \\
+  &\le C\,\tnorm{V_h}_{\mathrm{O}}\Bigl( \sum_K \bigl(c_1+\Dah\bigr)
+  \Bigl(\frac{\alpha_K}{h_K}\Bigr)^2\tau_{1,K}\,\Eint{K}{p}^2 \Bigr)^{1/2},
+\end{aligned}
+\]
+the second place where the Damk\"ohler factor enters (through
+$\tau_2^{-1/2} \le (c_1+\Dah)^{1/2}(\alpha_K/h_K)\tau_1^{1/2}$).
+
+\smallskip\noindent
+\emph{(I6) Momentum stabilization.} Since fluctuation operators are nonexpansive,
+\[
+  |S_1(\hat E, V_h)|
+  \le \bigl( \norm{\alpha\,\ba\cdot\nabla\hat{\boldsymbol e}_u}_{\tau_1}
+  + \norm{\alpha\nabla\hat e_p}_{\tau_1} \bigr)\,\tnorm{V_h}_{\mathrm{O}}.
+\]
+Elementwise, by \cref{oa:eq:P4},
+\[
+\begin{aligned}
+  \tau_{1,K}^{1/2}\,\alpha_K\,|\ba|_{\infty,K}\norm{\nabla\hat{\boldsymbol e}_u}_K
+  &\le C\,\frac{\alpha_K}{h_K}\,\tau_{2,K}^{1/2}\,\Eint{K}{\bu},
+  \qquad \\
+  \tau_{1,K}^{1/2}\,\alpha_K\norm{\nabla\hat e_p}_K
+  &\le C\,\frac{\alpha_K}{h_K}\,\tau_{1,K}^{1/2}\,\Eint{K}{p},
+\end{aligned}
+\]
+the second bound holding exactly; no Damk\"ohler factor arises.
+
+\smallskip\noindent
+\emph{(I7) Mass stabilization.} Likewise,
+$|S_2(\hat E, V_h)| \le
+\norm{\nabla\cdot(\alpha\hat{\boldsymbol e}_u)}_{\tau_2}\tnorm{V_h}_{\mathrm{O}}$, and elementwise,
+using \cref{H:porosity} in the form $\norm{\nabla\alpha}_{L^\infty(K)} \le C_{\nabla\alpha}\alpha_K/h_K$,
+\[
+  \tau_{2,K}^{1/2}\norm{\nabla\cdot(\alpha\hat{\boldsymbol e}_u)}_K
+  \le \tau_{2,K}^{1/2}\bigl( \alpha_K \norm{\nabla\hat{\boldsymbol e}_u}_K
+  + C_{\nabla\alpha}\tfrac{\alpha_K}{h_K}\norm{\hat{\boldsymbol e}_u}_K \bigr)
+  \le C(1+C_{\nabla\alpha})\,\frac{\alpha_K}{h_K}\,\tau_{2,K}^{1/2}\,\Eint{K}{\bu}.
+\]
+
+Collecting (I1)--(I7), each square-summed right-hand side is dominated by
+$\Psi_{\mathrm O}(h)$---the momentum, reaction and viscous groups through
+$c_1+\Dah \ge 1$, the convective, compressibility and pressure-gradient groups through their explicit
+$(c_1+\Dah)$ factor---and, absorbing $c_1$-dependent constants into $C$, we obtain
+\cref{oa:eq:InterpolationBound} directly in the $\ell^2$ functional.
+\end{proof}
+
+\begin{pedagogy}[The interpolation ledger, and the term-by-term ASGS contrast]
+This lemma is the OSGS counterpart of \cref{lem:continterp}, and holding the
+two side by side is the single most instructive comparison in the two
+appendices. First the ledger here. Damk\"ohler-free: (I1) (viscous, priced by
+$\nu \le \alpha_K\tau_2$) and (I6)--(I7) (the stabilization terms, priced by
+nonexpansiveness plus (P4); note the pressure half of (I6) is exact, no
+conversion at all). Damk\"ohler-priced: (I2), through the split
+$\tau_1^{-1/2} \le (\alpha_K\tns^{-1})^{1/2} + \sigma^{1/2}$ (from
+$\tau_1^{-1} = \alpha_K\tns^{-1}+\sigma$ and $\sqrt{a+b} \le \sqrt a + \sqrt
+b$), whose first piece converts by (P3) at no cost and whose second converts by
+(P6) at cost $\Dah^{1/2}$; (I3), the head-on reactive pairing, again by (P6);
+(I4) and (I5), both through (P5). \textbf{Audit note.} The prose tags (I2) as
+``the first of the two places where the Damk\"ohler factor enters'' and (I5) as
+``the second''; as the displayed bounds show, (I3) and (I4) also carry the
+factor, so the count ``two'' is accurate only for the two \emph{global
+integration-by-parts} terms, not for the factor's entry points. A revision
+might tag all four of (I2)--(I5), or reword to ``the first of the places''.
+Now the contrast the ASGS-fluent reader should draw, pairing by pairing. The
+pairing of (I2) is the Galerkin convective-plus-mass combination that the ASGS
+proof writes as [V] and \emph{telescopes} with the stabilization partner
+$\sigma(\tau_1\bu, \alpha\X(V))_h$ (its [II]) through
+$1-\sigma\tau_1 = \varphi_1\tau_1$, yielding the Damk\"ohler-free bound
+\cref{eq:IIVterm}. The pairing of (I3) is the ASGS reactive pair
+$T_3 + T_{14}$, renormalized to the $\sigmatilde$-pairing at zero cost
+(\cref{eq:reactivestep}). The pairing of (I5) is the Galerkin pressure pairing
+that the ASGS proof treats jointly with its stabilization partner [I] as
+[I]+[IV], telescoped elementwise at the price of the $[\tau_1]$ face terms and
+the jump condition (\cref{eq:IandIV}, \cref{eq:jumptotal}). In all three cases
+the ASGS proof escapes the Damk\"ohler factor by pairing the dangerous Galerkin
+term with a $\sigma$-weighted stabilization partner; the OSGS projection
+annihilates precisely those partners (\cref{oa:lem:annihilation}), so the same
+pairings must be bounded head-on, and (P5)/(P6) are the best head-on rates
+available. The factor $(c_1+\Dah)^{1/2}$ in \cref{oa:th:convergence} is exactly
+the sum of these head-on payments---no more, no less.
+\end{pedagogy}
+
+\begin{lemma}[Size of the interpolation error in the triple norm]
+\label{oa:lem:interpsize}
+Under \cref{H:mesh}--\cref{H:regularity}, \cref{H:design}--\cref{H:advectionsmooth},
+$\tnorm{\hat E}_{\mathrm{O}} \le C\,\Psi_{\mathrm O}(h)$.
+\end{lemma}
+
+\begin{proof}
+Estimate the five terms of \cref{oa:eq:TripleNorm} at $V = \hat E$: the viscous term as
+in (I1); $\norm{\sigma^{1/2}\hat{\boldsymbol e}_u}$ as in (I3);
+$\varepsilon^{1/2}\norm{\hat e_p}$ as in (I4);
+$\norm{\alpha X(\hat E)}_{\tau_1}$ as in (I6); and
+$\norm{\nabla\cdot(\alpha\hat{\boldsymbol e}_u)}_{\tau_2}$ as in (I7).
+\end{proof}
+
+\begin{pedagogy}[Why this lemma exists, and a hidden moral]
+The triangle inequality at the end needs the size of $\hat E$ itself in the
+norm, not just how the form sees it; the proof is pure reuse. One consequence
+deserves flagging, because it reframes the Damk\"ohler factor. The reactive
+component of $\tnorm{\hat E}_{\mathrm O}$ is
+$\norm{\sigma^{1/2}\hat{\boldsymbol e}_u} \sim \sigma^{1/2}h^{k_u+1}$, and by
+(P6) this is $\Dah^{1/2}$ times the $(\alpha_K/h_K)\tau_2^{1/2}$-weighted
+velocity interpolation error---i.e.\ the interpolation error \emph{alone},
+measured in this norm, is already of size $\Dah^{1/2}$ times the ASGS-type
+functional. Since no approximation can beat the best approximation, any
+convergence estimate in a norm containing the full $\norm{\sigma^{1/2}\cdot}$
+must carry the factor; it is a property of the \emph{norm}, not of the proof
+strategy. This is the cleanest way to see that the $(1+\Dah)^{1/2}$ of
+\cref{oa:th:convergence} cannot be removed by sharper estimates---only by
+weakening the display (\cref{oa:cor:asgsnorm}) or by dividing the reaction back
+out (\cref{oa:cor:Ltwo}).
+\end{pedagogy}
+
+\subsubsection{Main theorem and corollaries}
+
+\begin{theorem}[Convergence of the OSGS method]
+\label{oa:th:convergence}
+Let $U$ solve the linearized problem (\cref{sec:CommonSetting}) and let
+$U_h \in \Xhz$ solve \cref{oa:eq:Method}. Under \cref{H:mesh}--\cref{H:regularity}, \cref{H:design}--\cref{H:advectionsmooth} and for
+$h \le h_0$ as in \cref{oa:th:stability}, there is a constant $C$, independent of $h$,
+$\nu$, $\sigma$, $\varepsilon$ and of $\alpha$, $\ba$ except through the constants of
+\cref{oa:sec:hypotheses}, such that
+\begin{equation}
+  \label{oa:eq:MainResult}
+\begin{aligned}
+  \tnorm{U - U_h}_{\mathrm{O}}
+  &\;\le\;
+  C\,\Psi_{\mathrm O}(h) \\
+  &= C\Bigl( \sum_K \bigl( c_1 + \Dah \bigr)\,\frac{\alpha_K^2}{h_K^2}
+  \bigl( \tau_{2,K}\,\Eint{K}{\bu}^2 + \tau_{1,K}\,\Eint{K}{p}^2 \bigr) \Bigr)^{1/2} \\
+  &\;\le\; C\,\mathcal{E}(h),
+\end{aligned}
+\end{equation}
+with $\Psi_{\mathrm O}(h)$ and its $\ell^1$ majorant $\mathcal{E}(h)$ as in
+\cref{oa:eq:ErrorFunctionL2,oa:eq:ErrorFunction}.
+\end{theorem}
+
+\begin{proof}
+Write $U - U_h = \hat E + \eta_h$ with $\eta_h \coloneqq \hat U_h - U_h \in \Xhz$.
+By \cref{oa:th:stability} there is $V_h \in \Xhz$, $\tnorm{V_h}_{\mathrm{O}} = 1$, with
+\[
+  \beta_{\mathrm{osgs}}\,\tnorm{\eta_h}_{\mathrm{O}}
+  \le B_{\mathrm{osgs}}(\ba; \eta_h, V_h)
+  = -\,B_{\mathrm{osgs}}(\ba; \hat E, V_h)
+  + B_{\mathrm{osgs}}(\ba; U - U_h, V_h)
+  \le C\,\Psi_{\mathrm O}(h),
+\]
+by \cref{oa:lem:interpolation,oa:lem:consistency}. The triangle inequality and
+\cref{oa:lem:interpsize} conclude, both in the $\ell^2$ functional $\Psi_{\mathrm O}(h)$.
+\end{proof}
+
+\begin{pedagogy}[The two-line endgame]
+This is the abstract pattern \emph{stability + consistency + approximability
+$\Rightarrow$ convergence}, in its inf--sup form: split $U - U_h = \hat E +
+\eta_h$ with $\eta_h$ discrete; apply the inf--sup bound to $\eta_h$, which
+converts its norm into the form evaluated against a unit witness; expand
+$B_{\mathrm{osgs}}(\eta_h, V_h) = B_{\mathrm{osgs}}(U-U_h, V_h) -
+B_{\mathrm{osgs}}(\hat E, V_h)$, the first term being the consistency defect
+and the second the interpolation continuity; finish by triangle inequality with
+\cref{oa:lem:interpsize}. \Cref{thm:convergence} is the same three lines with
+the coercivity constant in place of $\beta_{\mathrm{osgs}}$ and Galerkin
+orthogonality in place of the consistency lemma. Once this pattern is
+internalized, every quasi-optimal error analysis in the finite element
+literature reads as an instance of it.
+\end{pedagogy}
+
+\begin{corollary}[Estimate in the ASGS norm]
+\label{oa:cor:asgsnorm}
+Under the hypotheses of \cref{oa:th:convergence}, the OSGS solution also satisfies the
+estimate of the ASGS convergence theorem of~the main text up to the local factor
+$(c_1+\Dah)^{1/2}$, in the same porosity-weighted $\ell^2$ form:
+\[
+\begin{aligned}
+  \tnorm{U - U_h}_{\mathrm{S}}
+  &\;\le\;
+  C\,\Psi_{\mathrm O}(h) \\
+  &= C\Bigl( \sum_K \bigl( c_1 + \Dah \bigr)\,\frac{\alpha_K^2}{h_K^2}
+  \bigl( \tau_{2,K}\,\Eint{K}{\bu}^2 + \tau_{1,K}\,\Eint{K}{p}^2 \bigr) \Bigr)^{1/2} .
+\end{aligned}
+\]
+\end{corollary}
+
+\begin{proof}
+Combine \cref{oa:th:convergence} with \cref{oa:lem:normcomparison}.
+\end{proof}
+
+\begin{pedagogy}[Reading the ASGS-norm corollary]
+Because \cref{oa:lem:normcomparison} is one-way, this corollary is the
+legitimate apples-to-apples display: the same left-hand side as the ASGS
+theorem, the same $\ell^2$ format, and the difference isolated in the local
+factor $(c_1+\Dah)^{1/2}$. Two cautions, both already in the text but worth
+repeating: the comparison orders the \emph{bounds}, not the methods
+(\cref{oa:rem:open}(iii)); and \cref{oa:th:convergence} actually controls the
+OSGS error in the \emph{stronger} norm---this corollary discards information,
+it does not add hypotheses.
+\end{pedagogy}
+
+\begin{corollary}[$\sigma$-robust $L^2$ velocity estimate]
+\label{oa:cor:Ltwo}
+Let $\sigma > 0$. Under the hypotheses of \cref{oa:th:convergence},
+\begin{equation}
+  \label{oa:eq:LtwoVelocity}
+  \norm{\bu - \bu_h}
+  \;\le\;
+  C \Bigl[ \sum_K \Bigl( 1 + \frac{c_1}{\Dah} \Bigr)
+  \Bigl(
+  \bigl( 1 + \tfrac{c_2}{c_1}\Reh \bigr)\, \Eint{K}{\bu}^2
+  + \frac{\alpha_K}{\sigma\nu}\, \Eint{K}{p}^2
+  \Bigr) \Bigr]^{1/2}.
+\end{equation}
+The factor is written $1+c_1/\Dah$, not $1+\Dah^{-1}$: dividing $\Psi_{\mathrm O}$ by
+$\sigma^{1/2}$ carries the full $c_1+\Dah$, and absorbing $c_1$ into that factor would hide
+its dependence. In particular, wherever $\Dah \gtrsim c_1$ (the reaction-dominated
+pre-asymptotic regime), the local factor $1+c_1/\Dah$ is $O(1)$ and, on a quasi-uniform
+mesh, the $L^2$ velocity error is of full interpolation order $h^{k_u+1}$ with a constant
+uniform in $\sigma$; the pressure contribution moreover \emph{decreases} as
+$(\sigma\nu)^{-1/2}$ as the reaction strengthens.
+\end{corollary}
+
+\begin{proof}
+Since the norm \cref{oa:eq:TripleNorm} controls $\norm{\sigma^{1/2}(\bu-\bu_h)}$,
+$\norm{\bu - \bu_h} \le \sigma^{-1/2}\tnorm{U - U_h}_{\mathrm{O}} \le
+C\,\sigma^{-1/2}\Psi_{\mathrm O}(h)$ by \cref{oa:th:convergence}. In each summand of
+$\sigma^{-1}\Psi_{\mathrm O}(h)^2$, use $\sigma^{-1} = h_K^2/(\Dah\,\alpha_K\nu)$ to write
+\[
+  \sigma^{-1}\,(c_1+\Dah)\,\frac{\alpha_K^2}{h_K^2}
+  = \Bigl(1 + \frac{c_1}{\Dah}\Bigr)\,\frac{\alpha_K}{\nu};
+\]
+then \cref{oa:eq:Tau2Expanded} gives $(\alpha_K/\nu)\,\tau_{2,K} = 1 + (c_2/c_1)\Reh$ for the
+velocity term, while $\tau_{1,K} \le 1/\sigma$ from \cref{oa:eq:P1} gives
+$(\alpha_K/\nu)\,\tau_{1,K} \le \alpha_K/(\sigma\nu)$ for the pressure term. Substituting
+these into $\sigma^{-1/2}\Psi_{\mathrm O}(h)$ yields \cref{oa:eq:LtwoVelocity}. \qedhere
+\end{proof}
+
+\begin{pedagogy}[Dividing by $\sigma^{1/2}$: the payoff of the stronger norm]
+Here the full-$\sigma$ component, which forced the Damk\"ohler payments
+upstream, pays out: since the norm controls $\norm{\sigma^{1/2}(\bu-\bu_h)}$,
+dividing by $\sigma^{1/2}$ yields an $L^2$ velocity estimate whose quality
+\emph{improves} as the reaction strengthens---the factor $1 + c_1/\Dah$ tends
+to one, and the pressure contribution decays like $(\sigma\nu)^{-1/2}$. Do not
+over-read this as an OSGS-only asset: the ASGS route reaches a comparable
+reaction-limit conclusion by a different mechanism, since in that regime
+$\sigmatilde$ saturates at $\varphi_1$, and dividing the ASGS estimate by
+$\sigmatilde^{1/2} \approx \varphi_1^{1/2}$ likewise returns a full-order,
+$\sigma$-uniform $L^2$ velocity bound. What the corollary adds is a single
+formula valid across regimes, with the crossover made explicit by $c_1/\Dah$
+and the pressure decay quantified. This is also the reading that makes
+fact~(i) of \cref{oa:rem:numerics}---indistinguishable $L^2$ velocity
+errors---unsurprising from both sides of the theory.
+\end{pedagogy}
+
+\subsection{Discussion}
+\label{oa:sec:discussion}
+
+\begin{remark}[The mechanism: $\sigma$ versus $\widetilde{\sigma}_\alpha$]
+\label{oa:rem:mechanism}
+The single structural difference between the two analyses is the fate of the reactive
+term. In the ASGS quadratic form the stabilization contains the reactive residual, and
+the diagonal reactive contribution is
+$\sigma\norm{\bu_h}_K^2 - \sigma^2\tau_{1}\norm{\bu_h}_K^2
+= \sigma(1-\sigma\tau_1)\norm{\bu_h}_K^2$, with
+$\sigma(1-\sigma\tau_1) = \sigma\,\alpha_K\tns^{-1}\tau_1 \eqsim
+\widetilde{\sigma}_\alpha$: the subscales \emph{renormalize} the reaction down to
+$\widetilde{\sigma}_\alpha \le \alpha_K\tns^{-1} = c_1\alpha_K^2\tau_2/h_K^2$, a
+quantity always commensurate with the divergence-stabilization scale, so all reactive
+pairings in the ASGS convergence proof can be traded against
+$(\alpha_K/h_K)\tau_2^{1/2}$-weighted quantities with no Damk\"ohler penalty. In the
+OSGS variant the orthogonal projection deletes the reactive residual identically
+(\cref{oa:lem:annihilation}), so no renormalization occurs: the diagonal keeps the full
+$\norm{\sigma^{1/2}\bu_h}^2$ (a stronger left-hand side, cf.\
+\cref{oa:lem:normcomparison}), but the reactive and pressure interpolation pairings must
+be bounded head-on, and the best conversions available to the present proof---\cref{oa:eq:P5}
+and \cref{oa:eq:P6}---cost factors $(c_1+\Dah)^{1/2}$ and $\Dah^{1/2}\le(c_1+\Dah)^{1/2}$, respectively. The Damk\"ohler factor in
+\cref{oa:eq:MainResult} is thus the factor these conversions introduce when the reactive
+subscale is deleted, while the strengthened norm (in particular \cref{oa:cor:Ltwo}) is the
+reaction control retained in return. Both are properties of the present (one-sided)
+estimate, not established as sharp or necessary.
+\end{remark}
+
+\begin{pedagogy}[The identity to memorize]
+This remark is the executive summary of the appendix, and the identity chain to
+memorize is $\sigma(1-\sigma\tau_1) = \sigma\varphi_1\tau_1 = \sigmatilde$
+(\cref{eq:sigmatilde}): the ASGS diagonal renormalizes, the OSGS projection
+deletes the renormalizer. Note the closing sentence's discipline
+(``one-sided, not established as sharp or necessary'') and read it together
+with the commentary at \cref{oa:lem:interpsize}, which shows the direction in
+which sharpness \emph{can} be argued: within this norm the factor is forced at
+the level of best approximation, so it is not an artifact of the estimates.
+\end{pedagogy}
+
+\begin{remark}[Consistency with the numerical campaign of~the main text]
+\label{oa:rem:numerics}
+The reaction-dominated experiments of~the main text (manufactured
+solutions, $\mathrm{Da} = 10^6$) report two facts about the OSGS variant relative to the ASGS
+one: (i)~the $L^2$ velocity errors of the two methods are indistinguishable at all
+resolutions, and (ii)~the $H^1$-type velocity error of the OSGS method exceeds the
+ASGS one by a factor of about $3.5$ on the finest $P_1$ meshes---the largest velocity
+discrepancy of the whole campaign---with the gap closing under refinement at an
+accelerating relative rate. Both observations are compatible in order of magnitude with
+the present, one-sided bounds. Fact (i) is \cref{oa:cor:Ltwo}: in the regime $\Dah \gg 1$ the
+OSGS $L^2$ velocity estimate is of full order with a $\sigma$-uniform constant, so no excess
+is predicted in $L^2$ (a one-sided bound cannot, of course, forbid one). Fact (ii) is consistent with the
+factor $(1+\Dah)^{1/2}$ in \cref{oa:eq:MainResult}: on the finest meshes of those
+experiments the global mesh Damk\"ohler number is of order ten (its precise value
+depends on the element-length convention entering $\tau$), so the bound permits an
+excess of about $(1+\Dah)^{1/2} \approx 3$; on the interior plateau of the porosity
+profile the elementwise values are larger and permit factors of $4$--$5$. Moreover,
+$\Dah^{1/2} = (\sigma/(\alpha_K\nu))^{1/2}\, h_K$ decays \emph{linearly} in $h$ while
+the bound itself decays like $h^{k_u}$, which reproduces the observed accelerating
+relative decay of the gap. Two caveats are mandatory. First, upper bounds are
+one-sided: the analysis shows that the observed excess is \emph{permitted} and
+supplies a mechanism for it (\cref{oa:rem:mechanism}); it does not prove that the excess
+must occur, and the absence of the factor from the ASGS bound does not by itself prove
+ASGS superiority. Second, the near-coincidence of the permitted and observed factors
+at the finest resolution should be read as an order-of-magnitude consistency check,
+not a validated prediction, since the constants in \cref{oa:eq:MainResult} are not
+tracked sharply.
+\end{remark}
+
+\begin{pedagogy}[One-sided-bound epistemics]
+The epistemics here are worth imitating: an upper bound can only ever
+\emph{permit} an observation, and the remark scrupulously claims no more. The
+genuinely falsifiable content is the scaling argument: $\Dah^{1/2} \propto
+h_K$, so the permitted excess must close linearly in $h$ relative to the
+bound---an accelerating relative gap closure, which is what the campaign
+observed. Had the observed gap been $h$-independent, the analysis would have
+been in tension with the data; consistency checks of this kind, not the
+coincidence of prefactors, carry the evidential weight.
+\end{pedagogy}
+
+\begin{remark}[Hypotheses dispensed with]
+\label{oa:rem:dispensed}
+Two technical hypotheses of the ASGS continuity analysis of~the main text are not
+needed here: the interior-face jump condition on $\tau_1$ (required there when
+$\sigma > 0$, following Eq.~(39) of~\cite{codina2001stabilized}), and the enlarged
+inverse-estimate constant for quantities of the form
+$\nabla\cdot(\alpha\nu\ViscProj\nabla\bv_h)$. The reason is structural: the analyzed
+OSGS form contains no viscous or reactive stabilization terms, so the proof never
+integrates a stabilization term by parts elementwise---the only integrations by parts
+are global ones, in (I2) and (I5) of \cref{oa:lem:interpolation}. In exchange, the OSGS
+analysis needs the projection stability condition \cref{H:projection}, which has no ASGS
+counterpart. The two hypothesis sets are thus not nested; they reflect the different
+routes (coercivity for ASGS, inf--sup for OSGS).
+\end{remark}
+
+\begin{pedagogy}[The hypothesis ledger, audited]
+\textbf{Audit note.} ``Dispensed'' is accurate about the \emph{proof} but is
+easily over-read about the \emph{hypotheses}, and the reader should hold both
+halves of the ledger. (a)~The jump condition's content---facewise comparability
+of $\varphi_1$, with $\sigma$ cancelling in the jump of $\tau_1^{-1}$---is
+implied by the standing hypotheses: it is \cref{oa:lem:patch} restricted to
+face-adjacent elements, derived there from porosity resolution, mesh
+nondegeneracy and continuity of $\ba$ over the viscous floor. So the ASGS
+analysis, in assuming \cref{H:jump}, assumes nothing beyond what this appendix
+proves and consumes anyway; dispensing with it is presentation economy, not a
+weakening. The same holds for the enlarged inverse constant, which the ASGS
+appendix itself controls through porosity-resolution factors
+(\cref{rem:winvconst}). (b)~Conversely, \cref{H:projection} is \emph{not}
+implied by the standing hypotheses: it is a genuine property of the finite
+element pair, of Codina--Blasco type, to be verified per element family. The
+honest net position: the two hypothesis sets are indeed not nested, but the
+only assumption in either analysis that is not automatic under the common
+standing assumptions is \cref{H:projection}, on the OSGS side. The structural
+point of the remark---no elementwise integration by parts of stabilization
+terms ever occurs here, because the projection annihilated the terms that
+would require it---is exactly right and is the deeper fact: granting the jump
+condition to the OSGS analysis would change nothing, since no $[\tau_1]$ face
+term exists anywhere in this appendix for it to price.
+\end{pedagogy}
+
+\begin{remark}[A Method II variant]
+\label{oa:rem:methodII}
+As in~\cite[\S 2.2]{Codina2008FiniteEA}, one may control the convective and pressure-gradient
+fluctuations separately, replacing $S_1$ by
+\[
+  S_1^{\mathrm{II}}(U,V) \coloneqq
+  \bigl( \Poneo[\alpha\,\ba\cdot\nabla\bu],\ \alpha\,\ba\cdot\nabla\bv \bigr)_{\tau_1}
+  + \bigl( \Poneo[\alpha\nabla p],\ \alpha\nabla q \bigr)_{\tau_1}.
+\]
+The diagonal then controls the two fluctuations individually, and the same arguments
+(with the elementary inequality $a^2 + b^2 \ge \tfrac13(a^2+b^2) + \tfrac13(a+b)^2$
+used in~\cite[Theorem~3]{Codina2008FiniteEA}) are expected to give stability in the correspondingly
+finer norm and a convergence estimate of the same form as \cref{oa:eq:MainResult}. We state
+this only as a prospective observation---the modified proof is not written out here---having
+analyzed Method~I because it is the variant implemented in~the main text (a single
+projected quantity per equation).
+\end{remark}
+
+\begin{pedagogy}[What the Method II variant would buy]
+With separate projections of the convective and pressure-gradient parts, the
+diagonal controls each fluctuation individually, hence a finer norm. The quoted
+inequality $a^2+b^2 \ge \tfrac13(a^2+b^2)+\tfrac13(a+b)^2$ is the device for
+recovering control of the \emph{combined} quantity (whose square is of
+$(a+b)^2$ type) from the separate squares---the reverse of the triangle
+inequality, at the cost of a factor. Analyzing Method~I instead is a fidelity
+choice: it is what the code implements.
+\end{pedagogy}
+
+\begin{remark}[Robustness regimes and the screening length]
+\label{oa:rem:robustness}
+Repeating the regime normalizations of the robustness section of~the main text
+with \cref{oa:eq:MainResult} in place of the ASGS estimate simply multiplies each regime
+estimate by $(1+\Dah)^{1/2}$. In the viscous- and convection-dominated regimes
+$\Dah \le 1$ on any reasonable mesh and the two variants obey identical bounds up to
+constants; asymptotically, $\Dah \propto h_K^2$, so the OSGS bound exceeds the ASGS
+one by $1 + O(h_K^2)$ only. The factor matters solely in the pre-asymptotic
+reaction-dominated regime, and it has a clean physical reading: introducing the
+porous screening length $\ell_\sigma \coloneqq (\alpha_K\nu/\sigma)^{1/2}$ (the decay
+length of velocity perturbations in a Brinkman medium), one has
+$\Dah = (h_K/\ell_\sigma)^2$, so the penalty persists exactly while the mesh
+under-resolves $\ell_\sigma$ and disappears once $h_K \lesssim \ell_\sigma$. In the
+$\mathrm{Da} = 10^6$ experiments of~the main text, $\ell_\sigma \sim 10^{-3}L$,
+below the finest resolutions employed, which is why the excess is still visible there.
+\end{remark}
+
+\begin{pedagogy}[The physical dictionary]
+The screening length gives the physical reading of the entire Damk\"ohler
+discussion: $\Dah = (h_K/\ell_\sigma)^2$, so the penalty is precisely a
+statement about \emph{resolving the Brinkman layer width} $\ell_\sigma =
+(\alpha_K\nu/\sigma)^{1/2}$. Under-resolve it and the OSGS bound concedes the
+factor $h_K/\ell_\sigma$; resolve it and the two analyses coincide up to
+constants. This also explains why the factor is invisible in the viscous- and
+convection-dominated regimes and why, asymptotically in $h$, it is a
+second-order effect ($1 + O(h_K^2)$).
+\end{pedagogy}
+
+\begin{remark}[What this analysis does not show]
+\label{oa:rem:open}
+(i)~The numerical campaign of~the main text observes, for $k \ge 2$, an $L^2$
+pressure convergence order for the OSGS variant one unit \emph{higher} than for the
+ASGS variant. Nothing in the present analysis (nor in~\cite{Codina2008FiniteEA}, whose norms
+contain no $L^2$ pressure term except in the viscous-dominated variant with
+Reynolds-degrading constants) explains this; a duality argument exploiting the
+orthogonality of the consistency error to the finite element space would be the
+natural route, and remains open. (ii)~The analysis takes the projection equation
+solved exactly; the lagged projection of the implemented staggered iteration, and the
+nonlinear problem, are not covered. (iii)~The estimate \cref{oa:eq:MainResult} is an
+upper bound; no lower bound is claimed, so the comparison with the ASGS estimate in
+\cref{oa:cor:asgsnorm} orders the \emph{bounds}, not the methods. (iv)~For $\alpha \equiv 1$
+and $\sigma = \varepsilon = 0$ the present theorem reduces to
+\cite[Theorem~2]{Codina2008FiniteEA} with the parameter dictionary $c_3 = 1$,
+$c_4 = c_2/c_1$, which serves as a consistency check of the constants.
+\end{remark}
+
+\begin{pedagogy}[Reading the open items]
+Item~(i) names the one observation the theory genuinely does not reach: the
+extra order of $L^2$ \emph{pressure} convergence for OSGS at $k \ge 2$. The
+suggested route is the right one to attempt: Aubin--Nitsche duality arguments
+convert norm-level estimates into lower-norm gains precisely when the
+consistency defect carries orthogonality against the discrete space---and the
+OSGS defect \cref{oa:eq:ConsistencyId} is a pairing against fluctuations,
+which are by construction $\tau_1$-orthogonal to the discrete velocity space.
+That orthogonality is an OSGS-specific asset with no ASGS analogue, which is
+at least consistent with the phenomenon being OSGS-specific. Items
+(ii)--(iii) are scope statements to keep in view when quoting the results;
+item~(iv)'s reduction to \cite[Theorem~2]{Codina2008FiniteEA} with $c_3 = 1$,
+$c_4 = c_2/c_1$ is the cheap but valuable sanity check that no porous-weight
+bookkeeping error crept in.
+\end{pedagogy}
+
+
