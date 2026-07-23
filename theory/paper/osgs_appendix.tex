@@ -150,9 +150,10 @@ with
 \end{equation}
 \begin{equation}
   \label{oa:eq:Sdefs}
-  S_1(U, V) \coloneqq \bigl( \Poneo[\alpha X(U)],\, \alpha X(V) \bigr)_{\tau_1},
-  \qquad
-  S_2(U, V) \coloneqq \bigl( \Ptwoo[\nabla\cdot(\alpha\bu)],\, \nabla\cdot(\alpha\bv) \bigr)_{\tau_2}.
+  \begin{aligned}
+    S_1(U, V) &\coloneqq \bigl( \Poneo[\alpha X(U)],\, \alpha X(V) \bigr)_{\tau_1}, \\
+    S_2(U, V) &\coloneqq \bigl( \Ptwoo[\nabla\cdot(\alpha\bu)],\, \nabla\cdot(\alpha\bv) \bigr)_{\tau_2}.
+  \end{aligned}
 \end{equation}
 Since $(\Poneo z, \Pone w)_{\tau_1} = 0$ for all $z, w$, both stabilization terms are
 symmetric and positive semidefinite:
@@ -288,7 +289,7 @@ Under \cref{H:design}, the parameters \cref{eq:Tau1Final,eq:Tau2Final} satisfy, 
   &\tau_1\,\tau_2 \le \frac{h_K^2}{c_1\,\alpha_K^2},
   \tag{P2}\label{oa:eq:P2}\\
   &h_K^2\,\tns^{-1} = c_1\,\alpha_K\,\tau_2,
-  \qquad\text{hence}\qquad
+  \quad\implies\quad
   \bigl(\alpha_K\,\tns^{-1}\bigr)^{1/2} = \sqrt{c_1}\,\frac{\alpha_K}{h_K}\,\tau_2^{1/2},
   \tag{P3}\label{oa:eq:P3}\\
   &\nu \le \alpha_K\,\tau_2,
@@ -296,7 +297,7 @@ Under \cref{H:design}, the parameters \cref{eq:Tau1Final,eq:Tau2Final} satisfy, 
   \tau_1^{1/2}\,|\ba|_{\infty,K} \le \frac{\sqrt{c_1}}{c_2}\,\tau_2^{1/2},
   \tag{P4}\label{oa:eq:P4}\\
   &\alpha_K^2\,\tau_1\,\tau_2 \;\ge\; \frac{h_K^2}{c_1 + \Dah},
-  \qquad\text{hence}\qquad
+  \quad\implies\quad
   \tau_2^{-1/2} \le \bigl(c_1 + \Dah\bigr)^{1/2}\,\frac{\alpha_K}{h_K}\,\tau_1^{1/2},
   \tag{P5}\label{oa:eq:P5}\\
   &\sigma^{1/2} \;\le\; \Dah^{1/2}\,\frac{\alpha_K}{h_K}\,\tau_2^{1/2}.
@@ -318,14 +319,12 @@ The first two inequalities of \cref{oa:eq:P1} ($\sigma\tau_1\le1$ and $\alpha_K\
 and the identity \cref{oa:eq:P3} are established in \cref{lem:parameters} of
 \cref{app:Continuity} (with $\varphi_1=\alpha_K\tns^{-1}$) and are not re-derived here; the
 third inequality of \cref{oa:eq:P1}, $\varepsilon\le C_2\tau_2^{-1}$, is \cref{H:design}, and
-\cref{oa:eq:P2} follows on combining $\alpha_K\tau_1\le\tns$ with the definition of $\tau_2$. We
-prove the OSGS{\hyp}specific items. \cref{oa:eq:P4}: the first inequality is
-\cref{oa:eq:Tau2Expanded}; for the second, $\tau_1 \le \tns/\alpha_K \le
-h_K/(c_2\alpha_K|\ba|_{\infty,K})$ gives
-$\tau_1|\ba|_{\infty,K}^2 \le |\ba|_{\infty,K}h_K/(c_2\alpha_K)$, while
-\cref{oa:eq:Tau2Expanded} gives
-$\tau_2 \ge (c_2/c_1)\,|\ba|_{\infty,K}h_K/\alpha_K$; divide. \cref{oa:eq:P5}: using
-$\tns \le h_K^2/(c_1\nu)$,
+\cref{oa:eq:P2} follows on combining $\alpha_K\tau_1\le\tns$ with the definition of $\tau_2$.
+
+We prove the OSGS{\hyp}specific items:
+\begin{itemize}[leftmargin=*]
+  \item \cref{oa:eq:P4}: The first inequality is \cref{oa:eq:Tau2Expanded}; for the second, $\tau_1 \le \tns/\alpha_K \le h_K/(c_2\alpha_K|\ba|_{\infty,K})$ gives $\tau_1|\ba|_{\infty,K}^2 \le |\ba|_{\infty,K}h_K/(c_2\alpha_K)$, while \cref{oa:eq:Tau2Expanded} gives $\tau_2 \ge (c_2/c_1)\,|\ba|_{\infty,K}h_K/\alpha_K$; divide.
+  \item \cref{oa:eq:P5}: Using $\tns \le h_K^2/(c_1\nu)$,
 \[
 \begin{aligned}
   \alpha_K^2\tau_1\tau_2
@@ -335,14 +334,11 @@ $\tns \le h_K^2/(c_1\nu)$,
   \ =\ \frac{h_K^2}{c_1 + \Dah}.
 \end{aligned}
 \]
-\cref{oa:eq:P6}: $\sigma^{1/2} = \Dah^{1/2}(\alpha_K\nu)^{1/2}/h_K \le
-\Dah^{1/2}\alpha_K\tau_2^{1/2}/h_K$ by the first inequality of \cref{oa:eq:P4}.
-\cref{oa:eq:K1}: $\tau_1^{-1} \ge \alpha_K\tns^{-1} \ge c_1\alpha_K\nu/h_K^2$, so
-$C_{\mathrm{inv}}(\alpha_K\nu)^{1/2}/h_K \le
-(C_{\mathrm{inv}}/\sqrt{c_1})\tau_1^{-1/2} \le \gamma^{-1}\tau_1^{-1/2}$ by \cref{H:design}.
-\cref{oa:eq:K2}: $\tau_1^{-1} \ge \alpha_K\tns^{-1} \ge c_2\alpha_K|\ba|_{\infty,K}/h_K$
-and $c_2 \ge \gamma C_{\mathrm{inv}}$. \cref{oa:eq:K3}: combine \cref{oa:eq:P2} with
-$c_1 \ge \gamma^2C_{\mathrm{inv}}^2$.
+  \item \cref{oa:eq:P6}: $\sigma^{1/2} = \Dah^{1/2}(\alpha_K\nu)^{1/2}/h_K \le \Dah^{1/2}\alpha_K\tau_2^{1/2}/h_K$ by the first inequality of \cref{oa:eq:P4}.
+  \item \cref{oa:eq:K1}: $\tau_1^{-1} \ge \alpha_K\tns^{-1} \ge c_1\alpha_K\nu/h_K^2$, so $C_{\mathrm{inv}}(\alpha_K\nu)^{1/2}/h_K \le (C_{\mathrm{inv}}/\sqrt{c_1})\tau_1^{-1/2} \le \gamma^{-1}\tau_1^{-1/2}$ by \cref{H:design}.
+  \item \cref{oa:eq:K2}: $\tau_1^{-1} \ge \alpha_K\tns^{-1} \ge c_2\alpha_K|\ba|_{\infty,K}/h_K$ and $c_2 \ge \gamma C_{\mathrm{inv}}$.
+  \item \cref{oa:eq:K3}: Combine \cref{oa:eq:P2} with $c_1 \ge \gamma^2C_{\mathrm{inv}}^2$.
+\end{itemize}
 \end{proof}
 
 \subsubsection{Patch equivalence and the smoothing operation}
@@ -400,7 +396,7 @@ function $v_h$,
 \begin{equation}
   \label{oa:eq:Smoothing}
   \norm{\tau\pmul v_h - \tau\smul v_h}_{K} \le \tau_K\,\psi(h)\,\normK{v_h},
-  \qquad\text{hence}\qquad
+  \quad\implies\quad
   \norm{\tau\smul v_h}_{K} \le (1+\psi(h))\,\tau_K\,\normK{v_h}.
 \end{equation}
 If, in addition, $\ba$ is Lipschitz on $\overline\Omega$, then $\psi(h) = O(h)$.

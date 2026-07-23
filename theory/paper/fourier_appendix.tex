@@ -41,9 +41,11 @@ Inserting the velocity block of $\mathbf{K}_{ij}$ from \cref{eq:matrices_station
 \end{equation}
 i.e.\ $\widehat{\mathcal{L}}_{\nu}=\frac{\alpha\nu}{h^2}\bigl(|\boldsymbol{k}_0|^2\mathbb{I}_d+(1-\tfrac{2}{d})\,\boldsymbol{k}_0\otimes\boldsymbol{k}_0\bigr)$ on the velocity block and zero on the pressure row and column (for $d=3$ the factor is $1-\tfrac23=\tfrac13$). This symmetric matrix has the eigenpairs
 \begin{equation}\label{eq:ftViscEig}
-  \widehat{\mathcal{L}}_{\nu}\,\boldsymbol{v}_\perp = \frac{\alpha\nu}{h^2}\,|\boldsymbol{k}_0|^2\,\boldsymbol{v}_\perp
-  \quad(\boldsymbol{v}_\perp\perp\boldsymbol{k}_0,\ \text{multiplicity }d-1),\qquad
-  \widehat{\mathcal{L}}_{\nu}\,\boldsymbol{k}_0 = \Bigl(2-\tfrac{2}{d}\Bigr)\frac{\alpha\nu}{h^2}\,|\boldsymbol{k}_0|^2\,\boldsymbol{k}_0,
+  \begin{aligned}
+    \widehat{\mathcal{L}}_{\nu}\,\boldsymbol{v}_\perp &= \frac{\alpha\nu}{h^2}\,|\boldsymbol{k}_0|^2\,\boldsymbol{v}_\perp
+    \quad(\boldsymbol{v}_\perp\perp\boldsymbol{k}_0,\ \text{multiplicity }d-1), \\
+    \widehat{\mathcal{L}}_{\nu}\,\boldsymbol{k}_0 &= \Bigl(2-\tfrac{2}{d}\Bigr)\frac{\alpha\nu}{h^2}\,|\boldsymbol{k}_0|^2\,\boldsymbol{k}_0,
+  \end{aligned}
 \end{equation}
 so that the longitudinal eigenvalue is $\tfrac43\,\alpha\nu|\boldsymbol{k}_0|^2/h^2$ for $d=3$ (and equals the transverse one for $d=2$). Its spectral radius gives
 \begin{equation}\label{eq:ftTauNu}

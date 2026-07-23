@@ -338,7 +338,6 @@ The abstract setting above will allow us to directly apply the VMS theory to our
 \newcommand{\NU}{\frac{\nu}{3}}
 \newcommand{\DeltaDiag}[1]{\delta_{i j}\phantom{\delta_{i j}} + \frac{1}{3}\delta_{#1 i}\delta_{#1 j}}
 \newcommand{\DeltaOffDiag}[2]{\delta_{#2 i}\delta_{#1 j} - \frac{2}{3}\delta_{#1 i}\delta_{#2 j}}
-\vfill\null
 \begin{equation} \label{eq:matrices_stationary_strong_problem}
   \begin{aligned}
     \mathbf{K}_{ij} &= \nu \alpha
@@ -1093,19 +1092,56 @@ $\sigma${\hyp}robust, optimal{\hyp}order $L^2$ velocity estimate follows as
 
 \begin{table}[!htbp]
   \centering
+  \small
+  \renewcommand{\arraystretch}{1.25}
   \caption{The linearized ASGS and OSGS analyses compared. Both concern the linearized
-  problem with prescribed weighted{\hyp}solenoidal advection, constant scalar reaction and
-  full Dirichlet data; neither covers the nonlinear DBF computations directly.}
+  problem of \cref{sec:CommonSetting}---prescribed weighted{\hyp}solenoidal advection
+  $\boldsymbol{a}$ (with $\nabla\cdot(\alpha\boldsymbol{a})=0$), constant scalar reaction
+  $\boldsymbol{\sigma}=\sigma\mathbb{I}$ and full homogeneous Dirichlet data---and rest on the
+  common standing assumptions \cref{H:mesh}--\cref{H:regularity}; the rows record the
+  method{\hyp}specific differences. Here $\triplenorm{\cdot}_{\mathrm{S}}$,
+  $\triplenorm{\cdot}_{\mathrm{O}}$ are the working norms of
+  \cref{lemma:Stability,eq:TripleNormOSGS}, $\sigmatilde$ the damped reaction weight
+  \cref{eq:SigmaAlpha}, $\Dah=\sigma h_K^2/(\alpha_K\nu)$ the elemental mesh Damk\"ohler number,
+  and $\Psi_{\mathrm{S}}(h),\Psi_{\mathrm{O}}(h)$ the porosity{\hyp}weighted $\ell^2$ error
+  functionals of \cref{eq:ConvergenceResult,eq:ConvergenceOSGS}. The single structural
+  difference is the fate of the reactive subscale (\cref{oa:rem:mechanism}); neither analysis
+  covers the nonlinear DBF computations of \cref{sec:NumericalExamples} directly.}
   \label{tab:ASGSvsOSGS}
-  \begin{tabular}{@{}lll@{}}
+  \begin{tabular}{@{}p{0.20\linewidth}p{0.365\linewidth}p{0.365\linewidth}@{}}
     \toprule
     Feature & ASGS & OSGS \\
     \midrule
-    Stability mechanism      & coercivity (test $=$ trial)          & discrete inf--sup \\
-    Working norm             & $\triplenorm{\cdot}_{\mathrm{S}}$: damped $\sigmatilde$ & $\triplenorm{\cdot}_{\mathrm{O}}$: full $\sigma$ \\
-    Consistency              & exact for the analyzed form           & high{\hyp}order consistency defect \\
-    Extra assumption         & face{\hyp}jump condition \cref{H:jump} when $\sigma>0$ & weighted projection stability \cref{H:projection} \\
-    Error functional         & $\Psi_{\mathrm{S}}(h)$                & $\Psi_{\mathrm{O}}(h)=(c_1+\Dah)^{1/2}$--weighted \\
+    Subscale model
+      & Algebraic subscale: the full element residual is retained, $\boldsymbol{\pi}_h\equiv\boldsymbol{0}$ (\cref{eq:OSGSProblem}).
+      & Orthogonal subscale: the fluctuation $\Pi_i^{\perp}=I-\Pi_i$ of the residual off the $\boldsymbol{\tau}${\hyp}weighted $L^2$ projection onto the unconstrained spaces (\cref{eq:BosgsMain}). \\
+    \addlinespace
+    Stability mechanism
+      & Coercivity in the working norm, test $=$ trial (\cref{lemma:Stability}); with continuity, Lax--Milgram gives a unique solution.
+      & Discrete inf--sup via a special test function built from smoothed projections (\cref{th:StabilityOSGS}); gives a unique solution. \\
+    Design constants
+      & $c_1$ only: $c_1>2\xi C_\text{inv}^2$ for some $\xi>2$ (\cref{H:coercivity}).
+      & both $c_1$ and $c_2$: $c_1\ge\gamma^2 C_\text{inv}^2$, $c_2\ge\gamma C_\text{inv}$, $\gamma\ge\gamma_0$ (\cref{H:design}). \\
+    Mesh{\hyp}size range
+      & all $h$ (unconditional).
+      & asymptotic: $h\le h_0$ (\cref{th:StabilityOSGS}). \\
+    Extra hypotheses
+      & interior{\hyp}face jump condition \cref{H:jump} (only when $\sigma>0$).
+      & projection stability \cref{H:projection}, and patch/porosity/advection strengthenings \cref{H:patch,H:porositysmooth,H:advectionsmooth} (the last two enter only consistency). The two sets are not nested (\cref{oa:rem:dispensed}). \\
+    \addlinespace
+    Working norm \& reaction control
+      & $\triplenorm{\cdot}_{\mathrm{S}}$, with the \emph{damped} reaction weight $\sigmatilde$ (\cref{eq:SigmaAlpha}).
+      & $\triplenorm{\cdot}_{\mathrm{O}}$, with the \emph{full} reaction $\sigma$; $\triplenorm{\cdot}_{\mathrm{S}}\le\triplenorm{\cdot}_{\mathrm{O}}$ term by term (\cref{oa:lem:normcomparison}). \\
+    Consistency
+      & Strongly consistent: the stabilization residual vanishes on the exact solution (Galerkin orthogonality).
+      & Not strongly consistent: the orthogonal projection leaves a defect, bounded at the optimal order $\Psi_{\mathrm{O}}(h)$ (\cref{oa:lem:consistency}); constant reactive/compressibility residuals are still annihilated (\cref{oa:lem:annihilation}). \\
+    \addlinespace
+    Convergence bound
+      & $\triplenorm{E_h}_{\mathrm{S}}\le C\,\Psi_{\mathrm{S}}(h)$ (\cref{eq:ConvergenceResult}).
+      & $\triplenorm{E_h}_{\mathrm{O}}\le C\,\Psi_{\mathrm{O}}(h)$, with $\Psi_{\mathrm{O}}(h)$ the $(c_1+\Dah)^{1/2}${\hyp}weighted $\Psi_{\mathrm{S}}(h)$ (\cref{eq:ConvergenceOSGS}). \\
+    Reaction{\hyp}dominated limit ($\Dah\to\infty$)
+      & Subscales renormalize $\sigma\to\sigmatilde$; no Damk\"ohler penalty.
+      & Reactive subscale deleted: a pre{\hyp}asymptotic $(c_1+\Dah)^{1/2}$ excess in the gradient/energy norm ($O(h)$, recovered under refinement) that cancels in the $\sigma${\hyp}robust, optimal{\hyp}order $L^2$ velocity estimate (\cref{oa:cor:Ltwo}). \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -1587,7 +1623,10 @@ For the 3D examples, we use the $z$-wise extruded version of the same manufactur
 
 We make sure that condition \cref{eq:UpperBoundOnEpsilon} is met, by using the conservative value $\varepsilon = 0.0001 \varepsilon_\text{ref}$, where
 \begin{equation} \label{eq:EpsilonRef}
-    \varepsilon_\text{ref} \coloneqq \frac{ \alpha_0 }{\nu(1 + \Reyn + \Damk)} \leq \frac{\alpha_K }{\nu(1 + \frac{c_2}{c_1} \Reyn_h + \frac{100}{c_1} \Damk_h)} \leq 100\frac{c_1 \alpha_K^2 \tau_{1,K}}{h^2},
+  \begin{aligned}
+    \varepsilon_\text{ref} &\coloneqq \frac{ \alpha_0 }{\nu(1 + \Reyn + \Damk)} \leq \frac{\alpha_K }{\nu(1 + \frac{c_2}{c_1} \Reyn_h + \frac{100}{c_1} \Damk_h)} \\
+    &\leq 100\frac{c_1 \alpha_K^2 \tau_{1,K}}{h^2},
+  \end{aligned}
 \end{equation}
 where the first inequality holds for the parameter ranges chosen for the numerical experiments.
 
@@ -1842,10 +1881,10 @@ R. Codina acknowledges the support received from the ICREA Acad\`emia Research P
 \appendix
 % Appendices are ordered by first reference in the text: elemental matrices
 % (sec:LinearizationOfCoupledSystem), Fourier symbols (sec:StabilizationDesign),
-% continuity proof (sec:StabilityASGS).
+% ASGS convergence proof (sec:StabilityASGS).
 \input{elemental_matrices_appendix.tex}
 \input{fourier_appendix.tex}
-\input{continuity_appendix.tex}
+\input{asgs_convergence.tex}
 \input{osgs_appendix.tex}
 
 \end{document}
