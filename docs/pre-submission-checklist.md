@@ -22,6 +22,19 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > Still open: strip `\amend`/author-notes (final markup pass), raw-data + reproducibility supplement, bibliography
 > clean-up. The 3D-OSGS 1.29 (C7/E1) is confirmed a *genuine* under-stabilization (rerun R10), not stale data.
 
+> **2026-07-23 addendum (commented-appendix audit — applied).** A third external audit
+> (`ChatGPT audit/audit_commented_article.md`, verified disposition there) drove a batch of definite fixes,
+> now applied and built clean (v2 + v1 + note, 0 undefined refs; SymPy **262/262**): the **Codina citation**
+> (`Codina2008FiniteEA`→`codina2008analysis` in both appendices + `:897`); three trusted-base proof gaps
+> (`ω_χ→0` smooth-grading hypothesis on `H:patch`; global `a∈W^{kᵤ,∞}` in `H:advectionsmooth`; the
+> contrast-free patch-equivalence chain); a **dev-sym definiteness lemma** in App C; abs-value bars on the
+> ASGS continuity displays; mean-corrected pressure interpolant; the §4.5 technicals; the §4.7 numeric
+> over-claim removal; the A17 inf–sup domain; and fold/`1/α` prose tempering. **Do NOT re-fix** the verified
+> false positives (§4.6 L² factor, §6.4 P₁ residual, §2.4 `m≥2`, §10 bib). Two new gates:
+> `proof_verification/sympy/theorem_statement_verification.py` (in `run_all.py`) and
+> `proof_verification/hypothesis_transcription_audit.md`. Still open: the `\amend`/author-note flatten, the
+> `:274` Fourier cite decision, and the broader β₀/h₀ and robustness wording (author judgment).
+
 ---
 
 ## 0. The α₀-exponent inconsistency in §6 — RE-DERIVED, ✅ APPLIED 2026-07-19

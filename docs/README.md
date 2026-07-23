@@ -77,7 +77,7 @@ coupled-only-leaning decision record.
 | **Submission checklist** | [pre-submission-checklist.md](pre-submission-checklist.md) | The final read-through checklist against the article. Most items ✅ done (2026-07-19 audit-response pass). Its line anchors are `article.tex` (v1); the paper's harmonized form is now `article_v2.tex`. |
 | Revision plan | [paper-revision-plan.md](paper-revision-plan.md) | Point-by-point response to `archive/review_numerics_vs_theory.md`; largely applied — its own banner defers current status to the checklist. |
 | Part-I erratum | [part_i_erratum.md](part_i_erratum.md) | The elemental-matrix assembly-display fix (RESOLVED 2026-07-12) + the durable `assembly_consistency_verification.py` guard. |
-| **External audit dossier** | [`ChatGPT audit/`](ChatGPT%20audit/) | Two rounds of external manuscript audit + the round-2 response plans that drive `article_v2.tex` (`revision_plan_v2.md`, `harmonization_plan_v2.md` — **in execution**). See the folder's own `README.md` for round-1 (done) vs round-2 (active). |
+| **External audit dossier** | [`ChatGPT audit/`](ChatGPT%20audit/) | Slimmed (2026-07-23): consumed audit dumps pruned; keeps the forward-looking records — `latest_audit_response.md` (live "what remains / do-not-re-fix" reference), `validity_verdicts.csv`, and the round-2 plans that produced `article_v2.tex`. The 2026-07-23 commented-appendix disposition is [`audit_commented_article.md`](audit_commented_article.md). |
 
 > **Paper version note.** The docs were written against [`../theory/paper/article.tex`](../theory/paper/article.tex)
 > (the original) and cite its line numbers. A harmonized [`../theory/paper/article_v2.tex`](../theory/paper/article_v2.tex)

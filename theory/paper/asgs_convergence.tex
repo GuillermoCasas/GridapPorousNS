@@ -144,6 +144,32 @@ norm of the main text is
   \Bigr)^{1/2}.
 \end{aligned}
 \end{equation}
+The viscous term already makes $\triplenorm{\cdot}$ a norm: under homogeneous Dirichlet data
+the deviatoric{\hyp}symmetric projection controls the full velocity gradient, by an elementary
+identity rather than a Korn inequality.
+\begin{lemma}[Definiteness of the working norm]\label{lem:definiteness}
+For every $\bv\in H^1_0(\Omega)^d$,
+\begin{equation}\label{eq:devsymidentity}
+  \bigl\lVert\ViscProj\nabla\bv\bigr\rVert^2
+  = \tfrac12\lVert\nabla\bv\rVert^2 + \Bigl(\tfrac12-\tfrac1d\Bigr)\lVert\nabla\cdot\bv\rVert^2
+  \ \ge\ \tfrac12\lVert\nabla\bv\rVert^2 ,
+\end{equation}
+so that $\lVert\nabla\bv\rVert\le\sqrt2\,\bigl\lVert\ViscProj\nabla\bv\bigr\rVert$; in particular
+$\triplenorm{\cdot}$ of \eqref{eq:triplenorm} is a norm on $\Xh$.
+\end{lemma}
+\begin{proof}
+Since $\ViscProj\nabla\bv=\operatorname{sym}\nabla\bv-\tfrac1d(\nabla\cdot\bv)\,\mathbf I$ and the
+deviatoric and spherical parts are orthogonal,
+$\lVert\ViscProj\nabla\bv\rVert^2=\lVert\operatorname{sym}\nabla\bv\rVert^2-\tfrac1d\lVert\nabla\cdot\bv\rVert^2$.
+For $\bv\in H^1_0(\Omega)^d$, integration by parts gives
+$\int_\Omega\nabla\bv:\nabla\bv^{\mathsf T}=\int_\Omega(\nabla\cdot\bv)^2$, whence
+$\lVert\operatorname{sym}\nabla\bv\rVert^2=\tfrac12\lVert\nabla\bv\rVert^2+\tfrac12\lVert\nabla\cdot\bv\rVert^2$;
+combining the two identities yields \eqref{eq:devsymidentity}, and $\tfrac12-\tfrac1d\ge0$ for
+$d\in\{2,3\}$. Thus $\triplenorm{V_h}=0$ forces $\ViscProj\nabla\bvh=0$, hence $\nabla\bvh=0$ and
+$\bvh=0$ by Poincar\'e; then $\X(V_h)=\nabla p_h$, so the $\tau_1$ term forces $\nabla p_h=0$, and
+$p_h=0$ through the $\varepsilon\norm{p_h}^2$ term when $\varepsilon>0$ and through the zero{\hyp}mean
+constraint when $\varepsilon=0$.
+\end{proof}
 
 \subsubsection{Constants and conventions}\label{sec:assumptions}
 Throughout, $C$ denotes a generic positive constant, possibly different at each occurrence,
@@ -444,7 +470,7 @@ minimum of the three nontrivial coefficients.
 Let \cref{H:mesh,H:data,H:porosity,H:advection} hold, together with the jump condition \cref{H:jump} when $\sigma>0$, with $c_1,c_2>0$. Then there exists $C>0$,
 independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$, such that
 \begin{equation}\label{eq:continuity}
-  \BS(\ba; U_h,V_h)
+  \bigl\lvert\BS(\ba; U_h,V_h)\bigr\rvert
   \le C\Bigl(
   \bigl\lVert\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
   + \bigl\lVert\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h
@@ -453,7 +479,7 @@ independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$, such th
 \end{equation}
 Moreover, the proof yields the sharper bound
 \begin{equation}\label{eq:sharpcont}
-  \BS(\ba; U_h,V_h)
+  \bigl\lvert\BS(\ba; U_h,V_h)\bigr\rvert
   \le C\Bigl(
   \bigl\lVert\alpha_K\,\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
   + \bigl\lVert\alpha_K\,\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h
@@ -829,7 +855,7 @@ and likewise $|T_{17}|\le\triplenorm{U}\,\triplenorm{V}$.
 \medskip\noindent\emph{Step 8: assembly.}
 Adding the estimates of Steps 1--7,
 \begin{equation}\label{eq:assembly}
-  \BS(\ba;U,V)
+  \bigl\lvert\BS(\ba;U,V)\bigr\rvert
   \le C\,\triplenorm{V}\Bigl(\triplenorm{U}
   + \bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\bu\bigr\rVert_h
   + \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h\Bigr).
@@ -914,9 +940,14 @@ with $m\ge k_u+1\ (\ge 2)$ and $n\ge k_p+1\ (\ge 2)$.
 In particular
 $\mathcal{L}_{\ba}U\in L^2(K)$ for every $K$, so that the consistency property
 \eqref{eq:consistency} holds, and for $d\le3$ both $\bu$ and $p$ are continuous on
-$\overline{\Omega}$. Let $\buhat\in\mathcal{V}_{h0}$ and
-$\widehat{p}_h\in\mathcal{Q}_{h0}$ be interpolants of $\bu$ and $p$
-(e.g.\ the Lagrange interpolants), set
+$\overline{\Omega}$. Let $\buhat\in\mathcal{V}_{h0}$ be the Lagrange interpolant of $\bu$, and let
+$\widehat{p}_h$ be the Lagrange interpolant $I_h p$ of $p$, mean{\hyp}corrected to
+$\widehat{p}_h\coloneqq I_h p-\tfrac{1}{|\Omega|}\int_\Omega I_h p$ when $\mathcal{Q}_{h0}$ is the
+zero{\hyp}mean subspace (the case $\varepsilon=0$), so that $\widehat{p}_h\in\mathcal{Q}_{h0}$; since $p$
+has zero mean, the shift $\tfrac{1}{|\Omega|}\int_\Omega I_h p=\tfrac{1}{|\Omega|}\int_\Omega(I_h p-p)$
+is bounded by $\lVert p-I_h p\rVert$ and is invisible in the $\nabla\cdot(\alpha\bvh)$ pairing (its
+gradient vanishes and $\int_\Omega\nabla\cdot(\alpha\bvh)=0$ for $\bvh\in H^1_0$) and in the
+$\varepsilon=0$ mass term. Set
 $\widehat{U}_h\coloneqq[\buhat;\widehat{p}_h]$, and define the elemental interpolation
 errors
 \begin{equation}\label{eq:Eint}

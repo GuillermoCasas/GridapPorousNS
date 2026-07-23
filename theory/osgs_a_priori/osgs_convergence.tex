@@ -618,17 +618,23 @@ $0 < \underline{c} \le \overline{c}$, independent of $h$, such that for $i = 1,2
 \end{lemma}
 
 \begin{proof}
-Patch quasi-uniformity gives $h_{K'} \eqsim h_K$. Since $\alpha$ is Lipschitz and
-bounded below by $\alpha_0 > 0$, and $\operatorname{diam}(S_K) \le C h_K$, one has
-$|\alpha_{K'} - \alpha_K| \le C h_K\norm{\nabla\alpha}_{L^\infty(S_K)} \le
-C\,C_{\nabla\alpha}\,\max_{K''\subset S_K}\alpha_{K''}$, from which the uniform equivalence of
-the $\alpha_{K}$ over the patch follows for $C\,C_{\nabla\alpha}$ bounded (and, in general, from
-$\alpha_{K'}/\alpha_K \le \alpha_\infty/\alpha_0$; the sharper route through $C_{\nabla\alpha}$
-keeps the constant independent of $\alpha_\infty/\alpha_0$). Likewise
-$\ba \in C^0(\overline\Omega)$ implies $|\ba|_{\infty,K'} \le |\ba|_{\infty,K} +
-\omega_{\ba}(Ch_K)$, where $\omega_{\ba}$ is the modulus of continuity, and the
-resulting perturbations of $\tns^{-1}$, $\tau_1^{-1}$ and $\tau_2$ are controlled as
-in the proof of \cref{lem:smoothing} below. The claim follows from the explicit
+Patch quasi-uniformity gives $h_{K'} \eqsim h_K$. For the porosity, let $\boldsymbol{x}_a$ be a
+vertex shared by $K$ and $K' \subset S_K$. The porosity is resolved by the mesh,
+$h_K\norm{\nabla\alpha}_{L^\infty(K)} \le C_{\nabla\alpha}\,\alpha_{0,K}$, so its oscillation over each
+element is bounded by $\delta_\alpha \coloneqq 1 + C_{\nabla\alpha}$: $\max_{\overline{K}}\alpha \le
+\delta_\alpha\,\alpha_{0,K}$ with $\alpha_{0,K}=\min_{\overline{K}}\alpha$. Since
+$\alpha_{0,K}\le\alpha(\boldsymbol{x}_a)$ and $\alpha(\boldsymbol{x}_a)\le\max_{\overline{K'}}\alpha\le\delta_\alpha\,\alpha_{0,K'}$,
+\begin{equation*}
+  \alpha_K \le \delta_\alpha\,\alpha_{0,K} \le \delta_\alpha\,\alpha(\boldsymbol{x}_a)
+  \le \delta_\alpha^{2}\,\alpha_{0,K'} \le \delta_\alpha^{2}\,\alpha_{K'},
+\end{equation*}
+and symmetrically $\alpha_{K'}\le\delta_\alpha^{2}\,\alpha_K$: a \emph{multiplicative} equivalence whose
+constant $\delta_\alpha^{2}$ depends only on $C_{\nabla\alpha}$, not on the porosity contrast
+$\alpha_\infty/\alpha_0$. Likewise $\ba \in C^0(\overline\Omega)$ implies $|\ba|_{\infty,K'} \le
+|\ba|_{\infty,K} + \omega_{\ba}(Ch_K)$, where $\omega_{\ba}$ is the modulus of continuity; rather than
+seek a multiplicative equivalence of $|\ba|_\infty$ (which fails near zeros of $\ba$), we compare the
+full positive expressions defining $\tns^{-1}$, $\tau_1^{-1}$ and $\tau_2$ over the viscous floor
+$c_1\nu/h_K^2$, as in the proof of \cref{lem:smoothing} below. The claim follows from the explicit
 formulas \cref{eq:TauDefs}.
 \end{proof}
 
@@ -680,8 +686,9 @@ the first term is bounded by $\omega_\alpha(Ch)/\alpha_0$, the second by
 $\alpha_\infty\,(c_2/(c_1\alpha_0\nu))\,h\,\omega_{\ba}(Ch)$, and the last two by
 $C\,\omega_{\chi}(h)$, where $\omega_\alpha, \omega_{\ba}$ are the moduli of
 continuity of $\alpha$ and $\ba$ and $\omega_\chi(h)\to 0$ quantifies the relative
-oscillation of $\chi_1(\cdot,h)$ over an element, which vanishes as $h \to 0$ by the
-construction of~\cite[Lemma~1]{Codina2008}. All right-hand sides tend to zero
+oscillation of $\chi_1(\cdot,h)$ over an element, which vanishes as $h \to 0$ under the
+smooth-grading assumption on the mesh family (bounded patch equivalence alone does not
+force it; cf.~\cite[Lemma~1]{Codina2008}). All right-hand sides tend to zero
 uniformly; here the strict positivity $\alpha_0 > 0$ and $\nu > 0$ are used, and for
 Lipschitz data all moduli are $O(h)$. Then
 $|\bar\tau_{1,a}/\tau_{1,K} - 1| = \bar\tau_{1,a}\,|\Delta(\tau_1^{-1})|
@@ -764,13 +771,13 @@ implies $V = 0$.
 Homogeneity, symmetry and the triangle inequality are immediate; only definiteness needs an
 argument, and it is here that the full Dirichlet data enter. Let $\tnorm{V} = 0$ for
 $V = [\bv; q] \in \Xhz$. Then $\ViscProj\nabla\bv \equiv 0$, i.e.\ the symmetric gradient of
-$\bv$ is spherical almost everywhere; since $\bv \in H^1_0(\Omega)^d$, the deviatoric
-(conformal) Korn inequality on the bounded domain $\Omega$---whose conformal--Killing kernel
-is excluded by the homogeneous boundary data---gives $\norm{\nabla\bv} \le
-C\,\bigl\lVert\ViscProj\nabla\bv\bigr\rVert = 0$, so $\bv \equiv 0$. With $\bv = 0$, the term
+$\bv$ is spherical almost everywhere; since $\bv \in H^1_0(\Omega)^d$, the elementary identity
+$\lVert\ViscProj\nabla\bv\rVert^2=\tfrac12\lVert\nabla\bv\rVert^2+(\tfrac12-\tfrac1d)\lVert\nabla\cdot\bv\rVert^2$
+(integration by parts on $H^1_0$) gives $\norm{\nabla\bv} \le
+\sqrt2\,\bigl\lVert\ViscProj\nabla\bv\bigr\rVert = 0$, so $\bv \equiv 0$. With $\bv = 0$, the term
 $\norm{\alpha X(V)}_{\tau_1} = 0$ reduces to $\norm{\alpha\nabla q}_{\tau_1} = 0$; as
 $\alpha \ge \alpha_0 > 0$ and $\tau_1 > 0$, this forces $\nabla q \equiv 0$, so $q$ is
-constant, and the normalization ($\varepsilon\norm{q} = 0$ when $\varepsilon > 0$, or the
+constant, and the normalization ($\varepsilon\norm{q}^2 = 0$ when $\varepsilon > 0$, or the
 zero-mean constraint when $\varepsilon = 0$) forces $q \equiv 0$. Hence $\tnorm{\cdot}$ is
 definite. (Absent full Dirichlet data or pressure normalization it is only a seminorm.)
 \end{proof}
@@ -1045,7 +1052,7 @@ $\norm{\alpha X(V^0)}_{\tau_1}$ and $\norm{\nabla\cdot(\alpha\bw_h)}_{\tau_2}$,
 and $P_1 \le \norm{\xi_h}_{\tau_1}^2$, $P_2 \le \norm{\delta_h}_{\tau_2}^2$ give
 $\tnorm{V^0} \le C\,\tnorm{U_h}$, hence $\tnorm{W} \le C\,\tnorm{U_h}$. Combining,
 \[
-  \sup_{V_h\in\Xhz} \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{V_h}}
+  \sup_{V_h\in\Xhz\setminus\{0\}} \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{V_h}}
   \ \ge\ \frac{B_{\mathrm{osgs}}(\ba; U_h, W)}{\tnorm{W}}
   \ \ge\ \beta_{\mathrm{osgs}}\, \tnorm{U_h}
 \]
@@ -1110,7 +1117,7 @@ whose coarser $\ell^1$ majorant is the error function
 i.e., the error function of the ASGS convergence theorem of~\cite{companion} with the
 local factor $(1+\Dah)^{1/2}$ inserted. The two are related by
 $\Psi_{\mathrm O}(h) \le c_1^{1/2}\,\mathcal{E}(h)$ (the discrete $\ell^2\subset\ell^1$
-inequality together with $c_1+\Dah \le c_1(1+\Dah)$). We state the theorem in
+inequality together with $c_1+\Dah \le c_1(1+\Dah)$, valid since $c_1 \ge 1$). We state the theorem in
 $\Psi_{\mathrm O}$: the $\ell^1$ passage to $\mathcal{E}$ can lose a mesh-cardinality
 factor $\sim h^{-d/2}$ on a quasi-uniform family, so the optimal-order corollaries
 must be read off the $\ell^2$ functional.
@@ -1199,8 +1206,8 @@ $\varepsilon\tau_{2} \le C_2 \le 1$ and $\varepsilon \le C_2\tau_2^{-1}$ from
   \Bigl(\frac{\alpha_K}{h_K}\Bigr)^{2}\tau_{1,K}\,\Eint{K}{p}^2 \Bigr)^{1/2}
   \tnorm{V_h}
 \end{align*}
-(in the last step, $\varepsilon\tau_2 \le C_2 \le 1$ was applied once more, followed
-by \cref{eq:P5}),
+(the second step above used $\varepsilon^2\tau_2 \le C_2^2\,\tau_2^{-1}$, from $\varepsilon\tau_2\le C_2$;
+the last step is \cref{eq:P5}),
 which is exactly $C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}$. Each of the two broken $\ell^2$
 right-hand sides is thus dominated by $\Psi_{\mathrm O}(h)$, so summing the two parts
 proves \cref{eq:ConsistencyBound} in the $\ell^2$ functional (with no $\ell^2\subset\ell^1$
@@ -1274,7 +1281,7 @@ using \cref{eq:P3} for the first part and \cref{eq:P6} for the second,
   \le C\,\tnorm{V_h}\Bigl( \sum_K \bigl(c_1 + \Dah\bigr)
   \Bigl(\frac{\alpha_K}{h_K}\Bigr)^2 \tau_{2,K}\,\Eint{K}{\bu}^2 \Bigr)^{1/2}.
 \]
-This is the first of the two places where the Damk\"ohler factor enters.
+This is one of the places, (I2)--(I5), where the Damk\"ohler factor enters.
 
 \smallskip\noindent
 \emph{(I3) Reactive term.} Using the full reactive control in the norm
@@ -1309,7 +1316,7 @@ This is the first of the two places where the Damk\"ohler factor enters.
   \le C\,\tnorm{V_h}\Bigl( \sum_K \bigl(c_1+\Dah\bigr)
   \Bigl(\frac{\alpha_K}{h_K}\Bigr)^2\tau_{1,K}\,\Eint{K}{p}^2 \Bigr)^{1/2},
 \]
-the second place where the Damk\"ohler factor enters (through
+another of the (I2)--(I5) places where the Damk\"ohler factor enters (through
 $\tau_2^{-1/2} \le (c_1+\Dah)^{1/2}(\alpha_K/h_K)\tau_1^{1/2}$).
 
 \smallskip\noindent
@@ -1493,11 +1500,16 @@ accelerating relative rate. Both observations are compatible in order of magnitu
 the present, one-sided bounds. Fact (i) is \cref{cor:Ltwo}: in the regime $\Dah \gg 1$ the
 OSGS $L^2$ velocity estimate is of full order with a $\sigma$-uniform constant, so no excess
 is predicted in $L^2$ (a one-sided bound cannot, of course, forbid one). Fact (ii) is consistent with the
-factor $(1+\Dah)^{1/2}$ in \cref{eq:MainResult}: on the finest meshes of those
-experiments the global mesh Damk\"ohler number is of order ten (its precise value
-depends on the element-length convention entering $\tau$), so the bound permits an
-excess of about $(1+\Dah)^{1/2} \approx 3$; on the interior plateau of the porosity
-profile the elementwise values are larger and permit factors of $4$--$5$. Moreover,
+reaction-dependent inflation of the error functional in \cref{eq:MainResult}, by
+$(c_1+\Dah)^{1/2}$ elementwise: on the finest meshes of those experiments the mesh
+Damk\"ohler number is of order ten (its precise value depends on the element-length
+convention entering $\tau$), so the OSGS gradient/energy-norm bound permits a
+pre-asymptotic excess that grows with $\Dah$. We do not attempt a numerical match:
+the theorem constants are untracked, and once the fixed $c_1^{1/2}$ is absorbed into the
+generic constant the \emph{varying} part of the permitted factor is $(1+\Dah/c_1)^{1/2}$,
+of order $1.9$ at $\Dah\approx10$ rather than the observed $3.5$. The bound thus supplies a
+qualitative mechanism---a reaction-dependent excess confined to the gradient/energy
+norm---without quantitatively explaining the measured factor. Moreover,
 $\Dah^{1/2} = (\sigma/(\alpha_K\nu))^{1/2}\, h_K$ decays \emph{linearly} in $h$ while
 the bound itself decays like $h^{k_u}$, which reproduces the observed accelerating
 relative decay of the gap. Two caveats are mandatory. First, upper bounds are
