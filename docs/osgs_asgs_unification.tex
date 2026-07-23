@@ -1,0 +1,1080 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.7cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage[colorlinks=true]{hyperref}
+\usepackage[capitalize,noabbrev]{cleveref}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{question}[theorem]{Open question}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\bw}{\boldsymbol{w}}
+\newcommand{\ba}{\boldsymbol{a}}
+\newcommand{\bff}{\boldsymbol{f}}
+\newcommand{\bn}{\boldsymbol{n}}
+\newcommand{\bz}{\boldsymbol{z}}
+\newcommand{\ViscProj}{\Pi^{\mathrm{DS}}}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\normK}[1]{\lVert #1 \rVert_{K}}
+\newcommand{\tnorm}[1]{\lvert\!\lvert\!\lvert\, #1 \,\rvert\!\rvert\!\rvert}
+\newcommand{\tns}{\tau_{1,\mathrm{NS}}}
+\newcommand{\Eint}[2]{\mathrm{E}_{\mathrm{int},#1}(#2)}
+\newcommand{\Dah}{\mathrm{Da}_{h,K}}
+\newcommand{\Reh}{\mathrm{Re}_{h,K}}
+\newcommand{\Pone}{\Pi_{1}}
+\newcommand{\Ptwo}{\Pi_{2}}
+\newcommand{\Poneo}{\Pi_{1}^{\perp}}
+\newcommand{\Ptwoo}{\Pi_{2}^{\perp}}
+\newcommand{\Xhz}{\mathcal{X}_{h0}}
+\newcommand{\st}{\widetilde{\sigma}_\alpha}
+\newcommand{\Bs}{B_{\mathrm{S}}}
+\newcommand{\Bo}{B_{\mathrm{osgs}}}
+\newcommand{\EF}{\mathcal{E}}
+
+\title{Can the ASGS and OSGS convergence results share one proof?\\[1ex]
+\large An exploration: a provable dichotomy, a unified penalized theorem,\\
+and what should stay method-specific}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We examine whether the inf--sup proof strategy developed for the OSGS variant
+in~\cite{OSGSnote} can be transported to the ASGS variant of~\cite{companion}, so
+that both a priori convergence results follow from essentially one argument. The
+answer has a sharp boundary. \emph{Negative part:} full-strength reactive control
+$\norm{\sigma^{1/2}\bu_h}$ is provably unattainable for the ASGS form---the
+stabilization renormalizes the reaction to $\st$ against \emph{every} test function,
+and we exhibit a family of discrete velocities along which the ASGS inf--sup constant
+in the strong (OSGS) norm degenerates like $(1+\Dah)^{-1/2}$. There is therefore no
+common norm, and the $\sigma$-versus-$\st$ dichotomy identified in~\cite{OSGSnote} is
+a property of the methods, not of the proofs. \emph{Positive part:} everything short
+of the norm does unify. We prove a jump-condition-free convergence theorem for the
+ASGS method in its own triple norm, with the same error function and the same
+$(1+\Dah)^{1/2}$ factor as the OSGS theorem, by the same skeleton: shared parameter
+inequalities, a shared interpolation core, exact consistency replacing the
+best-approximation consistency estimate, two zero-cost telescopings inherited from
+the companion's own continuity argument, and a short inventory of stabilization
+products of which exactly three families carry the Damk\"ohler factor. The two Damk\"ohler-sensitive results are then
+quantitatively symmetric: ASGS concedes $\Dah^{1/2}$ in the \emph{norm}
+($\st/\sigma \sim \Dah^{-1}$), OSGS concedes it in the \emph{constant}. The
+companion's Theorem~5.3 remains the sharper ASGS statement---its Damk\"ohler-freeness
+is purchased by the facewise $[\tau_1]$-estimates spent on the face terms of its
+integration-by-parts telescopings---and we recommend keeping it. Finally we examine
+the jump condition itself (\cref{sec:jump}): it is a facewise comparability of
+$\varphi_1 = \alpha_K\tns^{-1}$, \emph{implied} by the standing hypotheses with
+$h$-uniform constants (the same content, established the same way, as the
+patch-equivalence lemma on which the OSGS analysis rests), and it has \emph{no point
+of application} in the OSGS analysis, whose orthogonal projection annihilates the
+very pairings whose elementwise integration by parts the condition prices. A
+best-approximation floor (\cref{prop:floor}) shows that no hypothesis and no method
+can remove the $(1+\Dah)^{1/2}$ factor from a strong-norm estimate. The hypothesis
+ledger is thus rebalanced: neither the jump condition nor the enlarged inverse
+constant is a genuine surcharge of the ASGS analysis, and the only assumption in
+either proof not implied by the standing data and mesh hypotheses is the
+projection-stability condition (A7), on the OSGS side.
+\end{abstract}
+
+\section{The question and the verdict}
+\label{sec:verdict}
+
+The companion manuscript~\cite{companion} proves stability and convergence for the
+ASGS variant by coercivity plus a continuity lemma (with an interior-face jump
+condition on $\tau_1$ when $\sigma>0$); the note~\cite{OSGSnote} proves the analogous
+results for the OSGS variant by the inf--sup strategy of~\cite{Codina2008}
+(special test function, projection-stability hypothesis, best-approximation
+consistency). The natural question: can the second strategy absorb the first, so that
+both theorems are two instantiations of one proof?
+
+The exploration below yields a three-part verdict.
+
+\begin{enumerate}[label=(\Roman*), leftmargin=2.5em, itemsep=0.4ex]
+\item \emph{The proof skeleton unifies; the theorems do not.} Roughly $80\%$ of the
+material is genuinely shared: hypotheses, parameter inequalities, the interpolation
+core, the error-function format, and the overall
+stability--consistency--interpolation architecture. What cannot be shared is the
+norm. \Cref{prop:negative} shows that the strong norm of~\cite{OSGSnote} (with full
+$\norm{\sigma^{1/2}\bu_h}$) is unattainable for the ASGS bilinear form: the inf--sup
+constant in that norm degenerates like $(1+\Dah)^{-1/2}$. The reactive
+renormalization $\sigma \mapsto \sigma(1-\sigma\tau_1) = \st$ is an identity of the
+bilinear form, active against every test function, so no test-function ingenuity can
+undo it. Symmetrically, the OSGS form cannot produce the $\st$-renormalization
+(its projection deletes the reactive residual), so it keeps the strong norm and pays
+$(1+\Dah)^{1/2}$ in the constant~\cite{OSGSnote}. The dichotomy is a theorem about
+the methods.
+\item \emph{A unified, jump-free, penalized theorem holds.}
+\Cref{th:unifiedASGS} proves for the ASGS method, in its own triple norm and
+\emph{without} the jump condition of~\cite{companion}, the estimate
+\[
+  \tnorm{U - U_h}_{\mathrm{S}}
+  \;\le\;
+  C \sum_K \frac{\alpha_K}{h_K}\,\bigl(1+\Dah\bigr)^{1/2}
+  \Bigl( \tau_{2,K}^{1/2}\Eint{K}{\bu} + \tau_{1,K}^{1/2}\Eint{K}{p} \Bigr),
+\]
+which is the OSGS theorem of~\cite{OSGSnote} verbatim, norm apart. Its proof reuses
+the interpolation core of~\cite{OSGSnote} (three of five Galerkin estimates
+unchanged, the remaining two entering zero-cost telescopings with their
+stabilization partners), replaces the best-approximation consistency lemma by exact
+consistency, and adds a short inventory of stabilization products, of which exactly
+three families carry the Damk\"ohler factor. ``Jump-free'' is here a statement about
+the proof, not a hypothesis saving: \cref{sec:jump} shows the jump condition costs
+nothing to assume.
+\item \emph{The sharp ASGS theorem should be kept.} The Damk\"ohler-free Theorem~5.3
+of~\cite{companion} is strictly stronger than \cref{th:unifiedASGS} in its regime,
+and its extra machinery (the $\tau_1$ jump condition, used in an elementwise
+integration by parts) is spent on the pressure and convective \emph{face terms} of
+its two integration-by-parts telescopings, and on nothing else. \Cref{sec:jump}
+shows that the underlying facewise comparability is implied by the standing
+hypotheses, so the sharp theorem's hypothesis set is effectively the standing one;
+\cref{rem:sharper} sketches an alternative, regime-splitting route to the same face
+terms. Our recommendation (\cref{sec:recommendation}) remains to keep both existing
+proofs and add a remark on the shared architecture, the dichotomy, and the corrected
+hypothesis ledger.
+\item \emph{The jump condition is free for ASGS and inert for OSGS.}
+\Cref{sec:jump} examines the hypothesis itself. It is a facewise comparability
+requirement on $\varphi_1 = \alpha_K\tns^{-1}$ ($\sigma$ cancels in the jump of
+$\tau_1^{-1} = \varphi_1 + \sigma$), and \cref{lem:jumpauto} shows it is implied,
+with $h$-uniform constants, by the standing mesh, porosity and advection
+hypotheses---by the same mechanism, with the same $\nu$-floor, as the
+patch-equivalence and smoothing lemmas that the OSGS analysis itself consumes.
+Conversely, granting it to the OSGS analysis improves nothing: its only role is to
+price the interior-face terms generated by elementwise integration by parts of the
+$\sigma$-weighted stabilization pairings, and the OSGS projection annihilates those
+pairings, so no such face term ever arises (\cref{rem:inert}); moreover the dominant
+OSGS penalty is forced by the norm at the level of best approximation
+(\cref{prop:floor}), hence unremovable by any hypothesis and any method. The net
+hypothesis ledger favors, if anything, the ASGS analysis
+(\cref{rem:ledger}).
+\end{enumerate}
+
+An honest note on the exploration path: our first attempt was to \emph{restore} full
+$\sigma$-control for ASGS by enriching the special test function with a component
+$\tau_1\circledast(\sigma\bu_h)$, whose Galerkin pairing produces exactly the missing
+$\sum_K \sigma^2\tau_{1,K}\norm{\bu_h}_K^2$ (note the exact identity
+$\sigma^2\tau_1 = \sigma - \st$). This fails, instructively: the stabilization's
+reactive--adjoint coupling returns $-\sigma^2\tau_1(\bw,\bu_h)$ against the same
+component, cancelling the gain to leading order---the renormalization
+$\sigma(1-\sigma\tau_1)=\st$ applies to the pair $(\bu_h,\bw)$ for \emph{any} $\bw$.
+That observation, made quantitative, is \cref{prop:negative}.
+
+\section{Setting}
+\label{sec:setting}
+
+We work in the setting, notation and hypotheses (A1)--(A8) of~\cite{OSGSnote}, which
+restates~\cite{companion}; we recall only what is used here. The linearized problem,
+the Galerkin form $B$, the composite $X(V) = \ba\cdot\nabla\bv + \nabla q$, the
+parameters $\tau_{1,K}, \tau_{2,K}, \tns$, the elementwise numbers
+$\Dah = \sigma h_K^2/(\alpha_K\nu)$ and $\Reh$, the weighted products
+$(\cdot,\cdot)_{\tau_i}$, the projections $\Pone, \Ptwo$ onto the unconstrained
+spaces with fluctuations $\Poneo, \Ptwoo$, and the interpolation quantities
+$\Eint{K}{\cdot}$ are all as there. The parameter inequalities (P1)--(P6) and
+(K1)--(K3) of~\cite[Lemma~4.1]{OSGSnote} are used freely. We also use
+$\delta_\alpha \coloneqq \max_K \alpha_{\infty,K}/\alpha_{0,K}$, bounded under the
+porosity-resolution condition, and $M_2 \coloneqq 1 + C_\nabla/C_{\mathrm{inv}}$.
+
+The two stabilized forms are, with $G(\bu) \coloneqq
+2\nabla\cdot(\alpha\nu\ViscProj\nabla\bu) - \sigma\bu$,
+\begin{align}
+  \Bs(\ba; U, V)
+  &\coloneqq B(\ba; U, V)
+  + \sum_K \tau_{1,K}\bigl( \alpha X(V) + G(\bv),\ \alpha X(U) - G(\bu) \bigr)_K
+  \notag\\
+  &\qquad\qquad
+  + \sum_K \tau_{2,K}\bigl( \nabla\cdot(\alpha\bv) - \varepsilon q,\
+  \varepsilon p + \nabla\cdot(\alpha\bu) \bigr)_K,
+  \label{eq:BSdef}\\
+  \Bo(\ba; U, V)
+  &\coloneqq B(\ba; U, V)
+  + \bigl( \Poneo[\alpha X(U)],\, \alpha X(V) \bigr)_{\tau_1}
+  + \bigl( \Ptwoo[\nabla\cdot(\alpha\bu)],\, \nabla\cdot(\alpha\bv) \bigr)_{\tau_2}.
+  \label{eq:Bodef}
+\end{align}
+The diagonal of \cref{eq:BSdef} reproduces the stability identity
+of~\cite{companion} (the crossed viscous--reactive products telescope into
+$\norm{\tau_1^{1/2}\alpha X(U)}_h^2 - \norm{\tau_1^{1/2}G(\bu)}_h^2$ and
+$\norm{\tau_2^{1/2}\nabla\cdot(\alpha\bu)}_h^2 - \varepsilon^2
+\norm{\tau_2^{1/2}p}_h^2$), so \cref{eq:BSdef} is the ASGS form of the companion
+written out; \cref{eq:Bodef} is the analyzed OSGS form of~\cite{OSGSnote}. The two
+triple norms are
+\begin{align}
+  \tnorm{V}^2
+  &\coloneqq
+  2\nu\norm{\alpha^{1/2}\ViscProj\nabla\bv}^2
+  + \norm{\sigma^{1/2}\bv}^2
+  + \varepsilon\norm{q}^2
+  + \norm{\alpha X(V)}_{\tau_1}^2
+  + \norm{\nabla\cdot(\alpha\bv)}_{\tau_2}^2,
+  \label{eq:StrongNorm}\\
+  \tnorm{V}_{\mathrm{S}}^2
+  &\coloneqq
+  \nu\norm{\alpha^{1/2}\ViscProj\nabla\bv}^2
+  + \norm{\st^{1/2}\bv}_h^2
+  + \varepsilon\norm{q}^2
+  + \norm{\alpha X(V)}_{\tau_1}^2
+  + \norm{\nabla\cdot(\alpha\bv)}_{\tau_2}^2,
+  \label{eq:ASGSNorm}
+\end{align}
+where $\st \coloneqq \tns^{-1}\sigma/(\tns^{-1}+\sigma/\alpha_K)$, and
+$\tnorm{\cdot}_{\mathrm{S}} \le \tnorm{\cdot}$ termwise. Three exact identities
+organize everything (elementwise; direct algebra from
+$\tau_1^{-1} = \alpha_K\tns^{-1} + \sigma$):
+\begin{equation}
+  \label{eq:ThreeIdentities}
+  \sigma(1 - \sigma\tau_1) = \st,
+  \qquad
+  \sigma^2\tau_1 = \sigma - \st,
+  \qquad
+  \frac{\sigma\tau_1}{1-\sigma\tau_1} = \frac{\sigma\tns}{\alpha_K} \le \frac{\Dah}{c_1}.
+\end{equation}
+The first says the ASGS stabilization renormalizes the reaction; the second
+identifies the renormalization deficit; the third is the exchange rate for
+converting undamped reactive quantities into $\st$-quantities, and is the source of
+every Damk\"ohler factor below. Note also $\st \le \alpha_K\tns^{-1} =
+c_1\alpha_K^2\tau_{2,K}/h_K^2$, i.e.,
+\begin{equation}
+  \label{eq:SigmaTildeScale}
+  \st^{1/2} \;\le\; \sqrt{c_1}\,\frac{\alpha_K}{h_K}\,\tau_{2,K}^{1/2},
+\end{equation}
+so $\st$-weighted quantities are always commensurate with the
+divergence-stabilization scale: this is why the renormalized reaction never costs a
+Damk\"ohler factor.
+
+\section{The dichotomy is a theorem: no common norm}
+\label{sec:dichotomy}
+
+The OSGS analysis of~\cite{OSGSnote} controls the full reactive term
+$\norm{\sigma^{1/2}\bu_h}$; the ASGS analysis of~\cite{companion} controls only
+$\norm{\st^{1/2}\bu_h}_h$. If the second were an artifact of the coercivity-based
+proof, an inf--sup argument with a cleverer test function might upgrade it, and both
+methods could then be analyzed in the single strong norm \cref{eq:StrongNorm}. The
+following proposition rules this out. To keep the counterexample free of inessential
+technicalities we place it in the Darcy-dominated corner of the parameter space,
+which is precisely the regime where the two norms differ.
+
+\begin{proposition}[Sharpness of the reactive renormalization]
+\label{prop:negative}
+Let $\ba \equiv \boldsymbol{0}$, $\alpha \equiv 1$, $\varepsilon = 0$, let
+$\sigma, \nu > 0$ be constant, and let the mesh be such that $\tau_{1,K}$ and
+$\tau_{2,K}$ take a single value on all elements (e.g., a uniform mesh), with the
+spaces of~\cite{OSGSnote} and $\dim V_{h0} > \dim Q_h - 1$ (true for every standard
+pair once the mesh is fine enough). Write $\mathrm{Da}_h = \sigma h^2/\nu$
+(so $\sigma\tau_1 = \mathrm{Da}_h/(c_1 + \mathrm{Da}_h)$ and
+$\st/\sigma = c_1/(c_1+\mathrm{Da}_h)$). Then there exists
+$\bu_h \in V_{h0}\setminus\{\boldsymbol 0\}$ such that, with
+$U_h \coloneqq [\bu_h; 0]$,
+\begin{equation}
+  \label{eq:NegativeBound}
+  \sup_{V_h \in \Xhz}
+  \frac{\Bs(\ba; U_h, V_h)}{\tnorm{V_h}}
+  \;\le\;
+  C\,\sigma^{1/2}\bigl(1 + \mathrm{Da}_h\bigr)^{-1/2}\,\norm{\bu_h}
+  \;\le\;
+  C\,\bigl(1 + \mathrm{Da}_h\bigr)^{-1/2}\,\tnorm{U_h},
+\end{equation}
+with $C$ depending only on $c_1$, $c_2$ and $C_{\mathrm{inv}}$. Consequently the
+inf--sup constant of $\Bs$ with respect to the strong norm \cref{eq:StrongNorm}
+degenerates at least like $(1+\mathrm{Da}_h)^{-1/2}$ in the reaction-dominated
+regime, and no stability estimate of the form
+$\sup_V \Bs(U_h,V)/\tnorm{V} \ge \beta\tnorm{U_h}$ can hold with $\beta$ independent
+of $\mathrm{Da}_h$.
+\end{proposition}
+
+\begin{proof}
+\emph{Choice of $\bu_h$.} Since $\dim V_{h0} > \dim \nabla Q_h \le \dim Q_h - 1$,
+there is $\bu_h \in V_{h0}$, $\norm{\bu_h} = 1$, with
+$(\nabla q_h, \bu_h) = 0$ for all $q_h \in Q_h$; equivalently, since
+$\bu_h \in H^1_0(\Omega)^d$, $(q_h, \nabla\cdot\bu_h) = 0$ for all $q_h \in Q_h$.
+
+\emph{Expansion.} With $\ba = \boldsymbol 0$, $\alpha \equiv 1$, $p_h = 0$:
+$X(U_h) = \boldsymbol 0$, $G(\bu_h) = 2\nu\nabla\cdot(\ViscProj\nabla\bu_h)
+- \sigma\bu_h$, and for $V_h = [\bv_h; q_h]$,
+\begin{align}
+  \Bs(\ba; U_h, V_h)
+  ={}& 2\nu(\ViscProj\nabla\bv_h, \ViscProj\nabla\bu_h)
+  + \sigma(\bv_h, \bu_h)
+  + (q_h, \nabla\cdot\bu_h)
+  \notag\\
+  &- \sum_K \tau_1\bigl( \nabla q_h + G(\bv_h),\ G(\bu_h) \bigr)_K
+  + \sum_K \tau_2\bigl( \nabla\cdot\bv_h,\ \nabla\cdot\bu_h \bigr)_K .
+  \label{eq:NegExpansion}
+\end{align}
+The third term vanishes by the choice of $\bu_h$. In the fourth, expand
+$G(\bu_h)$ and $G(\bv_h)$ and collect the six products; two of them are special.
+First, the reactive--pressure product: since $\tau_1$ is globally constant,
+$+\sigma\tau_1(\nabla q_h, \bu_h) = \sigma\tau_1 \cdot 0 = 0$. Second, the
+reactive--reactive product $-\sigma^2\tau_1(\bv_h,\bu_h)$ telescopes with the
+Galerkin reaction by the first identity in \cref{eq:ThreeIdentities}:
+\[
+  \sigma(\bv_h,\bu_h) - \sigma^2\tau_1(\bv_h,\bu_h)
+  = \st\,(\bv_h,\bu_h)
+  \;\le\; \st^{1/2}\norm{\bv_h}\cdot \st^{1/2}\norm{\bu_h}
+  \;\le\; \Bigl(\frac{c_1}{c_1+\mathrm{Da}_h}\Bigr)^{1/2}\sigma^{1/2}
+  \norm{\bu_h}\,\tnorm{V_h},
+\]
+using $\st^{1/2}\norm{\bv_h} \le \sigma^{1/2}\norm{\bv_h} \le \tnorm{V_h}$. Every
+remaining term carries at least one viscous factor on the $\bu_h$ side and is
+Damk\"ohler-damped; we list the bounds, writing
+$\nu^{1/2}/h = (\sigma/\mathrm{Da}_h)^{1/2}$ and using the inverse estimate
+$\norm{\nabla\cdot(\ViscProj\nabla\bu_h)}_K \le (C_{\mathrm{inv}}/h)
+\norm{\ViscProj\nabla\bu_h}_K \le (C_{\mathrm{inv}}/h)^2\norm{\bu_h}_K$ throughout:
+{\small
+\begin{align*}
+  2\nu(\ViscProj\nabla\bv_h, \ViscProj\nabla\bu_h)
+  &\le \sqrt 2\,\tnorm{V_h}\cdot \sqrt 2\,C_{\mathrm{inv}}
+  \nu^{1/2}h^{-1}\norm{\bu_h}
+  = 2C_{\mathrm{inv}}\,\mathrm{Da}_h^{-1/2}\,\sigma^{1/2}
+  \norm{\bu_h}\tnorm{V_h},\displaybreak[0]\\
+  2\nu\tau_1\bigl|(\nabla q_h, \nabla\cdot(\ViscProj\nabla\bu_h))\bigr|
+  &\le \norm{\nabla q_h}_{\tau_1}\cdot
+  2\nu\tau_1^{1/2}C_{\mathrm{inv}}^2 h^{-2}\norm{\bu_h}\notag\\
+  &\le 2C_{\mathrm{inv}}^2\,\mathrm{Da}_h^{-1}\,\sigma^{1/2}\norm{\bu_h}\tnorm{V_h},
+  \displaybreak[0]\\
+  2\nu\sigma\tau_1\bigl|(\nabla\cdot(\ViscProj\nabla\bv_h), \bu_h)\bigr|
+  &\le \sigma\tau_1\cdot 2\nu^{1/2}C_{\mathrm{inv}}h^{-1}\cdot
+  \nu^{1/2}\norm{\ViscProj\nabla\bv_h}\,\norm{\bu_h}\notag\\
+  &\le \frac{2C_{\mathrm{inv}}\mathrm{Da}_h^{1/2}}{c_1+\mathrm{Da}_h}\,
+  \sigma^{1/2}\norm{\bu_h}\tnorm{V_h},\\
+  4\nu^2\tau_1\bigl|(\nabla\cdot(\ViscProj\nabla\bv_h),
+  \nabla\cdot(\ViscProj\nabla\bu_h))\bigr|
+  &\le 4 C_{\mathrm{inv}}^3\,\mathrm{Da}_h^{-1}\,
+  \sigma^{1/2}\norm{\bu_h}\tnorm{V_h},\\
+  2\nu\sigma\tau_1\bigl|(\bv_h, \nabla\cdot(\ViscProj\nabla\bu_h))\bigr|
+  &\le \sigma\tau_1\cdot 2\nu C_{\mathrm{inv}}^2h^{-2}
+  \,\sigma^{-1/2}\cdot\sigma^{1/2}\norm{\bv_h}\norm{\bu_h}\notag\\
+  &\le 2C_{\mathrm{inv}}^2\,\mathrm{Da}_h^{-1}\,
+  \sigma^{1/2}\norm{\bu_h}\tnorm{V_h},\\
+  \tau_2\bigl|(\nabla\cdot\bv_h, \nabla\cdot\bu_h)\bigr|
+  &\le \norm{\nabla\cdot\bv_h}_{\tau_2}\cdot
+  \tau_2^{1/2}\sqrt d\,C_{\mathrm{inv}}h^{-1}\norm{\bu_h}\notag\\
+  &\le C\,\mathrm{Da}_h^{-1/2}\sigma^{1/2}\norm{\bu_h}\tnorm{V_h},
+\end{align*}}%
+where in the second line $\nu\tau_1^{1/2}h^{-2} \le \nu^{1/2}\sigma^{-1/2}
+\nu^{1/2}h^{-2} = \sigma^{1/2}\mathrm{Da}_h^{-1}$ (via $\tau_1 \le 1/\sigma$), in
+the third $\sigma\tau_1\,\nu^{1/2}h^{-1} =
+\bigl[\mathrm{Da}_h/(c_1+\mathrm{Da}_h)\bigr]\mathrm{Da}_h^{-1/2}\sigma^{1/2}$, and
+in the last $\tau_2 = (\nu)(1 + (c_2/c_1)\Reh)$ with $\Reh = 0$ here since
+$\ba=\boldsymbol 0$. Summing all contributions,
+\[
+  \bigl| \Bs(\ba; U_h, V_h) \bigr|
+  \le C\,\sigma^{1/2}\Bigl[
+  \Bigl(\tfrac{c_1}{c_1+\mathrm{Da}_h}\Bigr)^{1/2}
+  + \mathrm{Da}_h^{-1/2}
+  + \tfrac{\mathrm{Da}_h^{1/2}}{c_1+\mathrm{Da}_h}
+  + \mathrm{Da}_h^{-1}
+  \Bigr]\norm{\bu_h}\,\tnorm{V_h},
+\]
+and every bracketed term is $\le C'(1+\mathrm{Da}_h)^{-1/2}$ for
+$\mathrm{Da}_h \ge 1$ (for $\mathrm{Da}_h \le 1$ the claim
+\cref{eq:NegativeBound} is trivial with $C$ adjusted). Finally
+$\tnorm{U_h} \ge \norm{\sigma^{1/2}\bu_h} = \sigma^{1/2}\norm{\bu_h}$, which gives
+the second inequality in \cref{eq:NegativeBound}.
+\end{proof}
+
+\begin{remark}[Reading of \cref{prop:negative}, and relation to the companion's
+remark]
+\label{rem:reading}
+The companion manuscript remarks, after its stability lemma, that the weaker
+apparent control of $\bu_h$ through $\st$ for large reaction ``turns out not to be
+the case'', pointing to the robustness analysis and the numerics.
+\Cref{prop:negative} does not contradict that statement; it sharpens the sense in
+which it is true. What is genuinely weaker is the \emph{norm control}: no argument
+can extract $\norm{\sigma^{1/2}\bu_h}$ from $\Bs$ with a Damk\"ohler-uniform
+constant, because $\Bs$ simply does not contain that information along
+gradient-orthogonal velocity directions in the Darcy limit. What is nevertheless
+unaffected is the \emph{convergence rate}: the error equation only requires control
+along the error direction, and the companion's Theorem~5.3 delivers optimal,
+Damk\"ohler-free rates in the $\st$-norm. Both facts are correct simultaneously; the
+proposition merely certifies that the $\st$-damping in the stability lemma is sharp,
+not an estimate that a better proof might remove.
+\end{remark}
+
+\begin{remark}[Quantitative symmetry of the dichotomy]
+\label{rem:symmetry}
+In the Darcy limit $\st/\sigma = c_1/(c_1+\mathrm{Da}_h)$, so the ASGS norm concedes
+a factor $\sim\Dah^{1/2}$ in its reactive component relative to the strong norm.
+The OSGS theorem of~\cite{OSGSnote} keeps the strong norm and concedes the factor
+$(1+\Dah)^{1/2}$ in the error constant. The two methods thus pay the same
+Damk\"ohler toll on opposite sides of the inequality:
+\[
+  \underbrace{\tnorm{E_h}_{\mathrm{S}} \le C\,\EF_0(h)}_{\text{ASGS, sharp
+  (Thm.~5.3 of~\cite{companion})}}
+  \qquad\text{versus}\qquad
+  \underbrace{\tnorm{E_h} \le C\,(1+\mathrm{Da}_h)^{1/2}\,\EF_0(h)}_{\text{OSGS
+  (\cite{OSGSnote})}},
+\]
+with $\EF_0(h) \coloneqq \sum_K (\alpha_K/h_K)(\tau_{2,K}^{1/2}\Eint{K}{\bu} +
+\tau_{1,K}^{1/2}\Eint{K}{p})$ the common error function, and, by
+\cref{prop:negative}, neither statement can be moved to the other side's norm
+without loss. This is the precise sense in which the methods---not the proofs---
+differ.
+\end{remark}
+
+\begin{remark}[The deficit table and the test-function recipe]
+\label{rem:deficits}
+The unifying principle behind both stability proofs is: \emph{the special test
+function must supply exactly the residual components that the method's own
+stabilization leaves uncontrolled at the diagonal}. The deficits are:
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+diagonal control of & ASGS \cref{eq:BSdef} & OSGS \cref{eq:Bodef} \\
+\midrule
+first-order residual $\alpha X(U_h)$ & full & fluctuation only
+($\Poneo$-part) \\
+divergence $\nabla\cdot(\alpha\bu_h)$ & full & fluctuation only
+($\Ptwoo$-part) \\
+reaction & damped: $\sigma(1-\sigma\tau_1) = \st$ & full $\sigma$ \\
+compressibility & damped: $\varepsilon(1-\varepsilon\tau_2)$ & full $\varepsilon$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+For OSGS the missing pieces are the resolvable parts $\Pone[\alpha X(U_h)]$,
+$\Ptwo[\nabla\cdot(\alpha\bu_h)]$, and the test components
+$\tau_1\circledast\Pi_{1,0}(\cdot)$, $\tau_2\circledast\Ptwo(\cdot)$
+of~\cite{OSGSnote} supply them (at the price of hypothesis (A7)). For ASGS the
+missing pieces are the renormalization deficits $\sigma^2\tau_1\norm{\bu_h}^2_K$ and
+$\varepsilon^2\tau_2\norm{p_h}^2_K$ (second identity in \cref{eq:ThreeIdentities}),
+and \cref{prop:negative} shows that the reactive one \emph{cannot} be supplied: the
+candidate component $\tau_1\circledast(\sigma\bu_h)$ generates its own gain and its
+own cancellation in equal measure. The compressibility deficit is benign as long as
+$\varepsilon\tau_2 \le C_2 < 1$, which the companion assumes. The recipe therefore
+unifies the two stability proofs conceptually, with the ASGS instantiation
+degenerating to pure coercivity (empty test enrichment) in its natural norm
+\cref{eq:ASGSNorm}---which is the companion's existing lemma.
+\end{remark}
+
+\section{The unified penalized theorem: jump-free ASGS convergence}
+\label{sec:unified}
+
+We now prove the positive half of the verdict: run the convergence half of the
+OSGS analysis of~\cite{OSGSnote} on the ASGS form, each method in its own norm.
+The result is the OSGS theorem with $\tnorm{\cdot}$ replaced by
+$\tnorm{\cdot}_{\mathrm{S}}$, proved without the interior-face jump condition
+of~\cite{companion}. Throughout this section we assume (A1)--(A6), (A8)
+of~\cite{OSGSnote} together with the hypotheses of the ASGS stability lemma
+of~\cite{companion} (in particular $c_1 > 2\xi C_{\mathrm{inv}}^2$ with $\xi > 2$,
+where $C_{\mathrm{inv}}$ is the enlarged constant of the companion's weighted
+inverse estimate, controlled by $\delta_\alpha^{1/2}M_2$ times the plain constant);
+hypothesis (A7) is \emph{not} needed (no projection appears), and neither is the
+jump condition---though, as \cref{sec:jump} shows, avoiding the latter saves
+nothing, since it is implied by the standing hypotheses; the value of the theorem
+below is the shared architecture at a quantified price, not hypothesis economy.
+
+The single method-specific algebraic ingredient is the telescoping identity, which
+we isolate:
+
+\begin{lemma}[Reactive telescoping]
+\label{lem:telescope}
+For any $\bw, \bz \in L^2(\Omega)^d$,
+\begin{equation}
+  \label{eq:Telescope}
+  \sigma(\bz, \bw) - \sum_K \sigma^2\tau_{1,K}(\bz,\bw)_K
+  = \sum_K \st\big|_K\, (\bz, \bw)_K ,
+\end{equation}
+and, elementwise, $\st^{1/2} \le \sqrt{c_1}\,(\alpha_K/h_K)\,\tau_{2,K}^{1/2}$.
+\end{lemma}
+
+\begin{proof}
+The first claim is the first identity of \cref{eq:ThreeIdentities} applied
+elementwise ($\tau_1$ is elementwise constant); the second is
+\cref{eq:SigmaTildeScale}.
+\end{proof}
+
+\begin{lemma}[Jump-free interpolation continuity for the ASGS form]
+\label{lem:asgsinterp}
+Let $\hat E = U - \hat U_h$ be the interpolation error of~\cite[\S 6.2]{OSGSnote}.
+Under the stated hypotheses, for all $V_h \in \Xhz$,
+\begin{equation}
+  \label{eq:ASGSInterpBound}
+  \bigl| \Bs(\ba; \hat E, V_h) \bigr|
+  \;\le\; C\,\EF(h)\,\tnorm{V_h}_{\mathrm{S}},
+  \qquad
+  \EF(h) = \sum_K \frac{\alpha_K}{h_K}(1+\Dah)^{1/2}
+  \bigl( \tau_{2,K}^{1/2}\Eint{K}{\bu} + \tau_{1,K}^{1/2}\Eint{K}{p} \bigr).
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Split $\Bs(\hat E, V_h)$ into the Galerkin part and the stabilization part.
+
+\smallskip\noindent\emph{Galerkin part, with two telescopings.}
+Estimates (I1) (viscous), (I4) (compressibility) and (I5) (pressure gradient, by
+global integration by parts) of~\cite[Lemma~6.2]{OSGSnote} apply verbatim: each uses
+only the $\nu$-, $\varepsilon$- and
+$\norm{\nabla\cdot(\alpha\bv_h)}_{\tau_2}$-components of the test norm, all present
+in $\tnorm{\cdot}_{\mathrm{S}}$, and each is bounded by
+$C\,\EF(h)\tnorm{V_h}_{\mathrm{S}}$, the Damk\"ohler factor now arising only in the
+(I4)/(I5) conversions through (P5)-type inequalities of~\cite[Lemma~4.1]{OSGSnote}. The two remaining
+Galerkin pairings are treated \emph{jointly with their stabilization partners},
+exploiting the elementwise identity $1-\sigma\tau_1 = \varphi_1\tau_1$,
+$\varphi_1 \coloneqq \alpha_K\tns^{-1}$---the mechanism of the companion's own
+continuity proof. First, the Galerkin reaction telescopes with the
+reactive--reactive stabilization product via \cref{lem:telescope}:
+\[
+  \sigma(\hat{\boldsymbol e}_u, \bv_h)
+  - \sum_K \sigma^2\tau_{1,K}(\bv_h, \hat{\boldsymbol e}_u)_K
+  = \sum_K \st(\hat{\boldsymbol e}_u, \bv_h)_K
+  \le \Bigl( \sum_K c_1 \Bigl(\tfrac{\alpha_K}{h_K}\Bigr)^2
+  \tau_{2,K}\,\Eint{K}{\bu}^2 \Bigr)^{1/2} \tnorm{V_h}_{\mathrm{S}},
+\]
+using $\st^{1/2}\normK{\hat{\boldsymbol e}_u} \le
+\sqrt{c_1}(\alpha_K/h_K)\tau_{2,K}^{1/2}\Eint{K}{\bu}$ and
+$\norm{\st^{1/2}\bv_h}_h \le \tnorm{V_h}_{\mathrm{S}}$; no Damk\"ohler factor
+arises. Second, the convective and mass--divergence Galerkin terms, combined by
+global integration by parts into $-(\hat{\boldsymbol e}_u, \alpha X(V_h))$ exactly
+as in (I2) of~\cite{OSGSnote}, telescope with the stabilization product
+$\sum_K \sigma\tau_{1,K}(\alpha X(V_h), \hat{\boldsymbol e}_u)_K$, which we
+accordingly remove from the inventory below:
+\[
+  -\bigl(\hat{\boldsymbol e}_u, \alpha X(V_h)\bigr)
+  + \sum_K \sigma\tau_{1,K}\bigl(\alpha X(V_h), \hat{\boldsymbol e}_u\bigr)_K
+  = -\sum_K \varphi_1\tau_1\bigl(\hat{\boldsymbol e}_u, \alpha X(V_h)\bigr)_K,
+\]
+and since $\varphi_1\tau_1 \le \varphi_1^{1/2}\tau_1^{1/2}$ (from
+$\varphi_1\tau_1 \le 1$) with $\varphi_1^{1/2} =
+\sqrt{c_1}\,(\alpha_K/h_K)\,\tau_{2,K}^{1/2}$,
+\[
+  \Bigl| \sum_K \varphi_1\tau_1\bigl(\hat{\boldsymbol e}_u,
+  \alpha X(V_h)\bigr)_K \Bigr|
+  \le \sqrt{c_1}\sum_K \frac{\alpha_K}{h_K}\,\tau_{2,K}^{1/2}\,\Eint{K}{\bu}\;
+  \tau_{1,K}^{1/2}\normK{\alpha X(V_h)}
+  \le C\,\EF(h)\,\tnorm{V_h}_{\mathrm{S}},
+\]
+again Damk\"ohler-free. Both dangerous first-order Galerkin pairings are thus
+neutralized by the reactive parts of the ASGS trial and test slots; this is where
+the full-residual structure pays, and precisely what the OSGS annihilations forgo
+(cf.\ \cref{rem:inert}).
+
+\smallskip\noindent\emph{Stabilization part: inventory.}
+Expanding \cref{eq:BSdef} at $(\hat E, V_h)$, the momentum stabilization is the sum
+over $K$ of $\tau_{1,K}$ times the products of the test factors
+$\{\alpha X(V_h),\ 2\nabla\cdot(\alpha\nu\ViscProj\nabla\bv_h),\ -\sigma\bv_h\}$
+with the trial factors
+$\{\alpha X(\hat E),\ -2\nabla\cdot(\alpha\nu\ViscProj\nabla\hat{\boldsymbol e}_u),\
++\sigma\hat{\boldsymbol e}_u\}$; the reactive--reactive product and the
+$\bigl(\alpha X(V_h), \sigma\hat{\boldsymbol e}_u\bigr)$ product were consumed by
+the two telescopings above. The mass stabilization contributes the products of
+$\{\nabla\cdot(\alpha\bv_h),\ -\varepsilon q_h\}$ with
+$\{\varepsilon\hat e_p,\ \nabla\cdot(\alpha\hat{\boldsymbol e}_u)\}$. We bound the
+factors elementwise once and multiply.
+
+\smallskip\noindent\emph{Trial factors.}
+\begin{align}
+  \tau_{1,K}^{1/2}\normK{\alpha X(\hat E)}
+  &\le C\,\frac{\alpha_K}{h_K}\bigl( \tau_{2,K}^{1/2}\Eint{K}{\bu}
+  + \tau_{1,K}^{1/2}\Eint{K}{p} \bigr)
+  && \text{(as in (I6) of~\cite{OSGSnote})},
+  \label{eq:TrialX}\\
+  \tau_{1,K}^{1/2}\normK{2\nabla\cdot(\alpha\nu\ViscProj\nabla\hat{\boldsymbol e}_u)}
+  &\le C(1+C_\nabla)\,\frac{\alpha_K}{h_K}\,\tau_{2,K}^{1/2}\Eint{K}{\bu}
+  && \text{(Damk\"ohler-free)},
+  \label{eq:TrialVisc}\\
+  \tau_{1,K}^{1/2}\normK{\sigma\hat{\boldsymbol e}_u}
+  \le \sigma^{1/2}\normK{\hat{\boldsymbol e}_u}
+  &\le C\,\Dah^{1/2}\,\frac{\alpha_K}{h_K}\,\tau_{2,K}^{1/2}\Eint{K}{\bu}
+  && \text{(penalized; (P6))},
+  \label{eq:TrialReac}\\
+  \tau_{2,K}^{1/2}\normK{\nabla\cdot(\alpha\hat{\boldsymbol e}_u)}
+  &\le C(1+C_\nabla)\,\frac{\alpha_K}{h_K}\,\tau_{2,K}^{1/2}\Eint{K}{\bu}
+  && \text{(as in (I7) of~\cite{OSGSnote})},
+  \label{eq:TrialDiv}\\
+  \tau_{2,K}^{1/2}\normK{\varepsilon \hat e_p}
+  \le C_2\,\tau_{2,K}^{-1/2}\normK{\hat e_p}
+  &\le C\,(c_1+\Dah)^{1/2}\,\frac{\alpha_K}{h_K}\,\tau_{1,K}^{1/2}\Eint{K}{p}
+  && \text{(penalized; (P1), (P5))}.
+  \label{eq:TrialEps}
+\end{align}
+For \cref{eq:TrialVisc}: expanding the divergence,
+$\normK{\nabla\cdot(\alpha\nu\ViscProj\nabla\hat{\boldsymbol e}_u)}
+\le \nu\bigl( \alpha_K \normK{\nabla(\ViscProj\nabla\hat{\boldsymbol e}_u)}
++ \norm{\nabla\alpha}_{L^\infty(K)}\normK{\ViscProj\nabla\hat{\boldsymbol e}_u}
+\bigr)
+\le C(1+C_\nabla)\,\nu\alpha_K\, h_K^{k_u-1}\norm{\bu}_{H^{k_u+1}(K)}$
+(the interpolation estimate with $m = 2$ and the resolution condition; $\ViscProj$
+has constant coefficients), and then
+$\tau_{1,K}^{1/2}\nu\alpha_K h_K^{k_u-1}
+\le \alpha_K^{1/2}\nu^{1/2}h_K^{k_u}/\sqrt{c_1}
+\le \alpha_K\tau_{2,K}^{1/2}h_K^{k_u}/\sqrt{c_1}$
+via $\tau_1 \le h^2/(c_1\alpha_K\nu)$ and $\nu \le \alpha_K\tau_{2,K}$. Note that
+the trial side never needs an inverse estimate: $\hat E$ is an interpolation error,
+not a finite element function.
+
+\smallskip\noindent\emph{Test factors.}
+\begin{align}
+  \tau_{1,K}^{1/2}\normK{\alpha X(V_h)},\quad
+  \tau_{2,K}^{1/2}\normK{\nabla\cdot(\alpha\bv_h)}
+  &\;\le\; \tnorm{V_h}_{\mathrm{S}}\text{-summands},
+  \label{eq:TestFirst}\\
+  \tau_{1,K}^{1/2}\normK{2\nabla\cdot(\alpha\nu\ViscProj\nabla\bv_h)}
+  &\le \frac{2\,\delta_\alpha^{1/2} M_2}{\gamma}\,
+  \nu^{1/2}\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv_h \bigr\rVert_K
+  && \text{(Damk\"ohler-free)},
+  \label{eq:TestVisc}\\
+  \tau_{1,K}^{1/2}\normK{\sigma\bv_h}
+  = (\sigma^2\tau_{1,K})^{1/2}\normK{\bv_h}
+  &\le \Bigl(\frac{\Dah}{c_1}\Bigr)^{1/2} \st^{1/2}\normK{\bv_h}
+  && \text{(penalized; \cref{eq:ThreeIdentities})},
+  \label{eq:TestReac}\\
+  \tau_{2,K}^{1/2}\normK{\varepsilon q_h}
+  \le (\varepsilon\tau_{2,K})^{1/2}\,\varepsilon^{1/2}\normK{q_h}
+  &\le C_2^{1/2}\,\varepsilon^{1/2}\normK{q_h}
+  && \text{(Damk\"ohler-free)}.
+  \label{eq:TestEps}
+\end{align}
+For \cref{eq:TestVisc}, the same divergence expansion and the elementwise bound
+$\normK{\ViscProj\nabla\bv_h} \le \alpha_{0,K}^{-1/2}
+\normK{\alpha^{1/2}\ViscProj\nabla\bv_h}$ give the companion's enlarged inverse
+estimate with constant $\delta_\alpha^{1/2}M_2 C_{\mathrm{inv}}$, after which (K1)
+applies; this is the one place the enlarged constant is needed, and it is needed
+because the ASGS \emph{test slot} genuinely contains the viscous operator---an
+irreducible difference from the OSGS analysis.
+
+\smallskip\noindent\emph{Assembly.}
+Multiplying test and trial factors, summing over $K$ by Cauchy--Schwarz, exactly
+three families carry a Damk\"ohler factor: (F2)
+$\bigl(2\nabla\cdot(\alpha\nu\ViscProj\nabla\bv_h),
+\sigma\hat{\boldsymbol e}_u\bigr)_{\tau_1}$, penalized through the trial factor
+\cref{eq:TrialReac}; and (F3) $\bigl(-\sigma\bv_h, \alpha X(\hat E)\bigr)_{\tau_1}$
+and (F4) $\bigl(-\sigma\bv_h,
+-2\nabla\cdot(\alpha\nu\ViscProj\nabla\hat{\boldsymbol e}_u)\bigr)_{\tau_1}$,
+penalized through the test factor \cref{eq:TestReac} (the former (F1) family,
+$(\alpha X(V_h), \sigma\hat{\boldsymbol e}_u)_{\tau_1}$, having been telescoped
+away). The
+$\varepsilon$-products carry at most the $(c_1+\Dah)^{1/2}$ of \cref{eq:TrialEps}.
+All remaining products are Damk\"ohler-free. Every product is bounded by
+$C(1+\Dah)^{1/2}$ times the corresponding term of $\EF(h)$ times a summand of
+$\tnorm{V_h}_{\mathrm{S}}$, and \cref{eq:ASGSInterpBound} follows.
+\end{proof}
+
+\begin{theorem}[Unified penalized convergence, ASGS instantiation]
+\label{th:unifiedASGS}
+Let $U$ solve the linearized problem and $U_h \in \Xhz$ the ASGS discrete problem
+of~\cite{companion}. Under the hypotheses stated at the head of this section
+(in particular: no jump condition, no hypothesis (A7)),
+\begin{equation}
+  \label{eq:UnifiedASGS}
+  \tnorm{U - U_h}_{\mathrm{S}}
+  \;\le\;
+  C \sum_K \frac{\alpha_K}{h_K}\,\bigl(1+\Dah\bigr)^{1/2}
+  \Bigl( \tau_{2,K}^{1/2}\Eint{K}{\bu} + \tau_{1,K}^{1/2}\Eint{K}{p} \Bigr).
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+The skeleton of~\cite[Theorem~6.4]{OSGSnote}, with two substitutions.
+\emph{Stability}: the coercivity lemma of~\cite{companion} gives
+$\Bs(\ba; W_h, W_h) \ge \beta\,\tnorm{W_h}_{\mathrm{S}}^2$ for $W_h \in \Xhz$; this
+is the degenerate (empty test enrichment) instance of the inf--sup template, cf.\
+\cref{rem:deficits}. \emph{Consistency}: the ASGS method is variationally
+consistent---for the exact solution, $\alpha X(U) - G(\bu) = \bff$ and
+$\varepsilon p + \nabla\cdot(\alpha\bu) = 0$, so the stabilization terms
+of~\cref{eq:BSdef} evaluate against the data exactly as in the companion's
+right-hand side, whence $\Bs(\ba; U - U_h, V_h) = 0$ for all $V_h \in \Xhz$; the
+best-approximation consistency lemma of~\cite{OSGSnote} is replaced by this
+identity. Then, with $\eta_h = \hat U_h - U_h$,
+\[
+  \beta\,\tnorm{\eta_h}_{\mathrm{S}}
+  \le \frac{\Bs(\ba;\eta_h,\eta_h)}{\tnorm{\eta_h}_{\mathrm{S}}}
+  = \frac{-\Bs(\ba;\hat E,\eta_h)}{\tnorm{\eta_h}_{\mathrm{S}}}
+  \le C\,\EF(h)
+\]
+by \cref{lem:asgsinterp}, and
+$\tnorm{\hat E}_{\mathrm{S}} \le \tnorm{\hat E} \le C\,\EF(h)$
+by~\cite[Lemma~6.5]{OSGSnote} and the termwise norm comparison. The triangle
+inequality concludes.
+\end{proof}
+
+\begin{remark}[Where the penalty actually resides; further repairs]
+\label{rem:sharper}
+The three surviving penalized families are not equally stubborn. Family (F2) can be
+repaired outright, with no new hypothesis: elementwise integration by parts gives
+\begin{align*}
+  \sigma\tau_{1,K}\bigl(2\nabla\cdot(\alpha\nu\ViscProj\nabla\bv_h),
+  \hat{\boldsymbol e}_u\bigr)_K
+  ={}& -2\sigma\tau_{1,K}\bigl(\alpha\nu\ViscProj\nabla\bv_h,
+  \ViscProj\nabla\hat{\boldsymbol e}_u\bigr)_K \\
+  &+ \sigma\tau_{1,K}\int_{\partial K} 2\alpha\nu\,
+  (\ViscProj\nabla\bv_h\,\bn)\cdot\hat{\boldsymbol e}_u\,\mathrm{d}\Gamma;
+\end{align*}
+using $\sigma\tau_1 \le 1$ and $\nu \le \alpha_K\tau_{2,K}$, the volume term is
+bounded by
+$C\delta_\alpha^{1/2}\,(\alpha_K/h_K)\tau_{2,K}^{1/2}\Eint{K}{\bu}\cdot
+\nu^{1/2}\lVert\alpha^{1/2}\ViscProj\nabla\bv_h\rVert_K$, and the face terms,
+estimated per element by a discrete trace inequality on $\ViscProj\nabla\bv_h$ and a
+continuous one on $\hat{\boldsymbol e}_u$, carry the same weight; both are
+Damk\"ohler-free, and no jump quantity arises because each face integral is bounded
+directly rather than assembled facewise. The genuinely delicate families are (F3),
+(F4) and the pressure/$\varepsilon$ conversions of \cref{eq:TrialEps} and (I5):
+these are exactly the terms on which the companion's proof spends its facewise
+$[\tau_1]$-estimates (its terms [I]+[IV] and [III], in the notation of the
+companion's appendix), and they can be made Damk\"ohler-free by two routes: (a) the
+companion's---elementwise integration by parts, facewise assembly into
+$[\tau_1]$-jumps, and the companion's jump lemma; or (b) a regime-splitting
+route---partition the elements by $\sigma\tau_1 \gtrless 1/2$, bound the
+reaction-dominated side directly (there $\st \ge \varphi_1/2$, so
+$\st^{1/2}$-pairings saturate the $\varphi_1$-scale), integrate by parts only on the
+complement (where $\Dah \lesssim c_1$, so every conversion is bounded), and estimate
+the interface faces by trace inequalities. We have verified the weights of route (b)
+family by family; both routes rest on the same facewise comparability of $\varphi_1$,
+which \cref{lem:jumpauto} below shows is implied by the standing hypotheses. We have
+not written route (b) out in full and do not claim it as a theorem; its interest is
+conceptual---it indicates that the jump \emph{machinery}, not merely the jump
+\emph{hypothesis}, is replaceable.
+\end{remark}
+
+\section{Comparison, corollaries and the residual asymmetries}
+\label{sec:comparison}
+
+\begin{remark}[What is shared and what is not]
+\label{rem:shared}
+The unified pair---\cref{th:unifiedASGS} here and
+\cite[Theorem~6.4]{OSGSnote}---now has the following anatomy:
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+component & ASGS instantiation & OSGS instantiation \\
+\midrule
+hypotheses & (A1)--(A6), (A8) & (A1)--(A8) \\
+extra hypothesis & enlarged inverse const.\ (automatic) & (A7); not automatic \\
+parameter toolbox & \multicolumn{2}{c}{(P1)--(P6), (K1)--(K3): shared} \\
+stability & coercivity (empty enrichment) & inf--sup (projection enrichment) \\
+consistency & exact ($\equiv 0$) & best approximation
+(\cite[Lemma~6.1]{OSGSnote}) \\
+interpolation core & (I1), (I2), (I4), (I5) + telescoped (I3$'$)
+& (I1)--(I5) \\
+stabilization terms & inventory of \cref{lem:asgsinterp} & nonexpansiveness
+(2 lines) \\
+norm & $\tnorm{\cdot}_{\mathrm{S}}$ ($\st$; forced by \cref{prop:negative}) &
+$\tnorm{\cdot}$ (full $\sigma$) \\
+result & $\EF(h)$, i.e., $(1+\Dah)^{1/2}\EF_0(h)$ &
+$\EF(h)$, identical \\
+$\varphi_1$-face comparability & $[\tau_1]$-face estimates
+(\cref{lem:jumpauto}) & patch equiv., smoothing \\
+\bottomrule
+\end{tabular}
+\end{center}
+A single parametric write-up covering both columns is entirely feasible; the
+method-specific residue is the two extra-hypothesis cells, the consistency cell,
+and the stabilization-term cell.
+\end{remark}
+
+\begin{remark}[$L^2$ velocity: both methods, both routes]
+\label{rem:Ltwo}
+The companion's sharp Theorem~5.3 yields, in the reaction-dominated regime, using
+$\st \eqsim c_1\alpha_K^2\tau_{2,K}/h_K^2$ there,
+$\norm{\bu-\bu_h}_{\mathrm{ASGS}} \le \st^{-1/2}\,C\,\EF_0(h) \le
+C\bigl( \Eint{K}{\bu}\text{-terms} + (\tau_1/\tau_2)^{1/2}\Eint{K}{p}\text{-terms}
+\bigr)$: optimal order with a $\sigma$-uniform constant. The OSGS corollary
+of~\cite[Corollary~6.6]{OSGSnote} gives
+$\norm{\bu-\bu_h}_{\mathrm{OSGS}} \le C\sum_K(1+\Dah^{-1})^{1/2}
+[(1+\tfrac{c_2}{c_1}\Reh)^{1/2}\Eint{K}{\bu} +
+(\alpha_K/(\sigma\nu))^{1/2}\Eint{K}{p}]$: also optimal order,
+$\sigma$-robust. So both analyses predict indistinguishable $L^2$ velocity behavior
+at strong reaction, which is exactly what the tables of~\cite{companion} show; the
+Damk\"ohler asymmetry lives entirely in the $H^1$-type components, again as
+observed.
+\end{remark}
+
+\begin{remark}[A third instantiation, and why the full-residual ASGS resists the
+template]
+\label{rem:thirdinstance}
+The Method-I template of~\cite{Codina2008} with the projection set to the identity
+complement removed---i.e., stabilizing the plain first-order quantities
+$(\alpha X(U_h), \alpha X(V_h))_{\tau_1}$ and
+$(\nabla\cdot(\alpha\bu_h), \nabla\cdot(\alpha\bv_h))_{\tau_2}$ without any
+projection---is the porous version of the term-by-term method
+of~\cite{Chacon1998}. It fits the unified skeleton perfectly (trivial stability
+enrichment, no (A7)), but its consistency error is
+$(\alpha X(U), \alpha X(V_h))_{\tau_1}$-sized, i.e., $O(\tau_1^{1/2})$ times an
+$O(1)$ residual, which restricts it to first-order elements, as~\cite{Codina2008}
+already notes. This clarifies the obstruction from the other side: the
+\emph{full-residual} structure of the companion's ASGS is exactly what buys exact
+consistency for all orders---and exactly what installs the viscous and reactive
+operators in both slots of the quadratic form, forcing the renormalization of
+\cref{prop:negative} and the enlarged inverse constant. One cannot keep the asset
+and drop the liabilities.
+\end{remark}
+
+\begin{question}[updated]
+\label{q:open}
+The original question asked whether the family
+$(\alpha X(V_h), \sigma\hat{\boldsymbol e}_u)_{\tau_1}$ admits a bound that is
+simultaneously Damk\"ohler-uniform and free of conditions on the jumps of
+$\tau_1$.
+It is now largely resolved, by dissolution rather than by answer: (i) that family
+telescopes against the Galerkin first-order pairing at zero cost
+(\cref{lem:asgsinterp}, second telescoping), with no integration by parts and no
+face terms; (ii) the families that do route through facewise machinery ((F3), (F4)
+and the pressure/$\varepsilon$ conversions) admit, besides the companion's
+$[\tau_1]$-route, the regime-splitting route sketched in \cref{rem:sharper}; and
+(iii) both routes rest only on the facewise comparability of $\varphi_1$, which
+\cref{lem:jumpauto} shows is implied by the standing hypotheses. The jump condition
+was therefore never an independent assumption, as the companion's own remark on it
+anticipated. What remains open is bookkeeping, not principle: a full write-up of the
+regime-splitting continuity lemma (which would make the companion's appendix
+independent of the explicit jump estimates), and, on the impossibility side, whether
+the Damk\"ohler factor can be removed from the OSGS bound in norms \emph{weaker}
+than the strong one---\cref{prop:floor} settles the strong norm, and the
+missing-telescoping-partner obstruction blocks all continuity-type arguments in the
+$\st$-norm, but duality-type arguments are not excluded.
+\end{question}
+
+\section{The jump condition examined: automatic for ASGS, inert for OSGS}
+\label{sec:jump}
+
+The companion's continuity lemma assumes, when $\sigma > 0$, the facewise
+comparability
+\begin{equation}\label{eq:Hjump}
+  c_J\,\varphi_{1,K_1} \;\le\; \varphi_{1,K_2} \;\le\; c_J'\,\varphi_{1,K_1},
+  \qquad \varphi_{1,K} \coloneqq \alpha_K\,\tns^{-1},
+  \qquad 0 < c_J \le 1 \le c_J',
+\end{equation}
+for every pair of elements sharing a face (its hypothesis H\textsubscript{jump},
+the porous analogue of condition~(39) in~\cite{Codina2001}). A natural question,
+prompted by the comparison of the two analyses: is this an extra assumption whose
+availability would \emph{also} improve the OSGS estimate---so that listing its
+absence as an OSGS feature misreads the ledger? The answer is that the condition is
+(i) implied by the standing hypotheses, (ii) identical in content to the patch
+equivalence on which the OSGS analysis already rests, and (iii) without any point of
+application in the OSGS analysis; and that the OSGS penalty one might have hoped it
+removes is unremovable by \emph{any} hypothesis. We take these in turn.
+
+\begin{lemma}[The jump condition is implied by the standing hypotheses]
+\label{lem:jumpauto}
+Assume the nondegeneracy hypothesis (A1), the porosity bounds and resolution
+condition (A3) with elementwise contrast $\delta_\alpha$, and continuity of the
+advection field, $\ba \in C^0(\overline\Omega)^d$, with modulus of continuity
+$\omega_{\ba}$; let $\nu > 0$. Then there is $h_0 > 0$, depending only on $\nu$ and
+$\omega_{\ba}$, such that \cref{eq:Hjump} holds for all $h \le h_0$ with constants
+$c_J, c_J'$ depending only on the mesh-regularity constants, $\delta_\alpha$, $c_1$
+and $c_2$. Since $\sigma$ cancels in the jump of $\tau_1^{-1} = \varphi_1 + \sigma$,
+the condition constrains only the data and the mesh, never the reaction.
+\end{lemma}
+
+\begin{proof}
+Let $K_1, K_2$ share the face $F$. \emph{Porosity factors:} since
+$\alpha_{0,K_1} \le \inf_F \alpha$ and $\inf_F\alpha \le \alpha_{K_2}$,
+\[
+  \alpha_{K_1} \le \delta_\alpha\,\alpha_{0,K_1}
+  \le \delta_\alpha \inf_F \alpha \le \delta_\alpha\,\alpha_{K_2},
+\]
+and symmetrically; this is the argument of the companion's own remark on the
+condition. \emph{Mesh factors:} $h_{K_1} \eqsim h_{K_2}$ with constants from (A1).
+\emph{Advection factors:} $\bigl|\,|\ba|_{\infty,K_1} - |\ba|_{\infty,K_2}\,\bigr|
+\le \omega_{\ba}(C h)$ since $K_1 \cup K_2$ has diameter $\le Ch$, whence
+\[
+  \frac{c_1\nu}{h_{K_1}^2} + \frac{c_2|\ba|_{\infty,K_1}}{h_{K_1}}
+  \;\le\; C\Bigl( \frac{c_1\nu}{h_{K_2}^2}
+  + \frac{c_2|\ba|_{\infty,K_2}}{h_{K_2}} \Bigr)
+  + \frac{C\,c_2\,\omega_{\ba}(Ch)}{h_{K_2}},
+\]
+and the last term is absorbed by the viscous floor:
+$c_2\omega_{\ba}(Ch)/h_{K_2} = \bigl[c_2\,\omega_{\ba}(Ch)\,h_{K_2}/(c_1\nu)\bigr]
+\cdot c_1\nu/h_{K_2}^2$, whose bracket is $\le 1$ for
+$h \le h_0(\nu, \omega_{\ba})$. Multiplying the three comparabilities gives
+\cref{eq:Hjump}. Two observations. First, the $h_0(\nu)$-dependence is exactly that
+of the smoothing function $\psi(h)$ in the OSGS stability proof, which controls the
+oscillation of the same quantity, by the same viscous floor, for the same reason.
+Second, \cref{eq:Hjump} restricted to face-neighbours is precisely the comparability
+content of the patch-equivalence lemma~\cite[Lemma~4.2]{OSGSnote} that the OSGS
+interpolation and smoothing estimates consume. The condition is thus not an
+independent assumption but a restatement, at faces, of regularity the standing
+hypotheses already provide.
+\end{proof}
+
+\begin{remark}[No point of application in the OSGS analysis]
+\label{rem:inert}
+Suppose one grants \cref{eq:Hjump} to the OSGS analysis. Nothing improves, for a
+structural reason. In the companion's continuity proof the condition enters through
+a single consequence: the facewise estimate
+$\sigma\,\bigl|[\tau_1]\bigr| \le C\,
+(\st\tau_1|_{K_1})^{1/2}(\st\tau_1|_{K_2})^{1/2}$, which prices the interior-face
+terms generated by \emph{elementwise} integration by parts of the $\sigma$-weighted
+stabilization pairings---the fee for executing the telescopings
+$1 - \sigma\tau_1 = \varphi_1\tau_1$ on its terms [I]+[IV] and [III] (in the
+notation of the companion's appendix; the third telescoping, [II]+[V], is jump-free
+algebra, and is the one imported into \cref{lem:asgsinterp}). The pairings being
+telescoped exist because the ASGS test slot contains $-\sigma\bv_h$ and its residual
+slot $+\sigma\bu_h$. The OSGS projection annihilates precisely these
+(the reactive parts of its residual and test slots have no fluctuation, cf.\ the
+form \cref{eq:Bodef}): there is no partner, hence no telescoping, hence no
+elementwise integration by parts, hence no $[\tau_1]$ face term anywhere in the OSGS
+error analysis. The Damk\"ohler losses there sit instead in \emph{Galerkin}
+pairings---$\sigma(\hat{\boldsymbol e}_u, \bv_h)$, the $\sigma^{1/2}$-part of the
+$\alpha X$-pairing, the $\tau_2^{-1/2}$ pressure weight---which carry no
+$\tau_1$-weight and, in the reactive case, no derivative structure to move. A
+hypothesis about $[\tau_1]$ has nothing to act on. Note finally that the OSGS proof
+already \emph{uses} the comparability content of \cref{eq:Hjump}, as patch
+equivalence, in its quasi-interpolation and smoothing lemmas; what it lacks is not
+the hypothesis but the telescoping partners.
+\end{remark}
+
+\begin{proposition}[The strong-norm penalty is forced by the norm]
+\label{prop:floor}
+Let $\ba \equiv \boldsymbol 0$, $\alpha \equiv 1$, $\varepsilon = 0$, on
+quasi-uniform meshes, and fix
+$\bu \in C^\infty(\overline\Omega)^d \cap H^1_0(\Omega)^d$ with
+$\nabla\cdot\bu = 0$ and $D^{k_u+1}\bu \not\equiv 0$; set $p \coloneqq 0$ and
+$\bff \coloneqq \sigma\bu - 2\nu\,\nabla\cdot(\ViscProj\nabla\bu)$, so that
+$U = [\bu; 0]$ solves the linearized problem of~\cite{OSGSnote} for every
+$\sigma, \nu > 0$. Then there is $c_{\bu} > 0$, independent of $h$, $\sigma$ and
+$\nu$, such that for \emph{every} $V_h \in \Xhz$---in particular for the discrete
+solution of any method whatsoever---
+\[
+  \tnorm{U - V_h} \;\ge\; \norm{\sigma^{1/2}(\bu - \bv_h)}
+  \;\ge\; c_{\bu}\,\sigma^{1/2} h^{k_u+1}
+  \;=\; \frac{c_{\bu}}{\norm{\bu}_{H^{k_u+1}(\Omega)}}\;
+  \mathrm{Da}_h^{1/2}\;\EF_0^{(2)}(h),
+\]
+where $\EF_0^{(2)}(h) \coloneqq \bigl( \sum_K \bigl[(\alpha_K/h_K)\,
+\tau_{2,K}^{1/2}\,\Eint{K}{\bu}\bigr]^2 \bigr)^{1/2} = \nu^{1/2} h^{k_u}
+\norm{\bu}_{H^{k_u+1}(\Omega)}$ in this setting. Consequently no a priori estimate
+$\tnorm{U - U_h} \le C\,\EF_0^{(2)}(h)$ with $C$ independent of $\mathrm{Da}_h$ can
+hold for any discretization; and since $\sigma$ is a free parameter, taking $\sigma$
+large at fixed $h$ extends the conclusion to the summed error function $\EF_0(h)
+\ge \EF_0^{(2)}(h)$. The factor $(1+\Dah)^{1/2}$ in the OSGS theorem
+of~\cite{OSGSnote} is therefore optimal up to constants: it measures the norm, not
+the proof. This complements \cref{prop:negative}: that result showed the ASGS form
+cannot \emph{reach} the strong norm; this one shows nothing can \emph{beat} the
+strong norm's own best-approximation scaling.
+\end{proposition}
+
+\begin{proof}
+Only the best-approximation lower bound requires proof. Discrete velocities are
+continuous piecewise polynomials of degree $k_u$, so
+$\operatorname{dist}_{L^2}(\bu, V_{h0}) \ge
+\operatorname{dist}_{L^2}\bigl(\bu, \mathbb P_{k_u}(\mathcal T_h)\bigr)$, the
+unconstrained piecewise-polynomial distance. Pick a ball $\omega \subset \Omega$
+and $\delta > 0$ with $|D^{k_u+1}\bu| \ge \delta$ on $\omega$ (possible:
+$D^{k_u+1}\bu$ is continuous and not identically zero). For $K \subset \omega$, let
+$T_K$ be the Taylor polynomial of $\bu$ of degree $k_u{+}1$ at the barycenter and
+$H_K$ its homogeneous part of degree $k_u{+}1$. Then
+\[
+  \operatorname{dist}_{L^2(K)}(\bu, \mathbb P_{k_u})
+  \;\ge\; \bigl\lVert (I - \Pi_{\mathbb P_{k_u}(K)})\,H_K \bigr\rVert_{L^2(K)}
+  - \norm{\bu - T_K}_{L^2(K)}
+  \;\ge\; c\,\delta\, h_K^{k_u+1}\,|K|^{1/2} - C_{\bu}\, h_K^{k_u+2}\,|K|^{1/2},
+\]
+where the first bound holds because
+$H \mapsto \lVert (I - \Pi_{\mathbb P_{k_u}}) H \rVert_{L^2(\widehat K)}$ is a norm
+on the homogeneous polynomials of degree $k_u{+}1$ (which meet
+$\mathbb P_{k_u}$ only at $0$), hence equivalent to the coefficient norm on that
+finite-dimensional space, uniformly over shape-regular elements after affine
+scaling; and the second is the Taylor remainder. Squaring, summing over
+$K \subset \omega$, and taking $h$ small enough that the remainder halves the
+leading term and the elements contained in $\omega$ cover half its measure,
+\[
+  \operatorname{dist}_{L^2}\bigl(\bu, \mathbb P_{k_u}(\mathcal T_h)\bigr)^2
+  \;\ge\; \tfrac14\, c^2\delta^2\, |\omega|\, h^{2(k_u+1)}
+  \;\eqqcolon\; c_{\bu}^2\, h^{2(k_u+1)}.
+\]
+The identifications $\tau_{2,K} = \nu$, $\alpha_K = 1$ (so that
+$(\alpha_K/h_K)\tau_{2,K}^{1/2}\Eint{K}{\bu} = \nu^{1/2}h^{k_u}
+\norm{\bu}_{H^{k_u+1}(K)}$ up to the quasi-uniformity constants) and
+$\sigma^{1/2}h^{k_u+1} = \mathrm{Da}_h^{1/2}\,\nu^{1/2}h^{k_u}$ complete the
+computation.
+\end{proof}
+
+\begin{remark}[The corrected hypothesis ledger]
+\label{rem:ledger}
+\Cref{lem:jumpauto,rem:inert,prop:floor} correct a framing that the comparison
+table of \cref{rem:shared}, and the notes~\cite{OSGSnote}, might otherwise invite.
+``No jump condition needed'' is not an advantage of the OSGS analysis: the condition
+costs nothing (it is implied by the standing hypotheses, exactly as the patch
+equivalence and smoothing estimates that the OSGS proof itself consumes), and having
+it would buy nothing (it has no point of application, and the dominant penalty is
+norm-forced). Symmetrically, the enlarged inverse-estimate constant of the ASGS
+analysis is $\delta_\alpha^{1/2} M_2\, C_{\mathrm{inv}}$, derived from the same
+resolution condition. Both analyses therefore rest on the same automatic regularity
+substrate; the ASGS proof converts it into Damk\"ohler-free sharpness through the
+three telescopings, and the OSGS proof cannot. The single assumption in either
+analysis that is \emph{not} implied by the standing data and mesh hypotheses is the
+projection-stability condition (A7), on the OSGS side, whose verification is a
+genuine property of the finite element spaces
+(\cite{CodinaBlasco1997}-type). If the hypothesis ledger tilts at all, it tilts
+toward the ASGS analysis.
+\end{remark}
+
+\section{Recommendation for the manuscript}
+\label{sec:recommendation}
+
+Three options, in increasing order of disruption. \emph{Option 1 (recommended for
+the present submission):} keep both existing proofs exactly as they are, and add one
+short remark after the ASGS convergence theorem noting (i) that the OSGS analysis
+of the companion note follows the same architecture with the projection-adapted
+test function, (ii) the dichotomy of \cref{prop:negative,rem:symmetry}
+($\st$ sharp for ASGS, full $\sigma$ with a $(1+\Dah)^{1/2}$ constant for OSGS),
+(iii) that this dichotomy is consistent with the reaction-dominated
+observations of the numerical section, and (iv) that the jump condition is implied
+by the standing hypotheses (\cref{lem:jumpauto}), so the ASGS theorem's effective
+hypothesis set is no larger than the standing one. Cost: a paragraph. \emph{Option 2:}
+restructure the analysis section as a single parametric proof
+(\cref{rem:shared}'s table as the organizing device) with the sharp
+Damk\"ohler-free ASGS bound retained as a method-specific refinement via the jump
+condition. This is the intellectually cleanest presentation but is a
+major-revision-scale rewrite and moves the jump condition to a more prominent
+position than it currently occupies. \emph{Option 3:} unified analysis in
+supplementary material, main text unchanged. Our assessment: the unified theorem's
+value is explanatory (it certifies the mechanism behind the observed OSGS/ASGS
+differences and removes the jump condition at a quantified price), not an
+improvement of any individual estimate; that argues for Option~1 now, with
+Options~2--3 as candidates for a follow-up methods paper if the open question above
+is resolved.
+
+\begin{thebibliography}{9}
+
+\bibitem{companion}
+G.~Casas, J.~Gonz\'alez-Us\'ua, R.~Codina, I.~de-Pouplana,
+\emph{A stabilized finite element method for incompressible, inertial flows in
+inhomogeneous porous media}, companion manuscript (submitted).
+
+\bibitem{OSGSnote}
+\emph{Stability and a priori error analysis of the OSGS variant of a stabilized
+finite element method for incompressible, inertial flows in inhomogeneous porous
+media}, companion note to~\cite{companion} (working document,
+\texttt{osgs\_convergence.pdf}).
+
+\bibitem{Codina2008}
+R.~Codina,
+\emph{Analysis of a stabilized finite element approximation of the Oseen equations
+using orthogonal subscales},
+Applied Numerical Mathematics 58 (2008) 264--283.
+
+\bibitem{Codina2001}
+R.~Codina,
+\emph{A stabilized finite element method for generalized stationary incompressible
+flows},
+Computer Methods in Applied Mechanics and Engineering 190 (2001) 2681--2706.
+
+\bibitem{CodinaBlasco1997}
+R.~Codina, J.~Blasco,
+\emph{A finite element formulation for the Stokes problem allowing equal
+velocity--pressure interpolation},
+Computer Methods in Applied Mechanics and Engineering 143 (1997) 373--391.
+
+\bibitem{Chacon1998}
+T.~Chac\'on Rebollo,
+\emph{A term by term stabilization algorithm for finite element solution of
+incompressible flow problems},
+Numerische Mathematik 79 (1998) 283--319.
+
+\bibitem{BrennerScott}
+S.~C. Brenner, L.~R. Scott,
+\emph{The Mathematical Theory of Finite Element Methods},
+Springer, New York, 2008.
+
+\end{thebibliography}
+
+\end{document}
