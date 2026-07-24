@@ -38,10 +38,10 @@
 \newcommand{\Damk}{\operatorname{\mathit{Da}}}
 
 % Projection operators used in the viscous term (deviatoric/symmetric split)
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\text{DS}}}{\Pi}}
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
 
 % Stabilization-parameter shorthand
-\newcommand{\tauNS}{\tau_{1,\text{NS}}}
+\newcommand{\tauNS}{\tau_{1,\mathrm{NS}}}
 
 % Boldface field shorthands (matched to theory/paper/article.tex)
 \newcommand{\bu}{\boldsymbol{u}}
@@ -201,8 +201,8 @@ derivative. Prefer~A.
 \paragraph{Denominator $\DM^k$ --- dynamic term-magnitude envelope.}
 \begin{equation}\label{eq:DM}
   \DM^k=
-    \underbrace{\norm{\alpha\,\bu^k\!\cdot\!\grad\bu^k}}_{\text{convection}}
-    +\underbrace{\norm{2\,\divg(\alpha\nu\,\ViscProj\grad\bu^k)}}_{\text{viscous}}
+    \underbrace{\norm{\alpha\,\bu^k\!\cdot\!\grad\bu^k}}_{\mathrm{convection}}
+    +\underbrace{\norm{2\,\divg(\alpha\nu\,\ViscProj\grad\bu^k)}}_{\mathrm{viscous}}
     +\underbrace{\norm{\alpha\grad p^k}}_{\text{pressure gradient}}
     +\underbrace{\norm{\sigma(\bu^k)\,\bu^k}}_{\text{resistance (Darcy + Forchheimer)}}
     +\underbrace{\norm{\bef}}_{\text{body force}}.
@@ -233,7 +233,7 @@ derivative. Prefer~A.
     with $P_1$, $\divg(\alpha\nu\,\ViscProj\grad\bu_h)\approx0$ element-wise;
     accept the $\approx0$ contribution --- the co-dominant pressure-gradient term
     supplies the viscous scale. Do \emph{not} patch with an inverse-estimate
-    factor $C_{\text{inv}}/h$: it overestimates the viscous force on fine meshes
+    factor $C_{\mathrm{inv}}/h$: it overestimates the viscous force on fine meshes
     and makes $\epsM$ over-optimistic.
 \end{itemize}
 
@@ -378,7 +378,7 @@ directly as a relative pressure error), replace the global $\Reyn,\Damk$ by
 the same quantities already inside $\tau_1$ (paper, \texttt{eq:Tau1Final},
 \texttt{eq:TauNavierStokes}). Then
 \begin{equation}\label{eq:epsCalt}
-  \epsC^{\text{alt}}
+  \epsC^{\mathrm{alt}}
   =\frac{\big\|\,\big(h^2/(\alpha_K\tau_{1,K})\big)\,\divg(\alpha\bu^k)\,\big\|}
         {\norm{p^k}}
   \ \sim\

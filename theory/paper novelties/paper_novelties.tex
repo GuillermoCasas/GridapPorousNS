@@ -30,9 +30,9 @@
 \titleformat{\subsection}{\color{headc}\normalsize\bfseries}{}{0em}{}
 
 % ---- paper projection-operator shorthands (from the paper's shared macros) ---
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\text{DS}}}{\Pi}}
-\newcommand{\DPi}{\overset{\scriptscriptstyle{\text{D}}}{\Pi}}
-\newcommand{\SPi}{\overset{\scriptscriptstyle{\text{S}}}{\Pi}}
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
+\newcommand{\DPi}{\overset{\scriptscriptstyle{\mathrm{D}}}{\Pi}}
+\newcommand{\SPi}{\overset{\scriptscriptstyle{\mathrm{S}}}{\Pi}}
 
 % ---- reference tags -------------------------------------------------
 \newcommand{\Orig}{\textcolor{origc}{\footnotesize\textsc{orig}}}
@@ -349,7 +349,7 @@ requiring no rerun:
    {n/a (new)}
    {\appl{elemental\_matrices\_appendix.tex}{39}--41}
    {States that in the penalty variant of \S7.2 the mass component of $F$ is $\varepsilon p^{m-1}$
-    (not zero), so $\overline\phi=\varepsilon p^{m-1}-\pi_{\text{mass}}$ and the Galerkin RHS gains a
+    (not zero), so $\overline\phi=\varepsilon p^{m-1}-\pi_{\mathrm{mass}}$ and the Galerkin RHS gains a
     $(q,\varepsilon p^{m-1})$ term. Cleanly separates the general case from the penalty variant.}
 \end{itemize}
 
@@ -1065,9 +1065,9 @@ definitions, corrected limits, and recomputed numerical tables.}
    {\appl{elemental\_matrices\_appendix.tex}{28}}
    {A spurious ``)'' inside the summed operator was removed.}
 \ch{Mass-source $\overline\phi$ redefined; $\varepsilon p^{n-1}$ and $\overline U^n$ line removed}
-   {\code{eq:DefinitionOfMassSourceTerm} ($\overline\phi=-\pi_{\text{mass}}+\varepsilon p^{n-1}$)}
+   {\code{eq:DefinitionOfMassSourceTerm} ($\overline\phi=-\pi_{\mathrm{mass}}+\varepsilon p^{n-1}$)}
    {\appl{elemental\_matrices\_appendix.tex}{32}--37}
-   {General mass source now $\overline\phi=-\pi_{\text{mass}}$ (tentative $\varepsilon p^{n-1}$
+   {General mass source now $\overline\phi=-\pi_{\mathrm{mass}}$ (tentative $\varepsilon p^{n-1}$
     removed), the redundant $\overline U^n=[u^n;p^n]$ line deleted, with the penalty case moved to the
     new remark.}
 \ch{Source equation cross-reference corrected}

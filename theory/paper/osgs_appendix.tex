@@ -46,8 +46,8 @@ identity of the main text: for every $U \in \mathcal{X}_0$ with $\bu \in H^1_0(\
   \label{oa:eq:CoercivityIdentity}
   B(\ba; U, U)
   = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu \bigr\rVert^2
-  + \norm{\sigma^{1/2}\bu}^2
-  + \varepsilon\norm{p}^2 .
+  + \bigl\lVert\sigma^{1/2}\bu\bigr\rVert^2
+  + \varepsilon\bigl\lVert p\bigr\rVert^2 .
 \end{equation}
 This is \cref{eq:GalerkinCoercivityIdentity} of the main text, recalled here in the notation
 of this appendix; the derivation is given there.
@@ -170,8 +170,8 @@ In particular, with \cref{oa:eq:CoercivityIdentity},
   \label{oa:eq:Diagonal}
   B_{\mathrm{osgs}}(\ba; U_h, U_h)
   = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu_h \bigr\rVert^2
-  + \norm{\sigma^{1/2}\bu_h}^2
-  + \varepsilon\norm{p_h}^2
+  + \bigl\lVert\sigma^{1/2}\bu_h\bigr\rVert^2
+  + \varepsilon\bigl\lVert p_h\bigr\rVert^2
   + \norm{\Poneo \xi_h}_{\tau_1}^2
   + \norm{\Ptwoo \delta_h}_{\tau_2}^2,
 \end{equation}
@@ -441,7 +441,7 @@ zero by $\nu/\alpha_\infty$) proves it for $\tau_2$.
 
 \begin{lemma}[Best approximation and weighted residual approximation]
 \label{oa:lem:bestapprox}
-Let $i \in \{1,2\}$ and let $\Pi_i$ be as in \cref{oa:sec:method}. Then, for any
+Let $i \in \{1,2\}$ and let $\Pi_i$ be as in \cref{oa:sec:method}$. Then, for any
 elementwise square-integrable $z$ and any finite element function $z_h$ in the
 corresponding projection space,
 \begin{equation}
@@ -493,10 +493,10 @@ main text (\cref{eq:TripleNormOSGS}), recalled here for convenience,
   \coloneqq
   \Bigl(
   2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv \bigr\rVert^2
-  + \norm{\sigma^{1/2}\bv}^2
-  + \varepsilon\norm{q}^2
-  + \norm{\alpha X(V)}_{\tau_1}^2
-  + \norm{\nabla\cdot(\alpha\bv)}_{\tau_2}^2
+  + \bigl\lVert\sigma^{1/2}\bv\bigr\rVert^2
+  + \varepsilon\bigl\lVert q\bigr\rVert^2
+  + \bigl\lVert\alpha X(V)\bigr\rVert_{\tau_1}^2
+  + \bigl\lVert\nabla\cdot(\alpha\bv)\bigr\rVert_{\tau_2}^2
   \Bigr)^{1/2}.
 \end{equation}
 Throughout this appendix we keep the method subscripts of the main text:
@@ -535,9 +535,9 @@ of~the main text,
   \tnorm{V}_{\mathrm{S}}^2
   &= \nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv \bigr\rVert^2
   + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2}\bv \bigr\rVert_h^2
-  + \varepsilon\norm{q}^2
-  + \norm{\alpha X(V)}_{\tau_1}^2
-  + \norm{\nabla\cdot(\alpha\bv)}_{\tau_2}^2,
+  + \varepsilon\bigl\lVert q\bigr\rVert^2
+  + \bigl\lVert\alpha X(V)\bigr\rVert_{\tau_1}^2
+  + \bigl\lVert\nabla\cdot(\alpha\bv)\bigr\rVert_{\tau_2}^2,
   \qquad \\
   \widetilde{\sigma}_\alpha
   &= \frac{\tns^{-1}\sigma}{\tns^{-1} + \sigma/\alpha_K}.

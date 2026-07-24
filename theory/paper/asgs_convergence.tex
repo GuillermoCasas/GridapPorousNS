@@ -131,14 +131,16 @@ so that $\tau_{1,K} = \bigl(\varphi_{1,K}+\sigma\bigr)^{-1}$, and
 \end{equation}
 We will drop the element subscript ($\tau_1$, $\tau_2$, $\varphi_1$, $\alpha_K$, $h$,
 $|\ba|_\infty$) whenever the elementwise character is clear from the context. The working
-norm of the main text is
+norm of the main text (the $\triplenorm{\cdot}_{\mathrm{S}}$ of \cref{lemma:Stability}), written
+here in the expanded form via the identity $\norm{f}_{\tau_i}=\lVert\tau_i^{1/2}f\rVert_h$ of
+\cref{eq:TauWeightedProduct}, is
 \begin{equation}\label{eq:triplenorm}
 \begin{aligned}
   \triplenorm{V_h}
   \coloneqq \Bigl(
   &\nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bvh\bigr\rVert^2
   + \bigl\lVert\sigmatilde^{1/2}\bvh\bigr\rVert_h^2
-  + \varepsilon\norm{q_h}^2 \\
+  + \varepsilon\bigl\lVert q_h \bigr\rVert^2 \\
   &+ \bigl\lVert\tau_1^{1/2}\alpha\X(V_h)\bigr\rVert_h^2
   + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bvh)\bigr\rVert_h^2
   \Bigr)^{1/2}.
@@ -146,7 +148,31 @@ norm of the main text is
 \end{equation}
 The viscous term already makes $\triplenorm{\cdot}$ a norm: under homogeneous Dirichlet data
 the deviatoric{\hyp}symmetric projection controls the full velocity gradient, by an elementary
-identity rather than a Korn inequality.
+identity, and the Poincaré inequality then controls the velocity $L^2$ norm, which in turn controls
+the pressure gradient through $\alpha\X(V_h)$ and fixes the pressure up to a constant, which
+the penalty parameter $\varepsilon>0$ (or the zero-mean constraint when $\varepsilon=0$) uniquely fixes.
+
+\subsubsection{Proof of coercivity (\cref{lemma:Stability})}\label{sec:proof-stability}
+We now prove the coercivity result stated in \cref{lemma:Stability} of the main text.
+Taking $V_h=U_h$ in $\BS(\ba;U_h,U_h)$, the Galerkin term reduces to
+$2\nu\norm{\alpha^{1/2}\ViscProj\nabla\buh}^2+\norm{\sigma^{1/2}\buh}^2+\varepsilon\bigl\lVert p_h \bigr\rVert^2$
+by skew-symmetry of the convection term and cancellation of the pressure-divergence pair.
+Expanding the stabilization terms yields the residual and divergence squares, a negative
+viscous residual square absorbed by the inverse estimate, a reaction square renormalizing
+$\sigma$ to the damped weight $\sigmatilde$, and a viscous-reaction cross term bounded by Young's
+inequality. Collecting all terms gives
+\begin{equation}\label{eq:coerccollect-lemma}
+\begin{aligned}
+  \BS(\ba;U_h,U_h)
+  \ \ge\ &\Bigl(2\bigl(1-\tfrac{2}{\eta}\bigr)-\tfrac{4\Cinva^2}{c_1}\Bigr)\,
+  \nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\buh\bigr\rVert^2
+  + \Bigl(1-\tfrac{\eta\Cinva^2}{c_1}\Bigr)\bigl\lVert\sigmatilde^{1/2}\buh\bigr\rVert_h^2 \\
+  &+ (1-C_2)\,\varepsilon\bigl\lVert p_h \bigr\rVert^2
+  + \bigl\lVert\tau_1^{1/2}\alpha\X(U_h)\bigr\rVert_h^2
+  + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\buh)\bigr\rVert_h^2 .
+\end{aligned}
+\end{equation}
+
 \begin{lemma}[Definiteness of the working norm]\label{lem:definiteness}
 For every $\bv\in H^1_0(\Omega)^d$,
 \begin{equation}\label{eq:devsymidentity}
@@ -177,7 +203,7 @@ that may depend on $d$, on the polynomial degrees, on the shape regularity of th
 family, on the algorithmic constants $c_1,c_2$ and on the constants
 $C_{\nabla\alpha},C_2,c_J,c_J'$ of the standing assumptions, but \emph{not} on the mesh size,
 nor on $\nu,\sigma,\varepsilon,\ba$ or $\alpha$. The analysis is carried out under the
-standing assumptions of \cref{sec:StabilityASGS}: the coefficients \cref{H:data} (with
+standing assumptions of \cref{sec:CommonSetting}: the coefficients \cref{H:data} (with
 $\varepsilon$ obeying \cref{eq:UpperBoundOnEpsilon}), the porosity resolution \cref{H:porosity}
 (condition \cref{eq:resolved}, with $\delta_\alpha\coloneqq 1+C_{\nabla\alpha}$ and
 $\alpha_{0,K}\le\alpha_K\le\delta_\alpha\,\alpha_{0,K}$), the advection \cref{H:advection}
@@ -191,6 +217,16 @@ $\varphi_{1,K}\coloneqq\alpha_K\tau_{1,\mathrm{NS}}^{-1}$ of \cref{eq:phi1}); we
 where it is first used.
 
 \subsection{Auxiliary results}\label{sec:auxiliary}
+
+We repeatedly use the standard inverse estimate: on a non{\hyp}degenerate mesh family there is a
+constant $\Cinv$, independent of the mesh size, such that for every $\psi_h$ in a
+finite{\hyp}dimensional subspace of $H^l(K)$,
+\begin{equation}
+    \|\psi_h \|_{W^l_p(K)} \le \Cinv\, h^{l-m + d/p - d/q}\, \| \psi_h \|_{W^m_q(K)},
+    \label{eq:InverseEstimateFiniteOrderNorm}
+\end{equation}
+valid for $0 \le m \le l$ and $1\le p,q \le \infty$ (see, e.g.,~\cite{brenner2008mathematical}); we
+use it in both its gradient and its $L^\infty$ forms.
 
 \begin{lemma}[Parameter inequalities]\label{lem:parameters}
 On each element $K$ (subscripts omitted) there hold:
@@ -315,18 +351,17 @@ $\alpha\le\alpha_K$, $|\ba|\le|\ba|_{\infty,K}$ and \eqref{eq:InverseEstimateFin
 \end{proof}
 
 \begin{remark}\label{rem:winvconst}
-\Cref{lem:winv} makes precise the inverse estimates used in the stability proof of the
-main text for the $\alpha$-weighted second-order term: since $\alpha$ is \emph{not}
-piecewise polynomial, the constant is not the bare $\Cinv$ but the slightly larger
+\Cref{lem:winv} makes precise the inverse estimates used in the stability proof for the
+$\alpha$-weighted second-order term $\nabla\cdot(\alpha\nu\ViscProj\nabla\buh)$: since
+$\alpha$ is \emph{not} piecewise polynomial, \cref{eq:InverseEstimateFiniteOrderNorm} does not
+apply to it directly, and the relevant constant is not the bare $\Cinv$ but the slightly larger
 $\Cinva$, which incorporates the porosity-resolution constant $C_{\nabla\alpha}$ of
-\eqref{eq:resolved}. \amend{This is the constant that the main text already denotes by
-$\Cinv$: the remark following \cref{eq:InverseEstimateFiniteOrderNorm} there introduces the
-enlarged constant and then, by an explicit abuse of notation, keeps the symbol $\Cinv$ for
-it. The conditions on $c_1$ in the main text---in particular
-\cref{eq:conditions_on_num_param} and the hypothesis of \cref{lemma:Stability}---are
-therefore to be read with the enlarged constant already in place, and require no further
-substitution. We write $\Cinva$ explicitly throughout this appendix only to keep the two
-constants distinguishable within the proofs.}
+\eqref{eq:resolved}. \amend{The main text writes $\Cinv$ for this enlarged constant, by an
+explicit abuse of notation; its conditions on $c_1$---in particular
+\cref{eq:conditions_on_num_param} and the coercivity condition \cref{H:coercivity} of
+\cref{lemma:Stability}---are therefore to be read with the enlarged constant already in place,
+and require no further substitution. We write $\Cinva$ explicitly throughout this appendix
+only to keep the two constants distinguishable within the proofs.}
 \end{remark}
 
 \begin{lemma}[Jump of $\tau_1$]\label{lem:jump}
@@ -689,13 +724,13 @@ while \eqref{eq:elemibp} applied to the convective part of $T_{11}$ gives
 \end{equation*}
 Adding $R=\sigma(\tau_1\bu,\alpha\nabla q)_h$ and collecting terms,
 \begin{align}
-  N ={}& \underbrace{-\sigma\bigl(\tau_1\bv,\alpha\nabla p\bigr)_h}_{\textup{[I]}}
-  \;+\; \underbrace{\sigma\bigl(\tau_1\bu,\alpha\X(V)\bigr)_h}_{\textup{[II]}}
+  N ={}& \underbrace{-\sigma\bigl(\tau_1\bv,\alpha\nabla p\bigr)_h}_{\mathrm{[I]}}
+  \;+\; \underbrace{\sigma\bigl(\tau_1\bu,\alpha\X(V)\bigr)_h}_{\mathrm{[II]}}
   \;\underbrace{-\,\sigma\sum_{K}\tau_{1,K}\int_{\partial K}
-  \alpha(\bn_K\cdot\ba)(\bu\cdot\bv)\dd\Gamma}_{\textup{[III]}}
+  \alpha(\bn_K\cdot\ba)(\bu\cdot\bv)\dd\Gamma}_{\mathrm{[III]}}
   \nonumber\\
-  &\;\underbrace{-\,\bigl(p,\nabla\cdot(\alpha\bv)\bigr)}_{\textup{[IV]}}
-  \;\underbrace{-\,\bigl(\bu,\alpha\X(V)\bigr)}_{\textup{[V]}} ,
+  &\;\underbrace{-\,\bigl(p,\nabla\cdot(\alpha\bv)\bigr)}_{\mathrm{[IV]}}
+  \;\underbrace{-\,\bigl(\bu,\alpha\X(V)\bigr)}_{\mathrm{[V]}} ,
   \label{eq:fiveterms}
 \end{align}
 which is the porous counterpart of Eq.~(66) of~\cite{codina2001stabilized}. (Note that the

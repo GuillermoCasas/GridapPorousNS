@@ -14,11 +14,11 @@ This appendix records, term by term, the matrix operations sketched in \cref{sec
 Throughout, $\boldsymbol{k}_0$ denotes the dimensionless, $h$-normalized wavenumber, so that a spatial derivative becomes $\partial_i \mapsto \mathrm{i}\,k_{0,i}/h$ under the Fourier transform, with $\alpha$, $\nu$ and $\nabla\alpha$ treated as locally constant (slowly varying over the element). We write $n=d+1$ for the number of unknown fields and order the components as $[\boldsymbol{u};p]$.
 
 \subsection{Splitting of the symbol}\label{sec:ftSplit}
-Recall the operator \cref{eq:CDR_equation} and its matrices \cref{eq:matrices_stationary_strong_problem}. For the design it is convenient to split the first-order part $\mathbf{A}_{\text{c},i}+\mathbf{A}_{\text{f},i}$ into a purely \emph{convective} block and a symmetric \emph{pressure-gradient/divergence} coupling,
+Recall the operator \cref{eq:CDR_equation} and its matrices \cref{eq:matrices_stationary_strong_problem}. For the design it is convenient to split the first-order part $\mathbf{A}_{\mathrm{c},i}+\mathbf{A}_{\mathrm{f},i}$ into a purely \emph{convective} block and a symmetric \emph{pressure-gradient/divergence} coupling,
 \begin{equation}\label{eq:ftSplit}
-  \mathbf{A}_{\text{c},i}(\boldsymbol{w}) + \mathbf{A}_{\text{f},i}
-   = \underbrace{\alpha\,\diag(w_i,\dots,w_i,0)}_{\textstyle \mathbf{A}_{\text{v},i}}
-   \; + \; \underbrace{\alpha\bigl(\boldsymbol{e}_i\boldsymbol{e}_{n}^{\top}+\boldsymbol{e}_{n}\boldsymbol{e}_i^{\top}\bigr)}_{\textstyle \mathbf{A}_{\text{b},i}},
+  \mathbf{A}_{\mathrm{c},i}(\boldsymbol{w}) + \mathbf{A}_{\mathrm{f},i}
+   = \underbrace{\alpha\,\diag(w_i,\dots,w_i,0)}_{\textstyle \mathbf{A}_{\mathrm{v},i}}
+   \; + \; \underbrace{\alpha\bigl(\boldsymbol{e}_i\boldsymbol{e}_{n}^{\top}+\boldsymbol{e}_{n}\boldsymbol{e}_i^{\top}\bigr)}_{\textstyle \mathbf{A}_{\mathrm{b},i}},
 \end{equation}
 where $\boldsymbol{e}_m$ is the $m$-th canonical vector of $\mathbb{R}^n$. Likewise the zeroth-order matrix splits as $\mathbf{S}=\mathbf{S}_\sigma+\mathbf{S}_{\nabla\alpha}$ exactly as in \cref{sec:StabilizationDesign}. The full symbol is then the sum of five contributions,
 \begin{equation}\label{eq:ftSymbolSplit}
@@ -55,10 +55,10 @@ so that the longitudinal eigenvalue is $\tfrac43\,\alpha\nu|\boldsymbol{k}_0|^2/
 This is the first row of \cref{eq:StabilizationParameters}. The squared wavenumber is what makes the identification $c_1\coloneqq|\boldsymbol{k}_0|^2$ consistent downstream.
 
 \subsection{Convective term}\label{sec:ftConvective}
-The convective block $\mathbf{A}_{\text{v},i}$ is first order, so
+The convective block $\mathbf{A}_{\mathrm{v},i}$ is first order, so
 \begin{equation}\label{eq:ftConvSymbol}
   \widehat{\mathcal{L}}_{c}(\boldsymbol{k}_0)
-  = \mathrm{i}\,\frac{k_{0,i}}{h}\,\mathbf{A}_{\text{v},i}
+  = \mathrm{i}\,\frac{k_{0,i}}{h}\,\mathbf{A}_{\mathrm{v},i}
   = \mathrm{i}\,\frac{\alpha}{h}\,(\boldsymbol{w}\cdot\boldsymbol{k}_0)\,\diag(\mathbb{I}_d,0),
 \end{equation}
 a multiple of the identity on the velocity block with eigenvalue $\mathrm{i}\,\alpha(\boldsymbol{w}\cdot\boldsymbol{k}_0)/h$. Its spectral radius is the modulus
@@ -68,10 +68,10 @@ a multiple of the identity on the velocity block with eigenvalue $\mathrm{i}\,\a
 the absolute value being intrinsic to a spectral radius.
 
 \subsection{Pressure-gradient/divergence coupling}\label{sec:ftCoupling}
-The block $\mathbf{A}_{\text{b},i}$ couples the $i$-th velocity component to the pressure, and its symbol is the off-diagonal matrix
+The block $\mathbf{A}_{\mathrm{b},i}$ couples the $i$-th velocity component to the pressure, and its symbol is the off-diagonal matrix
 \begin{equation}\label{eq:ftBSymbol}
   \widehat{\mathcal{L}}_{b}(\boldsymbol{k}_0)
-  = \mathrm{i}\,\frac{k_{0,i}}{h}\,\mathbf{A}_{\text{b},i}
+  = \mathrm{i}\,\frac{k_{0,i}}{h}\,\mathbf{A}_{\mathrm{b},i}
   = \mathrm{i}\,\frac{\alpha}{h}
     \begin{bmatrix} \mathbf{0} & \boldsymbol{k}_0 \\[2pt] \boldsymbol{k}_0^{\top} & 0 \end{bmatrix}.
 \end{equation}
@@ -104,20 +104,20 @@ Equations \cref{eq:ftTauNu,eq:ftTauC,eq:ftTauB,eq:ftTauSigma,eq:ftTauGradA} are 
 \subsection{Assembly and recovery of \texorpdfstring{$\tau_1$, $\tau_2$}{tau1, tau2}}\label{sec:ftAssembly}
 Summing the five contributions componentwise, $\boldsymbol{\tau}_K^{-1}=\sum_\bullet\boldsymbol{\tau}_\bullet^{-1}$, and choosing
 \begin{equation}\label{eq:ftLambda}
-  \lambda = \frac{h^2}{|\boldsymbol{k}_0|^2\,\tau_{1,\text{NS}}^2},
+  \lambda = \frac{h^2}{|\boldsymbol{k}_0|^2\,\tau_{1,\mathrm{NS}}^2},
   \qquad\text{so that}\qquad
-  \sqrt{\lambda} = \frac{h}{|\boldsymbol{k}_0|\,\tau_{1,\text{NS}}},
+  \sqrt{\lambda} = \frac{h}{|\boldsymbol{k}_0|\,\tau_{1,\mathrm{NS}}},
 \end{equation}
-the coupling and porosity-gradient entries become $\tau_{b,1}^{-1}=\alpha/\tau_{1,\text{NS}}$, $\tau_{b,2}^{-1}=c_1\,\alpha\,\tau_{1,\text{NS}}/h^2$ and $\tau_{\nabla\alpha,1}^{-1}=(h/|\boldsymbol{k}_0|)\,|\nabla\alpha|\,\tau_{1,\text{NS}}^{-1}$, with $c_1=|\boldsymbol{k}_0|^2$. For the \emph{momentum} eigenvalue, the viscous and convective entries collapse onto $\alpha\,\tau_{1,\text{NS}}^{-1}$ (ignoring the coefficient $\tfrac43$ of $\tau_{\nu,1}^{-1}$, as is done below \cref{eq:StabilizationParameters}, and writing $c_2=|\boldsymbol{k}_0\cos\phi|$ so that $c_2|\boldsymbol{w}|=|\boldsymbol{w}\cdot\boldsymbol{k}_0|$, cf.\ \cref{eq:TauNavierStokes}); the $\tau_{b,1}^{-1}$ entry coincides with this same momentum scale and is therefore the self-referential contribution absorbed into the algorithmic constants (the cancellation noted after \cref{eq:StabilizationParameters}). Adding the porosity-gradient and reaction entries gives
+the coupling and porosity-gradient entries become $\tau_{b,1}^{-1}=\alpha/\tau_{1,\mathrm{NS}}$, $\tau_{b,2}^{-1}=c_1\,\alpha\,\tau_{1,\mathrm{NS}}/h^2$ and $\tau_{\nabla\alpha,1}^{-1}=(h/|\boldsymbol{k}_0|)\,|\nabla\alpha|\,\tau_{1,\mathrm{NS}}^{-1}$, with $c_1=|\boldsymbol{k}_0|^2$. For the \emph{momentum} eigenvalue, the viscous and convective entries collapse onto $\alpha\,\tau_{1,\mathrm{NS}}^{-1}$ (ignoring the coefficient $\tfrac43$ of $\tau_{\nu,1}^{-1}$, as is done below \cref{eq:StabilizationParameters}, and writing $c_2=|\boldsymbol{k}_0\cos\phi|$ so that $c_2|\boldsymbol{w}|=|\boldsymbol{w}\cdot\boldsymbol{k}_0|$, cf.\ \cref{eq:TauNavierStokes}); the $\tau_{b,1}^{-1}$ entry coincides with this same momentum scale and is therefore the self-referential contribution absorbed into the algorithmic constants (the cancellation noted after \cref{eq:StabilizationParameters}). Adding the porosity-gradient and reaction entries gives
 \begin{equation}\label{eq:ftTau1}
   \tau_1^{-1}
-   = \Bigl(\alpha + \tfrac{h}{|\boldsymbol{k}_0|}|\nabla\alpha|\Bigr)\tau_{1,\text{NS}}^{-1} + \rho_{\Lambda^{-1}}(\boldsymbol{\sigma})
-   = C_\alpha\,\tau_{1,\text{NS}}^{-1} + \rho_{\Lambda^{-1}}(\boldsymbol{\sigma}),
+   = \Bigl(\alpha + \tfrac{h}{|\boldsymbol{k}_0|}|\nabla\alpha|\Bigr)\tau_{1,\mathrm{NS}}^{-1} + \rho_{\Lambda^{-1}}(\boldsymbol{\sigma})
+   = C_\alpha\,\tau_{1,\mathrm{NS}}^{-1} + \rho_{\Lambda^{-1}}(\boldsymbol{\sigma}),
 \end{equation}
 which is \cref{eq:Tau1} with $C_\alpha$ as in \cref{eq:CAlpha}. For the \emph{mass} eigenvalue, only the coupling and the compressibility survive,
 \begin{equation}\label{eq:ftTau2}
-  \tau_2^{-1} = \tau_{b,2}^{-1} + \tau_{\sigma,2}^{-1} = \frac{c_1\,\alpha\,\tau_{1,\text{NS}}}{h^2} + \varepsilon
+  \tau_2^{-1} = \tau_{b,2}^{-1} + \tau_{\sigma,2}^{-1} = \frac{c_1\,\alpha\,\tau_{1,\mathrm{NS}}}{h^2} + \varepsilon
   \quad\Longrightarrow\quad
-  \tau_2 = \frac{h^2}{c_1\,\alpha\,\tau_{1,\text{NS}} + \varepsilon\,h^2},
+  \tau_2 = \frac{h^2}{c_1\,\alpha\,\tau_{1,\mathrm{NS}} + \varepsilon\,h^2},
 \end{equation}
 which is \cref{eq:Tau2}. This closes the derivation of the simplified parameters from the Fourier symbols.

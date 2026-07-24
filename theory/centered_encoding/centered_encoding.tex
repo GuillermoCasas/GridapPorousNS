@@ -309,7 +309,7 @@ The centered encoding of Section~2 spends the $U$ degree of freedom and
 hardcodes $L = 1$ because the manufactured shape
 $\sin(\pi x)$ was wired to a unit period. Generalising the polynomial
 to $\sin(\pi x / L)$ and coupling the domain to $L$ (so the dimensionless
-mesh ratio $h_{\text{dim}} = h / L = 1/N$ and the similarity analysis
+mesh ratio $h_{\mathrm{dim}} = h / L = 1/N$ and the similarity analysis
 remain intact under any choice of $L$) unlocks the second degree of
 freedom.
 
@@ -520,7 +520,7 @@ over all 24 cells are:
 \begin{center}
 \begin{tabular}{lrl}
   \toprule
-  Encoding & $\max_{\text{cells}} M$ & Worst-case cells \\
+  Encoding & $\max_{\mathrm{cells}} M$ & Worst-case cells \\
   \midrule
   Default ($U = L = 1$)             & 12  & C3, C7, C12, C16, C23 \\
   Centered ($L = 1$)                & 9   & C3, C7, C12, C16, C23 \\
@@ -563,7 +563,7 @@ so legacy probes that pre-date the generalisation continue to compile.
 \paragraph{\texttt{test/extended/ManufacturedSolutions/run\_test.jl}.}
 A new helper
 \code{compute\_L\_and\_U(strategy, Re, Da, alpha\_infty)}
-returns the pair $(L, U_{\text{amp}})$ for the four named strategies
+returns the pair $(L, U_{\mathrm{amp}})$ for the four named strategies
 \code{"centered"} (default — $L = 1$, $U = \mathrm{Re}/\sqrt{\alpha_\infty \mathrm{Da}}$),
 \code{"balanced"} ($L = \sqrt{\alpha_\infty \mathrm{Da}}$,
 same $U$),
@@ -583,7 +583,7 @@ seconds of wall-clock per sweep, negligible against solve time.
 accepts $L$ and constructs \code{SmoothRadialPorosity} with
 $L \cdot r_1$ and $L \cdot r_2$. The homotopy perturbation
 \code{h\_raw\_func} is rescaled with $k = \pi/L$ on the polynomial
-frequencies and with $1/L^8$ on the boundary bubble $B_{\text{fn}}$,
+frequencies and with $1/L^8$ on the boundary bubble $B_{\mathrm{fn}}$,
 so $\|h\|_{L^2(\Omega)}$ stays $O(L^{d/2})$ matching the manufactured
 solution.
 
@@ -591,12 +591,12 @@ solution.
 key check that the dimensionless physics is genuinely the same across
 encodings:
 \begin{itemize}
-\item $\mathrm{Re}_{\text{check}} = U \cdot L / \nu = U L / (UL/\mathrm{Re}) = \mathrm{Re}$
+\item $\mathrm{Re}_{\mathrm{check}} = U \cdot L / \nu = U L / (UL/\mathrm{Re}) = \mathrm{Re}$
       — preserved algebraically.
-\item $\mathrm{Da}_{\text{check}} = \alpha_\infty \sigma L^2 / \nu
+\item $\mathrm{Da}_{\mathrm{check}} = \alpha_\infty \sigma L^2 / \nu
       = \alpha_\infty (\alpha_\infty \mathrm{Da} \nu / L^2) L^2 / (\alpha_\infty \nu) = \mathrm{Da}$
       — preserved.
-\item $u_{ex}(L\hat{x}) / U_{\text{amp}} = \alpha_0 / \alpha(L\hat{x}) \cdot \hat{S}(\hat{x})$.
+\item $u_{ex}(L\hat{x}) / U_{\mathrm{amp}} = \alpha_0 / \alpha(L\hat{x}) \cdot \hat{S}(\hat{x})$.
       For this ratio to be $L$-invariant, $\alpha(L\hat{x})$ as a
       function of $\hat{x}$ must equal $\alpha(\hat{x})$ at $L=1$.
       Writing $\tilde{r}_i = L \cdot r_i$ for the L-scaled radii stored
@@ -620,7 +620,7 @@ encodings:
       is encoding-invariant.
 \item The grid Reynolds number $\mathrm{Re}_h = U h / \nu
       = (U L / \nu) \cdot (h/L) = \mathrm{Re} / N$ — independent of $L$.
-      Stabilisation $\tau_{\text{NS}}$ at the same $N$ should therefore have
+      Stabilisation $\tau_{\mathrm{NS}}$ at the same $N$ should therefore have
       the same dimensionless value across encodings.
 \end{itemize}
 
@@ -662,15 +662,15 @@ Da$=10^{6}$, $\alpha_0=1$, OSGS) was the empirical motivation: under the
 centered encoding, the $L^2_u$ slope at the finest mesh pair drops from
 $2.04$ at $N=80 \to 160$ to $0.84$ at $N=160 \to 320$ — a stall
 attributed in Section~4 to the solution-scale precision floor at
-$U_{\text{amp}} = 10^{-9}$. Running the same cell at
-\code{encoding\_strategy = "minmax"} (which gives $U_{\text{amp}} =
+$U_{\mathrm{amp}} = 10^{-9}$. Running the same cell at
+\code{encoding\_strategy = "minmax"} (which gives $U_{\mathrm{amp}} =
 10^{-4.5}$, $L = 10^3$, $\nu = \sigma = 10^{4.5}$) yields the
 complementary trajectory:
 
 \begin{center}
 \begin{tabular}{lrr}
   \toprule
-  $N_{\text{coarse}} \to N_{\text{fine}}$ & Centered slope & Minmax slope \\
+  $N_{\mathrm{coarse}} \to N_{\mathrm{fine}}$ & Centered slope & Minmax slope \\
   \midrule
   $10 \to 20$   & $1.96$ & $0.94$ \\
   $20 \to 40$   & $1.98$ & $1.28$ \\
@@ -699,7 +699,7 @@ The continuous dimensionless problem
   = \hat{f}
   \label{eq:dimless-ns}
 \end{equation}
-is invariant under the choice of $(U_{\text{amp}}, L)$ — both encodings
+is invariant under the choice of $(U_{\mathrm{amp}}, L)$ — both encodings
 discretise the same equation, and the algebraic similarity invariants
 of §\ref{sec:varL-impl} (Re, Da, $\alpha$ at corresponding positions,
 $\nabla\alpha$ scaling, grid Reynolds $\mathrm{Re}_h = \mathrm{Re}/N$)
@@ -746,7 +746,7 @@ magnitudes change with the encoding; three plausible sites:
       $\tau_1^{-1} = \alpha\,c_1 \nu / h^2 + \alpha\,c_2 |u|/h + \sigma$
       (with $c_1 = 4k^4$, $c_2 = 2k^2$; note the reaction $\sigma$ enters
       $\tau_1$ directly, \emph{not} the Navier--Stokes parameter
-      $\tau_{\text{NS}} = (c_1 \nu / h^2 + c_2 |u|/h)^{-1}$, which carries no
+      $\tau_{\mathrm{NS}} = (c_1 \nu / h^2 + c_2 |u|/h)^{-1}$, which carries no
       reaction term) contains summands that scale unequally per encoding.
       For C7 at $N=10$ the diffusion summand and the reaction summand
       $\sigma$ sit four orders apart:
@@ -771,7 +771,7 @@ floating-point floors and the dimensionless slopes converge to the
 $h^{k+1}$ optimum in \emph{both} encodings. At coarse $N$ and at the
 mesh where the corresponding floor is binding, encoding-dependent
 deviations show: centered fails first at solution-scale (C7 at $N=320$
-where $U_{\text{amp}} h^{k+1} \sim \varepsilon_{\text{mach}}$); minmax
+where $U_{\mathrm{amp}} h^{k+1} \sim \varepsilon_{\mathrm{mach}}$); minmax
 fails first at operator-scale (the same cell at coarse $N$ where
 $\sigma h^2 \sim$ summand-cancellation noise). The full sweep of the
 24~cells shows the bulk of cells lying away from either floor for both

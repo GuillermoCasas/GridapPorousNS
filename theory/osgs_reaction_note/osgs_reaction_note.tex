@@ -27,13 +27,13 @@
 \newcommand{\Damk}{\operatorname{\mathit{Da}}}
 
 % Projection operators used in the viscous term (deviatoric/symmetric split)
-\newcommand{\DPi}{\overset{\scriptscriptstyle{\text{D}}}{\Pi}}
-\newcommand{\SPi}{\overset{\scriptscriptstyle{\text{S}}}{\Pi}}
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\text{DS}}}{\Pi}}
+\newcommand{\DPi}{\overset{\scriptscriptstyle{\mathrm{D}}}{\Pi}}
+\newcommand{\SPi}{\overset{\scriptscriptstyle{\mathrm{S}}}{\Pi}}
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
 
 % Triple norm
-\newcommand{\triplenorm}[1]{{\left\vert\kern-0.25ex\left\vert\kern-0.25ex\left\vert #1
-\right\vert\kern-0.25ex\right\vert\kern-0.25ex\right\vert}}
+\newcommand{\triplenorm}[1]{{\lvert\kern-0.25ex\lvert\kern-0.25ex\lvert #1
+\rvert\kern-0.25ex\rvert\kern-0.25ex\rvert}}
 
 % Inner-product / duality pairings (simplified, comma-separated arguments)
 \newcommand{\innerprod}[1]{\left(#1\right)}
@@ -58,9 +58,9 @@
 \newcommand{\Pio}{\Pi_{\boldsymbol{\tau}h}}            % FE projection in the tau-inner product
 \newcommand{\Porth}{\widetilde{\Pi}}                  % subscale-space projection
 \newcommand{\siga}{\widetilde{\sigma}_\alpha}
-\newcommand{\tauNS}{\tau_{1,\text{NS}}}
-\newcommand{\normh}[1]{\left\Vert #1\right\Vert_h}
-\newcommand{\norm}[1]{\left\Vert #1\right\Vert}
+\newcommand{\tauNS}{\tau_{1,\mathrm{NS}}}
+\newcommand{\normh}[1]{\lVert #1\rVert_h}
+\newcommand{\norm}[1]{\lVert #1\rVert}
 
 \title{Reactive coercivity in the reaction-dominated limit: \\[2pt]
 the constant-$\sigma$ annihilation favours the orthogonal subscales}
@@ -99,7 +99,7 @@ the mesh. Writing $\Uh=[\uh;\ph]\in\Xh$ for the finite element unknowns, both
 methods of interest share the single stabilized bilinear form
 %
 \begin{equation}\label{eq:BS}
-  B_\text{S}(\boldsymbol{a},\Uh,\Vh)
+  B_\mathrm{S}(\boldsymbol{a},\Uh,\Vh)
   = B(\boldsymbol{a},\Uh,\Vh)
   - \sum_{K\in\Th}\dualpairing{\mathcal{L}^*\Vh,\ \boldsymbol{\tau}_K\,\Porth\!\left[\mathcal{L}\Uh\right]}_K ,
 \end{equation}
@@ -121,9 +121,9 @@ formal adjoint; in the reaction-dominated regime the only piece of either operat
 that survives is the zeroth-order (reactive) one, so that
 %
 \begin{equation}\label{eq:reactive-part}
-  \mathcal{L}\Uh\big|_{\text{react}} = \sigma\uh,
+  \mathcal{L}\Uh\big|_{\mathrm{react}} = \sigma\uh,
   \qquad
-  \mathcal{L}^*\Vh\big|_{\text{react}} = \sigma\boldsymbol{v}_h .
+  \mathcal{L}^*\Vh\big|_{\mathrm{react}} = \sigma\boldsymbol{v}_h .
 \end{equation}
 %
 Recall the stabilization parameter and the reactive control quantity of the
@@ -155,7 +155,7 @@ Testing \cref{eq:BS} with $\Vh=\Uh$ and $\Porth=\mathcal{I}$ reproduces the
 manuscript's identity
 %
 \begin{align}\label{eq:ASGS-expand}
-  B_\text{S}(\boldsymbol{a},\Uh,\Uh)
+  B_\mathrm{S}(\boldsymbol{a},\Uh,\Uh)
   &= 2\nu\big\|\alpha^{1/2}\ViscProj\nabla\uh\big\|^2
    + \big\|\sigma^{1/2}\uh\big\|^2
    + \varepsilon\big\|\ph\big\|^2 \notag\\
@@ -179,13 +179,13 @@ square---a drain that the stabilization subtracts from the Galerkin reaction:
 \end{equation}
 %
 After the cross term is absorbed with Young's inequality and the inverse estimate
-$\|\nabla\!\cdot(\alpha\ViscProj\nabla\uh)\|_K\le C_\text{inv}h^{-1}
+$\|\nabla\!\cdot(\alpha\ViscProj\nabla\uh)\|_K\le C_\mathrm{inv}h^{-1}
 \|\alpha^{1/2}\ViscProj\nabla\uh\|_K$~\cite{brenner2008mathematical}, the surviving
 coefficient of $\|\uh\|_K^2$ is controlled from below by $C\,\siga$, giving the
 manuscript's bound
 %
 \begin{equation}\label{eq:ASGS-lemma}
-  B_\text{S}(\boldsymbol{a},\Uh,\Uh)\ \ge\ C\,\triplenorm{\Uh}^2,
+  B_\mathrm{S}(\boldsymbol{a},\Uh,\Uh)\ \ge\ C\,\triplenorm{\Uh}^2,
   \qquad
   \triplenorm{\Uh}^2
   = \nu\big\|\alpha^{1/2}\ViscProj\nabla\uh\big\|^2
@@ -247,7 +247,7 @@ the drained $\siga<\sigma$ that ASGS is left with. Collecting this:
 \begin{proposition}[Reactive coercivity gap, in favour of OSGS]\label{prop:gap}
 Under the constant-coefficient assumptions above, the largest coefficient
 $c_{\uh}$ for which an estimate of the form
-$B_\text{S}(\boldsymbol{a},\Uh,\Uh)\ge c_{\uh}\,\|\uh\|^2+(\text{other nonnegative terms})$
+$B_\mathrm{S}(\boldsymbol{a},\Uh,\Uh)\ge c_{\uh}\,\|\uh\|^2+(\text{other nonnegative terms})$
 is provable from \cref{eq:BS} satisfies, as $\Damk_h\to\infty$,
 \begin{equation}\label{eq:gap}
   c_{\uh}^{\,\mathrm{ASGS}}\sim C\,\siga\sim\alpha_K(1+\Reyn_h)\frac{\nu}{h^2},
@@ -294,8 +294,8 @@ which projection of it enters \cref{eq:BS}. The interpolation-error right-hand s
 of the convergence theorem is therefore identical for both methods, and the
 estimate
 $
-  \triplenorm{E_h}\lesssim\sum_K h_K^{-1}\big(\tau_{2,K}^{1/2}\mathrm{E}_{\text{int},K}(\boldsymbol{u})
-  +\tau_{1,K}^{1/2}\mathrm{E}_{\text{int},K}(p)\big)
+  \triplenorm{E_h}\lesssim\sum_K h_K^{-1}\big(\tau_{2,K}^{1/2}\mathrm{E}_{\mathrm{int},K}(\boldsymbol{u})
+  +\tau_{1,K}^{1/2}\mathrm{E}_{\mathrm{int},K}(p)\big)
 $
 holds in the (smaller) OSGS norm with the same order.
 
