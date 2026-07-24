@@ -109,13 +109,11 @@
   \sbox\accentbox{$#2$}#1{\usebox\accentbox}}
 % Use the following commands to replace AAAAAA by BBBB
 % like this: \Guillermo{BBBB\sout{AAAAAA}}
-\newcommand\Guillermo[1]{\textcolor{red}{#1}}
-\newcommand\Joaquin[1]{\textcolor{blue}{#1}}
+\newcommand\Guillermo[1]{#1}
+\newcommand\Joaquin[1]{#1}
 % Review markup for the 2026 amendment pass (math/prose corrections).
-% Distinct dark violet so it is not confused with the author annotations
-% above (red/blue). To flatten/accept all corrections, redefine as {#1}.
-\definecolor{amendcolor}{rgb}{0.58, 0.0, 0.83}
-\newcommand{\amend}[1]{\textcolor{amendcolor}{#1}}
+% Flattened: render as standard text without color.
+\newcommand{\amend}[1]{#1}
 % Absorb the occasional unbreakable-token overflow (e.g. grant IDs/DOIs in the
 % Acknowledgments) without affecting normal line breaking elsewhere.
 \setlength{\emergencystretch}{3em}
@@ -866,22 +864,18 @@ In this section we analyze the stability of the two stabilized methods---ASGS (\
 \end{align}
 Using the finite element unknown as the test function and assuming $\nabla \cdot (\alpha \boldsymbol{a}) = 0$ and $\boldsymbol{u}_h = \boldsymbol{0}$ on $\partial \Omega$ \amend{(the linearized setting made precise in \cref{sec:CommonSetting})}, we obtain
 \begin{equation}\label{eq:GalerkinCoercivityIdentity}
-  B(\boldsymbol{a}; U_h, U_h) = 2 \nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \big\| \sigma^{1/2} \boldsymbol{u}_h \big\|^2 + \varepsilon \big\| p_h \big\|^2,
+  B(\boldsymbol{a}; U_h, U_h) = 2 \nu \bigl\lVert \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \bigr\rVert^2 + \bigl\lVert \sigma^{1/2} \boldsymbol{u}_h \bigr\rVert^2 + \varepsilon \bigl\lVert p_h \bigr\rVert^2,
 \end{equation}
 which generalizes the stability estimate obtained for the Galerkin method for the standard Navier{\hyp}Stokes equations. Note that, for very small viscosities or fluid volume fractions, the first term above will provide almost no control over the gradient of the velocity, leading to oscillations on the solution. This is what happens in the standard case, but here the problem is aggravated for small porosities.
 
 \subsection{Common setting and standing assumptions}\label{sec:CommonSetting} \hfill\\
-\amend{Both stabilized variants are analyzed for the \emph{linearized} problem, in which the advection field $\boldsymbol{a}$ is prescribed (the frozen velocity of the previous nonlinear iteration) and satisfies $\nabla\cdot(\alpha\boldsymbol{a})=0$, the reaction is a constant scalar $\boldsymbol{\sigma}=\sigma\mathbb{I}$ with $\sigma\ge0$, and the boundary conditions are homogeneous Dirichlet on the whole of $\partial\Omega$; throughout, $\Omega\subset\mathbb{R}^d$, $d\in\{2,3\}$, is a bounded polyhedral domain. The stability and convergence theorems stated below---\cref{lemma:Stability,th:Convergence} for the ASGS method and \cref{th:StabilityOSGS,th:ConvergenceOSGS} for the OSGS method---hold only under the following standing assumptions, which we collect here once; the proofs are developed in \cref{app:Continuity} (ASGS) and \cref{app:osgs} (OSGS). We organize the assumptions into three groups and label each group by a distinct prefix: those \emph{common to both methods}, labelled $(\textup{A}1)$--$(\textup{A}6)$; those \emph{specific to the ASGS method}, labelled $(\textup{S}1)$--$(\textup{S}2)$; and those \emph{specific to the OSGS method}, labelled $(\textup{O}1)$--$(\textup{O}5)$. Accordingly, the ASGS analysis of \cref{sec:StabilityASGSvariant} invokes the $(\textup{A})$ and $(\textup{S})$ assumptions, whereas the OSGS analysis of \cref{sec:StabilityOSGS} invokes the $(\textup{A})$ and $(\textup{O})$ assumptions.}
+\amend{In the following subsections, we conduct the a priori analysis of the two stabilized formulations. Both variants are analyzed for the \emph{linearized} problem, in which the advection field $\boldsymbol{a}$ is prescribed (the frozen velocity of the previous nonlinear iteration) and satisfies $\nabla\cdot(\alpha\boldsymbol{a})=0$, the reaction is a constant scalar $\boldsymbol{\sigma}=\sigma\mathbb{I}$ with $\sigma\ge0$, and the boundary conditions are homogeneous Dirichlet on the whole of $\partial\Omega$; throughout, $\Omega\subset\mathbb{R}^d$, $d\in\{2,3\}$, is a bounded polyhedral domain.}
 
-\amend{Throughout, $\|\bullet\|_h\coloneqq\bigl(\sum_K\|\bullet\|_{L^2(K)}^2\bigr)^{1/2}$ denotes the broken $L^2$ norm, and, for $i=1,2$, the $\boldsymbol{\tau}${\hyp}weighted broken product and norm are}
-\begin{equation}\label{eq:TauWeightedProduct}
-  (f,g)_{\tau_i}\coloneqq\sum_K\tau_{i,K}\,(f,g)_K,
-  \qquad
-  \norm{f}_{\tau_i}\coloneqq(f,f)_{\tau_i}^{1/2}=\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h ,
-\end{equation}
-\amend{the last identity relating the two forms used below; both stabilized methods are analyzed in this common notation.}
+\amend{The proofs of all the lemmas and theorems stated in \cref{sec:StabilityASGSvariant,sec:StabilityOSGS}, including the stability and convergence results---\cref{lemma:Stability,th:Convergence} for the ASGS method and \cref{th:StabilityOSGS,th:ConvergenceOSGS} for the OSGS method, are given in full in the corresponding appendices---\cref{app:Continuity} for the ASGS method and \cref{app:osgs} for the OSGS method---, each employing a markedly different proof strategy.}
 
-\amend{We first collect the assumptions common to both methods, labelled $(\textup{A}1)$--$(\textup{A}6)$; they fix the mesh family, the coefficients, the porosity field, the prescribed advection, the discrete spaces and the regularity of the exact solution:}
+\amend{For convenience, we next list the collected sets of assumptions under which the various results hold, organizing them into three groups: those \emph{common to both methods}, labelled \crefrange{H:mesh}{H:regularity}; those \emph{specific to the ASGS method}, labelled \crefrange{H:coercivity}{H:jump}; and those \emph{specific to the OSGS method}, labelled \crefrange{H:design}{H:advectionsmooth}.}
+
+\amend{We begin with the shared assumptions; they fix the mesh family, the coefficients, the porosity field, the prescribed advection, the discrete spaces and the regularity of the exact solution:}
 \begin{enumerate}[label=\textup{(A\arabic*)},ref=\textup{(A\arabic*)},leftmargin=3.4em]
   \item\label{H:mesh} \emph{Meshes.} The family of partitions is conforming, shape{\hyp}regular and locally quasi{\hyp}uniform, so that the inverse estimate \cref{eq:InverseEstimateFiniteOrderNorm} holds with a constant $C_\mathrm{inv}$ independent of the mesh size.
   \item\label{H:data} \emph{Physical parameters.} $\nu>0$, $\sigma\ge0$ and $\varepsilon\ge0$ are constant, the reaction tensor is isotropic, $\boldsymbol{\sigma}=\sigma\mathbb{I}$, and the penalty parameter satisfies \cref{eq:UpperBoundOnEpsilon}.
@@ -895,7 +889,7 @@ which generalizes the stability estimate obtained for the Galerkin method for th
   \item\label{H:regularity} \emph{Regularity.} The exact solution satisfies $\boldsymbol{u}\in H^{k_u+1}(\Omega)^d$ and $p\in H^{k_p+1}(\Omega)$ \amend{(which, since $k_u,k_p\ge1$, forces $\boldsymbol{f}\in L^2(\Omega)^d$ through the momentum equation, upgrading the weak{\hyp}form requirement $\boldsymbol{f}\in\mathcal{V}_0'$ of \cref{sec:WeakForm})}.
 \end{enumerate}
 
-\amend{Beyond these, the ASGS analysis requires two further conditions, labelled $(\textup{S}1)$--$(\textup{S}2)$: a coercivity requirement on the design constant $c_1$ and, when $\sigma>0$, a mild jump condition across interior faces:}
+\amend{Beyond these, the ASGS analysis requires two further conditions: a coercivity requirement on the design constant $c_1$ and, when $\sigma>0$, a mild jump condition across interior faces:}
 \begin{enumerate}[label=\textup{(S\arabic*)},ref=\textup{(S\arabic*)},leftmargin=3.4em]
   \item\label{H:coercivity} \emph{Coercivity.} $c_1>2\xi\,C_\mathrm{inv}^2$ for some $\xi>2$ (\cref{eq:conditions_on_num_param}); here $C_\mathrm{inv}$ is understood as the porosity{\hyp}enlarged inverse constant of \cref{eq:InverseEstimateFiniteOrderNorm}, the abuse of notation made precise in \cref{rem:winvconst} of \cref{app:Continuity}.
   \item\label{H:jump} \emph{Interior{\hyp}face jump condition} (only when $\sigma>0$). Any two elements $K_1,K_2$ sharing a face satisfy
@@ -905,14 +899,20 @@ which generalizes the stability estimate obtained for the Galerkin method for th
   which, by \cref{H:porosity,H:mesh}, reduces to a mild comparability of $\lVert\boldsymbol{a}\rVert_{\infty}$ across the face relative to $\nu/h_K$, as in~\cite{codina2001stabilized}.
 \end{enumerate}
 
-\amend{The OSGS analysis, in turn, relies on five additional conditions, labelled $(\textup{O}1)$--$(\textup{O}5)$. The design and projection{\hyp}stability conditions \cref{H:design,H:projection} are proper to the orthogonal formulation, whereas the mesh, porosity and advection conditions \cref{H:patch,H:porositysmooth,H:advectionsmooth} are technical strengthenings of the common assumptions \cref{H:mesh,H:porosity,H:advection} used only by the OSGS analysis:}
+\amend{The OSGS analysis, in turn, relies on five additional conditions. The design and projection{\hyp}stability conditions \cref{H:design,H:projection} are proper to the orthogonal formulation, whereas the mesh, porosity and advection conditions \cref{H:patch,H:porositysmooth,H:advectionsmooth} are technical strengthenings of the common assumptions \cref{H:mesh,H:porosity,H:advection} used only by the OSGS analysis:}
 \begin{enumerate}[label=\textup{(O\arabic*)},ref=\textup{(O\arabic*)},leftmargin=3.4em]
   \item\label{H:design} \emph{Design constants.} There is $\gamma\ge\gamma_0$ with $c_1\ge\gamma^2 C_\mathrm{inv}^2$ and $c_2\ge\gamma\,C_\mathrm{inv}$ (an admissible $\gamma_0$, and a small{\hyp}mesh threshold $h\le h_0$, are given in \cref{app:osgs}); moreover $\varepsilon\tau_{2,K}\le C_2<1$ on every element, consistently with \cref{H:data}.
   \item\label{H:projection} \emph{Projection stability.} Let $\Pi_1$ and $\Pi_{1,0}$ be the $\tau_1${\hyp}weighted $L^2$ projections of a velocity field onto the unconstrained and the constrained velocity spaces, and $\Pi_1^{\perp}\coloneqq I-\Pi_1$. There is $\beta_0>0$, independent of $h$, such that for all $V_h=[\boldsymbol{v}_h;q_h]\in\Xh$, writing $\boldsymbol{z}_h\coloneqq\alpha(\boldsymbol{a}\cdot\nabla\boldsymbol{v}_h+\nabla q_h)$,
   \begin{equation}\label{eq:ProjectionStability}
     \bigl\lVert\tau_1^{1/2}\boldsymbol{z}_h\bigr\rVert_h \le \frac{1}{\beta_0}\Bigl(\bigl\lVert\tau_1^{1/2}\Pi_{1,0}\boldsymbol{z}_h\bigr\rVert_h+\bigl\lVert\tau_1^{1/2}\Pi_1^{\perp}\boldsymbol{z}_h\bigr\rVert_h\Bigr).
   \end{equation}
-  This is the Codina--Blasco{\hyp}type inf{\hyp}sup condition~(35) of~\cite{codina2008analysis}.
+  \amend{Here $\|\bullet\|_h\coloneqq\bigl(\sum_K\|\bullet\|_{L^2(K)}^2\bigr)^{1/2}$ denotes the broken $L^2$ norm and, for $i=1,2$, the $\boldsymbol{\tau}${\hyp}weighted broken product and norm are}
+  \begin{equation}\label{eq:TauWeightedProduct}
+    (f,g)_{\tau_i}\coloneqq\sum_K\tau_{i,K}\,(f,g)_K,
+    \qquad
+    \norm{f}_{\tau_i}\coloneqq(f,f)_{\tau_i}^{1/2}=\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h ,
+  \end{equation}
+  \amend{the last identity relating the two forms used below.} Inequality \cref{eq:ProjectionStability} is the Codina--Blasco{\hyp}type inf{\hyp}sup condition~(35) of~\cite{codina2008analysis}.
   \item\label{H:patch} \emph{Additional mesh regularity} (patch structure and element{\hyp}size surrogates), strengthening \cref{H:mesh}. The element patches $S_K$ (the union of the elements sharing at least a vertex with $K$) are quasi{\hyp}uniform: there are constants $0<\underline{C}\le\overline{C}$, independent of $h$, with
   \begin{equation}\label{eq:PatchQuasiUniformity}
     \underline{C}\,h_K\le h_{K'}\le\overline{C}\,h_K\qquad\forall\,K'\subset S_K,\ \forall\,K.
@@ -921,7 +921,7 @@ which generalizes the stability estimate obtained for the Galerkin method for th
   \begin{equation}\label{eq:SmoothGrading}
     \omega_\chi(h)\coloneqq\sup_{K}\ \max_{\boldsymbol{x}_a\in N_K}\Bigl|\frac{\chi_1(\boldsymbol{x}_a,h)}{\chi_1(\boldsymbol{x}_K,h)}-1\Bigr|\ \xrightarrow[h\to0]{}\ 0,
   \end{equation}
-  where $N_K$ denotes the vertices of $K$; $\omega_\chi(h)=O(h)$ when the family is quasi{\hyp}uniform or a Lipschitz refinement of a fixed macro{\hyp}mesh. (Bounded patch equivalence \cref{eq:PatchQuasiUniformity} alone does not force this---a fixed neighbor{\hyp}size ratio bounded away from $1$ leaves $\omega_\chi=O(1)$---so smooth grading is assumed separately; it is what makes the smoothing error of \cref{oa:lem:smoothing} tend to zero.)
+  where $N_K$ denotes the vertices of $K$; $\omega_\chi(h)=O(h)$ when the family is quasi{\hyp}uniform or a Lipschitz refinement of a fixed macro{\hyp}mesh. (Bounded patch equivalence \cref{eq:PatchQuasiUniformity} alone does not force this---a fixed neighbor{\hyp}size ratio bounded away from $1$ leaves $\omega_\chi=O(1)$---so smooth grading is assumed separately; it is what makes the smoothing error of \cref{oa:lem:smoothing} tend to zero, and hence what secures the mesh{\hyp}smallness threshold $h\le h_0$ of \cref{th:StabilityOSGS}: it forces $\psi(h)\to0$, so that $\psi(h_0)\le\min\{1/8,\beta_0^2/16\}$ holds once $h_0$ is small enough.)
   \item\label{H:porositysmooth} \emph{Porosity smoothness}, strengthening \cref{H:porosity}. For the OSGS consistency estimate at interpolation order $m=\max(k_u,k_p)\ge2$, additionally $\alpha\in W^{m,\infty}(\Omega)$, and we set $C_{\alpha,m}\coloneqq 1+\sum_{j=1}^{m}\norm{D^j\alpha}_{L^\infty(\Omega)}/\alpha_0$.
   \item\label{H:advectionsmooth} \emph{Advection smoothness}, strengthening \cref{H:advection}. For the OSGS consistency estimate, additionally $\boldsymbol{a}\in W^{k_u,\infty}(\Omega)^d$ globally, with $\lVert D^j\boldsymbol{a}\rVert_{L^\infty(\Omega)}\le C_D\,\lVert\boldsymbol{a}\rVert_{L^\infty(\Omega)}$ for $1\le j\le k_u$. (Global---not merely elementwise---regularity is needed so that the product $\alpha\,\boldsymbol{a}\cdot\nabla\boldsymbol{u}$ lies in $H^{k_u}$ on the element patches $S_K$, as the patchwise best approximation of the consistency estimate requires; for $k_u\ge2$ an elementwise{\hyp}smooth, globally continuous field need not belong to $H^{k_u}(S_K)$.)
 \end{enumerate}
@@ -944,13 +944,13 @@ where $\alpha_K$ is the representative porosity of \cref{H:porosity} ($\alpha_{0
 \end{remark}
 
 \subsection{The ASGS variant: stability and convergence}\label{sec:StabilityASGSvariant} \hfill\\
-\amend{We now turn to the stability of the \emph{stabilized} bilinear form $B_\mathrm{S}$; the argument is the porosity{\hyp}weighted counterpart of the one in~\cite{codina2001stabilized}, developed in full in \cref{app:Continuity}. Testing with $U_h$ and using $\nabla\cdot(\alpha\boldsymbol{a})=0$ (\cref{H:advection}) together with $\boldsymbol{u}_h=\boldsymbol{0}$ on $\partial\Omega$, the convective term is skew{\hyp}symmetric and the pressure{\hyp}velocity terms cancel on integration by parts, so the Galerkin part reduces to the coercive diagonal \cref{eq:GalerkinCoercivityIdentity}. Expanding the stabilization contributes the residual and divergence squares of the working norm, a negative viscous residual square that is absorbed by the inverse estimate, a reaction square that renormalizes $\sigma$ to the damped weight $\sigmatilde$ introduced below, and a sign{\hyp}indefinite viscous--reaction cross{\hyp}term controlled by Young's inequality with a free parameter $\eta>0$. Collecting all contributions gives the intermediate bound}
+\amend{We now turn to the stability of the \emph{stabilized} bilinear form $B_\mathrm{S}$; the argument is the porosity{\hyp}weighted counterpart of the one in~\cite{codina2001stabilized}, developed in full in \cref{app:Continuity}. Testing with $U_h$ and using $\nabla\cdot(\alpha\boldsymbol{a})=0$ (\cref{H:advection}) together with $\boldsymbol{u}_h=\boldsymbol{0}$ on $\partial\Omega$, the convective term is skew{\hyp}symmetric and the pressure{\hyp}velocity terms cancel on integration by parts, so the Galerkin part reduces to the coercive diagonal \cref{eq:GalerkinCoercivityIdentity}. Expanding the stabilization contributes the residual and divergence squares of the working norm, a negative viscous residual square that is absorbed by the inverse estimate, a reaction square that renormalizes $\sigma$ to the damped weight $\sigmatilde$ introduced below, and a sign{\hyp}indefinite viscous--reaction cross{\hyp}term controlled by Young's inequality. Collecting all contributions gives the intermediate bound}
 \begin{equation}\label{eq:CollectedCoercivity}
 \begin{aligned}
   B_\mathrm{S}(\boldsymbol{a}; U_h, U_h)
   \ \geq\ &\Bigl(2\bigl(1-\tfrac{2}{\eta}\bigr)-\tfrac{4 C_\mathrm{inv}^2}{c_1}\Bigr)\,
   \nu\bigl\| \alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h \bigr\|^2
-  + \Bigl(1-\tfrac{\eta C_\mathrm{inv}^2}{c_1}\Bigr)\bigl\| \sigmatilde^{1/2}\boldsymbol{u}_h \bigr\|_h^2 \\
+  + \Bigl(1-\tfrac{\eta C_\mathrm{inv}^2}{c_1}\Bigr)\bigl\| \widetilde{\sigma}_\alpha^{1/2}\boldsymbol{u}_h \bigr\|_h^2 \\
   &+ (1-C_2)\,\varepsilon\| p_h \|^2
   + \norm{\alpha X(U_h)}_{\tau_1}^2
   + \norm{\nabla\cdot(\alpha\boldsymbol{u}_h)}_{\tau_2}^2 ,
@@ -958,7 +958,7 @@ where $\alpha_K$ is the representative porosity of \cref{H:porosity} ($\alpha_{0
 \end{equation}
 \amend{derived as \cref{eq:coerccollect} in \cref{app:Continuity}; here $\eta>0$ is at our disposal and $C_2$ is the compressibility constant of \cref{eq:UpperBoundOnEpsilon} below. Rendering its viscous, reaction and compressibility coefficients positive then yields the coercivity of $B_\mathrm{S}$ in the working norm.}
 
-\amend{The compressibility coefficient stays positive under the smallness bound}
+\amend{It remains to guarantee that these coefficients are positive. The compressibility coefficient stays positive under the smallness bound}
 \begin{equation} \label{eq:UpperBoundOnEpsilon}
     \varepsilon \amend{\leq C_2\, c_1 \inf_K{\left\{\frac{\alpha_K^2 \tau_{1,K}}{h_K^2}\right\}},}
 \end{equation}
@@ -1019,7 +1019,7 @@ where $\psi$ is the field being interpolated and $k_\psi$ the corresponding poly
  \begin{equation*}
     \triplenorm{E_h}_{\mathrm{S}} \leq C \sum_K \frac{\alpha_K}{h_K} \left( \tau_{2,K}^{1/2}\mathrm{E}_{\mathrm{int},K}(\boldsymbol{u}) + \tau_{1,K}^{1/2} \mathrm{E}_{\mathrm{int},K}(p) \right)
  \end{equation*}
- follows at once by the discrete $\ell^2\subset\ell^1$ inequality and reduces, for $\alpha\equiv1$, to the form obtained in~\cite{codina2001stabilized}. A complete proof, following the process of~\cite{codina2001stabilized} adapted to the porosity field, is given in \cref{app:Continuity}.}
+ follows at once by the discrete $\ell^2\subset\ell^1$ inequality and reduces, for $\alpha\equiv1$, to the form obtained in~\cite{codina2001stabilized}.}
 
 % Section on variational crimes:
 %\input{variational_crimes}
@@ -1027,8 +1027,7 @@ where $\psi$ is the field being interpolated and $k_\psi$ the corresponding poly
 \subsection{The OSGS variant: stability and convergence}\label{sec:StabilityOSGS} \hfill\\
 The orthogonal subgrid{\hyp}scale (OSGS) variant replaces the algebraic subscale by the
 fluctuation $\Pi_i^{\perp}=I-\Pi_i$ of the finite{\hyp}element residual with respect to the
-$\boldsymbol{\tau}${\hyp}weighted $L^2$ projection $\Pi_i$ onto the unconstrained
-finite{\hyp}element spaces. For the
+$\boldsymbol{\tau}${\hyp}weighted $L^2$ projection $\Pi_i$ onto the unconstrained finite{\hyp}element spaces. For the
 linearized, constant{\hyp}coefficient problem analyzed here the resulting bilinear form is
 \begin{equation}\label{eq:BosgsMain}
   B_{\mathrm{osgs}}(\boldsymbol{a};U,V)
@@ -1063,6 +1062,81 @@ coercivity condition, constrains both $c_1$ and $c_2$) and a Codina--Blasco{\hyp
 projection stability \cref{H:projection}---together with mild technical strengthenings of the
 mesh, porosity and advection assumptions (\cref{H:patch,H:porositysmooth,H:advectionsmooth}),
 the last two entering only the higher{\hyp}order consistency estimate.
+
+\amend{As in the ASGS analysis, the design constants must be large enough to render a family of
+perturbation terms harmless; unlike that analysis, these terms are raised not by testing with the
+trial function but by the special inf{\hyp}sup test function $W=U_h+V^0$ (through its increment
+$V^0$) of \cref{oa:th:stability}, and they constrain \emph{both} $c_1$ and $c_2$. The mechanism is
+the trio of inverse{\hyp}estimate calibrations \cref{oa:eq:K1,oa:eq:K2,oa:eq:K3}, each showing that
+a porosity{\hyp}weighted inverse{\hyp}estimate factor costs at most $1/\gamma$ in the corresponding
+$\tau${\hyp}weight: the viscous cross{\hyp}talk \cref{oa:eq:K1} and the mixed $\tau_1\tau_2$ factor
+\cref{oa:eq:K3} draw this from $c_1\ge\gamma^2 C_\mathrm{inv}^2$, the convective factor
+\cref{oa:eq:K2} from $c_2\ge\gamma C_\mathrm{inv}$. Writing
+$D_\nu=2\nu\lVert\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\rVert^2$,
+$D_\sigma=\lVert\sigma^{1/2}\boldsymbol{u}_h\rVert^2$ and $D_\varepsilon=\varepsilon\lVert p_h\rVert^2$
+for the Galerkin diagonal squares, and $O_1,O_2$ and $P_1,P_2$ for the fluctuation and projected
+squares of the momentum and mass residuals defined in the proof of \cref{oa:th:stability}, the
+collection step of that proof yields}
+\begin{equation}\label{eq:OSGSCollected}
+\begin{aligned}
+  B_{\mathrm{osgs}}(\boldsymbol{a};U_h,W)\ \ge\
+  &\tfrac{3}{4} D_\nu+\tfrac{1}{2} D_\sigma+\tfrac{1}{2} D_\varepsilon
+  +\Bigl(1-\tfrac{2\psi}{\beta_0^2}-\tfrac{1+\psi}{\gamma}\Bigr)O_1
+  +\Bigl(1-\psi-\tfrac{M_2(1+\psi)}{2\gamma}\Bigr)O_2\\
+  &+\Bigl(1-\tfrac{2\psi}{\beta_0^2}-\tfrac{2(1+\psi)^2}{\gamma^2}-\tfrac{(1+\psi)^2}{2}
+  -\tfrac{1+\psi}{2\gamma}-\tfrac{M_2(1+\psi)}{2\gamma}\Bigr)P_1\\
+  &+\Bigl(1-\psi-\tfrac{(1+\psi)^2 C_2}{2}-\tfrac{1+\psi}{2\gamma}\Bigr)P_2 ,
+\end{aligned}
+\end{equation}
+\amend{the orthogonal counterpart of the ASGS collected coercivity bound \cref{eq:coerccollect}.
+Just as there the viscous, reaction and compressibility coefficients are rendered positive by the
+numerical{\hyp}parameter conditions, here the four residual coefficients are each at least
+$\tfrac{1}{8}$---in particular positive---\emph{whenever} $\gamma\ge\gamma_0=10(1+M_2)$ and
+$\psi\le\psi_0=\min\{\tfrac{1}{8},\beta_0^2/16\}$, where $M_2\coloneqq1+C_{\nabla\alpha}/C_\mathrm{inv}$
+and $\psi=\psi(h)$ is the smoothing error of \cref{oa:lem:smoothing}, which tends to $0$ under
+refinement; these are sufficient, non{\hyp}sharp conditions (\cref{oa:th:stability}). Since a margin
+$\gamma\ge\gamma_0$ meeting $c_1\ge\gamma^2 C_\mathrm{inv}^2$ and $c_2\ge\gamma C_\mathrm{inv}$ exists
+if and only if $\gamma_0\le\min(\sqrt{c_1},c_2)/C_\mathrm{inv}$, the design{\hyp}constant requirement
+of \cref{H:design} on $c_1,c_2$ is equivalent to the single scalar inequality}
+\begin{equation}\label{eq:OSGSDesignCondition}
+  \min\!\bigl(\sqrt{c_1},\,c_2\bigr)\ \ge\ \gamma_0\,C_\mathrm{inv},
+\end{equation}
+\amend{equivalently $c_1\ge\gamma_0^2 C_\mathrm{inv}^2$ together with $c_2\ge\gamma_0 C_\mathrm{inv}$,
+the working margin being $\gamma=\min(\sqrt{c_1},c_2)/C_\mathrm{inv}$. This is the orthogonal
+counterpart of the ASGS coercivity condition \cref{eq:conditions_on_num_param}: that condition
+constrains only $c_1$ (equivalently $\sqrt{c_1}>2C_\mathrm{inv}$), whereas the inf{\hyp}sup route
+constrains the smaller of $\sqrt{c_1}$ and $c_2$---a large $c_1$ cannot offset a deficient $c_2$,
+since \cref{oa:eq:K2} calls on $c_2$ alone. Two provisos separate \cref{eq:OSGSDesignCondition} from
+\cref{eq:conditions_on_num_param}. First, $\gamma_0$ is not a pure geometry constant: it carries the
+porosity{\hyp}resolution surcharge $M_2$. Second, whereas \cref{eq:conditions_on_num_param} together
+with the compressibility bound delivers coercivity for all $h$ (\cref{lemma:Stability}),
+\cref{eq:OSGSDesignCondition} is only one of the three hypotheses of \cref{th:StabilityOSGS} and does
+not by itself deliver stability: the theorem also requires the mesh{\hyp}smallness $h\le h_0$ (through
+$\psi\le\psi_0$, which enters the coefficients of \cref{eq:OSGSCollected}) and the projection
+stability \cref{H:projection}---which the coercivity route does not need: it recombines the
+projected residual harvested by the test function with the fluctuation controlled by the diagonal
+of $B_{\mathrm{osgs}}$ into the full $\tau_1${\hyp}weighted momentum residual of
+\cref{eq:TripleNormOSGS} (Steps~2 and~5 of \cref{oa:th:stability}). The compressibility bound
+$\varepsilon\tau_{2,K}\le C_2<1$ of
+\cref{H:design} is, as with \cref{eq:UpperBoundOnEpsilon} in the ASGS case, a separate requirement
+not folded into \cref{eq:OSGSDesignCondition}.}
+
+\begin{remark}
+\amend{As with \cref{eq:conditions_on_num_param} in the ASGS case, \cref{eq:OSGSDesignCondition}
+ties the admissible design constants to the inverse{\hyp}estimate constant, and hence---through the
+$k^2$ growth of $C_\mathrm{inv}$---to the element type and polynomial order. At the canonical
+equal{\hyp}order choice $c_1=4k^4$, $c_2=2k^2$ one has $\sqrt{c_1}=c_2=2k^2$, so
+$\min(\sqrt{c_1},c_2)=2k^2$ and \cref{eq:OSGSDesignCondition} reads $2k^2\ge\gamma_0 C_\mathrm{inv}$.
+This is the same left{\hyp}hand quantity $2k^2$ that \cref{eq:conditions_on_num_param} constrains
+through $\sqrt{c_1}>2C_\mathrm{inv}$; the two conditions thus share the same form and
+$k^2${\hyp}scaling, differing in the threshold constant ($2$ versus $\gamma_0$) and in which
+inverse{\hyp}estimate constant $C_\mathrm{inv}$ denotes.\footnote{\amend{The coincidence
+$\sqrt{c_1}=c_2=2k^2$ is exact; the $C_\mathrm{inv}$ on the right of \cref{eq:OSGSDesignCondition} is
+the plain inverse constant of \cref{oa:eq:K1,oa:eq:K3}, whereas that of
+\cref{eq:conditions_on_num_param} is the porosity{\hyp}enlarged constant of \cref{H:coercivity}.}} The
+value $\gamma_0=10(1+M_2)$ is sufficient but not sharp, and does not certify the canonical choice, as
+\cref{th:StabilityOSGS} and the discussion following it record.}
+\end{remark}
 
 \begin{theorem}[Inf--sup stability of the OSGS method]\label{th:StabilityOSGS}
 Under the standing assumptions of \cref{sec:CommonSetting} there exist $h_0>0$ and $\beta_{\mathrm{osgs}}>0$,

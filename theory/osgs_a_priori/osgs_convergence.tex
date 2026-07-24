@@ -255,8 +255,8 @@ $\bu \in H^1_0(\Omega)^d$. Then
   \label{eq:CoercivityIdentity}
   B(\ba; U, U)
   = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu \bigr\rVert^2
-  + \norm{\sigma^{1/2}\bu}^2
-  + \varepsilon\norm{p}^2 .
+  + \bigl\lVert\sigma^{1/2}\bu\bigr\rVert^2
+  + \varepsilon\bigl\lVert p\bigr\rVert^2 .
 \end{equation}
 \end{lemma}
 
@@ -397,10 +397,10 @@ In particular, with \cref{lem:coercivity},
   \label{eq:Diagonal}
   B_{\mathrm{osgs}}(\ba; U_h, U_h)
   = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu_h \bigr\rVert^2
-  + \norm{\sigma^{1/2}\bu_h}^2
-  + \varepsilon\norm{p_h}^2
-  + \norm{\Poneo \xi_h}_{\tau_1}^2
-  + \norm{\Ptwoo \delta_h}_{\tau_2}^2,
+  + \bigl\lVert\sigma^{1/2}\bu_h\bigr\rVert^2
+  + \varepsilon\bigl\lVert p_h\bigr\rVert^2
+  + \bigl\lVert\Poneo \xi_h\bigr\rVert_{\tau_1}^2
+  + \bigl\lVert\Ptwoo \delta_h\bigr\rVert_{\tau_2}^2,
 \end{equation}
 where here and below we abbreviate
 \begin{equation}
@@ -429,8 +429,8 @@ Consequently, the formulation obtained from the implemented OSGS method by proje
 the full residual and testing with the full adjoint differs from
 \cref{eq:Method}--\cref{eq:Sdefs} only through (a) the fluctuations of the viscous
 residual term $2\nabla\cdot(\alpha\nu\ViscProj\nabla\bu_h)$ and of the force $\bff$,
-and (b) the viscous part of the adjoint test slot---exactly the Method~I simplification
-of~\cite{Codina2008}.
+and (b) the viscous part of the adjoint test slot---exactly the Method~I
+simplification of~\cite{Codina2008}.
 \end{lemma}
 
 \begin{proof}
@@ -491,7 +491,7 @@ below; its value may change between appearances. We collect the standing assumpt
   $h$ (the resolution condition of~\cite{companion}). For the consistency estimate with
   $m \coloneqq \max(k_u, k_p) \ge 2$ we additionally assume
   $\alpha \in W^{m,\infty}(\Omega)$ and set
-  $C_{\alpha,m} \coloneqq 1 + \sum_{j=1}^{m}\norm{D^j\alpha}_{L^\infty(\Omega)}/\alpha_0$;
+  $C_{\alpha,m} \coloneqq 1 + \sum_{j=1}^{m}\norm{D^j\alpha}_{L^\infty}(\Omega)/\alpha_0$;
   for $k_u = k_p = 1$ no smoothness beyond $W^{1,\infty}$ is used.
   \item[(A4)] \emph{Convection field.} $\ba \in C^0(\overline\Omega)^d$, elementwise
   $W^{1,\infty}$, with $\nabla\cdot(\alpha\ba) = 0$ in the weak sense, and (only for
@@ -753,10 +753,10 @@ The stability and convergence analysis is carried out in the mesh-dependent norm
   \coloneqq
   \Bigl(
   2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv \bigr\rVert^2
-  + \norm{\sigma^{1/2}\bv}^2
-  + \varepsilon\norm{q}^2
-  + \norm{\alpha X(V)}_{\tau_1}^2
-  + \norm{\nabla\cdot(\alpha\bv)}_{\tau_2}^2
+  + \bigl\lVert\sigma^{1/2}\bv\bigr\rVert^2
+  + \varepsilon\bigl\lVert q\bigr\rVert^2
+  + \bigl\lVert\alpha X(V)\bigr\rVert_{\tau_1}^2
+  + \bigl\lVert\nabla\cdot(\alpha\bv)\bigr\rVert_{\tau_2}^2
   \Bigr)^{1/2}.
 \end{equation}
 
@@ -790,9 +790,9 @@ of~\cite{companion},
   \tnorm{V}_{\mathrm{S}}^2
   = \nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv \bigr\rVert^2
   + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2}\bv \bigr\rVert_h^2
-  + \varepsilon\norm{q}^2
-  + \norm{\alpha X(V)}_{\tau_1}^2
-  + \norm{\nabla\cdot(\alpha\bv)}_{\tau_2}^2,
+  + \varepsilon\bigl\lVert q\bigr\rVert^2
+  + \bigl\lVert\alpha X(V)\bigr\rVert_{\tau_1}^2
+  + \bigl\lVert\nabla\cdot(\alpha\bv)\bigr\rVert_{\tau_2}^2,
   \qquad
   \widetilde{\sigma}_\alpha
   = \frac{\tns^{-1}\sigma}{\tns^{-1} + \sigma/\alpha_K}.

@@ -140,7 +140,7 @@ here in the expanded form via the identity $\norm{f}_{\tau_i}=\lVert\tau_i^{1/2}
   \coloneqq \Bigl(
   &\nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bvh\bigr\rVert^2
   + \bigl\lVert\sigmatilde^{1/2}\bvh\bigr\rVert_h^2
-  + \varepsilon\norm{q_h}^2 \\
+  + \varepsilon\bigl\lVert q_h \bigr\rVert^2 \\
   &+ \bigl\lVert\tau_1^{1/2}\alpha\X(V_h)\bigr\rVert_h^2
   + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bvh)\bigr\rVert_h^2
   \Bigr)^{1/2}.
@@ -148,7 +148,31 @@ here in the expanded form via the identity $\norm{f}_{\tau_i}=\lVert\tau_i^{1/2}
 \end{equation}
 The viscous term already makes $\triplenorm{\cdot}$ a norm: under homogeneous Dirichlet data
 the deviatoric{\hyp}symmetric projection controls the full velocity gradient, by an elementary
-identity rather than a Korn inequality.
+identity, and the Poincaré inequality then controls the velocity $L^2$ norm, which in turn controls
+the pressure gradient through $\alpha\X(V_h)$ and fixes the pressure up to a constant, which
+the penalty parameter $\varepsilon>0$ (or the zero-mean constraint when $\varepsilon=0$) uniquely fixes.
+
+\subsubsection{Proof of coercivity (\cref{lemma:Stability})}\label{sec:proof-stability}
+We now prove the coercivity result stated in \cref{lemma:Stability} of the main text.
+Taking $V_h=U_h$ in $\BS(\ba;U_h,U_h)$, the Galerkin term reduces to
+$2\nu\norm{\alpha^{1/2}\ViscProj\nabla\buh}^2+\norm{\sigma^{1/2}\buh}^2+\varepsilon\bigl\lVert p_h \bigr\rVert^2$
+by skew-symmetry of the convection term and cancellation of the pressure-divergence pair.
+Expanding the stabilization terms yields the residual and divergence squares, a negative
+viscous residual square absorbed by the inverse estimate, a reaction square renormalizing
+$\sigma$ to the damped weight $\sigmatilde$, and a viscous-reaction cross term bounded by Young's
+inequality. Collecting all terms gives
+\begin{equation}\label{eq:coerccollect-lemma}
+\begin{aligned}
+  \BS(\ba;U_h,U_h)
+  \ \ge\ &\Bigl(2\bigl(1-\tfrac{2}{\eta}\bigr)-\tfrac{4\Cinva^2}{c_1}\Bigr)\,
+  \nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\buh\bigr\rVert^2
+  + \Bigl(1-\tfrac{\eta\Cinva^2}{c_1}\Bigr)\bigl\lVert\sigmatilde^{1/2}\buh\bigr\rVert_h^2 \\
+  &+ (1-C_2)\,\varepsilon\bigl\lVert p_h \bigr\rVert^2
+  + \bigl\lVert\tau_1^{1/2}\alpha\X(U_h)\bigr\rVert_h^2
+  + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\buh)\bigr\rVert_h^2 .
+\end{aligned}
+\end{equation}
+
 \begin{lemma}[Definiteness of the working norm]\label{lem:definiteness}
 For every $\bv\in H^1_0(\Omega)^d$,
 \begin{equation}\label{eq:devsymidentity}
