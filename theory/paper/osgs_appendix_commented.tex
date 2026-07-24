@@ -237,7 +237,8 @@ products and norms are defined, for $i = 1,2$, by
   \qquad
   \norm{f}_{\tau_i} \coloneqq (f,f)_{\tau_i}^{1/2},
 \end{equation}
-for functions that need only be square integrable elementwise; note
+for functions that need only be square integrable elementwise (this is the main-text
+definition \cref{eq:TauWeightedProduct}, recalled here); note
 $\norm{f}_{\tau_i} = \lVert \tau_i^{1/2} f\rVert_h$ in the broken-norm notation
 of~the main text.
 
@@ -1394,8 +1395,8 @@ $\ge \beta_{\mathrm{osgs}}\tnorm{U_h}_{\mathrm O}$, which is the inf--sup estima
 The proof is that of~\cite[Theorem~1]{codina2008analysis} with four modifications. (i)~All
 inverse-estimate steps carry the porosity weight, absorbed through
 \cref{oa:eq:K1}--\cref{oa:eq:K3}; only the plain inverse estimate
-\cref{eq:InverseEstimateFiniteOrderNorm} is used---in contrast with the ASGS stability proof
-of~the main text, no estimate for $\nabla\cdot(\alpha\nu\ViscProj\nabla\bv_h)$ is
+\cref{eq:InverseEstimateFiniteOrderNorm} is used---in contrast with the ASGS coercivity proof
+(\cref{lem:coercivity} of \cref{app:Continuity}), no estimate for $\nabla\cdot(\alpha\nu\ViscProj\nabla\bv_h)$ is
 needed, because the analyzed OSGS form contains no viscous stabilization term.
 (ii)~The reactive pairing \cref{oa:eq:T3} is new; it is absorbed by the \emph{full}
 Galerkin reaction term $D_\sigma$ at the price of half of $P_1$, using nothing more

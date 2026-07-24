@@ -201,7 +201,7 @@
 \newcommand{\jump}[1]{[\![#1]\!]}
 \DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
 \newcommand{\sigmatilde}{\widetilde{\sigma}_{\alpha}}
-\newcommand{\Eint}[2]{\mathrm{E}^{#1}_{\mathrm{int}}(#2)}
+\newcommand{\Eint}[2]{\mathrm{E}_{\mathrm{int},#1}(#2)}
 
 
 % ===== OSGS companion macros (for the integrated OSGS theory and \cref{app:osgs}) =====
@@ -223,7 +223,6 @@
 \newcommand{\Ponez}{\Pi_{1,0}}
 \newcommand{\Poneo}{\Pi_{1}^{\perp}}
 \newcommand{\Ptwoo}{\Pi_{2}^{\perp}}
-\renewcommand{\Eint}[2]{\mathrm{E}_{\mathrm{int},#1}(#2)}
 
 \begin{document}
 \def\mystrut(#1,#2){\vrule height #1pt depth #2pt width 0pt}
@@ -498,7 +497,7 @@ Note that we have not yet specified the space where $\alpha$, the porosity field
 
 In order to conveniently reexpress this problem in terms of linear functionals, let us introduce the form $B \colon \mathcal{V} \times \mathcal{X} \times \mathcal{X} \rightarrow \mathbb{R}$, bilinear with respect to the second and third arguments:
 \begin{align} \label{eq:BilinearForm}
-  B(\boldsymbol{w}, U, V) &\coloneqq \dualpairing{\partial_i V, \mathbf{K}_{ij} \partial_j U} + \dualpairing{V, \mathbf{A}_{\mathrm{c},i}(\boldsymbol{w}) \partial_i U} \notag \\
+  B(\boldsymbol{w}; U, V) &\coloneqq \dualpairing{\partial_i V, \mathbf{K}_{ij} \partial_j U} + \dualpairing{V, \mathbf{A}_{\mathrm{c},i}(\boldsymbol{w}) \partial_i U} \notag \\
                     &\phantom{\coloneqq{}} - \dualpairing{\partial_i(\mathbf{A}^{\top}_{\mathrm{f},i} V) , U} + \dualpairing{V, \mathbf{S}(\boldsymbol{w}) U },
 \end{align}
 %\begin{equation} \label{eq:AdjointFlux_commented}
@@ -513,7 +512,7 @@ Using \cref{eq:TraceOperator,eq:neumann_bc,eq:BilinearForm,eq:RHSLinearForm}, th
 
 \emph{Find $U = [\boldsymbol{u};p]\in \mathcal{X}_0$, such that}
 \begin{equation} \label{eq:WeakFormCompact}
-  B(\boldsymbol{u}, U, V) = L(V) \quad \forall V \in \mathcal{X}_0.
+  B(\boldsymbol{u}; U, V) = L(V) \quad \forall V \in \mathcal{X}_0.
 \end{equation}
 
 \section{Variational multiscale approach}\label{sec:StationaryProblem} \hfill\\
@@ -532,14 +531,14 @@ so that $U = U_h + \widetilde{U}$ (with $U_h \in \mathcal{X}_{h0}$ and $\widetil
 
 Or, in terms of bilinear forms,
 \begin{alignat}{3}
- B(\boldsymbol{u}, U_h, V_h) &+ B(\boldsymbol{u}, \widetilde{U}, V_h) &&= L(V_h) &&\quad \forall V_h \in \mathcal{X}_{h0}, \label{eq:weak_form_resolved} \\
- B(\boldsymbol{u}, U_h, \widetilde{V})&+ B(\boldsymbol{u}, \widetilde{U}, \widetilde{V}) &&= L(\widetilde{V}) &&\quad \forall \widetilde{V} \in \widetilde{\mathcal{X}}_0. \label{eq:weak_form_subscales}
+ B(\boldsymbol{u}; U_h, V_h) &+ B(\boldsymbol{u}; \widetilde{U}, V_h) &&= L(V_h) &&\quad \forall V_h \in \mathcal{X}_{h0}, \label{eq:weak_form_resolved} \\
+ B(\boldsymbol{u}; U_h, \widetilde{V})&+ B(\boldsymbol{u}; \widetilde{U}, \widetilde{V}) &&= L(\widetilde{V}) &&\quad \forall \widetilde{V} \in \widetilde{\mathcal{X}}_0. \label{eq:weak_form_subscales}
 \end{alignat}
 \Cref{eq:weak_form_resolved,eq:weak_form_subscales} are the starting point of the VMS methodology. \Cref{eq:weak_form_subscales} will be used to derive an approximation to the SGSs, while \cref{eq:weak_form_resolved} will become the modified weak form of the problem once the approximate SGSs are introduced in the second term of its left-hand side.
 
 To clarify the motivation behind the scale-splitting strategy, let us note that it is possible to formally eliminate $\widetilde{U}$ from the equations above to obtain
 \begin{equation} \label{eq:weak_form_eliminated_subscales}
-  B(\boldsymbol{u}, U_h, V_h) \amend{+} \dualpairing{V_h, \mathcal{L}\widetilde{\mathcal{L}}^{-1}\mathcal{R}U_h} = L(V_h) \quad \forall V_h \in \mathcal{X}_{h0},
+  B(\boldsymbol{u}; U_h, V_h) \amend{+} \dualpairing{V_h, \mathcal{L}\widetilde{\mathcal{L}}^{-1}\mathcal{R}U_h} = L(V_h) \quad \forall V_h \in \mathcal{X}_{h0},
 \end{equation}
 where $\mathcal{R}$ is the residual operator, i.e., $\mathcal{R}_{\boldsymbol{w}} \amend{U} \coloneqq F - \mathcal{L}_{\boldsymbol{w}} U$, whose explicit dependence on $\boldsymbol{w}$ we will also omit when ${\boldsymbol{w}}={\boldsymbol{u}}$ (except where emphasis is required), and $\widetilde{\mathcal{L}}^{-1}$ is the fine-scale Green's operator, which gives $\widetilde{U}$ from the coarse-scale residual, i.e., $\widetilde{U} = \widetilde{\mathcal{L}}_{U}^{-1}(\mathcal{R}U_h)$. Its expression can, in fact, be calculated explicitly~\cite{hughes2007variational}:
 \begin{equation} \label{eq:ExplicitExactSubscales}
@@ -552,7 +551,7 @@ The standard Galerkin finite element method consists in replacing the infinite{\
 
 As mentioned in the introduction, the discretized problem obtained with the Galerkin method will suffer from numerical instabilities due to the violation of the LBB condition (e.g., for equal{\hyp}order spaces) and from the degeneration of its inherent stability for extreme values of the physical parameters. Let us therefore use the VMS framework to produce a stabilized formulation of the discrete problem. Considering the finite element spaces defined by the discretization above in \cref{eq:weak_form_resolved} and applying Stokes' theorem to each element domain (which, in particular, is possible for piecewise polynomials), we obtain
 \begin{equation} \label{eq:simplified_weak_form_resolved}
-  B(\boldsymbol{u}, U_h, V_h) + \sum_K{ \left [ \dualpairing{\mathcal{L}^*V_h, \widetilde{U}}_K + \dualpairing{\mathcal{D}_\mathrm{N}^* V_h, \mathcal{D}_K \widetilde{U}}_{\partial K} \right]}
+  B(\boldsymbol{u}; U_h, V_h) + \sum_K{ \left [ \dualpairing{\mathcal{L}^*V_h, \widetilde{U}}_K + \dualpairing{\mathcal{D}_\mathrm{N}^* V_h, \mathcal{D}_K \widetilde{U}}_{\partial K} \right]}
   = L(V_h) \quad \forall V_h \in \mathcal{X}_{h0} \vphantom{\sum_K}
 \end{equation}
 with
@@ -594,7 +593,7 @@ Summarizing, under \labelcref{ExactAtBoundaries,ZeroAtInterElementBoundaries,Lin
 %   \boldsymbol{\pi} - \widetilde{\Pi}\mathcal{R}U_h &= 0
 % \end{align}
 \begin{equation} \label{eq:VMSWeakFormSystem}
-  B(\boldsymbol{u}, U_h, V_h) + \sum_K{ \dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau}_K(\boldsymbol{u}) \widetilde{\Pi} [\mathcal{R}U_h]}}_K = L(V_h).
+  B(\boldsymbol{u}; U_h, V_h) + \sum_K{ \dualpairing{\mathcal{L}^*V_h, \boldsymbol{\tau}_K(\boldsymbol{u}) \widetilde{\Pi} [\mathcal{R}U_h]}}_K = L(V_h).
 \end{equation}
 
 Different VMS methods are obtained by different choices of the SGSs space. Here we will consider the following methods:
@@ -624,7 +623,7 @@ Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakForm
 \begin{subequations}
   \label{eq:OSGSProblem}
   \begin{align}
-    B_\mathrm{S}(\boldsymbol{u}, U_h, V_h) &= L_\mathrm{S}(\boldsymbol{u}, V_h, \boldsymbol{\pi}_h), \label{eq:NonlinearStabilizedEquation} \\
+    B_\mathrm{S}(\boldsymbol{u}; U_h, V_h) &= L_\mathrm{S}(\boldsymbol{u}, V_h, \boldsymbol{\pi}_h), \label{eq:NonlinearStabilizedEquation} \\
     \widetilde{U} \vert_{K} &= \boldsymbol{\tau}_K(\boldsymbol{u}) \left. \left(\mathcal{R} U_h - \boldsymbol{\pi}_h \right) \right \vert_{K} \quad \forall K \in \mathcal{T}_h, \label{eq:ElementwiseSubscaleEquation}\\
     \dualpairing{W_h, \boldsymbol{\pi}_h} &= \dualpairing{W_h, \mathcal{R}U_h}, \label{eq:NonlinearResidualProjection} \\
     U &= U_h + \widetilde{U}, \label{eq:DefinitionOfNonlinearParameter}
@@ -633,7 +632,7 @@ Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakForm
 \endgroup
 \emph{where}
 \begin{align}
-  B_\mathrm{S}(\boldsymbol{w}, U, V) &\coloneqq B(\boldsymbol{w}, U, V) - \sum_K{ \dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \mathcal{L}_{\boldsymbol{w}} U}\amend{_K}}, \\
+  B_\mathrm{S}(\boldsymbol{w}; U, V) &\coloneqq B(\boldsymbol{w}; U, V) - \sum_K{ \dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \mathcal{L}_{\boldsymbol{w}} U}\amend{_K}}, \\
   L_\mathrm{S}(\boldsymbol{w}, V, \boldsymbol{\pi}) &\coloneqq L(V)
   - \sum_K{\dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \left (F - \boldsymbol{\pi} \right )}_K}.
 \end{align}
@@ -654,7 +653,7 @@ The process of approximating \cref{eq:OSGSProblem} to make it numerically tracta
 \begin{subequations}
   \label{eq:LinearizedOSGSProblem}
   \begin{align}
-    B_\mathrm{S}(\boldsymbol{u}^{m-1}, U_h^m, V_h) &= L_\mathrm{S}(\boldsymbol{u}^{m-1}, V_h, \boldsymbol{\pi}_h^m), \label{eq:DiscretizedNonlinearStabilizedEquation} \\
+    B_\mathrm{S}(\boldsymbol{u}^{m-1}; U_h^m, V_h) &= L_\mathrm{S}(\boldsymbol{u}^{m-1}, V_h, \boldsymbol{\pi}_h^m), \label{eq:DiscretizedNonlinearStabilizedEquation} \\
     \widetilde{U}^m \vert_{K} &= \boldsymbol{\tau}_K(\boldsymbol{u}^{m-1}) \left. \left(\mathcal{R}_{\boldsymbol{u}^{m-1}}  U_h^m - \boldsymbol{\pi}_h^m\right) \right \vert_{K}, \label{eq:DiscretizedElementwiseSubscaleEquation}\\
     \dualpairing{W_h, \boldsymbol{\pi}_h^m} &= \dualpairing{W_h, \mathcal{R}_{\boldsymbol{u}^{m-1}}U_h^{m-1}}, \label{eq:DiscretizedNonlinearResidualProjection} \\
     U^m &= U_h^m + \widetilde{U}^m \label{eq:DiscretizedDefinitionOfNonlinearParameter},
@@ -860,8 +859,27 @@ It is not clear from the analysis above how one must evaluate the varying parame
 \section{Stability and convergence for the linearized problem: the ASGS and OSGS methods}\label{sec:StabilityASGS} \hfill\\
 In this section we analyze the stability of the two stabilized methods---ASGS (\cref{sec:StabilityASGSvariant}) and OSGS (\cref{sec:StabilityOSGS})---in a simplified setting. The idea is to highlight why the generalization of the stabilization parameters given by \cref{eq:Tau1,eq:Tau2} with respect to the case $\alpha\equiv 1$ (standard Navier{\hyp}Stokes) still provides the necessary stability in the generic case. For the ASGS variant this stability is proved in a slightly weaker (damped{\hyp}reaction) norm when $\alpha \neq 1$, whereas the OSGS analysis of \cref{sec:StabilityOSGS} controls the full reaction term; the numerical tests presented in \cref{sec:NumericalExamples} indicate that, in practice, the accuracy of the methods does not significantly deteriorate in this case.
 
+\amend{We begin by recalling the stability of the \emph{unstabilized} Galerkin method for this linearized problem, which motivates the stabilization to follow and is the common baseline of both analyses.} Its associated bilinear form, in terms of the velocity and pressure unknowns $\boldsymbol{u}_h$ and $p_h$ as well as a given convective field $\boldsymbol{a}$, is
+\begin{align}
+  B(\boldsymbol{a}; U_h, V_h) &= \innerprod{\boldsymbol{v}_h, \alpha \boldsymbol{a} \cdot \nabla \boldsymbol{u}_h} + 2\innerprod{\nabla \boldsymbol{v}_h, \alpha \nu \ViscProj \nabla \boldsymbol{u}_h} \notag \\
+  & + \innerprod{\boldsymbol{v}_h, \alpha \nabla p_h} + \innerprod{\boldsymbol{v}_h, \sigma \boldsymbol{u}_h} + \innerprod{q_h, \varepsilon p_h} + \innerprod{q_h, \nabla \cdot \left( \alpha \boldsymbol{u}_h \right)}.
+\end{align}
+Using the finite element unknown as the test function and assuming $\nabla \cdot (\alpha \boldsymbol{a}) = 0$ and $\boldsymbol{u}_h = \boldsymbol{0}$ on $\partial \Omega$ \amend{(the linearized setting made precise in \cref{sec:CommonSetting})}, we obtain
+\begin{equation}\label{eq:GalerkinCoercivityIdentity}
+  B(\boldsymbol{a}; U_h, U_h) = 2 \nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \big\| \sigma^{1/2} \boldsymbol{u}_h \big\|^2 + \varepsilon \big\| p_h \big\|^2,
+\end{equation}
+which generalizes the stability estimate obtained for the Galerkin method for the standard Navier{\hyp}Stokes equations. Note that, for very small viscosities or fluid volume fractions, the first term above will provide almost no control over the gradient of the velocity, leading to oscillations on the solution. This is what happens in the standard case, but here the problem is aggravated for small porosities.
+
 \subsection{Common setting and standing assumptions}\label{sec:CommonSetting} \hfill\\
 \amend{Both stabilized variants are analyzed for the \emph{linearized} problem, in which the advection field $\boldsymbol{a}$ is prescribed (the frozen velocity of the previous nonlinear iteration) and satisfies $\nabla\cdot(\alpha\boldsymbol{a})=0$, the reaction is a constant scalar $\boldsymbol{\sigma}=\sigma\mathbb{I}$ with $\sigma\ge0$, and the boundary conditions are homogeneous Dirichlet on the whole of $\partial\Omega$; throughout, $\Omega\subset\mathbb{R}^d$, $d\in\{2,3\}$, is a bounded polyhedral domain. The stability and convergence theorems stated below---\cref{lemma:Stability,th:Convergence} for the ASGS method and \cref{th:StabilityOSGS,th:ConvergenceOSGS} for the OSGS method---hold only under the following standing assumptions, which we collect here once; the proofs are developed in \cref{app:Continuity} (ASGS) and \cref{app:osgs} (OSGS). We organize the assumptions into three groups and label each group by a distinct prefix: those \emph{common to both methods}, labelled $(\textup{A}1)$--$(\textup{A}6)$; those \emph{specific to the ASGS method}, labelled $(\textup{S}1)$--$(\textup{S}2)$; and those \emph{specific to the OSGS method}, labelled $(\textup{O}1)$--$(\textup{O}5)$. Accordingly, the ASGS analysis of \cref{sec:StabilityASGSvariant} invokes the $(\textup{A})$ and $(\textup{S})$ assumptions, whereas the OSGS analysis of \cref{sec:StabilityOSGS} invokes the $(\textup{A})$ and $(\textup{O})$ assumptions.}
+
+\amend{Throughout, $\|\bullet\|_h\coloneqq\bigl(\sum_K\|\bullet\|_{L^2(K)}^2\bigr)^{1/2}$ denotes the broken $L^2$ norm, and, for $i=1,2$, the $\boldsymbol{\tau}${\hyp}weighted broken product and norm are}
+\begin{equation}\label{eq:TauWeightedProduct}
+  (f,g)_{\tau_i}\coloneqq\sum_K\tau_{i,K}\,(f,g)_K,
+  \qquad
+  \norm{f}_{\tau_i}\coloneqq(f,f)_{\tau_i}^{1/2}=\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h ,
+\end{equation}
+\amend{the last identity relating the two forms used below; both stabilized methods are analyzed in this common notation.}
 
 \amend{We first collect the assumptions common to both methods, labelled $(\textup{A}1)$--$(\textup{A}6)$; they fix the mesh family, the coefficients, the porosity field, the prescribed advection, the discrete spaces and the regularity of the exact solution:}
 \begin{enumerate}[label=\textup{(A\arabic*)},ref=\textup{(A\arabic*)},leftmargin=3.4em]
@@ -879,7 +897,7 @@ In this section we analyze the stability of the two stabilized methods---ASGS (\
 
 \amend{Beyond these, the ASGS analysis requires two further conditions, labelled $(\textup{S}1)$--$(\textup{S}2)$: a coercivity requirement on the design constant $c_1$ and, when $\sigma>0$, a mild jump condition across interior faces:}
 \begin{enumerate}[label=\textup{(S\arabic*)},ref=\textup{(S\arabic*)},leftmargin=3.4em]
-  \item\label{H:coercivity} \emph{Coercivity.} $c_1>2\xi\,C_\mathrm{inv}^2$ for some $\xi>2$ (\cref{eq:conditions_on_num_param}); here $C_\mathrm{inv}$ is understood as the porosity{\hyp}enlarged inverse constant of \cref{eq:InverseEstimateFiniteOrderNorm}, the abuse of notation made precise in \cref{sec:StabilityASGSvariant}.
+  \item\label{H:coercivity} \emph{Coercivity.} $c_1>2\xi\,C_\mathrm{inv}^2$ for some $\xi>2$ (\cref{eq:conditions_on_num_param}); here $C_\mathrm{inv}$ is understood as the porosity{\hyp}enlarged inverse constant of \cref{eq:InverseEstimateFiniteOrderNorm}, the abuse of notation made precise in \cref{rem:winvconst} of \cref{app:Continuity}.
   \item\label{H:jump} \emph{Interior{\hyp}face jump condition} (only when $\sigma>0$). Any two elements $K_1,K_2$ sharing a face satisfy
   \begin{equation}\label{eq:JumpCondition}
     c_J\,\alpha_{K_1}\tau_{1,\mathrm{NS}}^{-1}\big|_{K_1}\le\alpha_{K_2}\tau_{1,\mathrm{NS}}^{-1}\big|_{K_2}\le c_J'\,\alpha_{K_1}\tau_{1,\mathrm{NS}}^{-1}\big|_{K_1},\qquad 0<c_J\le1\le c_J',
@@ -908,46 +926,43 @@ In this section we analyze the stability of the two stabilized methods---ASGS (\
   \item\label{H:advectionsmooth} \emph{Advection smoothness}, strengthening \cref{H:advection}. For the OSGS consistency estimate, additionally $\boldsymbol{a}\in W^{k_u,\infty}(\Omega)^d$ globally, with $\lVert D^j\boldsymbol{a}\rVert_{L^\infty(\Omega)}\le C_D\,\lVert\boldsymbol{a}\rVert_{L^\infty(\Omega)}$ for $1\le j\le k_u$. (Global---not merely elementwise---regularity is needed so that the product $\alpha\,\boldsymbol{a}\cdot\nabla\boldsymbol{u}$ lies in $H^{k_u}$ on the element patches $S_K$, as the patchwise best approximation of the consistency estimate requires; for $k_u\ge2$ an elementwise{\hyp}smooth, globally continuous field need not belong to $H^{k_u}(S_K)$.)
 \end{enumerate}
 
-\subsection{The ASGS variant: stability and convergence}\label{sec:StabilityASGSvariant} \hfill\\
-Under the standing assumptions of \cref{sec:CommonSetting}, the stabilization parameters reduce to
+\amend{We close the common setting by recording two consequences of these assumptions that both methods share: the reduced form of the stabilization parameters and the omission of a weighted{\hyp}divergence term from the adjoint.}
+
+Under the standing assumptions the stabilization parameters \cref{eq:Tau1,eq:Tau2} reduce to
 \begin{align}
     \tau_1 &= \frac{1}{\alpha_K \tau_{1, \mathrm{NS}}^{-1} + \sigma} \label{eq:Tau1Final}, \\
     \tau_2 &= \frac{h^2}{c_1 \alpha_K \tau_{1, \mathrm{NS}}} \label{eq:Tau2Final},
 \end{align}
-where $\alpha_K$ is the representative porosity of \cref{H:porosity} ($\alpha_{0,K}\leq\alpha_K\leq\alpha_{\infty,K}$). As with the convective velocity in the definition of $\tau_{1, \mathrm{NS}}$, we take $\alpha_K = \alpha_{\infty,K}$, the natural choice for the analysis presented below, as it yields simplified estimates. \amend{The coefficient bounds below are written for this choice; any other admissible representative works after inserting factors of $\delta_\alpha$, bounded under \cref{H:porosity}.}
+where $\alpha_K$ is the representative porosity of \cref{H:porosity} ($\alpha_{0,K}\leq\alpha_K\leq\alpha_{\infty,K}$). As with the convective velocity in the definition of $\tau_{1, \mathrm{NS}}$, we take $\alpha_K = \alpha_{\infty,K}$, the natural choice for the analysis that follows, as it yields simplified estimates. \amend{The coefficient bounds below are written for this choice; any other admissible representative works after inserting factors of $\delta_\alpha$, bounded under \cref{H:porosity}.}
 
 \begin{remark}
 \amend{Both the analysis below and the numerical experiments use $\tau_2$ as in \cref{eq:Tau2Final}, i.e.\ without the $\varepsilon h^2$ term of \cref{eq:Tau2}. Under \cref{eq:UpperBoundOnEpsilon} the two definitions are equivalent up to the factor $1+C_2<2$: writing $\tau_2^{\mathrm{full}}$ for \cref{eq:Tau2}, $\tau_2/\tau_2^{\mathrm{full}} = 1+\varepsilon\tau_2 \le 1+C_2$, so that $\tau_2^{\mathrm{full}}\le\tau_2\le(1+C_2)\,\tau_2^{\mathrm{full}}$, and every estimate below transfers to the fuller parameter \cref{eq:Tau2} with constants inflated by at most $1+C_2$.}
 \end{remark}
 
-First, let us look at the stability of the Galerkin method for the linearized problem. Let us begin by expressing its associated bilinear form in terms of the velocity and pressure unknowns $\boldsymbol{u}_h$ and $p_h$ as well as a given convective field $\boldsymbol{a}$:
-\begin{align}
-  B(\boldsymbol{a}, U_h, V_h) &= \innerprod{\boldsymbol{v}_h, \alpha \boldsymbol{a} \cdot \nabla \boldsymbol{u}_h} + 2\innerprod{\nabla \boldsymbol{v}_h, \alpha \nu \ViscProj \nabla \boldsymbol{u}_h} \notag \\
-  & + \innerprod{\boldsymbol{v}_h, \alpha \nabla p_h} + \innerprod{\boldsymbol{v}_h, \sigma \boldsymbol{u}_h} + \innerprod{q_h, \varepsilon p_h} + \innerprod{q_h, \nabla \cdot \left( \alpha \boldsymbol{u}_h \right)}.
-\end{align}
-Using the finite element unknown as the test function and assuming $\nabla \cdot (\alpha \boldsymbol{a}) = 0$ and $\boldsymbol{u}_h = \boldsymbol{0}$ on $\partial \Omega$, we obtain
-\begin{equation}\label{eq:GalerkinCoercivityIdentity}
-  B(\boldsymbol{a}, U_h, U_h) = 2 \nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \big\| \sigma^{1/2} \boldsymbol{u}_h \big\|^2 + \varepsilon \big\| p_h \big\|^2,
+\begin{remark}[Omission of the weighted{\hyp}divergence term in the adjoint]\label{rem:AdjointDivergence}
+\amend{The stabilization of both methods is built on the adjoint $\mathcal{L}^*V_h$ (\cref{eq:AdjointDifferentialOperator}), whose convective part we take as $\alpha\,\boldsymbol{a}\cdot\nabla\boldsymbol{v}_h$, discarding the term $\nabla\cdot(\alpha\boldsymbol{a})\,\boldsymbol{v}_h$ that a literal expansion of $\mathcal{L}^*V_h$ would carry. Being a simplification of the common operator $\mathcal{L}^*$, this choice bears on the ASGS and OSGS methods alike, even though the linearized OSGS analysis of \cref{sec:StabilityOSGS} exercises only the first{\hyp}order form \cref{eq:BosgsMain}, in which the discarded term does not appear. Under \cref{H:advection} the term vanishes identically in any case, so it is immaterial to both linearized analyses below; we record the choice because it is also the one made in the fully nonlinear formulation, where retaining the term generates crossed terms that harm stability.} This could be solved by adding an analogous term to the original equation to reestablish the adjoint symmetry between $\mathcal{L}$ and $\mathcal{L}^*$: the strong form of the problem would not be changed, and one would have none of the undesirable crossed terms. This was the case analyzed in~\cite{codina2001stabilized}, where it is mentioned that such a formulation helps to make the problem well posed, especially for large values of $\varepsilon$. \amend{As our focus is on small values of the compressibility, we prefer the simpler formulation, which has similar stability properties and forgoes little of the numerical advantage of the alternative.}
+\end{remark}
+
+\subsection{The ASGS variant: stability and convergence}\label{sec:StabilityASGSvariant} \hfill\\
+\amend{We now turn to the stability of the \emph{stabilized} bilinear form $B_\mathrm{S}$; the argument is the porosity{\hyp}weighted counterpart of the one in~\cite{codina2001stabilized}, developed in full in \cref{app:Continuity}. Testing with $U_h$ and using $\nabla\cdot(\alpha\boldsymbol{a})=0$ (\cref{H:advection}) together with $\boldsymbol{u}_h=\boldsymbol{0}$ on $\partial\Omega$, the convective term is skew{\hyp}symmetric and the pressure{\hyp}velocity terms cancel on integration by parts, so the Galerkin part reduces to the coercive diagonal \cref{eq:GalerkinCoercivityIdentity}. Expanding the stabilization contributes the residual and divergence squares of the working norm, a negative viscous residual square that is absorbed by the inverse estimate, a reaction square that renormalizes $\sigma$ to the damped weight $\sigmatilde$ introduced below, and a sign{\hyp}indefinite viscous--reaction cross{\hyp}term controlled by Young's inequality with a free parameter $\eta>0$. Collecting all contributions gives the intermediate bound}
+\begin{equation}\label{eq:CollectedCoercivity}
+\begin{aligned}
+  B_\mathrm{S}(\boldsymbol{a}; U_h, U_h)
+  \ \geq\ &\Bigl(2\bigl(1-\tfrac{2}{\eta}\bigr)-\tfrac{4 C_\mathrm{inv}^2}{c_1}\Bigr)\,
+  \nu\bigl\| \alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h \bigr\|^2
+  + \Bigl(1-\tfrac{\eta C_\mathrm{inv}^2}{c_1}\Bigr)\bigl\| \sigmatilde^{1/2}\boldsymbol{u}_h \bigr\|_h^2 \\
+  &+ (1-C_2)\,\varepsilon\| p_h \|^2
+  + \norm{\alpha X(U_h)}_{\tau_1}^2
+  + \norm{\nabla\cdot(\alpha\boldsymbol{u}_h)}_{\tau_2}^2 ,
+\end{aligned}
 \end{equation}
-which generalizes the stability estimate obtained for the Galerkin method for the standard Navier{\hyp}Stokes equations. Note that, for very small viscosities or fluid volume fractions, the first term above will provide almost no control over the gradient of the velocity, leading to oscillations on the solution. This is what happens in the standard case, but here the problem is aggravated for small porosities.
+\amend{derived as \cref{eq:coerccollect} in \cref{app:Continuity}; here $\eta>0$ is at our disposal and $C_2$ is the compressibility constant of \cref{eq:UpperBoundOnEpsilon} below. Rendering its viscous, reaction and compressibility coefficients positive then yields the coercivity of $B_\mathrm{S}$ in the working norm.}
 
-Let us now study the stability of the \emph{stabilized} bilinear form. Testing with $U_h$, using $\nabla\cdot(\alpha\boldsymbol{a})=0$ and $\boldsymbol{u}_h=\boldsymbol{0}$ on $\partial\Omega$, and absorbing the residual cross-terms with the inverse estimate below, one obtains coercivity in the working norm of \cref{lemma:Stability}; the full derivation, which follows the procedure of~\cite{codina2001stabilized}, is carried out in \cref{lem:coercivity} of \cref{app:Continuity}. Throughout, $\| \bullet \|_h \coloneqq \big( \sum_K{\| \bullet \|_{L^2(K)}^2} \big)^{1/2}$ denotes the broken $L^2$ norm and $X(U_h) \coloneqq \boldsymbol{a} \cdot \nabla \boldsymbol{u}_h + \nabla p_h$. \amend{Note that, strictly speaking, one has the term $\frac{1}{\alpha}\nabla \cdot (\alpha \boldsymbol{a}) \boldsymbol{v}_h$ in the expansion of $\mathcal{L}^* V_h$. The inclusion of such a term generates a number of crossed terms that actually harm stability.} This could be solved by adding an analogous term on the original equation to reestablish the adjoint symmetry between $\mathcal{L}$ and $\mathcal{L}^*$. By doing this, the strong form of the problem would not be changed, and one would have none of the undesirable crossed terms. This was the case analyzed in~\cite{codina2001stabilized}, where it is mentioned that such a formulation helps to make the problem well posed, especially for large values of $\varepsilon$. Here, we have opted for simplifying the formulation by removing the aforementioned term from $\mathcal{L}^* V_h$, leading to a simpler formulation with similar stability properties. Given that our focus is on small values of the compressibility, we do not miss out much in terms of the numerical advantages of the alternative formulation.
-
-That derivation uses the elementary inequality $-2xy \geq - \frac{1}{\xi} x^2 - \xi y^2$ (valid for any real $x,y$ and $\xi > 0$) together with the following inverse estimate, which guarantees the existence of a constant $C_\mathrm{inv}$ independent of the mesh size such that
-\begin{equation}
-    \|\psi_h \|_{W^l_p(K)} \leq C_\mathrm{inv} h^{l-m + d/p - d/q} \| \psi_h \|_{W^m_q(K)}, \label{eq:InverseEstimateFiniteOrderNorm}
-\end{equation}
-which is valid for $0 \leq m \leq l$ and $1\leq p,q \leq \infty$ and any function $\psi_h$ belonging to a finite-dimensional subspace of $H^l(K)$, under the assumption that the sequence of mesh refinements is non-degenerate (see, e.g., \cite{brenner2008mathematical}).
-
-\amend{Note that, since $\alpha$ is not piecewise polynomial, \cref{eq:InverseEstimateFiniteOrderNorm} does not directly apply to quantities of the form $\nabla \cdot (\alpha \nu \ViscProj \nabla \boldsymbol{u}_h)$. Expanding the divergence and using \cref{eq:SmallPorosityGradient}, the same elemental estimates hold with $C_\mathrm{inv}$ replaced by a constant $\overline{C}_\mathrm{inv}$ that additionally depends on the constant in \cref{eq:SmallPorosityGradient}. With a slight abuse of notation, we keep the symbol $C_\mathrm{inv}$ for this modified constant in what follows.}
-
-For the coercivity argument to close, $\varepsilon$ must be small; in particular, we require that
+\amend{The compressibility coefficient stays positive under the smallness bound}
 \begin{equation} \label{eq:UpperBoundOnEpsilon}
     \varepsilon \amend{\leq C_2\, c_1 \inf_K{\left\{\frac{\alpha_K^2 \tau_{1,K}}{h_K^2}\right\}},}
 \end{equation}
-\amend{for some fixed constant $0 \leq C_2 < 1$, independent of the mesh and of the physical parameters.}
-
-\amend{Under \cref{eq:UpperBoundOnEpsilon} the compressibility coefficient remains stabilizing, $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon>0$; the strict inequality $\varepsilon\tau_2<1$ alone would not suffice, as it gives no uniform margin when $\sigma=0$. As carried out in detail in \cref{lem:coercivity} of \cref{app:Continuity}, the coefficients of $\|\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\|_K^2$ and of $\|\boldsymbol{u}_h\|_K^2$ in $B_\mathrm{S}(\boldsymbol{a}, U_h, U_h)$ are then bounded below by a positive multiple of $\nu$ and of the damped reaction coefficient}
+\amend{for some fixed constant $0 \leq C_2 < 1$, independent of the mesh and of the physical parameters: under \cref{eq:UpperBoundOnEpsilon} one has $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon>0$, whereas the strict inequality $\varepsilon\tau_2<1$ alone gives no uniform margin when $\sigma=0$. The viscous and reaction coefficients---those of $\|\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\|_K^2$ and $\|\boldsymbol{u}_h\|_K^2$ in $B_\mathrm{S}(\boldsymbol{a}; U_h, U_h)$---are, in turn, bounded below by a positive multiple of $\nu$ and of the damped reaction coefficient}
 \begin{equation} \label{eq:SigmaAlpha}
     \widetilde{\sigma}_\alpha \coloneqq \frac{\tau_{1, \mathrm{NS}}^{-1} \sigma}{\tau_{1, \mathrm{NS}}^{-1} + \sigma/\alpha_K },
 \end{equation}
@@ -963,16 +978,17 @@ For the coercivity argument to close, $\varepsilon$ must be small; in particular
 The stability of the stabilized method is then expressed by the following bound, proved in \cref{lem:coercivity} of \cref{app:Continuity}:
 
 \begin{lemma} \label{lemma:Stability}
-  \amend{Under the standing assumptions of \cref{sec:CommonSetting}---in particular the coercivity condition \cref{H:coercivity} ($c_1 > 2\xi C_\mathrm{inv}^2$ for some $\xi > 2$)---there exists} a positive constant $C$ such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_{h0}$ it holds that
+  \amend{Under the standing assumptions of \cref{sec:CommonSetting}---of which the coercivity estimate uses the ASGS design condition \cref{H:coercivity} ($c_1 > 2\xi C_\mathrm{inv}^2$ for some $\xi > 2$) and the compressibility bound \cref{eq:UpperBoundOnEpsilon}, but not the jump condition \cref{H:jump} (needed only for the continuity of \cref{lemma:Continuity})---there exists} a positive constant $C$ such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_{h0}$ it holds that
   \begin{equation}
-    B_\mathrm{S}(\boldsymbol{a}, U_h, U_h) \geq C \triplenorm{U_h}_{\mathrm{S}}^2,
+    B_\mathrm{S}(\boldsymbol{a}; U_h, U_h) \geq C \triplenorm{U_h}_{\mathrm{S}}^2,
   \end{equation}
 \end{lemma}
 where
 \begin{equation}
-  \triplenorm{U_h}_{\mathrm{S}} \coloneqq \bigg(\nu \Big\| \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \Big\|^2 + \Big\| \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \Big\|_h^2 + \varepsilon\big\| p_h \big\|^2 + \Big\| \tau_1^{1/2} \alpha X(U_h) \Big\|_h^2 + \Big\| \tau_2^{1/2} \nabla \cdot ( \alpha \boldsymbol{u}_h ) \Big\|_h^2 \bigg)^{1/2},
+  \triplenorm{U_h}_{\mathrm{S}} \coloneqq \bigg(\nu \bigl\lVert \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \bigr\rVert^2 + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \bigr\rVert_h^2 + \varepsilon\bigl\lVert p_h \bigr\rVert^2 + \bigl\lVert \alpha X(U_h) \bigr\rVert_{\tau_1}^2 + \bigl\lVert \nabla \cdot ( \alpha \boldsymbol{u}_h ) \bigr\rVert_{\tau_2}^2 \bigg)^{1/2},
 \end{equation}
-with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
+\label{eq:TripleNormASGS}
+where $X(U_h) \coloneqq \boldsymbol{a} \cdot \nabla \boldsymbol{u}_h + \nabla p_h$ is the first{\hyp}order momentum operator and $\widetilde{\sigma}_\alpha$ is given in \cref{eq:SigmaAlpha}.
 \begin{remark}
     Note that the quantity $\widetilde{\sigma}_\alpha$ differs from the quantity $\widetilde{\sigma}$ defined in~\cite{codina2001stabilized} simply by the division of $\sigma$ by $\alpha_K $ in the denominator. This seems to indicate a weaker control on $\boldsymbol{u}_h$ for large reaction terms when $\alpha_K$ is simultaneously very small. It turns out this is not the case, as the asymptotic analysis presented below shows (see \cref{sec:DominantReaction}) and the numerical tests corroborate.
 \end{remark}
@@ -982,7 +998,7 @@ with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
 \begin{lemma} \label{lemma:Continuity}
     \amend{Under the standing assumptions of \cref{sec:CommonSetting}, but requiring of the design constants only $c_1,c_2>0$ (not the coercivity condition \cref{H:coercivity}; the complete proof in \cref{app:Continuity} uses these weaker hypotheses, though the mesh non-degeneracy and porosity resolution are still needed), and including the jump condition \cref{H:jump} when $\sigma>0$, there exists} a positive constant $C$, such that
     \begin{equation}
-        \bigl| B_\mathrm{S}(\boldsymbol{a}, U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h}_{\mathrm{S}},
+        \bigl| B_\mathrm{S}(\boldsymbol{a}; U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h}_{\mathrm{S}},
     \end{equation}
     for all $U_h, V_h \in \mathcal{X}_{h\amend{0}}$.
 \end{lemma}
@@ -1020,23 +1036,19 @@ linearized, constant{\hyp}coefficient problem analyzed here the resulting biline
   + \bigl(\Pi_1^{\perp}[\alpha X(U)],\,\alpha X(V)\bigr)_{\tau_1}
   + \bigl(\Pi_2^{\perp}[\nabla\cdot(\alpha\boldsymbol{u})],\,\nabla\cdot(\alpha\boldsymbol{v})\bigr)_{\tau_2},
 \end{equation}
-where $B$ is the Galerkin form and $X(U)=\boldsymbol{a}\cdot\nabla\boldsymbol{u}+\nabla p$ is
-the first{\hyp}order momentum operator. For constant $\sigma$ and $\varepsilon$ the reactive
+where $B$ is the Galerkin form and $X$ is the first{\hyp}order momentum operator of
+\cref{lemma:Stability}. For constant $\sigma$ and $\varepsilon$ the reactive
 and compressibility residuals belong to the finite{\hyp}element space and are annihilated by
-the projection (\cref{oa:lem:annihilation}), so they do not appear in \cref{eq:BosgsMain}. Here
-$(f,g)_{\tau_i}\coloneqq\sum_K\tau_{i,K}\,(f,g)_K$ and
-$\norm{f}_{\tau_i}\coloneqq(f,f)_{\tau_i}^{1/2}=\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h$ denote the
-$\boldsymbol{\tau}${\hyp}weighted broken product and norm. The
-analysis is carried out in the OSGS triple norm
+the projection (\cref{oa:lem:annihilation}), so they do not appear in \cref{eq:BosgsMain}. The analysis is carried out in the OSGS triple norm
 \begin{equation}\label{eq:TripleNormOSGS}
   \triplenorm{V}_{\mathrm{O}}
   \coloneqq
   \Bigl(
   2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\boldsymbol{v} \bigr\rVert^2
-  + \norm{\sigma^{1/2}\boldsymbol{v}}^2
-  + \varepsilon\norm{q}^2
-  + \norm{\alpha X(V)}_{\tau_1}^2
-  + \norm{\nabla\cdot(\alpha\boldsymbol{v})}_{\tau_2}^2
+  + \bigl\lVert\sigma^{1/2}\boldsymbol{v}\bigr\rVert^2
+  + \varepsilon\bigl\lVert q\bigr\rVert^2
+  + \bigl\lVert\alpha X(V)\bigr\rVert_{\tau_1}^2
+  + \bigl\lVert\nabla\cdot(\alpha\boldsymbol{v})\bigr\rVert_{\tau_2}^2
   \Bigr)^{1/2},
 \end{equation}
 which, unlike the ASGS norm $\triplenorm{\cdot}_{\mathrm{S}}$ of \cref{lemma:Stability}, controls
@@ -1073,9 +1085,9 @@ depends on the coefficient data. The result is a conditional stability theorem, 
 calibration of the stabilization constants.
 
 \begin{theorem}[Convergence of the OSGS method]\label{th:ConvergenceOSGS}
-Under the standing assumptions of \cref{sec:CommonSetting} (including the regularity \cref{H:regularity}) and for $h\le h_0$ as in \cref{th:StabilityOSGS}, the OSGS solution satisfies
+Under the standing assumptions of \cref{sec:CommonSetting} (including the regularity \cref{H:regularity}) and for $h\le h_0$ as in \cref{th:StabilityOSGS}, the OSGS solution $U_h$ satisfies, for the error $E_h\coloneqq U-U_h$,
 \begin{equation}\label{eq:ConvergenceOSGS}
-  \triplenorm{U-U_h}_{\mathrm{O}}
+  \triplenorm{E_h}_{\mathrm{O}}
   \ \le\ C\,\Psi_{\mathrm{O}}(h)
   = C\Bigl(\sum_K (c_1+\Dah)\,\frac{\alpha_K^2}{h_K^2}
   \bigl(\tau_{2,K}\,\Eint{K}{\boldsymbol{u}}^2 + \tau_{1,K}\,\Eint{K}{p}^2\bigr)\Bigr)^{1/2},
@@ -1086,7 +1098,7 @@ $(c_1+\Dah)^{1/2}$, with $\Dah\coloneqq\sigma h_K^2/(\alpha_K\nu)$ the elemental
 Damk\"ohler number.
 \end{theorem}
 
-\noindent The factor is a fixed $O(1)$ constant that degrades to $1+O(h_K^2)$ once the design
+\noindent The factor is a fixed $O(1)$ constant that reduces to $1+O(h_K^2)$ once the design
 constant $c_1$ is absorbed into $C$, but permits a pre{\hyp}asymptotic excess of order
 $\Dah^{1/2}$ in strongly reaction{\hyp}dominated regimes;
 it arises because the orthogonal projection deletes the reactive subscale that, in the ASGS
@@ -1098,7 +1110,7 @@ $\sigma${\hyp}robust, optimal{\hyp}order $L^2$ velocity estimate follows as
   \centering
   \small
   \renewcommand{\arraystretch}{1.25}
-  \caption{The linearized ASGS and OSGS analyses compared. Both concern the linearized
+  \caption{Comparison of the a priori analyses of the ASGS and OSGS methods. Both concern the linearized
   problem of \cref{sec:CommonSetting} and rest on the common standing assumptions
   \cref{H:mesh}--\cref{H:regularity}; the rows record the method{\hyp}specific differences.}
   \label{tab:ASGSvsOSGS}

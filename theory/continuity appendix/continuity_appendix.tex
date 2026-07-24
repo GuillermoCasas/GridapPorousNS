@@ -30,8 +30,8 @@
 \newcommand{\Cinva}{\overline{C}_{\mathrm{inv}}}
 \newcommand{\jump}[1]{[\![#1]\!]}
 \DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
-\newcommand{\triplenorm}[1]{{\left\vert\kern-0.25ex\left\vert\kern-0.25ex\left\vert #1
-\right\vert\kern-0.25ex\right\vert\kern-0.25ex\right\vert}}
+\newcommand{\triplenorm}[1]{{\lvert\kern-0.25ex\lvert\kern-0.25ex\lvert #1
+\rvert\kern-0.25ex\rvert\kern-0.25ex\rvert}}
 \newcommand{\sigmatilde}{\widetilde{\sigma}_{\alpha}}
 \newcommand{\Eint}[2]{\mathrm{E}^{#1}_{\mathrm{int}}(#2)}
 
@@ -197,7 +197,7 @@ norm of the main text is
   \coloneqq \Bigl(
   \nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bvh\bigr\rVert^2
   + \bigl\lVert\sigmatilde^{1/2}\bvh\bigr\rVert_h^2
-  + \varepsilon\norm{q_h}^2
+  + \varepsilon\bigl\lVert q_h \bigr\rVert^2
   + \bigl\lVert\tau_1^{1/2}\alpha\X(V_h)\bigr\rVert_h^2
   + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bvh)\bigr\rVert_h^2
   \Bigr)^{1/2}.
