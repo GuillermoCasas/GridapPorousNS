@@ -1,0 +1,853 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.6cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\usepackage[capitalize,noabbrev]{cleveref}
+\usepackage{xspace}
+
+% ------------------------- theorem environments -------------------------
+\theoremstyle{remark}
+\newtheorem{observation}{Observation}
+\newtheorem*{note}{Note}
+
+% ------------------------- macros (mirroring osgs_convergence.tex) -------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\bw}{\boldsymbol{w}}
+\newcommand{\ba}{\boldsymbol{a}}
+\newcommand{\bff}{\boldsymbol{f}}
+\newcommand{\bze}{\boldsymbol{0}}
+\newcommand{\ViscProj}{\Pi^{\mathrm{DS}}}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\normK}[1]{\lVert #1 \rVert_{K}}
+\newcommand{\tnorm}[1]{\lvert\!\lvert\!\lvert\, #1 \,\rvert\!\rvert\!\rvert}
+\newcommand{\tns}{\tau_{1,\mathrm{NS}}}
+\newcommand{\Eint}[2]{\mathrm{E}_{\mathrm{int},#1}(#2)}
+\newcommand{\Dah}{\mathrm{Da}_{h,K}}
+\newcommand{\Reh}{\mathrm{Re}_{h,K}}
+\newcommand{\sigmatilde}{\widetilde{\sigma}_{\alpha}}
+\newcommand{\Poneo}{\Pi_{1}^{\perp}}
+\newcommand{\Ptwoo}{\Pi_{2}^{\perp}}
+\newcommand{\smul}{\circledast}
+\newcommand{\pmul}{\circ}
+
+\newcommand{\forced}{\textsc{f}\xspace}   % forced by new physics
+\newcommand{\tight}{\textsc{t}\xspace}    % tightening of exposition
+\newcommand{\scope}{\textsc{s}\xspace}    % scope restriction
+
+\title{Porosity-specific particularities of the OSGS a priori analysis\\[0.4ex]
+\large A term-by-term comparison with Codina's orthogonal-subscale analysis of\\
+the Oseen equations, and where the two proofs diverge}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note compares, assumption by assumption and proof step by proof step, the
+orthogonal-subgrid-scale (OSGS) a priori analysis of the linearized incompressible
+inertial porous-media flow equations---the analysis carried out in the companion
+manuscript~\cite{companion} and its self-contained backing note~\cite{osgsnote}---with
+its direct ancestor, Codina's analysis of the Oseen equations by orthogonal
+subscales~\cite{Codina2008}. Three questions are addressed. First, \emph{what is forced
+by the new equation}: the porosity weight $\alpha(\boldsymbol x)$, the Darcy reaction
+$\sigma\bu$, the artificial-compressibility term $\varepsilon p$, and the
+deviatoric--symmetric viscous operator $\ViscProj$ each dictate concrete changes to the
+hypotheses, the stabilization parameters, the working norm and the estimates, catalogued
+in \cref{sec:forced}. Second, \emph{where the two proofs differ as proofs}, summarized as
+a step-by-step ledger in \cref{sec:ledger}. Third---answering an explicit question, and
+with the honest qualification that the answer is mostly ``no error, but the exposition can
+be tightened''---\emph{where the Oseen analysis of~\cite{Codina2008} is less than fully
+explicit}, and how the porous analysis sharpens it (\cref{sec:rigor}). Of the points
+examined, exactly one (the smoothing lemma silently requiring a smooth-grading mesh
+hypothesis) is a genuine, if benign, implicit assumption; the others are matters of
+\emph{sharpness} (the $\ell^1$ error functional), \emph{disclosure} (stabilization
+constants), or \emph{cleaner devices} (variable-$\tau$ projection handling). None is a
+soundness defect: every theorem of~\cite{Codina2008} is correct as stated, and
+R.~Codina is a co-author of~\cite{companion}. Throughout, ``Codina 2007'' denotes the
+2007-online / 2008-print paper~\cite{Codina2008} (Appl.\ Numer.\ Math.\ \textbf{58}
+(2008) 264--283); the companion note~\cite{osgsnote} cites it under the key
+\texttt{Codina2008}.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+% =====================================================================================
+\section{Scope and the correct triangulation}
+\label{sec:scope}
+
+Codina 2007~\cite{Codina2008} analyzes the stationary \emph{Oseen} problem
+\begin{equation}
+  \label{eq:oseen}
+  -\nu\Delta\bu + \ba\cdot\nabla\bu + \nabla p = \bff,
+  \qquad \nabla\cdot\bu = 0 \ \text{ in }\Omega, \qquad \bu = \bze \ \text{ on }\partial\Omega,
+\end{equation}
+stabilized by orthogonal subscales. It contains \emph{three} analyzed formulations:
+\textbf{Method~I} (a single projected residual per equation; Theorems~1--2), \textbf{Method~II}
+(convective and pressure-gradient fluctuations controlled separately, in a finer norm;
+Theorems~3--4), and a \textbf{pressure-only, viscous-dominated variant} whose norm depends
+explicitly on the mesh and global Reynolds numbers (Theorems~5--6). The companion
+paper~\cite{companion,osgsnote} treats the linearized porous problem
+\begin{subequations}
+\label{eq:porous}
+\begin{alignat}{2}
+  \alpha\,\ba\cdot\nabla\bu - 2\nabla\cdot(\alpha\nu\,\ViscProj\nabla\bu)
+  + \alpha\nabla p + \sigma\bu &= \bff && \quad\text{in }\Omega, \\
+  \varepsilon p + \nabla\cdot(\alpha\bu) &= 0 && \quad\text{in }\Omega,
+  \qquad \bu=\bze \ \text{ on }\partial\Omega,
+\end{alignat}
+\end{subequations}
+and adapts \textbf{only Method~I} (\cref{sec:ledger} records this as the single largest
+scope difference). Method~II survives in~\cite{osgsnote} as a one-paragraph prospective
+remark whose proof is not written out; the viscous-dominated pressure-only variant has no
+porous analogue at all.
+
+\paragraph{Two ancestor papers, two routes.}
+A recurring source of confusion must be dispatched at the outset. The porous work has
+\emph{two} a priori analyses following \emph{two different} Codina papers along
+\emph{two different} routes:
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Porous variant & Template & Route \\
+\midrule
+ASGS (companion App.~C~\cite{companion}) & Codina 2001~\cite{Codina2001} & coercivity / C\'ea \\
+OSGS (companion App.~D~\cite{companion}, $=$\cite{osgsnote}) & Codina 2007~\cite{Codina2008} & non-coercive inf--sup \\
+\bottomrule
+\end{tabular}
+\end{center}
+\emph{This note compares the OSGS row only: Codina 2007 versus the porous OSGS analysis.}
+The consequence is important for a fair comparison of assumptions. Objects such as the
+interior-face \emph{jump condition} on $\tau_1$, the \emph{enlarged inverse constant}
+$\overline{C}_{\mathrm{inv}}$ for $\nabla\cdot(\alpha\nu\ViscProj\nabla\bu_h)$, and the
+\emph{damped reaction coefficient} $\sigmatilde$ are \emph{Codina 2001} $\leftrightarrow$
+\emph{porous-ASGS} objects. Codina 2007 is pure Oseen ($\sigma=0$) and has none of them; the
+porous OSGS analysis \emph{dispenses} with the first two relative to the porous ASGS analysis
+and never had the third. It would therefore be wrong to say ``the OSGS variant drops
+hypothesis~H:jump of Codina 2007''---that hypothesis is not in Codina 2007.
+
+\paragraph{A symbol collision to keep in view.}
+Codina 2007 uses the letters $\alpha$ and $\sigma$ for \emph{design constants}:
+$\alpha>1$ is the stabilization-amplification factor in $c_1=\alpha^2C_{\mathrm{inv}}^2$,
+$c_2=\alpha C_{\mathrm{inv}}$, and $0<\sigma\le1$ appears in $c_3=\sigma$,
+$c_4=\sigma/(\alpha C_{\mathrm{inv}})$ (his Eqs.~(27)--(28)). In the porous problem the
+same letters are \emph{physical fields}: $\alpha$ is the porosity and $\sigma$ the Darcy
+reaction. The porous note therefore renames Codina's amplification factor $\alpha\to\gamma$
+(hypothesis (A6): $c_1\ge\gamma^2C_{\mathrm{inv}}^2$, $c_2\ge\gamma C_{\mathrm{inv}}$), and
+Codina's design constant $\sigma$ simply disappears because, as \cref{sec:params} shows,
+the porous $\tau_2$ is not free. \emph{One must not identify the porous $\alpha,\sigma$
+with Codina's $\alpha,\sigma$.}
+
+\paragraph{What is reused verbatim.}
+The porous OSGS proof reuses from Codina 2007, essentially unchanged in \emph{structure}:
+the non-coercive inf--sup argument built on a specially designed test function
+($\tau\smash{\smul}\Pi_0$ of the projected residual); the continuous element-size surrogate
+of his Lemma~1; the smoothing operation of his Lemma~2; the best-approximation property of
+the weighted projection (his Remark~4, Eq.~(46)); and the ``interpolate--consistency--triangle''
+skeleton of his Theorem~2. What changes is dictated, almost entirely, by the four new
+ingredients of~\cref{eq:porous}.
+
+% =====================================================================================
+\section{The two model problems, side by side}
+\label{sec:models}
+
+\Cref{tab:models} isolates the four structural differences between~\cref{eq:oseen}
+and~\cref{eq:porous}. Everything in \crefrange{sec:forced}{sec:ledger} is a consequence of
+one of these four rows.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}p{0.20\linewidth}p{0.36\linewidth}p{0.36\linewidth}@{}}
+\toprule
+Ingredient & Codina 2007 (Oseen) & Porous linearized NS \\
+\midrule
+Viscous operator
+ & $-\nu\Delta\bu$; energy $\nu\norm{\nabla\bu}^2$
+ & $-2\nabla\cdot(\alpha\nu\ViscProj\nabla\bu)$; energy $2\nu\norm{\alpha^{1/2}\ViscProj\nabla\bu}^2$ \\
+Coefficient weight
+ & unweighted operators; $\nabla\cdot\ba=0$
+ & everything weighted by porosity $\alpha(\boldsymbol x)$; weighted solenoidality $\nabla\cdot(\alpha\ba)=0$ \\
+Zero-order term
+ & none
+ & Darcy reaction $\sigma\bu$, $\sigma\ge0$ constant \\
+Mass equation
+ & $\nabla\cdot\bu=0$ (exactly incompressible)
+ & $\varepsilon p+\nabla\cdot(\alpha\bu)=0$ (artificial compressibility $\varepsilon\ge0$) \\
+\bottomrule
+\end{tabular}
+\caption{The four ingredients that separate the porous problem from Oseen. The Galerkin
+form gains, respectively, a deviatoric--symmetric viscous pairing, the porosity weight,
+the reaction pairing $\sigma(\bv,\bu)$, and the compressibility pairing
+$\varepsilon(q,p)$.}
+\label{tab:models}
+\end{table}
+
+The Galerkin bilinear form and its coercivity (``diagonal'') identity make the four
+additions concrete. In Codina 2007 (his Eqs.~(4), (39)),
+\[
+  B(U,V)=\nu(\nabla\bu,\nabla\bv)+(\ba\cdot\nabla\bu,\bv)-(p,\nabla\cdot\bv)+(q,\nabla\cdot\bu),
+  \qquad
+  B(U,U)=\nu\norm{\nabla\bu}^2;
+\]
+in the porous problem (\cite{osgsnote}, Eqs.~\texttt{GalerkinForm}, \texttt{CoercivityIdentity}),
+\[
+  B(\ba;U,V)=(\bv,\alpha\ba\cdot\nabla\bu)+2(\nabla\bv,\alpha\nu\ViscProj\nabla\bu)
+  +(\bv,\alpha\nabla p)+\sigma(\bv,\bu)+\varepsilon(q,p)+(q,\nabla\cdot(\alpha\bu)),
+\]
+\[
+  B(\ba;U,U)=2\nu\norm{\alpha^{1/2}\ViscProj\nabla\bu}^2+\norm{\sigma^{1/2}\bu}^2+\varepsilon\norm{p}^2 .
+\]
+The two \emph{new} diagonal quantities $\norm{\sigma^{1/2}\bu}^2$ and
+$\varepsilon\norm{p}^2$, and the replacement of $\nu\norm{\nabla\bu}^2$ by the
+deviatoric--symmetric $2\nu\norm{\alpha^{1/2}\ViscProj\nabla\bu}^2$, propagate into every
+downstream estimate.
+
+% =====================================================================================
+\section{Assumptions: H1--H6 versus (A1)--(A8)}
+\label{sec:assumptions}
+
+\Cref{tab:assumptions} aligns Codina's six hypotheses with the porous eight and classifies
+each porous item as \forced{} (forced by the new physics), \tight{} (a tightening or
+explicit disclosure of something implicit in Codina 2007), or an inherited transcription.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{0.09\linewidth}p{0.40\linewidth}p{0.42\linewidth}@{}}
+\toprule
+Porous & Content & Relation to Codina 2007 \\
+\midrule
+(A1) & Nondegenerate mesh; inverse estimate; quasi-uniform patches; continuous element-size surrogate.
+ & $=$ H3 $+$ his Lemma~1. Inherited. \\
+(A2) & $\nu>0$, $\sigma\ge0$, $\varepsilon\ge0$ constant; Darcy tensor \emph{isotropic}, $\boldsymbol\sigma=\sigma\boldsymbol1$.
+ & \forced. No Codina analogue; restricts the paper's general Forchheimer tensor $\boldsymbol\sigma(\alpha,\bu)$ so that the annihilation lemma holds. \\
+(A3) & Porosity $\alpha\in W^{1,\infty}$, $0<\alpha_0\le\alpha\le\alpha_\infty\ (\le1)$; \emph{resolution} $h_K\norm{\nabla\alpha}_{\infty,K}\le C_{\nabla\alpha}\alpha_K$; and $\alpha\in W^{m,\infty}$, $m=\max(k_u,k_p)$, when $m\ge2$.
+ & \forced. Entirely new. Codina has $\alpha\equiv1$. \\
+(A4) & $\ba\in C^0$, elementwise $W^{1,\infty}$; \emph{weighted} solenoidality $\nabla\cdot(\alpha\ba)=0$; and $\norm{D^j\ba}_{\infty,K}\le C_D|\ba|_{\infty,K}$ for consistency.
+ & \forced (weight) $+$ $=$ H1 (regularity) $+$ $=$ H2 (derivative bound). Codina: $\nabla\cdot\ba=0$. \\
+(A5) & Continuous $V_h,Q_h$ of degrees $k_u,k_p\ge1$, $k_p\le k_u+1$; constants in $Q_h$; Dirichlet data.
+ & Refines Codina's ``degree $k$ for both'': the porous analysis carries \emph{separate} $k_u,k_p$. \tight. \\
+(A6) & $c_1\ge\gamma^2C_{\mathrm{inv}}^2$, $c_2\ge\gamma C_{\mathrm{inv}}$, $\gamma\ge\gamma_0$; and $\varepsilon\tau_{2,K}\le C_2\le1$.
+ & $=$ H5 with amplification $\alpha\to\gamma$; \emph{explicit} admissible $\gamma_0$ (Codina leaves ``$\alpha$ large enough'' qualitative). $\varepsilon$-bound is new (\forced by $\varepsilon$). \tight/\forced. \\
+(A7) & Projection stability: $\norm{z_h}_{\tau_1}\le\beta_0^{-1}(\norm{\Pi_{1,0}z_h}_{\tau_1}+\norm{\Poneo z_h}_{\tau_1})$ for $z_h=\alpha X(V_h)$.
+ & $=$ H4 (his condition (35)), transported to the \emph{weighted} residual, and imposed only on the \emph{momentum} slot (see \cref{sec:ledger}). \\
+(A8) & $\bu\in H^{k_u+1}\cap H^1_0$, $p\in H^{k_p+1}\cap Q_0$.
+ & \tight. Stronger than H6, which assumes only $p\in H^{k}$ (one order below velocity). \\
+\bottomrule
+\end{tabular}
+\caption{The porous hypotheses against Codina's. \forced{}: forced by the new physics.
+\tight{}: a tightening/disclosure of something Codina left implicit or coarser.}
+\label{tab:assumptions}
+\end{table}
+
+Two observations deserve emphasis.
+
+\begin{observation}[The pressure-regularity/order refinement]
+Codina's H6 asks only for $p\in H^{k}(\Omega)$ with a \emph{single} interpolation degree
+$k$, and his error function carries the pressure at order $h^{k}$---one order below the
+velocity's $h^{k+1}$. The porous (A8) asks for $p\in H^{k_p+1}$ and carries the pressure at
+its own \emph{full} order $h^{k_p+1}$, with a possibly distinct degree $k_p\le k_u+1$. This
+is a genuine hypothesis and error-order difference, orthogonal to the four physical
+ingredients, and it is worth stating explicitly because it changes what ``optimal'' means
+for the pressure.
+\end{observation}
+
+\begin{observation}[The reaction is not wholly unprecedented in Codina's programme]
+Codina 2007 itself notes (immediately after its Eq.~(16)) that
+reference~\cite{Codina2001}---the very paper the porous \emph{ASGS} analysis
+follows---already analyzed ``zero-order terms coming from Coriolis forces and permeability
+effects'', i.e.\ an algebraic-subscale analysis \emph{with} a permeability zero-order term.
+Thus the Darcy reaction is unprecedented specifically in the \emph{orthogonal}-subscale
+setting of Codina 2007, not in Codina's stabilized-FEM programme as a whole. The novelty
+below is precise: it is the interaction of the reaction with the \emph{orthogonal
+projection} (the annihilation of the reactive residual) that is new.
+\end{observation}
+
+% =====================================================================================
+\section{How the new equation forces the differences}
+\label{sec:forced}
+
+We take the four ingredients in turn, tracing each to the assumptions, parameters, norm,
+and estimates it dictates.
+
+\subsection{Porosity weight \texorpdfstring{$\alpha(\boldsymbol x)$}{alpha(x)}}
+\label{sec:alpha}
+
+The porosity does not merely rescale; because it is a \emph{variable field} it changes the
+algebra of every step.
+\begin{enumerate}[leftmargin=1.5em,itemsep=0.3ex]
+\item \emph{The stabilized residual carries the weight.} The natural stabilized quantity is
+$\alpha X(V)=\alpha(\ba\cdot\nabla\bv+\nabla q)$, not the bare $X(V)$ of Codina. Both
+stabilization terms $S_1,S_2$ (\cite{osgsnote}, Eq.~\texttt{Sdefs}) project the
+\emph{weighted} momentum residual $\alpha X(U)$ and the \emph{weighted} divergence
+$\nabla\cdot(\alpha\bu)$.
+\item \emph{Weighted solenoidality.} The convective skew-symmetry that makes the Galerkin
+form diagonal now requires $\nabla\cdot(\alpha\ba)=0$ (assumption (A4)):
+$(\bu,\alpha\ba\cdot\nabla\bu)=\tfrac12(\alpha\ba,\nabla|\bu|^2)=-\tfrac12(\nabla\cdot(\alpha\ba),|\bu|^2)=0$.
+Codina's $\nabla\cdot\ba=0$ (H1) is the $\alpha\equiv1$ special case.
+\item \emph{Porosity-resolution condition (A3).} A hypothesis with \emph{no} Codina analogue:
+$h_K\norm{\nabla\alpha}_{\infty,K}\le C_{\nabla\alpha}\alpha_K$. It is consumed in three
+places: (i) a dedicated \emph{multiplicative} patch-equivalence lemma for $\alpha$
+(\cite{osgsnote}, \texttt{lem:patch}), whose constant $\delta_\alpha^2=(1+C_{\nabla\alpha})^2$
+depends only on $C_{\nabla\alpha}$ and \emph{not} on the porosity contrast
+$\alpha_\infty/\alpha_0$; (ii) the $\nabla\alpha$ term that appears whenever
+$\nabla\cdot(\alpha\bw)=\alpha\nabla\cdot\bw+\nabla\alpha\cdot\bw$ is expanded (stability
+term T7, interpolation term I7); (iii) the Leibniz step in the weighted best-approximation
+lemma. Codina's Lemma~1 equilibrates only $\tau$ across a patch; it never equilibrates a
+\emph{coefficient} like $\alpha$.
+\item \emph{The $\nabla\alpha$ term inflates the stability threshold.} Because
+$\nabla\cdot(\alpha\bw_h)$ carries the extra $\nabla\alpha\cdot\bw_h$ piece, term T7 gains
+the factor $M_2=1+C_{\nabla\alpha}/C_{\mathrm{inv}}$, which propagates into the admissible
+design constant $\gamma_0=10(1+M_2)$. In Codina, where $\alpha\equiv1$, the corresponding
+term has only $\nabla\cdot\bw_h$ and the threshold is merely ``$\alpha>3/2$''.
+\item \emph{Weighted inverse estimates.} Codina's three closing inequalities on his p.~273 gain
+the weight $\alpha_K$ and become $\mathrm{(K1)}$--$\mathrm{(K3)}$ of~\cite{osgsnote}
+(e.g.\ $C_{\mathrm{inv}}(\alpha_K\nu)^{1/2}/h_K\le\gamma^{-1}\tau_1^{-1/2}$), with the
+amplification $\alpha\to\gamma$ already noted.
+\item \emph{Extra porosity smoothness for $k\ge2$.} The best-approximation lemma must project the
+\emph{product} $\alpha z$; a Leibniz bound $\norm{\alpha z}_{H^r(S_K)}\le
+C\,C_{\alpha,r}\alpha_{\infty}\norm{z}_{H^r(S_K)}$ forces the constant $C_{\alpha,r}$ and
+hence the $W^{m,\infty}$ tail of (A3). Codina projects $z$ itself.
+\end{enumerate}
+
+\subsection{Darcy reaction \texorpdfstring{$\sigma\bu$}{sigma u}: the structural heart}
+\label{sec:reaction}
+
+This is where the analysis genuinely departs from Codina 2007, through a single mechanism.
+
+\paragraph{Annihilation.} For constant $\sigma$, $\sigma\bu_h$ is a finite element function,
+so its orthogonal fluctuation vanishes identically: $\Poneo(\sigma\bu_h)=\bze$
+(\cite{osgsnote}, \texttt{lem:annihilation}). The orthogonal projection therefore
+\emph{deletes} the reactive residual. There is no reactive subscale to renormalize the
+reaction coefficient.
+
+\paragraph{$\sigma$ versus $\sigmatilde$ (the trade).} Contrast the ASGS variant, whose
+residual-based stabilization retains the reactive fluctuation and produces the diagonal
+$\sigma(1-\sigma\tau_1)\norm{\bu_h}^2=\sigmatilde\norm{\bu_h}^2$ with the \emph{damped}
+\[
+  \sigmatilde=\frac{\tns^{-1}\sigma}{\tns^{-1}+\sigma/\alpha_K}\le\sigma .
+\]
+Because OSGS annihilates the reactive residual, no such damping occurs: the \emph{full}
+$\norm{\sigma^{1/2}\bu_h}^2$ survives in the diagonal and in the working norm. This is a
+strictly \emph{stronger} stability estimate---the porous OSGS triple norm dominates the ASGS
+triple norm term by term (\cite{osgsnote}, \texttt{lem:normcomparison}). The price is paid
+on the other side of the ledger: the reactive and pressure \emph{interpolation} errors, no
+longer absorbable through a reactive subscale, must be bounded head-on, and the best
+conversions available cost a Damk\"ohler factor.
+
+\paragraph{The Damk\"ohler factor and its two new identities.} The reaction enters $\tau_1$
+through its denominator, $\tau_1=(\alpha_K\tns^{-1}+\sigma)^{-1}$ (Codina's $\tau_1$ has no
+reaction), and this forces two parameter inequalities with no Codina analogue, in terms of
+the elemental \emph{mesh Damk\"ohler number} $\Dah=\sigma h_K^2/(\alpha_K\nu)$:
+\begin{align}
+  \text{(P5)}\quad & \alpha_K^2\tau_1\tau_2\ge\frac{h_K^2}{c_1+\Dah},
+  \qquad\text{hence}\qquad \tau_2^{-1/2}\le(c_1+\Dah)^{1/2}\tfrac{\alpha_K}{h_K}\tau_1^{1/2}, \\
+  \text{(P6)}\quad & \sigma^{1/2}\le\Dah^{1/2}\,\tfrac{\alpha_K}{h_K}\tau_2^{1/2}.
+\end{align}
+(P5) is the sole origin of the $(1+\Dah)^{1/2}$ inflation. When $\sigma=0$ it collapses to
+Codina's exact relation ``$\tau_{1,K}$ behaves as $h_K^2\tau_{2,K}^{-1}$'' (the last line of
+his Lemma~3 proof), i.e.\ $\alpha_K^2\tau_1\tau_2=h_K^2/c_1$. The reaction thus \emph{adds}
+$\Dah$ to a quantity that was a clean equality in the Oseen case.
+
+\paragraph{New proof terms.} The reaction produces the new stability pairing
+$\mathrm{T3}=\sigma(\bu_h,\bw_h)$, absorbed by the full diagonal $\norm{\sigma^{1/2}\bu_h}^2$
+using only $\sigma\tau_1\le1$; the new interpolation group I3; the reaction-inflated error
+functional (\cref{sec:params}); and an entirely new corollary---the \emph{$\sigma$-robust
+optimal $L^2$ velocity estimate} (\cite{osgsnote}, \texttt{cor:Ltwo}), obtained by dividing
+the $\sigma$-controlled triple norm by $\sigma^{1/2}$, with the pressure contribution
+\emph{decaying} as $(\sigma\nu)^{-1/2}$. Codina has no reaction and therefore no $L^2$
+velocity control except in his Reynolds-degrading viscous-dominated variant.
+
+\subsection{Artificial compressibility \texorpdfstring{$\varepsilon p$}{eps p}: a new consistency term}
+\label{sec:eps}
+
+The compressibility is easy to overlook but produces a qualitatively new phenomenon.
+\begin{enumerate}[leftmargin=1.5em,itemsep=0.3ex]
+\item \emph{New diagonal and new pairing.} The form gains $\varepsilon(q,p)$; the diagonal
+gains $\varepsilon\norm{p_h}^2$; the stability expansion gains
+$\mathrm{T4}=\varepsilon(p_h,r_h)$, controlled by the new design bound $\varepsilon\tau_2\le
+C_2\le1$ (assumption (A6))---an upper bound on $\varepsilon$ absent from Codina.
+\item \emph{The mass consistency term stops vanishing.} This is the salient point. In
+Codina, $\nabla\cdot\bu=0$ \emph{exactly}, so the mass part of his consistency error (his
+Eq.~(44), second term) is $(\Ptwoo(\nabla\cdot\bu),\cdot)=0$: it vanishes identically. In
+the porous problem the exact mass equation reads $\nabla\cdot(\alpha\bu)=-\varepsilon p$, so
+\[
+  S_2(U,V_h)=-\varepsilon\bigl(\Ptwoo p,\ \nabla\cdot(\alpha\bv_h)\bigr)_{\tau_2}\neq0
+  \quad(\varepsilon>0),
+\]
+a genuinely new consistency contribution that must be bounded head-on, via
+$\varepsilon\le C_2\tau_2^{-1}$ and (P5), and contributes a $(c_1+\Dah)$-carrying term to the
+error functional. It vanishes precisely when $\varepsilon=0$, isolating $\varepsilon$ as its
+sole driver. There is also a matching interpolation group I4 and the annihilation
+$\Ptwoo(\varepsilon p_h)=0$ for constant $\varepsilon$.
+\end{enumerate}
+
+\subsection{Deviatoric--symmetric viscous operator \texorpdfstring{$\ViscProj$}{Pi-DS}}
+\label{sec:visc}
+
+The viscous term is $-2\nabla\cdot(\alpha\nu\ViscProj\nabla\bu)$, with $\ViscProj$ the
+pointwise orthogonal projection onto the deviatoric--symmetric part of a tensor. Two
+consequences.
+\begin{enumerate}[leftmargin=1.5em,itemsep=0.3ex]
+\item \emph{Energy in a projected seminorm.} The diagonal and the norm carry
+$2\nu\norm{\alpha^{1/2}\ViscProj\nabla\bu}^2$ instead of Codina's $\nu\norm{\nabla\bu}^2$.
+The perturbation bound for the viscous cross term (T1, I1) uses $|\ViscProj\boldsymbol M|\le|\boldsymbol M|$
+pointwise.
+\item \emph{Definiteness of the norm is no longer trivial.} Because control is on
+$\ViscProj\nabla\bv$, not $\nabla\bv$, the triple norm is definite only through a
+Korn-type identity
+\[
+  \norm{\ViscProj\nabla\bv}^2=\tfrac12\norm{\nabla\bv}^2+\bigl(\tfrac12-\tfrac1d\bigr)\norm{\nabla\cdot\bv}^2,
+\]
+valid on $H^1_0$ (full Dirichlet data, via integration by parts), whence
+$\norm{\nabla\bv}\le\sqrt2\,\norm{\ViscProj\nabla\bv}$; absent full Dirichlet data or
+pressure normalization the triple norm is only a \emph{seminorm} (\cite{osgsnote},
+\texttt{lem:definiteness}). Codina's $\nu^{1/2}\norm{\nabla\bv}$ is a norm outright by
+Poincar\'e. The companion paper flags that this deviatoric structure is precisely what
+would make a Korn-type inequality nontrivial for a full existence theory.
+\item \emph{The neglected viscous residual carries $\nabla\alpha$ even at $k_u=1$.} In Codina,
+the dropped viscous residual $\nu\Delta\bu_h$ vanishes on element interiors for linear
+elements. Here the dropped residual is $2\nu(\ViscProj\nabla\bu_h)\nabla\alpha$, nonzero
+already at $k_u=1$ whenever $\alpha$ varies (though small under (A3)). This slightly widens
+the analyzed-versus-implemented distance of the Method~I simplification.
+\end{enumerate}
+
+\subsection{A parameter re-parametrization worth naming}
+\label{sec:params}
+
+Codina 2007 uses \emph{four independent} design constants: $\tau_1=[c_1\nu/h^2+c_2|\ba|/h]^{-1}$
+and $\tau_2=c_3\nu+c_4|\ba|h$ (his Eqs.~(11)--(12)), with $c_1,c_2$ in (27) and
+$c_3,c_4$ in (28). The porous $\tau_2$ is \emph{not free}: it is slaved to $\tns$,
+\[
+  \tau_{2,K}=\frac{h_K^2}{c_1\alpha_K\tns}=\frac{\nu}{\alpha_K}\Bigl(1+\tfrac{c_2}{c_1}\Reh\Bigr),
+\]
+so the exact identity $h_K^2\tns^{-1}=c_1\alpha_K\tau_2$ (P3) holds, and only $c_1,c_2$
+survive as free constants. This coupling---not present in Codina---is what \emph{generates}
+(P3) and (P5) and hence the Damk\"ohler factor. The reduction of the porous theorem to
+Codina's Theorem~2 therefore requires the dictionary $c_3=1$, $c_4=c_2/c_1$ (in the limit
+$\alpha\equiv1$, $\sigma=\varepsilon=0$); it is not a free relabeling of four constants but
+a consequence of the two-constant structure.
+
+The error functionals reflect the same story. Codina's is the $\ell^1$ element sum
+(his Eq.~(36))
+\[
+  \varepsilon_{\mathrm C}(h)=\sum_K\Bigl(\tau_{1,K}^{-1/2}h_K^{k+1}\norm{\bu}_{k+1,K}
+  +\tau_{2,K}^{-1/2}h_K^{k}\norm{p}_{k,K}\Bigr);
+\]
+the porous theorem is stated in the \emph{sharp} porosity-weighted broken $\ell^2$ functional
+\[
+  \Psi_{\mathrm O}(h)=\Bigl(\sum_K(c_1+\Dah)\tfrac{\alpha_K^2}{h_K^2}
+  \bigl(\tau_{2,K}\Eint{K}{\bu}^2+\tau_{1,K}\Eint{K}{p}^2\bigr)\Bigr)^{1/2},
+\]
+whose coarser $\ell^1$ majorant $\mathcal E(h)$ (the ASGS error function times
+$(1+\Dah)^{1/2}$) is retained only as a comparator. The relation $\Psi_{\mathrm O}\le
+c_1^{1/2}\mathcal E$ and the deliberate choice to state the theorem in $\Psi_{\mathrm O}$ is
+the subject of \cref{sec:rigor}\,(i).
+
+% =====================================================================================
+\section{Where the Oseen analysis is less than fully explicit}
+\label{sec:rigor}
+
+The question ``are there places where the original paper was not completely rigorous?'' has,
+after a careful re-reading, a nuanced answer, and it is worth stating the verdict before the
+evidence: \textbf{Codina 2007 contains no soundness error.} Every inequality is valid and
+every theorem holds as stated. What the porous analysis does---appropriately, since Codina
+co-authors it---is (i) state one estimate in a sharper norm, (ii) surface one implicit mesh
+hypothesis, (iii) disclose the gap between provable and practical constants, and (iv) replace
+one ``trivially'' with an exact, variable-coefficient-robust device. Only item (ii) is a
+genuine (and entirely benign) implicit assumption. We take them in order, each with its fair
+severity.
+
+\subsection*{(i) The \texorpdfstring{$\ell^1$}{l1} error functional is coarser than the sharp \texorpdfstring{$\ell^2$}{l2} object (sharpness, not soundness)}
+
+Codina's convergence Theorems~2 and~4 read $\tnorm{U-U_h}\le C\varepsilon_{\mathrm C}(h)$,
+with $\varepsilon_{\mathrm C}(h)$ the \emph{$\ell^1$} element sum above. But the $\tau$-norm
+$\norm{\cdot}_{\tau}=(\sum_K\tau_K\norm{\cdot}_K^2)^{1/2}$ that appears throughout the proof
+is an \emph{$\ell^2$} object, and the passage from it to $\varepsilon_{\mathrm C}(h)$---his
+Eq.~(46), $\norm{v-\Pi_\tau v}_\tau\le C\sum_K\tau_K^{1/2}h_K^r\norm{v}_{H^r(K)}$---uses the
+valid but lossy step $(\sum b_K^2)^{1/2}\le\sum b_K$.
+
+The gap is quantifiable. On a quasi-uniform mesh in $d$ dimensions with $N\sim h^{-d}$
+elements, a smooth solution has $\norm{\bu}_{H^{k+1}(K)}=O(h^{d/2})$ (since $|K|=O(h^d)$).
+With the diffusion-dominated scaling $\tau_1^{-1/2}\sim\nu^{1/2}/h$, the per-element term is
+$a_K=O(\nu^{1/2}h^{k+d/2})$; the sharp $\ell^2$ functional is
+$\Psi=(\sum a_K^2)^{1/2}=N^{1/2}a=O(\nu^{1/2}h^{k})$---the \emph{optimal} energy-norm
+rate---while the literal $\ell^1$ sum is $\varepsilon_{\mathrm C}=\sum a_K=Na=O(\nu^{1/2}h^{k-d/2})$.
+The ratio is exactly $N^{1/2}=h^{-d/2}$: for $d=2,k=1$, $\Psi=O(h)$ but
+$\varepsilon_{\mathrm C}=O(1)$; for $d=3,k=1$, $\varepsilon_{\mathrm C}=O(h^{-1/2})$, which
+does not even go to zero.
+
+\begin{note}
+This is a matter of \emph{sharpness}, not correctness. The theorem
+$\tnorm{U-U_h}\le C\varepsilon_{\mathrm C}(h)$ is a true inequality; the optimal rate is
+genuinely delivered by the $\ell^2$ object that already lives inside Codina's own proof
+(the $\tau$-norm best-approximation). The $O(h^{k-d/2})$ reading is what one gets by
+substituting local smooth-solution scalings term by term into the $\ell^1$ sum---something no
+informed reader of the stabilized-FEM literature does, where $\sum_K h^{k+1}\norm{\bu}_{k+1,K}$
+is understood at optimal order. The porous analysis simply makes this explicit: it states its
+theorem in $\Psi_{\mathrm O}$ and \emph{names} the loss (``the $\ell^1$ passage to $\mathcal E$
+can lose a mesh-cardinality factor $\sim h^{-d/2}$ on a quasi-uniform family, so the
+optimal-order corollaries must be read off the $\ell^2$ functional''). Severity: negligible as
+correctness, moderate as presentation. Note that the porous \emph{ASGS} appendix itself still
+uses an $\ell^1$ error functional in the Codina style, so this refinement is specifically a
+feature of the \emph{OSGS} note.
+\end{note}
+
+\subsection*{(ii) The smoothing lemma silently needs a smooth-grading mesh hypothesis (a genuine, benign gap)}
+
+This is the one point at which a hypothesis is genuinely missing. Codina's Lemma~2 bounds
+$\norm{\tau\pmul v_h-\tau\smul v_h}_K\le\tau_K\psi(h)\norm{v_h}_K$ with $\psi(h)\to0$, and
+its proof reduces this to $\max_{a\in N_K}|\bar\tau_a/\tau_K-1|\to0$, then closes with the
+single sentence: ``From the continuity assumed for the advection velocity $\ba$ we have that
+$\bar\tau_a\to\tau_K$ as $h\to0$.'' But $\tau_1$ depends on $h$ through $c_1\nu/h^2+c_2|\ba|/h$,
+with the element length the continuous surrogate $\chi_1(\boldsymbol x_K,h)$, while the nodal
+$\bar\tau_a$ uses $\chi_1(\boldsymbol x_a,h)$. Writing $\rho=\chi_1(\boldsymbol x_a,h)/\chi_1(\boldsymbol x_K,h)$,
+\[
+  \frac{\bar\tau_{1,a}^{-1}}{\tau_{1,K}^{-1}}
+  =\frac{c_1\nu/(\rho h_K)^2+c_2|\ba|/(\rho h_K)}{c_1\nu/h_K^2+c_2|\ba|/h_K}
+  \ \xrightarrow{\ h\to0\ }\ \begin{cases}\rho^{-2}&\text{(viscous-dominated)}\\[0.3ex]\rho^{-1}&\text{(convection-dominated)}\end{cases}
+\]
+which equals $1$ \emph{only if} $\rho\to1$. Continuity of $\ba$ controls the amplitude
+$|\ba(\boldsymbol x_a)|\to|\ba|_{\infty,K}$ but says nothing about $\rho$. His Lemma~1 delivers
+only a \emph{bounded} ratio $\chi_2/\chi_1\le\chi_0<\infty$ (patch quasi-uniformity), and
+bounded is not $\to1$. Indeed, even global quasi-uniformity with genuine size variation
+(element sizes in $[\underline c\,h,\overline c\,h]$, $\overline c>\underline c$) can keep
+$\rho$ away from $1$: a family with a fixed red/green refinement interface, refined uniformly,
+is shape-regular and patch-quasi-uniform with $h$-independent constants, yet the neighbour
+ratio stays $\approx2$ at the interface for every $h$, so in the viscous regime
+$|\bar\tau_a/\tau_K-1|\approx|2^{-2}-1|=3/4\not\to0$. Thus Lemma~2 as written requires the
+element-size function to have \emph{vanishing relative oscillation over each element}---a
+smooth-grading / asymptotic local quasi-uniformity property strictly stronger than
+nondegeneracy (H3), and not among H1--H6.
+
+\begin{note}
+The deduction is valid; only a hypothesis is left implicit, and the fix is one line (assume
+smooth grading, or restrict to globally quasi-uniform families, on which $\chi_1$ is
+essentially constant and the term is trivial---for a uniform mesh $\chi_1$ is constant and
+$\rho\equiv1$). Codina's convergence theorems, invoked on such meshes, are untouched. The
+porous smoothing lemma surfaces exactly this object: it decomposes $\Delta(\tau_1^{-1})$ into
+contributions from $\Delta\alpha$, $\Delta|\ba|$, $\Delta(h^{-2})$, $\Delta(h^{-1})$ and
+introduces a modulus $\omega_\chi(h)\to0$ for ``the relative oscillation of $\chi_1(\cdot,h)$
+over an element, which vanishes as $h\to0$ under the smooth-grading assumption on the mesh
+family (bounded patch equivalence alone does not force it)''. In full honesty, the porous note
+flags $\omega_\chi(h)\to0$ inside the proof rather than promoting it to its standing
+assumption list (A1); a maximally rigorous statement would make it a named hypothesis. This is
+a rigor-bookkeeping tightening, not a correctness bug: it should credit Codina's construction,
+not frame it as broken.
+\end{note}
+
+\subsection*{(iii) The stability constants are conditional and disconnected from those used in practice (disclosure)}
+
+Codina's Theorem~1 holds ``for $h$ sufficiently small and $\alpha$ in (27)--(28) large
+enough''. The proof exhibits the threshold only partially---it needs $\alpha>3/2$ for one
+coercivity coefficient, plus positivity of several collected coefficients---and gives no
+consolidated admissible $\alpha_0$. His numerical section then fixes $c_1=4$, $c_2=2$ with no
+reconciliation to (27)--(28). These are self-consistent with $\alpha C_{\mathrm{inv}}=2$, i.e.\
+$\alpha=2/C_{\mathrm{inv}}$; his own written step $\alpha>3/2$ would then require
+$C_{\mathrm{inv}}<4/3$, which is not established and is generally false for higher-degree
+elements (where $C_{\mathrm{inv}}$ grows). So the stability/convergence theorems are correctly
+proved \emph{conditional existence} results (``there exists a large enough amplification''),
+not validations of the $O(1)$ constants actually computed with.
+
+\begin{note}
+This is the standard, well-understood shape of stabilized/VMS a priori theory---provable
+stability needs stabilization above a threshold typically far larger than, and disconnected
+from, practice---and it is not a defect. The load-bearing point is one of \emph{disclosure}:
+Codina 2007 does not flag the gap, whereas the porous OSGS analysis does, quantitatively. It
+exhibits an explicit admissible $\gamma_0=10(1+M_2)\ (\ge20)$ and computes that this demands
+$c_1\gtrsim400\,C_{\mathrm{inv}}^2$, $c_2\gtrsim20\,C_{\mathrm{inv}}$---\emph{well above} the
+experimental $c_1=4k^4$ (or $16k^4$), $c_2=2k^2$, ``which are not shown to satisfy them.'' It
+concludes that the result is ``a conditional inf--sup stability theorem, not a calibration or
+validation of the stabilization constants employed in the computations.'' It likewise records that the
+smallness threshold $h_0$ is not uniform in $\alpha_0$, $\nu$, or the moduli of continuity of
+$\alpha$ and $\ba$. None of this contradicts robust convergence at $c_1=4$: the sufficient
+conditions are explicitly non-sharp, so practice simply lies in the region the theory does not
+certify. Severity as a criticism of Codina: low; value of the explicit disclosure: high.
+\end{note}
+
+\subsection*{(iv) ``Trivially \texorpdfstring{$\beta_0=1$}{beta0=1}'' and the weighted projection are exact only for globally constant \texorpdfstring{$\tau$}{tau} (cleaner devices)}
+
+Two closely related points, both about \emph{variable} $\tau$, both handled more transparently
+by the porous analysis, neither an error.
+
+\emph{(a) The divergence slot.} Codina states that condition (35) ``is trivially verified with
+$\beta_0=1$'' for $z_h=\nabla\cdot\bv_h$, because $\nabla\cdot\bv_h$ has zero mean and
+therefore $\Pi_{\tau_2,0}(\nabla\cdot\bv_h)=\Pi_{\tau_2}(\nabla\cdot\bv_h)$. Testing the
+weighted projection against the constant shows only that the \emph{$\tau_2$-weighted} integral
+is preserved, not the \emph{unweighted} one; so for \emph{variable} $\tau_2$ with a continuous
+pressure space the constrained and unconstrained projections differ by one mean-mode and the
+sharp constant is $\beta_0<1$, not $1$. (Exactness holds when $\tau_2$ is \emph{globally}
+constant, or when the pressure space is elementwise/discontinuous---not merely when $\tau_2$ is
+elementwise-constant, which is already Codina's case.) The consequence is benign: (35)/H4 still
+holds with a good $\beta_0\in(0,1]$, so his theorems are unaffected. The porous analysis reaches
+``constant exactly one'' by a manifestly exact route instead: it projects
+$\nabla\cdot(\alpha\bu_h)$ onto the \emph{unconstrained} $Q_h$ (an exact Pythagorean
+decomposition, no middle mode) and restores admissibility with a mean shift $m_h$ of the
+pressure \emph{test} function, shown invisible in every pairing (including the porous
+$\varepsilon(p_h,r_h)$ term). This is why the porous note imposes the projection-stability
+condition (A7) only on the \emph{momentum} slot and needs no analogue for the divergence.
+
+\emph{(b) The weighted projection.} Codina's a priori proof requires the \emph{$\tau$-weighted}
+projection (Remark~4: the weighted product is ``essential'' to the best-approximation
+property~(46)), yet he presents the discrete matrix form only for globally constant $\tau_1$,
+where $\Pi_{\tau_1}$ collapses to the plain $L^2$ projection ($M$ the ordinary Gram matrix).
+For variable $\tau$ the implemented (plain-$L^2$) and analyzed (weighted) methods differ, and
+the paper leaves this analyzed-versus-implemented distance implicit. The porous note makes it
+explicit (its ``analyzed versus implemented'' remark, item~(i)): ``the analysis uses the
+$\tau$-weighted projections; the implementation uses the plain $L^2$ projection; the two
+coincide when $\tau_i$ is \emph{globally} constant.''
+
+\begin{note}
+Both are cleaner or more explicit treatments, not corrections: Codina's analyzed bilinear
+form openly uses $\Pi_\tau$, his proof is correct for the method it analyzes, and his
+constant-$\tau$ matrix form is transparently flagged. The porous mean-shift device would
+equally sharpen the Oseen proof; $\varepsilon>0$ and the $\alpha$-weight only add cosmetic
+terms ($\int\nabla\cdot(\alpha\bu_h)=0$ still). Present these as variable-coefficient-robust
+reformulations that credit Codina's Remark~1, not as audit findings.
+\end{note}
+
+\subsection*{A point that is \emph{not} a gap: consistency framing}
+
+For completeness, one candidate concern turned out to be an overclaim and should be recorded
+as \emph{agreement}. Codina's phrase that dropping the viscous/force fluctuations ``leads to a
+method which is still consistent (in a sense explained later; cf.\ Remark~3)'' is sometimes read
+as loose. It is not. His Eq.~(44) states outright that ``the method is not consistent in the
+classical variational sense, since the RHS of (44) is not zero''; his Lemma~3 bounds the
+consistency error by $O(\varepsilon_{\mathrm C}(h))$; and his Remark~3 exhibits the fully
+consistent \emph{extended} form $B^\star_I$ with auxiliary unknowns to which ``in a sense''
+refers. The porous note (\texttt{lem:consistency}) \emph{transcribes} this---``not consistent
+in the classical variational sense (cf.\ Codina Eq.~(44)); its consistency error is the value
+of the stabilization terms at the exact solution''---rather than sharpening it. (One small
+technical clarification: the Eq.-(44) non-consistency holds for \emph{all} $k\ge1$; the $k\ge2$
+threshold governs only the separately-neglected viscous-projection term, which is zero for
+$P_1$ because $\Delta\bu_h=0$.) The two analyses treat OSGS consistency identically and
+rigorously.
+
+% =====================================================================================
+\section{Proof-step ledger: where the two OSGS proofs diverge}
+\label{sec:ledger}
+
+\Cref{tab:ledger} walks the two proofs in parallel and is the requested summary of ``places
+in the OSGS proofs where there are differences worth mentioning.'' Read it as: \emph{same
+skeleton, four physical perturbations, one scope restriction, and a handful of expository
+tightenings}.
+
+\begin{small}
+\renewcommand{\arraystretch}{1.25}
+\begin{longtable}{@{}p{0.16\linewidth}p{0.31\linewidth}p{0.44\linewidth}@{}}
+\caption{Step-by-step ledger of the two OSGS proofs. \forced{}: forced by the new physics;
+\tight{}: an expository tightening of Codina 2007; \scope{}: a scope restriction.}
+\label{tab:ledger}\\
+\toprule
+Step & Codina 2007 & Porous OSGS (difference) \\
+\midrule
+\endfirsthead
+\multicolumn{3}{@{}l}{\footnotesize\itshape \cref{tab:ledger} (continued)}\\
+\toprule
+Step & Codina 2007 & Porous OSGS (difference) \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Route &
+Non-coercive inf--sup with a special test function (Thm~1). &
+Same route; well-posedness obtained \emph{from} the inf--sup estimate on the square system.
+\forced{} nothing---this is the inherited backbone. \\
+
+Diagonal identity &
+$B_I(U_h,U_h)=\nu\norm{\nabla\bu_h}^2+\norm{\Poneo\xi_h}_{\tau_1}^2+\norm{\Ptwoo\delta_h}_{\tau_2}^2$. &
+Adds $\norm{\sigma^{1/2}\bu_h}^2$ and $\varepsilon\norm{p_h}^2$; viscous term becomes
+$2\nu\norm{\alpha^{1/2}\ViscProj\nabla\bu_h}^2$; requires $\nabla\cdot(\alpha\ba)=0$. \forced. \\
+
+$S_1,S_2$ &
+Project $\ba\cdot\nabla\bu_h+\nabla p_h$ and $\nabla\cdot\bu_h$. &
+Project the \emph{weighted} $\alpha X(U)$ and $\nabla\cdot(\alpha\bu)$; weighted projections
+$\Pi_1,\Pi_2$. \forced. \\
+
+Annihilation &
+Only viscous/force fluctuations neglected (zero for $P_1$). &
+Also: $\Poneo(\sigma\bu_h)=\bze$, $\Ptwoo(\varepsilon p_h)=0$ for constant $\sigma,\varepsilon$
+(\texttt{lem:annihilation})---the reaction/compressibility residuals are deleted \emph{exactly}.
+\forced; the mechanism of the whole note. \\
+
+$\tau_1,\tau_2$ &
+Four free constants $c_1,\dots,c_4$; $\tau_2=c_3\nu+c_4|\ba|h$. &
+Reaction in the $\tau_1$ denominator; $\tau_2$ \emph{slaved} to $\tns$ (only $c_1,c_2$ free);
+identity (P3); dictionary $c_3=1,c_4=c_2/c_1$ on reduction. \forced. \\
+
+Smoothing &
+Lemma~2, $\psi(h)\to0$ by continuity of $\ba$. &
+Aggregates moduli of $\alpha$, $\ba$ \emph{and} the mesh-grading $\omega_\chi$; uses
+$\alpha_0>0$; surfaces the smooth-grading requirement (\cref{sec:rigor}\,(ii)). \forced{}$+$\tight. \\
+
+Patch equivalence &
+Lemma~1 / Eq.~(31): equilibrates $\tau$ only. &
+Adds a \emph{multiplicative} porosity equivalence (constant independent of the contrast
+$\alpha_\infty/\alpha_0$); notes a multiplicative $|\ba|_\infty$ equivalence \emph{fails} near
+zeros of $\ba$. \forced. \\
+
+Best-approximation &
+Eq.~(46) for $z$; Remark~4. &
+\texttt{lem:bestapprox} for the \emph{product} $\alpha z$; Leibniz constant $C_{\alpha,r}$,
+$W^{m,\infty}$ porosity. \forced. \\
+
+Interpolant &
+A single interpolant satisfying~(30). &
+\emph{Two} operators: boundary-preserving nodal (drives the $H^1_0$ global IBP in I2/I5) and
+Scott--Zhang of $\alpha z$ (drives the weighted best-approximation). \forced. \\
+
+Triple norm / definiteness &
+$\nu^{1/2}\norm{\nabla\bv}+\dots$; definite by Poincar\'e. &
+Adds $2\nu\norm{\alpha^{1/2}\ViscProj\nabla\bv}^2$, $\norm{\sigma^{1/2}\bv}^2$,
+$\varepsilon\norm{q}^2$; definiteness needs the Korn/$\ViscProj$ identity and \emph{full}
+Dirichlet data (\texttt{lem:definiteness}); dominates the ASGS norm term by term. \forced. \\
+
+Special test function &
+$[\tau_1\smul\Pi_{\tau_1,0}\xi_h,\ \tau_2\smul\Pi_{\tau_2,0}\delta_h]$; both slots
+\emph{constrained}; $\beta_0=1$ ``trivially'' for the divergence. &
+Momentum slot constrained (needs (A7)); \emph{pressure} slot uses the \emph{unconstrained}
+projection $+$ mean shift $m_h$, invisible in every term, making the mass-slot constant
+\emph{exactly one}---no A7-analogue for the divergence. \tight{} (\cref{sec:rigor}\,(iv-a)). \\
+
+Perturbation terms &
+Viscous $+$ two mixed terms; no reaction, no compressibility, no $\nabla\alpha$. &
+New pairings $\mathrm{T3}=\sigma(\bu_h,\bw_h)$ (absorbed by full $D_\sigma$),
+$\mathrm{T4}=\varepsilon(p_h,r_h)$ (absorbed by $D_\varepsilon$, needs $\varepsilon\tau_2\le C_2$);
+all inverse steps carry $\alpha$; T7 carries the $\nabla\alpha$ piece (factor $M_2$). \forced. \\
+
+Collection / constants &
+``$\alpha>3/2$'' suffices; no consolidated $\alpha_0$. &
+Explicit $\gamma_0=10(1+M_2)$, $\psi(h_0)\le\min\{1/8,\beta_0^2/16\}$; declared
+\emph{conditional}, not a validation of $c_1=4k^4$ (\cref{sec:rigor}\,(iii)). \tight. \\
+
+Consistency &
+Eq.~(44); mass part $\propto\Ptwoo(\nabla\cdot\bu)=0$ \emph{vanishes}. &
+Momentum part weighted, splits $\tau_1^{-1/2}$ (Da enters); \emph{new} mass part
+$S_2(U,V_h)=-\varepsilon(\Ptwoo p,\nabla\cdot(\alpha\bv_h))_{\tau_2}\neq0$. \forced{} (by $\varepsilon$). \\
+
+Interpolation groups &
+Lemma~4: six groups. &
+Seven (I1--I7): new reactive I3 (via P6), compressibility I4 (via P5), plus the Damk\"ohler
+factor entering the convective I2, compressibility I4 and pressure-gradient I5; I7 carries
+$\nabla\alpha$. \forced. \\
+
+Error functional &
+Single $\ell^1$ sum $\varepsilon_{\mathrm C}(h)$, Eq.~(36). &
+Sharp $\ell^2$ $\Psi_{\mathrm O}(h)$ with local $(c_1+\Dah)$; $\ell^1$ majorant $\mathcal E(h)$
+demoted, $h^{-d/2}$ loss flagged (\cref{sec:rigor}\,(i)). \tight{}$+$\forced{} (Da). \\
+
+Theorem $+$ corollaries &
+Thm~2 (Method~I); \emph{also} Thms~3--4 (Method~II) and 5--6 (viscous-dominated). &
+Only Method~I proved. \emph{New} corollaries: ASGS-norm domination up to $(c_1+\Dah)^{1/2}$,
+and the $\sigma$-robust optimal $L^2$ velocity estimate. Method~II prospective only;
+viscous-dominated variant absent. \forced{} (corollaries) $+$ \scope{} (Method~II, Thms~5--6). \\
+
+Reduction check &
+Thm~2 with $c_1{=}\alpha^2C_{\mathrm{inv}}^2$, etc. &
+$\alpha\equiv1,\sigma{=}\varepsilon{=}0\Rightarrow\Dah{=}0$; $\Psi_{\mathrm O}\to c_1^{1/2}\varepsilon_{\mathrm C}$;
+recovers Codina Thm~2 under the dictionary $c_3=1,c_4=c_2/c_1$. Consistency check. \\
+\end{longtable}
+\end{small}
+
+% =====================================================================================
+\section{Closing taxonomy}
+\label{sec:taxonomy}
+
+Every difference between the two OSGS analyses falls into exactly one of three classes.
+\Cref{tab:taxonomy} is the one-page summary.
+
+\begin{table}[htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{0.24\linewidth}p{0.70\linewidth}@{}}
+\toprule
+Class & Differences \\
+\midrule
+\forced{} \ Forced by the new physics
+ & Weighted residual $\alpha X$; weighted solenoidality $\nabla\cdot(\alpha\ba)=0$;
+   porosity-resolution (A3) and patch-equivalence lemma; $\nabla\alpha$ term (factor $M_2$);
+   deviatoric--symmetric energy and Korn definiteness; reaction diagonal and pairing T3;
+   annihilation of the reactive/compressibility residual; the Damk\"ohler identities (P5),
+   (P6) and factor $(1+\Dah)^{1/2}$; $\tau_2$ slaved to $\tns$; compressibility pairing T4
+   and the \emph{new non-vanishing} mass consistency term; interpolation groups I3, I4, I7;
+   the isotropic-constant-coefficient restriction (A2); the $\sigma$-robust $L^2$ corollary. \\
+\tight{} \ Tightening / disclosure of Codina 2007
+ & The sharp $\ell^2$ error functional with the $h^{-d/2}$ warning
+   (\cref{sec:rigor}\,(i)); surfacing the smooth-grading modulus $\omega_\chi$
+   (\cref{sec:rigor}\,(ii)); explicit conditional constants $\gamma_0$ and the
+   theory-vs-practice disclosure (\cref{sec:rigor}\,(iii)); the exact
+   variable-$\tau$ mass-slot device and the explicit weighted-vs-plain projection distinction
+   (\cref{sec:rigor}\,(iv)); separate $k_u,k_p$ and the stronger pressure regularity (A8). \\
+\scope{} \ Scope restriction
+ & Only Method~I is transported. Method~II is a prospective remark (proof not written);
+   the pressure-only viscous-dominated variant (Codina Thms~5--6) has no porous analogue;
+   the coefficients are frozen constant/isotropic and the analysis is linear (given
+   $\ba$, converged projection). \\
+\bottomrule
+\end{tabular}
+\caption{Taxonomy of every catalogued difference. The overwhelming majority are \forced{}
+by the four physical ingredients of~\cref{eq:porous}; a compact set of \tight{} items sharpen
+Codina 2007's exposition (only the smooth-grading one being a genuine, benign implicit
+hypothesis); the \scope{} items record what the porous analysis deliberately does not
+attempt.}
+\label{tab:taxonomy}
+\end{table}
+
+\paragraph{One-sentence conclusion.} The porous OSGS a priori analysis is a faithful,
+strictly generalizing transcription of the Method~I analysis of Codina 2007, whose every
+substantive deviation is forced by the porosity weight, the Darcy reaction, the artificial
+compressibility, or the deviatoric--symmetric viscous operator; where it appears to
+``correct'' the ancestor it is in fact only sharpening exposition or disclosing a standard
+implicit convention, with the lone genuine---and entirely benign---finding being that the
+smoothing lemma of both papers tacitly assumes a smoothly graded mesh family.
+
+% =====================================================================================
+\begin{thebibliography}{9}
+
+\bibitem{companion}
+G.~Casas, J.~Gonz\'alez-Us\'ua, R.~Codina, I.~de-Pouplana,
+\emph{A stabilized finite element method for incompressible, inertial flows in
+inhomogeneous porous media}, companion manuscript.
+
+\bibitem{osgsnote}
+\emph{Stability and a priori error analysis of the OSGS variant} (self-contained companion
+note; identical to Appendix~D of~\cite{companion}), file
+\texttt{theory/osgs\_a\_priori/osgs\_convergence.tex}.
+
+\bibitem{Codina2008}
+R.~Codina,
+\emph{Analysis of a stabilized finite element approximation of the Oseen equations using
+orthogonal subscales},
+Appl.\ Numer.\ Math.\ \textbf{58} (2008) 264--283 (online 18 Jan.\ 2007).
+
+\bibitem{Codina2001}
+R.~Codina,
+\emph{A stabilized finite element method for generalized stationary incompressible flows},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ \textbf{190} (2001) 2681--2706.
+
+\bibitem{CodinaBlasco1997}
+R.~Codina, J.~Blasco,
+\emph{A finite element formulation for the Stokes problem allowing equal velocity--pressure
+interpolation},
+Comput.\ Methods Appl.\ Mech.\ Engrg.\ \textbf{143} (1997) 373--391.
+
+\bibitem{ScottZhang}
+L.~R. Scott, S.~Zhang,
+\emph{Finite element interpolation of nonsmooth functions satisfying boundary conditions},
+Math.\ Comp.\ \textbf{54} (1990) 483--493.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,33 @@
+# latexmk configuration file for porous_NS_with_Gridap — theory/osgs_a_priori
+#
+# Keep the build clean: route ALL auxiliary/intermediate files into a per-target
+# 'latex compilation/<basename>/' subfolder and leave ONLY the PDF beside the
+# source. See .agents/rules/clean-latex-compilation.md.
+
+# --- Per-target aux directory -------------------------------------------------
+# Some latexmk versions interpolate %B inside $aux_dir and some do NOT (TeX Live
+# 2023's v4.79 leaves it literal, scattering aux into a folder named '%B').
+# Compute the target basename explicitly from @ARGV instead, so routing is
+# identical on every platform/latexmk version (same approach as theory/paper).
+my $target = "";
+foreach my $arg (@ARGV) {
+    next if $arg =~ /^-/;
+    if ($arg =~ /^(.*)\.tex$/) { $target = $1; last; }
+    if (-e "$arg.tex")         { $target = $arg; last; }
+}
+$target =~ s/.*\///;
+$target = "default" if $target eq "";
+
+$aux_dir = "latex compilation/$target";   # all intermediates go here
+$out_dir = '.';                            # the PDF stays next to the source
+
+# Emit .synctex.gz beside the PDF for editor forward/inverse search.
+$pdflatex = 'pdflatex -synctex=1 %O %S';
+
+# Keep sibling per-target aux dirs on the search path for cross-references.
+$ENV{'TEXINPUTS'} = 'latex compilation//:' . ($ENV{'TEXINPUTS'} // '');
+
+# Extra extensions for `latexmk -c/-C` to remove.
+$clean_ext = 'synctex.gz synctex\(busy\) thm bbl blg';
+
+print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to './'\n";
