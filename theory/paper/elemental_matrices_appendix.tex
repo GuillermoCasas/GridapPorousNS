@@ -4,7 +4,7 @@
 
 The different terms that stem from~\cref{eq:DiscretizedNonlinearStabilizedEquation} can be worked out into the following expressions. The left-hand-side Galerkin terms are
 \begin{align}
-  \dualpairing{\partial_i V_h, \mathbf{K}_{ij} \partial_j U_h}  & \VertSpace = 2\nu (\alpha \nabla\boldsymbol{v}, \, \nabla^\text{S}\boldsymbol{u}) - \frac{2\nu}{3}(\alpha \nabla\cdot\boldsymbol{v},\, \nabla\cdot\boldsymbol{u}) \label{eq:ViscousTerm}, \\
+  \dualpairing{\partial_i V_h, \mathbf{K}_{ij} \partial_j U_h}  & \VertSpace = 2\nu (\alpha \nabla\boldsymbol{v}, \, \nabla^\mathrm{S}\boldsymbol{u}) - \frac{2\nu}{3}(\alpha \nabla\cdot\boldsymbol{v},\, \nabla\cdot\boldsymbol{u}) \label{eq:ViscousTerm}, \\
   \dualpairing{V_h, \mathbf{A}_{c,i} \partial_i U_h}            & \VertSpace = (\alpha \boldsymbol{v}, \, \boldsymbol{a}\cdot\nabla \boldsymbol{u}) + (\alpha q,\, \nabla \cdot \boldsymbol{u}) \label{eq:VelocityDerivativeTerm},                          \\
   - \dualpairing{\partial_i(\mathbf{A}^{\top}_{f,i} V_h) , U_h} & \VertSpace = - (\alpha \nabla \cdot \boldsymbol{v},\,p) - (\nabla \alpha \cdot \boldsymbol{v},\,p)\label{eq:FluxTerm},                                                                    \\
   \dualpairing{V_h, \mathbf{S} U_h}                             & \VertSpace = (\boldsymbol{v},\,\boldsymbol{\sigma}\boldsymbol{u}) + (q \nabla \alpha,\, \boldsymbol{u}) + (\varepsilon q,\,p). \label{eq:ReactionTerm}
@@ -16,12 +16,12 @@ And the stabilization terms are
                                                                                                  & \HorSpace\hphantom{\big(\tau_{1}}\VertSpace (\boldsymbol{a} \cdot \nabla)\boldsymbol{u} - \nu \overline{\Delta}\boldsymbol{u} - \amend{2}\nu \ViscProj \nabla \boldsymbol{u} \nabla \beta + \nabla p + \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{u} ) \notag                        \\
                                                                                                  & \VertSpace + (\tau_{2} \alpha^2 \left( \nabla \cdot \boldsymbol{v} + \boldsymbol{v} \cdot \nabla \beta - \frac{\varepsilon}{\alpha} q \right),\, \nabla \cdot \boldsymbol{u} + \boldsymbol{u} \cdot \nabla \beta + \frac{\varepsilon}{\alpha} p ), \label{eq:StabilizationLVLU}
 \end{align}
-where $\overline{\Delta} \boldsymbol{w} \coloneqq 2 \nabla \cdot \left ( \nabla^\text{S}\boldsymbol{w} \right ) - \frac{2}{3} \nabla \left ( \nabla \cdot \boldsymbol{w} \right )$, and where we have introduced $\beta \coloneqq \log \alpha$ to simplify the expressions once we pull out the common factor $\alpha$. Note how this way the terms that are new with respect to the Navier{\hyp}Stokes formulation stand out more clearly.
+where $\overline{\Delta} \boldsymbol{w} \coloneqq 2 \nabla \cdot \left ( \nabla^\mathrm{S}\boldsymbol{w} \right ) - \frac{2}{3} \nabla \left ( \nabla \cdot \boldsymbol{w} \right )$, and where we have introduced $\beta \coloneqq \log \alpha$ to simplify the expressions once we pull out the common factor $\alpha$. Note how this way the terms that are new with respect to the Navier{\hyp}Stokes formulation stand out more clearly.
 
 The right-hand-side Galerkin terms are
 \begin{align}
   \dualpairing{V_h, F}                                                & \VertSpace = \innerprod{\boldsymbol{v}, \boldsymbol{f}} \label{eq:GalerkinForceTerm},                 \\
-  \dualpairing{V_h, {[\boldsymbol{t}_\text{N}; 0]}}_{\Gamma_\text{N}} & \VertSpace = (\boldsymbol{v},\, \boldsymbol{t}_\text{N})_{\Gamma_\text{N}} \label{eq:NeumannBCsTerm},
+  \dualpairing{V_h, {[\boldsymbol{t}_\mathrm{N}; 0]}}_{\Gamma_\mathrm{N}} & \VertSpace = (\boldsymbol{v},\, \boldsymbol{t}_\mathrm{N})_{\Gamma_\mathrm{N}} \label{eq:NeumannBCsTerm},
 \end{align}
 and the right-hand side stabilization terms are
 \begin{align}
@@ -29,15 +29,15 @@ and the right-hand side stabilization terms are
                                                                                         & \HorSpace \left. + \nabla q - \frac{1}{\alpha}\boldsymbol{\sigma}\boldsymbol{v} \right ),\, \overline{\boldsymbol{f}}) \notag                                                                \\
                                                                                         & \VertSpace + ( \tau_{2} \alpha \left( \nabla \cdot \boldsymbol{v} + \boldsymbol{v} \cdot \nabla \beta - \frac{\varepsilon}{\alpha} q\right),\, \overline{\phi}), \label{eq:StabilizationLVF}
 \end{align}
-where $\boldsymbol{\pi}_h = [\boldsymbol{\pi}_{\text{mom}}; \pi_{\text{mass}}]^\top$, $\overline{F} = F - \boldsymbol{\pi}_h$ and where
+where $\boldsymbol{\pi}_h = [\boldsymbol{\pi}_{\mathrm{mom}}; \pi_{\mathrm{mass}}]^\top$, $\overline{F} = F - \boldsymbol{\pi}_h$ and where
 \begin{align} \label{eq:DefinitionOfMassSourceTerm}
-  \overline{\boldsymbol{f}} \coloneqq \boldsymbol{f} - \boldsymbol{\pi}_{\text{mom}}, \\
-  \overline{\phi} \coloneqq \amend{-} \pi_{\text{mass}},
+  \overline{\boldsymbol{f}} \coloneqq \boldsymbol{f} - \boldsymbol{\pi}_{\mathrm{mom}}, \\
+  \overline{\phi} \coloneqq \amend{-} \pi_{\mathrm{mass}},
 \end{align}
 from which we have $\overline{F} = [\overline{\boldsymbol{f}}, \overline{\phi}]^\top$\amend{, the mass component of $F = [\boldsymbol{f}; 0]$ being zero}.
 
 \begin{remark}
-\amend{In the iterative penalty variant used in \cref{sec:NumericalExamplesStationaryCase3D}, the mass component of $F$ is not zero but $\varepsilon p^{m-1}$, the compressibility term evaluated at the previous iterate. All the expressions below then hold with $\overline{\phi} = \varepsilon p^{m-1} - \pi_{\text{mass}}$, and the Galerkin right{\hyp}hand side \cref{eq:GalerkinForceTerm} acquires the additional mass{\hyp}equation contribution $(q,\, \varepsilon p^{m-1})$.}
+\amend{In the iterative penalty variant used in \cref{sec:NumericalExamplesStationaryCase3D}, the mass component of $F$ is not zero but $\varepsilon p^{m-1}$, the compressibility term evaluated at the previous iterate. All the expressions below then hold with $\overline{\phi} = \varepsilon p^{m-1} - \pi_{\mathrm{mass}}$, and the Galerkin right{\hyp}hand side \cref{eq:GalerkinForceTerm} acquires the additional mass{\hyp}equation contribution $(q,\, \varepsilon p^{m-1})$.}
 \end{remark}
 
 Let us first derive the form of the elemental matrices for the OSGS. In order to simplify the expressions, we will make use here of the following notation:
@@ -106,7 +106,7 @@ In the following subsections we derive the explicit matrix contributions for equ
 \begin{equation} \label{eq:FEfunction}
   u_{h,j} = N^b U^b_j, \,\, p_h = N^b P^b,
 \end{equation}
-for $j = 1 \isep d$ and $b=1 \isep n_{\text{nodes}}$; where the $N^b$ are the shape functions and $n_{\text{nodes}}$ is the total number of mesh nodes.
+for $j = 1 \isep d$ and $b=1 \isep n_{\mathrm{nodes}}$; where the $N^b$ are the shape functions and $n_{\mathrm{nodes}}$ is the total number of mesh nodes.
 \subsection{Components of $\mathbf{K}_{V, U}$} \label{sec:KVUComponents}
 Let us assume that, for any term of the form $T(\boldsymbol{v}, \boldsymbol{u})$ in \cref{eq:ViscousTerm,eq:VelocityDerivativeTerm,eq:ReactionTerm,eq:FluxTerm,eq:StabilizationLVLU}, the integral involved is calculated as a quadrature consisting in a weighted sum of the integrands evaluated at certain quadrature points. In such a case, the component $(ai)(bj)$ of the contribution of one of these integrands to the corresponding elemental matrix can be formally calculated as follows (summation is implied over repeated indices):
 \begin{equation} \label{eq:GenericMatrixVU}
@@ -319,17 +319,17 @@ Putting together the results from \cref{sec:FQComponents,sec:FVComponents,sec:KQ
   \begin{bmatrix}
     \mathbf{G}_S + \mathbf{D}_{\nu D} + \mathbf{V} + \mathbf{R}_\sigma & \mathbf{P} + \amend{\mathbf{G}_{\alpha P}} \\
     \mathbf{Q}_D + \mathbf{G}_{\alpha D}                              & \mathbf{P}_Q
-  \end{bmatrix} + \mathbf{K}_{\text{S}}, \\
+  \end{bmatrix} + \mathbf{K}_{\mathrm{S}}, \\
   \mathbf{F} = &
   \begin{bmatrix}
     \boldsymbol{V}_F + \amend{\boldsymbol{V}_T} \\
     0
-  \end{bmatrix} + \mathbf{F}_{\text{S}},
+  \end{bmatrix} + \mathbf{F}_{\mathrm{S}},
 \end{align}
-where $\mathbf{K}_{\text{S}}$ and $\mathbf{F}_{\text{S}}$ are the contributions from the stabilization terms, given by
+where $\mathbf{K}_{\mathrm{S}}$ and $\mathbf{F}_{\mathrm{S}}$ are the contributions from the stabilization terms, given by
 \begingroup\footnotesize
 \begin{align} \label{eq:GeneralStabilizationMatrices}
-  \mathbf{K}_{\text{S}} = &
+  \mathbf{K}_{\mathrm{S}} = &
   \begin{bmatrix}
     \begin{matrix}
       \mathbf{A}_A + \mathbf{A}_L + \mathbf{A}_C + \mathbf{A}_{G\beta} + \mathbf{A}_{D\beta} + \mathbf{A}_\sigma                                                             \\
@@ -346,7 +346,7 @@ where $\mathbf{K}_{\text{S}}$ and $\mathbf{F}_{\text{S}}$ are the contributions 
     \end{matrix}                                                                                                                                 \\
     \mathbf{G}_A + \mathbf{G}_L + \mathbf{G}_C + \mathbf{G}_{G \beta} + \mathbf{G}_{D \beta} + \mathbf{G}_R  + \mathbf{Q}_{\varepsilon D} + \mathbf{Q}_U                                   & \mathbf{G} + \mathbf{Q}_P
   \end{bmatrix}, \\
-  \mathbf{F}_{\text{S}} = &
+  \mathbf{F}_{\mathrm{S}} = &
   \begin{bmatrix}
     \mathbf{A}_F + \mathbf{L}_F + \mathbf{C}_F + \mathbf{G}_{\beta, F} + \mathbf{D}_{\beta, F} + \mathbf{R}_{\sigma, F} + \mathbf{D}_{\phi} + \mathbf{V}_{\phi} \\
     \mathbf{Q}_{\alpha F} + \mathbf{Q}_{\phi}
@@ -355,7 +355,7 @@ where $\mathbf{K}_{\text{S}}$ and $\mathbf{F}_{\text{S}}$ are the contributions 
 \endgroup
 If second-order contributions can be neglected (for example, if only linear finite elements are used) the stabilization matrices become simpler:
 \begin{align} \label{eq:FirstOrdertabilizationMatrices}
-  \mathbf{K}_{\text{S}} = &
+  \mathbf{K}_{\mathrm{S}} = &
   \begin{bmatrix}
     \begin{matrix}
       \mathbf{A}_A + \mathbf{A}_{G\beta} + \mathbf{A}_{D\beta} + \mathbf{A}_\sigma                                             \\
@@ -369,7 +369,7 @@ If second-order contributions can be neglected (for example, if only linear fini
     \end{matrix}                                                                  \\
     \mathbf{G}_A + \mathbf{G}_{G \beta} + \mathbf{G}_{D \beta} + \mathbf{G}_R  + \mathbf{Q}_{\varepsilon D} + \mathbf{Q}_U                   & \mathbf{G} + \mathbf{Q}_P
   \end{bmatrix}, \\
-  \mathbf{F}_{\text{S}} = &
+  \mathbf{F}_{\mathrm{S}} = &
   \begin{bmatrix}
     \mathbf{A}_F + \mathbf{G}_{\beta, F} + \mathbf{D}_{\beta, F} + \mathbf{R}_{\sigma, F} + \mathbf{D}_{\phi} + \mathbf{V}_{\phi} \\
     \mathbf{Q}_{\alpha F} + \mathbf{Q}_{\phi}
