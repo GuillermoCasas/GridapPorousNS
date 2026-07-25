@@ -611,7 +611,7 @@ In practice, it is often convenient to make the further simplification:
 \begin{equation} \label{eq:L2InnerProduct}
   \left ( \bullet{,} \bullet\right )_{\boldsymbol{\tau}} \approx \sum_K{\langle \bullet{,} \bullet \rangle_K},
 \end{equation}
-with the corresponding effect on the computation of $\Pi_{\boldsymbol{\tau}h}$. This simplified projection corresponds to the standard $L^2${\hyp}projection, which can be computed very efficiently and has similar stabilizing properties~\cite{codina2002stabilized}.
+with the corresponding effect on the computation of $\Pi_{\boldsymbol{\tau}h}$. This simplified projection corresponds to the standard $L^2${\hyp}projection, which can be computed very efficiently and has similar stabilizing properties~\cite{codina2002stabilized}. \amend{We note already here that, both in the a priori analysis of \cref{sec:StabilityOSGS} and in our implementation, this projection is taken onto the finite element spaces \emph{without} their Dirichlet constraints---rather than onto the constrained space $\mathcal{X}_{h0}$, so that $\boldsymbol{\pi}_h$ is not forced to vanish on $\partial\Omega$; see the footnote to \cref{eq:OSGSProblem} and \cref{oa:rem:analyzed}.}
 
 Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakFormSystem}, we obtain the following stabilized formulation of the discrete problem:
 
@@ -875,6 +875,14 @@ which generalizes the stability estimate obtained for the Galerkin method for th
 
 \amend{For convenience, we next list the collected sets of assumptions under which the various results hold, organizing them into three groups: those \emph{common to both methods}, labelled \crefrange{H:mesh}{H:regularity}; those \emph{specific to the ASGS method}, labelled \crefrange{H:coercivity}{H:jump}; and those \emph{specific to the OSGS method}, labelled \crefrange{H:design}{H:advectionsmooth}.}
 
+\amend{Throughout the analysis, $\|\bullet\|_h\coloneqq\bigl(\sum_K\|\bullet\|_{L^2(K)}^2\bigr)^{1/2}$ denotes the broken $L^2$ norm and, for $i=1,2$, the $\boldsymbol{\tau}${\hyp}weighted broken product and norm are}
+\begin{equation}\label{eq:TauWeightedProduct}
+  (f,g)_{\tau_i}\coloneqq\sum_K\tau_{i,K}\,(f,g)_K,
+  \qquad
+  \norm{f}_{\tau_i}\coloneqq(f,f)_{\tau_i}^{1/2}=\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h ,
+\end{equation}
+\amend{the last identity relating the two forms used below.}
+
 \amend{We begin with the shared assumptions; they fix the mesh family, the coefficients, the porosity field, the prescribed advection, the discrete spaces and the regularity of the exact solution:}
 \begin{enumerate}[label=\textup{(A\arabic*)},ref=\textup{(A\arabic*)},leftmargin=3.4em]
   \item\label{H:mesh} \emph{Meshes.} The family of partitions is conforming, shape{\hyp}regular and locally quasi{\hyp}uniform, so that the inverse estimate \cref{eq:InverseEstimateFiniteOrderNorm} holds with a constant $C_\mathrm{inv}$ independent of the mesh size.
@@ -885,7 +893,7 @@ which generalizes the stability estimate obtained for the Galerkin method for th
   \end{equation}
   which sharpens the heuristic requirement \cref{eq:SmallPorosityGradient}. Here $\alpha_{0,K}\coloneqq\inf_K\alpha$, $\alpha_{\infty,K}\coloneqq\sup_K\alpha$, $\alpha_K$ is a representative value with $\alpha_{0,K}\le\alpha_K\le\alpha_{\infty,K}$, and $\delta_\alpha\coloneqq 1+C_{\nabla\alpha}$, so that $\alpha_{\infty,K}\le\delta_\alpha\,\alpha_{0,K}$.
   \item\label{H:advection} \emph{Advection.} $\boldsymbol{a}\in C^0(\overline{\Omega})^d$, elementwise $W^{1,\infty}$, with $\nabla\cdot(\alpha\boldsymbol{a})=0$ in the weak sense.
-  \item\label{H:spaces} \emph{Discrete spaces.} The velocity and pressure spaces are continuous, of degrees $k_u,k_p\ge1$ with $k_p\le k_u+1$ and with constants belonging to the pressure space; the stabilization parameters $\tau_1,\tau_2$ (\cref{eq:Tau1Final,eq:Tau2Final}) are taken elementwise constant.
+  \item\label{H:spaces} \emph{Discrete spaces.} The velocity and pressure spaces are continuous \amend{Lagrange (nodal)} finite element spaces, of degrees $k_u,k_p\ge1$ with $k_p\le k_u+1$ and with constants belonging to the pressure space; the stabilization parameters $\tau_1,\tau_2$ (\cref{eq:Tau1Final,eq:Tau2Final}) are taken elementwise constant.
   \item\label{H:regularity} \emph{Regularity.} The exact solution satisfies $\boldsymbol{u}\in H^{k_u+1}(\Omega)^d$ and $p\in H^{k_p+1}(\Omega)$ \amend{(which, since $k_u,k_p\ge1$, forces $\boldsymbol{f}\in L^2(\Omega)^d$ through the momentum equation, upgrading the weak{\hyp}form requirement $\boldsymbol{f}\in\mathcal{V}_0'$ of \cref{sec:WeakForm})}.
 \end{enumerate}
 
@@ -906,13 +914,7 @@ which generalizes the stability estimate obtained for the Galerkin method for th
   \begin{equation}\label{eq:ProjectionStability}
     \bigl\lVert\tau_1^{1/2}\boldsymbol{z}_h\bigr\rVert_h \le \frac{1}{\beta_0}\Bigl(\bigl\lVert\tau_1^{1/2}\Pi_{1,0}\boldsymbol{z}_h\bigr\rVert_h+\bigl\lVert\tau_1^{1/2}\Pi_1^{\perp}\boldsymbol{z}_h\bigr\rVert_h\Bigr).
   \end{equation}
-  \amend{Here $\|\bullet\|_h\coloneqq\bigl(\sum_K\|\bullet\|_{L^2(K)}^2\bigr)^{1/2}$ denotes the broken $L^2$ norm and, for $i=1,2$, the $\boldsymbol{\tau}${\hyp}weighted broken product and norm are}
-  \begin{equation}\label{eq:TauWeightedProduct}
-    (f,g)_{\tau_i}\coloneqq\sum_K\tau_{i,K}\,(f,g)_K,
-    \qquad
-    \norm{f}_{\tau_i}\coloneqq(f,f)_{\tau_i}^{1/2}=\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h ,
-  \end{equation}
-  \amend{the last identity relating the two forms used below.} Inequality \cref{eq:ProjectionStability} is the Codina--Blasco{\hyp}type inf{\hyp}sup condition~(35) of~\cite{codina2008analysis}.
+  \amend{Here $\|\bullet\|_h$ and $\norm{\bullet}_{\tau_1}$ are the broken $L^2$ norm and the $\tau_1${\hyp}weighted norm of \cref{eq:TauWeightedProduct}.} Inequality \cref{eq:ProjectionStability} is the Codina--Blasco{\hyp}type inf{\hyp}sup condition~(35) of~\cite{codina2008analysis}.
   \item\label{H:patch} \emph{Additional mesh regularity} (patch structure and element{\hyp}size surrogates), strengthening \cref{H:mesh}. The element patches $S_K$ (the union of the elements sharing at least a vertex with $K$) are quasi{\hyp}uniform: there are constants $0<\underline{C}\le\overline{C}$, independent of $h$, with
   \begin{equation}\label{eq:PatchQuasiUniformity}
     \underline{C}\,h_K\le h_{K'}\le\overline{C}\,h_K\qquad\forall\,K'\subset S_K,\ \forall\,K.
@@ -986,8 +988,8 @@ The stability of the stabilized method is then expressed by the following bound,
 where
 \begin{equation}
   \triplenorm{U_h}_{\mathrm{S}} \coloneqq \bigg(\nu \bigl\lVert \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \bigr\rVert^2 + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \bigr\rVert_h^2 + \varepsilon\bigl\lVert p_h \bigr\rVert^2 + \bigl\lVert \alpha X(U_h) \bigr\rVert_{\tau_1}^2 + \bigl\lVert \nabla \cdot ( \alpha \boldsymbol{u}_h ) \bigr\rVert_{\tau_2}^2 \bigg)^{1/2},
+  \label{eq:TripleNormASGS}
 \end{equation}
-\label{eq:TripleNormASGS}
 where $X(U_h) \coloneqq \boldsymbol{a} \cdot \nabla \boldsymbol{u}_h + \nabla p_h$ is the first{\hyp}order momentum operator and $\widetilde{\sigma}_\alpha$ is given in \cref{eq:SigmaAlpha}.
 \begin{remark}
     Note that the quantity $\widetilde{\sigma}_\alpha$ differs from the quantity $\widetilde{\sigma}$ defined in~\cite{codina2001stabilized} simply by the division of $\sigma$ by $\alpha_K $ in the denominator. This seems to indicate a weaker control on $\boldsymbol{u}_h$ for large reaction terms when $\alpha_K$ is simultaneously very small. It turns out this is not the case, as the asymptotic analysis presented below shows (see \cref{sec:DominantReaction}) and the numerical tests corroborate.
@@ -1028,7 +1030,7 @@ where $\psi$ is the field being interpolated and $k_\psi$ the corresponding poly
 The orthogonal subgrid{\hyp}scale (OSGS) variant replaces the algebraic subscale by the
 fluctuation $\Pi_i^{\perp}=I-\Pi_i$ of the finite{\hyp}element residual with respect to the
 $\boldsymbol{\tau}${\hyp}weighted $L^2$ projection $\Pi_i$ onto the unconstrained finite{\hyp}element spaces. For the
-linearized, constant{\hyp}coefficient problem analyzed here the resulting bilinear form is
+linearized problem analyzed here \amend{(with $\sigma$, $\varepsilon$ and $\nu$ constant, the advection $\boldsymbol{a}$ prescribed, and the porosity $\alpha$ variable)} the resulting bilinear form is
 \begin{equation}\label{eq:BosgsMain}
   B_{\mathrm{osgs}}(\boldsymbol{a};U,V)
   = B(\boldsymbol{a};U,V)
@@ -1139,7 +1141,7 @@ value $\gamma_0=10(1+M_2)$ is sufficient but not sharp, and does not certify the
 \end{remark}
 
 \begin{theorem}[Inf--sup stability of the OSGS method]\label{th:StabilityOSGS}
-Under the standing assumptions of \cref{sec:CommonSetting} there exist $h_0>0$ and $\beta_{\mathrm{osgs}}>0$,
+Under \crefrange{H:mesh}{H:spaces} and \crefrange{H:design}{H:patch} \amend{(the regularity \cref{H:regularity} and the consistency strengthenings \cref{H:porositysmooth,H:advectionsmooth} are not needed for stability)} there exist $h_0>0$ and $\beta_{\mathrm{osgs}}>0$,
 depending only on the projection{\hyp}stability constant, the compressibility bound~$C_2$, and
 the mesh and porosity{\hyp}resolution constants, such that for all $h\le h_0$
 \begin{equation}\label{eq:InfSupMain}

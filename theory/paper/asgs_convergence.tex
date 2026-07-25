@@ -1014,7 +1014,7 @@ $E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
   &\coloneqq \Bigl(\sum_{K\in\Th}\alpha_K^2\,h_K^{-2}
   \bigl(\tau_{2,K}\,\Eint{K}{\bu}^2+\tau_{1,K}\,\Eint{K}{p}^2\bigr)\Bigr)^{1/2} \\
   &\;\le\;
-  \psi(h) \coloneqq \sum_{K\in\Th}\alpha_K\,h_K^{-1}
+  \overline{\Psi}(h) \coloneqq \sum_{K\in\Th}\alpha_K\,h_K^{-1}
   \Bigl(\tau_{2,K}^{1/2}\,\Eint{K}{\bu}+\tau_{1,K}^{1/2}\,\Eint{K}{p}\Bigr) \\
   &\;\le\;
   \sum_{K\in\Th}h_K^{-1}
@@ -1023,7 +1023,7 @@ $E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
 \end{equation}
 the first inequality being the discrete $\ell^2\subset\ell^1$ bound (using
 $a^2+b^2\le(a+b)^2$ elementwise); $\Psi(h)$ is the porosity{\hyp}weighted $\ell^2$
-functional in which the sharp estimate is stated, $\psi(h)$ its coarser $\ell^1$ majorant.
+functional in which the sharp estimate is stated, $\overline{\Psi}(h)$ its coarser $\ell^1$ majorant.
 
 \subsubsection{Continuity with respect to the interpolation error}
 
@@ -1034,8 +1034,8 @@ Let \cref{H:mesh,H:data,H:porosity,H:advection} and the jump condition \cref{H:j
   \le C\,\Psi(h)\,\triplenorm{V_h}
   \qquad\forall\,V_h\in\Xh ,
 \end{equation}
-with $\Psi(h)\le\psi(h)$ the porosity{\hyp}weighted $\ell^2$ functional of \eqref{eq:psih};
-the coarser $\ell^1$ bound in terms of $\psi(h)$ follows as a corollary.
+with $\Psi(h)\le\overline{\Psi}(h)$ the porosity{\hyp}weighted $\ell^2$ functional of \eqref{eq:psih};
+the coarser $\ell^1$ bound in terms of $\overline{\Psi}(h)$ follows as a corollary.
 \end{lemma}
 
 \begin{proof}
@@ -1100,7 +1100,7 @@ with \eqref{eq:interpdivvisc}--\eqref{eq:interpinftyE} gives
   = C\,\Psi(h),
 \end{equation}
 the middle expression being the porosity{\hyp}weighted $\ell^2$ functional $\Psi(h)$ of
-\eqref{eq:psih} (and only afterwards, if desired, majorised by $\psi(h)$).
+\eqref{eq:psih} (and only afterwards, if desired, majorised by $\overline{\Psi}(h)$).
 \item The bracketed norms in \eqref{eq:assembly} are broken mesh $\ell^2${\hyp}norms and are
 bounded, by the $m'=0$ estimates in \eqref{eq:interpzero}, as
 $\bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\beu\bigr\rVert_h
@@ -1125,10 +1125,10 @@ Under the hypotheses of \cref{lem:coercivity,lem:continterp},
   &\le C\,\Psi(h) \\
   &= C\Bigl(\sum_{K\in\Th}\alpha_K^2\,h_K^{-2}
   \bigl(\tau_{2,K}\,\Eint{K}{\bu}^2+\tau_{1,K}\,\Eint{K}{p}^2\bigr)\Bigr)^{1/2} \\
-  &\;\le\; C\,\psi(h),
+  &\;\le\; C\,\overline{\Psi}(h),
 \end{aligned}
 \end{equation}
-with $\Psi(h)\le\psi(h)$ the porosity{\hyp}weighted $\ell^2$ functional of \eqref{eq:psih}.
+with $\Psi(h)\le\overline{\Psi}(h)$ the porosity{\hyp}weighted $\ell^2$ functional of \eqref{eq:psih}.
 \end{theorem}
 
 \begin{proof}
@@ -1144,14 +1144,14 @@ porosity{\hyp}weighted $\ell^2$ bound $C\,\Psi(h)\,\triplenorm{V_h}$),
 \end{equation*}
 so $\triplenorm{\Delta_h}\le C\Psi(h)$. Since \eqref{eq:Enorm} bounds
 $\triplenorm{U-\widehat{U}_h}$ by the same $\Psi(h)$, the triangle inequality gives
-$\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{\Delta_h}\le C\,\Psi(h)\le C\,\psi(h)$.
+$\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{\Delta_h}\le C\,\Psi(h)\le C\,\overline{\Psi}(h)$.
 \end{proof}
 
 \noindent The bound \eqref{eq:convergence} is stated in the strongest form afforded by the
 present argument: the porosity{\hyp}weighted $\ell^2$ functional $\Psi(h)$, which coincides
 with the main-text estimate \eqref{eq:ConvergenceResult}. Two successive relaxations recover
 weaker but more familiar forms. First, the discrete $\ell^2\subset\ell^1$ inequality gives
-the $\ell^1$ bound $C\,\psi(h)$. Second, replacing the elementwise weight $\alpha_K\le1$ by
+the $\ell^1$ bound $C\,\overline{\Psi}(h)$. Second, replacing the elementwise weight $\alpha_K\le1$ by
 $1$ throughout yields the porosity{\hyp}free estimate, which reduces (for $\alpha\equiv1$) to
 the form found in~\cite{codina2001stabilized}. Both relaxations only enlarge the bound, so
 the $\Psi(h)$ statement is the strongest of the three; in particular the local factor
