@@ -92,6 +92,11 @@ latex\ compilation/
 /theory/cocquet/cocquet_form_mms_manufactured_solution.pdf
 /proof_verification/coq_coverage.pdf
 /theory/numerical_constants/c1_dimension_note.pdf
+/theory/continuity appendix/continuity_appendix.pdf
+/theory/osgs_a_priori/porosity-specific-particularities-for-osgs.pdf
+/theory/projection_space_note/projection_space_note.pdf
+/theory/scale_free_gate_note/scale_free_gate_note.pdf
+/theory/velocity_floor_regularization/velocity_floor_regularization.pdf
 
 # Python compilation files
 __pycache__/
