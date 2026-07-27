@@ -918,12 +918,12 @@ The stability of the stabilized method is then expressed by the following bound,
 \begin{lemma} \label{lemma:Stability}
   \amend{Under the standing assumptions of \cref{sec:StabilityASGS}---in particular the coercivity condition \cref{H:coercivity} ($c_1 > 2\xi C_\mathrm{inv}^2$ for some $\xi > 2$)---there exists} a positive constant $C$ such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_{h0}$ it holds that
   \begin{equation}
-    B_{\mathrm{ASGS}}(\boldsymbol{a}, U_h, U_h) \geq C \triplenorm{U_h}^2,
+    B_{\mathrm{ASGS}}(\boldsymbol{a}, U_h, U_h) \geq C \triplenorm{U_h}_{\mathrm{A}}^2,
   \end{equation}
 \end{lemma}
 where
 \begin{equation}
-  \triplenorm{U_h} \coloneqq \bigg(\nu \bigl\lVert \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \bigr\rVert^2 + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \bigr\rVert_h^2 + \varepsilon\bigl\lVert p_h \bigr\rVert^2 + \bigl\lVert \tau_1^{1/2} \alpha X(U_h) \bigr\rVert_h^2 + \bigl\lVert \tau_2^{1/2} \nabla \cdot ( \alpha \boldsymbol{u}_h ) \bigr\rVert_h^2 \bigg)^{1/2},
+  \triplenorm{U_h}_{\mathrm{A}} \coloneqq \bigg(\nu \bigl\lVert \alpha^{1/2} \ViscProj \nabla \boldsymbol{u}_h \bigr\rVert^2 + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2} \boldsymbol{u}_h \bigr\rVert_h^2 + \varepsilon\bigl\lVert p_h \bigr\rVert^2 + \bigl\lVert \tau_1^{1/2} \alpha X(U_h) \bigr\rVert_h^2 + \bigl\lVert \tau_2^{1/2} \nabla \cdot ( \alpha \boldsymbol{u}_h ) \bigr\rVert_h^2 \bigg)^{1/2},
 \end{equation}
 with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
 \begin{remark}
@@ -935,7 +935,7 @@ with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
 \begin{lemma} \label{lemma:Continuity}
     \amend{Under the standing assumptions of \cref{sec:StabilityASGS}, but requiring of the design constants only $c_1,c_2>0$ (not the coercivity condition \cref{H:coercivity}; the complete proof in \cref{app:Continuity} uses these weaker hypotheses, though the mesh non-degeneracy and porosity resolution are still needed), and including the jump condition \cref{H:jump} when $\sigma>0$, there exists} a positive constant $C$, such that
     \begin{equation}
-        \bigl| B_{\mathrm{ASGS}}(\boldsymbol{a}, U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h},
+        \bigl| B_{\mathrm{ASGS}}(\boldsymbol{a}, U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h}_{\mathrm{A}},
     \end{equation}
     for all $U_h, V_h \in \mathcal{X}_{h\amend{0}}$.
 \end{lemma}
@@ -945,7 +945,7 @@ Using \cref{lemma:Stability} and \amend{a modified version of \cref{lemma:Contin
 \begin{theorem} \label{th:Convergence}
  Let $U$ be the exact solution of the linearized problem corresponding to \cref{eq:DiscretizedNonlinearStabilizedEquation}, where $\boldsymbol{u}^{m-1}$ is replaced by a given $\boldsymbol{a}$ such that $\nabla \cdot (\alpha\boldsymbol{a})=0$ and where $\boldsymbol{\pi}_h^m=\boldsymbol{0}$ (ASGS method). Then, under the assumptions of \cref{lemma:Stability,lemma:Continuity}\amend{ and the regularity \cref{H:regularity}}, there exists a positive constant $C$, such that
  \begin{equation}\label{eq:ConvergenceResult}
-    \triplenorm{E_h} \leq C \amend{\left[ \sum_K \frac{\alpha_K^2}{h_K^2} \left( \tau_{2,K}\,\mathrm{E}_{\mathrm{int},K}(\boldsymbol{u})^2 + \tau_{1,K}\,\mathrm{E}_{\mathrm{int},K}(p)^2 \right) \right]^{1/2}},
+    \triplenorm{E_h}_{\mathrm{A}} \leq C \amend{\left[ \sum_K \frac{\alpha_K^2}{h_K^2} \left( \tau_{2,K}\,\mathrm{E}_{\mathrm{int},K}(\boldsymbol{u})^2 + \tau_{1,K}\,\mathrm{E}_{\mathrm{int},K}(p)^2 \right) \right]^{1/2}},
  \end{equation}
 \end{theorem}
 where $E_h \coloneqq U - U_h$ and where the interpolation error is defined as
@@ -954,7 +954,7 @@ where $E_h \coloneqq U - U_h$ and where the interpolation error is defined as
 \end{equation}
 where $\psi$ is the field being interpolated and $k_\psi$ the corresponding polynomial order of the interpolation. \amend{We write $\mathrm{E}_{\mathrm{int}}(\psi) \coloneqq \big(\sum_{K\in\mathcal{T}_h}\mathrm{E}_{\mathrm{int},K}(\psi)^2\big)^{1/2}$ for the associated global (mesh) interpolation error, the quantity used in the robustness analysis of \cref{sec:Robustness}. The estimate \cref{eq:ConvergenceResult} is stated in the strongest, porosity{\hyp}weighted $\ell^2$ form afforded by the present argument (it is derived as \cref{eq:Enorm} in \cref{app:Continuity}); the local factor $\alpha_K \le 1$ makes the bound tighter in regions of low porosity, consistently with \cref{sec:Robustness}. The coarser $\ell^1$ estimate
  \begin{equation*}
-    \triplenorm{E_h} \leq C \sum_K \frac{\alpha_K}{h_K} \left( \tau_{2,K}^{1/2}\mathrm{E}_{\mathrm{int},K}(\boldsymbol{u}) + \tau_{1,K}^{1/2} \mathrm{E}_{\mathrm{int},K}(p) \right)
+    \triplenorm{E_h}_{\mathrm{A}} \leq C \sum_K \frac{\alpha_K}{h_K} \left( \tau_{2,K}^{1/2}\mathrm{E}_{\mathrm{int},K}(\boldsymbol{u}) + \tau_{1,K}^{1/2} \mathrm{E}_{\mathrm{int},K}(p) \right)
  \end{equation*}
  follows at once by the discrete $\ell^2\subset\ell^1$ inequality and reduces, for $\alpha\equiv1$, to the form obtained in~\cite{codina2001stabilized}. A complete proof, following the process of~\cite{codina2001stabilized} adapted to the porosity field, is given in \cref{app:Continuity}.}
 

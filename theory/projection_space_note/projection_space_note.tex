@@ -793,7 +793,7 @@ viscosity-dominated asymptotic regime that governs the convergence
 \emph{rate} (\cref{sec:optimality}): $\tau_1=\Theta(h^2)$ (so
 $\tau_1^{1/2}=\Theta(h)$) and $\tau_2=\Theta(1)$ (from
 $\tau_2\to\nu/\alpha$; hence, by the design bound $\varepsilon\tau_2\le C_2$,
-$\varepsilon=O(1)$---a fact we will need). Throughout, $\tnorm{\cdot}_{\mathrm O}$
+$\varepsilon=O(1)$---a fact we will need). Throughout, $\tnorm{\cdot}_{\mathrm{O}}$
 is the projection-free triple norm (paper, \texttt{oa:eq:TripleNorm}),
 \emph{the same} for both variants; only the method's $S_1$ changes.
 
@@ -801,13 +801,13 @@ is the projection-free triple norm (paper, \texttt{oa:eq:TripleNorm}),
 
 \begin{lemma}[Reduction to the consistency defect]\label{lem:st:reduce}
 Let $B_{\mathrm{OSGS}}$ be OSGS with projector $\Pi$, inf-sup stable in
-$\tnorm{\cdot}_{\mathrm O}$ with an $h$-independent constant (for the
+$\tnorm{\cdot}_{\mathrm{O}}$ with an $h$-independent constant (for the
 constrained variant this is Codina's Remark~1). Then
 \begin{equation}\label{eq:st:reduce}
-  \tnorm{U-U_h}_{\mathrm O}\;\le\;C\bigl(\,\Psi_{\mathrm O}(h)+\eta_\Pi\,\bigr)
+  \tnorm{U-U_h}_{\mathrm{O}}\;\le\;C\bigl(\,\Psi_{\mathrm{O}}(h)+\eta_\Pi\,\bigr)
   \;=\;C\bigl(\,\Theta(h^{k})+\eta_\Pi\,\bigr),
 \end{equation}
-where $\Psi_{\mathrm O}(h)=\Theta(h^{k})$ is the interpolation error in the
+where $\Psi_{\mathrm{O}}(h)=\Theta(h^{k})$ is the interpolation error in the
 energy norm ($k\coloneqq k_u$).
 \end{lemma}
 
@@ -821,9 +821,9 @@ $W_h\in\Xhz$,
 \]
 Let $\widehat U_h\in\Xhz$ be the nodal interpolant of $U$ and
 $\boldsymbol e_h\coloneqq U_h-\widehat U_h$. Inf-sup stability gives a
-$W_h$ with $\tnorm{W_h}_{\mathrm O}=1$ and
+$W_h$ with $\tnorm{W_h}_{\mathrm{O}}=1$ and
 \[
-  \beta\,\tnorm{\boldsymbol e_h}_{\mathrm O}
+  \beta\,\tnorm{\boldsymbol e_h}_{\mathrm{O}}
   \le B_{\mathrm{OSGS}}(\boldsymbol e_h,W_h)
   = \underbrace{B_{\mathrm{OSGS}}(U-\widehat U_h,W_h)}_{(\mathrm I)}
   \;-\;\underbrace{\bigl(S_1(U,W_h)+S_2(U,W_h)\bigr)}_{(\mathrm{II})},
@@ -835,13 +835,13 @@ $(\bw,\alpha\ba\cdot\grad\bu)$ carrying an $h^{-1}$). Instead, term (I) is
 bounded by the appendix's interpolation lemma (paper,
 \texttt{oa:lem:interpolation}), valid precisely because
 $U-\widehat U_h$ is a \emph{small, boundary-vanishing} interpolation
-error: $|(\mathrm I)|\le C\,\Psi_{\mathrm O}(h)\,\tnorm{W_h}_{\mathrm O}$.
+error: $|(\mathrm I)|\le C\,\Psi_{\mathrm{O}}(h)\,\tnorm{W_h}_{\mathrm{O}}$.
 Term (II): by Cauchy--Schwarz in $(\cdot,\cdot)_{\tau_1}$ and the full-residual
-term of the triple norm, $\normtau{\alpha X(W_h)}\le\tnorm{W_h}_{\mathrm O}$,
-so $|S_1(U,W_h)|\le\eta_\Pi\,\tnorm{W_h}_{\mathrm O}$; the mass part $S_2$ is
+term of the triple norm, $\normtau{\alpha X(W_h)}\le\tnorm{W_h}_{\mathrm{O}}$,
+so $|S_1(U,W_h)|\le\eta_\Pi\,\tnorm{W_h}_{\mathrm{O}}$; the mass part $S_2$ is
 $O(h^{k_p+1})$ (the pressure carries no Dirichlet data, $\Qhz$ being only
 zero-mean, so it is unaffected by the constraint). Collecting and adding
-$\tnorm{U-\widehat U_h}_{\mathrm O}=\Theta(h^k)$ gives \cref{eq:st:reduce}.
+$\tnorm{U-\widehat U_h}_{\mathrm{O}}=\Theta(h^k)$ gives \cref{eq:st:reduce}.
 \end{proof}
 
 So the whole question is: \emph{how big is $\eta_\Pi$?}
@@ -922,15 +922,15 @@ the entire effect.
 \begin{proposition}[$k=1$: optimality is preserved]\label{prop:st:preserve}
 For equal-order linear elements ($k=1$) the constrained-projection
 OSGS retains the optimal energy rate,
-$\tnorm{U-U_h}_{\mathrm O}=\Theta(h)$.
+$\tnorm{U-U_h}_{\mathrm{O}}=\Theta(h)$.
 \end{proposition}
 
 \begin{proof}
 \Cref{lem:st:reduce,lem:st:defect} give
-$\tnorm{U-U_h}_{\mathrm O}\le C(h+\eta_0)=C\bigl(h+\Theta(h^{3/2})\bigr)$. As
+$\tnorm{U-U_h}_{\mathrm{O}}\le C(h+\eta_0)=C\bigl(h+\Theta(h^{3/2})\bigr)$. As
 $3/2>1$, $\eta_0=\Theta(h^{3/2})=o(h)$ sits \emph{strictly beneath} the
 interpolation floor $\Theta(h)$ and is asymptotically invisible. Hence
-$\tnorm{U-U_h}_{\mathrm O}=\Theta(h)$.
+$\tnorm{U-U_h}_{\mathrm{O}}=\Theta(h)$.
 \end{proof}
 
 The negative half needs one natural hypothesis. In the linearized (Oseen /
@@ -951,14 +951,14 @@ Assume ($\mathrm{H}_\Gamma$), the genericity of \cref{lem:st:defect}, and the
 viscous regime ($\tau_1=\Theta(h^2)$, $\tau_2=\Theta(1)$, hence
 $\varepsilon=O(1)$). For $k\ge2$,
 \begin{equation}\label{eq:st:spoil}
-  \tnorm{U-U_h}_{\mathrm O}=\Theta\bigl(h^{3/2}\bigr)\;<\;\Theta(h^{k}),
+  \tnorm{U-U_h}_{\mathrm{O}}=\Theta\bigl(h^{3/2}\bigr)\;<\;\Theta(h^{k}),
 \end{equation}
 so the constrained projection genuinely degrades the energy rate to $3/2$.
 \end{proposition}
 
 \begin{proof}
 The upper bound is \cref{lem:st:reduce,lem:st:defect}:
-$\tnorm{U-U_h}_{\mathrm O}\le C(h^k+\eta_0)=O(h^{3/2})$ since $3/2<k$. For the
+$\tnorm{U-U_h}_{\mathrm{O}}\le C(h^k+\eta_0)=O(h^{3/2})$ since $3/2<k$. For the
 matching lower bound, use a \emph{pressure} test function
 $V^{\ast}=[\bzero;q^{\ast}]$ with $q^{\ast}\in\Qhz$ a strip-localized
 finite-element bump chosen so that $\alpha\grad q^{\ast}=\bz$ on
@@ -967,13 +967,13 @@ $\bz$ is a gradient there, and because the pressure is \emph{not}
 Dirichlet-constrained (so $q^{\ast}$ is free on $\Gamma_{\mathrm D}$).
 
 \emph{Norm of the vehicle.} With $\bv^{\ast}=\bzero$ the viscous, reaction and
-mass terms of $\tnorm{V^{\ast}}_{\mathrm O}$ vanish, leaving
+mass terms of $\tnorm{V^{\ast}}_{\mathrm{O}}$ vanish, leaving
 $\varepsilon\|q^{\ast}\|^2=O(1)\cdot h^3=O(h^3)$ (here $\varepsilon=O(1)$ is
 essential; a gradient-$O(1)$ bump of width $h$ has amplitude $O(h)$, so
 $\|q^{\ast}\|^2\sim h^3$) and
 $\normtau{\alpha X(V^{\ast})}^2=\normtau{\alpha\grad q^{\ast}}^2
 \sim\tau_1\cdot O(1)\cdot|\Omega_h|=h^2\cdot h=h^3$. Thus
-$\tnorm{V^{\ast}}_{\mathrm O}=\Theta(h^{3/2})$.
+$\tnorm{V^{\ast}}_{\mathrm{O}}=\Theta(h^{3/2})$.
 
 \emph{The pairing does not cancel.} By idempotent self-adjointness of
 $\Ponez^{\perp}$ and $\alpha\grad q^{\ast}=\bz$ on $\Omega_h$,
@@ -990,7 +990,7 @@ of \cref{lem:st:defect}); and $S_2(U,V^{\ast})=0$.
 non-continuous convective term $(\bv,\alpha\ba\cdot\grad\bu)$ is absent,
 and one checks termwise---using $\tau_2=\Theta(1)$ for the divergence pairing
 $\normh[\tau_2^{-1}]{q^{\ast}}\le(\alpha/\nu)^{1/2}\|q^{\ast}\|\sim h^{3/2}$---that
-$|B^{0}_{\mathrm{OSGS}}(W,V^{\ast})|\le C\tnorm{W}_{\mathrm O}\tnorm{V^{\ast}}_{\mathrm O}$
+$|B^{0}_{\mathrm{OSGS}}(W,V^{\ast})|\le C\tnorm{W}_{\mathrm{O}}\tnorm{V^{\ast}}_{\mathrm{O}}$
 for \emph{this} pair. Expanding as in \cref{lem:st:reduce} with
 $\boldsymbol e_h=U_h-\widehat U_h$,
 \[
@@ -1000,9 +1000,9 @@ $\boldsymbol e_h=U_h-\widehat U_h$,
   \;=\;-\Theta(h^3)\quad(k\ge2,\ \text{since }h^{k+3/2}=o(h^3)).
 \]
 Restricted continuity then gives
-$\tnorm{\boldsymbol e_h}_{\mathrm O}\ge |B^{0}_{\mathrm{OSGS}}(\boldsymbol e_h,V^{\ast})|/(C\tnorm{V^{\ast}}_{\mathrm O})
+$\tnorm{\boldsymbol e_h}_{\mathrm{O}}\ge |B^{0}_{\mathrm{OSGS}}(\boldsymbol e_h,V^{\ast})|/(C\tnorm{V^{\ast}}_{\mathrm{O}})
 =\Theta(h^3)/\Theta(h^{3/2})=\Theta(h^{3/2})$, and
-$\tnorm{U-U_h}_{\mathrm O}\ge\tnorm{\boldsymbol e_h}_{\mathrm O}-\tnorm{U-\widehat U_h}_{\mathrm O}
+$\tnorm{U-U_h}_{\mathrm{O}}\ge\tnorm{\boldsymbol e_h}_{\mathrm{O}}-\tnorm{U-\widehat U_h}_{\mathrm{O}}
 \ge c\,h^{3/2}-C\,h^{k}=\Theta(h^{3/2})$ for $k\ge2$. With the upper bound this
 is two-sided.
 \end{proof}
