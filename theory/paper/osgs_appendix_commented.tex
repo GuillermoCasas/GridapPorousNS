@@ -282,13 +282,13 @@ boundary layers.
 The \emph{analyzed} OSGS method reads: find $U_h \in \Xhz$ such that
 \begin{equation}
   \label{oa:eq:Method}
-  B_{\mathrm{osgs}}(\ba; U_h, V_h) = L(V_h) \coloneqq (\bff, \bv_h)
+  B_{\mathrm{OSGS}}(\ba; U_h, V_h) = L(V_h) \coloneqq (\bff, \bv_h)
   \qquad \forall\, V_h \in \Xhz,
 \end{equation}
 with
 \begin{equation}
   \label{oa:eq:Bosgs}
-  B_{\mathrm{osgs}}(\ba; U, V)
+  B_{\mathrm{OSGS}}(\ba; U, V)
   \coloneqq
   B(\ba; U, V) + S_1(U, V) + S_2(U, V),
 \end{equation}
@@ -312,7 +312,7 @@ symmetric and positive semidefinite:
 In particular, with \cref{oa:eq:CoercivityIdentity},
 \begin{equation}
   \label{oa:eq:Diagonal}
-  B_{\mathrm{osgs}}(\ba; U_h, U_h)
+  B_{\mathrm{OSGS}}(\ba; U_h, U_h)
   = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu_h \bigr\rVert^2
   + \norm{\sigma^{1/2}\bu_h}^2
   + \varepsilon\norm{p_h}^2
@@ -883,11 +883,11 @@ definite. (Absent full Dirichlet data or pressure normalization it is only a sem
 
 \begin{lemma}[Comparison with the ASGS norm]
 \label{oa:lem:normcomparison}
-Let $\tnorm{\cdot}_{\mathrm{S}}$ denote the triple norm of the ASGS stability lemma
+Let $\tnorm{\cdot}_{\mathrm{A}}$ denote the triple norm of the ASGS stability lemma
 of~the main text,
 \[
 \begin{aligned}
-  \tnorm{V}_{\mathrm{S}}^2
+  \tnorm{V}_{\mathrm{A}}^2
   &= \nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv \bigr\rVert^2
   + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2}\bv \bigr\rVert_h^2
   + \varepsilon\norm{q}^2
@@ -898,7 +898,7 @@ of~the main text,
   &= \frac{\tns^{-1}\sigma}{\tns^{-1} + \sigma/\alpha_K}.
 \end{aligned}
 \]
-Then $\tnorm{V}_{\mathrm{S}} \le \tnorm{V}_{\mathrm{O}}$ for all $V$.
+Then $\tnorm{V}_{\mathrm{A}} \le \tnorm{V}_{\mathrm{O}}$ for all $V$.
 \end{lemma}
 
 \begin{proof}
@@ -936,15 +936,15 @@ seminorm, as the parenthetical in the proof warns.
 
 \begin{theorem}[Inf--sup stability]
 \label{oa:th:stability}
-Under \cref{H:mesh}--\cref{H:spaces}, \cref{H:design}--\cref{H:patch} there exist $h_0 > 0$ and $\beta_{\mathrm{osgs}} > 0$,
+Under \cref{H:mesh}--\cref{H:spaces}, \cref{H:design}--\cref{H:patch} there exist $h_0 > 0$ and $\beta_{\mathrm{OSGS}} > 0$,
 depending only on $\beta_0$, $C_2$, $C_{\nabla\alpha}/C_{\mathrm{inv}}$ and the constants of
 \cref{oa:sec:technical}, such that for all $h \le h_0$,
 \begin{equation}
   \label{oa:eq:InfSup}
   \inf_{U_h \in \Xhz\setminus\{0\}}\;
   \sup_{V_h \in \Xhz\setminus\{0\}}\;
-  \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{U_h}_{\mathrm{O}}\,\tnorm{V_h}_{\mathrm{O}}}
-  \;\ge\; \beta_{\mathrm{osgs}} .
+  \frac{B_{\mathrm{OSGS}}(\ba; U_h, V_h)}{\tnorm{U_h}_{\mathrm{O}}\,\tnorm{V_h}_{\mathrm{O}}}
+  \;\ge\; \beta_{\mathrm{OSGS}} .
 \end{equation}
 An admissible choice of the constants in \cref{H:design} is
 $\gamma_0 = 10\,(1 + M_2)$ with $M_2 \coloneqq 1 + C_{\nabla\alpha}/C_{\mathrm{inv}}$,
@@ -971,13 +971,13 @@ O}\tnorm{V_h}_{\mathrm O}$; equivalently, the system matrix is injective with a
 quantitative bound, and a square injective matrix is invertible. Coercivity is
 the special case in which the witness is always $U_h$ itself. Why that special
 case fails here \emph{in this norm}: the diagonal identity \cref{oa:eq:Diagonal}
-is a sum of squares, so $B_{\mathrm{osgs}}$ \emph{is} nonnegative on the
+is a sum of squares, so $B_{\mathrm{OSGS}}$ \emph{is} nonnegative on the
 diagonal---but of the wrong quantities. Splitting $\norm{\xi_h}_{\tau_1}^2 =
 \norm{\Pone\xi_h}_{\tau_1}^2 + O_1$ (Pythagoras for the unconstrained
 projection), the norm \cref{oa:eq:TripleNorm} contains the \emph{full}
 $\norm{\xi_h}_{\tau_1}^2$, while the diagonal delivers only the fluctuation
 parts $O_1$, $O_2$: the projected components are invisible to
-$B_{\mathrm{osgs}}(U_h,U_h)$, and no constant relates them to what the diagonal
+$B_{\mathrm{OSGS}}(U_h,U_h)$, and no constant relates them to what the diagonal
 controls. Contrast with the ASGS diagonal, familiar from \cref{lem:coercivity}:
 there the stabilization at $V=U$ produces the \emph{full} residual square minus
 a viscous--reactive penalty (\cref{eq:stabdiag1}--\cref{eq:Gexpand}); the
@@ -1019,7 +1019,7 @@ Write $\psi \coloneqq \psi(h)$ and set
 This is an \emph{inf--sup} proof, a different animal from the coercivity
 argument of the ASGS analysis you know, so it is worth fixing the goal and the
 route before the details. \emph{Goal}: for the given $U_h$, produce a single
-test function $W$ against which $B_{\mathrm{osgs}}(\ba;U_h,W)$ is at least a
+test function $W$ against which $B_{\mathrm{OSGS}}(\ba;U_h,W)$ is at least a
 constant times $\tnorm{U_h}_{\mathrm O}^2$; that one inequality (after dividing
 by $\tnorm{W}_{\mathrm O}$) is \cref{oa:eq:InfSup}. In the ASGS proof the test
 function was $U_h$ itself and this bound \emph{was} coercivity; here that route
@@ -1054,12 +1054,12 @@ $V^0 \coloneqq [\bw_h; r_h]$ and take as test function $W \coloneqq U_h + V^0$.
 By \cref{oa:eq:Diagonal},
 \begin{equation}
   \label{oa:eq:StepDiag}
-  B_{\mathrm{osgs}}(\ba; U_h, U_h) = D_\nu + D_\sigma + D_\varepsilon + O_1 + O_2 ,
+  B_{\mathrm{OSGS}}(\ba; U_h, U_h) = D_\nu + D_\sigma + D_\varepsilon + O_1 + O_2 ,
 \end{equation}
-and it remains to bound $B_{\mathrm{osgs}}(\ba; U_h, V^0)$ from below. Expanding
+and it remains to bound $B_{\mathrm{OSGS}}(\ba; U_h, V^0)$ from below. Expanding
 \cref{eq:BilinearForm} and \cref{oa:eq:Sdefs},
 \begin{align}
-  B_{\mathrm{osgs}}(\ba; U_h, V^0)
+  B_{\mathrm{OSGS}}(\ba; U_h, V^0)
   ={}& 2\nu\,(\alpha\,\ViscProj\nabla\bu_h, \ViscProj\nabla\bw_h)
   \tag{T1}\label{oa:eq:T1}\\
   &+ (\bw_h, \xi_h)
@@ -1117,7 +1117,7 @@ stabilization cross-talk. The ledger to be established: every cross term is at
 most a small multiple of a quantity the diagonal already controls, plus a
 fraction strictly less than one of the freshly harvested $P$'s.
 \emph{Achieved in Step~1}: the witness $W = U_h + V^0$ is fixed and admissible, and
-the extra pairing $B_{\mathrm{osgs}}(\ba;U_h,V^0)$ is laid out as the seven terms
+the extra pairing $B_{\mathrm{OSGS}}(\ba;U_h,V^0)$ is laid out as the seven terms
 \cref{oa:eq:T1}--\cref{oa:eq:T7}; disposing of these is the whole remaining task.
 \end{pedagogy}
 
@@ -1290,7 +1290,7 @@ Step~2 harvest cannot be undone.
 \medskip\noindent\emph{Step 4: collection.}
 Adding \cref{oa:eq:StepDiag} and the bounds of Steps~2--3,
 \begin{align*}
-  B_{\mathrm{osgs}}(\ba; U_h, W)
+  B_{\mathrm{OSGS}}(\ba; U_h, W)
   \ \ge\ & \tfrac34\, D_\nu + \tfrac12\, D_\sigma + \tfrac12\, D_\varepsilon\\
   &+ \Bigl( 1 - \frac{2\psi}{\beta_0^2} - \frac{1+\psi}{\gamma} \Bigr)\, O_1
   + \Bigl( 1 - \psi - \frac{M_2(1+\psi)}{2\gamma} \Bigr)\, O_2\\
@@ -1306,7 +1306,7 @@ using $C_2 \le 1$: $1 - 0.125 - 0.633 - 0.029 \ge 0.21$; the others are larger).
 Hence, with $C_0 = 1/8$,
 \begin{equation}
   \label{oa:eq:Collected}
-  B_{\mathrm{osgs}}(\ba; U_h, W)
+  B_{\mathrm{OSGS}}(\ba; U_h, W)
   \ \ge\ C_0\,\bigl( D_\nu + D_\sigma + D_\varepsilon + O_1 + O_2 + P_1 + P_2 \bigr).
 \end{equation}
 
@@ -1324,7 +1324,7 @@ unconditional in the physical parameters; all parameter sensitivity of the
 final convergence estimate enters later, through the interpolation
 conversions.
 \emph{Achieved in Step~4}: the single collected inequality \cref{oa:eq:Collected},
-$B_{\mathrm{osgs}}(\ba;U_h,W)\ge C_0(D_\nu+D_\sigma+D_\varepsilon+O_1+O_2+P_1+P_2)$
+$B_{\mathrm{OSGS}}(\ba;U_h,W)\ge C_0(D_\nu+D_\sigma+D_\varepsilon+O_1+O_2+P_1+P_2)$
 with $C_0=\tfrac18$ independent of every physical parameter.
 \end{pedagogy}
 
@@ -1337,7 +1337,7 @@ By \cref{H:projection} and the exact decomposition of the mass slot,
   \le D_\nu + D_\sigma + D_\varepsilon + \frac{2}{\beta_0^2}(P_1 + O_1) + (P_2 + O_2),
 \]
 so \cref{oa:eq:Collected} yields
-$B_{\mathrm{osgs}}(\ba; U_h, W) \ge C_0 \min\{1, \beta_0^2/2\}\,\tnorm{U_h}_{\mathrm{O}}^2$.
+$B_{\mathrm{OSGS}}(\ba; U_h, W) \ge C_0 \min\{1, \beta_0^2/2\}\,\tnorm{U_h}_{\mathrm{O}}^2$.
 It remains to bound $\tnorm{W}_{\mathrm{O}} \le \tnorm{U_h}_{\mathrm{O}} + \tnorm{V^0}_{\mathrm{O}}$. Using
 \cref{oa:eq:Smoothing} elementwise together with \cref{oa:eq:K1} for the viscous term,
 $\sigma\tau_1 \le 1$ for the reactive term, $\varepsilon\tau_2 \le C_2$ for the
@@ -1355,11 +1355,11 @@ $\norm{\alpha X(V^0)}_{\tau_1}$ and $\norm{\nabla\cdot(\alpha\bw_h)}_{\tau_2}$,
 and $P_1 \le \norm{\xi_h}_{\tau_1}^2$, $P_2 \le \norm{\delta_h}_{\tau_2}^2$ give
 $\tnorm{V^0}_{\mathrm{O}} \le C\,\tnorm{U_h}_{\mathrm{O}}$, hence $\tnorm{W}_{\mathrm{O}} \le C\,\tnorm{U_h}_{\mathrm{O}}$. Combining,
 \[
-  \sup_{V_h\in\Xhz\setminus\{0\}} \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{V_h}_{\mathrm{O}}}
-  \ \ge\ \frac{B_{\mathrm{osgs}}(\ba; U_h, W)}{\tnorm{W}_{\mathrm{O}}}
-  \ \ge\ \beta_{\mathrm{osgs}}\, \tnorm{U_h}_{\mathrm{O}}
+  \sup_{V_h\in\Xhz\setminus\{0\}} \frac{B_{\mathrm{OSGS}}(\ba; U_h, V_h)}{\tnorm{V_h}_{\mathrm{O}}}
+  \ \ge\ \frac{B_{\mathrm{OSGS}}(\ba; U_h, W)}{\tnorm{W}_{\mathrm{O}}}
+  \ \ge\ \beta_{\mathrm{OSGS}}\, \tnorm{U_h}_{\mathrm{O}}
 \]
-with $\beta_{\mathrm{osgs}} = C_0\min\{1,\beta_0^2/2\}/C > 0$, which is
+with $\beta_{\mathrm{OSGS}} = C_0\min\{1,\beta_0^2/2\}/C > 0$, which is
 \cref{oa:eq:InfSup}.
 \end{proof}
 
@@ -1374,7 +1374,7 @@ inf--sup quotient divides by $\tnorm{W}_{\mathrm O}$, so a witness of unbounded
 size would prove nothing; the estimate $\tnorm{V^0}_{\mathrm O} \le
 C\,\tnorm{U_h}_{\mathrm O}$ deliberately reuses the elementwise bounds of
 Step~3---an economy worth noticing: the same (K)-conversions price both the
-cross-talk and the witness's size. The final constant $\beta_{\mathrm{osgs}} =
+cross-talk and the witness's size. The final constant $\beta_{\mathrm{OSGS}} =
 C_0\min\{1,\beta_0^2/2\}/C$ assembles the three ingredients: collection floor,
 reconstruction rate, witness size. Two structural notes. First, the pattern
 ``test with $U_h$ plus a weighted correction, harvest, absorb, reconstruct,
@@ -1386,7 +1386,7 @@ matrix injective, hence invertible---the statement at the head of
 \cref{oa:sec:convergence}.
 \emph{Achieved in Step~5}, and with it the theorem: dividing the collected bound by
 the now-controlled witness size turns it into
-$\ge \beta_{\mathrm{osgs}}\tnorm{U_h}_{\mathrm O}$, which is the inf--sup estimate
+$\ge \beta_{\mathrm{OSGS}}\tnorm{U_h}_{\mathrm O}$, which is the inf--sup estimate
 \cref{oa:eq:InfSup}.
 \end{pedagogy}
 
@@ -1494,13 +1494,13 @@ function:
 Under \cref{H:mesh}--\cref{H:regularity}, \cref{H:design}--\cref{H:advectionsmooth}, for all $V_h \in \Xhz$,
 \begin{equation}
   \label{oa:eq:ConsistencyId}
-  B_{\mathrm{osgs}}(\ba;\, U - U_h,\, V_h)
+  B_{\mathrm{OSGS}}(\ba;\, U - U_h,\, V_h)
   = S_1(U, V_h) + S_2(U, V_h),
 \end{equation}
 and
 \begin{equation}
   \label{oa:eq:ConsistencyBound}
-  \bigl| B_{\mathrm{osgs}}(\ba;\, U - U_h,\, V_h) \bigr|
+  \bigl| B_{\mathrm{OSGS}}(\ba;\, U - U_h,\, V_h) \bigr|
   \;\le\; C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}_{\mathrm{O}}.
 \end{equation}
 \end{lemma}
@@ -1607,7 +1607,7 @@ permits stating \cref{oa:th:convergence} in $\Psi_{\mathrm O}$. The take-away
 principle, stated once: orthogonal-subscale methods trade exact consistency
 for consistency-up-to-fluctuations; at the level of convergence rates the
 trade is free, but it is paid for in data-smoothness hypotheses.
-\emph{Achieved}: $|B_{\mathrm{osgs}}(\ba;U-U_h,V_h)| \le C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}_{\mathrm O}$
+\emph{Achieved}: $|B_{\mathrm{OSGS}}(\ba;U-U_h,V_h)| \le C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}_{\mathrm O}$
 (\cref{oa:eq:ConsistencyBound})---exact consistency is lost, but only by an
 interpolation-order amount.
 \end{pedagogy}
@@ -1649,13 +1649,13 @@ tax of working in zero-mean pressure spaces.
 Under \cref{H:mesh}--\cref{H:regularity}, \cref{H:design}--\cref{H:advectionsmooth}, for all $V_h \in \Xhz$,
 \begin{equation}
   \label{oa:eq:InterpolationBound}
-  \bigl| B_{\mathrm{osgs}}(\ba;\, \hat E,\, V_h) \bigr|
+  \bigl| B_{\mathrm{OSGS}}(\ba;\, \hat E,\, V_h) \bigr|
   \;\le\; C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}_{\mathrm{O}}.
 \end{equation}
 \end{lemma}
 
 \begin{proof}
-Expand $B_{\mathrm{osgs}}(\ba; \hat E, V_h)$ into the Galerkin terms and the
+Expand $B_{\mathrm{OSGS}}(\ba; \hat E, V_h)$ into the Galerkin terms and the
 stabilization terms and estimate each. Below, all interpolation estimates are
 \cref{oa:eq:NodalInterp} with $n = k_u+1$ or $n = k_p+1$ and $m \in \{0,1\}$.
 
@@ -1665,7 +1665,7 @@ This lemma is the OSGS twin of the ASGS continuity estimate
 discrete form applied to the \emph{interpolation error} $\hat E = U - \hat U_h$
 by the error function $\Psi_{\mathrm O}(h)$ times the test norm, so that in the
 two-line convergence argument the discrete error inherits the interpolation
-rate. The work is pure bookkeeping: $B_{\mathrm{osgs}}(\ba;\hat E,V_h)$ breaks
+rate. The work is pure bookkeeping: $B_{\mathrm{OSGS}}(\ba;\hat E,V_h)$ breaks
 into six Galerkin terms (viscous, convective, continuity, reactive,
 compressibility, pressure-gradient) and the two stabilization terms $S_1,S_2$;
 the seven estimates (I1)--(I7) dispatch them---with (I2) taking the convective
@@ -1912,10 +1912,10 @@ with $\Psi_{\mathrm O}(h)$ and its $\ell^1$ majorant $\mathcal{E}(h)$ as in
 Write $U - U_h = \hat E + \eta_h$ with $\eta_h \coloneqq \hat U_h - U_h \in \Xhz$.
 By \cref{oa:th:stability} there is $V_h \in \Xhz$, $\tnorm{V_h}_{\mathrm{O}} = 1$, with
 \[
-  \beta_{\mathrm{osgs}}\,\tnorm{\eta_h}_{\mathrm{O}}
-  \le B_{\mathrm{osgs}}(\ba; \eta_h, V_h)
-  = -\,B_{\mathrm{osgs}}(\ba; \hat E, V_h)
-  + B_{\mathrm{osgs}}(\ba; U - U_h, V_h)
+  \beta_{\mathrm{OSGS}}\,\tnorm{\eta_h}_{\mathrm{O}}
+  \le B_{\mathrm{OSGS}}(\ba; \eta_h, V_h)
+  = -\,B_{\mathrm{OSGS}}(\ba; \hat E, V_h)
+  + B_{\mathrm{OSGS}}(\ba; U - U_h, V_h)
   \le C\,\Psi_{\mathrm O}(h),
 \]
 by \cref{oa:lem:interpolation,oa:lem:consistency}. The triangle inequality and
@@ -1927,11 +1927,11 @@ This is the abstract pattern \emph{stability + consistency + approximability
 $\Rightarrow$ convergence}, in its inf--sup form: split $U - U_h = \hat E +
 \eta_h$ with $\eta_h$ discrete; apply the inf--sup bound to $\eta_h$, which
 converts its norm into the form evaluated against a unit witness; expand
-$B_{\mathrm{osgs}}(\eta_h, V_h) = B_{\mathrm{osgs}}(U-U_h, V_h) -
-B_{\mathrm{osgs}}(\hat E, V_h)$, the first term being the consistency defect
+$B_{\mathrm{OSGS}}(\eta_h, V_h) = B_{\mathrm{OSGS}}(U-U_h, V_h) -
+B_{\mathrm{OSGS}}(\hat E, V_h)$, the first term being the consistency defect
 and the second the interpolation continuity; finish by triangle inequality with
 \cref{oa:lem:interpsize}. \Cref{thm:convergence} is the same three lines with
-the coercivity constant in place of $\beta_{\mathrm{osgs}}$ and Galerkin
+the coercivity constant in place of $\beta_{\mathrm{OSGS}}$ and Galerkin
 orthogonality in place of the consistency lemma. Once this pattern is
 internalized, every quasi-optimal error analysis in the finite element
 literature reads as an instance of it.
@@ -1944,7 +1944,7 @@ estimate of the ASGS convergence theorem of~the main text up to the local factor
 $(c_1+\Dah)^{1/2}$, in the same porosity-weighted $\ell^2$ form:
 \[
 \begin{aligned}
-  \tnorm{U - U_h}_{\mathrm{S}}
+  \tnorm{U - U_h}_{\mathrm{A}}
   &\;\le\;
   C\,\Psi_{\mathrm O}(h) \\
   &= C\Bigl( \sum_K \bigl( c_1 + \Dah \bigr)\,\frac{\alpha_K^2}{h_K^2}

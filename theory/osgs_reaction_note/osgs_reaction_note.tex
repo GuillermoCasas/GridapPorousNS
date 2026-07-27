@@ -155,7 +155,7 @@ Testing \cref{eq:BS} with $\Vh=\Uh$ and $\Porth=\mathcal{I}$ reproduces the
 manuscript's identity
 %
 \begin{align}\label{eq:ASGS-expand}
-  B_\mathrm{S}(\boldsymbol{a},\Uh,\Uh)
+  B_{\mathrm{ASGS}}(\boldsymbol{a},\Uh,\Uh)
   &= 2\nu\big\|\alpha^{1/2}\ViscProj\nabla\uh\big\|^2
    + \big\|\sigma^{1/2}\uh\big\|^2
    + \varepsilon\big\|\ph\big\|^2 \notag\\
@@ -185,7 +185,7 @@ coefficient of $\|\uh\|_K^2$ is controlled from below by $C\,\siga$, giving the
 manuscript's bound
 %
 \begin{equation}\label{eq:ASGS-lemma}
-  B_\mathrm{S}(\boldsymbol{a},\Uh,\Uh)\ \ge\ C\,\triplenorm{\Uh}^2,
+  B_{\mathrm{ASGS}}(\boldsymbol{a},\Uh,\Uh)\ \ge\ C\,\triplenorm{\Uh}^2,
   \qquad
   \triplenorm{\Uh}^2
   = \nu\big\|\alpha^{1/2}\ViscProj\nabla\uh\big\|^2
@@ -247,7 +247,7 @@ the drained $\siga<\sigma$ that ASGS is left with. Collecting this:
 \begin{proposition}[Reactive coercivity gap, in favour of OSGS]\label{prop:gap}
 Under the constant-coefficient assumptions above, the largest coefficient
 $c_{\uh}$ for which an estimate of the form
-$B_\mathrm{S}(\boldsymbol{a},\Uh,\Uh)\ge c_{\uh}\,\|\uh\|^2+(\text{other nonnegative terms})$
+$B_{\mathrm{ASGS}}(\boldsymbol{a},\Uh,\Uh)\ge c_{\uh}\,\|\uh\|^2+(\text{other nonnegative terms})$
 is provable from \cref{eq:BS} satisfies, as $\Damk_h\to\infty$,
 \begin{equation}\label{eq:gap}
   c_{\uh}^{\,\mathrm{ASGS}}\sim C\,\siga\sim\alpha_K(1+\Reyn_h)\frac{\nu}{h^2},

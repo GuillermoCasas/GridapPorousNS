@@ -132,12 +132,12 @@ broken norm is the square root of the \emph{sum of squares} of the elemental con
 (cf.\ \cref{sec:amendments}).
 
 Restricted to the present setting, the stabilized bilinear form of the main text,
-$\BS(\ba; U_h,V_h)=B(\ba; U_h,V_h)-\sum_K \langle \mathcal{L}^* V_h,
+$B_{\mathrm{ASGS}}(\ba; U_h,V_h)=B(\ba; U_h,V_h)-\sum_K \langle \mathcal{L}^* V_h,
 \boldsymbol{\tau}_K \mathcal{L} U_h\rangle_K$, reads, for
 $U_h=[\buh;p_h]$ and $V_h=[\bvh;q_h]$ in $\Xh$,
 \begin{equation}\label{eq:Bstab}
 \begin{aligned}
-  \BS(\ba; U_h,V_h)
+  B_{\mathrm{ASGS}}(\ba; U_h,V_h)
   ={}& 2\nu\bigl(\ViscProj\nabla\bvh,\alpha\ViscProj\nabla\buh\bigr)
      + \bigl(\bvh,\alpha\X(U_h)\bigr)
      + \sigma\bigl(\bvh,\buh\bigr)
@@ -156,7 +156,7 @@ For the exact solution $U$ of the linearized continuous problem (assumed smooth 
 see \cref{sec:convergence}) one has $\mathcal{L}_{\ba}U=F$ in $L^2(K)$ for every $K$, and
 therefore the method is consistent:
 \begin{equation}\label{eq:consistency}
-  \BS(\ba; U-U_h, V_h) = 0 \qquad \forall\, V_h\in\Xh .
+  B_{\mathrm{ASGS}}(\ba; U-U_h, V_h) = 0 \qquad \forall\, V_h\in\Xh .
 \end{equation}
 
 \subsection{Stabilization parameters and working norm}
@@ -418,7 +418,7 @@ from which \eqref{eq:jumpest} follows with the identity \eqref{eq:sigmatilde}.
 Let \crefrange{H:data}{H:jump} hold, with $c_1,c_2>0$. Then there exists $C>0$,
 independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$, such that
 \begin{equation}\label{eq:continuity}
-  \BS(\ba; U_h,V_h)
+  B_{\mathrm{ASGS}}(\ba; U_h,V_h)
   \le C\Bigl(
   \bigl\lVert\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
   + \bigl\lVert\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h
@@ -427,7 +427,7 @@ independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$, such th
 \end{equation}
 Moreover, the proof yields the sharper bound
 \begin{equation}\label{eq:sharpcont}
-  \BS(\ba; U_h,V_h)
+  B_{\mathrm{ASGS}}(\ba; U_h,V_h)
   \le C\Bigl(
   \bigl\lVert\alpha_K\,\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
   + \bigl\lVert\alpha_K\,\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h
@@ -446,7 +446,7 @@ follows the steps of the proof of Lemma~2 in~\cite{codina2001}.
 
 \medskip\noindent\emph{Step 0: term decomposition.}
 Expanding the products in \eqref{eq:Bstab} we obtain
-$\BS(\ba;U,V) = \sum_{j=1}^{18} T_j$, with
+$B_{\mathrm{ASGS}}(\ba;U,V) = \sum_{j=1}^{18} T_j$, with
 \begin{align}
   T_1 &\coloneqq 2\nu\bigl(\ViscProj\nabla\bv,\alpha\ViscProj\nabla\bu\bigr), \label{eq:T1}\\
   T_2 &\coloneqq \bigl(\bv,\alpha\X(U)\bigr), \label{eq:T2}\\
@@ -796,7 +796,7 @@ and likewise $|T_{17}|\le\triplenorm{U}\,\triplenorm{V}$.
 \medskip\noindent\emph{Step 8: assembly.}
 Adding the estimates of Steps 1--7,
 \begin{equation}\label{eq:assembly}
-  \BS(\ba;U,V)
+  B_{\mathrm{ASGS}}(\ba;U,V)
   \le C\,\triplenorm{V}\Bigl(\triplenorm{U}
   + \bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\bu\bigr\rVert_h
   + \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h\Bigr).
@@ -920,7 +920,7 @@ $E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
 \begin{lemma}[Continuity for the interpolation error]\label{lem:continterp}
 Let \crefrange{H:data}{H:jump} hold and let $U\in\mathcal{W}_r$. Then
 \begin{equation}\label{eq:continterp}
-  \BS\bigl(\ba;\,U-\widehat{U}_h,\,V_h\bigr)
+  B_{\mathrm{ASGS}}\bigl(\ba;\,U-\widehat{U}_h,\,V_h\bigr)
   \le C\,\psi(h)\,\triplenorm{V_h}
   \qquad\forall\,V_h\in\Xh .
 \end{equation}
@@ -1001,7 +1001,7 @@ interpolation estimates \eqref{eq:interpinftyE} (those applied to $\bvh$ are kep
 identical powers of $h$.
 \end{itemize}
 Steps 1--8 then yield
-$\BS(\ba;E,V_h)\le C\triplenorm{V_h}\bigl(\triplenorm{E}+C\psi(h)\bigr)$, and
+$B_{\mathrm{ASGS}}(\ba;E,V_h)\le C\triplenorm{V_h}\bigl(\triplenorm{E}+C\psi(h)\bigr)$, and
 \eqref{eq:Enorm} concludes the proof.
 \end{proof}
 
@@ -1012,7 +1012,7 @@ there (with the amendments of \cref{rem:winvconst,sec:amendments}).
 \begin{proposition}[Stability; main text]\label{prop:stability}
 Let \crefrange{H:data}{H:mesh} hold and let $c_1>2\xi\,\Cinva^2$ for some $\xi>2$. Then
 there is $C>0$ such that
-$\BS(\ba;U_h,U_h)\ge C\,\triplenorm{U_h}^2$ for all $U_h\in\Xh$.
+$B_{\mathrm{ASGS}}(\ba;U_h,U_h)\ge C\,\triplenorm{U_h}^2$ for all $U_h\in\Xh$.
 \end{proposition}
 
 \begin{theorem}[Convergence]\label{thm:convergence}
@@ -1030,8 +1030,8 @@ Let $E_h\coloneqq\widehat{U}_h-U_h\in\Xh$. By \cref{prop:stability}, consistency
 \eqref{eq:consistency} and \cref{lem:continterp},
 \begin{equation*}
   C\,\triplenorm{E_h}^2
-  \le \BS(\ba;E_h,E_h)
-  = \BS\bigl(\ba;\widehat{U}_h-U,E_h\bigr)
+  \le B_{\mathrm{ASGS}}(\ba;E_h,E_h)
+  = B_{\mathrm{ASGS}}\bigl(\ba;\widehat{U}_h-U,E_h\bigr)
   \le C\,\psi(h)\,\triplenorm{E_h},
 \end{equation*}
 so $\triplenorm{E_h}\le C\psi(h)$. The triangle inequality and \eqref{eq:Enorm} give

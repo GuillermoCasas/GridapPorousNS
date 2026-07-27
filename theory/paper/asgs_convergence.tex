@@ -73,13 +73,13 @@ where $\tau$ may take a different (constant) value $\tau_K$ on each element. Not
 broken norm is the square root of the \emph{sum of squares} of the elemental contributions.
 
 Restricted to the present setting, the stabilized bilinear form of the main text,
-$\BS(\ba; U_h,V_h)=B(\ba; U_h,V_h)-\sum_K \langle \mathcal{L}^* V_h,
+$\BASGS (\ba; U_h,V_h)=B(\ba; U_h,V_h)-\sum_K \langle \mathcal{L}^* V_h,
 \boldsymbol{\tau}_K \mathcal{L} U_h\rangle_K$ (with $\mathcal{L}$ and $\mathcal{L}^*$ from
 \cref{eq:StrongOperator,eq:AdjointOperator}), reads, for
 $U_h=[\buh;p_h]$ and $V_h=[\bvh;q_h]$ in $\Xh$,
 \begin{equation}\label{eq:Bstab}
 \begin{aligned}
-  \BS(\ba; U_h,V_h)
+  \BASGS (\ba; U_h,V_h)
   ={}& 2\nu\bigl(\ViscProj\nabla\bvh,\alpha\ViscProj\nabla\buh\bigr)
      + \bigl(\bvh,\alpha\X(U_h)\bigr)
      + \sigma\bigl(\bvh,\buh\bigr) \\
@@ -98,7 +98,7 @@ For the exact solution $U$ of the linearized continuous problem (assumed smooth 
 see \cref{sec:convergence}) one has $\mathcal{L}_{\ba}U=F$ in $L^2(K)$ for every $K$, and
 therefore the method is consistent:
 \begin{equation}\label{eq:consistency}
-  \BS(\ba; U-U_h, V_h) = 0 \qquad \forall\, V_h\in\Xh .
+  \BASGS (\ba; U-U_h, V_h) = 0 \qquad \forall\, V_h\in\Xh .
 \end{equation}
 
 \subsubsection{Stabilization parameters and working norm}
@@ -131,7 +131,7 @@ so that $\tau_{1,K} = \bigl(\varphi_{1,K}+\sigma\bigr)^{-1}$, and
 \end{equation}
 We will drop the element subscript ($\tau_1$, $\tau_2$, $\varphi_1$, $\alpha_K$, $h$,
 $|\ba|_\infty$) whenever the elementwise character is clear from the context. The working
-norm of the main text (the $\triplenorm{\cdot}_{\mathrm{S}}$ of \cref{lemma:Stability}), written
+norm of the main text (the $\triplenorm{\cdot}_{\mathrm{A}}$ of \cref{lemma:Stability}), written
 here in the expanded form via the identity $\norm{f}_{\tau_i}=\lVert\tau_i^{1/2}f\rVert_h$ of
 \cref{eq:TauWeightedProduct}, is
 \begin{equation}\label{eq:triplenorm}
@@ -154,7 +154,7 @@ the penalty parameter $\varepsilon>0$ (or the zero-mean constraint when $\vareps
 
 \subsubsection{Proof of coercivity (\cref{lemma:Stability})}\label{sec:proof-stability}
 We now prove the coercivity result stated in \cref{lemma:Stability} of the main text.
-Taking $V_h=U_h$ in $\BS(\ba;U_h,U_h)$, the Galerkin term reduces to
+Taking $V_h=U_h$ in $\BASGS (\ba;U_h,U_h)$, the Galerkin term reduces to
 $2\nu\norm{\alpha^{1/2}\ViscProj\nabla\buh}^2+\norm{\sigma^{1/2}\buh}^2+\varepsilon\bigl\lVert p_h \bigr\rVert^2$
 by skew-symmetry of the convection term and cancellation of the pressure-divergence pair.
 Expanding the stabilization terms yields the residual and divergence squares, a negative
@@ -163,7 +163,7 @@ $\sigma$ to the damped weight $\sigmatilde$, and a viscous-reaction cross term b
 inequality. Collecting all terms gives
 \begin{equation}\label{eq:coerccollect-lemma}
 \begin{aligned}
-  \BS(\ba;U_h,U_h)
+  \BASGS (\ba;U_h,U_h)
   \ \ge\ &\Bigl(2\bigl(1-\tfrac{2}{\eta}\bigr)-\tfrac{4\Cinva^2}{c_1}\Bigr)\,
   \nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\buh\bigr\rVert^2
   + \Bigl(1-\tfrac{\eta\Cinva^2}{c_1}\Bigr)\bigl\lVert\sigmatilde^{1/2}\buh\bigr\rVert_h^2 \\
@@ -389,7 +389,7 @@ from which \eqref{eq:jumpest} follows with the identity \eqref{eq:sigmatilde}.
 \end{proof}
 
 \subsection{Coercivity of the stabilized bilinear form}\label{sec:coercivity}
-The stability of the ASGS method is coercivity of $\BS$ in the working norm
+The stability of the ASGS method is coercivity of $\BASGS $ in the working norm
 \eqref{eq:triplenorm}; it is where the porosity-weighted inverse estimate
 \eqref{eq:winv-divvisc} and the condition on $c_1$ enter.
 
@@ -398,7 +398,7 @@ Let \cref{H:mesh,H:data,H:porosity,H:advection} hold and let $c_1 > 2\xi\,\Cinva
 a constant $C_{\mathrm{coer}}>0$, depending only on $\xi$, on $C_2$ of \eqref{eq:UpperBoundOnEpsilon} and
 on the shape regularity, such that
 \begin{equation}\label{eq:coercivity}
-  \BS(\ba; U_h,U_h) \ \ge\ C_{\mathrm{coer}}\,\triplenorm{U_h}^2
+  \BASGS (\ba; U_h,U_h) \ \ge\ C_{\mathrm{coer}}\,\triplenorm{U_h}^2
   \qquad\forall\,U_h\in\Xh .
 \end{equation}
 \end{lemma}
@@ -481,7 +481,7 @@ $\nu\sigma\tau_1\alpha_K/h^2\le\sigmatilde/c_1$. Since both negative viscous con
 subtract from the single Galerkin term $2\nu\norm{\alpha^{1/2}\ViscProj\nabla\buh}^2$, we obtain
 \begin{equation}\label{eq:coerccollect}
 \begin{aligned}
-  \BS(\ba;U_h,U_h)
+  \BASGS (\ba;U_h,U_h)
   \ \ge\ &\Bigl(2\bigl(1-\tfrac{2}{\eta}\bigr)-\tfrac{4\Cinva^2}{c_1}\Bigr)\,
   \nu\norm{\alpha^{1/2}\ViscProj\nabla\buh}^2
   + \Bigl(1-\tfrac{\eta\Cinva^2}{c_1}\Bigr)\bigl\lVert\sigmatilde^{1/2}\buh\bigr\rVert_h^2 \\
@@ -505,7 +505,7 @@ minimum of the three nontrivial coefficients.
 Let \cref{H:mesh,H:data,H:porosity,H:advection} hold, together with the jump condition \cref{H:jump} when $\sigma>0$, with $c_1,c_2>0$. Then there exists $C>0$,
 independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$, such that
 \begin{equation}\label{eq:continuity}
-  \bigl\lvert\BS(\ba; U_h,V_h)\bigr\rvert
+  \bigl\lvert\BASGS (\ba; U_h,V_h)\bigr\rvert
   \le C\Bigl(
   \bigl\lVert\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
   + \bigl\lVert\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h
@@ -514,7 +514,7 @@ independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$, such th
 \end{equation}
 Moreover, the proof yields the sharper bound
 \begin{equation}\label{eq:sharpcont}
-  \bigl\lvert\BS(\ba; U_h,V_h)\bigr\rvert
+  \bigl\lvert\BASGS (\ba; U_h,V_h)\bigr\rvert
   \le C\Bigl(
   \bigl\lVert\alpha_K\,\tau_2^{1/2}h^{-1}\buh\bigr\rVert_h
   + \bigl\lVert\alpha_K\,\tau_1^{1/2}h^{-1}p_h\bigr\rVert_h
@@ -533,7 +533,7 @@ follows the steps of the proof of Lemma~2 in~\cite{codina2001stabilized}.
 
 \medskip\noindent\emph{Step 0: term decomposition.}
 Expanding the products in \eqref{eq:Bstab} we obtain
-$\BS(\ba;U,V) = \sum_{j=1}^{18} T_j$, with
+$\BASGS (\ba;U,V) = \sum_{j=1}^{18} T_j$, with
 \begin{align}
   T_1 &\coloneqq 2\nu\bigl(\ViscProj\nabla\bv,\alpha\ViscProj\nabla\bu\bigr), \label{eq:T1}\\
   T_2 &\coloneqq \bigl(\bv,\alpha\X(U)\bigr), \label{eq:T2}\\
@@ -890,7 +890,7 @@ and likewise $|T_{17}|\le\triplenorm{U}\,\triplenorm{V}$.
 \medskip\noindent\emph{Step 8: assembly.}
 Adding the estimates of Steps 1--7,
 \begin{equation}\label{eq:assembly}
-  \bigl\lvert\BS(\ba;U,V)\bigr\rvert
+  \bigl\lvert\BASGS (\ba;U,V)\bigr\rvert
   \le C\,\triplenorm{V}\Bigl(\triplenorm{U}
   + \bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\bu\bigr\rVert_h
   + \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h\Bigr).
@@ -1030,7 +1030,7 @@ functional in which the sharp estimate is stated, $\overline{\Psi}(h)$ its coars
 \begin{lemma}[Continuity for the interpolation error]\label{lem:continterp}
 Let \cref{H:mesh,H:data,H:porosity,H:advection} and the jump condition \cref{H:jump} (when $\sigma>0$) hold, and let $U\in\mathcal{W}_r$. Then
 \begin{equation}\label{eq:continterp}
-  \bigl|\BS\bigl(\ba;\,U-\widehat{U}_h,\,V_h\bigr)\bigr|
+  \bigl|\BASGS \bigl(\ba;\,U-\widehat{U}_h,\,V_h\bigr)\bigr|
   \le C\,\Psi(h)\,\triplenorm{V_h}
   \qquad\forall\,V_h\in\Xh ,
 \end{equation}
@@ -1111,7 +1111,7 @@ interpolation estimates \eqref{eq:interpinftyE} (those applied to $\bvh$ are kep
 identical powers of $h$.
 \end{itemize}
 Steps 1--8 then yield
-$\bigl|\BS(\ba;E,V_h)\bigr|\le C\triplenorm{V_h}\bigl(\triplenorm{E}+C\Psi(h)\bigr)$, and
+$\bigl|\BASGS (\ba;E,V_h)\bigr|\le C\triplenorm{V_h}\bigl(\triplenorm{E}+C\Psi(h)\bigr)$, and
 \eqref{eq:Enorm} concludes the proof.
 \end{proof}
 
@@ -1138,8 +1138,8 @@ consistency \eqref{eq:consistency} and \cref{lem:continterp} (which already deli
 porosity{\hyp}weighted $\ell^2$ bound $C\,\Psi(h)\,\triplenorm{V_h}$),
 \begin{equation*}
   C\,\triplenorm{\Delta_h}^2
-  \le \BS(\ba;\Delta_h,\Delta_h)
-  = \BS\bigl(\ba;\widehat{U}_h-U,\Delta_h\bigr)
+  \le \BASGS (\ba;\Delta_h,\Delta_h)
+  = \BASGS \bigl(\ba;\widehat{U}_h-U,\Delta_h\bigr)
   \le C\,\Psi(h)\,\triplenorm{\Delta_h},
 \end{equation*}
 so $\triplenorm{\Delta_h}\le C\Psi(h)$. Since \eqref{eq:Enorm} bounds

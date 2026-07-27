@@ -1,0 +1,12 @@
+# latexmk configuration file for porous_NS_with_Gridap
+
+# Route auxiliary files to a target-specific subdirectory
+$aux_dir = 'latex compilation/%B';
+
+# Keep the output PDF in the source directory
+$out_dir = '.';
+
+# Clean up intermediate files that latexmk knows about
+$clean_ext = 'synctex.gz synctex\(busy\) thm bbl blg';
+
+print "latexmk: Routing auxiliary files to 'latex compilation/%B/' and PDF to './'\n";

@@ -289,6 +289,23 @@ integration status:
   continuation — wording softened), **R3** (c₁-eigenvalue study — see `open-questions.md` §3), **R4** (pointwise
   vs elementwise τ — N09 text fallback stands; a moderate code change if ever pursued).
 
+### 7g. Constrained-projection OSGS — measure the P2 MMS rate (settles the L²/energy-norm split)
+The companion note [`theory/projection_space_note/`](../theory/projection_space_note/projection_space_note.pdf)
+proves the OSGS **constrained** residual projection (onto `X_{h0}` instead of the implemented unconstrained
+`V_free`/`Q_free`) is degree-dependent in the **energy** norm: optimal for k=1, but a boundary-strip
+consistency defect `η₀ = Θ(h^{3/2})` provably degrades the rate to 3/2 for k≥2 (two-sided; under `a=0` on
+`Γ_D` and the viscous regime `τ₂=Θ(1)`). The remaining open strand is the **plain-L²/MMS gate** (the norm the
+paper footnote's `O(h^{k+1})` and the ε_M/ε_C indicators measure), where an Aubin–Nitsche duality *may*
+recover part of the loss (the defect enters quadratically). **Decisive check:** flip the OSGS projection
+target from the unconstrained spaces to the Dirichlet-constrained `X_{h0}` and re-run the standard **P2** MMS
+sweep — a rate collapse to ≈3/2 confirms the theorem reaches the L² gate; an optimal `h³` (k=2, L²) would show
+the energy-norm defect stays out of the L² gate. Touch point: the `V_proj`/`Q_proj` selection in
+[`src/solvers/osgs_solver.jl`](../src/solvers/osgs_solver.jl) (currently `V_free`/`Q_free` — see
+[`theory-code-map.md`](theory-code-map.md) §2). This is a **debug/A-B** run — route output to
+`results/debug_results/`, do not disturb the official DBs. Derivation:
+`theory/projection_space_note/projection_space_note.pdf` §6 (the degree-dependent theorem); Codina (2008)
+Remark 1.
+
 ---
 
 ## 8. Cleanups

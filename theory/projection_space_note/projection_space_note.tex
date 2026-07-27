@@ -1,0 +1,1193 @@
+\documentclass[11pt]{article}
+
+%=====================================================================
+%  Companion note: "The OSGS residual projection: constrained vs.
+%  unconstrained finite-element spaces, and why the constrained
+%  choice costs optimality."
+%
+%  This is a standalone pedagogical companion to the manuscript
+%    "A stabilized finite element method for incompressible, inertial
+%     flows in inhomogeneous porous media"
+%    (Casas, Gonzalez-Usua, Codina, de-Pouplana).
+%
+%  It introduces NO new mathematics. Its only purpose is to explain,
+%  from the ground up, why the orthogonal-subscale (OSGS) residual
+%  projection is computed onto the finite-element spaces WITHOUT their
+%  Dirichlet constraints, having first made the constrained choice look
+%  natural and even preferable.
+%
+%  Cross-references of the form "(paper, eq:Label)" point to the
+%  manuscript's own equation labels; they are typeset as plain text
+%  and are NOT hyperlinked (this note cannot \ref labels living in
+%  another document). Internal \cref/\eqref refer only to labels
+%  defined inside this note.
+%
+%  Compiles with pdflatex / latexmk in a single pass (manual
+%  thebibliography, no external .bib).
+%=====================================================================
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\usepackage{cleveref}
+
+%---------------------------------------------------------------------
+%  Macros mirroring the manuscript
+%---------------------------------------------------------------------
+% dimensionless numbers
+\newcommand{\Reyn}{\mathrm{Re}}
+\newcommand{\Damk}{\mathrm{Da}}
+\newcommand{\tauNS}{\tau_{1,\mathrm{NS}}}
+% deviatoric-symmetric viscous projector (as in the manuscript)
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
+% bold field symbols
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\bw}{\boldsymbol{w}}
+\newcommand{\bef}{\boldsymbol{f}}
+\newcommand{\bx}{\boldsymbol{x}}
+\newcommand{\bq}{\boldsymbol{q}}
+\newcommand{\bsig}{\boldsymbol{\sigma}}
+\newcommand{\ba}{\boldsymbol{a}}
+\newcommand{\bz}{\boldsymbol{z}}
+\newcommand{\bpi}{\boldsymbol{\pi}}
+\newcommand{\bzero}{\boldsymbol{0}}
+% differential operators and helpers
+\newcommand{\grad}{\nabla}
+\newcommand{\divg}{\nabla\!\cdot\!}
+\newcommand{\dd}{\,\mathrm{d}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\DeclarePairedDelimiter{\dualp}{\langle}{\rangle}
+% differential / residual operators
+\newcommand{\Lop}{\mathcal{L}}
+\newcommand{\Rop}{\mathcal{R}}
+\newcommand{\Dop}{\mathcal{D}}
+% function spaces
+\newcommand{\Xspace}{\mathcal{X}}
+\newcommand{\Xzero}{\mathcal{X}_{0}}
+\newcommand{\Xh}{\mathcal{X}_{h}}
+\newcommand{\Xhz}{\mathcal{X}_{h0}}
+\newcommand{\Vspace}{\mathcal{V}}
+\newcommand{\Vzero}{\mathcal{V}_{0}}
+\newcommand{\Vh}{\mathcal{V}_{h}}
+\newcommand{\Vhz}{\mathcal{V}_{h0}}
+\newcommand{\Qspace}{\mathcal{Q}}
+\newcommand{\Qzero}{\mathcal{Q}_{0}}
+\newcommand{\Qh}{\mathcal{Q}_{h}}
+\newcommand{\Qhz}{\mathcal{Q}_{h0}}
+\newcommand{\Xtil}{\widetilde{\mathcal{X}}}
+% projections
+\newcommand{\Pone}{\Pi_{1}}
+\newcommand{\Ponez}{\Pi_{1,0}}
+\newcommand{\Poneperp}{\Pi_{1}^{\perp}}
+\newcommand{\Ptwo}{\Pi_{2}}
+\newcommand{\Ptwoperp}{\Pi_{2}^{\perp}}
+\newcommand{\Ptauh}{\Pi_{\bm{\tau}h}}
+\newcommand{\Ptilde}{\widetilde{\Pi}}
+\newcommand{\Uh}{U_{h}}
+\newcommand{\Util}{\widetilde{U}}
+% norms
+\newcommand{\normh}[1]{\lVert #1 \rVert_{h}}
+\newcommand{\normtau}[1]{\lVert #1 \rVert_{\tau_{1}}}
+\DeclarePairedDelimiter\vvvert{\lvert\lvert\lvert}{\rvert\rvert\rvert}
+\newcommand{\tnorm}[1]{\vvvert{#1}}
+
+%---------------------------------------------------------------------
+%  Theorem-like environments (amsthm only)
+%---------------------------------------------------------------------
+\theoremstyle{plain}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+\newtheorem*{intuition}{Intuition}
+
+\title{\bfseries The OSGS residual projection:\\
+constrained versus unconstrained finite-element spaces,\\
+and why the constrained choice costs optimality}
+\author{Notes for the manuscript}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The orthogonal-subgrid-scale (OSGS) method requires projecting the
+strong residual of the momentum--mass system onto a finite-element
+space. \emph{Which} space? The unknown $\Uh$ lives in the
+Dirichlet-\emph{constrained} product space $\Xhz=\Vhz\times\Qhz$, so it
+is natural, and analytically convenient, to project the residual onto
+that same $\Xhz$. This note first builds that natural choice up
+sympathetically---following Codina's own Remark~1, projecting onto the
+constrained space \emph{removes} an analytical hypothesis and lets
+``all the results carry over''---and then explains, from first
+principles, exactly why the manuscript nonetheless projects onto the
+\emph{unconstrained} spaces $\Xh=\Vh\times\Qh$, on which
+$\bpi_h$ is free to be nonzero on $\partial\Omega$. The culprit is a
+one-element boundary strip on which the constrained projection is
+pinned to zero and cannot represent an $O(1)$ residual, seeding a
+spurious boundary layer. We teach the background as we go---the VMS
+scale split, the two subscale models, and $L^2$-projection
+approximation theory---and we pay careful, honest attention to a
+subtlety that is easy to get wrong: precisely \emph{how} optimality is
+affected. Codina \emph{asserts} (Remark~1) that the constrained projection
+keeps \emph{global} convergence optimal for general degree-$k$ interpolation
+(only local boundary layers appear); the manuscript's footnote makes the
+stronger, rate-level claim that it ``spoils the optimal $O(h^{k+1})$
+convergence.'' We reconcile the two, labelling clearly what is asserted, what
+is in genuine tension for $k\ge2$, and what is empirical conjecture.
+\end{abstract}
+
+\tableofcontents
+
+%=====================================================================
+\section{The setting}
+%=====================================================================
+
+\subsection{The continuous porous problem}
+
+We consider steady incompressible flow through an inhomogeneous porous
+medium on a bounded domain $\Omega\subset\mathbb{R}^d$. Writing $\bu$
+for the velocity, $p$ for the pressure, $\nu$ for the kinematic
+viscosity, $\alpha=\alpha(\bx)$ for the (spatially varying) porosity,
+and $\bsig=\bsig(\alpha,\bu)$ for the Darcy--Brinkman--Forchheimer
+resistance tensor, the strong form of the momentum and mass balances
+reads, schematically,
+%
+\begin{subequations}\label{eq:strong}
+\begin{align}
+  \alpha\,\ba\cdot\grad\bu
+  \;-\;\divg\!\bigl(2\alpha\nu\,\ViscProj\grad^{\mathrm s}\bu\bigr)
+  \;+\;\bsig\,\bu \;+\;\alpha\,\grad p
+    &= \bef && \text{in }\Omega,
+    \label{eq:strongmom}\\[2pt]
+  \divg(\alpha\,\bu) &= 0 && \text{in }\Omega,
+    \label{eq:strongmass}
+\end{align}
+\end{subequations}
+%
+with $\bu=\bzero$ on the Dirichlet boundary $\Gamma_{\mathrm D}$
+(the analysis and the numerical experiments take
+$\Gamma_{\mathrm N}=\emptyset$). Here $\ba$ is the advective velocity;
+in the linearised (Oseen-type) analysis it is a prescribed field with
+$\divg(\alpha\ba)=0$. This is exactly the manuscript's strong momentum
+and mass equations (paper, \texttt{eq:StrongMomentumEquation}) and
+(paper, \texttt{eq:StrongMassEquation}); the resistance $\bsig$ is
+symmetric positive semi-definite, of Forchheimer form
+$\bsig=a(\alpha)+b(\alpha)\lvert\bu\rvert$ (paper,
+\texttt{eq:DBFResistanceTerm}). The two dimensionless groups that
+organise the regimes are the Reynolds number $\Reyn$ and the Darcy
+number $\Damk$.
+
+It is convenient to package \cref{eq:strong} as a single differential
+operator acting on the pair $U\coloneqq[\bu;p]$. Let $\Lop_{\ba}$ be the
+first-plus-higher-order differential operator of the system and $F$ the
+data, so that \cref{eq:strong} reads $\Lop_{\ba}U=F$. The associated
+\emph{strong residual} of an approximation $U_h$ is
+%
+\begin{equation}\label{eq:residualdef}
+  \Rop U_h \;\coloneqq\; F-\Lop_{\ba}U_h ,
+\end{equation}
+%
+the pointwise amount by which $U_h$ fails to satisfy the strong
+equations. The residual is the single object around which everything
+below turns. Its \emph{first-order} part---the part that dominates the
+stabilisation---is
+%
+\begin{equation}\label{eq:firstorder}
+  \bz \;\coloneqq\; \alpha\bigl(\ba\cdot\grad\bu+\grad p\bigr),
+  \qquad
+  \delta \;\coloneqq\; \divg(\alpha\bu),
+\end{equation}
+%
+the convective--pressure momentum residual and the mass residual. The
+reaction $\bsig\bu$ and the viscous term are, respectively, a
+zeroth-order and a second-order contribution; we return to the role of
+$\bsig$ in \cref{sec:annih}.
+
+\subsection{The Galerkin spaces: constrained versus unconstrained}
+
+The weak form is posed on
+$\Xzero\coloneqq\Vzero\times\Qzero$, where
+$\Vzero\coloneqq\{\bv\in H^1(\Omega)^d:\bv|_{\Gamma_{\mathrm D}}=\bzero\}$
+(this reduces to $H^1_0(\Omega)^d$ when
+$\Gamma_{\mathrm N}=\emptyset$) and $\Qzero\coloneqq L^2(\Omega)$
+(the zero-mean subspace in the all-Dirichlet case); see (paper,
+\texttt{eq:WeakForm}, \S2). The subscript $0$ records the essential
+point: \emph{the trace vanishes on $\Gamma_{\mathrm D}$}.
+
+Discretising with continuous Lagrange elements of degree $k_u$ for
+velocity and $k_p$ for pressure ($k_p\le k_u+1$), we obtain \emph{two}
+families of spaces, and the whole note lives in the gap between them.
+
+\begin{definition}[Constrained and unconstrained FE spaces]
+\label{def:spaces}
+Let $\Vh\subset H^1(\Omega)^d$ and $\Qh\subset H^1(\Omega)\cap
+C^0(\overline\Omega)$ be the \emph{unconstrained} degree-$(k_u,k_p)$
+finite-element spaces---no boundary condition is imposed. Their
+Dirichlet-\emph{constrained} subspaces are
+\[
+  \Vhz\coloneqq\Vh\cap H^1_0(\Omega)^d,
+  \qquad
+  \Qhz\coloneqq\Qh\cap\Qzero,
+\]
+i.e.\ the functions in $\Vh,\Qh$ that vanish on $\Gamma_{\mathrm D}$.
+Write the product spaces
+$\Xh\coloneqq\Vh\times\Qh$ (unconstrained) and
+$\Xhz\coloneqq\Vhz\times\Qhz$ (constrained).
+\end{definition}
+
+This matches the manuscript verbatim: the constrained
+$\Xhz\coloneqq\Vhz\times\Qhz$ appears at (paper, \S3.2) and the
+appendix's line
+``$\Vhz\coloneqq\Vh\cap H^1_0(\Omega)^d$, $\Qhz\coloneqq\Qh\cap\Qzero$,
+$\Xhz\coloneqq\Vhz\times\Qhz$'' (paper, App.,
+\texttt{oa:} setup). It is also exactly Codina's distinction between
+$V_h\subset V=H^1(\Omega)$ and its subspace $V_{h,0}$ \cite{codina2008}.
+
+\begin{remark}[Where does the discrete solution live?]
+\emph{Always in the constrained space.} The Galerkin trial/test
+functions must honour $\bu_h|_{\Gamma_{\mathrm D}}=\bzero$, so the
+discrete unknown is $\Uh\in\Xhz$, and the Galerkin problem tests against
+$V_h\in\Xhz$. This never changes. What is in question is a
+\emph{different} object---the space onto which the residual is
+\emph{projected}---and the temptation of this note is precisely the
+(mistaken) reflex ``the residual should be projected where the unknown
+lives.''
+\end{remark}
+
+%=====================================================================
+\section{Subscales and the two stabilizations}\label{sec:vms}
+%=====================================================================
+
+\subsection{The variational multiscale scale split}
+
+Standard Galerkin fails for this problem twice over: it cannot control
+convection at high $\Reyn$, and equal-order $\bu$/$p$ interpolation
+violates the inf--sup condition. The Variational Multiscale (VMS)
+framework \cite{codina2018} repairs both from a single idea; the
+stabilised method used here generalises the stationary formulation of
+\cite{codina2001} and its transient orthogonal-subscale counterpart
+\cite{codina2002} to an inhomogeneous porous medium. Decompose the
+continuous solution space as a direct sum of what the mesh can resolve
+and what it cannot,
+%
+\begin{equation}\label{eq:split}
+  \Xzero=\Xhz\oplus\Xtil_0,
+  \qquad\text{so that}\qquad
+  U=\Uh+\Util,\quad \Uh\in\Xhz,\ \Util\in\Xtil_0,
+\end{equation}
+%
+where $\Xtil_0$ is the (infinite-dimensional) \emph{subscale} or
+subgrid-scale space, the complement of the finite-element space (paper,
+\S3.1, \emph{Scale Splitting}; the displayed splitting there is
+unlabelled). The exact solution equals the
+resolved part $\Uh$ plus a subscale $\Util$ that lives below the mesh.
+Testing the full weak form against resolved test functions
+$V_h\in\Xhz$ gives the \emph{resolved-scale equation} (paper,
+\texttt{eq:WeakFormResolvedScales}); the subscale $\Util$ appears there,
+and the game is to model it and eliminate it.
+
+\subsection{The exact subscale equation and its closure}
+
+Restricting the subscale equation to an element $K$ and using the VMS
+modelling assumptions (M1) the subscale vanishes on element boundaries,
+(M2) inter-element contributions are negligible, and (M3) the operator
+inverse is well approximated by a matrix of \emph{stabilisation
+parameters}, $\Lop_{\ba}^{-1}|_K\approx\bm{\tau}_K$, the subscale
+equation collapses to a projection statement (paper,
+\texttt{eq:weak\_form\_subscales\_as\_projection}),
+%
+\begin{equation}\label{eq:subprojection}
+  \Ptilde\bigl[\Lop\Util\bigr]=\Ptilde\bigl[\Rop U_h\bigr],
+\end{equation}
+%
+in which $\Ptilde$ projects onto the subscale space. Solving
+elementwise (paper, \texttt{eq:simplified\_weak\_form\_subscales}),
+%
+\begin{equation}\label{eq:submodel}
+  \boxed{\;\Util|_K
+  \;\approx\;\bm{\tau}_K\,\Ptilde\bigl[\Rop U_h\bigr]\big|_K\;}
+\end{equation}
+%
+The subscale is the ($\bm\tau$-weighted) \emph{projection of the strong
+residual}. Feeding \cref{eq:submodel} back into the resolved equation
+yields the stabilised finite-element method (paper,
+\texttt{eq:VMSWeakFormSystem}). Everything hinges on the operator
+$\Ptilde$: it decides which part of the residual is fed back as a
+subscale.
+
+\subsection{ASGS versus OSGS: two choices of \texorpdfstring{$\Ptilde$}{Pi}}
+
+There are two canonical closures.
+
+\paragraph{ASGS (algebraic subgrid scales).}
+Take the subscale space to be the space of finite-element residuals
+themselves; then $\Ptilde=\mathcal I$, the identity, and the
+\emph{whole} residual is retained,
+$\Util|_K=\bm\tau_K\,\Rop U_h|_K$. There is no projection to speak of.
+
+\paragraph{OSGS (orthogonal subgrid scales).}
+Take the subscale space to be the $L^2$-orthogonal complement of the
+finite-element space, $\Xtil=\Xhz^{\perp}$. Then $\Ptilde$ is the
+\emph{orthogonal projection off} the finite-element space,
+%
+\begin{equation}\label{eq:osgsproj}
+  \Ptilde=\mathcal I-\Ptauh
+  \qquad\Longleftrightarrow\qquad
+  \Util|_K=\bm\tau_K\bigl(\Rop U_h-\bpi_h\bigr)\big|_K,\quad
+  \dualp{W_h,\bpi_h}=\dualp{W_h,\Rop U_h},
+\end{equation}
+%
+where $\Ptauh$ is the ($\bm\tau$-weighted, in practice $L^2$)
+projection onto the finite-element space and
+$\bpi_h=\Ptauh[\Rop U_h]$ is the projected residual. The retained
+subscale is the \emph{fluctuation} $\Ptilde[\Rop U_h]=(\mathcal I-\Ptauh)
+[\Rop U_h]$: only the residual's component \emph{orthogonal to the
+mesh} survives. This is (paper, \texttt{eq:OSGSProjection}) with the
+$\bm\tau$-inner product (paper, \texttt{eq:TauInnerProduct}), simplified
+to plain $L^2$ (paper, \texttt{eq:L2InnerProduct}; this simplification and
+its stabilising properties are due to \cite{codina2002}). The full discrete
+system is (paper, \texttt{eq:OSGSProblem}): find $\Uh\in\Xhz$ with
+%
+\begin{align*}
+  B_{\mathrm S}(\bu;\Uh,V_h)&=L_{\mathrm S}(\bu,V_h,\bpi_h),\\
+  \Util|_K&=\bm\tau_K(\bu)\bigl(\Rop U_h-\bpi_h\bigr)|_K
+      \quad\forall K,\\
+  \dualp{W_h,\bpi_h}&=\dualp{W_h,\Rop U_h},\\
+  U&=\Uh+\Util,
+\end{align*}
+%
+and ASGS is recovered simply by setting $\bpi_h=\bzero$.
+
+\begin{intuition}
+The projection question exists \emph{only for OSGS}. In ASGS there is no
+$\bpi_h$ at all: $\Ptilde=\mathcal I$ retains the raw residual and there
+is nothing to project. The entire discussion that follows---onto
+\emph{which} finite-element space is $\bpi_h$ computed---is an
+OSGS-only question. We will not refer to ASGS again except to say this.
+\end{intuition}
+
+Notice what \cref{eq:osgsproj} demands of us: a projection operator
+$\Ptauh$ needs a target space. The unknown $\Uh$ lives in $\Xhz$; the
+test functions $W_h$ defining $\bpi_h$ range over \dots\ what? That is
+the one degree of freedom left, and it is the subject of the note.
+
+%=====================================================================
+\section{The natural first choice: project onto \texorpdfstring{$\Xhz$}{Xh0}}
+\label{sec:natural}
+%=====================================================================
+
+Let us make the constrained choice look as attractive as it genuinely
+is, because it is the choice one reaches for first, and for good
+reasons.
+
+\paragraph{Reason 1: the projected residual then lives with the unknown.}
+If $W_h$ ranges over the constrained $\Xhz$, then
+$\bpi_h=\Ptauh[\Rop U_h]\in\Xhz$ lives in the very same space as $\Uh$.
+The subscale $\Util$, the resolved field $\Uh$, and the projected
+residual $\bpi_h$ are then all objects of one type---elements of a
+Dirichlet-vanishing space. There is an appealing tidiness to a method in
+which every finite-dimensional quantity honours the same boundary
+condition.
+
+\paragraph{Reason 2: the analysis is strictly simpler.}
+This is not a matter of taste; it is a theorem-count. In the OSGS
+stability proof one needs a special test function built from the
+projection of the first-order residual onto the \emph{constrained}
+velocity space, $\Ponez\bz_h$ (it must be constrained to be an
+admissible, boundary-vanishing test function). If the \emph{method's}
+projector is \emph{also} the constrained one, then the two computable
+pieces of the residual---the fluctuation $\Poneperp\bz_h$ controlled by
+the Galerkin diagonal, and $\Ponez\bz_h$ supplied by the test
+function---are the two complementary halves of \emph{one and the same
+orthogonal projection}. They add up, by Pythagoras, to the full norm
+$\normtau{\bz_h}^2$ exactly, with constant $\beta_0=1$. No extra
+hypothesis is needed to recover control of the full residual.
+
+\paragraph{Reason 3: Codina says the results carry over.}
+This is stated, precisely, in \cite[Remark~1]{codina2008}. In that
+work the OSGS (there ``OSS'') methods are defined by projecting the
+residual onto the unconstrained $W_h$; Remark~1 records what happens if
+one uses the constrained $W_{h,0}$ instead. Verbatim:
+
+\begin{quote}\itshape
+Both methods I and II could be slightly modified by projecting onto
+$W_{h,0}$ in (18) instead of projecting onto $W_h$. This would simplify
+the analysis presented in the following section, since the stability
+condition (35) stated there would not be needed, and all the results to
+be presented carry over to this case. However, even though the global
+convergence is optimal, projecting onto $W_{h,0}$ leads to spurious
+numerical boundary layers, similar to those found for the pressure in
+classical fractional step schemes for the transient problem (see for
+example [25]). Further discussion about this point can be found in [18].
+\end{quote}
+
+Read the first two sentences on their own and the constrained choice
+looks like a free lunch: it \emph{removes} a hypothesis (condition~(35),
+which we meet in \cref{sec:optimality}) and \emph{all the results carry
+over}. If a modelling choice buys a simpler, less-assumption-heavy
+theory at no cost to convergence, why would anyone do otherwise?
+
+The answer is in the third sentence, and it is the whole point of this
+note.
+
+%=====================================================================
+\section{Why the constrained projection is abandoned: the boundary strip}
+\label{sec:strip}
+%=====================================================================
+
+\subsection{A refresher on \texorpdfstring{$L^2$}{L2}-projection approximation theory}
+
+Let $\Pi_h:L^2(\Omega)\to\Vh$ be the $L^2$ projection onto the
+\emph{unconstrained} degree-$k$ space: $\Pi_h g$ is the unique
+$g_h\in\Vh$ with $(g-\Pi_h g,v_h)=0$ for all $v_h\in\Vh$. Because it is
+an orthogonal projection it is, by construction, the \emph{best}
+$L^2$-approximation,
+%
+\begin{equation}\label{eq:best}
+  \norm{g-\Pi_h g}_{L^2(\Omega)}
+  \;=\;\inf_{v_h\in\Vh}\norm{g-v_h}_{L^2(\Omega)}.
+\end{equation}
+%
+Choosing $v_h$ to be a nodal interpolant of a smooth $g\in H^{k+1}$ and
+invoking Bramble--Hilbert gives the optimal fluctuation estimate
+%
+\begin{equation}\label{eq:optfluct}
+  \norm{g-\Pi_h g}_{L^2(\Omega)}\le C\,h^{k+1}\,\lvert g\rvert_{H^{k+1}(\Omega)}.
+\end{equation}
+%
+\emph{The estimate \cref{eq:optfluct} is derived on the unconstrained
+space}: the competitor $v_h$ in \cref{eq:best} is allowed to match $g$
+up to interpolation error \emph{everywhere}, including at boundary
+nodes. This freedom is exactly what will be revoked in the constrained
+case.
+
+In the OSGS method the retained subscale is precisely this kind of
+fluctuation, $\Ptilde[\Rop U_h]=\Poneperp[\Rop U_h]$ with
+$\Poneperp\coloneqq\mathcal I-\Pone$, but projected in the
+$\bm\tau$-weighted broken norm rather than in plain $L^2$. One caveat
+keeps the bookkeeping honest. The first-order residual
+$\bz=\alpha(\ba\cdot\grad\bu+\grad p)$ carries \emph{one derivative
+fewer} than $\bu$ (and the pressure lives only in $H^{k}$), so a plain
+$L^2$ best-approximation of $\bz$ on its own would give merely
+$O(h^{k-1})$, \emph{not} the $O(h^{k+1})$ one might read off
+\cref{eq:optfluct}. The missing two orders are supplied by the
+$\bm\tau$-weighting: on the momentum residual $\tau_1^{1/2}\sim h$, and
+the paper's \emph{weighted} best-approximation lemma (paper, App.,
+\texttt{oa:lem:bestapprox}, \texttt{oa:eq:WeightedApprox}), whose
+$h_K^{2r}\tau_{i,K}$ weighting supplies the extra order, is what makes
+the consistency estimate close at the optimal rate. In other words the
+plain-$L^2$ bound \cref{eq:optfluct} is the \emph{intuition}, and the
+weighted lemma is the \emph{theorem}; what matters here---and what the
+constrained projection will destroy---is the same qualitative fact in
+either norm: away from the boundary the fluctuation is an
+\emph{interpolation-error-sized} object.
+
+\subsection{The pinned strip}
+
+Now switch the projector's target to the constrained $\Vhz$. Let
+$\Ponez$ be the $L^2$ projection onto $\Vhz$. Every admissible
+competitor $v_h\in\Vhz$ satisfies $v_h=\bzero$ on $\Gamma_{\mathrm D}$;
+the projection is \emph{pinned to zero on the boundary}. But the field
+being projected does not vanish there.
+
+\begin{proposition}[Annihilation of the local projection on the strip]
+\label{prop:strip}
+Let $\bz=\alpha(\ba\cdot\grad\bu+\grad p)$ be the exact first-order
+momentum residual \cref{eq:firstorder}, and suppose it is smooth enough
+to have a well-defined trace on $\Gamma_{\mathrm D}$ with
+$\bz|_{\Gamma_{\mathrm D}}\neq\bzero$ (the generic case). Let $\Omega_h$
+denote the one-element strip of elements touching $\Gamma_{\mathrm D}$,
+so $\lvert\Omega_h\rvert = O(h)$ on a shape-regular mesh. Then the
+constrained fluctuation satisfies, pointwise,
+\[
+  \Ponez^{\perp}\bz \;=\; \bz-\Ponez\bz \;=\; O(1)
+  \qquad\text{on }\Omega_h,
+\]
+and consequently, in the plain $L^2$ norm,
+\begin{equation}\label{eq:half}
+  \norm{\Ponez^{\perp}\bz}_{L^2(\Omega)}
+  \;\ge\;\norm{\Ponez^{\perp}\bz}_{L^2(\Omega_h)}
+  \;\approx\; O(1)\cdot\lvert\Omega_h\rvert^{1/2}
+  \;=\; O(h^{1/2}),
+\end{equation}
+in place of the $O(h^{k+1})$ of \cref{eq:optfluct}.
+\end{proposition}
+
+\begin{proof}[Heuristic]
+On $\Gamma_{\mathrm D}$ every $v_h\in\Vhz$ is zero, so the pointwise
+defect there is forced to equal the trace itself,
+$(\bz-v_h)|_{\Gamma_{\mathrm D}}=\bz|_{\Gamma_{\mathrm D}}=O(1)$,
+uniformly in $h$: best approximation \cref{eq:best} cannot remove an
+error the constraint hard-wires in. A continuous $\Pi_k$ function that
+is $O(1)$ on $\Gamma_{\mathrm D}$ but returns toward the interior best
+approximation must carry that $O(1)$ magnitude across the one boundary
+layer of elements, a band of thickness $O(h)$ along a boundary of
+$(d\!-\!1)$-measure $O(1)$. Hence
+$\int_{\Omega_h}\lvert\Ponez^{\perp}\bz\rvert^2 \approx O(1)^2\cdot O(h)$,
+which is \cref{eq:half}. The exponent $\tfrac12$ comes entirely from the
+$O(h)$ \emph{measure} of the strip, not from any approximation power;
+that is why it does not improve with $k$.
+\end{proof}
+
+That $\bz|_{\Gamma_{\mathrm D}}\neq\bzero$ is not exotic: on
+$\Gamma_{\mathrm D}$ the velocity is Dirichlet-fixed, yet the momentum
+equation forces
+$\ba\cdot\grad\bu+\grad p=\alpha^{-1}(\bef+\divg(2\alpha\nu\,\ViscProj\grad^{\mathrm s}\bu)-\bsig\bu)$,
+which has no reason to vanish there. So a constrained projection of the
+residual is generically annihilated on a strip where the true residual
+is $O(1)$: \emph{the local projection is destroyed exactly where the
+subscale is supposed to live.}
+
+\subsection{The fractional-step analogy}
+
+This mechanism is not new; it is the spatial twin of a well-known defect
+in time-splitting methods, and Codina's Remark~1 makes the analogy
+explicitly (``similar to those found for the pressure in classical
+fractional step schemes''). In a fractional-step / pressure-projection
+scheme the velocity--pressure decoupling silently over-imposes a
+boundary condition---effectively a spurious homogeneous Neumann
+condition $\partial p/\partial n=0$ that the true pressure does not
+satisfy---and the mismatch concentrates in a thin wall layer of width
+$O(\sqrt{\nu\Delta t})$, the \emph{artificial pressure boundary layer},
+which caps pressure accuracy \cite{guermond2006,codina2001pressure}. In
+both cases an approximation or decomposition step forces an incorrect
+boundary behaviour and the error localises in an $O(\text{width})$ strip
+along $\Gamma$ where mesh (or time-step) refinement of the interior
+cannot reach it. The constrained OSGS projection manufactures precisely
+the spatial version of that layer.
+
+%=====================================================================
+\section{Exactly how optimality is affected --- a careful reconciliation}
+\label{sec:optimality}
+%=====================================================================
+
+Here is the pedagogical payoff, and the one place where it is easy to
+overclaim. There are \emph{two} statements in the literature about the
+consequence of the constrained projection, and they are \emph{not} the
+same statement. We put them side by side, honestly.
+
+\subsection{(a) What Codina 2008 asserts (Remark~1): optimal global rate, local layers}
+
+Codina's Remark~1 is a \emph{qualitative-defect} statement, not a
+rate-loss statement---and it is a \emph{remark}, asserting that ``all the
+results \dots\ carry over'' to the constrained variant without giving a
+separate proof for it. Re-read the key clause, verbatim:
+
+\begin{quote}\itshape
+\dots\ even though the global convergence is optimal, projecting onto
+$W_{h,0}$ leads to spurious numerical boundary layers \dots
+\end{quote}
+
+Global convergence \emph{remains optimal}; the constrained projection
+produces \emph{spurious boundary layers}, a local, qualitative artefact.
+The rate in the relevant (mesh-dependent, $\bm\tau$-weighted energy)
+norm of the resolved field is not claimed to degrade. The manuscript's
+own appendix transcribes this faithfully: it states only that the
+constrained choice ``would simplify the analysis (assumption
+\texttt{H:projection} would not be needed) but produces spurious
+numerical boundary layers'' (paper, App.), and its remark on the
+analysed-versus-implemented formulation asserts no rate change (paper,
+App., \texttt{oa:rem:analyzed}).
+
+\subsection{(b) The power-counting puzzle, and its resolution}
+
+\Cref{prop:strip} produced an $O(1)$ defect on an $O(h)$-measure strip,
+i.e.\ $O(h^{1/2})$ in the plain $L^2$ norm. For $k\ge1$ we have
+$h^{1/2}\gg h^{k+1}$ as $h\to0$; taken at face value this would wreck an
+$O(h^{k+1})$ target. How, then, can Codina keep the \emph{global} rate
+optimal? Two independent mechanisms, both real, resolve the puzzle;
+we flag which parts are firm and which are conjecture.
+
+\paragraph{(i) The layer lives in the subscale, not the resolved field.}
+The $O(1)$ object is $\Ptilde[\Rop U_h]=\Ponez^{\perp}[\Rop U_h]$---the
+\emph{fluctuation}, hence the subscale $\Util$ and the reconstructed
+total field $U=\Uh+\Util$. Codina's ``optimal global convergence'' is a
+statement about the \emph{resolved} $\Uh$; the spurious layer is a
+feature of the subscale/total-field reconstruction, precisely the
+analogue of the fractional-step pressure layer he cites. The resolved
+velocity is not itself made to carry the $O(1)$. \emph{[Firm as an
+attribution of Codina's claim; the extent of leakage into $\Uh$ is the
+open point of part (c).]}
+
+\paragraph{(ii) The working norm is $\bm\tau$-weighted, and the strip is
+mesh-thin.} The plain-$L^2$ count is simply the \emph{wrong norm} for
+Codina's theorem: convergence is measured in the $\bm\tau$-weighted
+broken norm. Redo \cref{eq:half} with the weight. On $\Omega_h$,
+\begin{equation}\label{eq:weightcount}
+  \normtau{\Ponez^{\perp}[\alpha X]}^2
+  \;=\;\sum_{K\subset\Omega_h}\tau_{1,K}\cdot O(1)\cdot\lvert K\rvert
+  \;\approx\;\tau_1\cdot O(1)\cdot h
+  \quad\Longrightarrow\quad
+  \normtau{\cdot}\sim(\tau_1 h)^{1/2}.
+\end{equation}
+In Codina's diffusion-dominated Oseen setting ($\bsig=0$),
+$\tau_1\sim h^2/(c_1\alpha\nu)$, so $(\tau_1 h)^{1/2}\sim
+h^{3/2}/\nu^{1/2}$. Now, Codina asserts optimal global convergence for
+\emph{general} degree-$k$ interpolation---his hypothesis~H6 takes
+$\bu\in H^{k+1}$, $p\in H^{k}$ with $k\ge1$, and Remark~1 says of the
+constrained variant that ``all the results \dots\ carry over''; he
+nowhere confines optimality to $k=1$. For $k=1$ the optimal energy rate
+is $O(h)$ and the strip contribution $h^{3/2}$ is \emph{higher order},
+hence invisible in the global rate: optimality is uncontroversial. For
+$k\ge2$, however, the optimal energy rate is $h^{k}\ge h^2$ while this
+crude $O(1)$-on-the-strip count still gives $h^{3/2}$, which \emph{would}
+then dominate---a genuine tension with Codina's general-$k$ Remark~1.
+\emph{[We flag this and do not pretend to resolve it. Because Remark~1 is
+an informal remark with no detailed proof for the constrained variant,
+we cannot tell whether the crude $O(1)$ amplitude overestimates the true
+boundary defect (so that optimality survives for $k\ge2$ after all) or
+whether the ``carry-over'' claim is optimistic there. What is firm is the
+$k=1$ case, the existence of the tension for $k\ge2$, and the fact that
+the manuscript sidesteps the whole question by projecting onto the
+unconstrained space. We do \emph{not} read Codina as having restricted
+optimality to $k=1$.]}
+
+\subsection{(c) The manuscript's stronger claim, and where it rests}
+
+The manuscript's footnote to (paper, \texttt{eq:OSGSProblem}) says
+something one notch stronger. Verbatim:
+
+\begin{quote}\itshape
+In our implementation the projection \texttt{(eq:NonlinearResidualProjection)}
+is computed with $W_h$ ranging over the velocity and pressure finite
+element spaces \emph{without} their Dirichlet constraints, so that
+$\bm\pi_h$ is not forced to vanish on $\partial\Omega$. Projecting on the
+constrained space $\mathcal X_{h0}$ instead would force the boundary
+degrees of freedom to vanish (the space $\mathcal X_{h0}$ carrying
+homogeneous Dirichlet conditions), annihilating the local $L^2$
+projection there and introducing an $O(1)$ boundary residual that spoils
+the optimal $O(h^{k+1})$ convergence.
+\end{quote}
+
+The phrase ``spoils the optimal $O(h^{k+1})$ convergence'' is a
+\emph{rate} claim. It goes beyond Codina's ``optimal global convergence
+with boundary layers,'' and---read literally as a statement about the
+global rate of the resolved field in the energy norm---it is in tension
+with the paper's \emph{own} appendix, which claims only spurious layers.
+This is the single sentence in the cluster that must be read carefully.
+
+The honest reading is that the footnote's rate-level claim is \emph{not}
+Codina's theorem and is \emph{not} proved in the appendix (which
+explicitly declines to analyse the constrained variant). It rests
+instead on the manuscript's \emph{own manufactured-solution (MMS)
+evidence} in the porous/reaction setting, and it can be true
+\emph{simultaneously} with Codina's theorem because the two speak about
+different norms and different regimes:
+%
+\begin{itemize}
+\item \emph{Different norm.} The MMS convergence gate measures the
+  plain-$L^2$ velocity and continuity error of the \emph{resolved}
+  field, via the scale-free indicators $\varepsilon_M,\varepsilon_C$.
+  Plain $L^2$ is exactly the norm in which the $O(1)$-on-$O(h)$ count
+  \emph{does} bite ($O(h^{1/2})$)---\emph{if} the spurious stabilisation
+  forcing contaminates $\Uh$. Codina's theorem uses the $\bm\tau$-weighted
+  energy norm of \cref{eq:weightcount}, which damps the strip.
+\item \emph{Different regime.} Codina is $\bsig=0$ Oseen; the manuscript
+  is porous, with reaction $\bsig$ and varying porosity $\alpha$ absent
+  from his setting, and it probes high $\Damk$. At high $\Damk$ the exact
+  solution develops a Brinkman screening layer of width
+  $\ell_\sigma=(\alpha\nu/\sigma)^{1/2}$; when $h$ under-resolves
+  $\ell_\sigma$, the true first-order residual $\bz$ is already steep and
+  large near $\Gamma_{\mathrm D}$, and the constrained projection---still
+  pinned to zero---superimposes its spurious layer on a genuine,
+  under-resolved physical one, so the effective ``$O(1)$'' is
+  $O(\text{large})$. It is plausible that this sharpens the qualitative
+  layer into a \emph{measurable} rate loss. \emph{[Conjecture: the paper
+  does not analyse the constrained variant; and note two honest
+  counter-currents---(1) for constant $\sigma$ the reaction residual has
+  \emph{no} fluctuation at all (\cref{sec:annih}), so $\bsig$ never drives
+  the layer directly; (2) high $\Damk$ makes $\tau_1\approx1/\sigma$
+  small, which \emph{suppresses} the velocity fluctuation in the energy
+  norm. The rate reading therefore rests on physical-layer amplification
+  plus plain-$L^2$ contamination of $\Uh$, neither of which is
+  established here.]}
+\item \emph{Possibly $k\ge2$.} As the power count in (b)(ii) shows,
+  degradation is far more available for $k\ge2$ than for the $k=1$ case
+  Codina certifies.
+\end{itemize}
+
+The disciplined conclusion: keep the footnote's rate phrasing as an
+\emph{empirical, regime-specific} claim about the plain-$L^2$ MMS gate,
+and do not present it as Codina's theorem or as a proven global-rate
+result. Codina's qualitative statement and the paper's empirical
+extension are compatible, not contradictory.
+
+\subsection{(d) The price of the honest choice: condition (35)}
+
+If the constrained projection is so simple analytically, what does the
+\emph{unconstrained} projection---the one actually implemented and
+analysed---cost? Exactly one hypothesis. In the stability proof the
+Galerkin diagonal controls the fluctuation $\Poneperp\bz_h$ (now off the
+\emph{unconstrained} space), while the special test function still
+supplies $\Ponez\bz_h$ (necessarily off the \emph{constrained} space,
+to be admissible). These two are projections onto \emph{different}
+spaces, so they no longer sum to $\normtau{\bz_h}^2$ by Pythagoras. The
+missing glue is the manuscript's assumption \texttt{H:projection}
+(paper, \texttt{eq:ProjectionStability}), verbatim:
+
+\begin{quote}\itshape
+\emph{Projection stability.} Let $\Pi_1$ and $\Pi_{1,0}$ be the
+$\tau_1$-weighted $L^2$ projections of a velocity field onto the
+unconstrained and the constrained velocity spaces, and
+$\Pi_1^{\perp}\coloneqq I-\Pi_1$. There is $\beta_0>0$, independent of
+$h$, such that for all $V_h=[\bm v_h;q_h]\in\mathcal X_h$, writing
+$\bm z_h\coloneqq\alpha(\bm a\cdot\nabla\bm v_h+\nabla q_h)$,
+\end{quote}
+\begin{equation}\label{eq:projstab}
+  \bigl\lVert\tau_1^{1/2}\bm z_h\bigr\rVert_h
+  \;\le\;\frac{1}{\beta_0}\Bigl(
+    \bigl\lVert\tau_1^{1/2}\Pi_{1,0}\bm z_h\bigr\rVert_h
+    +\bigl\lVert\tau_1^{1/2}\Pi_1^{\perp}\bm z_h\bigr\rVert_h\Bigr).
+\end{equation}
+This is exactly the Codina--Blasco-type inf--sup condition (35) of
+\cite{codina2008} (the equal-order-interpolation device it descends from
+originates in \cite{codinablasco1997}), which in his own notation reads
+\[
+  \norm{z_h}_{\tau_1}\le\frac{1}{\beta_0}
+  \bigl(\norm{\Pi_{\tau_1,0}(z_h)}+\norm{\Pi_{\tau_1}^{\perp}(z_h)}_\tau\bigr),
+  \qquad z_h\equiv\ba\cdot\grad\bv_h+\grad q_h .
+\]
+It says precisely: a bound on the constrained-projection part
+$\Ponez\bz_h$ \emph{and} on the unconstrained fluctuation
+$\Poneperp\bz_h$ suffices to bound the \emph{whole} residual
+$\normtau{\bz_h}$---i.e.\ the component of $\bz_h$ that lies in $\Vh$ but
+is $\tau_1$-orthogonal to $\Vhz$ is not independent of the other two.
+(For the divergence part it holds trivially with $\beta_0=1$, because
+$\bv_h=\bzero$ on $\partial\Omega$ forces $\divg\bv_h$ to have zero
+mean.) It is needed precisely because $B_{\mathrm S}$ is \emph{not}
+coercive; \cref{eq:projstab} is what recovers inf--sup stability from the
+two controllable projections.
+
+\begin{center}
+\emph{Constrained projection:} easy analysis, no \cref{eq:projstab},
+but boundary layers. \\
+\emph{Unconstrained projection:} needs \cref{eq:projstab}, but clean
+boundaries --- and it is the honest method that is implemented.
+\end{center}
+
+%=====================================================================
+\section{Settling the question: a degree-dependent theorem}
+\label{sec:settle}
+%=====================================================================
+
+We can now do more than flag the tension of \cref{sec:optimality}: in the
+OSGS energy norm we can \emph{prove} the answer, and it turns out to depend
+on the polynomial degree. Write $X(V)\coloneqq\ba\cdot\grad\bv+\grad q$ for
+the first-order operator, so that $\bz=\alpha X(U)$ is the momentum
+residual of \cref{eq:firstorder}, and let
+\begin{equation}\label{eq:st:defect}
+  \eta_\Pi \;\coloneqq\; \normtau{\Pi^{\perp}[\alpha X(U)]}
+\end{equation}
+be the \emph{consistency defect} of the method whose residual projector is
+$\Pi$ (either $\Pone$, the unconstrained projection, or $\Ponez$, the
+constrained one). Everything below is set in the fixed-data,
+viscosity-dominated asymptotic regime that governs the convergence
+\emph{rate} (\cref{sec:optimality}): $\tau_1=\Theta(h^2)$ (so
+$\tau_1^{1/2}=\Theta(h)$) and $\tau_2=\Theta(1)$ (from
+$\tau_2\to\nu/\alpha$; hence, by the design bound $\varepsilon\tau_2\le C_2$,
+$\varepsilon=O(1)$---a fact we will need). Throughout, $\tnorm{\cdot}_{\mathrm O}$
+is the projection-free triple norm (paper, \texttt{oa:eq:TripleNorm}),
+\emph{the same} for both variants; only the method's $S_1$ changes.
+
+\subsection{The question reduces to the size of one number}
+
+\begin{lemma}[Reduction to the consistency defect]\label{lem:st:reduce}
+Let $B_{\mathrm{OSGS}}$ be OSGS with projector $\Pi$, inf-sup stable in
+$\tnorm{\cdot}_{\mathrm O}$ with an $h$-independent constant (for the
+constrained variant this is Codina's Remark~1). Then
+\begin{equation}\label{eq:st:reduce}
+  \tnorm{U-U_h}_{\mathrm O}\;\le\;C\bigl(\,\Psi_{\mathrm O}(h)+\eta_\Pi\,\bigr)
+  \;=\;C\bigl(\,\Theta(h^{k})+\eta_\Pi\,\bigr),
+\end{equation}
+where $\Psi_{\mathrm O}(h)=\Theta(h^{k})$ is the interpolation error in the
+energy norm ($k\coloneqq k_u$).
+\end{lemma}
+
+\begin{proof}
+The analyzed OSGS method is not strongly consistent; by the appendix's
+consistency identity (paper, \texttt{oa:lem:consistency}), for all
+$W_h\in\Xhz$,
+\[
+  B_{\mathrm{OSGS}}(\ba;\,U-U_h,\,W_h)=S_1(U,W_h)+S_2(U,W_h),
+  \qquad S_1(U,W)=\bigl(\Pi^{\perp}[\alpha X(U)],\,\alpha X(W)\bigr)_{\tau_1}.
+\]
+Let $\widehat U_h\in\Xhz$ be the nodal interpolant of $U$ and
+$\boldsymbol e_h\coloneqq U_h-\widehat U_h$. Inf-sup stability gives a
+$W_h$ with $\tnorm{W_h}_{\mathrm O}=1$ and
+\[
+  \beta\,\tnorm{\boldsymbol e_h}_{\mathrm O}
+  \le B_{\mathrm{OSGS}}(\boldsymbol e_h,W_h)
+  = \underbrace{B_{\mathrm{OSGS}}(U-\widehat U_h,W_h)}_{(\mathrm I)}
+  \;-\;\underbrace{\bigl(S_1(U,W_h)+S_2(U,W_h)\bigr)}_{(\mathrm{II})},
+\]
+using $B_{\mathrm{OSGS}}(U_h,W_h)=L(W_h)$ and the identity above. We do
+\emph{not} invoke a general continuity of $B_{\mathrm{OSGS}}$ (it fails with
+an $h$-independent constant, the convective term
+$(\bw,\alpha\ba\cdot\grad\bu)$ carrying an $h^{-1}$). Instead, term (I) is
+bounded by the appendix's interpolation lemma (paper,
+\texttt{oa:lem:interpolation}), valid precisely because
+$U-\widehat U_h$ is a \emph{small, boundary-vanishing} interpolation
+error: $|(\mathrm I)|\le C\,\Psi_{\mathrm O}(h)\,\tnorm{W_h}_{\mathrm O}$.
+Term (II): by Cauchy--Schwarz in $(\cdot,\cdot)_{\tau_1}$ and the full-residual
+term of the triple norm, $\normtau{\alpha X(W_h)}\le\tnorm{W_h}_{\mathrm O}$,
+so $|S_1(U,W_h)|\le\eta_\Pi\,\tnorm{W_h}_{\mathrm O}$; the mass part $S_2$ is
+$O(h^{k_p+1})$ (the pressure carries no Dirichlet data, $\Qhz$ being only
+zero-mean, so it is unaffected by the constraint). Collecting and adding
+$\tnorm{U-\widehat U_h}_{\mathrm O}=\Theta(h^k)$ gives \cref{eq:st:reduce}.
+\end{proof}
+
+So the whole question is: \emph{how big is $\eta_\Pi$?}
+
+\subsection{A sharp two-sided bound on the constrained defect}
+
+\begin{lemma}[The constrained defect is $\Theta(h^{3/2})$, the unconstrained one $O(h^{k+1})$]
+\label{lem:st:defect}
+Assume $\bz|_{\Gamma_{\mathrm D}}=\alpha X(U)|_{\Gamma_{\mathrm D}}\neq\bzero$
+on a subset of $\Gamma_{\mathrm D}$ of positive $(d\!-\!1)$-measure (the
+generic case). Then, on a shape-regular quasi-uniform family in the
+viscous regime,
+\begin{equation}\label{eq:st:sharp}
+  \eta_0\coloneqq\normtau{\Ponez^{\perp}[\alpha X(U)]}=\Theta\bigl(h^{3/2}\bigr),
+  \qquad\text{while}\qquad
+  \eta_1\coloneqq\normtau{\Poneperp[\alpha X(U)]}=O\bigl(h^{k+1}\bigr).
+\end{equation}
+The exponent $3/2$ is \emph{independent of $k$}; only the hidden constant
+$c_k>0$ decreases (mildly) with $k$.
+\end{lemma}
+
+\begin{proof}
+\emph{Upper bound.} By the minimizing property of the $\tau_1$-orthogonal
+projection (paper, \texttt{oa:eq:BestApprox}), $\eta_0\le\normtau{\alpha X(U)-w_h}$
+for every $w_h\in\Vhz$. Take $w_h$ the \emph{constrained} Scott--Zhang
+interpolant, which reproduces the homogeneous nodal boundary values. Split
+the mesh into the interior and the one-element boundary strip
+$\Omega_h\coloneqq\bigcup\{K:\overline K\cap\Gamma_{\mathrm D}\neq\emptyset\}$,
+$|\Omega_h|=O(h)$. On interior elements the constraint is inactive and the
+standard estimate gives $\sum_{K}\tau_{1,K}\alpha_K^2h_K^{2k}\|\cdot\|_{H^k(K)}^2
+\lesssim (h^2/\nu)\,h^{2k}=h^{2k+2}/\nu$. On a strip element $K$ the competitor
+must vanish on the face $F=\overline K\cap\Gamma_{\mathrm D}$ while
+$\alpha X(U)|_F\neq\bzero$; no polynomial vanishing on $F$ can match a nonzero
+trace, so $\|\alpha X(U)-w_h\|_{L^2(K)}^2\ge c_k\,|K|$ with $c_k>0$ (a
+subspace-obstruction / Markov fact: a fixed-degree polynomial cannot
+form a boundary layer thinner than $O(h)$). Summing over the
+$O(h^{-(d-1)})$ strip elements, each weighted by $\tau_{1,K}=\Theta(h^2/\nu)$,
+\[
+  \sum_{K\subset\Omega_h}\tau_{1,K}\|\alpha X(U)-w_h\|_{L^2(K)}^2
+  \;\lesssim\;\frac{h^2}{\nu}\cdot O(1)\cdot\underbrace{h^{d}\cdot h^{-(d-1)}}_{|\Omega_h|=O(h)}
+  \;=\;\frac{h^3}{\nu}.
+\]
+Since $2k+2>3$ for every $k\ge1$, the strip dominates and
+$\eta_0\le C\,h^{3/2}\nu^{-1/2}$, with \emph{no} $k$ in the exponent. The same
+computation with the \emph{un}constrained Scott--Zhang interpolant (which
+matches the trace) has no strip penalty and reproduces the appendix's weighted
+best approximation (paper, \texttt{oa:lem:bestapprox}), giving
+$\eta_1=O(h^{k+1})$.
+
+\emph{Lower bound (the strip penalty is real).} It suffices to exhibit one
+configuration. On a uniform 1D mesh of $(0,1)$, size $h$, with linear elements,
+$\tau_1$ is elementwise \emph{constant} (so the $\tau_1$-weighted
+projection is the plain $L^2$ projection) \emph{and} of magnitude
+$\tau_1=\Theta(h^2)$. Project $g\equiv1$ (smooth, $g|_{\partial\Omega}=1\neq0$)
+onto $\Vhz$. With the interior hat basis the normal equations read
+$\tfrac16 c_{i-1}+\tfrac23 c_i+\tfrac16 c_{i+1}=1$; the constant $c_i\equiv1$
+solves every interior row \emph{exactly}, so the nodal error $e_i\coloneqq1-c_i$
+satisfies the homogeneous recurrence $e_{i-1}+4e_i+e_{i+1}=0$ with
+$e_0=e_n=1$. Its characteristic roots are $-2\pm\sqrt3$; the decaying mode has
+ratio $2-\sqrt3\approx0.27$, so the error is $\Theta(1)$ on $O(1)$ elements
+(width $O(h)$) and geometrically negligible inside. On the first element
+$\int_0^h(g-\Ponez g)^2=\tfrac h3\bigl(1-(2-\sqrt3)+(2-\sqrt3)^2\bigr)=\Theta(h)$,
+whence $\|g-\Ponez g\|_{L^2}=\Theta(h^{1/2})$ and, since this projection is the
+exact minimizer, nothing is smaller. Therefore
+$\eta_0=\tau_1^{1/2}\|g-\Ponez g\|_{L^2}=\Theta(h)\cdot\Theta(h^{1/2})=\Theta(h^{3/2})$.
+The same one-element layer along a flat boundary patch, with
+$O(h^{-(d-1)})$ faces and $|\Omega_h|=O(h)$, reproduces $\Theta(h^{3/2})$ in
+$d$ dimensions.
+\end{proof}
+
+Raising $k$ helps only in the interior; it \emph{cannot} repair the trace
+obstruction on the boundary, where a function pinned to $\bzero$ is asked to
+represent an $O(1)$ field. That single asymmetry between $\Vh$ and $\Vhz$ is
+the entire effect.
+
+\subsection{The degree-dependent verdict}
+
+\begin{proposition}[$k=1$: optimality is preserved]\label{prop:st:preserve}
+For equal-order linear elements ($k=1$) the constrained-projection
+OSGS retains the optimal energy rate,
+$\tnorm{U-U_h}_{\mathrm O}=\Theta(h)$.
+\end{proposition}
+
+\begin{proof}
+\Cref{lem:st:reduce,lem:st:defect} give
+$\tnorm{U-U_h}_{\mathrm O}\le C(h+\eta_0)=C\bigl(h+\Theta(h^{3/2})\bigr)$. As
+$3/2>1$, $\eta_0=\Theta(h^{3/2})=o(h)$ sits \emph{strictly beneath} the
+interpolation floor $\Theta(h)$ and is asymptotically invisible. Hence
+$\tnorm{U-U_h}_{\mathrm O}=\Theta(h)$.
+\end{proof}
+
+The negative half needs one natural hypothesis. In the linearized (Oseen /
+Newton) problem the advecting field $\ba$ is a velocity iterate, so it is
+legitimate---though not automatic in the appendix---to assume
+\begin{equation*}
+  \tag{$\mathrm{H}_\Gamma$}
+  \ba=\bzero\ \text{on}\ \Gamma_{\mathrm D}\quad(\text{the advecting field obeys no-slip}).
+\end{equation*}
+Under ($\mathrm{H}_\Gamma$), on $\Gamma_{\mathrm D}$ the boundary residual is a
+\emph{gradient}, $\bz|_{\Gamma_{\mathrm D}}=\alpha\grad p|_{\Gamma_{\mathrm D}}$
+(the convective part vanishes), and on the strip interior $\alpha\ba\cdot\grad\bu=O(h)$
+is subdominant. This is what lets a curl-free test field align with $\bz$.
+
+\begin{proposition}[$k\ge2$: optimality is spoiled, with a matching lower bound]
+\label{prop:st:spoil}
+Assume ($\mathrm{H}_\Gamma$), the genericity of \cref{lem:st:defect}, and the
+viscous regime ($\tau_1=\Theta(h^2)$, $\tau_2=\Theta(1)$, hence
+$\varepsilon=O(1)$). For $k\ge2$,
+\begin{equation}\label{eq:st:spoil}
+  \tnorm{U-U_h}_{\mathrm O}=\Theta\bigl(h^{3/2}\bigr)\;<\;\Theta(h^{k}),
+\end{equation}
+so the constrained projection genuinely degrades the energy rate to $3/2$.
+\end{proposition}
+
+\begin{proof}
+The upper bound is \cref{lem:st:reduce,lem:st:defect}:
+$\tnorm{U-U_h}_{\mathrm O}\le C(h^k+\eta_0)=O(h^{3/2})$ since $3/2<k$. For the
+matching lower bound, use a \emph{pressure} test function
+$V^{\ast}=[\bzero;q^{\ast}]$ with $q^{\ast}\in\Qhz$ a strip-localized
+finite-element bump chosen so that $\alpha\grad q^{\ast}=\bz$ on
+$\Omega_h$ up to lower order---admissible because, by ($\mathrm{H}_\Gamma$),
+$\bz$ is a gradient there, and because the pressure is \emph{not}
+Dirichlet-constrained (so $q^{\ast}$ is free on $\Gamma_{\mathrm D}$).
+
+\emph{Norm of the vehicle.} With $\bv^{\ast}=\bzero$ the viscous, reaction and
+mass terms of $\tnorm{V^{\ast}}_{\mathrm O}$ vanish, leaving
+$\varepsilon\|q^{\ast}\|^2=O(1)\cdot h^3=O(h^3)$ (here $\varepsilon=O(1)$ is
+essential; a gradient-$O(1)$ bump of width $h$ has amplitude $O(h)$, so
+$\|q^{\ast}\|^2\sim h^3$) and
+$\normtau{\alpha X(V^{\ast})}^2=\normtau{\alpha\grad q^{\ast}}^2
+\sim\tau_1\cdot O(1)\cdot|\Omega_h|=h^2\cdot h=h^3$. Thus
+$\tnorm{V^{\ast}}_{\mathrm O}=\Theta(h^{3/2})$.
+
+\emph{The pairing does not cancel.} By idempotent self-adjointness of
+$\Ponez^{\perp}$ and $\alpha\grad q^{\ast}=\bz$ on $\Omega_h$,
+\[
+  S_1^{0}(U,V^{\ast})=\bigl(\Ponez^{\perp}\bz,\ \alpha\grad q^{\ast}\bigr)_{\tau_1}
+  =\bigl(\Ponez^{\perp}\bz,\ \bz\bigr)_{\tau_1}+\text{(l.o.)}
+  =\normtau{\Ponez^{\perp}\bz}^2+\text{(l.o.)}=\eta_0^2=\Theta(h^3),
+\]
+the lower-order correction controlled by $\eta_0\cdot o(h^{3/2})=o(h^3)$
+because $\Ponez^{\perp}\bz$ is strip-concentrated (the exponential profile
+of \cref{lem:st:defect}); and $S_2(U,V^{\ast})=0$.
+
+\emph{Restricted continuity, then the bound.} Because $\bv^{\ast}=\bzero$, the
+non-continuous convective term $(\bv,\alpha\ba\cdot\grad\bu)$ is absent,
+and one checks termwise---using $\tau_2=\Theta(1)$ for the divergence pairing
+$\normh[\tau_2^{-1}]{q^{\ast}}\le(\alpha/\nu)^{1/2}\|q^{\ast}\|\sim h^{3/2}$---that
+$|B^{0}_{\mathrm{OSGS}}(W,V^{\ast})|\le C\tnorm{W}_{\mathrm O}\tnorm{V^{\ast}}_{\mathrm O}$
+for \emph{this} pair. Expanding as in \cref{lem:st:reduce} with
+$\boldsymbol e_h=U_h-\widehat U_h$,
+\[
+  B^{0}_{\mathrm{OSGS}}(\boldsymbol e_h,V^{\ast})
+  =\underbrace{B^{0}_{\mathrm{OSGS}}(U-\widehat U_h,V^{\ast})}_{\le\,C\,h^{k}\cdot h^{3/2}=h^{k+3/2}}
+  \;-\;\underbrace{S_1^{0}(U,V^{\ast})}_{\Theta(h^3)}
+  \;=\;-\Theta(h^3)\quad(k\ge2,\ \text{since }h^{k+3/2}=o(h^3)).
+\]
+Restricted continuity then gives
+$\tnorm{\boldsymbol e_h}_{\mathrm O}\ge |B^{0}_{\mathrm{OSGS}}(\boldsymbol e_h,V^{\ast})|/(C\tnorm{V^{\ast}}_{\mathrm O})
+=\Theta(h^3)/\Theta(h^{3/2})=\Theta(h^{3/2})$, and
+$\tnorm{U-U_h}_{\mathrm O}\ge\tnorm{\boldsymbol e_h}_{\mathrm O}-\tnorm{U-\widehat U_h}_{\mathrm O}
+\ge c\,h^{3/2}-C\,h^{k}=\Theta(h^{3/2})$ for $k\ge2$. With the upper bound this
+is two-sided.
+\end{proof}
+
+\begin{intuition}
+The boundary blemish has a \emph{fixed} size $\Theta(h^{3/2})$, set by the
+geometry of the $O(h)$ strip, not by the elements; the target it must beat is
+the shrinking $h^{k}$. For $k=1$ the target $h$ is coarser than $h^{3/2}$, so
+the blemish hides beneath it; for $k\ge2$ the target $h^{k}$ is finer than
+$h^{3/2}$, so the blemish sticks out and \emph{becomes} the rate. Optimality
+survives iff $3/2>k$, i.e.\ iff $k=1$.
+\end{intuition}
+
+\subsection{The tension, resolved}
+
+\Cref{prop:st:preserve,prop:st:spoil} settle \cref{sec:optimality} in the
+energy norm: Codina's Remark~1---``all the results carry over''---is
+\emph{exactly right for $k=1$ and false for $k\ge2$}. There is no
+contradiction with anything Codina proves: his consistency estimate
+(\cite[Lemma~3]{codina2008}) is derived for the \emph{unconstrained} method
+via a best-approximation competitor that \emph{matches the boundary
+trace}---the very step that fails on $\Vhz$---and his optimal $Q_1$/$Q_2$
+numerics are that unconstrained method; the constrained variant is supported
+only by the informal Remark~1 and is never analysed or tested for $k\ge2$.
+Symmetrically, the manuscript's footnote is right for the higher-order
+elements ($\mathbb P_2$) it actually uses.
+
+Two honest caveats bound the claim. First, the regime is load-bearing:
+the argument uses $\tau_2=\Theta(1)$ (hence $\varepsilon=O(1)$); were
+$\tau_2$ to scale like $h^2$ the pressure vehicle would fail, so the verdict
+is tied to the viscous-dominated asymptotics that fix the rate. Second,
+the theorem is in the \emph{energy} norm. The manufactured-solution gate
+and the footnote's ``$O(h^{k+1})$'' measure the plain-$L^2$ velocity
+error, and there the story is subtler: the defect enters the duality
+(Aubin--Nitsche) estimate \emph{quadratically}
+($\eta_0\cdot\eta_0^{\mathrm{dual}}=\Theta(h^3)$), so clean theory would leave
+the $k=1$ $L^2$ rate optimal and only partly degrade $k\ge2$. We do not bank
+on that recovery---the duality for an inconsistent, non-coercive form is
+exactly the open route of the appendix, and this codebase's own MMS evidence
+reports that the constrained projection breaks the $O(h^{k+1})$ gate in
+practice. The energy-norm statement above is the part that is
+\emph{proved}; the plain-$L^2$ verdict for $k\ge2$ is decided cleanly by
+a single numerical experiment---project onto $\Vhz$ and measure the
+$\mathbb P_2$ rate---which we recommend as the definitive check.
+
+%=====================================================================
+\section{A caution: two different ``annihilations''}\label{sec:annih}
+%=====================================================================
+
+The word \emph{annihilation} appears twice in this cluster with
+completely unrelated meanings, and conflating them would be a serious
+error.
+
+\paragraph{The GOOD annihilation (intended).}
+The OSGS appendix's ``Exact annihilations'' lemma (paper, App.,
+\texttt{oa:lem:annihilation}) states, for constant $\sigma$ and
+$\varepsilon$ and all $\Uh,V_h\in\Xhz$:
+\begin{quote}\itshape
+$\Pi_1^{\perp}(\sigma\bm u_h)=\bm 0$ and $\Pi_2^{\perp}(\varepsilon
+p_h)=0$ (reactive and compressibility parts of the residual have no
+fluctuation); \dots\ $(\Pi_1^{\perp}z,\sigma\bm v_h)_{\tau_1}=0$ and
+$(\Pi_2^{\perp}w,\varepsilon q_h)_{\tau_2}=0$ for any $z,w$ \dots
+\end{quote}
+The mechanism: $\sigma\bu_h\in\Vh$ already, and the \emph{unconstrained}
+fluctuation $\Poneperp=\mathcal I-\Pone$ annihilates \emph{anything
+already in the projection space} $\Vh$. This is a desirable structural
+fact---the reactive and compressibility residuals carry no subscale, so
+OSGS keeps the full $\norm{\sigma^{1/2}\bv}$ norm and needs no reaction
+renormalisation. \emph{Constancy of $\sigma$ is essential}: a variable
+$\sigma$ would carry $\sigma\bu_h$ out of $\Vh$.
+
+\paragraph{The BAD annihilation (this note).}
+\Cref{prop:strip}'s ``annihilation of the local projection'' is the
+destruction of $\Ponez\bz$ on the boundary strip because
+\emph{constrained} functions must vanish there. It has nothing to do
+with residual components lying in a space; it is a defect \emph{caused
+by} the Dirichlet constraint on the projection target.
+
+\begin{center}\itshape
+Same word, opposite valence. The good annihilation is
+$\Poneperp$ killing what is \emph{in} $\Vh$; the bad annihilation is the
+\emph{constraint} killing $\Ponez$ on $\Gamma_{\mathrm D}$. Never
+conflate them.
+\end{center}
+
+%=====================================================================
+\section{Summary}\label{sec:summary}
+%=====================================================================
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}p{0.30\linewidth} p{0.30\linewidth} p{0.30\linewidth}@{}}
+\toprule
+ & \textbf{Constrained proj.\ onto $\Xhz$} & \textbf{Unconstrained proj.\ onto $\Xh$} \\
+\midrule
+Projected residual $\bpi_h$ lives in
+  & $\Xhz$ (vanishes on $\Gamma_{\mathrm D}$)
+  & $\Xh$ (free on $\Gamma_{\mathrm D}$) \\
+Condition \cref{eq:projstab} / (35)
+  & not needed ($\beta_0=1$, Pythagoras)
+  & required (Codina--Blasco inf--sup) \\
+Boundary behaviour of the subscale
+  & $O(1)$ on the $O(h)$ strip (pinned)
+  & $O(h^{k+1})$ interpolation fluctuation \\
+Codina 2008 verdict (Remark~1, asserted)
+  & optimal \emph{global} rate $+$ spurious \emph{local} boundary layers (general $k$; but see the $k\ge2$ tension, \S\ref{sec:optimality}(b))
+  & optimal, clean boundaries \\
+This paper's claimed verdict (empirical/conjectural)
+  & rate-level $O(h^{k+1})$ \emph{claimed} spoiled in the porous/high-$\Damk$ plain-$L^2$ MMS gate --- regime-specific, not proved for the constrained variant
+  & optimal $O(h^{k+1})$ MMS convergence \\
+Implemented \& analysed here?
+  & no
+  & \textbf{yes} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+
+\noindent The constrained projection is the natural first reach and the
+easier theory---it even removes hypothesis \cref{eq:projstab}. It is
+abandoned for one reason: on the one-element strip touching
+$\Gamma_{\mathrm D}$ it is pinned to zero and cannot represent the $O(1)$
+first-order residual, annihilating the local projection and seeding a
+spurious boundary layer (the spatial twin of the fractional-step
+pressure layer). Codina \emph{asserts} (Remark~1) that this keeps the
+\emph{global} rate optimal for general $k$ while polluting the boundary
+(with a genuine, unresolved tension at $k\ge2$, \S\ref{sec:optimality}(b));
+the manuscript's stronger, rate-level
+phrasing is an empirical extension resting on its own porous MMS, and is
+best read as a claim about the plain-$L^2$ gate rather than as Codina's
+energy-norm theorem. The price of the honest unconstrained
+projection---and it is a fair price---is the projection-stability
+condition \cref{eq:projstab}, which glues the constrained projection and
+the unconstrained fluctuation back into control of the full residual.
+
+%=====================================================================
+\begin{thebibliography}{9}
+%=====================================================================
+
+\bibitem{codina2008}
+R.~Codina,
+\emph{Analysis of a stabilized finite element approximation of the Oseen
+equations using orthogonal subscales},
+Applied Numerical Mathematics \textbf{58}(3), 264--283, 2008.
+
+\bibitem{codina2002}
+R.~Codina,
+\emph{Stabilized finite element approximation of transient
+incompressible flows using orthogonal subscales},
+Computer Methods in Applied Mechanics and Engineering
+\textbf{191}(39--40), 4295--4321, 2002.
+
+\bibitem{codina2001}
+R.~Codina,
+\emph{A stabilized finite element method for generalized stationary
+incompressible flows},
+Computer Methods in Applied Mechanics and Engineering
+\textbf{190}(20--21), 2681--2706, 2001.
+
+\bibitem{codinablasco1997}
+R.~Codina and J.~Blasco,
+\emph{A finite element formulation for the Stokes problem allowing equal
+velocity--pressure interpolation},
+Computer Methods in Applied Mechanics and Engineering
+\textbf{143}, 373--391, 1997.
+
+\bibitem{codina2018}
+R.~Codina, S.~Badia, J.~Baiges and J.~Principe,
+\emph{Variational multiscale methods in computational fluid dynamics},
+in \emph{Encyclopedia of Computational Mechanics}, 2nd ed., Wiley,
+pp.~1--28, 2018.
+
+\bibitem{codina2001pressure}
+R.~Codina,
+\emph{Pressure stability in fractional step finite element methods for
+incompressible flows},
+Journal of Computational Physics \textbf{170}(1), 112--140, 2001.
+
+\bibitem{guermond2006}
+J.-L.~Guermond, P.~Minev and J.~Shen,
+\emph{An overview of projection methods for incompressible flows},
+Computer Methods in Applied Mechanics and Engineering
+\textbf{195}(44--47), 6011--6045, 2006.
+
+\end{thebibliography}
+
+\end{document}

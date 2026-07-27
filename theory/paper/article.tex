@@ -190,7 +190,9 @@
 \newcommand{\buhat}{\widehat{\boldsymbol{u}}_h}
 \newcommand{\Th}{\mathcal{T}_h}
 \newcommand{\Xh}{\mathcal{X}_{h0}}
-\newcommand{\BS}{B_{\mathrm{S}}}
+\newcommand{\BS}{B_{\mathrm{S}}}          % generic stabilized bilinear form
+\newcommand{\BASGS}{B_{\mathrm{ASGS}}}    % ASGS particularization ($\pi_h=0$; used in App.~C)
+\newcommand{\BOSGS}{B_{\mathrm{OSGS}}}    % OSGS particularization
 \newcommand{\LS}{L_{\mathrm{S}}}
 \newcommand{\X}{X}
 \newcommand{\dd}{\,\mathrm{d}}
@@ -615,7 +617,8 @@ Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakForm
   L_\mathrm{S}(\boldsymbol{w}, V, \boldsymbol{\pi}) &\coloneqq L(V)
   - \sum_K{\dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \left (F - \boldsymbol{\pi} \right )}_K}.
 \end{align}
-\Cref{eq:OSGSProblem} is the complete discretized system of equations to be solved corresponding to the OSGS method. The ASGS method is then recovered by simply taking $\boldsymbol{\pi}_h = \boldsymbol{0}$. This system is nonlinear and of a larger size (in the OSGS case) than the original Galerkin system due to the introduction of the residual projections $\boldsymbol{\pi}_h$.\amend{\footnote{In our implementation the projection \cref{eq:NonlinearResidualProjection} is computed with $W_h$ ranging over the velocity and pressure finite element spaces \emph{without} their Dirichlet constraints, so that $\boldsymbol{\pi}_h$ is not forced to vanish on $\partial\Omega$. Projecting on the constrained space $\mathcal{X}_{h0}$ instead would force the boundary degrees of freedom to vanish (the space $\mathcal{X}_{h0}$ carrying homogeneous Dirichlet conditions), annihilating the local $L^2$ projection there and introducing an $O(1)$ boundary residual that spoils the optimal $O(h^{k+1})$ convergence.}} In \cref{sec:LinearizationOfCoupledSystem} we describe the particular way in which we have decoupled and linearized the system.
+%% Notation convention: $B_\mathrm{S}$ is the GENERIC stabilized form (staggered; the projection $\boldsymbol{\pi}_h$ is a separate variable, carried in $L_\mathrm{S}$). Its ASGS and OSGS particularizations, obtained once $\boldsymbol{\pi}_h$ is eliminated, are written $B_{\mathrm{ASGS}}$ ($\equiv B_\mathrm{S}$, the case $\boldsymbol{\pi}_h=\boldsymbol{0}$) and $B_{\mathrm{OSGS}}$; likewise the working norms $\triplenorm{\cdot}_{\mathrm{A}}$ (ASGS) and $\triplenorm{\cdot}_{\mathrm{O}}$ (OSGS).
+\Cref{eq:OSGSProblem} is the complete discretized system of equations to be solved corresponding to the OSGS method. The ASGS method is then recovered by simply taking $\boldsymbol{\pi}_h = \boldsymbol{0}$. \amend{Once the projection is eliminated, the two choices yield two particularizations of the stabilized bilinear form $B_\mathrm{S}$, which we denote $B_{\mathrm{ASGS}}$ (the case $\boldsymbol{\pi}_h=\boldsymbol{0}$, so that $B_{\mathrm{ASGS}}\equiv B_\mathrm{S}$) and $B_{\mathrm{OSGS}}$; the a priori analyses below use this notation, with the corresponding working norms $\triplenorm{\cdot}_{\mathrm{A}}$ and $\triplenorm{\cdot}_{\mathrm{O}}$.} This system is nonlinear and of a larger size (in the OSGS case) than the original Galerkin system due to the introduction of the residual projections $\boldsymbol{\pi}_h$.\amend{\footnote{In our implementation the projection \cref{eq:NonlinearResidualProjection} is computed with $W_h$ ranging over the velocity and pressure finite element spaces \emph{without} their Dirichlet constraints, so that $\boldsymbol{\pi}_h$ is not forced to vanish on $\partial\Omega$. Projecting on the constrained space $\mathcal{X}_{h0}$ instead would force the boundary degrees of freedom to vanish (the space $\mathcal{X}_{h0}$ carrying homogeneous Dirichlet conditions), annihilating the local $L^2$ projection there and introducing an $O(1)$ boundary residual that spoils the optimal $O(h^{k+1})$ convergence.}} In \cref{sec:LinearizationOfCoupledSystem} we describe the particular way in which we have decoupled and linearized the system.
 
 \subsection{Linearization of the coupled system of discrete equations}\label{sec:LinearizationOfCoupledSystem} \hfill\\
 The process of approximating \cref{eq:OSGSProblem} to make it numerically tractable involves both its linearization with respect to $U$, and the decoupling of \cref{eq:NonlinearStabilizedEquation,eq:ElementwiseSubscaleEquation,eq:NonlinearResidualProjection,eq:DefinitionOfNonlinearParameter}. To the latter end, note that, while equations \cref{eq:NonlinearStabilizedEquation,eq:NonlinearResidualProjection} involve the resolution of two global systems, and must therefore be solved separately, \cref{eq:ElementwiseSubscaleEquation,eq:DefinitionOfNonlinearParameter} are local, in the sense that they express elemental equations, only involving a reduced number of unknowns. Therefore, it is possible to consider the latter two equations both separately or as a single (monolithic) system to be solved independently on each element without running into unacceptable numerical costs.
@@ -896,7 +899,7 @@ For the coercivity argument to close, $\varepsilon$ must be small; in particular
 \end{equation}
 \amend{for some fixed constant $0 \leq C_2 < 1$, independent of the mesh and of the physical parameters.}
 
-Under \cref{eq:UpperBoundOnEpsilon} the compressibility coefficient remains stabilizing, $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon>0$; the strict inequality $\varepsilon\tau_2<1$ alone would not suffice, as it gives no uniform margin when $\sigma=0$. \amend{As carried out in detail in \cref{lem:coercivity} of \cref{app:Continuity}, the coefficients of $\|\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\|_K^2$ and of $\|\boldsymbol{u}_h\|_K^2$ in $B_\mathrm{S}(\boldsymbol{a}, U_h, U_h)$ are then bounded below by a positive multiple of $\nu$ and of the damped reaction coefficient}
+Under \cref{eq:UpperBoundOnEpsilon} the compressibility coefficient remains stabilizing, $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon>0$; the strict inequality $\varepsilon\tau_2<1$ alone would not suffice, as it gives no uniform margin when $\sigma=0$. \amend{As carried out in detail in \cref{lem:coercivity} of \cref{app:Continuity}, the coefficients of $\|\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\|_K^2$ and of $\|\boldsymbol{u}_h\|_K^2$ in $B_{\mathrm{ASGS}}(\boldsymbol{a}, U_h, U_h)$ are then bounded below by a positive multiple of $\nu$ and of the damped reaction coefficient}
 \begin{equation} \label{eq:SigmaAlpha}
     \widetilde{\sigma}_\alpha \coloneqq \frac{\tau_{1, \mathrm{NS}}^{-1} \sigma}{\tau_{1, \mathrm{NS}}^{-1} + \sigma/\alpha_K },
 \end{equation}
@@ -915,7 +918,7 @@ The stability of the stabilized method is then expressed by the following bound,
 \begin{lemma} \label{lemma:Stability}
   \amend{Under the standing assumptions of \cref{sec:StabilityASGS}---in particular the coercivity condition \cref{H:coercivity} ($c_1 > 2\xi C_\mathrm{inv}^2$ for some $\xi > 2$)---there exists} a positive constant $C$ such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_{h0}$ it holds that
   \begin{equation}
-    B_\mathrm{S}(\boldsymbol{a}, U_h, U_h) \geq C \triplenorm{U_h}^2,
+    B_{\mathrm{ASGS}}(\boldsymbol{a}, U_h, U_h) \geq C \triplenorm{U_h}^2,
   \end{equation}
 \end{lemma}
 where
@@ -927,17 +930,17 @@ with $\widetilde{\sigma}_\alpha$ given in \cref{eq:SigmaAlpha}.
     Note that the quantity $\widetilde{\sigma}_\alpha$ differs from the quantity $\widetilde{\sigma}$ defined in~\cite{codina2001stabilized} simply by the division of $\sigma$ by $\alpha_K $ in the denominator. This seems to indicate a weaker control on $\boldsymbol{u}_h$ for large reaction terms when $\alpha_K$ is simultaneously very small. It turns out this is not the case, as the asymptotic analysis presented below shows (see \cref{sec:DominantReaction}) and the numerical tests corroborate.
 \end{remark}
 
-\amend{Following the process used in the proof of Lemma 2 in~\cite{codina2001stabilized}, adapting every estimate to the presence of the porosity field, one can prove the following continuity result for the bilinear form $B_\mathrm{S}$ (a complete proof is given in \cref{app:Continuity}):}
+\amend{Following the process used in the proof of Lemma 2 in~\cite{codina2001stabilized}, adapting every estimate to the presence of the porosity field, one can prove the following continuity result for the bilinear form $B_{\mathrm{ASGS}}$ (a complete proof is given in \cref{app:Continuity}):}
 
 \begin{lemma} \label{lemma:Continuity}
     \amend{Under the standing assumptions of \cref{sec:StabilityASGS}, but requiring of the design constants only $c_1,c_2>0$ (not the coercivity condition \cref{H:coercivity}; the complete proof in \cref{app:Continuity} uses these weaker hypotheses, though the mesh non-degeneracy and porosity resolution are still needed), and including the jump condition \cref{H:jump} when $\sigma>0$, there exists} a positive constant $C$, such that
     \begin{equation}
-        \bigl| B_\mathrm{S}(\boldsymbol{a}, U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h},
+        \bigl| B_{\mathrm{ASGS}}(\boldsymbol{a}, U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h},
     \end{equation}
     for all $U_h, V_h \in \mathcal{X}_{h\amend{0}}$.
 \end{lemma}
 
-Using \cref{lemma:Stability} and \amend{a modified version of \cref{lemma:Continuity}, in which the first argument of $B_\mathrm{S}$ is the interpolation error rather than a finite element function (\cref{lem:continterp} in \cref{app:Continuity})}, and assuming that the solution of the linearized problem is sufficiently smooth, convergence follows as in~\cite{codina2001stabilized}:
+Using \cref{lemma:Stability} and \amend{a modified version of \cref{lemma:Continuity}, in which the first argument of $B_{\mathrm{ASGS}}$ is the interpolation error rather than a finite element function (\cref{lem:continterp} in \cref{app:Continuity})}, and assuming that the solution of the linearized problem is sufficiently smooth, convergence follows as in~\cite{codina2001stabilized}:
 
 \begin{theorem} \label{th:Convergence}
  Let $U$ be the exact solution of the linearized problem corresponding to \cref{eq:DiscretizedNonlinearStabilizedEquation}, where $\boldsymbol{u}^{m-1}$ is replaced by a given $\boldsymbol{a}$ such that $\nabla \cdot (\alpha\boldsymbol{a})=0$ and where $\boldsymbol{\pi}_h^m=\boldsymbol{0}$ (ASGS method). Then, under the assumptions of \cref{lemma:Stability,lemma:Continuity}\amend{ and the regularity \cref{H:regularity}}, there exists a positive constant $C$, such that

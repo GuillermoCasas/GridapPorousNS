@@ -368,13 +368,13 @@ boundary layers.
 The \emph{analyzed} OSGS method reads: find $U_h \in \Xhz$ such that
 \begin{equation}
   \label{eq:Method}
-  B_{\mathrm{osgs}}(\ba; U_h, V_h) = L(V_h) \coloneqq (\bff, \bv_h)
+  B_{\mathrm{OSGS}}(\ba; U_h, V_h) = L(V_h) \coloneqq (\bff, \bv_h)
   \qquad \forall\, V_h \in \Xhz,
 \end{equation}
 with
 \begin{equation}
   \label{eq:Bosgs}
-  B_{\mathrm{osgs}}(\ba; U, V)
+  B_{\mathrm{OSGS}}(\ba; U, V)
   \coloneqq
   B(\ba; U, V) + S_1(U, V) + S_2(U, V),
 \end{equation}
@@ -395,7 +395,7 @@ symmetric and positive semidefinite:
 In particular, with \cref{lem:coercivity},
 \begin{equation}
   \label{eq:Diagonal}
-  B_{\mathrm{osgs}}(\ba; U_h, U_h)
+  B_{\mathrm{OSGS}}(\ba; U_h, U_h)
   = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu_h \bigr\rVert^2
   + \bigl\lVert\sigma^{1/2}\bu_h\bigr\rVert^2
   + \varepsilon\bigl\lVert p_h\bigr\rVert^2
@@ -784,10 +784,10 @@ definite. (Absent full Dirichlet data or pressure normalization it is only a sem
 
 \begin{lemma}[Comparison with the ASGS norm]
 \label{lem:normcomparison}
-Let $\tnorm{\cdot}_{\mathrm{S}}$ denote the triple norm of the ASGS stability lemma
+Let $\tnorm{\cdot}_{\mathrm{A}}$ denote the triple norm of the ASGS stability lemma
 of~\cite{companion},
 \[
-  \tnorm{V}_{\mathrm{S}}^2
+  \tnorm{V}_{\mathrm{A}}^2
   = \nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bv \bigr\rVert^2
   + \bigl\lVert \widetilde{\sigma}_\alpha^{1/2}\bv \bigr\rVert_h^2
   + \varepsilon\bigl\lVert q\bigr\rVert^2
@@ -797,7 +797,7 @@ of~\cite{companion},
   \widetilde{\sigma}_\alpha
   = \frac{\tns^{-1}\sigma}{\tns^{-1} + \sigma/\alpha_K}.
 \]
-Then $\tnorm{V}_{\mathrm{S}} \le \tnorm{V}$ for all $V$.
+Then $\tnorm{V}_{\mathrm{A}} \le \tnorm{V}$ for all $V$.
 \end{lemma}
 
 \begin{proof}
@@ -811,15 +811,15 @@ the remaining three terms coincide.
 
 \begin{theorem}[Inf--sup stability]
 \label{th:stability}
-Under \textup{(A1)--(A7)} there exist $h_0 > 0$ and $\beta_{\mathrm{osgs}} > 0$,
+Under \textup{(A1)--(A7)} there exist $h_0 > 0$ and $\beta_{\mathrm{OSGS}} > 0$,
 depending only on $\beta_0$, $C_2$, $C_{\nabla\alpha}/C_{\mathrm{inv}}$ and the constants of
 \cref{sec:technical}, such that for all $h \le h_0$,
 \begin{equation}
   \label{eq:InfSup}
   \inf_{U_h \in \Xhz\setminus\{0\}}\;
   \sup_{V_h \in \Xhz\setminus\{0\}}\;
-  \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{U_h}\,\tnorm{V_h}}
-  \;\ge\; \beta_{\mathrm{osgs}} .
+  \frac{B_{\mathrm{OSGS}}(\ba; U_h, V_h)}{\tnorm{U_h}\,\tnorm{V_h}}
+  \;\ge\; \beta_{\mathrm{OSGS}} .
 \end{equation}
 An admissible choice of the constants in \textup{(A6)} is
 $\gamma_0 = 10\,(1 + M_2)$ with $M_2 \coloneqq 1 + C_{\nabla\alpha}/C_{\mathrm{inv}}$,
@@ -872,12 +872,12 @@ $V^0 \coloneqq [\bw_h; r_h]$ and take as test function $W \coloneqq U_h + V^0$.
 By \cref{eq:Diagonal},
 \begin{equation}
   \label{eq:StepDiag}
-  B_{\mathrm{osgs}}(\ba; U_h, U_h) = D_\nu + D_\sigma + D_\varepsilon + O_1 + O_2 ,
+  B_{\mathrm{OSGS}}(\ba; U_h, U_h) = D_\nu + D_\sigma + D_\varepsilon + O_1 + O_2 ,
 \end{equation}
-and it remains to bound $B_{\mathrm{osgs}}(\ba; U_h, V^0)$ from below. Expanding
+and it remains to bound $B_{\mathrm{OSGS}}(\ba; U_h, V^0)$ from below. Expanding
 \cref{eq:GalerkinForm} and \cref{eq:Sdefs},
 \begin{align}
-  B_{\mathrm{osgs}}(\ba; U_h, V^0)
+  B_{\mathrm{OSGS}}(\ba; U_h, V^0)
   ={}& 2\nu\,(\alpha\,\ViscProj\nabla\bu_h, \ViscProj\nabla\bw_h)
   \tag{T1}\label{eq:T1}\\
   &+ (\bw_h, \xi_h)
@@ -1005,7 +1005,7 @@ by \cref{eq:K3}, with $M_2 = 1 + C_{\nabla\alpha}/C_{\mathrm{inv}}$; hence
 \medskip\noindent\emph{Step 4: collection.}
 Adding \cref{eq:StepDiag} and the bounds of Steps~2--3,
 \begin{align*}
-  B_{\mathrm{osgs}}(\ba; U_h, W)
+  B_{\mathrm{OSGS}}(\ba; U_h, W)
   \ \ge\ & \tfrac34\, D_\nu + \tfrac12\, D_\sigma + \tfrac12\, D_\varepsilon\\
   &+ \Bigl( 1 - \frac{2\psi}{\beta_0^2} - \frac{1+\psi}{\gamma} \Bigr)\, O_1
   + \Bigl( 1 - \psi - \frac{M_2(1+\psi)}{2\gamma} \Bigr)\, O_2\\
@@ -1021,7 +1021,7 @@ using $C_2 \le 1$: $1 - 0.125 - 0.633 - 0.029 \ge 0.21$; the others are larger).
 Hence, with $C_0 = 1/8$,
 \begin{equation}
   \label{eq:Collected}
-  B_{\mathrm{osgs}}(\ba; U_h, W)
+  B_{\mathrm{OSGS}}(\ba; U_h, W)
   \ \ge\ C_0\,\bigl( D_\nu + D_\sigma + D_\varepsilon + O_1 + O_2 + P_1 + P_2 \bigr).
 \end{equation}
 
@@ -1034,7 +1034,7 @@ By \textup{(A7)} and the exact decomposition of the mass slot,
   \le D_\nu + D_\sigma + D_\varepsilon + \frac{2}{\beta_0^2}(P_1 + O_1) + (P_2 + O_2),
 \]
 so \cref{eq:Collected} yields
-$B_{\mathrm{osgs}}(\ba; U_h, W) \ge C_0 \min\{1, \beta_0^2/2\}\,\tnorm{U_h}^2$.
+$B_{\mathrm{OSGS}}(\ba; U_h, W) \ge C_0 \min\{1, \beta_0^2/2\}\,\tnorm{U_h}^2$.
 It remains to bound $\tnorm{W} \le \tnorm{U_h} + \tnorm{V^0}$. Using
 \cref{eq:Smoothing} elementwise together with \cref{eq:K1} for the viscous term,
 $\sigma\tau_1 \le 1$ for the reactive term, $\varepsilon\tau_2 \le C_2$ for the
@@ -1052,11 +1052,11 @@ $\norm{\alpha X(V^0)}_{\tau_1}$ and $\norm{\nabla\cdot(\alpha\bw_h)}_{\tau_2}$,
 and $P_1 \le \norm{\xi_h}_{\tau_1}^2$, $P_2 \le \norm{\delta_h}_{\tau_2}^2$ give
 $\tnorm{V^0} \le C\,\tnorm{U_h}$, hence $\tnorm{W} \le C\,\tnorm{U_h}$. Combining,
 \[
-  \sup_{V_h\in\Xhz\setminus\{0\}} \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{V_h}}
-  \ \ge\ \frac{B_{\mathrm{osgs}}(\ba; U_h, W)}{\tnorm{W}}
-  \ \ge\ \beta_{\mathrm{osgs}}\, \tnorm{U_h}
+  \sup_{V_h\in\Xhz\setminus\{0\}} \frac{B_{\mathrm{OSGS}}(\ba; U_h, V_h)}{\tnorm{V_h}}
+  \ \ge\ \frac{B_{\mathrm{OSGS}}(\ba; U_h, W)}{\tnorm{W}}
+  \ \ge\ \beta_{\mathrm{OSGS}}\, \tnorm{U_h}
 \]
-with $\beta_{\mathrm{osgs}} = C_0\min\{1,\beta_0^2/2\}/C > 0$, which is
+with $\beta_{\mathrm{OSGS}} = C_0\min\{1,\beta_0^2/2\}/C > 0$, which is
 \cref{eq:InfSup}.
 \end{proof}
 
@@ -1134,13 +1134,13 @@ function:
 Under \textup{(A1)--(A8)}, for all $V_h \in \Xhz$,
 \begin{equation}
   \label{eq:ConsistencyId}
-  B_{\mathrm{osgs}}(\ba;\, U - U_h,\, V_h)
+  B_{\mathrm{OSGS}}(\ba;\, U - U_h,\, V_h)
   = S_1(U, V_h) + S_2(U, V_h),
 \end{equation}
 and
 \begin{equation}
   \label{eq:ConsistencyBound}
-  \bigl| B_{\mathrm{osgs}}(\ba;\, U - U_h,\, V_h) \bigr|
+  \bigl| B_{\mathrm{OSGS}}(\ba;\, U - U_h,\, V_h) \bigr|
   \;\le\; C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}.
 \end{equation}
 \end{lemma}
@@ -1240,13 +1240,13 @@ the shifted interpolant notationally.
 Under \textup{(A1)--(A8)}, for all $V_h \in \Xhz$,
 \begin{equation}
   \label{eq:InterpolationBound}
-  \bigl| B_{\mathrm{osgs}}(\ba;\, \hat E,\, V_h) \bigr|
+  \bigl| B_{\mathrm{OSGS}}(\ba;\, \hat E,\, V_h) \bigr|
   \;\le\; C\,\Psi_{\mathrm O}(h)\,\tnorm{V_h}.
 \end{equation}
 \end{lemma}
 
 \begin{proof}
-Expand $B_{\mathrm{osgs}}(\ba; \hat E, V_h)$ into the Galerkin terms and the
+Expand $B_{\mathrm{OSGS}}(\ba; \hat E, V_h)$ into the Galerkin terms and the
 stabilization terms and estimate each. Below, all interpolation estimates are
 \cref{eq:NodalInterp} with $n = k_u+1$ or $n = k_p+1$ and $m \in \{0,1\}$.
 
@@ -1395,10 +1395,10 @@ with $\Psi_{\mathrm O}(h)$ and its $\ell^1$ majorant $\mathcal{E}(h)$ as in
 Write $U - U_h = \hat E + \eta_h$ with $\eta_h \coloneqq \hat U_h - U_h \in \Xhz$.
 By \cref{th:stability} there is $V_h \in \Xhz$, $\tnorm{V_h} = 1$, with
 \[
-  \beta_{\mathrm{osgs}}\,\tnorm{\eta_h}
-  \le B_{\mathrm{osgs}}(\ba; \eta_h, V_h)
-  = -\,B_{\mathrm{osgs}}(\ba; \hat E, V_h)
-  + B_{\mathrm{osgs}}(\ba; U - U_h, V_h)
+  \beta_{\mathrm{OSGS}}\,\tnorm{\eta_h}
+  \le B_{\mathrm{OSGS}}(\ba; \eta_h, V_h)
+  = -\,B_{\mathrm{OSGS}}(\ba; \hat E, V_h)
+  + B_{\mathrm{OSGS}}(\ba; U - U_h, V_h)
   \le C\,\Psi_{\mathrm O}(h),
 \]
 by \cref{lem:interpolation,lem:consistency}. The triangle inequality and
@@ -1411,7 +1411,7 @@ Under the hypotheses of \cref{th:convergence}, the OSGS solution also satisfies 
 estimate of the ASGS convergence theorem of~\cite{companion} up to the local factor
 $(c_1+\Dah)^{1/2}$, in the same porosity-weighted $\ell^2$ form:
 \[
-  \tnorm{U - U_h}_{\mathrm{S}}
+  \tnorm{U - U_h}_{\mathrm{A}}
   \;\le\;
   C\,\Psi_{\mathrm O}(h)
   = C\Bigl( \sum_K \bigl( c_1 + \Dah \bigr)\,\frac{\alpha_K^2}{h_K^2}
