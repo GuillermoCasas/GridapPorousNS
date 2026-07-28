@@ -868,17 +868,17 @@ implies $V = 0$.
 \end{lemma}
 
 \begin{proof}
-Homogeneity, symmetry and the triangle inequality are immediate; only definiteness needs an
-argument, and it is here that the full Dirichlet data enter. Let $\tnorm{V}_{\mathrm{O}} = 0$ for
-$V = [\bv; q] \in \Xhz$. Then $\ViscProj\nabla\bv \equiv 0$, i.e.\ the symmetric gradient of
-$\bv$ is spherical almost everywhere; since $\bv \in H^1_0(\Omega)^d$, the elementary identity
-\cref{eq:devsymidentity} of \cref{app:Continuity} gives $\norm{\nabla\bv} \le
-\sqrt2\,\bigl\lVert\ViscProj\nabla\bv\bigr\rVert = 0$, so $\bv \equiv 0$. With $\bv = 0$, the term
-$\norm{\alpha X(V)}_{\tau_1} = 0$ reduces to $\norm{\alpha\nabla q}_{\tau_1} = 0$; as
-$\alpha \ge \alpha_0 > 0$ and $\tau_1 > 0$, this forces $\nabla q \equiv 0$, so $q$ is
-constant, and the normalization ($\varepsilon\norm{q}^2 = 0$ when $\varepsilon > 0$, or the
-zero-mean constraint when $\varepsilon = 0$) forces $q \equiv 0$. Hence $\tnorm{\cdot}_{\mathrm{O}}$ is
-definite. (Absent full Dirichlet data or pressure normalization it is only a seminorm.)
+Homogeneity, symmetry and the triangle inequality are immediate. For definiteness, note that
+$\tnorm{\cdot}_{\mathrm{O}}$ differs from the ASGS working norm $\tnorm{\cdot}_{\mathrm{S}}$ of
+\cref{lem:definiteness} only in its first two coefficients---$2\nu$ in place of $\nu$ (viscous term) and
+the undamped $\sigma$ in place of the damped $\sigmatilde$ (reaction term)---the remaining three terms
+coinciding; since $2\nu \ge \nu$ and $\sigma \ge \sigmatilde$ elementwise, $\tnorm{V}_{\mathrm{O}} \ge
+\tnorm{V}_{\mathrm{S}}$ for every $V \in \Xhz$. Definiteness of $\tnorm{\cdot}_{\mathrm{O}}$ therefore
+follows from that of $\tnorm{\cdot}_{\mathrm{S}}$, proved in \cref{lem:definiteness} of \cref{app:Continuity}:
+it is there that the full Dirichlet data enter, forcing $\bv \equiv 0$ through the deviatoric{\hyp}symmetric
+identity \cref{eq:devsymidentity} and $q \equiv 0$ through the pressure normalization
+($\varepsilon\norm{q}^2$ for $\varepsilon > 0$, zero mean for $\varepsilon = 0$). (Absent full Dirichlet
+data or pressure normalization it is only a seminorm.)
 \end{proof}
 
 \begin{lemma}[Comparison with the ASGS norm]
