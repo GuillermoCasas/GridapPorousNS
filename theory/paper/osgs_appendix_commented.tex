@@ -97,39 +97,25 @@ stability, then convergence, consulting \cref{oa:sec:technical} on demand.
 \subsection{The linearized problem and the OSGS method}
 \label{oa:sec:setting}
 
-\subsubsection{Continuous problem and Galerkin form}
+\subsubsection{Setting}
 \label{oa:sec:continuous}
 
-The analyzed linearized problem, the Galerkin bilinear form $B(\ba;U,V)$
-(\cref{eq:BilinearForm}) and the composite first-order quantity
-$X(V) \coloneqq \ba\cdot\nabla\bv + \nabla q$ are those of the common setting
-(\cref{sec:CommonSetting}) and of the ASGS analysis (\cref{sec:setting} of
-\cref{app:Continuity}, where $X$ is denoted as in \cref{eq:XG}); we use them without
-restatement. We recall only that, in the porous setting, the momentum residual carries the
-weight $\alpha$, so the natural stabilized quantity is $\alpha X(V)$, and that
-$(\nabla\bv, \alpha\nu\ViscProj\nabla\bu) = (\ViscProj\nabla\bv, \alpha\nu\ViscProj\nabla\bu)$
-since $\ViscProj$ is a pointwise orthogonal projection and $\alpha\nu$ is scalar. We write
-$(\cdot,\cdot)$ and $\norm{\cdot}$ for the $L^2(\Omega)$ inner product and norm (of scalars,
-vectors or tensors), $\normK{\cdot} \coloneqq \norm{\cdot}_{L^2(K)}$,
-$\norm{\cdot}_{m,K} \coloneqq \norm{\cdot}_{H^m(K)}$; the velocity and pressure spaces are
-$V_0 \coloneqq H_0^1(\Omega)^d$ and $Q_0$ (the zero-mean subspace of $L^2(\Omega)$; for
-$\varepsilon > 0$ the zero mean is automatic, since integrating the mass equation
-$\varepsilon p + \nabla\cdot(\alpha\bu) = 0$ over $\Omega$ and using $\bu \in V_0$ gives
-$\varepsilon\int_\Omega p = 0$), and $\mathcal{X}_0 \coloneqq V_0\times Q_0$.
-
-Testing $B$ with $V = U$ and using $\nabla\cdot(\alpha\ba) = 0$ together with
-$\bu|_{\partial\Omega} = \boldsymbol{0}$---so that the pressure--divergence pair cancels by
-integration by parts and the convective term vanishes---gives the Galerkin coercivity
-identity of the main text: for every $U \in \mathcal{X}_0$ with $\bu \in H^1_0(\Omega)^d$,
+The linearized problem, the Galerkin bilinear form $B(\ba;U,V)$ (\cref{eq:BilinearForm}), the
+first{\hyp}order quantity $X(V)$ (\cref{eq:XG}), the spaces $\mathcal{X}_0 = \mathcal{V}_0\times\mathcal{Q}_0$
+(\cref{sec:WeakForm}), the meshes, the finite element spaces and the stabilization parameters
+$\tns, \tau_{1,K}, \tau_{2,K}$ (\cref{eq:TauNavierStokes,eq:Tau1Final,eq:Tau2Final}) are all those of the
+common setting (\cref{sec:CommonSetting}), identical to the ASGS analysis of \cref{app:Continuity}; we use
+them without restatement, recalling only that in the porous setting the momentum residual carries the
+weight $\alpha$, so the stabilized first{\hyp}order quantity is $\alpha X(V)$. The Galerkin coercivity
+identity \cref{eq:GalerkinCoercivityIdentity} of the main text is recalled here as
 \begin{equation}
   \label{oa:eq:CoercivityIdentity}
   B(\ba; U, U)
   = 2\nu\,\bigl\lVert \alpha^{1/2}\ViscProj\nabla\bu \bigr\rVert^2
-  + \norm{\sigma^{1/2}\bu}^2
-  + \varepsilon\norm{p}^2 .
+  + \bigl\lVert\sigma^{1/2}\bu\bigr\rVert^2
+  + \varepsilon\bigl\lVert p\bigr\rVert^2 ,
+  \qquad U \in \mathcal{X}_0 .
 \end{equation}
-This is \cref{eq:GalerkinCoercivityIdentity} of the main text, recalled here in the notation
-of this appendix; the derivation is given there.
 
 \begin{pedagogy}[The energy identity is the shared floor]
 Identity \cref{oa:eq:CoercivityIdentity} is the same Galerkin energy budget both
@@ -149,43 +135,23 @@ OSGS addition is a sum of squares for free (\cref{oa:eq:Diagonal})---but of the
 \emph{wrong} squares, as discussed at \cref{oa:th:stability} below.
 \end{pedagogy}
 
-\subsubsection{Meshes, finite element spaces and interpolation}
-\label{oa:sec:meshes}
-
-The mesh nondegeneracy, the inverse estimate \cref{eq:InverseEstimateFiniteOrderNorm} and the
-finite element spaces are the common ones of the analysis (\cref{sec:CommonSetting}), shared
-with the ASGS setting of \cref{app:Continuity}; the OSGS route additionally uses the patch
-structure and element{\hyp}size surrogates of \cref{H:patch} and the interpolation operators
-recalled below.
-
-We write $\mathcal{F} = \{\mathcal{T}_h\}_{h>0}$ for the (nondegenerate, shape-regular) mesh
-family, $h_K \coloneqq \operatorname{diam}(K)$, $h \coloneqq \max_K h_K$; the continuous
-degree-$k_u,k_p$ spaces $V_h \subset H^1(\Omega)^d$ and
-$Q_h \subset H^1(\Omega)\cap C^0(\overline\Omega)$ (constants in $Q_h$, $k_p \le k_u+1$); and
-the constrained subspaces $V_{h0} \coloneqq V_h \cap H^1_0(\Omega)^d$,
-$Q_{h0} \coloneqq Q_h \cap Q_0$, $\Xhz \coloneqq V_{h0}\times Q_{h0}$.
-
-\emph{Patch structure and element{\hyp}size surrogates} (\cref{H:patch}). We use the patch
-quasi{\hyp}uniformity $\underline{C}\, h_{K} \le h_{K'} \le \overline{C}\, h_K$ for all
-$K' \subset S_K$~\cite{AinsworthOden} and the continuous surrogates $\chi_1(\cdot,h),
-\chi_2(\cdot,h)$ of \cref{H:patch}, with the element length taken as
-$h_{K} \coloneqq \chi_1(\boldsymbol{x}_K, h)$ (as in~\cite[Lemma~1]{codina2008analysis}); this
-last choice alters each stabilization parameter by a bounded factor ($\le \chi_0^2$) relative
-to the raw diameter and is immaterial to every estimate, so we do not distinguish the two
-notationally.
-
-\emph{Interpolation operators.} For $v \in H^{r}(\Omega)$ with $r \ge 2$ (hence
-$v \in C^0(\overline\Omega)$ for $d \le 3$) the nodal interpolant $\hat v_h$ satisfies
+The OSGS analysis adds three ingredients to this shared setting. The first is the \emph{patch
+structure} of \cref{H:patch}: writing $h_K$ for the element diameter, the quasi{\hyp}uniformity
+$\underline{C}\, h_{K} \le h_{K'} \le \overline{C}\, h_K$ for all $K' \subset S_K$~\cite{AinsworthOden}
+and the continuous element{\hyp}size surrogate $\chi_1(\cdot, h)$, adopted as $h_K$ (as
+in~\cite[Lemma~1]{codina2008analysis}), which alters each stabilization parameter by a bounded factor
+and is not distinguished from the raw diameter. The second is the \emph{interpolation operators}: with
+$\norm{\cdot}_{m,K} \coloneqq \norm{\cdot}_{H^m(K)}$ (and $\normK{\cdot} \coloneqq \norm{\cdot}_{0,K}$), for
+$v \in H^{r}(\Omega)$ with $r \ge 2$ the nodal interpolant $\hat v_h$ preserves homogeneous Dirichlet
+data and satisfies
 \begin{equation}
   \label{oa:eq:NodalInterp}
   \norm{v - \hat v_h}_{m,K} \le C_I\, h_K^{n-m}\norm{v}_{n,K},
   \qquad 0 \le m \le n \le \min(r,\, k+1),
 \end{equation}
-with $k$ the polynomial degree of the target space, and it preserves homogeneous Dirichlet
-data (this is the estimate of the ASGS analysis, \cref{eq:interp} of \cref{app:Continuity},
-in the norm form used below). For $v \in H^{r}(\Omega)$ with $r \ge 1$ the Scott--Zhang
-quasi-interpolant~\cite{ScottZhang} satisfies the same estimate with $\norm{v}_{n,K}$
-replaced by $\norm{v}_{H^n(S_K)}$ and also preserves homogeneous boundary values.
+with $k$ the polynomial degree of the target space (this is \cref{eq:interp} of \cref{app:Continuity}),
+while for $v \in H^{r}(\Omega)$ with $r \ge 1$ the Scott--Zhang quasi{\hyp}interpolant~\cite{ScottZhang}
+satisfies the same estimate with $\norm{v}_{n,K}$ replaced by $\norm{v}_{H^n(S_K)}$.
 
 \begin{pedagogy}[Two interpolants, and why both are needed]
 Background. The \emph{nodal} interpolant evaluates the target function at the
@@ -212,15 +178,9 @@ coercivity route never builds test functions from $\tau$, and its interpolation
 lemma \cref{lem:continterp} uses only the nodal interpolant.
 \end{pedagogy}
 
-\subsubsection{Stabilization parameters}
-\label{oa:sec:parameters}
-
-The stabilization parameters $\tns$, $\tau_{1,K}$ and $\tau_{2,K}$ are those of the main text
-(\cref{eq:TauNavierStokes,eq:Tau1Final,eq:Tau2Final}), shared with \cref{app:Continuity}, with
-$\alpha_K \coloneqq \sup_K \alpha$, $|\ba|_{\infty,K} \coloneqq \norm{\ba}_{L^\infty(K)}$ and
-design constants $c_1, c_2 > 0$ subject to \cref{H:design} of \cref{sec:CommonSetting}. Specific to the OSGS analysis are the
-two dimensionless numbers and the $\boldsymbol{\tau}$-weighted broken products introduced now.
-Expanding $\tau_2$,
+The third is the pair of \emph{dimensionless numbers}. With $\alpha_K \coloneqq \sup_K \alpha$,
+$|\ba|_{\infty,K} \coloneqq \norm{\ba}_{L^\infty(K)}$ and the design constants $c_1,c_2>0$ of \cref{H:design},
+expanding $\tau_2$ gives
 \begin{equation}
   \label{oa:eq:Tau2Expanded}
   \tau_{2,K}
@@ -228,22 +188,13 @@ Expanding $\tau_2$,
   \qquad
   \Reh \coloneqq \frac{|\ba|_{\infty,K}\, h_K}{\nu},
 \end{equation}
-so that $\tau_{2,K} \ge \nu/\alpha_K$ always. We will also use the elementwise mesh
-Damk\"ohler number $\Dah \coloneqq \sigma h_K^2/(\alpha_K\nu)$. Weighted broken inner
-products and norms are defined, for $i = 1,2$, by
-\begin{equation}
-  \label{oa:eq:TauInner}
-  (f, g)_{\tau_i} \coloneqq \sum_K \tau_{i,K}\,(f, g)_{K},
-  \qquad
-  \norm{f}_{\tau_i} \coloneqq (f,f)_{\tau_i}^{1/2},
-\end{equation}
-for functions that need only be square integrable elementwise (this is the main-text
-definition \cref{eq:TauWeightedProduct}, recalled here); note
-$\norm{f}_{\tau_i} = \lVert \tau_i^{1/2} f\rVert_h$ in the broken-norm notation
-of~the main text.
+so that $\tau_{2,K} \ge \nu/\alpha_K$ always; we also use the elementwise mesh Damk\"ohler number
+$\Dah \coloneqq \sigma h_K^2/(\alpha_K\nu)$. Fluctuations are measured in the $\boldsymbol{\tau}${\hyp}weighted
+broken products $(\cdot,\cdot)_{\tau_i}$ and norms $\norm{\cdot}_{\tau_i} = \lVert \tau_i^{1/2}\cdot\rVert_h$
+of \cref{eq:TauWeightedProduct} (for functions square integrable elementwise).
 
 \begin{pedagogy}[Fixing the units the whole analysis is measured in]
-This short subsection does one job: it fixes the currency in which every later
+These definitions do one job: they fix the currency in which every later
 bound is paid. \cref{oa:eq:Tau2Expanded} rewrites the pressure parameter as
 $\tau_{2,K} = (\nu/\alpha_K)\bigl(1 + (c_2/c_1)\Reh\bigr)$. Since the design
 constants satisfy $c_1,c_2>0$ (\cref{H:design}) and $\Reh\ge 0$, the bracket is at
@@ -254,7 +205,7 @@ mesh Reynolds number $\Reh = |\ba|_{\infty,K}h_K/\nu$ weighs advection against
 diffusion, and the mesh Damk\"ohler number $\Dah = \sigma h_K^2/(\alpha_K\nu)$
 weighs reaction against diffusion. Watch $\Dah$: it is the Damk\"ohler factor that
 will price almost every convergence constant to come, all the way to the main
-estimate \cref{oa:eq:MainResult}. Finally, ``broken'' in \cref{oa:eq:TauInner}
+estimate \cref{oa:eq:MainResult}. Finally, ``broken'' in \cref{eq:TauWeightedProduct}
 means summed element by element with no inter-element continuity demanded (the
 inputs need only be square integrable on each $K$), each term weighted by the
 local $\tau_{i,K}$; the identity $\norm{f}_{\tau_i}=\lVert\tau_i^{1/2}f\rVert_h$
@@ -266,8 +217,9 @@ stabilization terms are themselves $\tau$-weighted.
 \subsubsection{Projections and the analyzed OSGS method}
 \label{oa:sec:method}
 
-Let $\Pone$ denote the $\tau_1$-weighted $L^2$ projection onto the
-\emph{unconstrained} velocity space $V_h$ (acting componentwise), $\Ptwo$ the
+Write $V_h, Q_h$ for the unconstrained degree{\hyp}$k_u,k_p$ finite element spaces and
+$V_{h0}, Q_{h0}, \Xhz$ for their constrained subspaces. Let $\Pone$ denote the $\tau_1$-weighted $L^2$
+projection onto the \emph{unconstrained} velocity space $V_h$ (acting componentwise), $\Ptwo$ the
 $\tau_2$-weighted projection onto the unconstrained pressure space $Q_h$, and
 $\Poneo \coloneqq I - \Pone$, $\Ptwoo \coloneqq I - \Ptwo$ the complementary
 (fluctuation) operators. We will also need $\Ponez$, the $\tau_1$-weighted projection
@@ -328,7 +280,7 @@ where here and below we abbreviate
 \end{equation}
 
 \begin{pedagogy}[Reading the fluctuation stabilization]
-$\Pone$ is the $\tau_1$-weighted $L^2$ projection onto the velocity space $V_h$: it returns the finite element field closest to its argument in the weighted product $(\cdot,\cdot)_{\tau_1}$ of \cref{oa:eq:TauInner}; $\Ptwo$ does the same in pressure. The complements $\Poneo = I - \Pone$ and $\Ptwoo = I - \Ptwo$ therefore extract the \emph{fluctuation}---the part of a field the mesh cannot represent. The method \cref{oa:eq:Method} adds the terms $S_1, S_2$ of \cref{oa:eq:Sdefs}, which weigh the fluctuation of the first-order residual ($\xi_h$ in momentum, $\delta_h$ in mass; these are just shorthand, \cref{oa:eq:XiDelta}) against the test slot. Since a fluctuation is $\tau_i$-orthogonal to every projected field, $(\Poneo z, \Pone w)_{\tau_1} = 0$, only the fluctuation of the test slot survives; this is \cref{oa:eq:Ssym}, exhibiting $S_1, S_2$ as symmetric and positive semidefinite. Taking $V = U_h$ then gives \cref{oa:eq:Diagonal}: the Galerkin energy \cref{oa:eq:CoercivityIdentity} plus two fluctuation squares, gained for free---though the ``wrong'' squares, as \cref{oa:th:stability} shows.
+$\Pone$ is the $\tau_1$-weighted $L^2$ projection onto the velocity space $V_h$: it returns the finite element field closest to its argument in the weighted product $(\cdot,\cdot)_{\tau_1}$ of \cref{eq:TauWeightedProduct}; $\Ptwo$ does the same in pressure. The complements $\Poneo = I - \Pone$ and $\Ptwoo = I - \Ptwo$ therefore extract the \emph{fluctuation}---the part of a field the mesh cannot represent. The method \cref{oa:eq:Method} adds the terms $S_1, S_2$ of \cref{oa:eq:Sdefs}, which weigh the fluctuation of the first-order residual ($\xi_h$ in momentum, $\delta_h$ in mass; these are just shorthand, \cref{oa:eq:XiDelta}) against the test slot. Since a fluctuation is $\tau_i$-orthogonal to every projected field, $(\Poneo z, \Pone w)_{\tau_1} = 0$, only the fluctuation of the test slot survives; this is \cref{oa:eq:Ssym}, exhibiting $S_1, S_2$ as symmetric and positive semidefinite. Taking $V = U_h$ then gives \cref{oa:eq:Diagonal}: the Galerkin energy \cref{oa:eq:CoercivityIdentity} plus two fluctuation squares, gained for free---though the ``wrong'' squares, as \cref{oa:th:stability} shows.
 \end{pedagogy}
 
 The next elementary observation locates the analyzed method precisely relative to the
@@ -384,7 +336,7 @@ inf--sup argument of \cref{oa:th:stability} (see \cref{oa:rem:mechanism}).
 For later reference we list the exact distance between \cref{oa:eq:Method} and the OSGS
 method as implemented in~the main text. (i)~\emph{Weighted versus plain projection}:
 the analysis uses the $\boldsymbol{\tau}$-weighted projections of
-\cref{oa:eq:TauInner}; the implementation uses the plain $L^2$ projection. The two
+\cref{eq:TauWeightedProduct}; the implementation uses the plain $L^2$ projection. The two
 coincide when $\tau_i$ is globally constant; otherwise the weighted product is the one
 for which the best-approximation property of \cref{oa:lem:bestapprox} holds, which is
 essential to the consistency estimate (cf.~\cite[Remark~4]{codina2008analysis}).
@@ -477,7 +429,7 @@ Under \cref{H:design}, the parameters \cref{eq:Tau1Final,eq:Tau2Final} satisfy, 
   &\tau_1\,\tau_2 \le \frac{h_K^2}{c_1\,\alpha_K^2},
   \tag{P2}\label{oa:eq:P2}\\
   &h_K^2\,\tns^{-1} = c_1\,\alpha_K\,\tau_2,
-  \quad\implies\quad
+  \quad\text{equivalently}\quad
   \bigl(\alpha_K\,\tns^{-1}\bigr)^{1/2} = \sqrt{c_1}\,\frac{\alpha_K}{h_K}\,\tau_2^{1/2},
   \tag{P3}\label{oa:eq:P3}\\
   &\nu \le \alpha_K\,\tau_2,
@@ -485,7 +437,7 @@ Under \cref{H:design}, the parameters \cref{eq:Tau1Final,eq:Tau2Final} satisfy, 
   \tau_1^{1/2}\,|\ba|_{\infty,K} \le \frac{\sqrt{c_1}}{c_2}\,\tau_2^{1/2},
   \tag{P4}\label{oa:eq:P4}\\
   &\alpha_K^2\,\tau_1\,\tau_2 \;\ge\; \frac{h_K^2}{c_1 + \Dah},
-  \quad\implies\quad
+  \quad\text{equivalently}\quad
   \tau_2^{-1/2} \le \bigl(c_1 + \Dah\bigr)^{1/2}\,\frac{\alpha_K}{h_K}\,\tau_1^{1/2},
   \tag{P5}\label{oa:eq:P5}\\
   &\sigma^{1/2} \;\le\; \Dah^{1/2}\,\frac{\alpha_K}{h_K}\,\tau_2^{1/2}.
@@ -711,7 +663,7 @@ function $v_h$,
 \begin{equation}
   \label{oa:eq:Smoothing}
   \norm{\tau\pmul v_h - \tau\smul v_h}_{K} \le \tau_K\,\psi(h)\,\normK{v_h},
-  \quad\implies\quad
+  \quad\text{hence}\quad
   \norm{\tau\smul v_h}_{K} \le (1+\psi(h))\,\tau_K\,\normK{v_h}.
 \end{equation}
 If, in addition, $\ba$ is Lipschitz on $\overline\Omega$, then $\psi(h) = O(h)$.
