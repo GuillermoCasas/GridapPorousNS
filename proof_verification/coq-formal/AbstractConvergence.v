@@ -140,7 +140,7 @@ Hypothesis hK_pos    : forall k, 0 < hK k.
 Hypothesis aK_pos    : forall k, 0 < aK k.
 Hypothesis am_nonneg : forall k, 0 <= am k.
 
-(*  The parameters, per element, via the paper's formulas (eq:taus,          *)
+(*  The parameters, per element, via the paper's formulas (eq:Tau1Final,     *)
 (*  eq:phi1, eq:sigmatilde), reusing the closed definitions of               *)
 (*  ContinuityAlgebra.v verbatim.                                            *)
 Definition ph (k : K) : R := phi1 nu (hK k) (aK k) (am k) c1 c2.

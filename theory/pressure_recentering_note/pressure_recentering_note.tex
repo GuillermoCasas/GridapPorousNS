@@ -6,9 +6,10 @@
 %  "A stabilized finite element method for incompressible, inertial flows
 %   in inhomogeneous porous media" (Casas, Gonzalez-Usua, Codina, de-Pouplana).
 %
-%  STATUS: exploratory. The re-centering step described in Section 6 is a
-%  PROPOSAL of this note, NOT part of Codina's published iterated-penalty
-%  method and NOT (yet) implemented in the solver. See Section 7 (Provenance).
+%  STATUS: the re-centering step described in Section 6 is a PROPOSAL of this
+%  note, NOT part of Codina's published iterated-penalty method; it IS
+%  implemented in the solver behind the default-off config flag
+%  recenter_pressure_between_penalty_passes.  See Section 7 (Provenance).
 %==============================================================================
 \documentclass[11pt]{article}
 
@@ -259,7 +260,8 @@ incorrect.
 
 \noindent
 The honest status is therefore: \emph{iterated penalty --- established and in use; between-pass
-re-centering --- our proposal, unverified against the source literature, not implemented.}
+re-centering --- our proposal, unverified against the source literature, implemented behind a
+default-off flag and not yet adopted by default.}
 
 \section{Empirical status: accumulation dormant, but the mean is not small}
 \label{sec:empirical}

@@ -97,7 +97,15 @@ where $\ba$ is the given advection field, $\alpha:\Omega\to(0,1]$ is the fluid v
 fraction, $\varepsilon\ge 0$ is the penalty parameter, and $\ViscProj$ denotes the
 (pointwise, orthogonal) projection extracting the deviatoric--symmetric part of a
 second-order tensor, so that $\bigl|\ViscProj \mathbf{T}\bigr|\le|\mathbf{T}|$ pointwise
-for any tensor $\mathbf{T}$. Throughout we use the abbreviations
+for any tensor $\mathbf{T}$.\footnote{The proofs below use only two properties of
+$\ViscProj$: that it is a pointwise, constant-coefficient orthogonal projection of
+second-order tensors, and that it is Korn-compatible on $H^1_0(\Omega)^d$, i.e.\
+$\lVert\nabla\bv\rVert\le C_{\mathrm{K}}\lVert\ViscProj\nabla\bv\rVert$ there. They therefore
+hold verbatim for any such operator; the submitted version of the article states them as a
+standing assumption and identifies the admissible family. The deviatoric--symmetric choice
+kept here is one instance; its specific form is used nowhere below. Definiteness of the
+working norm \eqref{eq:triplenorm} needs only the Korn compatibility stated above, and is
+established in that generic form in Appendix~C of the article, not here.} Throughout we use the abbreviations
 \begin{equation}\label{eq:XG}
   \X(V) \coloneqq \ba\cdot\nabla\bv + \nabla q,
   \qquad

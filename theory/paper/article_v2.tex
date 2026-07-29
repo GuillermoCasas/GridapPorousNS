@@ -169,7 +169,7 @@
 \newsiamremark{assumption}{Assumption}
 \crefname{assumption}{Assumption}{Assumptions}
 \Crefname{assumption}{Assumption}{Assumptions}
-% The standing assumptions (A1)-(A6),(S1)-(S2),(O1)-(O2) are enumitem list items with a
+% The standing assumptions (A1)-(A7),(S1)-(S2),(O1)-(O5) are enumitem list items with a
 % custom ref format "(A1)". By default cleveref prefixes the enumi type name ("Item"),
 % giving the clunky "Item (A1)". Suppress the name for \cref (mid-sentence: "(A1)") and use
 % "Assumption(s)" for \Cref (sentence-start). Only the H:* assumptions use \cref on enumi
@@ -179,6 +179,17 @@
 \crefrangeformat{enumi}{#3#1#4--#5#2#6}
 \Crefformat{enumi}{Assumption~#2#1#3}
 \Crefrangeformat{enumi}{Assumptions~#3#1#4--#5#2#6}
+% The single- and range- formats above suppress the "Item(s)" type name, but the
+% MULTIPLE-reference formats do not inherit that, so a list such as
+% \cref{H:mesh,H:projector,H:porosity} used to render as "Items (A1), (A3), and (A4)"
+% next to a compressible list rendering as "(A1)-(A6)".  Suppress the name there too,
+% so every mid-sentence citation of the standing assumptions looks the same.
+\crefmultiformat{enumi}{#2#1#3}{ and~#2#1#3}{, #2#1#3}{, and~#2#1#3}
+\crefrangemultiformat{enumi}{#3#1#4--#5#2#6}{ and~#3#1#4--#5#2#6}%
+  {, #3#1#4--#5#2#6}{, and~#3#1#4--#5#2#6}
+\Crefmultiformat{enumi}{Assumptions~#2#1#3}{ and~#2#1#3}{, #2#1#3}{, and~#2#1#3}
+\Crefrangemultiformat{enumi}{Assumptions~#3#1#4--#5#2#6}{ and~#3#1#4--#5#2#6}%
+  {, #3#1#4--#5#2#6}{, and~#3#1#4--#5#2#6}
 \newcommand{\bu}{\boldsymbol{u}}
 \newcommand{\bv}{\boldsymbol{v}}
 \newcommand{\ba}{\boldsymbol{a}}
@@ -193,7 +204,9 @@
 \newcommand{\BS}{B_{\mathrm{S}}}          % generic stabilized bilinear form
 \newcommand{\BASGS}{B_{\mathrm{ASGS}}}    % ASGS particularization ($\pi_h=0$; used in App.~C)
 \newcommand{\BOSGS}{B_{\mathrm{OSGS}}}    % OSGS particularization
-\newcommand{\LS}{L_{\mathrm{S}}}
+\newcommand{\LS}{L_{\mathrm{S}}}          % generic stabilized RHS (carries $\pi_h$)
+\newcommand{\LASGS}{L_{\mathrm{ASGS}}}    % ASGS particularization ($\pi_h=0$; used in App.~C)
+\newcommand{\LOSGS}{L_{\mathrm{OSGS}}}    % OSGS particularization (App.~D, article\_v2 only)
 \newcommand{\X}{X}
 \newcommand{\dd}{\,\mathrm{d}}
 \newcommand{\Cinv}{C_{\mathrm{inv}}}
@@ -264,7 +277,7 @@ From the numerical standpoint, the generalized equations bring about all the wel
 
 For the Navier{\hyp}Stokes system, all of these numerical issues have been successfully addressed in the past~\cite{codina2001stabilized,codina2002stabilized} using the Variational Multi-scale (VMS) framework~\cite{Hughes1998TheVM} to design stabilized methods. In~\cite{codina2001stabilized}, the so-called Algebraic Sub{\hyp}Grid Scale (ASGS) formulation is applied to the Navier{\hyp}Stokes system, including a reactive term (as well as additional terms related to Coriolis forces which we will not consider here), where optimal error estimates are proven for the linearized problem.
 
-Our goal in this work is to present a numerical method \Guillermo{for single-phase, highly permeable porous media flows. We will concentrate on the time-independent problem here, leaving time dependence considerations (e.g., of the porosity field) to future work}. To accomplish this, we generalize the formulation presented in~\cite{codina2001stabilized}, allowing for the presence of an externally-imposed porosity field, and analyze the extent to which the various results obtained in \Guillermo{that} work carry over to the present setting. Indeed, \amend{for the linearized ASGS problem with constant scalar reaction and homogeneous Dirichlet data,} our analysis shows that essentially the same stability and convergence properties are preserved \amend{provided} the porosity field is smooth \amend{with} bounded gradients \amend{that are} sufficiently resolved by the mesh. This analysis is \amend{complemented by a numerical study of the nonlinear ASGS and OSGS schemes---which explore behavior beyond the setting of the theorem---across a wide range of physical parameters}. \amend{The OSGS variant is given its own linear theory---a discrete inf{\hyp}sup stability estimate and the corresponding convergence result (\cref{sec:StabilityOSGS}, with proofs in \cref{app:osgs})---so that both stabilized formulations exercised in the experiments are covered by a linearized analysis, and the analyses of the two variants can be compared directly.} Over the course of drafting the present paper, we came across the work \cite{nillama2022explicit}, which applies VMS to the so-called Navier{\hyp}Stokes{\hyp}Brinkman system, applicable to highly-permeable porous media flows with a \emph{uniform} porosity field. Except for the presence of a nonlinear reaction term, the theory in~\cite{codina2001stabilized} fully applies to this case, so \amend{no revision of the theory was necessary} there.
+Our goal in this work is to present a numerical method \Guillermo{for single-phase, highly permeable porous media flows. We will concentrate on the time-independent problem here, leaving time dependence considerations (e.g., of the porosity field) to future work}. To accomplish this, we generalize the formulation presented in~\cite{codina2001stabilized}, allowing for the presence of an externally-imposed porosity field, and analyze the extent to which the various results obtained in \Guillermo{that} work carry over to the present setting. Indeed, \amend{for the linearized ASGS problem with constant scalar reaction and homogeneous Dirichlet data,} our analysis shows that essentially the same stability and convergence properties are preserved\amend{---and preserved for a whole family of viscous operators---the full{\hyp}gradient, symmetric{\hyp}gradient, deviatoric and deviatoric{\hyp}symmetric choices collected in \cref{sec:ViscousProjector}---which we isolate by the two properties the argument actually needs of the operator, \cref{V:orthogonality,V:korn}---}\amend{provided} the porosity field is smooth \amend{with} bounded gradients \amend{that are} sufficiently resolved by the mesh. This analysis is \amend{complemented by a numerical study of the nonlinear ASGS and OSGS schemes---which explore behavior beyond the setting of the theorem---across a wide range of physical parameters}. \amend{The OSGS variant is given its own linear theory---a discrete inf{\hyp}sup stability estimate and the corresponding convergence result (\cref{sec:StabilityOSGS}, with proofs in \cref{app:osgs})---so that both stabilized formulations exercised in the experiments are covered by a linearized analysis, and the analyses of the two variants can be compared directly.} Over the course of drafting the present paper, we came across the work \cite{nillama2022explicit}, which applies VMS to the so-called Navier{\hyp}Stokes{\hyp}Brinkman system, applicable to highly-permeable porous media flows with a \emph{uniform} porosity field. Except for the presence of a nonlinear reaction term, the theory in~\cite{codina2001stabilized} fully applies to this case, so \amend{no revision of the theory was necessary} there.
 
 The formulation presented here is general enough to encompass alternative variants of the VMS formulation, defined by different choices of the space where the sub{\hyp}grid scales (SGS) live (see \cref{sec:FEDiscretization}). This generality can be useful for researchers or engineers looking to explore alternative possibilities to the basic method. In particular, we consider the so-called Orthogonal Sub{\hyp}Grid Scale (OSGS)~\cite{codina2002stabilized,codina2008analysis} alongside the ASGS in all our numerical tests.
 
@@ -273,7 +286,13 @@ Our approach has some advantages over previous efforts that were able to success
 The rest of the paper is organized as follows. The continuous problem is introduced in \cref{sec:TheContinuousProblem}. In \cref{sec:StationaryProblem} we rewrite the strong problem in standard form and apply the VMS approach. In \cref{sec:StabilizationDesign} we provide a rationale behind the design of the unspecified algorithmic parameters. Their design is motivated by an argument based on the Fourier transform that can be found in~\cite{codina2002stabilized,Roa2016VariationalMF,Codina2008FiniteEA} but that, to our knowledge, had not yet been applied to the Navier{\hyp}Stokes system \amend{in the generalized form considered here}. In \cref{sec:StabilityASGS} we carry out the stability and convergence analysis of the linearized ASGS and OSGS methods: the convergence analysis of~\cite{codina2001stabilized} is extended to the current setting for the ASGS variant (by coercivity), and a discrete inf{\hyp}sup stability estimate is established for the OSGS variant, \amend{supporting the asymptotic scaling of our stabilization parameters in that linearized, elementwise{\hyp}constant setting}. In \cref{sec:Robustness}, we analyze the robustness of the formulation with respect to variations in the physical parameters. Finally, in \cref{sec:NumericalExamples} we present the results from the numerical experiments, followed by the main conclusions of our work in \cref{sec:Conclusions}.
 
 \section{The porous Navier{\hyp}Stokes problem}\label{sec:TheContinuousProblem}
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
+% \ViscProj is the GENERIC viscous projector of the standing assumption
+% \cref{H:projector}; \DSPi is its deviatoric--symmetric instance, the default used in
+% the numerical experiments.  Every occurrence of \ViscProj in the analysis sections and
+% appendices is to be read generically; the spots that specifically mean the default
+% instance write \DSPi.
+\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{v}}}{\Pi}}
+\newcommand{\DSPi}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
 \newcommand{\DPi}{\overset{\scriptscriptstyle{\mathrm{D}}}{\Pi}}
 \newcommand{\SPi}{\overset{\scriptscriptstyle{\mathrm{S}}}{\Pi}}
 Let our problem spatial domain be $\Omega\subset\mathbb{R}^d$, with $d\in\{2,3\}$ its dimension and let $\Gamma \coloneqq \partial \Omega$ be its boundary. For simplicity, we will consider $\Omega$ to be polyhedral. Let $\alpha : \Omega \rightarrow (0, 1]$ be a given \Joaquin{spatially inhomogeneous} scalar field over $\Omega$ representing the fluid volume fraction. We will assume this field to be differentiable, with a uniformly bounded gradient in $\Omega$. The continuous form of the problem consists in finding (fluid{\hyp}averaged) pressure and velocity fields, $p$ and $\boldsymbol{u}$, such that
@@ -281,23 +300,203 @@ Let our problem spatial domain be $\Omega\subset\mathbb{R}^d$, with $d\in\{2,3\}
   \alpha \boldsymbol{u} \cdot \nabla \boldsymbol{u} - 2\nabla \cdot ( \alpha \nu \ViscProj \nabla \boldsymbol{u}) + \alpha \nabla p + \boldsymbol{\sigma}(\alpha, \boldsymbol{u})\boldsymbol{u} = \boldsymbol{f} \quad \text{in } \Omega \label{eq:StrongMomentumEquation}, \\
   \varepsilon p + \nabla \cdot (\alpha \boldsymbol{u}) = 0 \quad \text{in } \Omega \label{eq:StrongMassEquation},
 \end{align}
-where $\boldsymbol{\sigma}$ represents a viscous resistance tensor \amend{(equal, in the linear Darcy limit, to the kinematic viscosity times the inverse of the permeability tensor)}, which we will assume to be symmetric and positive semidefinite, \Joaquin{$\nu$ is the kinematic viscosity}, and $\boldsymbol{f}$ is a forcing term representing external body forces, such as gravity, which for simplicity we will assume to be independent of the solution. Finally, $\varepsilon \geq 0$ represents a small compressibility, which we mainly include for numerical reasons (i.e., in order to implement the \emph{iterative penalty method}~\cite{codina1993iterative}), as in some cases it helps to ensure the well-posedness of the problem; see \cref{sec:NumericalExamplesStationaryCase3D}. %(i.e. as may be the case within a segregated approach where the particles' phase is resolved using the old values of the velocity field)%. $\scriptstyle{\ViscProj}$ is an orthogonal linear projection operator.
+where $\boldsymbol{\sigma}$ represents a viscous resistance tensor \amend{(equal, in the linear Darcy limit, to the kinematic viscosity times the inverse of the permeability tensor)}, which we will assume to be symmetric and positive semidefinite, \Joaquin{$\nu$ is the kinematic viscosity}, and $\boldsymbol{f}$ is a forcing term representing external body forces, such as gravity, which for simplicity we will assume to be independent of the solution. Finally, $\varepsilon \geq 0$ represents a small compressibility, which we mainly include for numerical reasons (i.e., in order to implement the \emph{iterative penalty method}~\cite{codina1993iterative}), as in some cases it helps to ensure the well-posedness of the problem; see \cref{sec:NumericalExamplesStationaryCase3D}. \amend{The operator $\scriptstyle{\ViscProj}$ is a fixed linear map on second{\hyp}order tensors, acting pointwise with constant coefficients; \cref{sec:ViscousProjector} states the two properties the analysis requires of it, identifies the admissible choices found in the literature, and fixes our default, the deviatoric{\hyp}symmetric projection $\scriptstyle{\DSPi}$.} %(i.e. as may be the case within a segregated approach where the particles' phase is resolved using the old values of the velocity field)%. $\scriptstyle{\ViscProj}$ is an orthogonal linear projection operator.
 
-By defining $\scriptstyle{\ViscProj} \displaystyle{\coloneqq} \scriptstyle{\DPi\SPi}$, where $\scriptstyle{\DPi}$ and $\scriptstyle{\SPi}$ are \amend{commuting} orthogonal linear projection operators, and considering different versions of the latter two, we obtain alternative formulations found in different contexts in the literature. Our particular choice for these operators in the examples presented, corresponds to taking $\scriptstyle\DPi$ and $\scriptstyle\SPi$ as the operators that extract, respectively, the deviatoric and symmetric components of the tensor upon which they act. This yields
-\begin{equation}
-    -2\nabla \cdot( \alpha \nu \ViscProj \nabla \boldsymbol{u}) = -2 \nabla \cdot ( \alpha \nu \nabla^\mathrm{S}\boldsymbol{u}) + \frac{2}{d}\nabla ( \alpha \nu \nabla \cdot \boldsymbol{u} ),
-  \end{equation}
-  where $\nabla^\mathrm{S} \boldsymbol{u} \coloneqq \frac{1}{2}(\nabla \boldsymbol{u} + (\nabla \boldsymbol{u})^\top)$. This particular formulation for the second term in \cref{eq:StrongMomentumEquation} is based on the assumption that the bulk viscosity is zero (Stokes' hypothesis) and it is consistent with the formulation used in multicomponent fluid formulations, where the full system involving several phases is solved in a segregated way, taking one phase at a time and assuming the porosity to be given~\cite{prosperetti2009computational,norouzi2016coupled}. \Guillermo{Note that for $\alpha \equiv 1$ the model considered in~\cite{codina2001stabilized} is recovered (i.e., the standard incompressible Navier{\hyp}Stokes system with a viscous resistance term)}. 
-  
-  As mentioned, other combinations are possible. For instance, taking $\scriptstyle{\DPi} \displaystyle{\equiv} \mathbb{I}$, $\scriptstyle{\SPi}\displaystyle\nabla\boldsymbol{u} \displaystyle{=} \nabla^\mathrm{S} \boldsymbol{u}$, together with a particular expression for $\boldsymbol{\sigma}$, we recover the DBF equations~\cite{cocquet2021error}\footnote{Although in other works we find $\scriptstyle{\DPi} \displaystyle{=} \scriptstyle{\SPi} \displaystyle{\equiv} \mathbb{I}$~\cite{skrzypacz}, even though the name used for the equations is also DBF.}\amend{.}
-
-To complete the definition of the problem, it is necessary to supply the above equations with suitable boundary conditions, whose form will be specified in the following sections. We are not aware of any analysis addressing the well-posedness of the resulting problem in its full generality, although in~\cite{cocquet2021error} it is proven for the particular case of $\scriptstyle\DPi \displaystyle\equiv \mathbb{I}$, $\scriptstyle\SPi\displaystyle\nabla\boldsymbol{u} = \nabla^\mathrm{S} \boldsymbol{u}$, a resistance term of the form $ \boldsymbol{\sigma} = \sigma(\alpha, \boldsymbol{u}) \mathbb{I}$, with $\sigma$ a scalar function defined in terms of additional scalar functions $a(\alpha), b(\alpha)$ as
+To complete the definition of the problem, it is necessary to supply the above equations with suitable boundary conditions, whose form will be specified in the following sections. We are not aware of any analysis addressing the well-posedness of the resulting problem in its full generality, although in~\cite{cocquet2021error} it is proven for the particular case \amend{$\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\SPi}$ (the symmetric{\hyp}gradient member of the family of \cref{sec:ViscousProjector})}, a resistance term of the form $ \boldsymbol{\sigma} = \sigma(\alpha, \boldsymbol{u}) \mathbb{I}$, with $\sigma$ a scalar function defined in terms of additional scalar functions $a(\alpha), b(\alpha)$ as
 \begin{equation} \label{eq:DBFResistanceTerm}
     \sigma(\alpha, \boldsymbol{u}) = a(\alpha) + b(\alpha) |\boldsymbol{u}|,
 \end{equation}
-and a combination of Dirichlet (walls and inlet) and Neumann (outlet) boundary conditions. While we have not attempted a generalization of the results presented in~\cite{cocquet2021error}, we note that finding an alternative to the explicit use of Korn-type inequalities as done in that work may be nontrivial for $\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\DPi \SPi}$, \amend{by which the spherical (trace) part of the symmetric velocity gradient is removed from the viscous term---equivalently, only its deviatoric symmetric part is retained, as the decomposition displayed above makes explicit---which is precisely what makes a deviatoric Korn{\hyp}type inequality necessary}.  We will nonetheless proceed by assuming that the solution always exists, and that uniqueness holds for sufficiently large values of $\nu$ and of $\inf_{\Omega}\{\alpha\}$.
+and a combination of Dirichlet (walls and inlet) and Neumann (outlet) boundary conditions. While we have not attempted a generalization of the results presented in~\cite{cocquet2021error}, we note that finding an alternative to the explicit use of Korn-type inequalities as done in that work may be nontrivial for $\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\DSPi}$, \amend{by which the spherical (trace) part of the symmetric velocity gradient is removed from the viscous term---equivalently, only its deviatoric symmetric part is retained, as the decomposition \cref{eq:DevSymDecomposition} below makes explicit---which is precisely what makes a deviatoric Korn{\hyp}type inequality necessary}.\amend{\footnote{The difficulty is proper to the \emph{mixed Dirichlet--Neumann} setting of~\cite{cocquet2021error}: it is the Neumann portion of the boundary that leaves boundary terms in the integration by parts \cref{eq:crossibp} underlying \cref{eq:devsymidentity}. Where the velocity vanishes on the whole boundary, as in the a priori analysis of \cref{sec:StabilityASGS}, the corresponding inequality \cref{V:korn} is elementary and holds with the constant $\sqrt2$ for the whole family of \cref{sec:ViscousProjector}; see \cref{lem:projfamily}.}}  We will nonetheless proceed by assuming that the solution always exists, and that uniqueness holds for sufficiently large values of $\nu$ and of $\inf_{\Omega}\{\alpha\}$.
 
 % A particular case of interest is $\boldsymbol{u} = \boldsymbol{u}_D$ (with $\boldsymbol{u}_D$ consistent with \cref{eq:StrongMomentumEquation}) everywhere in $\Omega$ at $t = 0$ and $\boldsymbol{u} = \boldsymbol{0}$ on $\Gamma$ for all $\left ( 0, T \right )$, although we will next consider more general conditions.
+
+% ---------------------------------------------------------------------------
+% \cref{sec:ViscousProjector}: the single home of the viscous-projector
+% discussion.  Relocated here on 2026-07-29 from App. C (asgs_convergence.tex,
+% subsubsection "Admissible viscous projectors"), so that the definition, the
+% assumed properties, the variants and the proofs that the variants satisfy
+% them sit together at the point of use.  This subsection is duplicated
+% in article.tex (v1) except for the ONE sentence flagged "v1/v2 DIVERGENCE"
+% below, because App. B and App. C are \input by BOTH mains and cite
+% lem:projfamily, lem:projinstances, eq:PiKorn, eq:devsymidentity,
+% eq:projmonotone.  Keep the two copies in sync (guarded by rule D12 of
+% proof_verification/sympy/projector_algebra_verification.py).
+%
+% The sharp characterization of Korn compatibility (the constant c_Pi, the
+% Plancherel argument, and the projectors that are admissible without lying in
+% the family of lem:projfamily) was moved OUT of this subsection on 2026-07-29
+% into the standalone note theory/viscous_projector_note/.  Do not reintroduce
+% it here; App. B's rem:ftGenericPi carries the one consequence the paper needs.
+% ---------------------------------------------------------------------------
+\subsection{The viscous projector}\label{sec:ViscousProjector} \hfill\\
+\amend{In this work we take the operator $\ViscProj$ of \cref{eq:StrongMomentumEquation} to be a fixed linear map on second{\hyp}order tensors, acting pointwise and with constant coefficients, of which we shall require only the two following properties:}
+\begin{enumerate}[label=\textup{(V\arabic*)},ref=\textup{(V\arabic*)},leftmargin=3.4em]
+  \item\label{V:orthogonality} \emph{Orthogonality.} $\ViscProj$ is an orthogonal projection with respect to the Frobenius inner product, that is,
+  \begin{equation}\label{eq:PiOrthogonal}
+    \ViscProj\ViscProj=\ViscProj,
+    \qquad
+    (\ViscProj\mathbf{A})\!:\!\mathbf{B}=\mathbf{A}\!:\!(\ViscProj\mathbf{B})
+    \qquad\text{for all second{\hyp}order tensors }\mathbf{A},\mathbf{B}.
+  \end{equation}
+  In particular $\ViscProj$ is non{\hyp}expansive: $|\ViscProj\mathbf{T}|\le|\mathbf{T}|$ pointwise, for every tensor $\mathbf{T}$.
+  \item\label{V:korn} \emph{Korn compatibility.} There is a constant $C_{\mathrm{K}}\ge1$, independent of the mesh and of the physical parameters, such that
+  \begin{equation}\label{eq:PiKorn}
+    \lVert\nabla\boldsymbol{v}\rVert
+    \le C_{\mathrm{K}}\,\bigl\lVert\ViscProj\nabla\boldsymbol{v}\bigr\rVert
+    \qquad\forall\,\boldsymbol{v}\in H^1_0(\Omega)^d .
+  \end{equation}
+\end{enumerate}
+\amend{We shall call \emph{admissible} any such operator---pointwise, with constant coefficients---satisfying \cref{V:orthogonality,V:korn}. Leaving $\ViscProj$ at this level of generality will allow us to treat, within a single formulation, several viscous operators of relevance that are found in different contexts in the literature. We describe them next, and verify in \cref{lem:projfamily,lem:projinstances} that all of them are admissible.}
+
+\amend{The operators in question are built from the two elementary extractors}
+\begin{equation}\label{eq:ProjExtractors}
+  \SPi\mathbf{T}\coloneqq\operatorname{sym}\mathbf{T}=\tfrac12\bigl(\mathbf{T}+\mathbf{T}^{\mathsf T}\bigr),
+  \qquad
+  \DPi\mathbf{T}\coloneqq\mathbf{T}-\tfrac1d(\operatorname{tr}\mathbf{T})\,\mathbf{I},
+\end{equation}
+\amend{which return, respectively, the symmetric and the deviatoric part of the tensor upon which they act and which commute with one another. Taking for $\ViscProj$ the identity, either extractor, or their composition,}
+\begin{equation}\label{eq:ProjFamily}
+  \ViscProj\in\Bigl\{\,\mathbb{I},\ \SPi,\ \DPi,\ \DSPi\coloneqq\DPi\SPi\,\Bigr\},
+\end{equation}
+\amend{we obtain alternative formulations found in different contexts in the literature. Our default choice, denoted $\DSPi$ and used in all the numerical examples except where stated (cf.\ \cref{sec:NumericalExampleFromLiterature}), is the composition of both extractors. It yields}
+\begin{equation}\label{eq:DevSymDecomposition}
+    -2\nabla \cdot( \alpha \nu \DSPi \nabla \boldsymbol{u}) = -2 \nabla \cdot ( \alpha \nu \nabla^\mathrm{S}\boldsymbol{u}) + \frac{2}{d}\nabla ( \alpha \nu \nabla \cdot \boldsymbol{u} ),
+  \end{equation}
+  where $\nabla^\mathrm{S} \boldsymbol{u} \coloneqq \frac{1}{2}(\nabla \boldsymbol{u} + (\nabla \boldsymbol{u})^\top)$. This particular formulation for the second term in \cref{eq:StrongMomentumEquation} is based on the assumption that the bulk viscosity is zero (Stokes' hypothesis) and it is consistent with the formulation used in multicomponent fluid formulations, where the full system involving several phases is solved in a segregated way, taking one phase at a time and assuming the porosity to be given~\cite{prosperetti2009computational,norouzi2016coupled}. \Guillermo{Note that for $\alpha \equiv 1$ the model considered in~\cite{codina2001stabilized} is recovered (i.e., the standard incompressible Navier{\hyp}Stokes system with a viscous resistance term)}.
+
+% v1/v2 DIVERGENCE -- "the stabilized method" (v1, ASGS only) vs "the stabilized
+% methods" (v2, ASGS and OSGS) at the end of the next paragraph.
+  \amend{The remaining members of \cref{eq:ProjFamily} are met elsewhere in the literature.} For instance, taking $\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\SPi}$, together with a particular expression for $\boldsymbol{\sigma}$, we recover the DBF equations~\cite{cocquet2021error}\footnote{In other works we find $\scriptstyle{\ViscProj} \displaystyle{\equiv} \mathbb{I}$~\cite{skrzypacz}, even though the name used for the equations is also DBF.}\amend{; this is also the choice with which the comparison of \cref{sec:NumericalExampleFromLiterature} runs the stabilized methods.}
+
+\amend{Of the two admissibility properties, \cref{V:orthogonality} is immediate to verify on any concrete candidate, whereas \cref{V:korn} is not. We therefore give a sufficient criterion for it, carrying a constant uniform over the whole family (\cref{lem:projfamily}), and check the criterion on the four operators of \cref{eq:ProjFamily} (\cref{lem:projinstances}). The criterion is sufficient but not necessary; since every operator of interest here meets it, we do not pursue the sharp characterization of \cref{V:korn}.}
+
+\begin{lemma}[A sufficient criterion for Korn compatibility]\label{lem:projfamily}
+Let $\Pi$ be a constant{\hyp}coefficient orthogonal projection on second-order tensors whose
+range contains the deviatoric--symmetric tensors, i.e., $\Pi\mathbf{T}=\mathbf{T}$ whenever
+$\mathbf{T}=\mathbf{T}^{\mathsf T}$ and $\operatorname{tr}\mathbf{T}=0$. Then, pointwise,
+\begin{equation}\label{eq:projmonotone}
+  \bigl|\Pi\mathbf{T}\bigr|^2
+  = \bigl|\DSPi\,\mathbf{T}\bigr|^2 + \bigl|(\Pi-\DSPi)\mathbf{T}\bigr|^2
+  \;\ge\; \bigl|\DSPi\,\mathbf{T}\bigr|^2
+  \qquad\text{for every tensor }\mathbf{T},
+\end{equation}
+and, for every $\bv\in H^1_0(\Omega)^d$,
+\begin{equation}\label{eq:devsymidentity}
+  \bigl\lVert\DSPi\nabla\bv\bigr\rVert^2
+  = \tfrac12\lVert\nabla\bv\rVert^2
+  + \Bigl(\tfrac12-\tfrac1d\Bigr)\lVert\nabla\cdot\bv\rVert^2
+  \ \ge\ \tfrac12\lVert\nabla\bv\rVert^2 .
+\end{equation}
+Consequently $\lVert\nabla\bv\rVert\le\sqrt2\,\lVert\Pi\nabla\bv\rVert$ for all
+$\bv\in H^1_0(\Omega)^d$: every such $\Pi$ satisfies \cref{V:korn} with
+$C_{\mathrm{K}}=\sqrt2$, uniformly over the family and over the domain.
+\end{lemma}
+
+\begin{proof}
+Since the range of $\Pi$ contains that of $\DSPi$, $\Pi$ fixes it pointwise, so
+$\Pi\DSPi=\DSPi$; taking Frobenius adjoints and using that both operators are self-adjoint
+gives $\DSPi\Pi=\DSPi$ as well. Hence $\Pi-\DSPi$ is idempotent and self-adjoint---an
+orthogonal projection---and $(\Pi-\DSPi)\DSPi=0$, so its range is orthogonal to that of
+$\DSPi$. As $\Pi\mathbf{T}=\DSPi\mathbf{T}+(\Pi-\DSPi)\mathbf{T}$ splits $\Pi\mathbf{T}$ into
+two mutually orthogonal parts at every point, \cref{eq:projmonotone} is the resulting pointwise
+Pythagoras identity.
+
+For \cref{eq:devsymidentity}, write
+$\DSPi\nabla\bv=\operatorname{sym}\nabla\bv-\tfrac1d(\nabla\cdot\bv)\,\mathbf{I}$; since the
+deviatoric and spherical parts are orthogonal,
+$\lVert\DSPi\nabla\bv\rVert^2=\lVert\operatorname{sym}\nabla\bv\rVert^2
+-\tfrac1d\lVert\nabla\cdot\bv\rVert^2$. For $\bv\in H^1_0(\Omega)^d$, integration by
+parts---first for $\bv\in C_c^\infty(\Omega)^d$ and then by density---gives
+\begin{equation}\label{eq:crossibp}
+  \int_\Omega\nabla\bv:\nabla\bv^{\mathsf T}\dd\Omega
+  = \int_\Omega(\nabla\cdot\bv)^2\dd\Omega ,
+\end{equation}
+whence $\lVert\operatorname{sym}\nabla\bv\rVert^2
+=\tfrac12\lVert\nabla\bv\rVert^2+\tfrac12\lVert\nabla\cdot\bv\rVert^2$; combining the two
+identities yields \cref{eq:devsymidentity}, the final inequality following from
+$\tfrac12-\tfrac1d\ge0$ for $d\ge2$. Integrating \cref{eq:projmonotone} with
+$\mathbf{T}=\nabla\bv$ and chaining with \cref{eq:devsymidentity} gives the Korn bound.
+
+The constant $\sqrt2$ is sharp already for $\Pi=\DSPi$: for $d=2$ the coefficient
+$\tfrac12-\tfrac1d$ vanishes and \cref{eq:devsymidentity} is an equality for every field, while
+for $d=3$ any nonzero divergence{\hyp}free $\bv\in H^1_0(\Omega)^d$ makes it one.
+\end{proof}
+
+\begin{lemma}[Instances]\label{lem:projinstances}
+The four operators of \cref{eq:ProjFamily} are constant{\hyp}coefficient orthogonal
+projections whose ranges contain the deviatoric--symmetric tensors. They are therefore
+admissible, with $C_{\mathrm{K}}=\sqrt2$; their sharp Korn constants are, respectively,
+\begin{equation}\label{eq:projconstants}
+  C_{\mathrm{K}}(\mathbb{I})=1,\qquad
+  C_{\mathrm{K}}(\SPi)=\sqrt2,\qquad
+  C_{\mathrm{K}}(\DPi)=\sqrt{\tfrac{d}{d-1}},\qquad
+  C_{\mathrm{K}}(\DSPi)=\sqrt2 .
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+\emph{The four operators are orthogonal projections.} For $\mathbb{I}$ there is nothing to
+prove. Idempotency of $\SPi$ and of $\DPi$ is immediate from \cref{eq:ProjExtractors}, and
+their Frobenius self{\hyp}adjointness follows from the two elementary identities
+\begin{equation*}
+\begin{aligned}
+  (\SPi\mathbf{A})\!:\!\mathbf{B}
+  &= \tfrac12\bigl(\mathbf{A}+\mathbf{A}^{\mathsf T}\bigr)\!:\!\mathbf{B}
+  = \mathbf{A}\!:\!\tfrac12\bigl(\mathbf{B}+\mathbf{B}^{\mathsf T}\bigr)
+  = \mathbf{A}\!:\!(\SPi\mathbf{B}), \\[2pt]
+  \bigl((\mathbb{I}-\DPi)\mathbf{A}\bigr)\!:\!\mathbf{B}
+  &= \tfrac1d(\operatorname{tr}\mathbf{A})\,\mathbf{I}\!:\!\mathbf{B}
+  = \tfrac1d(\operatorname{tr}\mathbf{A})(\operatorname{tr}\mathbf{B})
+  = \mathbf{A}\!:\!\bigl((\mathbb{I}-\DPi)\mathbf{B}\bigr),
+\end{aligned}
+\end{equation*}
+the first using $\mathbf{A}^{\mathsf T}\!:\!\mathbf{B}=\mathbf{A}\!:\!\mathbf{B}^{\mathsf T}$
+and the second the definition of the trace; self{\hyp}adjointness of the spherical part
+$\mathbb{I}-\DPi$ is that of $\DPi$. The two extractors commute, since $\SPi$ preserves the
+trace and leaves spherical tensors unchanged:
+\begin{equation*}
+  \DPi\SPi\mathbf{T}
+  = \SPi\DPi\mathbf{T}
+  = \operatorname{sym}\mathbf{T}-\tfrac1d(\operatorname{tr}\mathbf{T})\,\mathbf{I} ,
+\end{equation*}
+so their composition $\DSPi$ is idempotent and self{\hyp}adjoint as well. Finally, each of the
+four leaves every symmetric traceless tensor unchanged, so \cref{lem:projfamily} applies and
+gives $C_{\mathrm{K}}=\sqrt2$ throughout.
+
+\emph{The sharp constants.} That $C_{\mathrm{K}}(\mathbb{I})=1$ is trivial. For $\SPi$, the
+identity \cref{eq:crossibp} gives, for every $\bv\in H^1_0(\Omega)^d$,
+\begin{equation*}
+  \bigl\lVert\SPi\nabla\bv\bigr\rVert^2
+  = \tfrac12\lVert\nabla\bv\rVert^2 + \tfrac12\lVert\nabla\cdot\bv\rVert^2
+  \ge \tfrac12\lVert\nabla\bv\rVert^2 ,
+\end{equation*}
+with equality precisely for divergence{\hyp}free fields. Those same fields---and, when $d=2$,
+every field---turn \cref{eq:devsymidentity} into an equality, which settles $\DSPi$.
+
+For $\DPi$, the pointwise splitting of a tensor into its deviatoric and spherical parts is
+orthogonal, so that, using \cref{eq:crossibp} together with the Cauchy--Schwarz inequality,
+\begin{equation*}
+\begin{aligned}
+  \bigl\lVert\DPi\nabla\bv\bigr\rVert^2
+  &= \lVert\nabla\bv\rVert^2 - \tfrac1d\lVert\nabla\cdot\bv\rVert^2 , \\[2pt]
+  \lVert\nabla\cdot\bv\rVert^2
+  &= \int_\Omega\nabla\bv:\nabla\bv^{\mathsf T}\dd\Omega
+  \ \le\ \lVert\nabla\bv\rVert\,\bigl\lVert\nabla\bv^{\mathsf T}\bigr\rVert
+  = \lVert\nabla\bv\rVert^2 ,
+\end{aligned}
+\end{equation*}
+and therefore
+$\bigl\lVert\DPi\nabla\bv\bigr\rVert^2\ge\bigl(1-\tfrac1d\bigr)\lVert\nabla\bv\rVert^2$. This
+is sharp: taking $\bv=\nabla\varphi$ with $\varphi\in C_c^\infty(\Omega)$ makes $\nabla\bv$ the
+Hessian of $\varphi$, and a double integration by parts gives
+\begin{equation*}
+  \lVert\nabla\cdot\bv\rVert
+  = \lVert\Delta\varphi\rVert
+  = \bigl\lVert D^2\varphi\bigr\rVert
+  = \lVert\nabla\bv\rVert ,
+\end{equation*}
+which turns the inequality above into an equality.
+\end{proof}
 
 \subsection{Abstract reformulation of the problem (Strong form)}\label{sec:AbstractReformulation} \hfill\\
 Let $\mathcal{X} \coloneqq \mathcal{V} \times \mathcal{Q}$ be the space of unknowns, with $\mathcal{V}$ the space of velocity components and $\mathcal{Q}$ that of the pressure; and let $\mathcal{X}'$ be the topological dual of $\mathcal{X}$ (the precise notion of duality to be employed will be determined later). Let us also denote by $n = d + 1$ the number of components of the elements $U$ in $\mathcal{X}$. Consider the following differential operator:
@@ -369,7 +568,7 @@ The abstract setting above will allow us to directly apply the VMS theory to our
 \end{bmatrix},
   \end{aligned}
 \end{equation}
-where $\delta_{\bullet \bullet}$ is the Kronecker delta and where in the reaction matrix the dependence of $\boldsymbol{\sigma}$ on $\alpha$ has been (and will henceforth be) omitted for brevity.
+where $\delta_{\bullet \bullet}$ is the Kronecker delta and where in the reaction matrix the dependence of $\boldsymbol{\sigma}$ on $\alpha$ has been (and will henceforth be) omitted for brevity. \amend{The displayed $\mathbf{K}_{ij}$ is the instance corresponding to the default $\ViscProj=\DSPi$. For a general projector satisfying \cref{H:projector}, written in components as $(\ViscProj\mathbf{M})_{ai}=P_{aibj}M_{bj}$, the velocity block reads $[\mathbf{K}_{ij}]_{ab}=2\nu\alpha\,P_{aibj}$; the Frobenius self{\hyp}adjointness of $\ViscProj$ is then exactly the major symmetry $P_{aibj}=P_{bjai}$, which gives $\mathbf{K}_{ji}^{\top}=\mathbf{K}_{ij}$---the symmetry that makes the second{\hyp}order part of the adjoint operators \cref{eq:AdjointFlux,eq:AdjointDifferentialOperator} below coincide with that of $\mathcal{L}_{\boldsymbol{w}}$ in \cref{eq:CDR_equation}.}
 
 The particular version of the trace operator that we will be interested in is given by
 \begin{equation} \label{eq:TraceOperator}
@@ -393,7 +592,7 @@ where $\Gamma = \Gamma_\mathrm{D} \cup \Gamma_\mathrm{N}$, $\Gamma_\mathrm{D} \c
   \label{eq:neumann_bc}
   &\begin{aligned}
     \mathcal{D}_{\mathrm{N},U} \colon \Gamma_\mathrm{N} &\rightarrow \mathbb{R}^{\amend{d}} \\
-    \boldsymbol{x} &\mapsto \alpha \big ( \amend{2} \nu \ViscProj \nabla \boldsymbol{u} \small\vert_{\Gamma}(\boldsymbol{x}) - p \small\vert_{\Gamma}(\boldsymbol{x})  \mathbb{I} \big ) \cdot \boldsymbol{n},
+    \boldsymbol{x} &\mapsto \alpha \big ( \amend{2} \nu \ViscProj \nabla \boldsymbol{u} \vert_{\Gamma}(\boldsymbol{x}) - p \vert_{\Gamma}(\boldsymbol{x})  \mathbb{I} \big ) \cdot \boldsymbol{n},
   \end{aligned}
 \end{align}
 where $\vert_{\Gamma}$ denotes the trace of the function on $\Gamma$ (we may assume $\alpha$ to be defined on the whole of $\partial\Omega$). Moreover, we take
@@ -605,15 +804,23 @@ The projection operator for the OSGS method is
 \begin{equation} \label{eq:OSGSProjection}
   \widetilde{\Pi} = \mathcal{I} - \Pi_{\boldsymbol{\tau}h},
 \end{equation}
-where $\Pi_{\boldsymbol{\tau}h}$ is the projection onto $\mathcal{X}_{h0}$ associated \amend{with} the inner product defined as
+where $\Pi_{\boldsymbol{\tau}h}$ is the projection onto $\mathcal{X}_{h0}$ associated \amend{with} the inner product \amend{and norm of the first line of the following display, whose second line introduces the unweighted, elementwise{\hyp}assembled (\emph{broken}) product and norm that the analysis below is written in}:
 \begin{equation} \label{eq:TauInnerProduct}
-  \left ( \bullet{,} \bullet\right )_{\boldsymbol{\tau}} \coloneqq \sum_K{\langle\boldsymbol{\tau}_K{\bullet{,}} \bullet\rangle_K}.
+\begin{gathered}
+  \left ( \bullet{,} \bullet\right )_{\boldsymbol{\tau}} \coloneqq \sum_K{\langle\boldsymbol{\tau}_K{\bullet{,}} \bullet\rangle_K},
+  \qquad
+  \amend{\norm{\bullet}_{\boldsymbol{\tau}} \coloneqq \left ( \bullet{,} \bullet\right )_{\boldsymbol{\tau}}^{1/2}} , \\[2pt]
+  \amend{\left ( \bullet{,} \bullet\right )_{h} \coloneqq \sum_K{\langle \bullet{,} \bullet \rangle_K},
+  \qquad
+  \norm{\bullet}_{h} \coloneqq \left ( \bullet{,} \bullet\right )_{h}^{1/2}} .
+\end{gathered}
 \end{equation}
+\amend{The subscript $h$ marks that assembly: no inter{\hyp}element continuity is asked of the arguments, only square integrability on each $K$, for which the pairing $\langle\bullet{,}\bullet\rangle_K$ is the $L^2(K)$ inner product. The same notation is used below with a single stabilization parameter $\tau_i$, $i=1,2$ (those of \cref{eq:Tau1,eq:Tau2}), in place of the matrix $\boldsymbol{\tau}_K$: the products $(\bullet{,}\bullet)_{\tau_i}$ and norms $\norm{\bullet}_{\tau_i}$ act on a single velocity or pressure field, and, $\boldsymbol{\tau}_K$ being taken diagonal in \cref{sec:StabilizationDesign}, the matrix{\hyp}weighted product of two system vectors is exactly the sum of the two single{\hyp}field products so obtained---one for the velocity, weighted by $\tau_1$, one for the pressure, weighted by $\tau_2$. It is in these broken products and norms that the a priori analysis of \cref{sec:StabilityASGS} and of the appendices measures the stabilization terms.}
 In practice, it is often convenient to make the further simplification:
 \begin{equation} \label{eq:L2InnerProduct}
-  \left ( \bullet{,} \bullet\right )_{\boldsymbol{\tau}} \approx \sum_K{\langle \bullet{,} \bullet \rangle_K},
+  \left ( \bullet{,} \bullet\right )_{\boldsymbol{\tau}} \approx \left ( \bullet{,} \bullet\right )_{h},
 \end{equation}
-with the corresponding effect on the computation of $\Pi_{\boldsymbol{\tau}h}$. This simplified projection corresponds to the standard $L^2${\hyp}projection, which can be computed very efficiently and has similar stabilizing properties~\cite{codina2002stabilized}. \amend{We note already here that, both in the a priori analysis of \cref{sec:StabilityOSGS} and in our implementation, this projection is taken onto the finite element spaces \emph{without} their Dirichlet constraints---rather than onto the constrained space $\mathcal{X}_{h0}$, so that $\boldsymbol{\pi}_h$ is not forced to vanish on $\partial\Omega$; see the footnote to \cref{eq:OSGSProblem} and \cref{oa:rem:analyzed}.}
+with the corresponding effect on the computation of $\Pi_{\boldsymbol{\tau}h}$. This simplified projection corresponds to the standard $L^2${\hyp}projection, which can be computed very efficiently and has similar stabilizing properties~\cite{codina2002stabilized}. \amend{The simplification \cref{eq:L2InnerProduct} is an algorithmic choice, adopted in the implementation only: the analysis retains the weighted product throughout.} \amend{We note already here that, both in the a priori analysis of \cref{sec:StabilityOSGS} and in our implementation, this projection is taken onto the finite element spaces \emph{without} their Dirichlet constraints---rather than onto the constrained space $\mathcal{X}_{h0}$, so that $\boldsymbol{\pi}_h$ is not forced to vanish on $\partial\Omega$; see the footnote to \cref{eq:OSGSProblem} and \cref{oa:rem:analyzed}.}
 
 Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakFormSystem}, we obtain the following stabilized formulation of the discrete problem:
 
@@ -623,7 +830,7 @@ Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakForm
 \begin{subequations}
   \label{eq:OSGSProblem}
   \begin{align}
-    B_\mathrm{S}(\boldsymbol{u}; U_h, V_h) &= L_\mathrm{S}(\boldsymbol{u}, V_h, \boldsymbol{\pi}_h), \label{eq:NonlinearStabilizedEquation} \\
+    \BS(\boldsymbol{u}; U_h, V_h) &= \LS(\boldsymbol{u}; V_h, \boldsymbol{\pi}_h), \label{eq:NonlinearStabilizedEquation} \\
     \widetilde{U} \vert_{K} &= \boldsymbol{\tau}_K(\boldsymbol{u}) \left. \left(\mathcal{R} U_h - \boldsymbol{\pi}_h \right) \right \vert_{K} \quad \forall K \in \mathcal{T}_h, \label{eq:ElementwiseSubscaleEquation}\\
     \dualpairing{W_h, \boldsymbol{\pi}_h} &= \dualpairing{W_h, \mathcal{R}U_h}, \label{eq:NonlinearResidualProjection} \\
     U &= U_h + \widetilde{U}, \label{eq:DefinitionOfNonlinearParameter}
@@ -632,12 +839,26 @@ Taking this approach, and using \cref{eq:OSGSProjection} in \cref{eq:VMSWeakForm
 \endgroup
 \emph{where}
 \begin{align}
-  B_\mathrm{S}(\boldsymbol{w}; U, V) &\coloneqq B(\boldsymbol{w}; U, V) - \sum_K{ \dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \mathcal{L}_{\boldsymbol{w}} U}\amend{_K}}, \\
-  L_\mathrm{S}(\boldsymbol{w}, V, \boldsymbol{\pi}) &\coloneqq L(V)
+  \BS(\boldsymbol{w}; U, V) &\coloneqq B(\boldsymbol{w}; U, V) - \sum_K{ \dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \mathcal{L}_{\boldsymbol{w}} U}\amend{_K}}, \\
+  \LS(\boldsymbol{w}; V, \boldsymbol{\pi}) &\coloneqq L(V)
   - \sum_K{\dualpairing{\mathcal{L}_{\boldsymbol{w}}^*V, \boldsymbol{\tau}_K(\boldsymbol{w}) \left (F - \boldsymbol{\pi} \right )}_K}.
 \end{align}
-%% Notation convention: $B_\mathrm{S}$ is the GENERIC stabilized form (staggered; the projection $\boldsymbol{\pi}_h$ is a separate variable, carried in $L_\mathrm{S}$). Its ASGS and OSGS particularizations, obtained once $\boldsymbol{\pi}_h$ is eliminated, are written $B_{\mathrm{ASGS}}$ ($\equiv B_\mathrm{S}$, the case $\boldsymbol{\pi}_h=\boldsymbol{0}$) and $B_{\mathrm{OSGS}}$; likewise the working norms $\triplenorm{\cdot}_{\mathrm{A}}$ (ASGS) and $\triplenorm{\cdot}_{\mathrm{O}}$ (OSGS).
-\Cref{eq:OSGSProblem} is the complete discretized system of equations to be solved corresponding to the OSGS method. The ASGS method is then recovered by simply taking $\boldsymbol{\pi}_h = \boldsymbol{0}$. \amend{Once the projection is eliminated, the two choices yield two particularizations of the stabilized bilinear form $B_\mathrm{S}$, which we denote $B_{\mathrm{ASGS}}$ (the case $\boldsymbol{\pi}_h=\boldsymbol{0}$, so that $B_{\mathrm{ASGS}}\equiv B_\mathrm{S}$) and $B_{\mathrm{OSGS}}$; the a priori analyses below use this notation, with the corresponding working norms $\triplenorm{\cdot}_{\mathrm{A}}$ and $\triplenorm{\cdot}_{\mathrm{O}}$.} This system is nonlinear and of a larger size (in the OSGS case) than the original Galerkin system due to the introduction of the residual projections $\boldsymbol{\pi}_h$.\amend{\footnote{In our implementation the residual projection \cref{eq:NonlinearResidualProjection} is computed with $W_h$ ranging over the velocity and pressure finite element spaces \emph{without} their Dirichlet constraints, so that $\boldsymbol{\pi}_h$ is not forced to vanish on $\partial\Omega$. Projecting instead onto the constrained space $\mathcal{X}_{h0}$ is also possible; even where it does not affect the global convergence order, it forces $\boldsymbol{\pi}_h$ to vanish on $\partial\Omega$ and thereby generates spurious localized boundary layers there---near{\hyp}wall oscillations of the kind found for the pressure in classical fractional{\hyp}step schemes~\cite{codina2008analysis} (Remark~1). We adopt the unconstrained projection to avoid them.}} In \cref{sec:LinearizationOfCoupledSystem} we describe the particular way in which we have decoupled and linearized the system.
+%% Notation convention (authoritative; keep in sync with the sentence below).
+%%   B            Galerkin bilinear form;   L  Galerkin load (eq:RHSLinearForm), which
+%%                reduces to (f,v) in the all-Dirichlet linearized setting of the appendices.
+%%   B_S, L_S     GENERIC stabilized pair (staggered; the projection \pi_h is a separate
+%%                variable, carried in L_S).
+%%   B_ASGS,L_ASGS  the \pi_h = 0 particularization, so B_ASGS == B_S and L_ASGS == L_S.
+%%   B_OSGS,L_OSGS  the OSGS particularization.  For the first-order-truncated form analysed
+%%                in App. D, L_OSGS reduces to the Galerkin L (no force stabilization).
+%%   Working norms  |||.|||_A (ASGS) and |||.|||_O (OSGS); error functionals \Psi_A, \Psi_O.
+%%   NB article.tex covers ASGS only: there the OSGS members name the method but no
+%%   analysis uses them; the OSGS half of the scheme is exercised in article_v2.tex.
+%%                App. C treats only ASGS and drops the A subscript, declaring this once;
+%%                elsewhere a bare ||| . ||| or \Psi appears only where that very convention
+%%                is being described (once in each App. D file).  NEVER write |||.|||_S:
+%%                the S subscript belongs to the generic *form* B_S/L_S, not to a norm.
+\Cref{eq:OSGSProblem} is the complete discretized system of equations to be solved corresponding to the OSGS method. The ASGS method is then recovered by simply taking $\boldsymbol{\pi}_h = \boldsymbol{0}$. \amend{Once the projection is eliminated, the two choices yield two particularizations of the stabilized bilinear form $\BS$ and of its right{\hyp}hand side $\LS$, which we denote $\BASGS, \LASGS$ (the case $\boldsymbol{\pi}_h=\boldsymbol{0}$, so that $\BASGS\equiv \BS$ and $\LASGS\equiv \LS$) and $\BOSGS, \LOSGS$; the a priori analyses below use this notation, with the corresponding working norms $\triplenorm{\cdot}_{\mathrm{A}}$ and $\triplenorm{\cdot}_{\mathrm{O}}$.} This system is nonlinear and of a larger size (in the OSGS case) than the original Galerkin system due to the introduction of the residual projections $\boldsymbol{\pi}_h$.\amend{\footnote{In our implementation the residual projection \cref{eq:NonlinearResidualProjection} is computed with $W_h$ ranging over the velocity and pressure finite element spaces \emph{without} their Dirichlet constraints, so that $\boldsymbol{\pi}_h$ is not forced to vanish on $\partial\Omega$. Projecting instead onto the constrained space $\mathcal{X}_{h0}$ is also possible; even where it does not affect the global convergence order, it forces $\boldsymbol{\pi}_h$ to vanish on $\partial\Omega$ and thereby generates spurious localized boundary layers there---near{\hyp}wall oscillations of the kind found for the pressure in classical fractional{\hyp}step schemes~\cite{codina2008analysis} (Remark~1). We adopt the unconstrained projection to avoid them.}} In \cref{sec:LinearizationOfCoupledSystem} we describe the particular way in which we have decoupled and linearized the system.
 
 \subsection{Linearization of the coupled system of discrete equations}\label{sec:LinearizationOfCoupledSystem} \hfill\\
 The process of approximating \cref{eq:OSGSProblem} to make it numerically tractable involves both its linearization with respect to $U$, and the decoupling of \cref{eq:NonlinearStabilizedEquation,eq:ElementwiseSubscaleEquation,eq:NonlinearResidualProjection,eq:DefinitionOfNonlinearParameter}. To the latter end, note that, while equations \cref{eq:NonlinearStabilizedEquation,eq:NonlinearResidualProjection} involve the resolution of two global systems, and must therefore be solved separately, \cref{eq:ElementwiseSubscaleEquation,eq:DefinitionOfNonlinearParameter} are local, in the sense that they express elemental equations, only involving a reduced number of unknowns. Therefore, it is possible to consider the latter two equations both separately or as a single (monolithic) system to be solved independently on each element without running into unacceptable numerical costs.
@@ -654,7 +875,7 @@ The process of approximating \cref{eq:OSGSProblem} to make it numerically tracta
 \begin{subequations}
   \label{eq:LinearizedOSGSProblem}
   \begin{align}
-    B_\mathrm{S}(\boldsymbol{u}^{m-1}; U_h^m, V_h) &= L_\mathrm{S}(\boldsymbol{u}^{m-1}, V_h, \boldsymbol{\pi}_h^m), \label{eq:DiscretizedNonlinearStabilizedEquation} \\
+    \BS(\boldsymbol{u}^{m-1}; U_h^m, V_h) &= \LS(\boldsymbol{u}^{m-1}; V_h, \boldsymbol{\pi}_h^m), \label{eq:DiscretizedNonlinearStabilizedEquation} \\
     \widetilde{U}^m \vert_{K} &= \boldsymbol{\tau}_K(\boldsymbol{u}^{m-1}) \left. \left(\mathcal{R}_{\boldsymbol{u}^{m-1}}  U_h^m - \boldsymbol{\pi}_h^m\right) \right \vert_{K}, \label{eq:DiscretizedElementwiseSubscaleEquation}\\
     \dualpairing{W_h, \boldsymbol{\pi}_h^m} &= \dualpairing{W_h, \mathcal{R}_{\boldsymbol{u}^{m-1}}U_h^{m-1}}, \label{eq:DiscretizedNonlinearResidualProjection} \\
     U^m &= U_h^m + \widetilde{U}^m \label{eq:DiscretizedDefinitionOfNonlinearParameter},
@@ -832,7 +1053,7 @@ Now, we must specify an expression for the scaling parameter $\lambda$ which, as
 \begin{equation}
   \lambda = \frac{h^2}{|\boldsymbol{k}_0|^2\tau_{1, \mathrm{NS}}^2},
 \end{equation}
-where $\tau_{1, \mathrm{NS}}$ corresponds to the usual expression for $\tau_1$ for the Navier{\hyp}Stokes equations~\cite{codina2001stabilized}, so as to recover the expected expression for $\tau_1$ at $\alpha \equiv 1$ (see \cref{eq:TauNavierStokes} below). Note that, in the latter case, the contribution $\tau_{b, 1}^{-1}$ becomes equal to the LHS of \cref{eq:DesignConditionOnTauWeak} which, if taken literally, leads to a nonsensical equation where $\tau_1$ cancels out. This should be interpreted as meaning that this contribution \emph{has the same asymptotic behavior} as the full $\tau_1$. Therefore, it is superfluous to include it as its effect will be absorbed in the algorithmic constants. In fact, neglecting the contribution to $\tau_1$ of the mass conservation equation is also done in~\cite{codina2002stabilized} using a different reasoning. For similar reasons, we will ignore the $O(1)$ factor $\amend{2-2/d}$ in the expression of $\tau_{\nu, 1}^{-1}$\amend{, which equals $4/3$ for $d=3$ and exactly $1$ for $d=2$ (the case of the two-dimensional experiments), so that for $d=2$ there is nothing to drop}.
+where $\tau_{1, \mathrm{NS}}$ corresponds to the usual expression for $\tau_1$ for the Navier{\hyp}Stokes equations~\cite{codina2001stabilized}, so as to recover the expected expression for $\tau_1$ at $\alpha \equiv 1$ (see \cref{eq:TauNavierStokes} below). Note that, in the latter case, the contribution $\tau_{b, 1}^{-1}$ becomes equal to the LHS of \cref{eq:DesignConditionOnTauWeak} which, if taken literally, leads to a nonsensical equation where $\tau_1$ cancels out. This should be interpreted as meaning that this contribution \emph{has the same asymptotic behavior} as the full $\tau_1$. Therefore, it is superfluous to include it as its effect will be absorbed in the algorithmic constants. In fact, neglecting the contribution to $\tau_1$ of the mass conservation equation is also done in~\cite{codina2002stabilized} using a different reasoning. For similar reasons, we will ignore the $O(1)$ factor $\amend{2-2/d}$ in the expression of $\tau_{\nu, 1}^{-1}$\amend{, which for the default projector $\DSPi$ equals $4/3$ for $d=3$ and exactly $1$ for $d=2$, so that for $\DSPi$ in two dimensions there is nothing to drop, whereas for $\mathbb{I}$, $\SPi$ and $\DPi$ it equals $2$ in every dimension (\cref{rem:ftGenericPi} of \cref{app:FourierTau}); for every projector of the family of \cref{lem:projfamily} the discarded factor still lies in $[1,2]$, so the simplification---and with it the parameters \cref{eq:Tau1,eq:Tau2}---is uniform over that family, and remains an $O(1)$ factor for any admissible $\ViscProj$ (\cref{rem:ftGenericPi} of \cref{app:FourierTau})}.
 
 Furthermore, since $\alpha$ is assumed to be slowly varying over the element, it will be taken as a constant over each element and, in particular, we will take it to be equal to the maximum value it attains in it. Similarly, we will take the modulus of its gradient to be constant over the element and equal to its maximum value.
 
@@ -878,18 +1099,13 @@ which generalizes the stability estimate obtained for the Galerkin method for th
 
 \amend{For convenience, we next list the collected sets of assumptions under which the various results hold, organizing them into three groups: those \emph{common to both methods}, labelled \crefrange{H:mesh}{H:regularity}; those \emph{specific to the ASGS method}, labelled \crefrange{H:coercivity}{H:jump}; and those \emph{specific to the OSGS method}, labelled \crefrange{H:design}{H:advectionsmooth}.}
 
-\amend{Throughout the analysis, $\|\bullet\|_h\coloneqq\bigl(\sum_K\|\bullet\|_{L^2(K)}^2\bigr)^{1/2}$ denotes the broken $L^2$ norm and, for $i=1,2$, the $\boldsymbol{\tau}${\hyp}weighted broken product and norm are}
-\begin{equation}\label{eq:TauWeightedProduct}
-  (f,g)_{\tau_i}\coloneqq\sum_K\tau_{i,K}\,(f,g)_K,
-  \qquad
-  \norm{f}_{\tau_i}\coloneqq(f,f)_{\tau_i}^{1/2}=\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h ,
-\end{equation}
-\amend{the last identity relating the two forms used below.}
+\amend{Throughout, quantities defined element by element are assembled in the broken and $\boldsymbol{\tau}${\hyp}weighted products and norms \cref{eq:TauInnerProduct}.}
 
 \amend{We begin with the shared assumptions; they fix the mesh family, the coefficients, the porosity field, the prescribed advection, the discrete spaces and the regularity of the exact solution:}
 \begin{enumerate}[label=\textup{(A\arabic*)},ref=\textup{(A\arabic*)},leftmargin=3.4em]
   \item\label{H:mesh} \emph{Meshes.} The family of partitions is conforming, shape{\hyp}regular and locally quasi{\hyp}uniform, so that the inverse estimate \cref{eq:InverseEstimateFiniteOrderNorm} holds with a constant $C_\mathrm{inv}$ independent of the mesh size.
   \item\label{H:data} \emph{Physical parameters.} $\nu>0$, $\sigma\ge0$ and $\varepsilon\ge0$ are constant, the reaction tensor is isotropic, $\boldsymbol{\sigma}=\sigma\mathbb{I}$, and the penalty parameter satisfies \cref{eq:UpperBoundOnEpsilon}.
+  \item\label{H:projector} \emph{Viscous projector.} The operator $\ViscProj$ of \cref{eq:StrongMomentumEquation} is admissible in the sense of \cref{sec:ViscousProjector}, i.e.\ it satisfies \cref{V:orthogonality,V:korn}.
   \item\label{H:porosity} \emph{Porosity.} $\alpha\in W^{1,\infty}(\Omega)$ with $0<\alpha_0\le\alpha\le1$, and the porosity variations are resolved by the mesh: there is $C_{\nabla\alpha}\ge0$ with
   \begin{equation}\label{eq:resolved}
     h_K\,\norm{\nabla\alpha}_{L^\infty(K)}\le C_{\nabla\alpha}\,\alpha_{0,K}\qquad\forall\,K,
@@ -917,7 +1133,7 @@ which generalizes the stability estimate obtained for the Galerkin method for th
   \begin{equation}\label{eq:ProjectionStability}
     \bigl\lVert\tau_1^{1/2}\boldsymbol{z}_h\bigr\rVert_h \le \frac{1}{\beta_0}\Bigl(\bigl\lVert\tau_1^{1/2}\Pi_{1,0}\boldsymbol{z}_h\bigr\rVert_h+\bigl\lVert\tau_1^{1/2}\Pi_1^{\perp}\boldsymbol{z}_h\bigr\rVert_h\Bigr).
   \end{equation}
-  \amend{Here $\|\bullet\|_h$ and $\norm{\bullet}_{\tau_1}$ are the broken $L^2$ norm and the $\tau_1${\hyp}weighted norm of \cref{eq:TauWeightedProduct}.} Inequality \cref{eq:ProjectionStability} is the Codina--Blasco{\hyp}type inf{\hyp}sup condition~(35) of~\cite{codina2008analysis}.
+  \amend{Here $\|\bullet\|_h$ and $\norm{\bullet}_{\tau_1}$ are the broken and $\tau_1${\hyp}weighted norms of \cref{eq:TauInnerProduct}.} Inequality \cref{eq:ProjectionStability} is the Codina--Blasco{\hyp}type inf{\hyp}sup condition~(35) of~\cite{codina2008analysis}.
   \item\label{H:patch} \emph{Additional mesh regularity} (patch structure and element{\hyp}size surrogates), strengthening \cref{H:mesh}. The element patches $S_K$ (the union of the elements sharing at least a vertex with $K$) are quasi{\hyp}uniform: there are constants $0<\underline{C}\le\overline{C}$, independent of $h$, with
   \begin{equation}\label{eq:PatchQuasiUniformity}
     \underline{C}\,h_K\le h_{K'}\le\overline{C}\,h_K\qquad\forall\,K'\subset S_K,\ \forall\,K.
@@ -949,10 +1165,10 @@ where $\alpha_K$ is the representative porosity of \cref{H:porosity} ($\alpha_{0
 \end{remark}
 
 \subsection{The ASGS variant: stability and convergence}\label{sec:StabilityASGSvariant} \hfill\\
-\amend{We now turn to the stability of the \emph{stabilized} bilinear form $B_{\mathrm{ASGS}}$; the argument is the porosity{\hyp}weighted counterpart of the one in~\cite{codina2001stabilized}, developed in full in \cref{app:Continuity}. Testing with $U_h$ and using $\nabla\cdot(\alpha\boldsymbol{a})=0$ (\cref{H:advection}) together with $\boldsymbol{u}_h=\boldsymbol{0}$ on $\partial\Omega$, the convective term is skew{\hyp}symmetric and the pressure{\hyp}velocity terms cancel on integration by parts, so the Galerkin part reduces to the coercive diagonal \cref{eq:GalerkinCoercivityIdentity}. Expanding the stabilization contributes the residual and divergence squares of the working norm, a negative viscous residual square that is absorbed by the inverse estimate, a reaction square that renormalizes $\sigma$ to the damped weight $\sigmatilde$ introduced below, and a sign{\hyp}indefinite viscous--reaction cross{\hyp}term controlled by Young's inequality. Collecting all contributions gives the intermediate bound}
+\amend{We now turn to the stability of the \emph{stabilized} bilinear form $\BASGS$; the argument is the porosity{\hyp}weighted counterpart of the one in~\cite{codina2001stabilized}, developed in full in \cref{app:Continuity}. Testing with $U_h$ and using $\nabla\cdot(\alpha\boldsymbol{a})=0$ (\cref{H:advection}) together with $\boldsymbol{u}_h=\boldsymbol{0}$ on $\partial\Omega$, the convective term is skew{\hyp}symmetric and the pressure{\hyp}velocity terms cancel on integration by parts, so the Galerkin part reduces to the coercive diagonal \cref{eq:GalerkinCoercivityIdentity}. Expanding the stabilization contributes the residual and divergence squares of the working norm, a negative viscous residual square that is absorbed by the inverse estimate, a reaction square that renormalizes $\sigma$ to the damped weight $\sigmatilde$ introduced below, and a sign{\hyp}indefinite viscous--reaction cross{\hyp}term controlled by Young's inequality. Collecting all contributions gives the intermediate bound}
 \begin{equation}\label{eq:CollectedCoercivity}
 \begin{aligned}
-  B_{\mathrm{ASGS}}(\boldsymbol{a}; U_h, U_h)
+  \BASGS(\boldsymbol{a}; U_h, U_h)
   \ \geq\ &\Bigl(2\bigl(1-\tfrac{2}{\eta}\bigr)-\tfrac{4 C_\mathrm{inv}^2}{c_1}\Bigr)\,
   \nu\bigl\| \alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h \bigr\|^2
   + \Bigl(1-\tfrac{\eta C_\mathrm{inv}^2}{c_1}\Bigr)\bigl\| \widetilde{\sigma}_\alpha^{1/2}\boldsymbol{u}_h \bigr\|_h^2 \\
@@ -961,13 +1177,13 @@ where $\alpha_K$ is the representative porosity of \cref{H:porosity} ($\alpha_{0
   + \norm{\nabla\cdot(\alpha\boldsymbol{u}_h)}_{\tau_2}^2 ,
 \end{aligned}
 \end{equation}
-\amend{derived as \cref{eq:coerccollect} in \cref{app:Continuity}; here $\eta>0$ is at our disposal and $C_2$ is the compressibility constant of \cref{eq:UpperBoundOnEpsilon} below. Rendering its viscous, reaction and compressibility coefficients positive then yields the coercivity of $B_{\mathrm{ASGS}}$ in the working norm.}
+\amend{derived as \cref{eq:coerccollect} in \cref{app:Continuity}; here $\eta>0$ is at our disposal and $C_2$ is the compressibility constant of \cref{eq:UpperBoundOnEpsilon} below. Rendering its viscous, reaction and compressibility coefficients positive then yields the coercivity of $\BASGS$ in the working norm.}
 
 \amend{It remains to guarantee that these coefficients are positive. The compressibility coefficient stays positive under the smallness bound}
 \begin{equation} \label{eq:UpperBoundOnEpsilon}
     \varepsilon \amend{\leq C_2\, c_1 \inf_K{\left\{\frac{\alpha_K^2 \tau_{1,K}}{h_K^2}\right\}},}
 \end{equation}
-\amend{for some fixed constant $0 \leq C_2 < 1$, independent of the mesh and of the physical parameters: under \cref{eq:UpperBoundOnEpsilon} one has $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon>0$, whereas the strict inequality $\varepsilon\tau_2<1$ alone gives no uniform margin when $\sigma=0$. The viscous and reaction coefficients---those of $\|\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\|_K^2$ and $\|\boldsymbol{u}_h\|_K^2$ in $B_{\mathrm{ASGS}}(\boldsymbol{a}; U_h, U_h)$---are, in turn, bounded below by a positive multiple of $\nu$ and of the damped reaction coefficient}
+\amend{for some fixed constant $0 \leq C_2 < 1$, independent of the mesh and of the physical parameters: under \cref{eq:UpperBoundOnEpsilon} one has $\varepsilon(1-\varepsilon\tau_2)\ge(1-C_2)\varepsilon>0$, whereas the strict inequality $\varepsilon\tau_2<1$ alone gives no uniform margin when $\sigma=0$. The viscous and reaction coefficients---those of $\|\alpha^{1/2}\ViscProj\nabla\boldsymbol{u}_h\|_K^2$ and $\|\boldsymbol{u}_h\|_K^2$ in $\BASGS(\boldsymbol{a}; U_h, U_h)$---are, in turn, bounded below by a positive multiple of $\nu$ and of the damped reaction coefficient}
 \begin{equation} \label{eq:SigmaAlpha}
     \widetilde{\sigma}_\alpha \coloneqq \frac{\tau_{1, \mathrm{NS}}^{-1} \sigma}{\tau_{1, \mathrm{NS}}^{-1} + \sigma/\alpha_K },
 \end{equation}
@@ -985,7 +1201,7 @@ The stability of the stabilized method is then expressed by the following bound,
 \begin{lemma} \label{lemma:Stability}
   \amend{Under the standing assumptions of \cref{sec:CommonSetting}---of which the coercivity estimate uses the ASGS design condition \cref{H:coercivity} ($c_1 > 2\xi C_\mathrm{inv}^2$ for some $\xi > 2$) and the compressibility bound \cref{eq:UpperBoundOnEpsilon}, but not the jump condition \cref{H:jump} (needed only for the continuity of \cref{lemma:Continuity})---there exists} a positive constant $C$ such that for any $U_h = [\boldsymbol{u}_h; p_h] \in \mathcal{X}_{h0}$ it holds that
   \begin{equation}
-    B_{\mathrm{ASGS}}(\boldsymbol{a}; U_h, U_h) \geq C \triplenorm{U_h}_{\mathrm{A}}^2,
+    \BASGS(\boldsymbol{a}; U_h, U_h) \geq C \triplenorm{U_h}_{\mathrm{A}}^2,
   \end{equation}
 \end{lemma}
 where
@@ -998,17 +1214,17 @@ where $X(U_h) \coloneqq \boldsymbol{a} \cdot \nabla \boldsymbol{u}_h + \nabla p_
     Note that the quantity $\widetilde{\sigma}_\alpha$ differs from the quantity $\widetilde{\sigma}$ defined in~\cite{codina2001stabilized} simply by the division of $\sigma$ by $\alpha_K $ in the denominator. This seems to indicate a weaker control on $\boldsymbol{u}_h$ for large reaction terms when $\alpha_K$ is simultaneously very small. It turns out this is not the case, as the asymptotic analysis presented below shows (see \cref{sec:DominantReaction}) and the numerical tests corroborate.
 \end{remark}
 
-\amend{Following the process used in the proof of Lemma 2 in~\cite{codina2001stabilized}, adapting every estimate to the presence of the porosity field, one can prove the following continuity result for the bilinear form $B_{\mathrm{ASGS}}$ (a complete proof is given in \cref{app:Continuity}):}
+\amend{Following the process used in the proof of Lemma 2 in~\cite{codina2001stabilized}, adapting every estimate to the presence of the porosity field, one can prove the following continuity result for the bilinear form $\BASGS$ (a complete proof is given in \cref{app:Continuity}):}
 
 \begin{lemma} \label{lemma:Continuity}
     \amend{Under the standing assumptions of \cref{sec:CommonSetting}, but requiring of the design constants only $c_1,c_2>0$ (not the coercivity condition \cref{H:coercivity}; the complete proof in \cref{app:Continuity} uses these weaker hypotheses, though the mesh non-degeneracy and porosity resolution are still needed), and including the jump condition \cref{H:jump} when $\sigma>0$, there exists} a positive constant $C$, such that
     \begin{equation}
-        \bigl| B_{\mathrm{ASGS}}(\boldsymbol{a}; U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h}_{\mathrm{A}},
+        \bigl| \BASGS(\boldsymbol{a}; U_h, V_h) \bigr| \leq C \bigg( \Big\| \amend{\alpha_K} \frac{\tau_2^{1/2}}{h} \boldsymbol{u}_h \Big\|_h + \Big\| \amend{\alpha_K} \frac{\tau_1^{1/2}}{h} p_h \Big\|_h \bigg) \triplenorm{V_h}_{\mathrm{A}},
     \end{equation}
     for all $U_h, V_h \in \mathcal{X}_{h\amend{0}}$.
 \end{lemma}
 
-Using \cref{lemma:Stability} and \amend{a modified version of \cref{lemma:Continuity}, in which the first argument of $B_{\mathrm{ASGS}}$ is the interpolation error rather than a finite element function (\cref{lem:continterp} in \cref{app:Continuity})}, and assuming that the solution of the linearized problem is sufficiently smooth, convergence follows as in~\cite{codina2001stabilized}:
+Using \cref{lemma:Stability} and \amend{a modified version of \cref{lemma:Continuity}, in which the first argument of $\BASGS$ is the interpolation error rather than a finite element function (\cref{lem:continterp} in \cref{app:Continuity})}, and assuming that the solution of the linearized problem is sufficiently smooth, convergence follows as in~\cite{codina2001stabilized}:
 
 \begin{theorem} \label{th:Convergence}
  Let $U$ be the exact solution of the linearized problem corresponding to \cref{eq:DiscretizedNonlinearStabilizedEquation}, where $\boldsymbol{u}^{m-1}$ is replaced by a given $\boldsymbol{a}$ such that $\nabla \cdot (\alpha\boldsymbol{a})=0$ and where $\boldsymbol{\pi}_h^m=\boldsymbol{0}$ (ASGS method). Then, under the assumptions of \cref{lemma:Stability,lemma:Continuity}\amend{ and the regularity \cref{H:regularity}}, there exists a positive constant $C$, such that
@@ -1026,6 +1242,10 @@ where $\psi$ is the field being interpolated and $k_\psi$ the corresponding poly
  \end{equation*}
  follows at once by the discrete $\ell^2\subset\ell^1$ inequality and reduces, for $\alpha\equiv1$, to the form obtained in~\cite{codina2001stabilized}.}
 
+\begin{corollary}[The four viscous projectors]\label{cor:ProjectorASGS}
+\amend{Each of the four variants $\ViscProj\in\{\mathbb{I},\SPi,\DPi,\DSPi\}$ of \cref{sec:ViscousProjector} is admissible, with the uniform Korn constant $C_{\mathrm{K}}=\sqrt2$ (\cref{lem:projfamily,lem:projinstances}). \Cref{lemma:Stability,lemma:Continuity,th:Convergence} therefore hold for each of them, with the same constants. Indeed, the choice of $\ViscProj$ enters the three results only through \cref{H:projector}---no step uses the deviatoric{\hyp}symmetric form---and the constant $C_{\mathrm{K}}$ it supplies serves only to know that $\triplenorm{\cdot}_{\mathrm{A}}$ is a norm (\cref{lem:definiteness}): it fixes the norm in which the error is measured, and enters neither $C$ nor the error functional $\Psi_{\mathrm{A}}(h)$ of \cref{eq:ConvergenceResult}. The one place where the choice does tell quantitatively is the Fourier design of \cref{sec:StabilizationDesign}, and there the discarded $O(1)$ viscous factor stays, for all four, inside the uniform window $[1,2]$; for a general admissible projector its lower end is only $2c_{\ViscProj}^2$ (\cref{rem:ftGenericPi} of \cref{app:FourierTau}), which need not reach $1$.}
+\end{corollary}
+
 % Section on variational crimes:
 %\input{variational_crimes}
 
@@ -1035,7 +1255,7 @@ fluctuation $\Pi_i^{\perp}=I-\Pi_i$ of the finite{\hyp}element residual with res
 $\boldsymbol{\tau}${\hyp}weighted $L^2$ projection $\Pi_i$ onto the unconstrained finite{\hyp}element spaces. For the
 linearized problem analyzed here \amend{(with $\sigma$, $\varepsilon$ and $\nu$ constant, the advection $\boldsymbol{a}$ prescribed, and the porosity $\alpha$ variable)} the resulting bilinear form is
 \begin{equation}\label{eq:BosgsMain}
-  B_{\mathrm{OSGS}}(\boldsymbol{a};U,V)
+  \BOSGS(\boldsymbol{a};U,V)
   = B(\boldsymbol{a};U,V)
   + \bigl(\Pi_1^{\perp}[\alpha X(U)],\,\alpha X(V)\bigr)_{\tau_1}
   + \bigl(\Pi_2^{\perp}[\nabla\cdot(\alpha\boldsymbol{u})],\,\nabla\cdot(\alpha\boldsymbol{v})\bigr)_{\tau_2},
@@ -1084,7 +1304,7 @@ squares of the momentum and mass residuals defined in the proof of \cref{oa:th:s
 collection step of that proof yields}
 \begin{equation}\label{eq:OSGSCollected}
 \begin{aligned}
-  B_{\mathrm{OSGS}}(\boldsymbol{a};U_h,W)\ \ge\
+  \BOSGS(\boldsymbol{a};U_h,W)\ \ge\
   &\tfrac{3}{4} D_\nu+\tfrac{1}{2} D_\sigma+\tfrac{1}{2} D_\varepsilon\\
   &+\Bigl(1-\tfrac{2\psi}{\beta_0^2}-\tfrac{1+\psi}{\gamma}\Bigr)O_1
   +\Bigl(1-\psi-\tfrac{M_2(1+\psi)}{2\gamma}\Bigr)O_2\\
@@ -1120,7 +1340,7 @@ not by itself deliver stability: the theorem also requires the mesh{\hyp}smallne
 $\psi\le\psi_0$, which enters the coefficients of \cref{eq:OSGSCollected}) and the projection
 stability \cref{H:projection}---which the coercivity route does not need: it recombines the
 projected residual harvested by the test function with the fluctuation controlled by the diagonal
-of $B_{\mathrm{OSGS}}$ into the full $\tau_1${\hyp}weighted momentum residual of
+of $\BOSGS$ into the full $\tau_1${\hyp}weighted momentum residual of
 \cref{eq:TripleNormOSGS} (Steps~2 and~5 of \cref{oa:th:stability}). The compressibility bound
 $\varepsilon\tau_{2,K}\le C_2<1$ of
 \cref{H:design} is, as with \cref{eq:UpperBoundOnEpsilon} in the ASGS case, a separate requirement
@@ -1149,7 +1369,7 @@ depending only on the projection{\hyp}stability constant, the compressibility bo
 the mesh and porosity{\hyp}resolution constants, such that for all $h\le h_0$
 \begin{equation}\label{eq:InfSupMain}
   \inf_{U_h\in\Xh\setminus\{0\}}\ \sup_{V_h\in\Xh\setminus\{0\}}\
-  \frac{B_{\mathrm{OSGS}}(\boldsymbol{a};U_h,V_h)}{\triplenorm{U_h}_{\mathrm{O}}\,\triplenorm{V_h}_{\mathrm{O}}}
+  \frac{\BOSGS(\boldsymbol{a};U_h,V_h)}{\triplenorm{U_h}_{\mathrm{O}}\,\triplenorm{V_h}_{\mathrm{O}}}
   \ \ge\ \beta_{\mathrm{OSGS}};
 \end{equation}
 in particular the linearized OSGS problem has a unique discrete solution.
@@ -1184,6 +1404,10 @@ it arises because the orthogonal projection deletes the reactive subscale that, 
 variant, renormalizes $\sigma$ down to $\sigmatilde$ (\cref{oa:rem:mechanism}). A
 $\sigma${\hyp}robust, optimal{\hyp}order $L^2$ velocity estimate follows as
 \cref{oa:cor:Ltwo}. \Cref{tab:ASGSvsOSGS} summarizes the comparison.
+
+\begin{corollary}[The four viscous projectors]\label{cor:ProjectorOSGS}
+\amend{Exactly as for the ASGS variant (\cref{cor:ProjectorASGS}), \cref{th:StabilityOSGS,th:ConvergenceOSGS} hold for each of the four variants $\ViscProj\in\{\mathbb{I},\SPi,\DPi,\DSPi\}$ of \cref{sec:ViscousProjector}, with the same constants. The choice of $\ViscProj$ enters only through \cref{H:projector}, and the constant $C_{\mathrm{K}}$ it supplies serves only to know that $\triplenorm{\cdot}_{\mathrm{O}}$ is a norm (\cref{oa:lem:definiteness}, which inherits definiteness from \cref{lem:definiteness}); neither $\beta_{\mathrm{OSGS}}$, nor the threshold $h_0$, nor the constant $C$ of \cref{eq:ConvergenceOSGS} depends on it.}
+\end{corollary}
 
 \begin{table}[!htbp]
   \centering
@@ -1331,7 +1555,7 @@ They yield the following error bound:
     \lVert \ViscProj \nabla \boldsymbol{e}_u \rVert + (1 + \Reyn_h)^{1/2} \frac{\lVert \boldsymbol{e}_u \rVert}{h} + \frac{\alpha_0^{\amend{1/2}}}{\sigma^{1/2} \nu^{1/2}} \lVert \nabla e_p \rVert_h + \frac{(1 + \Reyn_h)^{1/2}}{\alpha_0^{1/2}} \lVert \nabla \cdot(\alpha \boldsymbol{e}_u)\rVert_h \\
     \lesssim \frac{1}{\alpha_0^{\amend{1/2}}} \left( (1 + \Reyn_h)^{1/2} \frac{\mathrm{E}_\mathrm{int}(\boldsymbol{u})}{h} + \frac{\amend{1}}{\sigma^{1/2} \nu^{1/2}} \frac{\mathrm{E}_\mathrm{int}(p)}{h} \right).
 \end{align*}
-Here the bound can again be considered optimal, even though the first term on the LHS will provide a more or less weak control, depending on the particular form of the $\ViscProj$ operator. Furthermore, note that the control on the pressure term deteriorates for very large Reynolds numbers, although this deterioration is slow, growing only with its square root. For equal{\hyp}order discretizations, we can derive the following estimates:
+Here the bound can again be considered optimal, \amend{the first term on the LHS controlling the full velocity gradient up to the Korn constant $C_{\mathrm{K}}$ of \cref{V:korn}, which equals $\sqrt2$ for every member of \cref{eq:ProjFamily}.} Furthermore, note that the control on the pressure term deteriorates for very large Reynolds numbers, although this deterioration is slow, growing only with its square root. For equal{\hyp}order discretizations, we can derive the following estimates:
 \begin{align}
     \lVert \ViscProj \nabla \boldsymbol{e}_u \rVert &\lesssim \frac{1}{\alpha_0^{\amend{1/2}}} \left( (1 + \Reyn_h)^{1/2} + \frac{\amend{1}}{\sigma^{1/2} \nu^{1/2}} \frac{P}{U}\right) \frac{\mathrm{E}_\mathrm{int}(\boldsymbol{u})}{h} \notag \\ \label{eq:DominantReactionVelocityGradientEstimate}
     &\sim \left(\frac{1}{\alpha_0^{\amend{1/2}}} (1 + \Reyn_h)^{1/2} + \frac{\Damk^{1/2}}{\amend{(\alpha_0\alpha_\infty)}^{1/2}}\right) \frac{\mathrm{E}_\mathrm{int}(\boldsymbol{u})}{h},
@@ -1437,6 +1661,8 @@ We consider two types of elements: linear triangles ($\mathbb{P}_1$ elements) an
 \setlength{\abovetopsep}{4pt}
 \begin{table}[!htbp]
 \centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
 \caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{P}_1$ elements), calculated from the $L^2$-norm of the error obtained with the two finest meshes (theoretical convergence rates in parentheses). \amend{The parenthetical rate is $k_v+1$ for the velocity and $k_p$ for the pressure in the $L^2$-norm, and $k_v$ and $k_p-1$ respectively in the $H^1$-seminorm (a dash denoting that no positive rate is guaranteed); the same convention is used in \cref{tab:Linear2DH1,tab:Quadratic2DL2,tab:Quadratic2DH1}. These are the \emph{viscosity-dominated worst case}: in the reaction- and convection-dominated regimes the analysis of \cref{sec:Robustness} predicts one order more for the pressure, which the corresponding rows attain. The last entries of each block give the error of the nodal interpolant of the exact solution on the same mesh sequence, which is independent of $\Reyn$, $\Damk$ and of the stabilization variant (and, for the pressure, of $\alpha_0$); it is the nodal{\hyp}interpolation benchmark against which the FME should be read.}}
 \begin{tabular}{>{\raggedleft\arraybackslash}p{7.5mm}
                 >{\raggedleft\arraybackslash}p{7.5mm}
@@ -1702,7 +1928,7 @@ $10^{6}$  & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{
 \subsection{Manufactured solutions: 3D cases}\label{sec:NumericalExamplesStationaryCase3D} \hfill\\
 For the 3D examples, we use the $z$-wise extruded version of the same manufactured field on the parallelepiped $(0, 1) \times (0, 1) \times (0, 0.3)$. \amend{We report results on two families of tetrahedral meshes, both generated with \texttt{Gridap}: a \emph{regular} family, obtained by splitting a structured Cartesian grid into Kuhn tetrahedra, and an \emph{irregular} family, obtained by successive uniform (red) refinement of an unstructured base mesh, each refinement halving the element size. The irregular family is included precisely because its lack of symmetry forces the velocity to acquire a nonzero $z${\hyp}component through the discretization error, providing a genuinely three-dimensional \emph{discretization} test (the exact field itself remaining $z${\hyp}invariant, with zero exact $z${\hyp}velocity); the regular family, in turn, isolates the behavior of the method on well-shaped elements. We consider linear ($\mathbb{P}_1$) and quadratic ($\mathbb{P}_2$) tetrahedra. For the $\mathbb{P}_1$ elements we use four meshes in both families; for the (more expensive) $\mathbb{P}_2$ elements, four on the regular family and three on the irregular one. The regular meshes split a uniform $N \times N \times \lceil 0.3\,N \rceil$ grid of the parallelepiped into Kuhn tetrahedra, with $N \in \{8,16,24,32\}$ for $\mathbb{P}_1$ and $N \in \{12,16,20,24\}$ for $\mathbb{P}_2$; the irregular meshes are produced by an unstructured tetrahedralization of target size $h \approx 0.2$, successively refined by uniform red subdivision, each refinement halving $h$. The reported errors are computed with a direct (sparse LU) solver, so that the tabulated values are the genuine discretization errors rather than an artifact of an iterative solver's stopping tolerance; the memory required to factorize the monolithic velocity{\hyp}pressure system grows steeply with the number of unknowns and, on the single machine (32~GB of memory) used for these runs, this---rather than any property of the formulation---sets the finest mesh reported here. The reported sequences already reach the range in which the convergence rates are established, so finer meshes would only reconfirm them.} The physical parameters are fixed to $(\alpha_0, \Reyn, \Damk) = (0.5, 1, 1)$ for all the cases run.
 
-\amend{As anticipated in the remark following \cref{eq:conditions_on_num_param}, tetrahedral meshes call for a larger viscous stabilization constant than in two dimensions. For $\mathbb{P}_2$ elements the elementwise viscous energy loses coercivity unless $c_1 \ge 2\hat c^2(K)$, a purely geometric threshold that is about $(100+5\sqrt2)/24 \approx 4.5$ times larger on the Kuhn tetrahedron than on the right triangle, whereas for $\mathbb{P}_1$ elements it vanishes identically.\footnote{These thresholds are the largest eigenvalues of a local (reference{\hyp}element) generalized eigenvalue problem for the operator $\boldsymbol{u}\mapsto\nabla\cdot(\ViscProj\nabla\boldsymbol{u})$. That $\mathbb{P}_2$ tetrahedra genuinely require the larger constant was confirmed directly, without relying on this estimate alone: a numerical evaluation of the discrete coercivity constant on the Kuhn meshes returns a negative value for $c_1=4k^4$---deepening as the mesh is refined---and a positive one for $c_1=16k^4$; correspondingly, the convergence study stalls well above the interpolation benchmark at $c_1=4k^4$ but recovers the optimal rates at $c_1=16k^4$.} Accordingly, in all the 3D experiments we take $c_1 = 16 k^4$ and keep $c_2 = 2 k^2$. This round value---four times the two{\hyp}dimensional one---sits just below the elementwise Kuhn threshold; the value is admissible because the inter{\hyp}element continuity of the conforming spaces renders the effective (global) coercivity requirement milder than the elementwise one, and it proved sufficient on all the meshes tested.}
+\amend{As anticipated in the remark following \cref{eq:conditions_on_num_param}, tetrahedral meshes call for a larger viscous stabilization constant than in two dimensions. For $\mathbb{P}_2$ elements the elementwise viscous energy loses coercivity unless $c_1 \ge 2\hat c^2(K)$, a purely geometric threshold that is about $(100+5\sqrt2)/24 \approx 4.5$ times larger on the Kuhn tetrahedron than on the right triangle, whereas for $\mathbb{P}_1$ elements it vanishes identically.\footnote{These thresholds are the largest eigenvalues of a local (reference{\hyp}element) generalized eigenvalue problem for the operator $\boldsymbol{u}\mapsto\nabla\cdot(\DSPi\nabla\boldsymbol{u})$\amend{, for the deviatoric{\hyp}symmetric projector employed in the experiments}. That $\mathbb{P}_2$ tetrahedra genuinely require the larger constant was confirmed directly, without relying on this estimate alone: a numerical evaluation of the discrete coercivity constant on the Kuhn meshes returns a negative value for $c_1=4k^4$---deepening as the mesh is refined---and a positive one for $c_1=16k^4$; correspondingly, the convergence study stalls well above the interpolation benchmark at $c_1=4k^4$ but recovers the optimal rates at $c_1=16k^4$.} Accordingly, in all the 3D experiments we take $c_1 = 16 k^4$ and keep $c_2 = 2 k^2$. This round value---four times the two{\hyp}dimensional one---sits just below the elementwise Kuhn threshold; the value is admissible because the inter{\hyp}element continuity of the conforming spaces renders the effective (global) coercivity requirement milder than the elementwise one, and it proved sufficient on all the meshes tested.}
 
 \amend{With Dirichlet conditions imposed on the whole boundary the discrete pressure is determined only up to a constant, and on the irregular meshes the manufactured boundary data is moreover not exactly compatible with discrete mass conservation; both effects render the fully incompressible ($\varepsilon=0$) problem ill-posed. We therefore take a small compressibility $\varepsilon > 0$, which restores well-posedness and, through the iterative penalty below, fixes the pressure by imposing a zero mean, removing the need to prescribe it at a point~\cite{codina1993iterative}.}
 
@@ -1821,7 +2047,7 @@ Additionally, we also add the previous-step value of the compressibility term to
 \subsection{Comparison with an inf{\hyp}sup{\hyp}stable formulation from the literature}\label{sec:NumericalExampleFromLiterature} \hfill\\
 As a final example, we compare the equal{\hyp}order stabilized method developed in this paper against the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood approach employed by Cocquet et al.~\cite{cocquet2021error} for the Darcy{\hyp}Brinkman{\hyp}Forchheimer (DBF) equations. Our goal is the same as in that reference: to assess the convergence rates and accuracy of the two discretizations. Rather than reproducing the tube{\hyp}flow benchmark of~\cite{cocquet2021error}---whose reference solution is itself a fine{\hyp}mesh approximation---we resort once more to the method of manufactured solutions, so that both methods are held to the same standard, namely the exact error.
 
-To this end we keep the manufactured fields \cref{eq:ManufacturedProblem} and the porosity bump \cref{eq:PlateauBumpFunction} used throughout this section, together with the Dirichlet data (the exact velocity prescribed on the whole boundary), and only replace the viscous and reaction operators by the DBF particularization of Cocquet et al. That is, we take $\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\SPi}$ (i.e., $\scriptstyle{\DPi} \displaystyle{\equiv} \mathbb{I}$, the full symmetric gradient; cf.\ the discussion around \cref{eq:DBFResistanceTerm}) and the nonlinear Forchheimer{\hyp}Ergun resistance \cref{eq:DBFResistanceTerm}, $\sigma(\alpha,\boldsymbol{u}) = a(\alpha) + b(\alpha)|\boldsymbol{u}|$, with the Ergun{\hyp}type porosity dependence
+To this end we keep the manufactured fields \cref{eq:ManufacturedProblem} and the porosity bump \cref{eq:PlateauBumpFunction} used throughout this section, together with the Dirichlet data (the exact velocity prescribed on the whole boundary), and only replace the viscous and reaction operators by the DBF particularization of Cocquet et al. That is, we take $\ViscProj = \SPi$ (the symmetric{\hyp}gradient member of \cref{eq:ProjFamily}, i.e.\ the full symmetric gradient is retained; cf.\ \cref{sec:ViscousProjector})\amend{---an instance covered by the a priori analysis, cf.\ \cref{H:projector,lem:projinstances}, carrying the same Korn constant $C_{\mathrm{K}}=\sqrt2$ as the deviatoric{\hyp}symmetric default\footnote{So the change of viscous operator alone does not take this experiment any further from the linearized theory of \cref{sec:StabilityASGS} than the other experiments already are; it is the nonlinear resistance that places it beyond that theory, as stated at the start of \cref{sec:NumericalExamples}.}---}and the nonlinear Forchheimer{\hyp}Ergun resistance \cref{eq:DBFResistanceTerm}, $\sigma(\alpha,\boldsymbol{u}) = a(\alpha) + b(\alpha)|\boldsymbol{u}|$, with the Ergun{\hyp}type porosity dependence
 \begin{equation}\label{eq:CocquetMMSReaction}
   a(\alpha) = C_a \left(\frac{1-\alpha}{\alpha}\right)^{2}, \qquad
   b(\alpha) = C_b \left(\frac{1-\alpha}{\alpha}\right),
@@ -1943,7 +2169,7 @@ The specialization of the robustness analysis to equal{\hyp}order polynomial ele
 
 The abstract framework favored here makes it natural to include different particularizations of VMS in a very concise way. This has allowed us to implement both the ASGS and the OSGS versions of the method, showing through the many numerical experiments that the two variants behave very similarly for the velocity\amend{---the one notable exception being the strongly reaction-dominated regime, where the OSGS linear element carries a larger velocity error, the largest such discrepancy of the campaign and one that our analysis does not resolve---while the OSGS variant tends to deliver somewhat better pressure convergence in some regimes (in three dimensions this means a higher rate rather than a smaller error),} at least for the problem considered.
 
-\amend{Two aspects of the numerical study deserve a concluding remark. First, the a priori condition on the viscous stabilization constant, \cref{eq:conditions_on_num_param}, makes explicit its dependence on the local inverse{\hyp}estimate constant; this motivates a larger constant for elements with larger inverse constants, and the three{\hyp}dimensional experiments confirm that quadratic tetrahedra require such an increase whereas linear elements do not. The specific value $c_1 = 16\,k^4$ (against $4\,k^4$ in two dimensions) was selected empirically---the round value just below the elementwise coercivity threshold---and restored the optimal three{\hyp}dimensional rates on well{\hyp}shaped (regular) meshes. Second, the comparison of \cref{sec:NumericalExampleFromLiterature} shows that, on the Darcy{\hyp}Brinkman{\hyp}Forchheimer equations, the equal{\hyp}order stabilized method matches the \amend{velocity} accuracy of the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair used in~\cite{cocquet2021error} without requiring a compatible velocity{\hyp}pressure space\amend{ (the inf{\hyp}sup{\hyp}stable pair remaining more accurate in the pressure in the viscosity{\hyp}dominated regime, where it converges)}, and remains convergent in the convection{\hyp}dominated regime in which the unstabilized Galerkin Taylor{\hyp}Hood velocity does not.}
+\amend{Two aspects of the numerical study deserve a concluding remark. First, the a priori condition on the viscous stabilization constant, \cref{eq:conditions_on_num_param}, makes explicit its dependence on the local inverse{\hyp}estimate constant; this motivates a larger constant for elements with larger inverse constants, and the three{\hyp}dimensional experiments confirm that quadratic tetrahedra require such an increase whereas linear elements do not. The specific value $c_1 = 16\,k^4$ (against $4\,k^4$ in two dimensions) was selected empirically---the round value just below the elementwise coercivity threshold---and restored the optimal three{\hyp}dimensional rates on well{\hyp}shaped (regular) meshes. Second, the comparison of \cref{sec:NumericalExampleFromLiterature} shows that, on the Darcy{\hyp}Brinkman{\hyp}Forchheimer equations, the equal{\hyp}order stabilized method matches the \amend{velocity} accuracy of the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair used in~\cite{cocquet2021error} without requiring a compatible velocity{\hyp}pressure space\amend{ (the inf{\hyp}sup{\hyp}stable pair remaining more accurate in the pressure in the viscosity{\hyp}dominated regime, where it converges)}, and remains convergent in the convection{\hyp}dominated regime in which the unstabilized Galerkin Taylor{\hyp}Hood velocity does not. That comparison uses the symmetric{\hyp}gradient viscous operator rather than the deviatoric{\hyp}symmetric one employed elsewhere, and the a priori analysis covers it: stating the theory for any pointwise, constant{\hyp}coefficient Korn{\hyp}compatible orthogonal projection of the velocity gradient, as the standing assumption \cref{H:projector} does, costs nothing in the a priori results---not one constant of \cref{lemma:Stability,lemma:Continuity,th:Convergence} depends on the choice (\cref{cor:ProjectorASGS,cor:ProjectorOSGS})---the one quantitative trace being the Fourier design, whose discarded factor keeps the uniform window $[1,2]$ over the family of \cref{lem:projfamily}, and brings the viscous operators used in the literature, and in our own experiments, within a single statement.}
 
 There are several directions in which we think it is interesting to take the formulation developed here. First, we would like to study the possibility of simplifying the stabilized linear forms, given that not all the terms included are strictly necessary to obtain optimal convergence rates. In this sense, the so{\hyp}called term{\hyp}by{\hyp}term stabilization approach~\cite{codina2008analysis} is a promising alternative.
 

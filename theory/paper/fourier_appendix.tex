@@ -6,6 +6,28 @@
 % symbolically by proof_verification/sympy/fourier_tau_verification.py (sympy);
 % see proof_verification/sympy/README.md.  Equation labels are namespaced
 % eq:ft* to avoid collisions with the main text.
+%
+% 2026-07-29: rem:ftGenericPi (generic viscous projector: the symbol T_Pi; the two-sided
+% bounds 1/2|k|^2 I <= T_Pi <= |k|^2 I, hence the [1,2] range of the dropped O(1) factor,
+% for the lem:projfamily family ONLY -- for a general (A3)-admissible projector only the
+% upper bound survives and the lower one is 2 c_Pi^2) was added.  Its claims are checked in
+% proof_verification/sympy/projector_algebra_verification.py, not by the sympy file above.
+%
+% [known-fragility]  This file is \input by BOTH article.tex (v1) and article_v2.tex (v2),
+% so it may cite only labels defined in BOTH.  The labels it uses from outside itself are
+% eq:matrices_stationary_strong_problem, eq:StabilizationParameters, eq:Tau1, eq:Tau2,
+% eq:CAlpha, eq:TauNavierStokes, eq:DesignConditionOnTauWeak, eq:CDR_equation,
+% sec:StabilizationDesign, sec:NumericalExamplesStationaryCase2D, H:projector,
+% sec:ViscousProjector, lem:projfamily, lem:projinstances, eq:projmonotone
+% -- all present in both builds, the projector ones because they live in the
+% main-text subsection sec:ViscousProjector (Sec. 2.1), which is duplicated in
+% article.tex and article_v2.tex.  (Until 2026-07-29 they lived in the shared
+% appendix asgs_convergence.tex and were cited "of \cref{app:Continuity}".)
+%
+% 2026-07-29: eq:cPi is now DEFINED HERE, in rem:ftGenericPi.  It used to live in
+% the main text (rem:projscope), which was moved out of the paper into the
+% standalone note theory/viscous_projector_note/.  This appendix is the only place
+% in the paper that needs the ellipticity constant, so it carries its definition.
 % =============================================================================
 \section{Fourier symbols of the differential operator and the design of the stabilization parameters}\label{app:FourierTau}
 
@@ -34,7 +56,7 @@ The viscous part is second order, so its symbol is the double contraction of the
   \widehat{\mathcal{L}}_{\nu}(\boldsymbol{k}_0)
   = \frac{1}{h^2}\, k_{0,i}\,k_{0,j}\,\mathbf{K}_{ij}.
 \end{equation}
-Inserting the velocity block of $\mathbf{K}_{ij}$ from \cref{eq:matrices_stationary_strong_problem}, whose entries \amend{are, for general $d$, $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{ij}\delta_{ab}+(1-\tfrac{2}{d})\delta_{ai}\delta_{aj})$ on the diagonal $a=b$ and $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{bi}\delta_{aj}-\tfrac{2}{d}\delta_{ai}\delta_{bj})$ off it (\cref{eq:matrices_stationary_strong_problem} displays the $d=3$ instance, for which these read $+\tfrac13$ and $-\tfrac23$)}, the contraction collapses to
+Inserting the velocity block of $\mathbf{K}_{ij}$ from \cref{eq:matrices_stationary_strong_problem} \amend{(the default instance $\ViscProj=\DSPi$; see \cref{rem:ftGenericPi} below for a general admissible projector)}, whose entries \amend{are, for general $d$, $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{ij}\delta_{ab}+(1-\tfrac{2}{d})\delta_{ai}\delta_{aj})$ on the diagonal $a=b$ and $(\mathbf{K}_{ij})_{ab}=\nu\alpha\,(\delta_{bi}\delta_{aj}-\tfrac{2}{d}\delta_{ai}\delta_{bj})$ off it (\cref{eq:matrices_stationary_strong_problem} displays the $d=3$ instance, for which these read $+\tfrac13$ and $-\tfrac23$)}, the contraction collapses to
 \begin{equation}\label{eq:ftViscClosed}
   k_{0,i}k_{0,j}(\mathbf{K}_{ij})_{ab}
    = \alpha\nu\Bigl(|\boldsymbol{k}_0|^2\,\delta_{ab} + \bigl(1-\tfrac{2}{d}\bigr)\,k_{0,a}k_{0,b}\Bigr),
@@ -53,6 +75,19 @@ so that the longitudinal eigenvalue is $\tfrac43\,\alpha\nu|\boldsymbol{k}_0|^2/
 \end{equation}
 \amend{which is $\tfrac43\,\alpha\nu|\boldsymbol{k}_0|^2/h^2$ for $d=3$ and exactly $\alpha\nu|\boldsymbol{k}_0|^2/h^2$ for $d=2$, the case of the two-dimensional experiments of \cref{sec:NumericalExamplesStationaryCase2D}. As discussed below, the resulting $O(1)$ factor is deliberately dropped; for $d=2$ there is nothing to drop, the retained expression being exact.}
 This is the first row of \cref{eq:StabilizationParameters}. The squared wavenumber is what makes the identification $c_1\coloneqq|\boldsymbol{k}_0|^2$ consistent downstream.
+
+\begin{remark}[General viscous projectors]\label{rem:ftGenericPi}
+The closed form \cref{eq:ftViscClosed} is the deviatoric--symmetric instance of a structure that is uniform over the admissible projectors. For any $\ViscProj$ satisfying \cref{H:projector}, written in components as $(\ViscProj\mathbf{M})_{ai}=P_{aibj}M_{bj}$, the velocity block of the viscous symbol is $\widehat{\mathcal{L}}_{\nu}=(2\alpha\nu/h^2)\,\mathbf{T}_{\ViscProj}(\boldsymbol{k}_0)$, where $\mathbf{T}_{\ViscProj}(\boldsymbol{k})_{ab}\coloneqq P_{aibj}k_ik_j$ is the symmetric positive-semidefinite matrix with quadratic form
+\begin{equation}\label{eq:ftGenericQuad}
+  \boldsymbol{v}^{\mathsf T}\mathbf{T}_{\ViscProj}(\boldsymbol{k})\,\boldsymbol{v}
+  = \bigl|\ViscProj(\boldsymbol{v}\otimes\boldsymbol{k})\bigr|^2 ,
+\end{equation}
+the last identity following from the idempotency and Frobenius self-adjointness of $\ViscProj$. Non-expansiveness then gives $\mathbf{T}_{\ViscProj}(\boldsymbol{k}_0)\le|\boldsymbol{k}_0|^2\,\mathbb{I}_d$, while for every projector whose range contains the deviatoric--symmetric tensors (\cref{lem:projfamily} of \cref{sec:ViscousProjector})---in particular for the whole family of \cref{lem:projinstances}---the pointwise monotonicity \cref{eq:projmonotone} applied to $\boldsymbol{v}\otimes\boldsymbol{k}_0$ gives $\mathbf{T}_{\ViscProj}(\boldsymbol{k}_0)\ge\mathbf{T}_{\DSPi}(\boldsymbol{k}_0)$, and hence, by the eigenvalues \cref{eq:ftViscEig} of the latter, also $\mathbf{T}_{\ViscProj}(\boldsymbol{k}_0)\ge\tfrac12|\boldsymbol{k}_0|^2\,\mathbb{I}_d$. For every projector of that family the spectral radius entering $\tau_{\nu,1}^{-1}$ therefore lies between $\alpha\nu|\boldsymbol{k}_0|^2/h^2$ and $2\alpha\nu|\boldsymbol{k}_0|^2/h^2$: the factor is $2-\tfrac2d$ for $\DSPi$ (the value displayed in \cref{eq:ftTauNu}) and exactly $2$ for $\mathbb{I}$, $\SPi$ and $\DPi$. Dropping this $O(1)$ factor, as is done below \cref{eq:StabilizationParameters}, is thus uniform over the family of \cref{lem:projinstances}, and the parameters \cref{eq:Tau1,eq:Tau2} require no modification. For a general admissible $\ViscProj$ only the upper bound survives verbatim; the lower one becomes $2c_{\ViscProj}^2\,\alpha\nu|\boldsymbol{k}_0|^2/h^2$, where
+\begin{equation}\label{eq:cPi}
+  c_{\ViscProj}\coloneqq\min\bigl\{\,\bigl|\ViscProj(\boldsymbol{v}\otimes\boldsymbol{k})\bigr|\ :\ |\boldsymbol{v}|=|\boldsymbol{k}|=1\,\bigr\}
+\end{equation}
+is the ellipticity constant of $\ViscProj$, positive whenever $\ViscProj$ is admissible but not bounded below independently of it (both facts are proved in the companion note on Korn{\hyp}compatible viscous projectors). The discarded factor is then still $O(1)$---it lies in $[2c_{\ViscProj}^2,2]$---and is still absorbed in the algorithmic constant $c_1$, but the window is no longer uniform.
+\end{remark}
 
 \subsection{Convective term}\label{sec:ftConvective}
 The convective block $\mathbf{A}_{\mathrm{v},i}$ is first order, so

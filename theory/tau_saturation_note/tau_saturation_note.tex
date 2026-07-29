@@ -31,7 +31,7 @@
 \newcommand{\bn}{\boldsymbol{n}}
 \newcommand{\bx}{\boldsymbol{x}}
 \newcommand{\bsig}{\boldsymbol{\sigma}}
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}} % paper's Xi
+\newcommand{\DSPi}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}  % the paper's \DSPi; the paper's \DSPi is now the GENERIC projector % paper's Xi
 \newcommand{\Lop}{\mathcal{L}}
 \newcommand{\Ladj}{\mathcal{L}^{*}}
 \newcommand{\Rop}{\mathcal{R}}
@@ -95,13 +95,13 @@ kinematic viscosity $\nu$, and symmetric positive-semidefinite resistance tensor
 $\bsig(\alpha,\bu)$, the strong porous Navier--Stokes problem is (paper,
 \texttt{eq:StrongMomentumEquation}--\texttt{eq:StrongMassEquation})
 \begin{equation}
-  \alpha\,\bu\!\cdot\!\grad\bu \;-\; 2\divg(\alpha\nu\,\ViscProj\grad\bu)
+  \alpha\,\bu\!\cdot\!\grad\bu \;-\; 2\divg(\alpha\nu\,\DSPi\grad\bu)
   \;+\;\alpha\grad p \;+\;\bsig(\alpha,\bu)\bu \;=\;\bef,
   \qquad
   \varepsilon p + \divg(\alpha\bu)=0,
   \label{eq:strong}
 \end{equation}
-with $\ViscProj$ the deviatoric--symmetric projection of the velocity gradient and
+with $\DSPi$ the deviatoric--symmetric projection of the velocity gradient and
 $\varepsilon\ge0$ the iterative-penalty compressibility. The Darcy--Brinkman--%
 Forchheimer closure is $\bsig=\sigma(\alpha,\bu)\,\mathbb I$ with (paper,
 \texttt{eq:DBFResistanceTerm})
@@ -119,8 +119,8 @@ $\Rop_{\bw}U_h := F-\Lop_{\bw}U_h$.
 \paragraph{Galerkin and stabilized forms.}
 The Galerkin bilinear form is (paper, \texttt{eq:823})
 \begin{equation}
-  B(\ba,U_h,V_h)=\langle\bvh,\alpha\,\ba\!\cdot\!\grad\buh\rangle
-  +2\langle\grad\bvh,\alpha\nu\ViscProj\grad\buh\rangle
+  B(\ba;U_h,V_h)=\langle\bvh,\alpha\,\ba\!\cdot\!\grad\buh\rangle
+  +2\langle\grad\bvh,\alpha\nu\DSPi\grad\buh\rangle
   +\langle\bvh,\alpha\grad p_h\rangle
   +\langle\bvh,\sigma\buh\rangle
   +\langle q_h,\varepsilon p_h\rangle
@@ -128,12 +128,12 @@ The Galerkin bilinear form is (paper, \texttt{eq:823})
   \label{eq:B}
 \end{equation}
 The VMS stabilized problem (paper, \texttt{eq:OSGSProblem}) reads
-$\BS(\bw,U_h,V_h)=\LS(\bw,V_h,\boldsymbol\pi_h)$ with (paper, Eqs.~under
+$\BS(\bw;U_h,V_h)=\LS(\bw;V_h,\boldsymbol\pi_h)$ with (paper, Eqs.~under
 \texttt{eq:OSGSProblem})
 \begin{equation}
-  \BS(\bw,U,V)=B(\bw,U,V)-\sum_K\innerK{\Ladj_{\bw}V}{\tauK(\bw)\,\Lop_{\bw}U},
+  \BS(\bw;U,V)=B(\bw;U,V)-\sum_K\innerK{\Ladj_{\bw}V}{\tauK(\bw)\,\Lop_{\bw}U},
   \quad
-  \LS(\bw,V,\boldsymbol\pi)=L(V)-\sum_K\innerK{\Ladj_{\bw}V}{\tauK(\bw)\,(F-\boldsymbol\pi)},
+  \LS(\bw;V,\boldsymbol\pi)=L(V)-\sum_K\innerK{\Ladj_{\bw}V}{\tauK(\bw)\,(F-\boldsymbol\pi)},
   \label{eq:BS}
 \end{equation}
 where $\Ladj_{\bw}$ is the adjoint operator (paper, \texttt{eq:AdjointDifferential%
@@ -164,7 +164,7 @@ Testing \eqref{eq:B} with $U_h$ itself, under $\divg(\alpha\ba)=0$ and homogeneo
 Dirichlet data, gives the Galerkin coercivity identity (paper, \texttt{eq:Galerkin
 coercivity})
 \begin{equation}
-  B(\ba,U_h,U_h)=2\nu\big\|\alpha^{1/2}\ViscProj\grad\buh\big\|^2
+  B(\ba;U_h,U_h)=2\nu\big\|\alpha^{1/2}\DSPi\grad\buh\big\|^2
   +\big\|\sigma^{1/2}\buh\big\|^2+\varepsilon\|p_h\|^2 .
   \label{eq:galcoerc}
 \end{equation}
@@ -223,7 +223,7 @@ It is convenient to read the discrete equation \eqref{eq:BS} as a single residua
 functional. With $\Rop_{\bw}U_h=F-\Lop_{\bw}U_h$, the ASGS equation
 $\BS=\LS|_{\boldsymbol\pi=0}$ is
 \begin{equation}
-  \rM(V):=\underbrace{\big[B(\bw,U_h,V)-L(V)\big]}_{\textstyle \rG(V)}
+  \rM(V):=\underbrace{\big[B(\bw;U_h,V)-L(V)\big]}_{\textstyle \rG(V)}
   \;+\;\underbrace{\sum_K\innerK{\Ladj_{\bw}V}{\tauK(\bw)\,\Rop_{\bw}U_h}}_{\textstyle \rS(V)}
   \;=\;0 ,
   \label{eq:resdecomp}

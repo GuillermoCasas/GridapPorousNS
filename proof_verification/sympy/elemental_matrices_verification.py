@@ -178,6 +178,78 @@ check("G    = tau1 alpha^2 d_k N^a d_k N^b  (pressure Laplacian, K_QP)",
 check("Q_P  = -tau2 eps^2 N^a N^b",
       sp.simplify(Dpre(-tau2*eps**2*Na*pp) - (-tau2*eps**2*Na*Nb)) == 0)
 
+
+# =========================================================================
+# SOURCE LINT OF THE PRINTED DERIVATION  (added 2026-07-29)
+#
+# Everything above re-derives the elemental matrices from THIS script's own
+# encoding and never opens the appendix.  That is a structural blind spot: the
+# endpoint is certified while the printed PATH to it goes unread, so a typo in an
+# intermediate display of App. A survives every symbolic check in the suite.  On
+# 2026-07-29 a whole-paper referee read found exactly that -- "\partial_{ik} N^c
+# U_m^c" inside eq:AGBetaLHSStabilizationTerm, where the symmetric-gradient pair
+# requires "\partial_k N^c U_m^c" (App. A prints it correctly in five siblings,
+# e.g. eq:LGBetaLHSStabilizationTerm, which carries the identical sub-expression).
+#
+# The two rules below are deliberately NARROW.  A broader "index balance" lint was
+# prototyped and REJECTED: counting index occurrences per display row conflates
+# independent additive terms and flagged 52 of 68 rows, i.e. it had no
+# discriminating power.  A gate that cries wolf is a gate people learn to ignore.
+# These rules key on a convention App. A follows without exception, so their false
+# positive rate on the current source is zero, and each ships with a negative
+# control built from the pre-fix text.
+# =========================================================================
+print("\n" + "=" * 70)
+print("SOURCE LINT OF APPENDIX A's PRINTED DERIVATION")
+print("=" * 70)
+
+import os as _os
+import re as _re
+
+_PAPER = _os.path.normpath(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                         "..", "..", "theory", "paper"))
+with open(_os.path.join(_PAPER, "elemental_matrices_appendix.tex"), encoding="utf-8") as _f:
+    _APPA = _f.read()
+
+# S1  Second-derivative convention: App. A writes every second derivative with an
+# explicit ^2 (\partial^2_{kl} or \partial_{kl}^2).  A multi-letter \partial subscript
+# WITHOUT it is a first derivative that has absorbed a neighbouring index.
+_MULTI = _re.compile(r"\\partial(\^2)?_\{([a-z]{2,})\}(\^2)?")
+_multi = _MULTI.findall(_APPA)
+_bad1 = [m for m in _multi if not (m[0] or m[2])]
+check(f"S1 every multi-index \\partial subscript in App. A carries an explicit ^2 "
+      f"({len(_multi)} inspected, {len(_bad1)} missing it)",
+      len(_multi) > 0 and not _bad1)
+
+# S2  The symmetric-gradient pair is always printed as
+# (\partial_k N^c U_m^c + \partial_m N^c U_k^c).  The derivative index must be a SINGLE
+# letter.  The pattern must accept BOTH \partial_k and \partial_{ik}: the braced form is
+# what the 2026-07-29 typo looked like, so a rule blind to it cannot guard against it.
+_DERIV = r"\\partial_(?:\{([a-z]+)\}|([a-z]))"
+_PAIR = _re.compile(_DERIV + r" N\^c U_\{?([a-z])\}?\^c\s*\+\s*"
+                    + _DERIV + r" N\^c U_\{?([a-z])\}?\^c")
+
+
+def _pair_deriv_indices(m):
+    """The two derivative indices of one matched symmetric-gradient pair."""
+    return (m.group(1) or m.group(2), m.group(4) or m.group(5))
+
+
+_pairs = list(_PAIR.finditer(_APPA))
+_bad2 = [m for m in _pairs if any(len(x) != 1 for x in _pair_deriv_indices(m))]
+check(f"S2 every symmetric-gradient pair in App. A uses single-index derivatives "
+      f"({len(_pairs)} pairs inspected, {len(_bad2)} malformed)",
+      len(_pairs) > 0 and not _bad2)
+
+# Discriminating negatives, built from the text exactly as it stood before the fix.
+_PREFIX = (r"\delta_{ik} \left( \partial_{ik} N^c U_m^c "
+           r"+ \partial_m N^c U_k^c \right) \partial_m \beta")
+check("negative: S1 rejects the pre-fix \\partial_{ik} (multi-index, no ^2)",
+      any(not (m[0] or m[2]) for m in _MULTI.findall(_PREFIX)))
+check("negative: S2 rejects the pre-fix symmetric-gradient pair",
+      any(len(x) != 1 for m in _PAIR.finditer(_PREFIX)
+          for x in _pair_deriv_indices(m)))
+
 # -------------------------------------------------------------------------
 print("\n" + "=" * 70)
 npass = sum(1 for t, _ in results if t == "PASS")

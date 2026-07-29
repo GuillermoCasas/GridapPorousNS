@@ -9,49 +9,124 @@
 %   - the standalone "Amendments to the original statements" section was dropped
 %     (its main-text amendments are now applied in the body of the article);
 %   - macros and the assumption environment are declared in the article preamble.
+%
+% Restructured 2026-07-28 to run parallel to Appendix D (osgs_appendix.tex): setting ->
+% standing assumptions -> technical results (parameters, weighted inverse estimates, jump,
+% global identities, triple norm) -> stability -> continuity -> convergence.  The duplicated
+% "Proof of coercivity" subsubsection (label sec:proof-stability, display eq:coerccollect-lemma)
+% was removed; its content lives once, in full, in the Stability subsection.
+%
+% [known-fragility]  This file is \input by BOTH article.tex (v1) and article_v2.tex (v2).
+% It may therefore cite only labels defined in BOTH.  In particular do NOT cite
+% sec:CommonSetting, eq:TripleNormASGS, eq:GalerkinCoercivityIdentity, eq:CollectedCoercivity,
+% app:osgs, sec:StabilityOSGS or any oa:* / H:design.. label: all are v2-only and silently
+% become undefined references in the v1 build.
+%
+% NOTATION SET (consolidated into Sec. 3.2 on 2026-07-29; cite these two, restate nothing):
+%   eq:TauInnerProduct  (Eq. 3.16) -- the ONE definitional display: line 1 the tau-matrix
+%                                     product and its norm, line 2 the broken (.,.)_h and
+%                                     ||.||_h, plus a prose comment right after it covering
+%                                     the single-parameter weighting (.,.)_{tau_i},
+%                                     ||.||_{tau_i}.  CITE THIS for the notation set.
+%   eq:L2InnerProduct   (Eq. 3.17) -- ONLY the approximation (.,.)_tau ~~ (.,.)_h, i.e. the
+%                                     implemented plain-L2 projection.  It defines nothing;
+%                                     cite it only where the implemented-vs-analyzed
+%                                     distinction is the point (see oa:rem:analyzed).
+% Two Sec. 5 displays that duplicated these were RETIRED on 2026-07-29: eq:TauWeightedProduct
+% (it re-defined, with \coloneqq, the product already at eq:TauInnerProduct) and
+% eq:BrokenProduct (its RHS is literally the RHS of eq:L2InnerProduct).  Do not reintroduce
+% either; both mains now carry the whole set in Sec. 3.2.
+%
+% Labels this file cites that are GUARANTEED to exist in both builds (keep in sync):
+%   H:mesh, H:data, H:projector, H:porosity, H:advection, H:spaces, H:regularity,
+%   H:coercivity, H:jump; eq:PiKorn, eq:L2InnerProduct, eq:TauInnerProduct,
+%   eq:Tau1Final, eq:Tau2Final, eq:TauNavierStokes, eq:UpperBoundOnEpsilon,
+%   eq:JumpCondition, eq:SigmaAlpha, eq:resolved, eq:conditions_on_num_param,
+%   eq:InterpolationError, eq:ConvergenceResult, sec:StabilityASGS,
+%   sec:TheContinuousProblem, sec:ViscousProjector, sec:NumericalExamplesStationaryCase3D,
+%   lemma:Stability, lemma:Continuity, th:Convergence,
+%   lem:projfamily, lem:projinstances.
+%   (The rest of the relocated projector labels -- eq:PiOrthogonal, eq:projmonotone,
+%   eq:devsymidentity, eq:crossibp, eq:projconstants -- are
+%   NOT cited from here; they live in sec:ViscousProjector of both mains.  Add a name
+%   to the list above only when this file actually starts citing it.)
+%   (H:projector / eq:PiKorn were added to BOTH mains on 2026-07-29, immediately after
+%   the H:data item, so that every existing \crefrange / dash range over the standing
+%   assumptions keeps bracketing them without edits.)
+%
+% 2026-07-29 (RELOCATION): the subsubsection "Admissible viscous projectors"
+% (\label{sec:projectors}: lem:projfamily, lem:projinstances and their
+% displays) was MOVED OUT of this appendix into a new main-text subsection
+% \label{sec:ViscousProjector} ("The viscous projector", Sec. 2.1), present VERBATIM in
+% BOTH mains -- which is what keeps the labels above resolvable in both builds.  The
+% display eq:PiKorn moved with it, out of the (A3) item and into that subsection, so (A3)
+% now states the bare conditions and cites eq:PiOrthogonal / eq:PiKorn.  Do NOT
+% reintroduce the block here: a second definition of those labels makes them
+% multiply-defined in both builds.  What stays here is only the appendix-local
+% bookkeeping (the setting sentence in Sec. C.1 and rem:hypotheses).
 % =============================================================================
 \section{Convergence analysis of the ASGS method}\label{app:Continuity}
 
-\subsection{Setting}\label{sec:setting}
+This appendix establishes, for the linearized ASGS method, the stability
+(\cref{lem:coercivity}), continuity (\cref{lem:continuity}) and convergence
+(\cref{thm:convergence}) results stated as
+\cref{lemma:Stability,lemma:Continuity,th:Convergence} in \cref{sec:StabilityASGS}. It follows
+the algebraic{\hyp}subgrid{\hyp}scale template of~\cite{codina2001stabilized}, transported to the
+porosity{\hyp}weighted operator, the Darcy reaction term and the artificial{\hyp}compressibility
+perturbation. The proof is developed in full; only the material shared with the main text is
+not re{\hyp}derived. Specifically, the continuous problem, the Galerkin bilinear form and its
+coercivity identity, the stabilization parameters and the standing assumptions are stated once
+in \cref{sec:StabilityASGS} and are here only recalled and referenced, so that this appendix
+develops the ingredients specific to the ASGS route---the porosity{\hyp}weighted inverse
+estimates, the coercivity of the stabilized form obtained by testing with the solution itself,
+the eighteen{\hyp}term continuity estimate with its elementwise integrations by parts and jump
+machinery, and the convergence theorem that follows from the two.
 
-\subsubsection{The linearized problem and the stabilized bilinear form}
-Let $\Omega\subset\mathbb{R}^d$, $d\in\{2,3\}$, be a bounded polyhedral domain with
+\subsection{The linearized problem and the ASGS method}\label{sec:setting}
+
+Let $\Omega\subset\mathbb{R}^d$, $d\in\{2,3\}$, be a bounded, connected polyhedral domain with
 boundary $\Gamma$. As in the analysis section of the main text, we consider the ASGS
 method applied to the linearized porous Navier--Stokes problem with homogeneous Dirichlet
 boundary conditions on the whole of $\Gamma$, uniform kinematic viscosity $\nu>0$ and a
 uniform, isotropic resistance $\boldsymbol{\sigma}=\sigma\mathbb{I}$, $\sigma\ge 0$. Throughout,
 $\ba$ is the given advection field, $\alpha:\Omega\to(0,1]$ the fluid volume fraction,
-$\varepsilon\ge 0$ the penalty parameter, and $\ViscProj$ the (pointwise, orthogonal)
-projection onto the deviatoric--symmetric part of a second-order tensor, so that
-$\bigl|\ViscProj\mathbf{T}\bigr|\le|\mathbf{T}|$ pointwise for every tensor $\mathbf{T}$.
+$\varepsilon\ge 0$ the penalty parameter, and $\ViscProj$ any viscous projector admissible in
+the sense of \cref{sec:ViscousProjector}, as \cref{H:projector} requires; the
+deviatoric--symmetric default $\ViscProj=\DSPi$ of \cref{sec:TheContinuousProblem} is one
+instance, and nothing below is specific to it. \Cref{rem:hypotheses} records where each half of
+\cref{H:projector} enters the proofs that follow.
 
-Acting on a pair $U=[\bu;p]$, the linearized differential operator $\mathcal{L}_{\ba}$ of
-\cref{sec:StabilityASGS} has momentum and mass components
+The linearized differential operator $\mathcal{L}_{\ba}$ of \cref{sec:StabilityASGS}, acting on a
+pair $U=[\bu;p]$, and its formal adjoint, acting on $V=[\bv;q]$, have momentum and mass
+components
 \begin{equation}\label{eq:StrongOperator}
   \mathcal{L}_{\ba}U =
   \begin{bmatrix}
-    \alpha\,\ba\cdot\nabla\bu - 2\nabla\cdot(\alpha\nu\ViscProj\nabla\bu) + \alpha\nabla p + \sigma\bu\\[4pt]
+    \alpha\X(U)-G(\bu)\\[4pt]
     \varepsilon p + \nabla\cdot(\alpha\bu)
-  \end{bmatrix}.
-\end{equation}
-We abbreviate its convection--pressure and viscous--reaction operators by
-\begin{equation}\label{eq:XG}
-  \X(V) \coloneqq \ba\cdot\nabla\bv + \nabla q,
+  \end{bmatrix},
   \qquad
-  G(\bv) \coloneqq 2\nu\,\nabla\cdot\bigl(\alpha\ViscProj\nabla\bv\bigr) - \sigma\bv,
-  \qquad V=[\bv;q],
-\end{equation}
-so that the momentum component of \cref{eq:StrongOperator} reads compactly $\alpha\X(U)-G(\bu)$.
-Under $\nabla\cdot(\alpha\ba)=0$ (\cref{H:advection}), and with the simplification of the main
-text---the removal of the term proportional to $\nabla\cdot(\alpha\ba)$, which vanishes anyway
-in the present setting---the formal adjoint is
-\begin{equation}\label{eq:AdjointOperator}
   \mathcal{L}_{\ba}^{*}V =
   \begin{bmatrix}
     -\alpha\X(V)-G(\bv)\\[4pt]
     \varepsilon q - \nabla\cdot(\alpha\bv)
-  \end{bmatrix}.
+  \end{bmatrix},
 \end{equation}
+where, on any pair $[\bv;q]$,
+\begin{equation}\label{eq:XG}
+  \X(V) = \ba\cdot\nabla\bv + \nabla q,
+  \qquad
+  G(\bv) \coloneqq 2\nu\,\nabla\cdot\bigl(\alpha\ViscProj\nabla\bv\bigr) - \sigma\bv ,
+\end{equation}
+the same formulas giving $\X(U)$ and $G(\bu)$ in the first column. Here $\X$ is the
+first{\hyp}order momentum operator of \cref{sec:StabilityASGS} and $G$ collects the viscous and
+reactive terms; keeping the two apart is what later turns the $\tau_1$ product into a difference
+of squares \eqref{eq:stabdiag1}. The adjoint is written under $\nabla\cdot(\alpha\ba)=0$
+(\cref{H:advection}) and with the simplification of the main text---the removal of the term
+proportional to $\nabla\cdot(\alpha\ba)$, which vanishes anyway in the present setting. Passing to
+it then reverses the sign of the first{\hyp}order terms---$\alpha\X$ in the momentum row,
+$\nabla\cdot(\alpha\,\cdot)$ in the mass row---and leaves $G$ and the $\varepsilon$ terms
+unchanged.
 
 Let $\Th$ be a finite element partition of $\overline{\Omega}$ of elements $K$ with
 diameters $h_K$, and let
@@ -61,21 +136,14 @@ $\mathcal{Q}_{h0}\subset H^1(\Omega)\cap\mathcal{Q}_0$, be the continuous finite
 spaces of polynomial degrees $k_u\ge 1$ and $k_p\ge 1$ used for the velocity and the
 pressure ($\mathcal{Q}_0$ being $L^2(\Omega)$, or its zero-mean subspace when
 $\varepsilon=0$). The $L^2(\omega)$ inner product is written
-$(\cdot,\cdot)_\omega$, with $\omega$ omitted when $\omega=\Omega$, and for elementwise
-defined quantities we write
-\begin{equation}\label{eq:brokennotation}
-  (f,\tau g)_h \coloneqq \sum_{K\in\Th}\int_K f\,\tau\, g \dd\Omega,
-  \qquad
-  \norm{\tau^{1/2} f}_h \coloneqq \Bigl(\,\sum_{K\in\Th}\int_K \tau\, |f|^2
-  \dd\Omega\Bigr)^{1/2},
-\end{equation}
-where $\tau$ may take a different (constant) value $\tau_K$ on each element. Note that the
-broken norm is the square root of the \emph{sum of squares} of the elemental contributions.
+$(\cdot,\cdot)_\omega$, with $\omega$ omitted when $\omega=\Omega$; elementwise defined
+quantities are assembled in the broken and $\boldsymbol{\tau}${\hyp}weighted products and norms
+\cref{eq:TauInnerProduct} of the main text, of whose two spellings the proofs below use the
+expanded ones, $(f,\tau_i\,g)_h$ and $\bigl\lVert\tau_i^{1/2}f\bigr\rVert_h$, throughout.
 
-Restricted to the present setting, the stabilized bilinear form of the main text,
-$\BASGS (\ba; U_h,V_h)=B(\ba; U_h,V_h)-\sum_K \langle \mathcal{L}^* V_h,
-\boldsymbol{\tau}_K \mathcal{L} U_h\rangle_K$ (with $\mathcal{L}$ and $\mathcal{L}^*$ from
-\cref{eq:StrongOperator,eq:AdjointOperator}), reads, for
+Restricted to this setting, the stabilized bilinear form of the main text,
+$\BASGS (\ba; U_h,V_h)=B(\ba; U_h,V_h)-\sum_K \langle \mathcal{L}_{\ba}^{*} V_h,
+\boldsymbol{\tau}_K \mathcal{L}_{\ba} U_h\rangle_K$, reads, for
 $U_h=[\buh;p_h]$ and $V_h=[\bvh;q_h]$ in $\Xh$,
 \begin{equation}\label{eq:Bstab}
 \begin{aligned}
@@ -92,7 +160,7 @@ $U_h=[\buh;p_h]$ and $V_h=[\bvh;q_h]$ in $\Xh$,
 \end{aligned}
 \end{equation}
 together with
-$\LS(\ba;V_h)=(\bvh,\bff)
+$\LASGS(\ba;V_h)=(\bvh,\bff)
  +\bigl(\alpha\X(V_h)+G(\bvh),\tau_1\bff\bigr)_h$.
 For the exact solution $U$ of the linearized continuous problem (assumed smooth enough,
 see \cref{sec:convergence}) one has $\mathcal{L}_{\ba}U=F$ in $L^2(K)$ for every $K$, and
@@ -101,135 +169,74 @@ therefore the method is consistent:
   \BASGS (\ba; U-U_h, V_h) = 0 \qquad \forall\, V_h\in\Xh .
 \end{equation}
 
-\subsubsection{Stabilization parameters and working norm}
-On each element $K$ the stabilization parameters of the main text are
-\begin{equation}\label{eq:taus}
-  \tau_{1,K} = \frac{1}{\alpha_K\,\tau_{1,\mathrm{NS}}^{-1} + \sigma},
-  \qquad
-  \tau_{2,K} = \frac{h_K^2}{c_1\,\alpha_K\,\tau_{1,\mathrm{NS}}},
-  \qquad
-  \tau_{1,\mathrm{NS}}^{-1}
-  = c_1\frac{\nu}{h_K^2} + c_2\frac{|\ba|_{\infty,K}}{h_K},
-\end{equation}
-where $c_1,c_2>0$ are the algorithmic constants,
-$|\ba|_{\infty,K}\coloneqq\sup_K|\ba|$ (Euclidean norm), and
-$\alpha_K\coloneqq\alpha_{\infty,K}\coloneqq\sup_K\alpha$; we also write
-$\alpha_{0,K}\coloneqq\inf_K\alpha>0$. It is convenient to define, in analogy
-with~\cite{codina2001stabilized},
+The stabilization parameters $\tau_{1,K}$, $\tau_{2,K}$ and $\tau_{1,\mathrm{NS}}$ are those of
+\cref{eq:Tau1Final,eq:Tau2Final,eq:TauNavierStokes}, used here without restatement, with the
+elemental evaluations fixed there: $c_1,c_2>0$ are the algorithmic constants,
+$|\ba|_{\infty,K}\coloneqq\sup_K|\ba|$ (Euclidean norm) is the value at which the advection
+modulus is taken on $K$, and $\alpha_K\coloneqq\alpha_{\infty,K}\coloneqq\sup_K\alpha$; we
+also write $\alpha_{0,K}\coloneqq\inf_K\alpha>0$. What organizes the estimates below is not
+$\tau_{1,\mathrm{NS}}$ itself but its porosity{\hyp}weighted inverse, which we abbreviate---in
+analogy with~\cite{codina2001stabilized}---as
 \begin{equation}\label{eq:phi1}
   \varphi_{1,K} \coloneqq \alpha_K\,\tau_{1,\mathrm{NS}}^{-1}
   = \alpha_K\Bigl(c_1\frac{\nu}{h_K^2}+c_2\frac{|\ba|_{\infty,K}}{h_K}\Bigr),
 \end{equation}
-so that $\tau_{1,K} = \bigl(\varphi_{1,K}+\sigma\bigr)^{-1}$, and
+so that $\tau_{1,K} = \bigl(\varphi_{1,K}+\sigma\bigr)^{-1}$. The damped reaction coefficient
+$\sigmatilde$ of \cref{eq:SigmaAlpha} then admits, on each element, the equivalent forms
 \begin{equation}\label{eq:sigmatilde}
   \sigmatilde\big|_K
   \coloneqq \frac{\tau_{1,\mathrm{NS}}^{-1}\sigma}{\tau_{1,\mathrm{NS}}^{-1}
   + \sigma/\alpha_K}
   = \frac{\varphi_{1,K}\,\sigma}{\varphi_{1,K}+\sigma}
   = \sigma - \sigma^2\tau_{1,K}
-  = \sigma\,\varphi_{1,K}\,\tau_{1,K}\;\ge 0 .
+  = \sigma\,\varphi_{1,K}\,\tau_{1,K}\;\ge 0 ,
 \end{equation}
-We will drop the element subscript ($\tau_1$, $\tau_2$, $\varphi_1$, $\alpha_K$, $h$,
-$|\ba|_\infty$) whenever the elementwise character is clear from the context. The working
-norm here is the ASGS working norm $\triplenorm{\cdot}_{\mathrm{A}}$ of the main text
-(\cref{lemma:Stability}); as this appendix concerns only the ASGS method, no ambiguity with the
-OSGS norm $\triplenorm{\cdot}_{\mathrm{O}}$ can arise, and we drop the subscript throughout,
-writing simply $\triplenorm{\cdot}$. In the expanded form obtained via the identity
-$\norm{f}_{\tau_i}=\lVert\tau_i^{1/2}f\rVert_h$ of \cref{eq:TauWeightedProduct}, it reads
-\begin{equation}\label{eq:triplenorm}
-\begin{aligned}
-  \triplenorm{V_h}
-  \coloneqq \Bigl(
-  &\nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bvh\bigr\rVert^2
-  + \bigl\lVert\sigmatilde^{1/2}\bvh\bigr\rVert_h^2
-  + \varepsilon\bigl\lVert q_h \bigr\rVert^2 \\
-  &+ \bigl\lVert\tau_1^{1/2}\alpha\X(V_h)\bigr\rVert_h^2
-  + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bvh)\bigr\rVert_h^2
-  \Bigr)^{1/2}.
-\end{aligned}
-\end{equation}
-That $\triplenorm{\cdot}$ is indeed a norm on $\Xh$---the viscous term alone suffices---is the
-content of the following lemma.
+of which the last two carry the whole reactive bookkeeping below. We drop the element subscript
+($\tau_1$, $\tau_2$, $\varphi_1$, $\alpha_K$, $h$, $|\ba|_\infty$) whenever the elementwise
+character is clear from the context.
 
-\begin{lemma}[Definiteness of the working norm]\label{lem:definiteness}
-For every $\bv\in H^1_0(\Omega)^d$,
-\begin{equation}\label{eq:devsymidentity}
-  \bigl\lVert\ViscProj\nabla\bv\bigr\rVert^2
-  = \tfrac12\lVert\nabla\bv\rVert^2 + \Bigl(\tfrac12-\tfrac1d\Bigr)\lVert\nabla\cdot\bv\rVert^2
-  \ \ge\ \tfrac12\lVert\nabla\bv\rVert^2 ,
-\end{equation}
-so that $\lVert\nabla\bv\rVert\le\sqrt2\,\bigl\lVert\ViscProj\nabla\bv\bigr\rVert$; in particular
-$\triplenorm{\cdot}$ of \eqref{eq:triplenorm} is a norm on $\Xh$.
-\end{lemma}
-\begin{proof}
-Since $\ViscProj\nabla\bv=\operatorname{sym}\nabla\bv-\tfrac1d(\nabla\cdot\bv)\,\mathbf I$ and the
-deviatoric and spherical parts are orthogonal,
-$\lVert\ViscProj\nabla\bv\rVert^2=\lVert\operatorname{sym}\nabla\bv\rVert^2-\tfrac1d\lVert\nabla\cdot\bv\rVert^2$.
-For $\bv\in H^1_0(\Omega)^d$, integration by parts gives
-$\int_\Omega\nabla\bv:\nabla\bv^{\mathsf T}=\int_\Omega(\nabla\cdot\bv)^2$, whence
-$\lVert\operatorname{sym}\nabla\bv\rVert^2=\tfrac12\lVert\nabla\bv\rVert^2+\tfrac12\lVert\nabla\cdot\bv\rVert^2$;
-combining the two identities yields \eqref{eq:devsymidentity}, and $\tfrac12-\tfrac1d\ge0$ for
-$d\in\{2,3\}$. Thus $\triplenorm{V_h}=0$ forces $\ViscProj\nabla\bvh=0$, hence $\nabla\bvh=0$ and
-$\bvh=0$ by Poincar\'e; then $\X(V_h)=\nabla p_h$, so the $\tau_1$ term forces $\nabla p_h=0$, and
-$p_h=0$ through the $\varepsilon\norm{p_h}^2$ term when $\varepsilon>0$ and through the zero{\hyp}mean
-constraint when $\varepsilon=0$.
-\end{proof}
-
-\subsubsection{Proof of coercivity (\cref{lemma:Stability})}\label{sec:proof-stability}
-We now prove the coercivity result stated in \cref{lemma:Stability} of the main text.
-Taking $V_h=U_h$ in $\BASGS (\ba;U_h,U_h)$, the Galerkin term reduces to
-$2\nu\norm{\alpha^{1/2}\ViscProj\nabla\buh}^2+\norm{\sigma^{1/2}\buh}^2+\varepsilon\bigl\lVert p_h \bigr\rVert^2$
-by skew-symmetry of the convection term and cancellation of the pressure-divergence pair.
-Expanding the stabilization terms yields the residual and divergence squares, a negative
-viscous residual square absorbed by the inverse estimate, a reaction square renormalizing
-$\sigma$ to the damped weight $\sigmatilde$, and a viscous-reaction cross term bounded by Young's
-inequality. Collecting all terms gives
-\begin{equation}\label{eq:coerccollect-lemma}
-\begin{aligned}
-  \BASGS (\ba;U_h,U_h)
-  \ \ge\ &\Bigl(2\bigl(1-\tfrac{2}{\eta}\bigr)-\tfrac{4\Cinva^2}{c_1}\Bigr)\,
-  \nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\buh\bigr\rVert^2
-  + \Bigl(1-\tfrac{\eta\Cinva^2}{c_1}\Bigr)\bigl\lVert\sigmatilde^{1/2}\buh\bigr\rVert_h^2 \\
-  &+ (1-C_2)\,\varepsilon\bigl\lVert p_h \bigr\rVert^2
-  + \bigl\lVert\tau_1^{1/2}\alpha\X(U_h)\bigr\rVert_h^2
-  + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\buh)\bigr\rVert_h^2 .
-\end{aligned}
-\end{equation}
-
-As $\triplenorm{\cdot}$ is a norm (\cref{lem:definiteness}, established with the norm above),
-positivity of the coefficients on the right is coercivity in the working norm; the design
-condition on $c_1$ that secures it is detailed in \cref{sec:coercivity}.
-
-\subsubsection{Constants and conventions}\label{sec:assumptions}
+\subsection{Standing assumptions and notation}\label{sec:assumptions}
 Throughout, $C$ denotes a generic positive constant, possibly different at each occurrence,
 that may depend on $d$, on the polynomial degrees, on the shape regularity of the mesh
 family, on the algorithmic constants $c_1,c_2$ and on the constants
-$C_{\nabla\alpha},C_2,c_J,c_J'$ of the standing assumptions, but \emph{not} on the mesh size,
-nor on $\nu,\sigma,\varepsilon,\ba$ or $\alpha$. The analysis is carried out under the
-standing assumptions of \cref{sec:CommonSetting}: the coefficients \cref{H:data} (with
-$\varepsilon$ obeying \cref{eq:UpperBoundOnEpsilon}), the porosity resolution \cref{H:porosity}
-(condition \cref{eq:resolved}, with $\delta_\alpha\coloneqq 1+C_{\nabla\alpha}$ and
-$\alpha_{0,K}\le\alpha_K\le\delta_\alpha\,\alpha_{0,K}$), the advection \cref{H:advection}
-(so that, $\alpha\ba$ being continuous across interior faces, $\nabla\cdot(\alpha\ba)=0$
-a.e.\ in each $K$, the form used in \cref{eq:elemibp}), the meshes and spaces \cref{H:mesh}
-(inverse estimate \cref{eq:InverseEstimateFiniteOrderNorm}, which we use both in its
-gradient and its $L^\infty$ forms), the coercivity condition \cref{H:coercivity}
-($c_1>2\xi\Cinva^2$ for some $\xi>2$), and, when $\sigma>0$, the interior-face jump condition
-\cref{H:jump} (\cref{eq:JumpCondition}, written in terms of
-$\varphi_{1,K}\coloneqq\alpha_K\tau_{1,\mathrm{NS}}^{-1}$ of \cref{eq:phi1}); we recall each
-where it is first used.
+$C_{\nabla\alpha},C_2,c_J,c_J'$ named below, but \emph{not} on the mesh size,
+nor on $\nu,\sigma,\varepsilon,\ba$ or $\alpha$.
 
-\subsection{Auxiliary results}\label{sec:auxiliary}
+The analysis is carried out under the standing assumptions of \cref{sec:StabilityASGS}: the
+assumptions \cref{H:mesh,H:data,H:projector,H:porosity,H:advection,H:spaces,H:regularity} and,
+specific to the ASGS method, the coercivity condition \cref{H:coercivity}
+($c_1>2\xi\Cinva^2$ for some $\xi>2$) and---only when $\sigma>0$---the interior{\hyp}face jump
+condition \cref{H:jump}. Each assumption is recalled
+where it is first used, and \cref{rem:hypotheses} collects the bookkeeping for the continuity
+proof. Three consequences are used so often that we record them here: \cref{H:porosity}
+supplies $\delta_\alpha\coloneqq 1+C_{\nabla\alpha}$ with
+$\alpha_{0,K}\le\alpha_K\le\delta_\alpha\,\alpha_{0,K}$ and $\alpha_K\le1$; \cref{H:advection}
+gives $\nabla\cdot(\alpha\ba)=0$ in the weak sense, with $\alpha\ba$ continuous across interior
+faces, hence a.e.\ in each $K$ (the form used in \cref{eq:elemibp}); and \cref{H:spaces} makes
+$\tau_1,\tau_2$---and therefore $\sigmatilde$ through \cref{eq:sigmatilde}---constant on each
+element, which is what allows them to be moved in and out of elemental integrals.
+
+\subsection{Technical results}\label{sec:auxiliary}
 
 We repeatedly use the standard inverse estimate: on a non{\hyp}degenerate mesh family there is a
-constant $\Cinv$, independent of the mesh size, such that for every $\psi_h$ in a
-finite{\hyp}dimensional subspace of $H^l(K)$,
+constant $\Cinv$, independent of the mesh size, such that for every $\psi_h$ in the finite
+element space restricted to $K$---that is, in the image on $K$ of a fixed finite{\hyp}dimensional
+space on the reference element---
 \begin{equation}
-    \|\psi_h \|_{W^l_p(K)} \le \Cinv\, h^{l-m + d/p - d/q}\, \| \psi_h \|_{W^m_q(K)},
+    \|\psi_h \|_{W^l_p(K)} \le \Cinv\, h^{m-l + d/p - d/q}\, \| \psi_h \|_{W^m_q(K)},
     \label{eq:InverseEstimateFiniteOrderNorm}
 \end{equation}
-valid for $0 \le m \le l$ and $1\le p,q \le \infty$ (see, e.g.,~\cite{brenner2008mathematical}); we
-use it in both its gradient and its $L^\infty$ forms.
+valid for $0 \le m \le l$ and $1\le p,q \le \infty$ (see,
+e.g.,~\cite[Thm.~4.5.11]{brenner2008mathematical}). We use it in its gradient form
+($l=1$, $m=0$, $p=q=2$: $\lVert\nabla\psi_h\rVert_K\le\Cinv h^{-1}\norm{\psi_h}_K$) throughout,
+and in its $L^\infty$ form ($l=m=0$, $p=\infty$, $q=2$:
+$\norm{\psi_h}_{L^\infty(K)}\le\Cinv h^{-d/2}\norm{\psi_h}_K$) only in the jump terms of the
+continuity proof.
+
+\subsubsection{Parameter inequalities}
+
+We first collect the elementary relations among $\tau_1,\tau_2,\varphi_1$ and $\sigmatilde$ that
+are used, silently, throughout the coercivity and continuity proofs below.
 
 \begin{lemma}[Parameter inequalities]\label{lem:parameters}
 On each element $K$ (subscripts omitted) there hold:
@@ -256,9 +263,9 @@ On each element $K$ (subscripts omitted) there hold:
 
 \begin{proof}
 Items \ref{P:basic} and \ref{P:components} are immediate from
-\eqref{eq:taus}--\eqref{eq:phi1} and $\tau_1^{-1}=\varphi_1+\sigma$.
+\eqref{eq:phi1} and $\tau_1^{-1}=\varphi_1+\sigma$.
 
-For \ref{P:27}, \eqref{eq:phi1} and the definition of $\tau_2$ give
+For \ref{P:27}, \eqref{eq:phi1} and \cref{eq:Tau2Final} give
 \begin{equation*}
   \varphi_1 h^2 = \alpha_K\,h^2\,\tau_{1,\mathrm{NS}}^{-1}
   = c_1\,\alpha_K^2\,\frac{h^2}{c_1\,\alpha_K\,\tau_{1,\mathrm{NS}}}
@@ -281,11 +288,19 @@ $\varepsilon\le C_2\,c_1\,\alpha_K^2\,\tau_1/h^2$; multiplying by $\tau_2$ and u
   \varepsilon\,\tau_2 \le C_2\,c_1\,\alpha_K^2\,\tau_1\,\frac{\tau_2}{h^2}
   = C_2\,\varphi_1\,\tau_1 \le C_2 .
 \end{equation*}
-The remaining statements follow from $\alpha_K\le 1$ and $C_2<1$.
+The remaining statements are \eqref{eq:UpperBoundOnEpsilon} itself, followed by taking square
+roots and using $C_2<1$.
 \end{proof}
 
+\subsubsection{Weighted inverse estimates}
+
+Next, the porosity{\hyp}weighted forms of \eqref{eq:InverseEstimateFiniteOrderNorm}. They are
+what the porous setting adds to the classical argument: $\alpha$ is not piecewise polynomial, so
+the inverse estimate cannot be applied to the products $\alpha\ViscProj\nabla\boldsymbol{w}_h$
+and $\alpha\boldsymbol{w}_h$ directly.
+
 \begin{lemma}[Weighted inverse estimates]\label{lem:winv}
-Let \cref{H:porosity,H:mesh} hold. There is a constant
+Let \cref{H:mesh,H:projector,H:porosity} hold. There is a constant
 $\Cinva = \Cinva(\Cinv,C_{\nabla\alpha},d)$ such that, for all
 finite element functions $\boldsymbol{w}_h\in\mathcal{V}_{h0}$,
 $r_h\in\mathcal{Q}_{h0}$, and all $K\in\Th$,
@@ -313,8 +328,9 @@ $r_h\in\mathcal{Q}_{h0}$, and all $K\in\Th$,
 \end{lemma}
 
 \begin{proof}
-Write $\mathbf{M}\coloneqq\ViscProj\nabla\boldsymbol{w}_h$, a polynomial tensor field on
-$K$ (the projection $\ViscProj$ acts pointwise with constant coefficients). By the product
+Write $\mathbf{M}\coloneqq\ViscProj\nabla\boldsymbol{w}_h$; since $\ViscProj$ acts pointwise with
+constant coefficients, $\mathbf{M}$ inherits from $\boldsymbol{w}_h$ the finite element structure
+on $K$ and \eqref{eq:InverseEstimateFiniteOrderNorm} applies to it. By the product
 rule, $\nabla\cdot(\alpha\mathbf{M})=\alpha\,\nabla\cdot\mathbf{M}
 +\mathbf{M}\,\nabla\alpha$. For the first contribution, using
 $\norm{\nabla\cdot\mathbf{M}}_K\le\sqrt{d}\,\norm{\nabla\mathbf{M}}_K$, the inverse
@@ -367,6 +383,15 @@ and require no further substitution. We write $\Cinva$ explicitly throughout thi
 only to keep the two constants distinguishable within the proofs.}
 \end{remark}
 
+\subsubsection{The jump of $\tau_1$}
+
+The last elemental ingredient is needed only by the continuity proof, and there only when
+$\sigma>0$: it controls how much $\tau_1$ may vary across an interior face. Note that, by the
+definition \eqref{eq:phi1} of $\varphi_1$, the jump condition \cref{eq:JumpCondition} of
+\cref{H:jump} reads simply
+$c_J\,\varphi_{1,K_1}\le\varphi_{1,K_2}\le c_J'\,\varphi_{1,K_1}$ for any two elements sharing a
+face, and it is in this form that we use it.
+
 \begin{lemma}[Jump of $\tau_1$]\label{lem:jump}
 Let \cref{H:jump} hold and let $K_1,K_2$ share the face $\Gamma^b$. Setting
 $\jump{\tau_1}\coloneqq\tau_{1,K_1}-\tau_{1,K_2}$, there holds, for $i\in\{1,2\}$,
@@ -391,37 +416,121 @@ $\varphi_{1,K_2}+\sigma\ge \min\{c_J,1\}\,(\varphi_{1,K_1}+\sigma)$ (and symmetr
 from which \eqref{eq:jumpest} follows with the identity \eqref{eq:sigmatilde}.
 \end{proof}
 
-\subsection{Coercivity of the stabilized bilinear form}\label{sec:coercivity}
-The stability of the ASGS method is coercivity of $\BASGS $ in the working norm
-\eqref{eq:triplenorm}; it is where the porosity-weighted inverse estimate
-\eqref{eq:winv-divvisc} and the condition on $c_1$ enter.
+\subsubsection{Two global integration-by-parts identities}
+
+Both proofs below open by transferring a derivative from one argument to the other. The two
+transfers that involve no boundary term---because the velocities vanish on $\Gamma$---are
+recorded once here.
+
+\begin{lemma}[Global identities]\label{lem:globalid}
+Let \cref{H:porosity,H:advection} hold. For all $\bu,\bv\in H^1_0(\Omega)^d$ and all
+$p,q\in H^1(\Omega)$,
+\begin{align}
+  (\bv,\alpha\,\ba\cdot\nabla\bu) &= -(\bu,\alpha\,\ba\cdot\nabla\bv), \label{eq:skew}\\
+  (\bv,\alpha\nabla p) &= -\bigl(p,\nabla\cdot(\alpha\bv)\bigr),
+  \qquad
+  \bigl(q,\nabla\cdot(\alpha\bu)\bigr) = -(\bu,\alpha\nabla q). \label{eq:globalibp}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+For \eqref{eq:skew}, the pointwise identity
+$(\alpha\ba\cdot\nabla\bu)\cdot\bv+(\alpha\ba\cdot\nabla\bv)\cdot\bu
+=\alpha\ba\cdot\nabla(\bu\cdot\bv)$ holds and $\bu\cdot\bv\in W^{1,1}_0(\Omega)$; since
+$\alpha\ba\in L^\infty(\Omega)^d$ and $\nabla\cdot(\alpha\ba)=0$ in the weak sense
+(\cref{H:advection}), $\int_\Omega\alpha\ba\cdot\nabla(\bu\cdot\bv)\dd\Omega=0$, which is
+\eqref{eq:skew}. For \eqref{eq:globalibp}, $\alpha\in W^{1,\infty}(\Omega)$
+(\cref{H:porosity}) and $\bv\in H^1_0(\Omega)^d$ give $\alpha\bv\in H^1_0(\Omega)^d$, and
+likewise for $\bu$; the two identities are then the divergence theorem applied to
+$p\,\alpha\bv$ and to $q\,\alpha\bu$, whose boundary terms vanish.
+\end{proof}
+
+\noindent Taking $\bv=\bu$ and $q=p$ in \cref{lem:globalid} gives the two \emph{diagonal}
+identities used in the stability proof: the convective pairing $(\bu,\alpha\,\ba\cdot\nabla\bu)$
+vanishes, and $(\bu,\alpha\nabla p)+\bigl(p,\nabla\cdot(\alpha\bu)\bigr)=0$.
+
+\subsubsection{The ASGS triple norm}\label{sec:norm}
+
+The stability and convergence analysis is carried out in the mesh{\hyp}dependent ASGS working
+norm $\triplenorm{\cdot}_{\mathrm{A}}$ of \cref{lemma:Stability}; as this appendix treats only
+the ASGS method, no ambiguity arises and we drop the subscript, writing simply
+$\triplenorm{\cdot}$. Written out in the expanded broken notation of
+\cref{eq:TauInnerProduct}, it reads
+\begin{equation}\label{eq:triplenorm}
+\begin{aligned}
+  \triplenorm{V_h}
+  \coloneqq \Bigl(
+  &\nu\bigl\lVert\alpha^{1/2}\ViscProj\nabla\bvh\bigr\rVert^2
+  + \bigl\lVert\sigmatilde^{1/2}\bvh\bigr\rVert_h^2
+  + \varepsilon\bigl\lVert q_h \bigr\rVert^2 \\
+  &+ \bigl\lVert\tau_1^{1/2}\alpha\X(V_h)\bigr\rVert_h^2
+  + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\bvh)\bigr\rVert_h^2
+  \Bigr)^{1/2}.
+\end{aligned}
+\end{equation}
+Its five terms control, respectively, the viscous gradient, the damped reaction, the
+compressibility, the first{\hyp}order momentum residual and the porous divergence. That it is
+indeed a norm on $\Xh$---the viscous term alone controlling the velocity, after which the
+$\tau_1$ residual term and the compressibility (or, when $\varepsilon=0$, the zero{\hyp}mean
+constraint) pin the pressure---is the content of the following lemma.
+
+\begin{lemma}[Definiteness of the working norm]\label{lem:definiteness}
+Let \cref{H:data,H:projector,H:porosity,H:advection,H:spaces} hold. Then $\triplenorm{\cdot}$ of
+\eqref{eq:triplenorm} is a norm on $\Xh$.
+\end{lemma}
+\begin{proof}
+Homogeneity, symmetry and the triangle inequality being immediate, only definiteness remains.
+Suppose $\triplenorm{V_h}=0$. Since $\nu>0$ (\cref{H:data}) and $\alpha\ge\alpha_0>0$
+(\cref{H:porosity}), the first term forces $\ViscProj\nabla\bvh=0$, hence $\nabla\bvh=0$ by the
+Korn compatibility \cref{eq:PiKorn} of \cref{H:projector}---available with
+$C_{\mathrm{K}}=\sqrt2$ for the whole family of \cref{lem:projinstances}, by
+\cref{lem:projfamily}---and $\bvh=\boldsymbol 0$ by Poincar\'e. Then $\X(V_h)=\nabla p_h$, and
+the $\tau_1$ term---whose weights $\tau_{1,K}=(\varphi_{1,K}+\sigma)^{-1}$ are positive, $|\ba|_{\infty,K}$ being finite by \cref{H:advection}---forces $\nabla p_h=0$, so that
+$p_h$ is constant on the connected domain $\Omega$ ($\mathcal{Q}_{h0}\subset H^1(\Omega)$ by
+\cref{H:spaces}). That constant vanishes: through the term $\varepsilon\norm{p_h}^2$ when
+$\varepsilon>0$, and through the zero{\hyp}mean constraint defining $\mathcal{Q}_0$ when
+$\varepsilon=0$.
+\end{proof}
+
+\subsection{Stability}\label{sec:coercivity}
+The stability of the ASGS method is the coercivity of $\BASGS $ in the working norm
+\eqref{eq:triplenorm}: this is \cref{lemma:Stability} of the main text, which we now prove. It
+is the only place where the design condition \cref{H:coercivity} on $c_1$ is used, and the first
+of the two where the porosity{\hyp}weighted inverse estimate \eqref{eq:winv-divvisc} is (the
+other being Step~4 of the continuity proof).
 
 \begin{lemma}[Coercivity]\label{lem:coercivity}
-Let \cref{H:mesh,H:data,H:porosity,H:advection} hold and let $c_1 > 2\xi\,\Cinva^2$ for some $\xi>2$. There is
-a constant $C_{\mathrm{coer}}>0$, depending only on $\xi$, on $C_2$ of \eqref{eq:UpperBoundOnEpsilon} and
-on the shape regularity, such that
+Let \cref{H:mesh,H:data,H:projector,H:porosity,H:advection,H:spaces} hold, together with the design
+condition \cref{H:coercivity}, i.e.\ $c_1 > 2\xi\,\Cinva^2$ for some $\xi>2$. Then
 \begin{equation}\label{eq:coercivity}
   \BASGS (\ba; U_h,U_h) \ \ge\ C_{\mathrm{coer}}\,\triplenorm{U_h}^2
-  \qquad\forall\,U_h\in\Xh .
+  \qquad\forall\,U_h\in\Xh ,
 \end{equation}
+with the explicit constant
+\begin{equation}\label{eq:coerconstant}
+  C_{\mathrm{coer}} \coloneqq \min\Bigl\{1-\frac{4\Cinva^2}{c_1},\ 1-C_2\Bigr\}
+  \ \ge\ \min\Bigl\{1-\frac{2}{\xi},\ 1-C_2\Bigr\} \ >\ 0 ,
+\end{equation}
+$C_2<1$ being the compressibility constant of \eqref{eq:UpperBoundOnEpsilon}. In particular
+$C_{\mathrm{coer}}$ is bounded below by a quantity depending only on $\xi$ and $C_2$, and is
+independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$.
 \end{lemma}
 
 \begin{proof}
 Put $V_h=U_h=[\buh;p_h]$ in \eqref{eq:Bstab} and group the terms.
 
-\emph{Galerkin diagonal.}
-The convective pairing is skew and vanishes,
-$\bigl(\buh,\alpha\,\ba\cdot\nabla\buh\bigr)
-=-\tfrac12\!\int_\Omega\!\nabla\cdot(\alpha\ba)\,|\buh|^2=0$,
-by \cref{H:advection} and $\buh\in H^1_0(\Omega)^d$; the two pressure--velocity pairings
-cancel after integration by parts,
-$\bigl(\buh,\alpha\nabla p_h\bigr)+\bigl(p_h,\nabla\cdot(\alpha\buh)\bigr)=0$ (again
-$\buh\in H^1_0$). Hence the Galerkin part equals
+\medskip\noindent\emph{Step 1: the Galerkin diagonal.}
+By the diagonal case of \cref{lem:globalid}, the convective pairing vanishes,
+$\bigl(\buh,\alpha\,\ba\cdot\nabla\buh\bigr)=0$ by \eqref{eq:skew}, and the two
+pressure--velocity pairings cancel,
+$\bigl(\buh,\alpha\nabla p_h\bigr)+\bigl(p_h,\nabla\cdot(\alpha\buh)\bigr)=0$ by
+\eqref{eq:globalibp}. Hence the Galerkin part reduces to the coercive diagonal of the main
+text,
 $2\nu\norm{\alpha^{1/2}\ViscProj\nabla\buh}^2+\sigma\norm{\buh}^2+\varepsilon\norm{p_h}^2$.
 
-\emph{Stabilization diagonals.}
+\medskip\noindent\emph{Step 2: the stabilization diagonals.}
 In the $\tau_1$ term the mixed products cancel by the symmetry of the weighted inner
-product, leaving
+product---the weights $\tau_{1,K}$ being elementwise constant, \cref{H:spaces}---leaving
 \begin{equation}\label{eq:stabdiag1}
   \bigl(\alpha\X(U_h)+G(\buh),\,\tau_1[\alpha\X(U_h)-G(\buh)]\bigr)_h
   = \bigl\lVert\tau_1^{1/2}\alpha\X(U_h)\bigr\rVert_h^2
@@ -431,7 +540,7 @@ and, likewise, the $\tau_2$ term equals
 $\lVert\tau_2^{1/2}\nabla\cdot(\alpha\buh)\rVert_h^2
 -\varepsilon^2\lVert\tau_2^{1/2}p_h\rVert_h^2$.
 
-\emph{Reaction renormalization and penalty.}
+\medskip\noindent\emph{Step 3: reaction renormalization and penalty absorption.}
 Write $G(\buh)=G_{\mathrm v}-\sigma\buh$ with
 $G_{\mathrm v}\coloneqq 2\nu\,\nabla\cdot(\alpha\ViscProj\nabla\buh)$. Then
 \begin{equation}\label{eq:Gexpand}
@@ -441,7 +550,8 @@ $G_{\mathrm v}\coloneqq 2\nu\,\nabla\cdot(\alpha\ViscProj\nabla\buh)$. Then
   + \sigma^2\bigl\lVert\tau_1^{1/2}\buh\bigr\rVert_h^2 ,
 \end{equation}
 and its last term recombines with the Galerkin reaction into the damped coefficient of the
-working norm, since $\sigma-\sigma^2\tau_1=\sigmatilde$ by \eqref{eq:sigmatilde}:
+working norm: on each element $\sigma-\sigma^2\tau_{1,K}=\sigmatilde|_K$ by
+\eqref{eq:sigmatilde}, so that, summing (again using \cref{H:spaces}),
 \begin{equation}\label{eq:reactrenorm}
   \sigma\norm{\buh}^2-\sigma^2\bigl\lVert\tau_1^{1/2}\buh\bigr\rVert_h^2
   = \bigl\lVert\sigmatilde^{1/2}\buh\bigr\rVert_h^2 .
@@ -450,7 +560,7 @@ Similarly, by \ref{P:eps} ($\varepsilon\tau_2\le C_2<1$) the penalty residual is
 $\varepsilon\norm{p_h}^2-\varepsilon^2\lVert\tau_2^{1/2}p_h\rVert_h^2
 \ge (1-C_2)\,\varepsilon\norm{p_h}^2\ge 0$.
 
-\emph{Absorption of the viscous residual.}
+\medskip\noindent\emph{Step 4: absorption of the viscous residual.}
 By \eqref{eq:winv-divvisc} and $\tau_1\le h^2/(c_1\alpha_K\nu)$ from \ref{P:components},
 \begin{equation}\label{eq:viscabsorb}
   \bigl\lVert\tau_1^{1/2}G_{\mathrm v}\bigr\rVert_h^2
@@ -461,10 +571,13 @@ and the cross term is estimated per element by the Cauchy--Schwarz inequality, t
 estimate \eqref{eq:winv-divvisc}, and Young's inequality $2ab\le\eta^{-1}a^2+\eta b^2$ (any
 $\eta>0$): since $G_{\mathrm v}=2\nu\,\nabla\cdot(\alpha\ViscProj\nabla\buh)$,
 \[
+\begin{aligned}
   \bigl|2\sigma\bigl(\tau_1 G_{\mathrm v},\buh\bigr)_K\bigr|
-  \le 4\nu\sigma\tau_1\bigl\lVert\nabla\cdot(\alpha\ViscProj\nabla\buh)\bigr\rVert_K\norm{\buh}_K
-  \le 4\nu\sigma\tau_1\,\frac{\Cinva}{h}\,\alpha_K^{1/2}
-  \bigl\lVert\alpha^{1/2}\ViscProj\nabla\buh\bigr\rVert_K\norm{\buh}_K ,
+  &\le 4\nu\sigma\tau_1
+    \bigl\lVert\nabla\cdot(\alpha\ViscProj\nabla\buh)\bigr\rVert_K\norm{\buh}_K \\
+  &\le 4\nu\sigma\tau_1\,\frac{\Cinva}{h}\,\alpha_K^{1/2}
+    \bigl\lVert\alpha^{1/2}\ViscProj\nabla\buh\bigr\rVert_K\norm{\buh}_K ,
+\end{aligned}
 \]
 so that, taking $a=2(\nu\sigma\tau_1)^{1/2}\bigl\lVert\alpha^{1/2}\ViscProj\nabla\buh\bigr\rVert_K$
 and $b=(\nu\sigma\tau_1)^{1/2}(\Cinva/h)\,\alpha_K^{1/2}\norm{\buh}_K$,
@@ -474,7 +587,7 @@ and $b=(\nu\sigma\tau_1)^{1/2}(\Cinva/h)\,\alpha_K^{1/2}\norm{\buh}_K$,
   + \eta\,\Cinva^2\,\frac{\nu\sigma\tau_1\alpha_K}{h^2}\,\norm{\buh}_K^2\Bigr\}.
 \end{equation}
 
-\emph{Collection.}
+\medskip\noindent\emph{Step 5: collection.}
 We combine the diagonal, the reaction renormalisation \eqref{eq:reactrenorm}, the penalty
 absorption, and \eqref{eq:viscabsorb}--\eqref{eq:crossbound}, bounding $\sigma\tau_1\le1$
 (\ref{P:basic}) in the first cross term of \eqref{eq:crossbound} and, in the second,
@@ -493,19 +606,65 @@ subtract from the single Galerkin term $2\nu\norm{\alpha^{1/2}\ViscProj\nabla\bu
   + \bigl\lVert\tau_2^{1/2}\nabla\cdot(\alpha\buh)\bigr\rVert_h^2 .
 \end{aligned}
 \end{equation}
-The Young parameter $\eta>0$ is at our disposal. The hypothesis $c_1>2\xi\Cinva^2$ for some
-$\xi>2$ is equivalent to $c_1>4\Cinva^2$; choosing $\eta=4$ makes the viscous coefficient
-$2(1-\tfrac{2}{\eta})-\tfrac{4\Cinva^2}{c_1}=1-\tfrac{4\Cinva^2}{c_1}$ and the
-damped{\hyp}reaction coefficient $1-\tfrac{\eta\Cinva^2}{c_1}=1-\tfrac{4\Cinva^2}{c_1}$ both
-strictly positive, exactly under this hypothesis. With $1-C_2>0$ and the two remaining
-coefficients equal to $1$, this gives \eqref{eq:coercivity} with $C_{\mathrm{coer}}$ the
-minimum of the three nontrivial coefficients.
+
+\medskip\noindent\emph{Step 6: choice of the Young parameter, and conclusion.}
+Only the first two coefficients of \eqref{eq:coerccollect} depend on $\eta>0$, which is still at
+our disposal: writing $t\coloneqq\Cinva^2/c_1$, the viscous one,
+$c_{\mathrm v}(\eta)\coloneqq2(1-2/\eta)-4t$, increases with $\eta$, while the damped{\hyp}reaction one,
+$c_{\mathrm r}(\eta)\coloneqq1-\eta t$, decreases. Their minimum is therefore largest where the two
+coincide, and $c_{\mathrm v}(\eta)=c_{\mathrm r}(\eta)$ reads $t\eta^2+(1-4t)\eta-4=0$, i.e.\
+$(\eta-4)(t\eta+1)=0$: the optimal choice is $\eta=4$, \emph{whatever the value of $t$}, and it
+makes both coefficients equal to
+\begin{equation}\label{eq:coercoeff}
+  c_{\mathrm v}(4)=c_{\mathrm r}(4)=1-\frac{4\Cinva^2}{c_1} .
+\end{equation}
+This common value is positive precisely when $c_1>4\Cinva^2$, so that condition is not merely
+sufficient but necessary for the present collection---and it is exactly what
+\cref{H:coercivity} grants, since ``$c_1>2\xi\Cinva^2$ for some $\xi>2$'' and
+``$c_1>4\Cinva^2$'' are equivalent requirements on $c_1$. The first reading gives in addition
+$4\Cinva^2/c_1<2/\xi$, whence the $\xi$-explicit lower bound in \eqref{eq:coerconstant}.
+
+The compressibility coefficient is $1-C_2>0$ and the two residual squares carry the coefficient
+$1$; comparing \eqref{eq:coerccollect} termwise with \eqref{eq:triplenorm} therefore yields
+\eqref{eq:coercivity} with the constant \eqref{eq:coerconstant}.
 \end{proof}
 
-\subsection{The continuity estimate}\label{sec:continuity}
+\noindent Because $\triplenorm{\cdot}$ is a \emph{norm} on $\Xh$ (\cref{lem:definiteness}) and
+not merely a seminorm, \eqref{eq:coercivity} makes the operator of the square discrete system
+injective, hence invertible: the discrete ASGS problem has a unique solution $U_h\in\Xh$, which
+obeys the a priori bound
+$\triplenorm{U_h}\le C_{\mathrm{coer}}^{-1}\sup_{V_h\in\Xh\setminus\{0\}}
+\lvert\LASGS(\ba;V_h)\rvert/\triplenorm{V_h}$.
+
+\begin{remark}[Sharpness of the condition on $c_1$]\label{rem:c1sharp}
+The threshold $c_1>4\Cinva^2$ is the worst case over the reaction regime, and it can be traced
+to the single place where the reaction was discarded: in Step~5 the factor $\sigma\tau_1\le1$
+was used to charge the whole first cross term of \eqref{eq:crossbound} against the viscous
+Galerkin term. Since Young's inequality is applied elementwise, $\eta$ may be taken
+element{\hyp}dependent and $s_K\coloneqq\sigma\tau_{1,K}\in[0,1)$ kept: the elemental
+coefficients are then $c_{\mathrm v,K}(\eta)=2-4s_K/\eta-4t$ and $c_{\mathrm r,K}(\eta)=1-\eta t$, whose maximin is
+positive if and only if $2-4t(1+s_K)>0$, that is
+\begin{equation}\label{eq:c1elemental}
+  c_1 > 2\bigl(1+\sigma\tau_{1,K}\bigr)\,\Cinva^2 \qquad\text{on every } K .
+\end{equation}
+The reaction{\hyp}dominated limit $\sigma\tau_{1,K}\to1$ recovers $c_1>4\Cinva^2$, whereas in the
+absence of reaction, and more generally on any viscosity{\hyp}dominated element,
+$c_1>2\Cinva^2$ already suffices. The latter is the purely geometric, elementwise requirement
+that governs the choice of $c_1$ in three dimensions
+(cf.\ \cref{sec:NumericalExamplesStationaryCase3D}). We state \cref{lem:coercivity} under the
+uniform condition \cref{H:coercivity} because it is parameter{\hyp}free.
+\end{remark}
+
+\subsection{Continuity}\label{sec:continuity}
+The counterpart of \cref{lem:coercivity} is a continuity estimate in which the first argument of
+$\BASGS $ is measured in the mesh{\hyp}dependent quantities that the interpolation error will
+later supply. It is \cref{lemma:Continuity} of the main text. Of the design constants it
+requires only $c_1,c_2>0$---not the coercivity condition \cref{H:coercivity}---but it does
+require the jump condition \cref{H:jump}, and with it the $L^\infty$ inverse estimate, whenever
+$\sigma>0$ (\cref{rem:hypotheses}).
 
 \begin{lemma}[Continuity]\label{lem:continuity}
-Let \cref{H:mesh,H:data,H:porosity,H:advection} hold, together with the jump condition \cref{H:jump} when $\sigma>0$, with $c_1,c_2>0$. Then there exists $C>0$,
+Let \cref{H:mesh,H:data,H:projector,H:porosity,H:advection,H:spaces} hold, together with the jump condition \cref{H:jump} when $\sigma>0$, with $c_1,c_2>0$. Then there exists $C>0$,
 independent of the mesh size and of $\nu,\sigma,\varepsilon,\ba,\alpha$, such that
 \begin{equation}\label{eq:continuity}
   \bigl\lvert\BASGS (\ba; U_h,V_h)\bigr\rvert
@@ -530,9 +689,9 @@ $\alpha\le 1$.
 
 \begin{proof}
 Throughout the proof we write $U=U_h=[\bu;p]$ and $V=V_h=[\bv;q]$, dropping the subscript
-$h$ of the unknowns for conciseness, and we omit the element subscript $K$ in
-$\tau_1,\tau_2,\varphi_1,\alpha_K,h,|\ba|_\infty$ inside elementwise sums. The proof
-follows the steps of the proof of Lemma~2 in~\cite{codina2001stabilized}.
+$h$ of the unknowns for conciseness, and, as elsewhere, we omit the element subscript inside
+elementwise sums. The proof follows the steps of the proof of Lemma~2
+in~\cite{codina2001stabilized}.
 
 \medskip\noindent\emph{Step 0: term decomposition.}
 Expanding the products in \eqref{eq:Bstab} we obtain
@@ -686,34 +845,17 @@ absorbed into the group $N$}.
 $N\coloneqq R+T_2+T_4+T_{11}$.}
 
 \smallskip\noindent\emph{Step 6a: exact rewriting of $N$.}
-We first record three integration-by-parts identities.
-\begin{enumerate}[label=\textup{(\roman*)},leftmargin=2.6em]
-\item (Global skew-symmetry of convection.) For $\bu,\bv\in\mathcal{V}_{h0}$ the
-pointwise identity
-$(\alpha\ba\cdot\nabla\bu)\cdot\bv+(\alpha\ba\cdot\nabla\bv)\cdot\bu
-=\alpha\ba\cdot\nabla(\bu\cdot\bv)$ holds, and $\bu\cdot\bv\in W^{1,1}_0(\Omega)$;
-\cref{H:advection} then gives $\int_\Omega\alpha\ba\cdot\nabla(\bu\cdot\bv)\dd\Omega=0$,
-i.e.
-\begin{equation}\label{eq:skew}
-  (\bv,\alpha\,\ba\cdot\nabla\bu) = -(\bu,\alpha\,\ba\cdot\nabla\bv).
-\end{equation}
-\item (Global pressure/mass integration by parts.) Since
-$\alpha\in W^{1,\infty}(\Omega)$ and $\bv\in H^1_0(\Omega)^d$, we have
-$\alpha\bv\in H^1_0(\Omega)^d$, and similarly for $\bu$; hence
-\begin{equation}\label{eq:globalibp}
-  (\bv,\alpha\nabla p) = -\bigl(p,\nabla\cdot(\alpha\bv)\bigr),
-  \qquad
-  \bigl(q,\nabla\cdot(\alpha\bu)\bigr) = -(\bu,\alpha\nabla q).
-\end{equation}
-\item (Elementwise convective integration by parts.) On each $K$, with $\tau_1$ constant
-on $K$, $\ba$ continuous on $\overline{K}$ and $\nabla\cdot(\alpha\ba)=0$ in $K$, the
-divergence theorem gives
+Besides the two global identities \eqref{eq:skew}--\eqref{eq:globalibp} of
+\cref{lem:globalid}---applicable here because $\bu,\bv\in\mathcal{V}_{h0}\subset H^1_0(\Omega)^d$
+and $p,q\in\mathcal{Q}_{h0}\subset H^1(\Omega)$---we need their elementwise counterpart for the
+convective term, which does carry a boundary contribution: on each $K$, with $\tau_1$ constant
+on $K$ (\cref{H:spaces}), $\ba$ continuous on $\overline{K}$ and $\nabla\cdot(\alpha\ba)=0$ in
+$K$, the divergence theorem gives
 \begin{equation}\label{eq:elemibp}
   \bigl(\tau_1\,\alpha\,\ba\cdot\nabla\bu,\bv\bigr)_K
   = -\bigl(\tau_1\,\alpha\,\ba\cdot\nabla\bv,\bu\bigr)_K
   + \tau_{1}\int_{\partial K}\alpha\,(\bn\cdot\ba)\,(\bu\cdot\bv)\dd\Gamma .
 \end{equation}
-\end{enumerate}
 Using \eqref{eq:skew}--\eqref{eq:globalibp} in $T_2$ and $T_4$,
 \begin{equation*}
   T_2 + T_4 = -\bigl(\bu,\alpha\X(V)\bigr) - \bigl(p,\nabla\cdot(\alpha\bv)\bigr),
@@ -850,8 +992,10 @@ On $\Gamma^b$ we bound $\alpha\,|\bn\cdot\ba|\le\alpha_{K_j}|\ba|_{\infty,K_j}
 \eqref{eq:jumpsplit} in the symmetric form
 $\sigma|\jump{\tau_1}|\le C(\sigmatilde\tau_1|_{K_i})^{1/2}
 (\sigmatilde\tau_1|_{K_j})^{1/2}$, and
-$\tau_{1,K_i}^{1/2}\varphi_{1,K_j}^{1/2}\le C\,(\tau_1\varphi_1|_{K_j})^{1/2}\le C$ (comparability of $\tau_1$ across the face
-and $\varphi_1\tau_1\le1$), we obtain on each face, after applying the $L^\infty$ inverse
+$\tau_{1,K_i}^{1/2}\tau_{1,K_j}^{1/2}\varphi_{1,K_j}
+=\bigl(\tau_{1,K_i}^{1/2}\varphi_{1,K_j}^{1/2}\bigr)
+\bigl(\tau_1\varphi_1|_{K_j}\bigr)^{1/2}\le C$ (comparability of $\tau_1$ across the face
+and $\varphi_1\tau_1\le1$, \cref{lem:parameters}\ref{P:basic}), we obtain on each face, after applying the $L^\infty$ inverse
 estimates and $\operatorname{meas}(\Gamma^b)\le Ch^{d-1}$ exactly as in Step~6b,
 \begin{equation}\label{eq:IIIface}
   \sigma\Bigl|\int_{\Gamma^b}\jump{\tau_1}\alpha(\bn\cdot\ba)(\bu\cdot\bv)
@@ -944,31 +1088,40 @@ Inserting \eqref{eq:normconv} in \eqref{eq:assembly} proves \eqref{eq:sharpcont}
 $\alpha_K\le1$ \cref{H:porosity} gives \eqref{eq:continuity}.
 \end{proof}
 
-\begin{remark}[Sharper, porosity-weighted estimate]\label{rem:sharper}
-The bound \eqref{eq:sharpcont} is strictly sharper than \eqref{eq:continuity} wherever
-$\alpha$ is small, and it propagates to the convergence estimate
-\eqref{eq:convergence} (equivalently, the porosity{\hyp}weighted form of the main-text
-estimate \eqref{eq:ConvergenceResult}). It is remarkable that the smallness condition
-\eqref{eq:UpperBoundOnEpsilon} on $\varepsilon$, with its factor $\alpha_K^2$, is exactly what is
-needed for the penalty contribution \eqref{eq:absorb3} to carry the weight $\alpha_K$ as
-well; the same factor is the one required by the stability analysis of the main text.
+\begin{remark}[Where the porosity weight comes from]\label{rem:sharper}
+The weight $\alpha_K$ of \eqref{eq:sharpcont}, which propagates to the convergence estimate
+\eqref{eq:convergence}, survives every step of the proof for one reason worth recording: the
+smallness condition \eqref{eq:UpperBoundOnEpsilon} on $\varepsilon$ carries the factor
+$\alpha_K^2$, and that is exactly what the penalty contribution \eqref{eq:absorb3} needs in
+order to carry the weight $\alpha_K$ as well. The same factor is the one demanded by the
+stability analysis, so the two requirements coincide rather than compete.
 \end{remark}
 
 \begin{remark}[Where each hypothesis is used]\label{rem:hypotheses}
 \Cref{H:data} (condition \eqref{eq:UpperBoundOnEpsilon}) enters Steps 3, 7 and 9;
+\cref{H:projector} enters through the symmetric form of $T_1$ and through
+\cref{lem:winv}, whose proof uses both the constant{\hyp}coefficient action of
+$\ViscProj$ and the contraction $|\ViscProj\mathbf{T}|\le|\mathbf{T}|$ (Steps 1, 4, 5 and 9);
+its Korn half \cref{eq:PiKorn} is \emph{not} used here, only in \cref{lem:definiteness};
 \cref{H:porosity} enters through \cref{lem:winv} (Steps 4, 5 and 9) and through
-$\alpha_K\le1$; \cref{H:advection} enters Step 6a; \cref{H:mesh} enters every inverse
-estimate and the facewise bookkeeping of Steps 6b and 6d; \cref{H:jump} enters only
-\eqref{eq:jumpsplit}, i.e.\ the jump terms of Steps 6b and 6d, which carry the factor
-$\sigma$ and hence vanish identically when $\sigma=0$. As in~\cite{codina2001stabilized}, the jump
-condition and the $L^\infty$ inverse estimate are therefore needed only when $\sigma>0$.
+$\alpha_K\le1$; \cref{H:advection} enters Step 6a; \cref{H:spaces} enters wherever
+$\tau_1,\tau_2$ are moved in or out of an elemental integral, in particular in Steps 2 and 6a;
+\cref{H:mesh} enters every inverse estimate and the facewise bookkeeping of Steps 6b and 6d;
+\cref{H:jump} enters only \eqref{eq:jumpsplit}, i.e.\ the jump terms of Steps 6b and 6d, which
+carry the factor $\sigma$ and hence vanish identically when $\sigma=0$. As
+in~\cite{codina2001stabilized}, the jump condition and the $L^\infty$ inverse estimate are
+therefore needed only when $\sigma>0$.
 \end{remark}
 
-\subsection{Consequences for the convergence analysis}\label{sec:convergence}
+\subsection{Convergence}\label{sec:convergence}
+Stability and continuity are now combined in the standard way. The only new ingredient is that
+the continuity estimate has to be re-run with the \emph{interpolation error} in its first slot,
+where the inverse estimates of \cref{lem:winv} are no longer available and must be replaced by
+interpolation estimates.
 
 \subsubsection{Interpolation estimates}
-Let $U=[\bu;p]$ denote the solution of the continuous linearized problem and assume the
-regularity
+Let $U=[\bu;p]$ denote the solution of the continuous linearized problem, whose regularity
+\cref{H:regularity} we write, allowing for extra smoothness, as
 \begin{equation}\label{eq:regularity}
   U\in\mathcal{W}_r \coloneqq
   \bigl(H^{m}(\Omega)\cap H^1_0(\Omega)\bigr)^d
@@ -978,16 +1131,32 @@ with $m\ge k_u+1\ (\ge 2)$ and $n\ge k_p+1\ (\ge 2)$.
 In particular
 $\mathcal{L}_{\ba}U\in L^2(K)$ for every $K$, so that the consistency property
 \eqref{eq:consistency} holds, and for $d\le3$ both $\bu$ and $p$ are continuous on
-$\overline{\Omega}$. Let $\buhat\in\mathcal{V}_{h0}$ be the Lagrange interpolant of $\bu$, and let
-$\widehat{p}_h$ be the Lagrange interpolant $I_h p$ of $p$, mean{\hyp}corrected to
-$\widehat{p}_h\coloneqq I_h p-\tfrac{1}{|\Omega|}\int_\Omega I_h p$ when $\mathcal{Q}_{h0}$ is the
-zero{\hyp}mean subspace (the case $\varepsilon=0$), so that $\widehat{p}_h\in\mathcal{Q}_{h0}$; since $p$
-has zero mean, the shift $\tfrac{1}{|\Omega|}\int_\Omega I_h p=\tfrac{1}{|\Omega|}\int_\Omega(I_h p-p)$
-is bounded by $\lVert p-I_h p\rVert$ and is invisible in the $\nabla\cdot(\alpha\bvh)$ pairing (its
-gradient vanishes and $\int_\Omega\nabla\cdot(\alpha\bvh)=0$ for $\bvh\in H^1_0$) and in the
-$\varepsilon=0$ mass term. Set
-$\widehat{U}_h\coloneqq[\buhat;\widehat{p}_h]$, and define the elemental interpolation
-errors
+$\overline{\Omega}$. Let $\buhat\in\mathcal{V}_{h0}$ be the Lagrange interpolant of $\bu$ and
+$I_h p$ that of $p$. For $\varepsilon>0$ we set $\widehat{p}_h\coloneqq I_h p$; when
+$\mathcal{Q}_{h0}$ is the zero{\hyp}mean subspace---the case $\varepsilon=0$---the interpolant
+must be mean{\hyp}corrected to
+$\widehat{p}_h\coloneqq I_h p-\tfrac{1}{|\Omega|}\int_\Omega I_h p$ so that
+$\widehat{p}_h\in\mathcal{Q}_{h0}$. In either case we set
+$\widehat{U}_h\coloneqq[\buhat;\widehat{p}_h]\in\Xh$.
+
+The mean shift is a \emph{global} constant, and therefore not controlled by any local
+interpolation error; it is, however, invisible to the analysis exactly in the case where it is
+applied. Indeed, the first{\hyp}slot pressure enters \eqref{eq:Bstab} only through $\nabla p$
+(inside $\X$, \cref{eq:XG}) and through the two terms carrying $\varepsilon$, and it enters
+\eqref{eq:triplenorm} only in the same two ways, so that for every constant $c$
+\begin{equation}\label{eq:constshift}
+  \BASGS \bigl(\ba;[\boldsymbol{0};c],V_h\bigr)=0
+  \quad\text{and}\quad
+  \triplenorm{[\boldsymbol{0};c]}=0
+  \qquad (\varepsilon=0,\ \forall\, V_h\in\Xh).
+\end{equation}
+All the estimates below may therefore be carried out with the \emph{uncorrected} interpolant
+$I_h p$, the correction being reinstated only where the membership
+$\widehat{U}_h-U_h\in\Xh$ is invoked, in the proof of \cref{thm:convergence}. We accordingly
+write the interpolation estimates for $I_h p$.
+
+Let the elemental interpolation error
+\cref{eq:InterpolationError} of the main text be evaluated on the two fields,
 \begin{equation}\label{eq:Eint}
   \Eint{K}{\bu}\coloneqq h_K^{k_u+1}\norm{\bu}_{H^{k_u+1}(K)},
   \qquad
@@ -998,7 +1167,7 @@ Standard interpolation theory~\cite{brenner2008mathematical,ernguermond} provide
 \begin{aligned}
   \norm{\bu-\buhat}_{H^{m'}(K)} &\le C\,h_K^{-m'}\,\Eint{K}{\bu},
   \qquad m'\in\{0,1,2\},\\
-  \norm{p-\widehat{p}_h}_{H^{m'}(K)} &\le C\,h_K^{-m'}\,\Eint{K}{p},
+  \norm{p-I_h p}_{H^{m'}(K)} &\le C\,h_K^{-m'}\,\Eint{K}{p},
   \qquad m'\in\{0,1\},
 \end{aligned}
 \end{equation}
@@ -1006,11 +1175,12 @@ and, since $k_u+1,\,k_p+1>d/2$ for $d\le3$, also the $L^\infty$ estimates
 \begin{equation}\label{eq:interpinfty}
 \begin{aligned}
   \norm{\bu-\buhat}_{L^\infty(K)} &\le C\,h_K^{-d/2}\,\Eint{K}{\bu},\\
-  \norm{p-\widehat{p}_h}_{L^\infty(K)} &\le C\,h_K^{-d/2}\,\Eint{K}{p},
+  \norm{p-I_h p}_{L^\infty(K)} &\le C\,h_K^{-d/2}\,\Eint{K}{p},
 \end{aligned}
 \end{equation}
 which are the analogues of Eqs.~(78)--(79) of~\cite{codina2001stabilized}. We abbreviate
-$E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
+$E\coloneqq[\beu;e_p]\coloneqq[\bu-\buhat;\,p-I_h p]$, interchangeable with $U-\widehat{U}_h$
+throughout by \eqref{eq:constshift}, and define
 \begin{equation}\label{eq:psih}
 \begin{aligned}
   \Psi(h)
@@ -1025,20 +1195,23 @@ $E\coloneqq U-\widehat{U}_h=[\beu;e_p]$ and define
 \end{aligned}
 \end{equation}
 the first inequality being the discrete $\ell^2\subset\ell^1$ bound (using
-$a^2+b^2\le(a+b)^2$ elementwise); $\Psi(h)$ is the porosity{\hyp}weighted $\ell^2$
-functional in which the sharp estimate is stated, $\overline{\Psi}(h)$ its coarser $\ell^1$ majorant.
+$a^2+b^2\le(a+b)^2$ elementwise). Here $\Psi(h)$ is the porosity{\hyp}weighted $\ell^2$
+functional appearing on the right of the main{\hyp}text estimate \eqref{eq:ConvergenceResult}---we
+drop its method subscript, as we do for the norm---and $\overline{\Psi}(h)$ is its coarser
+$\ell^1$ majorant. The estimates below are therefore stated in
+$\Psi(h)$: on a quasi{\hyp}uniform family the passage to $\ell^1$ can cost a mesh{\hyp}cardinality
+factor $\sim h^{-d/2}$, so the optimal orders must be read off the $\ell^2$ functional.
 
 \subsubsection{Continuity with respect to the interpolation error}
 
 \begin{lemma}[Continuity for the interpolation error]\label{lem:continterp}
-Let \cref{H:mesh,H:data,H:porosity,H:advection} and the jump condition \cref{H:jump} (when $\sigma>0$) hold, and let $U\in\mathcal{W}_r$. Then
+Let \cref{H:mesh,H:data,H:projector,H:porosity,H:advection,H:spaces} and the jump condition \cref{H:jump} (when $\sigma>0$) hold, and let $U\in\mathcal{W}_r$. Then
 \begin{equation}\label{eq:continterp}
   \bigl|\BASGS \bigl(\ba;\,U-\widehat{U}_h,\,V_h\bigr)\bigr|
   \le C\,\Psi(h)\,\triplenorm{V_h}
   \qquad\forall\,V_h\in\Xh ,
 \end{equation}
-with $\Psi(h)\le\overline{\Psi}(h)$ the porosity{\hyp}weighted $\ell^2$ functional of \eqref{eq:psih};
-the coarser $\ell^1$ bound in terms of $\overline{\Psi}(h)$ follows as a corollary.
+with $\Psi(h)$ the functional of \eqref{eq:psih}.
 \end{lemma}
 
 \begin{proof}
@@ -1052,10 +1225,11 @@ the first argument that $\beu\in H^1_0(\Omega)^d$ with $\beu|_K\in H^2(K)^d$, an
 $e_p\in H^1(\Omega)$, together with the continuity of $\beu$ and $e_p$ across interior
 faces; all of this holds by \eqref{eq:regularity} (for $d\le 3$,
 $H^2(K)\hookrightarrow C^0(\overline{K})$ and $\bu,p\in C^0(\overline{\Omega})$, while
-$\buhat,\widehat{p}_h$ are continuous finite element functions). In particular
-$\beu\cdot\bvh\in W^{1,1}_0(\Omega)$, so \eqref{eq:skew} holds, and the elementwise
-identities \eqref{eq:elemibp} and those preceding \eqref{eq:IandIV} hold with
-well-defined traces.
+$\buhat,\widehat{p}_h$ are continuous finite element functions). In particular this places $E$
+within the scope of \cref{lem:globalid}---which was stated for $H^1_0(\Omega)^d\times
+H^1(\Omega)$ precisely so as to cover the non{\hyp}discrete first argument---so that
+\eqref{eq:skew}--\eqref{eq:globalibp} apply verbatim, and the elementwise identities
+\eqref{eq:elemibp} and those preceding \eqref{eq:IandIV} hold with well-defined traces.
 
 \smallskip\noindent\emph{(2) Inverse estimates on the first argument are replaced by
 interpolation estimates.}
@@ -1102,8 +1276,7 @@ with \eqref{eq:interpdivvisc}--\eqref{eq:interpinftyE} gives
   + \tau_{1,K}(\Eint{K}{p})^2\bigr)\Bigr)^{1/2}
   = C\,\Psi(h),
 \end{equation}
-the middle expression being the porosity{\hyp}weighted $\ell^2$ functional $\Psi(h)$ of
-\eqref{eq:psih} (and only afterwards, if desired, majorised by $\overline{\Psi}(h)$).
+the middle expression being $\Psi(h)$ of \eqref{eq:psih} written out.
 \item The bracketed norms in \eqref{eq:assembly} are broken mesh $\ell^2${\hyp}norms and are
 bounded, by the $m'=0$ estimates in \eqref{eq:interpzero}, as
 $\bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\beu\bigr\rVert_h
@@ -1118,7 +1291,7 @@ $\bigl|\BASGS (\ba;E,V_h)\bigr|\le C\triplenorm{V_h}\bigl(\triplenorm{E}+C\Psi(h
 \eqref{eq:Enorm} concludes the proof.
 \end{proof}
 
-\subsubsection{Convergence}
+\subsubsection{Main theorem}
 
 \begin{theorem}[Convergence]\label{thm:convergence}
 Under the hypotheses of \cref{lem:coercivity,lem:continterp},
@@ -1127,36 +1300,33 @@ Under the hypotheses of \cref{lem:coercivity,lem:continterp},
   \triplenorm{U-U_h}
   &\le C\,\Psi(h) \\
   &= C\Bigl(\sum_{K\in\Th}\alpha_K^2\,h_K^{-2}
-  \bigl(\tau_{2,K}\,\Eint{K}{\bu}^2+\tau_{1,K}\,\Eint{K}{p}^2\bigr)\Bigr)^{1/2} \\
-  &\;\le\; C\,\overline{\Psi}(h),
+  \bigl(\tau_{2,K}\,\Eint{K}{\bu}^2+\tau_{1,K}\,\Eint{K}{p}^2\bigr)\Bigr)^{1/2}
+  \;\le\; C\,\overline{\Psi}(h).
 \end{aligned}
 \end{equation}
-with $\Psi(h)\le\overline{\Psi}(h)$ the porosity{\hyp}weighted $\ell^2$ functional of \eqref{eq:psih}.
 \end{theorem}
 
 \begin{proof}
 Let $\Delta_h\coloneqq\widehat{U}_h-U_h\in\Xh$ (not to be confused with the total error
 $E_h = U-U_h$ of \cref{th:Convergence}). By \cref{lem:coercivity},
-consistency \eqref{eq:consistency} and \cref{lem:continterp} (which already delivers the
-porosity{\hyp}weighted $\ell^2$ bound $C\,\Psi(h)\,\triplenorm{V_h}$),
+consistency \eqref{eq:consistency} and \cref{lem:continterp},
 \begin{equation*}
-  C\,\triplenorm{\Delta_h}^2
+  C_{\mathrm{coer}}\,\triplenorm{\Delta_h}^2
   \le \BASGS (\ba;\Delta_h,\Delta_h)
   = \BASGS \bigl(\ba;\widehat{U}_h-U,\Delta_h\bigr)
   \le C\,\Psi(h)\,\triplenorm{\Delta_h},
 \end{equation*}
-so $\triplenorm{\Delta_h}\le C\Psi(h)$. Since \eqref{eq:Enorm} bounds
-$\triplenorm{U-\widehat{U}_h}$ by the same $\Psi(h)$, the triangle inequality gives
+so $\triplenorm{\Delta_h}\le C\Psi(h)$. Here $\Delta_h$ is a legitimate test function precisely
+because $\widehat{U}_h$ was mean{\hyp}corrected, which is the only role the correction plays;
+$\triplenorm{U-\widehat{U}_h}=\triplenorm{E}$ by \eqref{eq:constshift}, and \eqref{eq:Enorm}
+bounds the latter by $C\,\Psi(h)$. The triangle inequality then gives
 $\triplenorm{U-U_h}\le\triplenorm{U-\widehat{U}_h}+\triplenorm{\Delta_h}\le C\,\Psi(h)\le C\,\overline{\Psi}(h)$.
 \end{proof}
 
-\noindent The bound \eqref{eq:convergence} is stated in the strongest form afforded by the
-present argument: the porosity{\hyp}weighted $\ell^2$ functional $\Psi(h)$, which coincides
-with the main-text estimate \eqref{eq:ConvergenceResult}. Two successive relaxations recover
-weaker but more familiar forms. First, the discrete $\ell^2\subset\ell^1$ inequality gives
-the $\ell^1$ bound $C\,\overline{\Psi}(h)$. Second, replacing the elementwise weight $\alpha_K\le1$ by
-$1$ throughout yields the porosity{\hyp}free estimate, which reduces (for $\alpha\equiv1$) to
-the form found in~\cite{codina2001stabilized}. Both relaxations only enlarge the bound, so
-the $\Psi(h)$ statement is the strongest of the three; in particular the local factor
-$\alpha_K$ makes it tighter in regions of low porosity, consistently with the robustness analysis of
-\cref{sec:Robustness}.
+\noindent This is the porosity{\hyp}weighted form of the main{\hyp}text bound
+\eqref{eq:ConvergenceResult}, whose interpretation is discussed there. We only add the caveat
+already noted after \eqref{eq:psih}: the two relaxations---to $\overline{\Psi}(h)$, and then to
+the porosity{\hyp}free weight $\alpha_K\equiv1$---are not innocuous in the same way. The second
+merely enlarges the constant, but the first can cost a mesh{\hyp}cardinality factor
+$\sim h^{-d/2}$, so the optimal convergence orders must be read off $\Psi(h)$ and not off its
+$\ell^1$ majorant.

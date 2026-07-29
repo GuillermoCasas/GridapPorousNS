@@ -14,7 +14,7 @@ python3 -m venv /tmp/sympy_venv && /tmp/sympy_venv/bin/pip install sympy numpy
 /tmp/sympy_venv/bin/python "run_all.py"
 ```
 
-Current status: **253/253 checks pass across 19 scripts.** See
+Current status: **498/498 checks pass across 23 scripts.** See
 [`../verification-gap-coverage.md`](../verification-gap-coverage.md) for why successive 2026-07
 external reviews still caught displayed-but-unchecked defects (F1/F2, the §6 isolation error
 F3/M03, and — 2026-07-22 — the App. C `T₁₃` bookkeeping and the App. D display coverage gap)

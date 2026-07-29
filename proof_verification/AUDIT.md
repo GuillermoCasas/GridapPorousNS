@@ -392,6 +392,9 @@ specialising `V = U` reproduces eq:StabilityEstimate exactly (the
 difference-of-squares check). The appendix definitions eq:taus/eq:phi1/
 eq:sigmatilde/eq:epscond match eq:Tau1Final/eq:Tau2Final/eq:SigmaAlpha/
 eq:UpperBoundOnEpsilon. ✔
+(2026-07-29: acting on exactly this finding, the redundant restatement eq:taus was
+deleted from App. C, which now cites eq:Tau1Final/eq:Tau2Final/eq:TauNavierStokes
+directly; eq:phi1 and eq:sigmatilde remain.)
 
 ---
 

@@ -47,3 +47,42 @@
 %%% mode:latex
 %%% TeX-master: "ex_article"
 %%% End:
+
+% ---------------------------------------------------------------------------
+% [known-fragility]  Appendix \section labels and \nameref.
+%
+% The SIAM class makes \appendix redefine \section as \secdef\append\sappend
+% (siamart190516.cls:912-937), and neither \append nor \sappend routes through
+% \@sect/\@ssect -- the only place nameref assigns \@currentlabelname.  So every
+% \label after an appendix \section inherited the name of the PRECEDING titled
+% unit; before this patch the live aux read
+%   \newlabel{app:ElementalMatrices}{{A}{55}{Acknowledgments}{...}}
+%   \newlabel{app:FourierTau}{{B}{65}{Boundary terms}{...}}
+% i.e. field 3 (the nameref title) was one unit stale for all four appendices.
+% Harmless under \cref (which reads fields 1-2), wrong under \nameref, and
+% misleading in the aux itself.
+%
+% Fix: REDEFINE \append/\sappend with the class body plus an explicit
+% \NR@gettitle.  Do NOT try to \let-wrap them: \newcommand\append[2][?] builds an
+% \@protected@testopt dispatcher that calls \append BY NAME, so a wrapper that
+% \lets the old meaning and renews the name recurses until
+% "TeX capacity exceeded [input stack size]" (verified 2026-07-29).
+% The \NR@gettitle call is guarded so the document still builds without hyperref.
+% ---------------------------------------------------------------------------
+\makeatletter
+\renewcommand\append[2][?]{%
+  \refstepcounter{section}%
+  \@ifundefined{NR@gettitle}{}{\NR@gettitle{#2}}%
+  {\par\addvspace{\@sectionspace}
+    \reset@font\normalsize\bfseries\appendixname\ \thesection. #2\@mypunct{} }%
+  \addcontentsline{toc}{section}{\appendixname~\thesection. #2}%
+  \gobblepars
+}
+\renewcommand\sappend[1]{%
+  \@ifundefined{NR@gettitle}{}{\NR@gettitle{#1}}%
+  {\par\addvspace{\@sectionspace}
+    \reset@font\normalsize\bfseries#1\@mypunct{} }%
+  \addcontentsline{toc}{section}{#1}%
+  \gobblepars
+}
+\makeatother

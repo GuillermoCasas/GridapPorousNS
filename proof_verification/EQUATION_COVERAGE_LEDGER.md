@@ -19,15 +19,37 @@ _Generated 2026-07-21 from an automated coverage audit (15 region agents over al
 
 ## Summary
 
+> **STATUS 2026-07-29 — generalized viscous projector.** The a priori theory was restated for a
+> family of viscous operators (standing assumption `H:projector` / `eq:PiOrthogonal` / `eq:PiKorn`;
+> main-text §2.1 `sec:ViscousProjector` with `lem:projfamily`, `lem:projinstances` (`rem:projscope`
+> and `eq:cPi` left the article on 2026-07-29 for `theory/viscous_projector_note/`; `eq:cPi` is
+> now defined in App. B, and the coverage below is unchanged)
+> — relocated there from the App. C subsubsection `sec:projectors` on 2026-07-29; App. B
+> `rem:ftGenericPi`). Seven new displays enter the ledger below (`eq:projmonotone`,
+> `eq:devsymidentity` — moved, label unchanged —, `eq:crossibp`, `eq:projconstants`, `eq:cPi`,
+> `eq:PiKorn`, `eq:ftGenericQuad`), **all covered**: exactly, for `d = 2, 3`, by the new
+> `sympy/projector_algebra_verification.py` (176 checks, including a source lint of the printed
+> constants and of the shared-appendix label constraint), and — for the abstract algebra —
+> by the new Coq module `ViscousProjector.v`. Suite now **442/442 across 21 scripts**; Coq
+> **25/25 files + coqchk**.
+>
+> One real defect was caught by the post-edit adversarial reread and fixed: the τ-design sentence
+> and `rem:ftGenericPi` claimed the dropped `O(1)` viscous factor lies in `[1,2]` **for every
+> (A3)-admissible projector**. That is false — (A3) asks only `c_Π > 0`, whereas the lower bound
+> `T_Π ≥ ½|k|²I` needs the strictly stronger `lem:projfamily` hypothesis. An explicit
+> counterexample (a tilted `d = 2` projector with `c_Π > 0` but factor `→ 0`) is now a permanent
+> negative control, section **E** of `projector_algebra_verification.py`, and lints **D10/D11**
+> guard the corrected scoping in both mains and in App. B.
+
 | Coverage | Count |
 |---|---|
-| SYMPY | 126 |
+| SYMPY | 132 |
 | DEFINITIONAL | 101 |
-| COQ | 64 |
+| COQ | 65 |
 | PARTIAL | 42 |
 | UNCHECKED | 26 |
 | MMS | 10 |
-| **Total** | **369** |
+| **Total** | **376** |
 
 ## A1-model  (10 equations)
 
@@ -83,7 +105,7 @@ _Generated 2026-07-21 from an automated coverage audit (15 region agents over al
 | eq:VMSWeakFormSystem | 566 | IDENTITY | PARTIAL | [NOT_AN_ERROR] Re-derived eq:VMSWeakFormSystem (article.tex line 566) from upstream equations.  |
 | eq:OSGSProjection | 576 | DEFINITION | DEFINITIONAL |  |
 | eq:TauInnerProduct | 580 | DEFINITION | DEFINITIONAL |  |
-| eq:L2InnerProduct | 584 | DEFINITION | DEFINITIONAL |  |
+| eq:L2InnerProduct | 584 | DEFINITION | DEFINITIONAL | Since 2026-07-29 this display carries ONLY the approximation `(.,.)_tau ~ (.,.)_h` (the implemented plain-L2 projection) and defines nothing; the broken pair it used to spell out moved into eq:TauInnerProduct, which is now the single definitional display for the whole notation set. |
 | eq:NonlinearStabilizedEquation | 597 | IDENTITY | PARTIAL | [CONFIRMED_UNCHECKED] Re-derived from first principles and verified with sympy. eq:NonlinearStabilized |
 | eq:ElementwiseSubscaleEquation | 598 | DEFINITION | DEFINITIONAL |  |
 | eq:NonlinearResidualProjection | 599 | DEFINITION | DEFINITIONAL |  |
@@ -225,12 +247,18 @@ _Generated 2026-07-21 from an automated coverage audit (15 region agents over al
 |---|---|---|---|---|
 | eq:strongop | 24 | DEFINITION | DEFINITIONAL |  |
 | eq:XG | 38 | DEFINITION | DEFINITIONAL |  |
-| eq:brokennotation | 61 | NOTATION | DEFINITIONAL |  |
+| ~~eq:brokennotation~~ | — | NOTATION | REMOVED 2026-07-29 | Broken/tau-weighted products and norms now defined once, in the main text Sec. 3.2, in the single display eq:TauInnerProduct (line 1 tau-matrix product + norm, line 2 broken product + norm, single-parameter weighting in the prose after it). The two Sec. 5 restatements eq:TauWeightedProduct and eq:BrokenProduct were retired 2026-07-29 as duplicates; App. C/D cite eq:TauInnerProduct. |
 | eq:Bstab | 74 | IDENTITY | PARTIAL | [NOT_AN_ERROR] Re-derived eq:Bstab (continuity_appendix.tex:74) from first principles. Upstream |
 | eq:consistency | 94 | OTHER | DEFINITIONAL | Encoded as hypothesis Horth in AbstractConvergence.v ('Galerkin orthogonality (eq:consistency)', lines 14/397) |
-| eq:taus | 100 | DEFINITION | DEFINITIONAL | Main-article eq:Tau1/eq:Tau2 forms recovered in fourier_tau_verification.py [6]; here it is a restatement/def  |
+| ~~eq:taus~~ | — | DEFINITION | REMOVED 2026-07-29 | Was a restatement of main-article eq:Tau1Final/eq:Tau2Final/eq:TauNavierStokes; App. C now cites them. Main-article forms still checked in fourier_tau_verification.py [6]. |
 | eq:phi1 | 113 | DEFINITION | DEFINITIONAL | phi1 = alphaK*tau1NS_inv defined and used in stability_estimate_verification.py line 44. |
 | eq:sigmatilde | 118 | IDENTITY | SYMPY | stability_estimate_verification.py: check("sigtilde = sigma phi1/(phi1+sigma)") L51, check("sigtilde = sigma - |
+| eq:projmonotone | sec:ViscousProjector | IDENTITY | SYMPY+COQ | projector_algebra_verification.py A4 (exact, d=2,3, all nested pairs of {I,S,D,DS}); ViscousProjector.nested_pythagoras (abstract, kernel-checked). ADDED 2026-07-29 with lem:projfamily. |
+| eq:devsymidentity | sec:ViscousProjector | IDENTITY | SYMPY | projector_algebra_verification.py B1-B3 (eq:crossibp verified as an exact pointwise divergence; the four integrated norm identities derived from it). MOVED 2026-07-29 from lem:definiteness into lem:projfamily; label unchanged. |
+| eq:crossibp | sec:ViscousProjector | IDENTITY | SYMPY | projector_algebra_verification.py B1 (d=2,3): the integrand difference is the divergence of a compactly supported field, which is what makes the identity true on H_0^1. ADDED 2026-07-29. |
+| eq:projconstants | sec:ViscousProjector | IDENTITY | SYMPY | projector_algebra_verification.py B6-B12 (sharpness witnesses: gradient field for D, divergence-free field for S and DS) + D4 source lint. ADDED 2026-07-29 with lem:projinstances. |
+| eq:cPi | app:FourierTau (rem:ftGenericPi); sharp characterization in theory/viscous_projector_note/ | DEFINITION | SYMPY | projector_algebra_verification.py C6/C6b (exact minimization over rank-one tensors; the skew and spherical kernels exhibited). ADDED 2026-07-29 with rem:projscope. |
+| eq:PiKorn | main text (A3) | DEFINITION | SYMPY+COQ | the standing assumption itself: satisfiability for the four instances is projector_algebra_verification.py A1/A3 + B7/B10; the chaining that delivers it from eq:projmonotone is ViscousProjector.korn_sqrt2. Source lint D1/D2 guards that it is defined in BOTH mains. ADDED 2026-07-29. |
 | eq:triplenorm | 129 | DEFINITION | DEFINITIONAL |  |
 | eq:epscond | 150 | BC | DEFINITIONAL | Concrete instance checked in manufactured_solution_verification.py L121 (eps=1e-4 eps_ref <= C2 c1 alpha_K^2 t |
 | eq:resolved | 160 | DEFINITION | DEFINITIONAL |  |
@@ -351,10 +379,11 @@ _Generated 2026-07-21 from an automated coverage audit (15 region agents over al
 | eq:convergence | 991 | ESTIMATE | COQ | AbstractConvergence.v Theorem abstract_convergence (line 952: NErr <= Cconv*Psi), Cconv:=Kb+Ct/Cst (line 950); |
 | unnumbered@1005 | 1005 | ESTIMATE | COQ | AbstractConvergence.v Lemma stab_W (line 573: BSWW >= Cst*NW^2, from prop:stability), Lemma cont_EW (line 593: |
 
-## FA-fourier  (1 equations)
+## FA-fourier  (2 equations)
 
 | Label | Line | Kind | Coverage | Evidence / verdict |
 |---|---|---|---|---|
+| eq:ftGenericQuad | rem:ftGenericPi | IDENTITY | SYMPY | projector_algebra_verification.py C1-C4 (closed forms T_I, T_S, T_DS, T_D; the quadratic-form identity; the family bounds 1/2|k|^2 I <= T_Pi <= |k|^2 I; the resulting spectral-radius factors 2-2/d for DS and 2 for I, S, D). ADDED 2026-07-29 with rem:ftGenericPi. |
 | eq:ftSplit | 18 | IDENTITY | PARTIAL | [CONFIRMED_UNCHECKED] eq:ftSplit (fourier_appendix.tex line 18-22) asserts A_{c,i}(w) + A_{f,i} = A_{v |
 
 ## EA1-matrices  (61 equations)

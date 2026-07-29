@@ -31,6 +31,8 @@ must we never break again?* Read these first.
 
 ---
 
+- [appendix-a-intermediate-coverage-spec.md](appendix-a-intermediate-coverage-spec.md) — **open spec**: how to close the last verification blind spot (App. A's printed intermediate derivations are certified by nothing; the endpoints are). Includes the two approaches that were measured and rejected, so nobody repeats them.
+
 ## Tier 2 — Evidence dossiers (the full experiment logs behind the living docs)
 
 Detailed, mostly-read-only records. Open one when `findings.md` / `open-questions.md` points you here for the

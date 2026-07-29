@@ -92,7 +92,7 @@ Qed.
 
 (* ========================================================================= *)
 (*  [1] + [2]  Single-element parameter inequalities and step scalar cores.  *)
-(*  Notation as in the appendix (eq:taus, eq:phi1, eq:sigmatilde):           *)
+(*  Notation as in the appendix (eq:Tau1Final, eq:phi1, eq:sigmatilde):      *)
 (*    tauNSinv = c1 nu/h^2 + c2 |a|/h,   phi1 = alpha_K tauNSinv,            *)
 (*    tau1 = 1/(phi1 + sigma),           tau2 = h^2 tauNSinv/(c1 alpha_K),   *)
 (*    sigt = sigma phi1/(phi1 + sigma).                                      *)

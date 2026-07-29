@@ -52,6 +52,23 @@ porosity figure kept; the "Kratos Multiphysics" claim — the paper reads Gridap
 
 ---
 
+### 1d. Cover Appendix A's *intermediate* derivations in the verification suite
+
+**Spec:** [appendix-a-intermediate-coverage-spec.md](appendix-a-intermediate-coverage-spec.md)
+(written 2026-07-29, ready to execute).
+
+`elemental_matrices_verification.py` certifies App. A's printed *results* from its own sympy
+encoding and never opens the appendix, so the ~54 printed pre-differentiation integrands are
+covered by nothing. Nine real defects lived there undetected while the suite was green at
+454/454; all nine are now fixed, and the `\partial^2` convention class is covered by the new
+S1/S2 lints, but the **dummy-index-reuse class (eight of the nine) is still uncovered**.
+
+The spec records two cheap lints that were tried and **rejected with measurements** (52/68 and
+22 false positives — do not re-attempt them), the approach that works (transcribe each printed
+intermediate, differentiate it, compare against the printed result), the mandatory control-sibling
+protocol, acceptance criteria including negative controls built from two historical defects, and
+an effort estimate (~54 arguments, ~12 distinct shapes, order of a day).
+
 ## 2. Code–theory consistency
 
 ### 2a. TAU-02 — σ inside τ₁ evaluated at the floored `kin.mag_u`, not the physical reaction speed

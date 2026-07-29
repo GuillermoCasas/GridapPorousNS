@@ -7,7 +7,7 @@
 %   in inhomogeneous porous media" (Casas, Gonzalez-Usua, Codina, de-Pouplana).
 %
 %  The macros below replicate the relevant ones defined inline in that paper
-%  (\ViscProj, \Reyn, \Damk, \triplenorm, \dualpairing, \innerprod, ...), so the
+%  (\DSPi, \Reyn, \Damk, \triplenorm, \dualpairing, \innerprod, ...), so the
 %  equations can be lifted into the manuscript with no changes.  If you compile
 %  this inside the paper itself, simply delete the PREAMBLE-DUPLICATE block.
 %==============================================================================
@@ -29,7 +29,7 @@
 % Projection operators used in the viscous term (deviatoric/symmetric split)
 \newcommand{\DPi}{\overset{\scriptscriptstyle{\mathrm{D}}}{\Pi}}
 \newcommand{\SPi}{\overset{\scriptscriptstyle{\mathrm{S}}}{\Pi}}
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
+\newcommand{\DSPi}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}  % the paper's \DSPi; the paper's \DSPi is now the GENERIC projector
 
 % Triple norm
 \newcommand{\triplenorm}[1]{{\lvert\kern-0.25ex\lvert\kern-0.25ex\lvert #1
@@ -99,8 +99,8 @@ the mesh. Writing $\Uh=[\uh;\ph]\in\Xh$ for the finite element unknowns, both
 methods of interest share the single stabilized bilinear form
 %
 \begin{equation}\label{eq:BS}
-  B_\mathrm{S}(\boldsymbol{a},\Uh,\Vh)
-  = B(\boldsymbol{a},\Uh,\Vh)
+  B_\mathrm{S}(\boldsymbol{a};\Uh,\Vh)
+  = B(\boldsymbol{a};\Uh,\Vh)
   - \sum_{K\in\Th}\dualpairing{\mathcal{L}^*\Vh,\ \boldsymbol{\tau}_K\,\Porth\!\left[\mathcal{L}\Uh\right]}_K ,
 \end{equation}
 %
@@ -155,13 +155,13 @@ Testing \cref{eq:BS} with $\Vh=\Uh$ and $\Porth=\mathcal{I}$ reproduces the
 manuscript's identity
 %
 \begin{align}\label{eq:ASGS-expand}
-  B_{\mathrm{ASGS}}(\boldsymbol{a},\Uh,\Uh)
-  &= 2\nu\big\|\alpha^{1/2}\ViscProj\nabla\uh\big\|^2
+  B_{\mathrm{ASGS}}(\boldsymbol{a};\Uh,\Uh)
+  &= 2\nu\big\|\alpha^{1/2}\DSPi\nabla\uh\big\|^2
    + \big\|\sigma^{1/2}\uh\big\|^2
    + \varepsilon\big\|\ph\big\|^2 \notag\\
   &\quad
    + \big\|\tau_1^{1/2}\alpha X(\Uh)\big\|_h^2
-   - \big\|\tau_1^{1/2}\big(2\nabla\!\cdot(\alpha\nu\ViscProj\nabla\uh)-\sigma\uh\big)\big\|_h^2
+   - \big\|\tau_1^{1/2}\big(2\nabla\!\cdot(\alpha\nu\DSPi\nabla\uh)-\sigma\uh\big)\big\|_h^2
    + \big\|\tau_2^{1/2}\nabla\!\cdot(\alpha\uh)\big\|_h^2
    - \varepsilon^2\big\|\tau_2^{1/2}\ph\big\|_h^2 ,
 \end{align}
@@ -172,23 +172,23 @@ line produces a \emph{cross term} and, crucially, a \emph{negative} reactive
 square---a drain that the stabilization subtracts from the Galerkin reaction:
 %
 \begin{equation}\label{eq:reactive-drain}
-  -\big\|\tau_1^{1/2}\big(2\nabla\!\cdot(\alpha\nu\ViscProj\nabla\uh)-\sigma\uh\big)\big\|_h^2
-  = -\big\|\tau_1^{1/2}\,2\nabla\!\cdot(\alpha\nu\ViscProj\nabla\uh)\big\|_h^2
+  -\big\|\tau_1^{1/2}\big(2\nabla\!\cdot(\alpha\nu\DSPi\nabla\uh)-\sigma\uh\big)\big\|_h^2
+  = -\big\|\tau_1^{1/2}\,2\nabla\!\cdot(\alpha\nu\DSPi\nabla\uh)\big\|_h^2
     \;\underbrace{-\;\big\|\tau_1^{1/2}\sigma\uh\big\|_h^2}_{\text{from }\mathcal{L}^*\text{ paired with }\mathcal{L}}
-    \;+\;2\dualpairing{2\tau_1\nabla\!\cdot(\nu\alpha\ViscProj\nabla\uh),\,\sigma\uh}_h .
+    \;+\;2\dualpairing{2\tau_1\nabla\!\cdot(\nu\alpha\DSPi\nabla\uh),\,\sigma\uh}_h .
 \end{equation}
 %
 After the cross term is absorbed with Young's inequality and the inverse estimate
-$\|\nabla\!\cdot(\alpha\ViscProj\nabla\uh)\|_K\le C_\mathrm{inv}h^{-1}
-\|\alpha^{1/2}\ViscProj\nabla\uh\|_K$~\cite{brenner2008mathematical}, the surviving
+$\|\nabla\!\cdot(\alpha\DSPi\nabla\uh)\|_K\le C_\mathrm{inv}h^{-1}
+\|\alpha^{1/2}\DSPi\nabla\uh\|_K$~\cite{brenner2008mathematical}, the surviving
 coefficient of $\|\uh\|_K^2$ is controlled from below by $C\,\siga$, giving the
 manuscript's bound
 %
 \begin{equation}\label{eq:ASGS-lemma}
-  B_{\mathrm{ASGS}}(\boldsymbol{a},\Uh,\Uh)\ \ge\ C\,\triplenorm{\Uh}^2,
+  B_{\mathrm{ASGS}}(\boldsymbol{a};\Uh,\Uh)\ \ge\ C\,\triplenorm{\Uh}^2,
   \qquad
   \triplenorm{\Uh}^2
-  = \nu\big\|\alpha^{1/2}\ViscProj\nabla\uh\big\|^2
+  = \nu\big\|\alpha^{1/2}\DSPi\nabla\uh\big\|^2
   + \big\|\siga^{1/2}\uh\big\|^2
   + \varepsilon\big\|\ph\big\|^2
   + \big\|\tau_1^{1/2}\alpha X(\Uh)\big\|_h^2
@@ -247,7 +247,7 @@ the drained $\siga<\sigma$ that ASGS is left with. Collecting this:
 \begin{proposition}[Reactive coercivity gap, in favour of OSGS]\label{prop:gap}
 Under the constant-coefficient assumptions above, the largest coefficient
 $c_{\uh}$ for which an estimate of the form
-$B_{\mathrm{ASGS}}(\boldsymbol{a},\Uh,\Uh)\ge c_{\uh}\,\|\uh\|^2+(\text{other nonnegative terms})$
+$B_{\mathrm{ASGS}}(\boldsymbol{a};\Uh,\Uh)\ge c_{\uh}\,\|\uh\|^2+(\text{other nonnegative terms})$
 is provable from \cref{eq:BS} satisfies, as $\Damk_h\to\infty$,
 \begin{equation}\label{eq:gap}
   c_{\uh}^{\,\mathrm{ASGS}}\sim C\,\siga\sim\alpha_K(1+\Reyn_h)\frac{\nu}{h^2},

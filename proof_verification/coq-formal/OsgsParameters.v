@@ -7,7 +7,7 @@
 (*  inequalities (P1)--(P6) and (K1)--(K3)).                                  *)
 (*                                                                           *)
 (*  The OSGS variant is analysed with EXACTLY the stabilization parameters    *)
-(*  of the companion manuscript (eq:TauDefs of the note = eq:taus of the      *)
+(*  of the companion manuscript (eq:TauDefs of the note = eq:Tau1Final of the *)
 (*  companion): with tauNSinv = c1 nu/h^2 + c2 |a|/h, phi1 = alpha_K          *)
 (*  tauNSinv,                                                                 *)
 (*    tau1 = 1/(phi1 + sigma),   tau2 = h^2 tauNSinv/(c1 alpha_K),            *)

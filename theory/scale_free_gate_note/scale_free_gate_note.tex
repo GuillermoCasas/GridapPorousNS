@@ -12,7 +12,7 @@
 %    in inhomogeneous porous media" (Casas, Gonzalez-Usua, Codina, de-Pouplana).
 %
 %  The macros below replicate the relevant ones defined inline in that paper
-%  (\ViscProj, \Reyn, \Damk, \tauNS, ...), so the equations can be lifted into
+%  (\DSPi, \Reyn, \Damk, \tauNS, ...), so the equations can be lifted into
 %  the manuscript with no changes. Cross-references of the form
 %  (paper, eq:Label) point to its equation labels.
 %
@@ -38,7 +38,7 @@
 \newcommand{\Damk}{\operatorname{\mathit{Da}}}
 
 % Projection operators used in the viscous term (deviatoric/symmetric split)
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
+\newcommand{\DSPi}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}  % the paper's \DSPi; the paper's \DSPi is now the GENERIC projector
 
 % Stabilization-parameter shorthand
 \newcommand{\tauNS}{\tau_{1,\mathrm{NS}}}
@@ -115,7 +115,7 @@ with
   \item \textbf{Momentum} $\displaystyle \epsM=\frac{\norm{\rM^k}}{\DM^k}$,
     \quad
     $\DM^k=\norm{\alpha\,\bu\!\cdot\!\grad\bu}
-      +\norm{2\,\divg(\alpha\nu\,\ViscProj\grad\bu)}
+      +\norm{2\,\divg(\alpha\nu\,\DSPi\grad\bu)}
       +\norm{\alpha\grad p}
       +\norm{\sigma(\bu)\,\bu}
       +\norm{\bef}$;
@@ -126,7 +126,7 @@ with
     \texttt{eps\_C\_strong} --- see \cref{sec:status}).
 \end{itemize}
 All norms are global $L^2(\Omega)$, $\norm{w}=\big(\int_\Omega|w|^2\dd\Omega\big)^{1/2}$,
-accumulated by quadrature in a single assembly pass. Here $\ViscProj$ is the
+accumulated by quadrature in a single assembly pass. Here $\DSPi$ is the
 deviatoric--symmetric projector of the viscous term (paper notation) and
 $d\in\{2,3\}$. Report $\epsM$ and $\epsC$ separately at every iteration.
 
@@ -152,7 +152,7 @@ Strong form (kinematic; density absorbed into $\nu$, $p$, $\sigma$), following
 \begin{align}
   \text{momentum:}\quad&
     \alpha\,\bu\!\cdot\!\grad\bu
-    -2\,\divg(\alpha\nu\,\ViscProj\grad\bu)
+    -2\,\divg(\alpha\nu\,\DSPi\grad\bu)
     +\alpha\grad p
     +\sigma(\alpha,\bu)\,\bu = \bef, \label{eq:mom}\\
   \text{mass:}\quad&
@@ -185,7 +185,7 @@ included), velocity block. Use a fixed vector norm (Euclidean or
 mass-matrix-weighted) --- the \emph{same} norm for every term in $\DM$. Build the
 denominator terms by assembling each physical term's velocity-block contribution
 \emph{through the same weak form}: the viscous term is then the
-integrated-by-parts $\langle\grad^{\mathrm S}\bv,\,2\alpha\nu\,\ViscProj\grad\bu^k\rangle$,
+integrated-by-parts $\langle\grad^{\mathrm S}\bv,\,2\alpha\nu\,\DSPi\grad\bu^k\rangle$,
 a first-derivative quantity --- \emph{no second derivatives, no special-casing by
 polynomial order}.
 
@@ -202,7 +202,7 @@ derivative. Prefer~A.
 \begin{equation}\label{eq:DM}
   \DM^k=
     \underbrace{\norm{\alpha\,\bu^k\!\cdot\!\grad\bu^k}}_{\mathrm{convection}}
-    +\underbrace{\norm{2\,\divg(\alpha\nu\,\ViscProj\grad\bu^k)}}_{\mathrm{viscous}}
+    +\underbrace{\norm{2\,\divg(\alpha\nu\,\DSPi\grad\bu^k)}}_{\mathrm{viscous}}
     +\underbrace{\norm{\alpha\grad p^k}}_{\text{pressure gradient}}
     +\underbrace{\norm{\sigma(\bu^k)\,\bu^k}}_{\text{resistance (Darcy + Forchheimer)}}
     +\underbrace{\norm{\bef}}_{\text{body force}}.
@@ -230,7 +230,7 @@ derivative. Prefer~A.
     collapsing if the operator terms cancel. When $\bef=0$ it contributes nothing.
   \item \emph{Why the viscous term is unproblematic under Philosophy A.} The weak
     form already integrated it by parts, so it is first-order. Under Philosophy B
-    with $P_1$, $\divg(\alpha\nu\,\ViscProj\grad\bu_h)\approx0$ element-wise;
+    with $P_1$, $\divg(\alpha\nu\,\DSPi\grad\bu_h)\approx0$ element-wise;
     accept the $\approx0$ contribution --- the co-dominant pressure-gradient term
     supplies the viscous scale. Do \emph{not} patch with an inverse-estimate
     factor $C_{\mathrm{inv}}/h$: it overestimates the viscous force on fine meshes

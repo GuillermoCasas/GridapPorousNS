@@ -218,6 +218,27 @@ that did not exist in the submitted manuscript.}
     $\mathrm E_{\mathrm{int}}(\psi)=(\sum_K\mathrm E_{\mathrm{int},K}(\psi)^2)^{1/2}$ used in \S6 is now
     defined (audit M02), and \code{lem:continterp}'s proof is noted to deliver $\Psi(h)$. The false
     ``$\ell^1$ is the sharpest'' wording is removed. No Coq change was needed---the $\ell^2$ proof already exists.}
+\ch{The a priori theory now covers a \emph{family} of viscous operators}
+   {\S2 and \S5: the analysis was stated and proved only for the deviatoric--symmetric
+    operator $\smash{\overset{\scriptscriptstyle\mathrm{DS}}{\Pi}}=\smash{\overset{\scriptscriptstyle\mathrm{D}}{\Pi}}\smash{\overset{\scriptscriptstyle\mathrm{S}}{\Pi}}$ (did not exist as a general statement)}
+   {New standing assumption \code{H:projector} (A3) with display \code{eq:PiKorn} in both mains;
+    new main-text subsection \code{sec:ViscousProjector} (Sec.~2.1, "The viscous projector") (\code{lem:projfamily}, \code{lem:projinstances},
+    \code{rem:projscope}, since 2026-07-29 in the standalone note \code{theory/viscous\_projector\_note/}); rewritten \code{lem:definiteness}; new App.~B \code{rem:ftGenericPi}}
+   {The proofs were audited for where the projector's specific form is actually used. It enters in
+    exactly one place---the definiteness of the working norms---so the theory is now stated for any
+    $\smash{\overset{\scriptscriptstyle\mathrm{v}}{\Pi}}$ that is (i) a pointwise, constant-coefficient orthogonal projection in the
+    Frobenius product and (ii) Korn-compatible on $H^1_0(\Omega)^d$, $\lVert\nabla\boldsymbol
+    v\rVert\le C_{\mathrm K}\lVert\smash{\overset{\scriptscriptstyle\mathrm{v}}{\Pi}}\nabla\boldsymbol v\rVert$. A sufficient algebraic criterion
+    (range $\supseteq$ deviatoric--symmetric tensors) gives (ii) with the \emph{uniform} constant
+    $\sqrt2$, and the four canonical operators
+    $\{\mathbb I,\ \mathrm{sym},\ \mathrm{dev},\ \mathrm{dev}\,\mathrm{sym}\}$ are verified as
+    instances, with sharp constants $1,\sqrt2,\sqrt{d/(d-1)},\sqrt2$. \emph{Nothing changes
+    quantitatively}: no constant of the five main results depends on the choice, and $C_{\mathrm K}$
+    appears only in the definiteness lemma. This closes a genuine theory--experiment scope gap: the
+    DBF comparison of \S7.3 runs the stabilized methods with the \emph{symmetric-gradient} operator,
+    which the previous statements did not literally cover. All claims machine-verified
+    (\code{proof\_verification/sympy/projector\_algebra\_verification.py}); the abstract projector
+    algebra is Coq-checked (\code{ViscousProjector.v}).}
 \end{itemize}
 
 \subsection{External-audit response (2026-07-21)}
@@ -836,7 +857,7 @@ definitions, corrected limits, and recomputed numerical tables.}
 \ch{$B_{\mathrm S}$ argument and missing element subscript fixed}
    {\S3.2, def.\ of $B_{\mathrm S}$ (eq.~(3.19)), \pdfp{13}}
    {\S3.2, \artl{606}}
-   {In $B_{\mathrm S}(w,U,V)$ the RHS wrongly wrote $B(u,U,V)$; corrected to $B(w,U,V)$, and the
+   {In $B_{\mathrm S}(w,U,V)$ the RHS wrongly wrote $B(u;U,V)$; corrected to $B(w;U,V)$, and the
     missing element-restriction subscript $_K$ was added to the stabilization pairing under the
     sum over $K$.}
 \end{itemize}
@@ -906,7 +927,7 @@ definitions, corrected limits, and recomputed numerical tables.}
    {\S5, viscous- and velocity-coefficient displays, \pdfp{21}}
    {\S5, \artl{906} and \artl{914}}
    {The convective speed $c_2|w|_{\infty,K}/h$ was replaced by $c_2\|a\|_{\infty,K}/h$, matching the
-    given convective field $a$ used throughout $B(a,\cdot,\cdot)$.}
+    given convective field $a$ used throughout $B(a;\cdot,\cdot)$.}
 \ch{$\tilde\sigma_\alpha$ notation $\tau_{\mathrm{NS}}\to\tau_{1,\mathrm{NS}}$}
    {\S5, \code{eq:SigmaAlpha} (eq.~(5.15)), \pdfp{21}}
    {\S5, \artl{919}}

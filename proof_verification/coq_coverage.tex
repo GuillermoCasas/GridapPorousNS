@@ -13,7 +13,12 @@
 % =====================================================================
 \documentclass[11pt]{article}
 
-\usepackage[a4paper,margin=1in]{geometry}
+\usepackage[a4paper,margin=0.85in]{geometry}
+\usepackage{etoolbox}
+% The 28 inventory tables carry long Coq identifiers and statement text and were
+% overflowing the text block (17 overfull boxes, worst 133pt).  Set every table in
+% \footnotesize rather than editing 28 column specs by hand.  % narrowed 1in->0.85in on 2026-07-29: the 28 inventory tables were
+%  overflowing the 1in text block (17 overfull boxes, worst 133pt).
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{booktabs}
 \usepackage{longtable}
@@ -27,6 +32,12 @@
 % \detokenize renders underscores literally, so Coq names need no escaping.
 \newcommand{\coq}[1]{\texttt{\detokenize{#1}}}
 \newcommand{\lbl}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\BASGSc}{B_{\mathrm{ASGS}}}
+\newcommand{\BOSGSc}{B_{\mathrm{OSGS}}}
+\newcommand{\LASGSc}{L_{\mathrm{ASGS}}}
+% The manuscript's generic viscous projector (its default instance is the
+% deviatoric--symmetric operator); written $\mathcal P$ in Table~\ref{tab:inventory}.
+\newcommand{\ViscProjSym}{\overset{\scriptscriptstyle{\mathrm{v}}}{\Pi}}
 \newcommand{\file}[1]{\texttt{\detokenize{#1}}}
 
 % Long typewriter identifiers/paths are unbreakable; let TeX break the line
@@ -73,9 +84,12 @@
 \title{\bfseries Machine-checked coverage map:\\
        from the paper's theory to the Coq formalisation}
 \author{Coverage note accompanying \file{proof_verification/coq-formal/}}
-\date{Revised 2026-07-22 \quad (retargeted to \file{article_v2.tex}: the ASGS chain
+\date{Revised 2026-07-29 \quad (retargeted to \file{article_v2.tex}: the ASGS chain
       maps to \S5 $+$ Appendix~C, the OSGS chain of \S\ref{sec:osgs} to Appendix~D;
-      24 Coq files, all compiled and \coq{coqchk}-verified on Coq~8.18 / Rocq~9.1)}
+      25 Coq files, all compiled and \coq{coqchk}-verified on Coq~8.18 / Rocq~9.1)}
+
+\AtBeginEnvironment{tabular}{\footnotesize}
+\AtBeginEnvironment{longtable}{\footnotesize}
 
 \begin{document}
 \maketitle
@@ -139,13 +153,13 @@ guarantee is and where residual trust remains.
 The Coq development mirrors, file by file, the SymPy ``verification scripts''
 suite in \file{proof_verification/sympy/}: where SymPy checks an identity
 by symbolic computation, the Coq files \emph{prove} it. The suite is
-\textbf{24 files, all proved} --- the eighteen ASGS-chain files and the six
+\textbf{25 files, all proved} --- the nineteen ASGS-chain files and the six
 OSGS-chain files of \S\ref{sec:osgs} --- and there is no
 \coq{Admitted}, no \coq{Axiom} and no \coq{admit} anywhere in the sources
 (\coq{grep} confirms this, and so, more strongly, does \coq{Print Assumptions}:
 \S\ref{sec:stratum0}). It uses \emph{only} the standard library, and the whole
 suite has been compiled and independently kernel-checked on Coq~8.18 / Rocq~9.1:
-twenty-four \coq{[PASS]} lines followed by \emph{``coqchk: all 24 modules
+twenty-five \coq{[PASS]} lines followed by \emph{``coqchk: all 25 modules
 successfully checked by the trusted kernel''} (\S\ref{sec:repro}).
 
 What changed since the previous revision is a step up in \emph{kind}, not just
@@ -424,12 +438,20 @@ $\tau_1$ (\lbl{eq:Tau1Final})       & \coq{tau1}       & $\varphi_1=\aK\,\tau_{1
 $\tau_2$ (\lbl{eq:Tau2Final})       & \coq{tau2}       & $\tau_{1,\mathrm{NS}}$ (\lbl{eq:TauNavierStokes}) & \coq{tau1NS} \\
 $\sigt$ (\lbl{eq:SigmaAlpha})       & \coq{sigt}/\coq{sg} & $\bar C_{\mathrm{inv}}$ (\lbl{lem:winv}) & \coq{Cb} \\
 $\aK$                               & \coq{alphaK}/\coq{aK}     & $|\mathbf a|_{\infty,K}$   & \coq{am} \\
-$\Cinv$ (\lbl{eq:InverseEstimateFiniteOrderNorm}) & \coq{Cinv}       & $\xi$ (Young parameter)   & \coq{xi} \\
+$\Cinv$ (\lbl{eq:InverseEstimateFiniteOrderNorm}) & \coq{Cinv}       & $\eta$ (Young parameter)   & \coq{xi} \\
 $\Reh,\Dah$                         & \coq{Re},\coq{Da} & $\varepsilon$ (mass penalty) & \coq{eps} \\
 $B_S(U_h,U_h)$                      & \coq{BS}         & $|||U_h|||^2$ (\lbl{eq:triplenorm}) & \coq{NormSq} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\emph{On the name $B_S$.} The paper reserves $B_S$, $L_S$ for the \emph{generic} stabilized pair,
+in which the projection $\boldsymbol{\pi}_h$ is still a free variable, and writes
+$\BASGSc$, $\LASGSc$ for the $\boldsymbol{\pi}_h=\boldsymbol{0}$ particularization that
+Appendix~C analyses (see the notation convention stated with \lbl{eq:OSGSProblem}). Since the two
+coincide, $\BASGSc\equiv B_S$, the Coq development's \coq{BS} --- the eighteen-term form of
+\lbl{eq:Bstab} --- may be read either way; throughout this document $B_S$ denotes that ASGS form,
+never the OSGS one, which is $\BOSGSc$ and is covered by the \file{Osgs*.v} modules.
 
 \subsection{A worked example, read side by side}
 
@@ -514,16 +536,19 @@ exactly the standard, hand-audited facts it is labelled as.
 \section{The crosswalk: theory \texorpdfstring{$\to$}{->} Coq}\label{sec:crosswalk}
 % =====================================================================
 
-Dependency and topic map of the eighteen ASGS-chain files (the six OSGS-chain
+Dependency and topic map of the nineteen ASGS-chain files (the six OSGS-chain
 files are tabulated in \S\ref{sec:osgs}). \file{Limits.v}/\file{DerivKit.v}
 serve the concrete analytic files; \file{AbstractSums.v}/\file{InnerSpace.v}
 serve the four abstract-theorem files, which also import the closed algebraic
 theorems of \file{StabilityAlgebra.v}/\file{ContinuityAlgebra.v} and apply them
-per element.
+per element. \file{ViscousProjector.v} builds on \file{InnerSpace.v} alone and is
+imported by none of the chain files: it stands beside them, certifying the algebra
+of the standing assumption \lbl{H:projector} that those files absorb into their
+atoms (\S\ref{sec:crossProj}).
 
 \begin{center}
 \small
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}llL{0.46\textwidth}@{}}
 \toprule
 Coq file & Paper location & Role \\
 \midrule
@@ -531,6 +556,7 @@ Coq file & Paper location & Role \\
 \file{DerivKit.v}    & --- & infrastructure: derivative toolkit \\
 \file{AbstractSums.v}  & --- & infrastructure: finite mesh/face sums, discrete C--S \\
 \file{InnerSpace.v}    & --- & infrastructure: abstract pre-Hilbert space \\
+\file{ViscousProjector.v} & \lbl{H:projector}, \lbl{lem:projfamily} & viscous-projector algebra: contraction, nesting, Korn chaining \\
 \file{InverseEstimates.v} & \lbl{lem:winv} & infrastructure: inverse-estimate schema \& composition \\
 \file{StabilityAlgebra.v}  & \S\ref{sec:crossStab} (\S5 $+$ App.\ C) & stability estimate, scalar algebra \\
 \file{ContinuityAlgebra.v} & \S\ref{sec:crossCont} (App.\ C) & continuity proof, scalar algebra \\
@@ -549,7 +575,7 @@ Coq file & Paper location & Role \\
 \end{tabular}
 \end{center}
 
-\subsection{Infrastructure: \texttt{InnerSpace.v}, \texttt{InverseEstimates.v} and \texttt{AbstractSums.v}}\label{sec:crossInfra}
+\subsection{Infrastructure: \texttt{InnerSpace.v}, \texttt{ViscousProjector.v}, \texttt{InverseEstimates.v} and \texttt{AbstractSums.v}}\label{sec:crossInfra}
 
 \begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
 \toprule
@@ -564,6 +590,14 @@ Coq file & Paper location & Role \\
 \coq{young_scalar}, \coq{young_vector} & the parametrized Young inequality at vector level. \\
 \coq{diff_of_squares} & $\langle -a+b,\,a+b\rangle=\lVert b\rVert^2-\lVert a\rVert^2$: the ASGS cancellation. \\
 \midrule
+\multicolumn{2}{@{}l}{\emph{\file{ViscousProjector.v} --- the algebra of the viscous projector \lbl{H:projector} (see \S\ref{sec:crossProj})}}\\
+\coq{proj_nonexpansive} & the contraction $\lVert\mathcal P x\rVert\le\lVert x\rVert$ of \lbl{H:projector}, from idempotence $+$ self-adjointness alone. \\
+\coq{nested_pythagoras} & \lbl{eq:projmonotone}: $\lVert\mathcal P x\rVert^2=\lVert\mathcal Q x\rVert^2+\lVert(\mathcal P-\mathcal Q)x\rVert^2$ when $\operatorname{ran}\mathcal P\supseteq\operatorname{ran}\mathcal Q$. \\
+\coq{proj_monotone_sq}, \coq{proj_monotone} & its corollary $\lVert\mathcal Q x\rVert\le\lVert\mathcal P x\rVert$. \\
+\coq{korn_chain_sq}, \coq{korn_norm_of_sq}, \coq{korn_sqrt2} & the chaining of \lbl{lem:projfamily}: the Korn constant of $\mathcal Q$ transfers to every $\mathcal P$ above it, and $\kappa=\tfrac12$ gives $C_{\mathrm K}=\sqrt2$ in \lbl{eq:PiKorn}. \\
+\coq{korn_definite} & the velocity step of \lbl{lem:definiteness}: $\lVert\mathcal P x\rVert=0\Rightarrow\lVert x\rVert=0$. \\
+\coq{witness_korn_sqrt2} & non-vacuity: a concrete model with $\mathcal P\ne\mathcal Q$, $\mathcal P\ne\mathbb I$ and a proper admissible class, satisfying every hypothesis at $\kappa=\tfrac12$. \\
+\midrule
 \multicolumn{2}{@{}l}{\emph{\file{InverseEstimates.v} --- the \lbl{lem:winv} weighted inverse-estimate shape, named once (full account: \S\ref{sec:stratumI}, I1)}}\\
 \coq{winv_est}\,$C\,W\,A\,B$ & the common shape $\lVert A_K\rVert_K\le(C/h_K)\,W_K\,\lVert B_K\rVert_K$ that the nine \coq{Hw_*} hypotheses each instantiate; a \emph{notational} predicate, not a hypothesis --- it replaces none and adds none, so Table~\ref{tab:inventory} keeps its row count. \\
 \coq{winv_compose} & composes two \coq{winv_est} instances sharing a middle atom into the double estimate $\lVert A_K\rVert_K\le C_1C_2(W_1W_2)_K\,h_K^{-2}\,\lVert B_K\rVert_K$; the single proved lemma that retires the byte-identical \coq{double_inv_u}/\coq{double_inv_v} triplication. \\
@@ -575,6 +609,52 @@ Coq file & Paper location & Role \\
 \coq{Rsum_sq_mono}, \coq{sqrt_plus_le}, \coq{sqrt_mono} & squared-sum monotonicity; subadditivity/monotonicity of $\sqrt{\cdot}$. \\
 \bottomrule
 \end{longtable}
+
+\subsection{\texttt{ViscousProjector.v} --- the viscous projector \lbl{H:projector}}\label{sec:crossProj}
+
+The manuscript states the properties of the viscous operator as a standing
+assumption, \lbl{H:projector} with display \lbl{eq:PiKorn}: $\ViscProjSym$ is a
+pointwise, constant-coefficient orthogonal projection of second-order tensors
+which is \emph{Korn-compatible} on $H^1_0(\Omega)^d$. Section~2.1 (\lbl{sec:ViscousProjector}) then proves
+(\lbl{lem:projfamily}) that any orthogonal projection whose range contains the
+deviatoric--symmetric tensors is Korn-compatible with the uniform constant
+$\sqrt2$, and (\lbl{lem:projinstances}) that the four operators
+$\{\mathbb I,\ \operatorname{sym},\ \operatorname{dev},\
+\operatorname{dev}\operatorname{sym}\}$ are instances.
+
+\file{ViscousProjector.v} puts the \emph{algebraic core} of that argument inside
+the kernel, over the same \coq{PreHilbert} interface as the rest of the abstract
+chain. The intended model is $L^2(\Omega)^{d\times d}$ with the integrated
+Frobenius product: a projector acting pointwise with constant coefficients,
+idempotent and Frobenius-self-adjoint, \emph{is} an orthogonal projection of that
+space, so the pointwise statement of \lbl{eq:projmonotone} and its integrated
+form are one and the same abstract statement. What is proved is listed in the
+table of \S\ref{sec:crossInfra}; what is \emph{not} modelled, deliberately, is
+the concrete identity \lbl{eq:devsymidentity} itself --- an integration-by-parts
+fact about one differential operator on one function space, outside an algebraic
+kernel. It enters \coq{korn_sqrt2} as the hypothesis $\kappa=\tfrac12$ on the
+class $G$ of admissible arguments (the gradients of $H^1_0$ velocity fields), and
+is checked, exactly and for $d=2,3$, by
+\file{proof_verification/sympy/projector_algebra_verification.py} --- together
+with the idempotence and self-adjointness of the four instances, the sharp
+constants of \lbl{eq:projconstants}, the Fourier symbols of \lbl{rem:ftGenericPi}
+and the inadmissibility witnesses, which since 2026-07-29 are stated in the standalone note \file{theory/viscous\_projector\_note/} rather than in the article. The division of labour is the
+usual one of this development: the kernel certifies the implications, SymPy
+certifies the concrete data they are applied to.
+
+Two remarks on trust. First, the hypothesis bundle is \emph{not} vacuous:
+\coq{witness_korn_sqrt2} instantiates every hypothesis simultaneously on a
+concrete pre-Hilbert space with $\mathcal P\neq\mathcal Q$, $\mathcal P$ not the
+identity and $G$ a proper subclass, at $\kappa=\tfrac12$. Second, this file
+\emph{shrinks} the trusted base rather than enlarging it: the contraction
+$\lvert\ViscProjSym\mathbf T\rvert\le\lvert\mathbf T\rvert$ and the symmetry of
+the viscous form, previously carried as unstated reading obligations of
+\S\ref{sec:stratum1}~(I4) (see the discussion of piece~(iv) there), are now
+consequences of a printed hypothesis, proved in the kernel. No row of
+Table~\ref{tab:inventory} changes: the four abstract theorems neither gain nor
+lose a hypothesis, because the projector never appears in them --- it is
+absorbed, exactly as before, in the atoms $\lVert\alpha^{1/2}\ViscProjSym\nabla
+\mathbf u_h\rVert$ that those theorems treat as opaque.
 
 \subsection{\texttt{StabilityAlgebra.v} --- \S5 / Appendix C: the stability estimate (scalar algebra)}\label{sec:crossStab}
 
@@ -590,13 +670,31 @@ so). The constants below are therefore written with $\Cbar$ --- which is exactly
 substitution \lbl{rem:winvconst} prescribes, and what the coercivity lemma
 \lbl{lem:coercivity} (Appendix~C) states. (Renaming the Coq variable to \coq{Cb} would remove the trap.)
 
+\emph{A second naming caution: \coq{xi} is the paper's $\eta$, not its $\xi$.}
+Appendix~C keeps two symbols apart that Coq fuses into one section variable: $\eta>0$ is the
+\emph{free Young parameter} of \lbl{eq:crossbound}, whereas $\xi>2$ is the constant of the
+design condition \lbl{H:coercivity} ($c_1>2\xi\Cbar^2$). Coq's \coq{xi} is the \emph{former}:
+it is the Young weight in \coq{lam} $=\coq{xi}\,\Cbar^2\nu\aK/h_K^2$, and \coq{C_visc},
+\coq{C_u} are functions of it. Coq never instantiates it, so \coq{abstract_stability} is a
+\emph{family} of bounds indexed by $\eta$; Appendix~C prints the member at $\eta=4$, which its
+endgame shows to be the maximin choice (the viscous and reaction coefficients
+$2(1-2/\eta)-4t$ and $1-\eta t$, $t := \Cbar^2/c_1$, cross at $\eta=4$ for every $t$),
+landing on this file's hypothesis $c_1>\coq{xi}\,\Cbar^2$ read at $\coq{xi}=4$, i.e.\
+$c_1>4\Cbar^2$ --- equivalently \lbl{H:coercivity} --- with the explicit constant
+$C_{\mathrm{coer}}=\min\{1-4\Cbar^2/c_1,\,1-C_2\}$ of \lbl{eq:coerconstant}.
+Coq is additionally sharper in the viscous slot: \coq{C_visc} keeps $\sigma\tau_1$ rather than
+bounding it by~$1$, so the printed coefficient of \lbl{eq:coerccollect} is the weaker of the
+two and the paper's statement is a consequence of what is proved here. The elementwise
+refinement \lbl{rem:c1sharp} of Appendix~C, $c_1>2(1+\sigma\tau_{1,K})\Cbar^2$, is what
+recovers that slack on the paper side.
+
 \begin{longtable}{@{}L{0.42\textwidth}L{0.53\textwidth}@{}}
 \toprule
 \textbf{Coq statement} & \textbf{Paper content} \\
 \midrule \endhead
 \coq{sigt_form_phi}, \coq{sigt_form_tau1}, \coq{sigt_form_key} & The three forms of $\sigt$ (\lbl{eq:SigmaAlpha}). \\
 \coq{young_perfect_square}, \coq{young_inequality} & Young's step $-2xy\ge -x^2/\xi-\xi y^2$. \\
-\coq{viscous_coefficient_expansion} & Viscous coefficient of the collected coercivity bound \lbl{eq:coerccollect} $=$ the expanded viscous-absorption step \lbl{eq:viscabsorb} (Appendix~C, \lbl{lem:coercivity}). \\
+\coq{viscous_coefficient_expansion} & The two forms of the \emph{elementwise-exact} viscous coefficient produced by the viscous-absorption step \lbl{eq:viscabsorb} together with the first cross term of \lbl{eq:crossbound} (Appendix~C, \lbl{lem:coercivity}); the printed coefficient of \lbl{eq:coerccollect} is its lower bound after $\sigma\tau_1\le1$. \\
 \coq{velocity_coefficient_expansion}, \coq{velocity_slack_identity}, \coq{velocity_coefficient_lower_bound}, \coq{u_final_lower_bound} & the velocity coefficient of the collected coercivity bound \lbl{eq:coerccollect} (via the reaction renormalisation \lbl{eq:reactrenorm}) and its \emph{exact} slack over $C_u\sigt$, $C_u=1-\xi\Cbar^2/c_1$. \\
 \coq{eps_max_tau2_identity}, \coq{eps_tau2_le_C2}, \coq{pressure_term_coercive}, \coq{epsilon_smallness_chain} & The $\varepsilon$-smallness chain (\lbl{eq:UpperBoundOnEpsilon}): $\varepsilon\tau_2\le C_2$, pressure coeff $\ge(1-C_2)\varepsilon$. \\
 \coq{viscous_coefficient_lower_bound}, \coq{visc_final_lower_bound} & Viscous bracket $\ge C_{\mathrm{visc}}\nu$, $C_{\mathrm{visc}}=\min\{2-4\Cbar^2/c_1,2(1-2/\xi)\}$. \\
@@ -871,14 +969,15 @@ identically. Its a priori chain is now a set of complete machine-checked theorem
 too, in \emph{six} new files that reuse the same abstract inner-product / mesh
 interface (\file{InnerSpace.v}, \file{AbstractSums.v}) and the same closed
 parameter algebra (\file{ContinuityAlgebra.v}); the OSGS variant is analysed with
-\emph{exactly} the same $\tau_1,\tau_2,\sigt$ (Appendix~D quotes the main-text
-definitions \lbl{eq:Tau1Final}, \lbl{eq:Tau2Final}, i.e.\ the manuscript's
-\lbl{eq:taus}), so the two developments share one parameter set,
+\emph{exactly} the same $\tau_1,\tau_2,\sigt$ (both appendices now quote the main-text
+definitions \lbl{eq:Tau1Final}, \lbl{eq:Tau2Final} rather than restating them; Appendix~C's
+former restatement \lbl{eq:taus} was removed on 2026-07-29, leaving \lbl{eq:phi1} as the only
+parameter definition proper to that appendix), so the two developments share one parameter set,
 reconciled inside the kernel.
 
 \begin{center}
 \small
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}llL{0.34\textwidth}@{}}
 \toprule
 Coq file & App~D location & Role \\
 \midrule
@@ -1901,14 +2000,19 @@ at $V_h=U_h$ --- the terms $T_2+T_4$ of \lbl{eq:Bstab} --- which is what
 $\nabla\!\cdot(\alpha\mathbf a)=0$ (\lbl{H:advection}) and
 $\mathbf u_h\in H^1_0$ buy, and which is the whole content of
 \eqref{eq:galerkin-here}; and (iv) the symmetry and idempotence of the pointwise
-deviatoric-symmetric viscous projector $\mathcal P$ (i.e.\ $\mathcal
+viscous projector $\mathcal P$ (i.e.\ $\mathcal
 P^{\!\top}\mathcal P=\mathcal P$), which turns the manuscript's
 $2(\nabla\mathbf v_h,\alpha\nu\mathcal P\nabla\mathbf u_h)$ --- note the
 \emph{full} gradient in the first slot --- into
 $2\nu\lVert\alpha^{1/2}\mathcal P\nabla\mathbf u_h\rVert^2$. ($\mathcal P$ here
-is the viscous projector of the deviatoric operator, \emph{not} the orthogonal
-subgrid projection $\pi_h$ that distinguishes OSGS from ASGS; it is never the
-identity.)
+is the viscous projector of the momentum equation, \emph{not} the orthogonal
+subgrid projection $\pi_h$ that distinguishes OSGS from ASGS.) Since 2026-07-29
+piece~(iv) is no longer an unstated reading obligation: it is exactly the first
+half of the standing assumption \lbl{H:projector}, printed in the manuscript, and
+its consequences --- the contraction and the nesting algebra --- are themselves
+kernel-checked in \file{ViscousProjector.v} (\S\ref{sec:crossProj}). What the
+reader still supplies is the \emph{identification} of the manuscript's operator
+with the abstract one, not the algebra.
 
 \emph{Of those four, exactly one was provable, and it is now proved.} Piece~(iii)
 --- the annihilation --- is genuine mathematics with genuine content, and it is
@@ -2719,7 +2823,8 @@ its two neighbours; $[\![\tau_1]\!]_\Gamma=\tau_{1,K_1}-\tau_{1,K_2}$;
 $\varphi_{1,K}=\aK\tau_{1,\mathrm{NS}}^{-1}$;
 $E_{\mathrm{int},K}(\mathbf u)$, $E_{\mathrm{int},K}(p)$ are the elemental
 interpolation-error sizes of \lbl{eq:Eint} (\coq{IU}, \coq{IP});
-$\mathcal P$ is the deviatoric-symmetric viscous projector; and
+$\mathcal P$ is the viscous projector of \lbl{H:projector} (the
+deviatoric-symmetric operator in the default instance); and
 $\mathcal L_m,\mathcal L_m^{*},\mathcal L_c,\mathcal L_c^{*}$ are the
 residual/adjoint-residual operators of \eqref{eq:HBS-here}.
 
@@ -2729,7 +2834,7 @@ parentheses. These were not assigned by hand: they were extracted mechanically
 from the sources by locating, for each hypothesis, every lemma whose proof
 mentions it.
 
-\begin{longtable}{@{}r@{\ }L{0.155\textwidth}L{0.455\textwidth}L{0.245\textwidth}@{}}
+\begin{longtable}{@{}r@{\ }L{0.150\textwidth}L{0.430\textwidth}L{0.235\textwidth}@{}}
 \caption{Every hypothesis of the four abstract theorems.}\label{tab:inventory}\\
 \toprule
 \textbf{\#} & \textbf{Coq name (class)} & \textbf{Statement} & \textbf{In; steps that use it} \\
@@ -3582,13 +3687,14 @@ The run recorded for this revision (Rocq~9.1.1, macOS) is:
 \begin{lstlisting}[language=bash,keywordstyle=\color{black}]
 Coq formal verification suite (PNSFormal)
 coqc: The Rocq Prover, version 9.1.1
-files: 24, in the dependency order given by _CoqProject
-  [PASS] Limits.v            [PASS] PlateauBump.v
-  [PASS] DerivKit.v          [PASS] NonVacuity.v
-  [PASS] StabilityAlgebra.v  [PASS] NonVacuityInterp.v
-  [PASS] ContinuityAlgebra.v [PASS] NonVacuityConv.v
-  [PASS] AbstractSums.v      [PASS] OsgsParameters.v
-  [PASS] InnerSpace.v        [PASS] OsgsNorm.v
+files: 25, in the dependency order given by _CoqProject
+  [PASS] Limits.v            [PASS] ManufacturedSolution.v
+  [PASS] DerivKit.v          [PASS] PlateauBump.v
+  [PASS] StabilityAlgebra.v  [PASS] NonVacuity.v
+  [PASS] ContinuityAlgebra.v [PASS] NonVacuityInterp.v
+  [PASS] AbstractSums.v      [PASS] NonVacuityConv.v
+  [PASS] InnerSpace.v        [PASS] OsgsParameters.v
+  [PASS] ViscousProjector.v  [PASS] OsgsNorm.v
   [PASS] InverseEstimates.v  [PASS] OsgsStability.v
   [PASS] AbstractContinuity.v[PASS] OsgsInterpolation.v
   [PASS] AbstractInterpolation.v [PASS] OsgsConvergence.v
@@ -3596,11 +3702,10 @@ files: 24, in the dependency order given by _CoqProject
   [PASS] AbstractConvergence.v
   [PASS] TauDesign.v
   [PASS] Asymptotics.v
-  [PASS] ManufacturedSolution.v
-RESULT: all 24 files compiled; every theorem is proved
+RESULT: all 25 files compiled; every theorem is proved
         (no Admitted, no Axiom).
 Running coqchk (independent kernel re-verification) ...
-  [PASS] coqchk: all 24 modules successfully checked by the trusted kernel.
+  [PASS] coqchk: all 25 modules successfully checked by the trusted kernel.
 \end{lstlisting}
 (The sources keep the $8.16$--$8.20$-compatible \coq{From Coq} spelling on
 purpose; on Rocq~9 it merely emits a deprecation notice in favour of
@@ -3613,7 +3718,7 @@ audit of the analytic steps and the F1--F9 findings: \file{AUDIT.md}. The Lean~4
 plan for the residual base: \file{LEAN_ROADMAP.md} and \file{PorousNSToolbox.lean}.
 The authoritative theory: \file{theory/paper/article_v2.tex} and its appendices
 (\file{elemental_matrices_appendix.tex} = App.~A, \file{fourier_appendix.tex} = App.~B,
-\file{continuity_appendix.tex} = App.~C, \file{osgs_appendix.tex} = App.~D), the last
+\file{asgs_convergence.tex} = App.~C, \file{osgs_appendix.tex} = App.~D), the last
 mirroring the companion note \file{theory/osgs_a_priori/osgs_convergence.tex}.
 
 % =====================================================================

@@ -31,8 +31,13 @@ import os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PAPER = os.path.normpath(os.path.join(HERE, "..", "..", "theory", "paper"))
-# Submission-track appendices: App C (ASGS/continuity) and App D (OSGS, clean).
-FILES = ["asgs_convergence.tex", "osgs_appendix.tex"]
+# Submission-track appendices: App C (ASGS/continuity) and App D (OSGS, clean), PLUS
+# both mains.  The mains are in scope because printed lemma/theorem statements live
+# there too -- lemma:Continuity states the barred bound |B_ASGS(...)| <= ... in the
+# body, and the 2026-07-29 relocation moved lem:projfamily / lem:projinstances out of
+# App. C and into the main-text subsection sec:ViscousProjector.  A lint that reads
+# only the appendices would not follow them.
+FILES = ["asgs_convergence.tex", "osgs_appendix.tex", "article.tex", "article_v2.tex"]
 
 results = []
 def check(name, ok, detail=""):
@@ -44,8 +49,15 @@ def check(name, ok, detail=""):
     print(line)
     return ok
 
-# A bilinear stabilized form as it appears in the two appendices.
-BILINEAR = re.compile(r'\\BS|\\BO|B_\{\\mathrm\{osgs\}\}|B_\{\\mathrm\{S\}\}|B_\{\\mathrm\{O\}\}')
+# A bilinear stabilized form as it appears in the two appendices.  Both the macro
+# spellings (\BS, \BASGS, \BOSGS) and the expanded ones (B_{\mathrm{ASGS}}, ...) must be
+# listed: App C writes the ASGS form through the macro \BASGS while App D writes the OSGS
+# form expanded as B_{\mathrm{OSGS}}.  [known-fragility]  Miss a spelling and Rule 1 below
+# silently checks NOTHING while still reporting PASS -- which is exactly what happened
+# between the B_S -> B_ASGS/B_OSGS rename and 2026-07-28.  The "(N bound(s) checked)"
+# counter in the PASS line is the tell: it must stay > 0 for both files.
+BILINEAR = re.compile(r'\\BASGS|\\BOSGS|\\BS|\\BO'
+                      r'|B_\{\\mathrm\{(?:osgs|asgs|ASGS|OSGS|S|O)\}\}')
 # Any "opening absolute value" delimiter (\lvert / \lVert with any size prefix, or a bar |).
 ABS_OPEN = re.compile(r'\\(?:bigl|Bigl|biggl|Biggl|left)?\s*(?:\\lvert|\\lVert|\|)')
 # An UPPER-bound relation. Rule 1 targets continuity/boundedness (|B| <= ...) ONLY:
@@ -107,9 +119,13 @@ def bilinear_bound_is_barred(block):
 
 
 # --- inf-sup domain rule ----------------------------------------------------
-# Flag any  \sup_{ X_h \in \Xhz }  /  \inf_{...}  quotient that omits \setminus\{0\}.
-SUP_BARE = re.compile(r'\\(?:sup|inf)_\{\s*[UV]_h\s*\\in\s*\\Xhz\s*\}')
-SUP_OK   = re.compile(r'\\(?:sup|inf)_\{\s*[UV]_h\s*\\in\s*\\Xhz\\setminus\\\{0\\\}\s*\}')
+# Flag any  \sup_{ X_h \in \Xh(z) }  /  \inf_{...}  quotient that omits \setminus\{0\}.
+# [known-fragility]  BOTH spellings of the space must be in the pattern: \Xhz is only an
+# alias (\newcommand{\Xhz}{\Xh}), and the printed inf-sup of the MAIN TEXT writes \Xh.
+# A pattern hard-wired to \Xhz matches nothing outside App. D and prints "(0 guarded)"
+# while still passing -- the same silent vacuity as the 2026-07-28 Rule 1 regression.
+SUP_BARE = re.compile(r'\\(?:sup|inf)_\{\s*[UV]_h\s*\\in\s*\\Xhz?\s*\}')
+SUP_OK   = re.compile(r'\\(?:sup|inf)_\{\s*[UV]_h\s*\\in\s*\\Xhz?\\setminus\\\{0\\\}\s*\}')
 
 
 print("=" * 72)
@@ -136,18 +152,33 @@ for fn in FILES:
           f"({checked} continuity bound(s) checked)",
           not offenders,
           detail="one-sided (barless) bound(s): " + " | ".join(offenders))
+    # Anti-vacuity: a rule that matches nothing is a rule that has stopped biting.
+    check(f"{fn}: the bilinear-form rule is non-vacuous (>=1 bound reached it)",
+          checked > 0,
+          detail="BILINEAR did not match any statement -- the form's spelling probably "
+                 "changed; extend the regex rather than accepting the empty PASS")
 
 # ---------------------------------------------------------------------------
 # Rule 2: no inf-sup sup/inf over Xhz omits \setminus\{0\}.
 # ---------------------------------------------------------------------------
+n_guarded_total = 0
 for fn in FILES:
     text = read(fn)
     bare = SUP_BARE.findall(text)
-    ok = len(bare) == 0
-    check(f"{fn}: every inf-sup sup/inf over Xhz excludes 0 "
-          f"({len(SUP_OK.findall(text))} guarded)",
-          ok,
-          detail=f"{len(bare)} sup/inf over Xhz without \\setminus\\{{0\\}}")
+    n_guarded = len(SUP_OK.findall(text))
+    n_guarded_total += n_guarded
+    check(f"{fn}: every inf-sup sup/inf over Xh excludes 0 "
+          f"({n_guarded} guarded)",
+          len(bare) == 0,
+          detail=f"{len(bare)} sup/inf over Xh without \\setminus\\{{0\\}}")
+# Anti-vacuity, GLOBAL: per-file would fail legitimately (article.tex states no inf-sup,
+# and App. C is the coercivity route). But if NO file in the whole set has a guarded
+# quotient, the pattern has stopped matching the paper and the rule is inspecting nothing.
+check(f"the inf-sup domain rule is non-vacuous across the set "
+      f"({n_guarded_total} guarded quotient(s) found in {len(FILES)} files)",
+      n_guarded_total > 0,
+      detail="SUP_OK matched nowhere -- the space's spelling probably changed; extend the "
+             "pattern rather than accepting the empty PASS")
 
 # ---------------------------------------------------------------------------
 # Discriminating NEGATIVES: the rules must REJECT hand-built bad statements.
@@ -164,6 +195,14 @@ check("negative: a properly barred bound is accepted",
 good_bound_pipe = r"\bigl| B_{\mathrm{osgs}}(\ba; U-U_h, V_h) \bigr| \le C\,\Psi"
 check("negative: the \\bigl|...\\bigr| pipe form is accepted",
       bilinear_bound_is_barred(good_bound_pipe) is True)
+
+# The post-rename spellings actually used by the two appendices (App C: \BASGS macro;
+# App D: expanded B_{\mathrm{OSGS}}).  These guard the 2026-07-28 vacuity regression.
+check("negative: a barless \\BASGS bound is rejected",
+      bilinear_bound_is_barred(r"\BASGS(\ba; U_h,V_h) \le C\,\triplenorm{V_h}") is False)
+check("negative: a barred B_{\\mathrm{OSGS}} bound is accepted",
+      bilinear_bound_is_barred(
+          r"\bigl| B_{\mathrm{OSGS}}(\ba; U-U_h, V_h) \bigr| \le C\,\Psi") is True)
 
 bad_sup = r"\sup_{V_h \in \Xhz} \frac{B_{\mathrm{osgs}}(\ba; U_h, V_h)}{\tnorm{V_h}}"
 check("negative: a sup over Xhz missing \\setminus\\{0\\} is rejected",

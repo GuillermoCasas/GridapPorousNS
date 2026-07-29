@@ -151,6 +151,16 @@ full symmetric) strain tensor:
 The `∇(∇·u)` contribution is dimension-dependent for the deviatoric variant (coefficient `0` in 2D,
 `+1/6` in 3D) and always present for the symmetric-gradient variant.
 
+**Scope note (2026-07-29)**: the paper's a priori theory is no longer stated for the deviatoric–symmetric
+operator alone. Standing assumption `H:projector` (A3) asks only that `Π` be a pointwise,
+constant-coefficient orthogonal projection of the velocity gradient that is Korn-compatible on `H¹₀`
+(property `(V2)`, display `eq:PiKorn`), and §2.1 `sec:ViscousProjector` (`lem:projfamily`, `lem:projinstances`) proves that
+`{𝕀, sym, dev, dev∘sym}` are all instances, with the uniform constant `√2`. **Both** viscous operators
+implemented here — `DeviatoricSymmetricViscosity` (canonical) and `SymmetricGradientViscosity` — are
+therefore covered by the theorems, with identical constants; the choice affects only which quantity the
+error estimate controls (`‖Π∇e_u‖`). The `LaplacianPseudoTraction` variant stays `[legacy]` and is *not*
+of this form.
+
 **Code reality**: Both the strong operator and its formal adjoint use the same dimension-aware
 Hessian-evaluation operations:
 

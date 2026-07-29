@@ -8,7 +8,8 @@
 #
 # WHY THIS SCRIPT EXISTS (coverage-gap closure, 2026-07-21)
 # --------------------------------------------------------
-# The parameter definitions eq:taus / eq:phi1 / eq:sigmatilde and the elementary
+# The parameter definitions eq:Tau1Final/eq:Tau2Final (main text; formerly restated in
+# App. C as eq:taus, removed 2026-07-29), eq:phi1, eq:sigmatilde and the elementary
 # identities of Lemma "Parameter inequalities" (lem:parameters) are algebraically
 # correct but had NO permanent encoded check.  This script reconstructs each
 # identity FROM ITS UPSTREAM DEFINITIONS (not from the printed form) and encodes:
@@ -26,7 +27,7 @@
 #                                = sigma phi1 tau1, plus sigt >= 0,
 #                                sigt <= min(sigma,phi1), sigt tau1 <= 1.
 #
-# Definitions (eq:taus, eq:phi1):
+# Definitions (eq:Tau1Final/eq:Tau2Final, eq:phi1):
 #   tau1NS_inv = c1 nu/h^2 + c2 |a|/h ,   tau1NS = 1/tau1NS_inv
 #   phi1       = alpha_K tau1NS_inv
 #   tau1       = 1/(phi1 + sigma)
@@ -47,7 +48,7 @@ def check(name, ok):
     tag = "PASS" if ok else "FAIL"; results.append((tag, name)); print(f"  [{tag}] {name}"); return ok
 
 print("=" * 70)
-print("Continuity-appendix parameter algebra (eq:taus/phi1/sigmatilde) -- symbolic")
+print("Continuity-appendix parameter algebra (tau_1,tau_2/phi1/sigmatilde) -- symbolic")
 print("=" * 70)
 
 # Positive physical symbols.  c1,c2>0 algorithmic constants; nu,h,amag>0;
@@ -55,12 +56,12 @@ print("=" * 70)
 c1, c2, nu, h, amag, alphaK, sigma = sp.symbols(
     'c1 c2 nu h amag alpha_K sigma', positive=True)
 
-# ---- Definitions (eq:taus, eq:phi1) -------------------------------------
-tau1NS_inv = c1*nu/h**2 + c2*amag/h          # eq:taus, tau_{1,NS}^{-1}
+# ---- Definitions (eq:Tau1Final/eq:Tau2Final, eq:phi1) --------------------
+tau1NS_inv = c1*nu/h**2 + c2*amag/h          # eq:TauNavierStokes, tau_{1,NS}^{-1}
 tau1NS     = 1/tau1NS_inv
 phi1       = alphaK*tau1NS_inv               # eq:phi1
-tau1       = 1/(phi1 + sigma)                # eq:taus tau_{1,K} = (phi1+sigma)^{-1}
-tau2       = h**2/(c1*alphaK*tau1NS)         # eq:taus tau_{2,K}
+tau1       = 1/(phi1 + sigma)                # eq:Tau1Final, = (phi1+sigma)^{-1}
+tau2       = h**2/(c1*alphaK*tau1NS)         # eq:Tau2Final
 sigt       = sigma*phi1*tau1                 # eq:sigmatilde (final closed form)
 
 Z = lambda e: sp.simplify(e) == 0            # "is identically zero"

@@ -1,3 +1,16 @@
+% =============================================================================
+% Working note, superseded as a submission source by Appendix D of
+% theory/paper/article_v2.tex (osgs_appendix.tex / osgs_appendix_commented.tex).
+%
+% 2026-07-29: the article now states the properties of the viscous projector as a
+% standing assumption -- a pointwise, constant-coefficient orthogonal projection that
+% is Korn-compatible on H^1_0 -- and proves that the four operators {I, sym, dev,
+% dev-sym} are instances.  Everything below holds verbatim for any such operator; the
+% only place the deviatoric-symmetric form is used is the definiteness lemma, whose
+% inline identity is the dev-sym instance of the general chain.  See Sec. 2.1 of the
+% article (subsection "The viscous projector", sec:ViscousProjector) -- until
+% 2026-07-29 this material sat in an Appendix C subsubsection.
+% =============================================================================
 \documentclass[11pt]{article}
 \usepackage[margin=2.7cm]{geometry}
 \usepackage{amsmath,amssymb,amsthm,mathtools}
@@ -774,7 +787,8 @@ implies $V = 0$.
 \begin{proof}
 Homogeneity, symmetry and the triangle inequality are immediate; only definiteness needs an
 argument, and it is here that the full Dirichlet data enter. Let $\tnorm{V} = 0$ for
-$V = [\bv; q] \in \Xhz$. Then $\ViscProj\nabla\bv \equiv 0$, i.e.\ the symmetric gradient of
+$V = [\bv; q] \in \Xhz$. Then $\ViscProj\nabla\bv \equiv 0$, i.e.\ (for the deviatoric--symmetric instance kept here)
+the symmetric gradient of
 $\bv$ is spherical almost everywhere; since $\bv \in H^1_0(\Omega)^d$, the elementary identity
 $\lVert\ViscProj\nabla\bv\rVert^2=\tfrac12\lVert\nabla\bv\rVert^2+(\tfrac12-\tfrac1d)\lVert\nabla\cdot\bv\rVert^2$
 (integration by parts on $H^1_0$) gives $\norm{\nabla\bv} \le

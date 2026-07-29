@@ -36,7 +36,8 @@
 (*                     - sum_K tau_1 < L*_m , L_m >_K                        *)
 (*                     - sum_K tau_2 < L*_c , L_c >_K                        *)
 (*                                                                           *)
-(*  -- with the paper's momentum/mass residual vectors (eq:strongop, eq:XG)  *)
+(*  -- with the paper's momentum/mass residual vectors                       *)
+(*  (eq:StrongOperator, eq:XG)                                               *)
 (*  L_m = alpha X(U) - G(u),  L*_m = -alpha X(U) - G(u),                     *)
 (*  L_c = eps p + div(alpha u),  L*_c = eps p - div(alpha u) -- is a         *)
 (*  THEOREM (see HBS below), proved from the two Green identities above and  *)
@@ -60,6 +61,25 @@
 (*  manuscript's c1 > 2 xi Cbar^2 implies it, and additionally buys the      *)
 (*  margin of StabilityAlgebra.C_stab_margin), xi > 2, C_2 < 1 and           *)
 (*  eq:UpperBoundOnEpsilon.  Note sigma, eps, C_2 need only be >= 0.         *)
+(*                                                                           *)
+(*  [known-fragility]  NAMING.  This file's `xi' is the FREE YOUNG           *)
+(*  PARAMETER written `eta' in Appendix C (the Young weight `lam' below),    *)
+(*  NOT the `xi' of the design condition H:coercivity (c1 > 2 xi Cb^2,       *)
+(*  xi > 2).  The paper keeps the two apart; Coq fuses them into one         *)
+(*  section variable.  This is sound -- the theorem holds for every          *)
+(*  xi > 2 with c1 > xi Cb^2 -- but must not be read as a transcription      *)
+(*  of H:coercivity.  Appendix C instantiates eta = 4 (the maximin: the      *)
+(*  two coefficients 2(1-2/eta)-4t and 1-eta*t cross at eta = 4 for every    *)
+(*  t = Cb^2/c1), landing on this file's hypothesis at xi = 4, i.e.          *)
+(*  c1 > 4 Cb^2, with C_coer = min{1-4Cb^2/c1, 1-C_2} (eq:coerconstant).     *)
+(*  Coq never instantiates xi, so it proves a FAMILY of bounds of which      *)
+(*  the printed one is the member at xi = 4.  Coq is also sharper in the     *)
+(*  viscous slot: C_visc = min{2-4Cb^2/c1, 2(1-2/xi)} does not pass          *)
+(*  through sigma*tau1 <= 1, whereas eq:coerccollect's printed               *)
+(*  coefficient does; the printed one is thus the weaker of the two, and     *)
+(*  the paper's statement is a consequence of what is proved here.           *)
+(*  Appendix C's rem:c1sharp records the elementwise refinement              *)
+(*  c1 > 2(1 + sigma*tau_1K) Cb^2 that recovers this slack.                  *)
 (*                                                                           *)
 (*  Coq 8.18, stdlib only.                                                   *)
 (* ========================================================================= *)
@@ -88,7 +108,8 @@ Local Open Scope R_scope.
 (*  Bridges between the two scalar-algebra modules.                          *)
 (*                                                                           *)
 (*  tau_1 and tau_2 are given by the SAME closed formula in StabilityAlgebra *)
-(*  and in ContinuityAlgebra (eq:taus), so the bridges are conversions --     *)
+(*  and in ContinuityAlgebra (eq:Tau1Final), so the bridges are              *)
+(*  conversions --                                                           *)
 (*  each is closed by reflexivity after unfolding.  They live here, above    *)
 (*  the section, because the eighteen-term B_S imported from                 *)
 (*  AbstractInterpolation.v is phrased with ContinuityAlgebra's parameters   *)
@@ -140,7 +161,7 @@ Hypothesis eps_nonneg   : 0 <= eps.     (*  H:data allows eps   = 0  *)
 Hypothesis c1_pos  : 0 < c1.
 Hypothesis c2_pos  : 0 < c2.
 Hypothesis Cb_pos  : 0 < Cb.        (*  Cbar of rem:winvconst / lem:winv  *)
-Hypothesis C2_nonneg : 0 <= C2.         (*  eq:epscond allows C2 = 0  *)
+Hypothesis C2_nonneg : 0 <= C2.         (*  eq:UpperBoundOnEpsilon allows C2 = 0  *)
 Hypothesis C2_lt_1  : C2 < 1.
 (*  eq:conditions_on_num_param, in its SHARP form: positivity of the
     coefficients needs only c1 > xi Cbar^2 (the manuscript states the
@@ -190,7 +211,7 @@ Variables (gu uu pp cxu gpu divu du : K -> V).
     inside x -- they use it only through Xn -- so they are unaffected.       *)
 Definition xu (k : K) : V := (cxu k) +v (gpu k).
 
-(* ---------- The residual vectors (eq:strongop, eq:XG) ----------------------- *)
+(* ---------- The residual vectors (eq:StrongOperator, eq:XG) ----------------------- *)
 
 Definition Bv (k : K) : V := vsub (du k) (sigma *v (uu k)).      (*  G(u_h)|_K  *)
 Definition L_m (k : K) : V := (xu k) +v (vopp (Bv k)).           (*  alpha X - G *)
@@ -270,7 +291,7 @@ Qed.
 
 (* ---------- Step 1: the difference-of-squares expansion --------------------- *)
 
-(*  < L*_m , L_m >_K = ||G(u)||^2 - ||alpha X||^2   (eq:StabilityEstimate).   *)
+(*  < L*_m , L_m >_K = ||G(u)||^2 - ||alpha X||^2   (eq:stabdiag1).           *)
 Lemma momentum_pairing :
   forall k, << (Lstar_m k) , (L_m k) >> = << (Bv k) , (Bv k) >> - Xn k.
 Proof.
@@ -305,7 +326,7 @@ Qed.
 
 (* ========================================================================= *)
 (*  Step 1b: THE TESTED IDENTITY, NOW A THEOREM (was: Hypothesis HBS).       *)
-(*  eq:StabilityEstimate, i.e. eq:Bstab tested with U_h against itself.      *)
+(*  eq:stabdiag1, i.e. eq:Bstab tested with U_h against itself.              *)
 (*                                                                           *)
 (*  The only inputs are the two diagonal Green identities of the trusted     *)
 (*  base; no positivity is used.  The rest is the difference-of-squares      *)
@@ -449,7 +470,7 @@ Qed.
 (* ---------- Step 3: the Young step and the coefficient collection ----------- *)
 
 (*  The per-element lower bound: the left-hand-side elemental contribution    *)
-(*  dominates the coefficient-collected form of eq:StabilityEstimateFinal.    *)
+(*  dominates the coefficient-collected form of eq:coerccollect.              *)
 Lemma element_lower_bound :
   forall k,
     2 * nu * Vn k + sigma * Un k + eps * Pn k
