@@ -250,6 +250,306 @@ check("negative: S2 rejects the pre-fix symmetric-gradient pair",
       any(len(x) != 1 for m in _PAIR.finditer(_PREFIX)
           for x in _pair_deriv_indices(m)))
 
+
+# =========================================================================
+# READING APPENDIX A's PRINTED DERIVATION  (added 2026-07-29)
+#
+# The checks at the top of this file certify App. A's printed RESULTS from this
+# script's own sympy encoding.  S1/S2 above lint two textual conventions.  Neither
+# reads the ~67 pre-differentiation INTEGRANDS that App. A prints inside
+#     T_{(ai)(bj)} = <prefactor> d/dU_j^b ( <integrand> ) = <printed result>,
+# so the printed PATH to the certified destination was verified by nothing.  Nine
+# index defects lived there while the suite was green at 454/454 (BS-2 in
+# docs/lessons_learned.md, 2026-07-29).
+#
+# This section closes that gap by PARSING the appendix rather than transcribing
+# it.  Transcription would not be honest closure: the transcriber is the same
+# reader who must notice the typo, and the characteristic defect -- a trial factor
+# silently re-using a test dummy index -- is exactly the kind a human eye repairs
+# without registering that it did.  Parsing removes the reader from the loop:
+# BOTH the intermediate and the printed result come from the .tex, so the check
+# holds the paper to its own claim.
+#
+# Two independent arms, either of which can fail alone:
+#
+#   P2 INDEX CENSUS.  Distribute every product over every (nested) sum, then
+#      require each monomial to obey the Einstein convention exactly: a declared
+#      free index occurs once, every other letter occurs twice.  Distribution is
+#      what the two cheap lints measured and rejected in the spec could not do
+#      (52/68 rows flagged; 22 false positives) -- see
+#      docs/appendix-a-intermediate-coverage-spec.md Sec. 2.
+#   P4 DIFFERENTIATION.  Differentiate the parsed integrand w.r.t. the nodal
+#      unknown and compare, index by index, against the parsed printed result.
+#
+# The two arms catch different things, and the negative controls below prove it:
+# the nine HISTORICAL defects (recovered verbatim from the pre-fix source, commit
+# fdc7507) are all caught by P1/P2, while five index-BALANCED mutations -- which
+# no census can see -- are caught only by P4.
+# =========================================================================
+print("\n" + "=" * 70)
+print("READING APPENDIX A's PRINTED DERIVATION (parse -> census -> differentiate)")
+print("=" * 70)
+
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+import latex_index_notation as _lin
+
+_ENV = _re.compile(r'\\begin\{(align|equation)\*?\}(.*?)\\end\{\1\*?\}', _re.S)
+_ROWSPLIT = _re.compile(r'\\\\\s*(?:\[[^\]]*\])?')
+_DERIVOP = _re.compile(r'\\frac\s*\{\s*\\partial\s*\}\s*\{\s*\\partial\s*'
+                       r'(U\s*_\s*\{?j\}?\s*\^\s*\{?b\}?|P\s*\^\s*\{?b\}?)\s*\}')
+# Which spatial indices each block's left-hand side DECLARES free, read off the
+# subscript pattern of the printed component name (e.g. "A_{A\, (ai)(bj)}").
+# The differentiation argument never carries j: j enters through d/dU_j^b.
+_BLOCKS = [(r'\(ai\)\(bj\)', 'VU'), (r'a\(bj\)', 'QU'), (r'\(ai\)b', 'VP'),
+           (r'\(ia\)', 'FV'), (r'ab', 'QP')]
+_ARGFREE = {'VU': ['i'], 'QU': [], 'VP': ['i'], 'QP': []}
+_RESFREE = {'VU': ['i', 'j'], 'QU': ['j'], 'VP': ['i'], 'QP': [], 'FV': ['i'], 'FQ': []}
+
+
+def _logical_rows(region):
+    """App. A's align rows, joined across the \\notag continuations."""
+    out = []
+    for m in _ENV.finditer(region):
+        body, off = m.group(2), m.start(2)
+        phys, pos = [], 0
+        for rm in _ROWSPLIT.finditer(body):
+            phys.append((body[pos:rm.start()], off + pos))
+            pos = rm.end()
+        phys.append((body[pos:], off + pos))
+        cur, curoff = [], None
+        for txt, o in phys:
+            if not txt.strip():
+                continue
+            if curoff is None:
+                curoff = o
+            cur.append(txt)
+            if r'\notag' not in txt and r'\nonumber' not in txt:
+                out.append((" ".join(cur), curoff))
+                cur, curoff = [], None
+        if cur:
+            out.append((" ".join(cur), curoff))
+    return out
+
+
+_i0 = _APPA.index(r'\subsection{Components of $\mathbf{K}_{V, U}$}')
+_i1 = _APPA.index('Putting together the results')
+_REGION = _APPA[_i0:_i1]
+_BASELINE = _APPA[:_i0].count('\n') + 1
+
+_rows = _logical_rows(_REGION)
+_displays, _templates = [], 0
+for _raw, _off in _rows:
+    _ln = _BASELINE + _REGION[:_off].count('\n')
+    _m = _re.search(r'\\label\{([^}]*)\}', _raw)
+    _lab = _m.group(1) if _m else '(unnumbered)'
+    _norm = _lin.normalize(_raw)
+    _parts = [_re.sub(r'[,.;]+$', '', p.strip()).strip() for p in _norm.split('=')]
+    _parts = [p for p in _parts if p]
+    if _re.match(r'T\s*_', _parts[0]):        # the generic T(...) templates
+        _templates += 1
+        continue
+    _blk = next((b for pat, b in _BLOCKS if _re.search(pat, _parts[0])), 'FQ')
+    _displays.append((_ln, _lab, _blk, _parts, _DERIVOP.search(_norm) is not None))
+
+# P0  Extraction must actually have found the appendix.  A rule whose input silently
+# empties is the failure mode this suite has been bitten by twice (2026-07-28 Rule 1,
+# 2026-07-29 D3): the counts below are asserted, not merely printed.
+_nderiv = sum(1 for *_r, hasd in _displays if hasd)
+check(f"P0 App. A component displays extracted "
+      f"({len(_displays)} displays, {_nderiv} with a d/dU or d/dP operator, "
+      f"{_templates} generic templates skipped)",
+      len(_displays) >= 79 and _nderiv >= 67 and _templates == 6)
+
+
+def _split_deriv(part):
+    k = _DERIVOP.search(part)
+    return part[:k.start()], part[k.end():], ('P' if k.group(1).startswith('P') else 'U')
+
+
+_nparsed = _nmono = _ndiff = _nchain = 0
+_nonzero_seen = 0
+for _ln, _lab, _blk, _parts, _hasd in _displays:
+    _name = f"A.{_lab} (l.{_ln})"
+    try:
+        if _hasd:
+            _pre, _arg, _wrt = _split_deriv(_parts[1])
+            # `1` keeps a bare leading sign in the prefactor grammatical
+            _inter = _lin.parse(f"{_pre} 1 ( {_arg} )")
+            _res = _lin.parse(_parts[-1])
+            _nparsed += 2
+            _af, _rf = _ARGFREE[_blk], _RESFREE[_blk]
+            _n1, _v1 = _lin.census(_inter, _af)
+            _n2, _v2 = _lin.census(_res, _rf)
+            _nmono += _n1 + _n2
+            if _v1 or _v2:
+                check(f"{_name} index census", False)
+                print(f"        argument: {_v1}")
+                print(f"        result  : {_v2}")
+                continue
+            # every monomial of a differentiation argument carries exactly one
+            # nodal trial coefficient -- an argument that is already differentiated
+            # (or has no unknown in it) is the ':160' defect class
+            _tc = {_lin.trial_factors(f) for _, f in _lin.expand(_inter)}
+            if _tc != {1}:
+                check(f"{_name} argument is linear in exactly one nodal unknown", False)
+                print(f"        trial-coefficient counts per monomial: {sorted(_tc)}")
+                continue
+            _ok, _nz = True, False
+            for _i in ([0, 1, 2] if 'i' in _rf else [None]):
+                for _j in ([0, 1, 2] if 'j' in _rf else [None]):
+                    _fa = {'i': _i} if 'i' in _af else {}
+                    _fr = {}
+                    if 'i' in _rf:
+                        _fr['i'] = _i
+                    if 'j' in _rf:
+                        _fr['j'] = _j
+                    _lv = _lin.evaluate(_inter, _fa, mode=(_wrt, _j) if _wrt == 'U' else ('P', None))
+                    _rv = _lin.evaluate(_res, _fr)
+                    _nz = _nz or _lv != 0
+                    if not _lin.zero(_lv - _rv):
+                        _ok = False
+                        print(f"        i={_i} j={_j}")
+                        print(f"        d/d{_wrt} of the printed intermediate: {sp.simplify(_lv)}")
+                        print(f"        printed result                      : {sp.simplify(_rv)}")
+                        break
+                if not _ok:
+                    break
+            _ndiff += 1
+            _nonzero_seen += 1 if _nz else 0
+            check(f"{_name} printed intermediate --d/d{_wrt}--> printed result", _ok and _nz)
+        else:
+            _rf = _RESFREE[_blk]
+            _chain = [_lin.parse(p) for p in _parts[1:]]
+            _nparsed += len(_chain)
+            _viol = []
+            for _c in _chain:
+                _n, _v = _lin.census(_c, _rf)
+                _nmono += _n
+                _viol += _v
+            if _viol:
+                check(f"{_name} index census", False)
+                print(f"        {_viol}")
+                continue
+            _ok, _nz = True, False
+            for _i in ([0, 1, 2] if 'i' in _rf else [None]):
+                _fv = {'i': _i} if 'i' in _rf else {}
+                _vals = [_lin.evaluate(_c, _fv) for _c in _chain]
+                _nz = _nz or any(v != 0 for v in _vals)
+                if any(not _lin.zero(_vals[0] - v) for v in _vals[1:]):
+                    _ok = False
+            if len(_chain) > 1:
+                _nchain += 1
+            check(f"{_name} index census"
+                  + (" + printed chain is self-consistent" if len(_chain) > 1 else ""),
+                  _ok and _nz)
+    except Exception as _e:                                   # noqa: BLE001
+        check(f"{_name} parses under App. A's own grammar", False)
+        print(f"        {type(_e).__name__}: {_e}")
+
+check(f"P1/P2/P4 counters are non-vacuous "
+      f"({_nparsed} expressions parsed, {_nmono} monomials censused, "
+      f"{_ndiff} differentiation checks, {_nchain} printed chains, "
+      f"{_nonzero_seen} intermediates verified not identically zero)",
+      _nparsed >= 140 and _nmono >= 200 and _ndiff >= 67 and _nchain >= 1
+      and _nonzero_seen == _ndiff)
+
+# -------------------------------------------------------------------------
+# NEGATIVE CONTROLS I -- the nine HISTORICAL defects, verbatim from the '-' side
+# of commit fdc7507's hunks.  These are the real pre-fix intermediates, not
+# synthetic look-alikes: if the gate does not reject exactly the text the paper
+# used to carry, it does not close the class it claims to close.
+# -------------------------------------------------------------------------
+print("\n[negative controls] the nine 2026-07-29 defects, as they were printed")
+_HISTORICAL = [
+    ("eq:AGBetaLHSStabilizationTerm",
+     r"a_l \partial_l N^a \delta_{ik} \left( \partial_{ik} N^c U_m^c "
+     r"+ \partial_m N^c U_k^c \right) \partial_m \beta"),
+    ("eq:ASigmaLHSStabilizationTerm",
+     r"a_l \partial_l N^a \delta_{ik} \sigma_{kl} U_l^c N^c"),
+    ("eq:LDBetaLHSStabilizationTerm",
+     r"\partial_l \left( \partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) "
+     r"\partial_m N^b \delta_{mj} \partial_k \beta"),
+    ("eq:LSigmaLHSStabilizationTerm",
+     r"\partial_l \left( \partial_l N^a \delta_{ik} + \partial_k N^a \delta_{il} \right) "
+     r"\sigma_{kl} U_l^c N^c"),
+    ("eq:DBetaLLHSStabilizationTerm",
+     r"\partial_l N^a \delta_{ik} \partial_k \beta \partial_m "
+     r"\left( \partial_m N^c U_k^c +\partial_k N^c U_m^c \right)"),
+    ("eq:DBetaGLHSStabilizationTerm",
+     r"\partial_l N^a \delta_{il} \partial_k \beta "
+     r"\left( \partial_l N^c U_k^c + \partial_k N^c U_l^c \right) \partial_l \beta"),
+    ("eq:RSigmaLLHSStabilizationTerm",
+     r"\sigma_{lk} N^a \delta_{il} \partial_l "
+     r"\left( \partial_l N^c U_k^c + \partial_k N^c U_l^c \right)"),
+    ("eq:GULHSStabilizationTerm",
+     r"N^a \delta_{il} \partial_l \beta U_l^c N^c \partial_l \beta"),
+    ("eq:GAlphaDLHSStabilizationTerm",
+     r"N^a \delta_{il} \partial_l \beta \partial_l N^c U_l^c"),
+]
+
+
+def _rejects(arg, free=('i',)):
+    """Would the structural arm (P1 grammar / P2 census / trial-count) reject this?"""
+    try:
+        node = _lin.parse(arg)
+    except _lin.ParseError as e:
+        return f"grammar: {e}"
+    n, viol = _lin.census(node, list(free))
+    if viol:
+        return f"census: {viol[0]}"
+    if {_lin.trial_factors(f) for _, f in _lin.expand(node)} != {1}:
+        return "argument is not linear in exactly one nodal unknown"
+    return None
+
+
+for _lab, _arg in _HISTORICAL:
+    _why = _rejects(_arg)
+    check(f"negative: rejects the pre-fix {_lab}"
+          + (f"  [{_why[:72]}]" if _why else ""), _why is not None)
+
+# -------------------------------------------------------------------------
+# NEGATIVE CONTROLS II -- index-BALANCED mutations.  Every one of these satisfies
+# the Einstein convention perfectly, so the census arm passes them; only the
+# differentiation arm can tell they are wrong.  Without these the suite could not
+# distinguish "P4 verifies the algebra" from "P4 re-states the census".
+# -------------------------------------------------------------------------
+print("\n[negative controls] index-balanced mutations (census-invisible, P4 only)")
+_MUTANTS = [
+    ("A_A: convective trial index moved onto the test factor", 'VU', 'U',
+     r"\tau_1 \alpha^2", r"a_l \partial_l N^a \delta_{ik} a_m \partial_k N^c U_m^c",
+     r"\tau_1 \alpha^2 a_l \partial_l N^a a_m \partial_m N^b \delta_{ij}"),
+    ("A_L: sign flip inside the symmetric-gradient pair", 'VU', 'U',
+     r"- \tau_1 \alpha^2 \nu",
+     r"a_l \partial_l N^a \delta_{ik} \partial_m \left(\partial_m N^c U_k^c "
+     r"- \partial_k N^c U_m^c \right)",
+     r"- \tau_1 \alpha^2 \nu a_l \partial_l N^a \left( \partial^2_{mm}N^b \delta_{ij} "
+     r"+ \partial^2_{ij} N^b \right)"),
+    ("G_S: symmetric-gradient pair with a repeated branch", 'VU', 'U',
+     r"\alpha \nu",
+     r"\left( \partial_l N^c U_k^c + \partial_l N^c U_k^c \right) \partial_l N^a \delta_{ik}",
+     r"\alpha \nu \left( \partial_l N^a \partial_l N^b \delta_{ij} "
+     r"+ \partial_j N^a \partial_i N^b \right)"),
+    ("C_C: second-derivative contraction rewired", 'VU', 'U',
+     r"- \frac{4}{9} \tau_1 \alpha^2 \nu^2",
+     r"\partial^2_{kl} N^a \delta_{il} \partial^2_{mm} N^c U_k^c",
+     r"- \frac{4}{9} \tau_1 \alpha^2 \nu^2 \partial^2_{ki} N^a \partial^2_{kj} N^b"),
+    ("A_C: one power of alpha dropped from the prefactor", 'VU', 'U',
+     r"\frac{2}{3} \tau_1 \alpha \nu",
+     r"a_l \partial_l N^a \delta_{ik} \partial^2_{km} U_m^c N^c",
+     r"\frac{2}{3} \tau_1 \alpha^2 \nu a_l \partial_l N^a \partial^2_{ij} N^b"),
+]
+for _desc, _blk, _wrt, _pre, _arg, _res in _MUTANTS:
+    _structural = _rejects(_arg)
+    _inter = _lin.parse(f"{_pre} 1 ( {_arg} )")
+    _resn = _lin.parse(_res)
+    _differs = any(
+        not _lin.zero(_lin.evaluate(_inter, {'i': _i}, mode=('U', _j))
+                      - _lin.evaluate(_resn, {'i': _i, 'j': _j}))
+        for _i in range(3) for _j in range(3))
+    check(f"negative: P4 rejects [{_desc}] and the census does NOT (as intended)",
+          _differs and _structural is None)
+
 # -------------------------------------------------------------------------
 print("\n" + "=" * 70)
 npass = sum(1 for t, _ in results if t == "PASS")

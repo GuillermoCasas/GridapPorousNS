@@ -331,19 +331,17 @@ and a combination of Dirichlet (walls and inlet) and Neumann (outlet) boundary c
 \subsection{The viscous projector}\label{sec:ViscousProjector} \hfill\\
 \amend{In this work we take the operator $\ViscProj$ of \cref{eq:StrongMomentumEquation} to be a fixed linear map on second{\hyp}order tensors, acting pointwise and with constant coefficients, of which we shall require only the two following properties:}
 \begin{enumerate}[label=\textup{(V\arabic*)},ref=\textup{(V\arabic*)},leftmargin=3.4em]
-  \item\label{V:orthogonality} \emph{Orthogonality.} $\ViscProj$ is an orthogonal projection with respect to the Frobenius inner product, that is,
+  \item\label{V:orthogonality} \emph{Orthogonality.} $\ViscProj$ is an orthogonal projection with respect to the Frobenius inner product, that is, for all second{\hyp}order tensors $\mathbf{A},\mathbf{B}$,
   \begin{equation}\label{eq:PiOrthogonal}
     \ViscProj\ViscProj=\ViscProj,
     \qquad
-    (\ViscProj\mathbf{A})\!:\!\mathbf{B}=\mathbf{A}\!:\!(\ViscProj\mathbf{B})
-    \qquad\text{for all second{\hyp}order tensors }\mathbf{A},\mathbf{B}.
+    (\ViscProj\mathbf{A})\!:\!\mathbf{B}=\mathbf{A}\!:\!(\ViscProj\mathbf{B}).
   \end{equation}
   In particular $\ViscProj$ is non{\hyp}expansive: $|\ViscProj\mathbf{T}|\le|\mathbf{T}|$ pointwise, for every tensor $\mathbf{T}$.
-  \item\label{V:korn} \emph{Korn compatibility.} There is a constant $C_{\mathrm{K}}\ge1$, independent of the mesh and of the physical parameters, such that
+  \item\label{V:korn} \emph{Korn compatibility.} There is a constant $C_{\mathrm{K}}\ge1$, independent of the mesh and of the physical parameters, such that, for all $\boldsymbol{v}\in H^1_0(\Omega)^d$,
   \begin{equation}\label{eq:PiKorn}
     \lVert\nabla\boldsymbol{v}\rVert
-    \le C_{\mathrm{K}}\,\bigl\lVert\ViscProj\nabla\boldsymbol{v}\bigr\rVert
-    \qquad\forall\,\boldsymbol{v}\in H^1_0(\Omega)^d .
+    \le C_{\mathrm{K}}\,\bigl\lVert\ViscProj\nabla\boldsymbol{v}\bigr\rVert .
   \end{equation}
 \end{enumerate}
 \amend{We shall call \emph{admissible} any such operator---pointwise, with constant coefficients---satisfying \cref{V:orthogonality,V:korn}. Leaving $\ViscProj$ at this level of generality will allow us to treat, within a single formulation, several viscous operators of relevance that are found in different contexts in the literature. We describe them next, and verify in \cref{lem:projfamily,lem:projinstances} that all of them are admissible.}

@@ -52,22 +52,22 @@ porosity figure kept; the "Kratos Multiphysics" claim — the paper reads Gridap
 
 ---
 
-### 1d. Cover Appendix A's *intermediate* derivations in the verification suite
+### 1d. Cover the paper's *intermediate* derivations in the verification suite — App. A **DONE**
 
-**Spec:** [appendix-a-intermediate-coverage-spec.md](appendix-a-intermediate-coverage-spec.md)
-(written 2026-07-29, ready to execute).
+**Spec / inventory:** [appendix-a-intermediate-coverage-spec.md](appendix-a-intermediate-coverage-spec.md)
 
-`elemental_matrices_verification.py` certifies App. A's printed *results* from its own sympy
-encoding and never opens the appendix, so the ~54 printed pre-differentiation integrands are
-covered by nothing. Nine real defects lived there undetected while the suite was green at
-454/454; all nine are now fixed, and the `\partial^2` convention class is covered by the new
-S1/S2 lints, but the **dummy-index-reuse class (eight of the nine) is still uncovered**.
+**✅ DONE 2026-07-29 for Appendix A** (and for App. C's Step-6 η-optimisation). The gate *parses*
+App. A rather than transcribing it: all 79 component displays pass an index census taken after full
+distribution plus symbolic differentiation of the printed intermediate against the printed result;
+the nine historical defects are re-injected verbatim as negative controls, and five index-balanced
+mutations prove the differentiation arm works independently of the census. Suite 498/498 → 608/608.
 
-The spec records two cheap lints that were tried and **rejected with measurements** (52/68 and
-22 false positives — do not re-attempt them), the approach that works (transcribe each printed
-intermediate, differentiate it, compare against the printed result), the mandatory control-sibling
-protocol, acceptance criteria including negative controls built from two historical defects, and
-an effort estimate (~54 arguments, ~12 distinct shapes, order of a day).
+**Still open:** the same blind spot everywhere else in the paper. The spec's §6 now carries the
+inventory from a six-agent survey — App. C's Step 0–9 bound chains, App. D's inf-sup Step 2–4
+chains, App. B's symbol chain, the main-text↔appendix duplicated *collections*, and the documents
+no script opens at all — each with a difficulty estimate and the specific gate that would close it.
+Two live defects found while inventorying (a script anchored to labels that exist in no `.tex`, and
+a `0 == 0` check) are fixed and recorded in [`lessons_learned.md`](lessons_learned.md).
 
 ## 2. Code–theory consistency
 
