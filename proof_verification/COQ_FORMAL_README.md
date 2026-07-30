@@ -4,11 +4,11 @@ This directory contains a Coq formalisation of the algebraic and analytic
 claims underlying *A stabilized finite element method for incompressible,
 inertial flows in inhomogeneous porous media* (Casas, González-Usúa, Codina,
 de-Pouplana). It is the proof-assistant counterpart of the SymPy suite in
-`theory/verification scripts/`: where SymPy checks the identities by symbolic
+`proof_verification/sympy/`: where SymPy checks the identities by symbolic
 computation, the files here prove them from the axioms of the real numbers,
 and the proofs are re-verified by Coq's trusted kernel (`coqchk`).
 
-**Status: 24 files, all proved. No `Admitted`, no `Axiom`,
+**Status: 25 files, all proved. No `Admitted`, no `Axiom`,
 no `admit` anywhere** (grep the sources to confirm — and, more strongly,
 `Print Assumptions`: every top-level theorem depends on exactly three axioms,
 all from the standard library's *construction* of the reals
@@ -19,7 +19,7 @@ Compiled and independently kernel-checked (`coqchk`) on Coq 8.18 / Rocq 9.1 usin
 Every definition has been checked against the manuscript sources (`article.tex`,
 `continuity_appendix.tex`, July 2026 revision).
 
-The 18 files of the ASGS a priori chain are joined by **6 files for the OSGS
+The 19 files of the ASGS a priori chain are joined by **6 files for the OSGS
 (orthogonal-subgrid-scale) a priori chain** of the companion note
 `theory/osgs_a_priori/osgs_convergence.tex`: `OsgsParameters.v` (Lemma 3.1, the
 parameter inequalities (P1)–(P6), (K1)–(K3), including the Damköhler inequality
@@ -175,7 +175,10 @@ satisfy the hypotheses is the other direction, and is what the hand audit in
 
 **Headline of this revision: the paper's entire a priori chain --
 `lemma:Stability`, `lemma:Continuity`, `lem:continterp` and
-`thm:convergence` -- consists of complete machine-checked theorems**
+`thm:convergence` -- consists of complete machine-checked theorems *over an
+explicit abstract interface*: kernel-proved assembly, conditional on a named
+analytic trusted base and on a concrete instantiation that is human-audited
+rather than formalised**
 (`abstract_stability`, `abstract_continuity` with its sharp form
 `abstract_continuity_sharp`, `abstract_continterp`, `abstract_convergence`),
 proved over an
@@ -368,7 +371,7 @@ is `bound_II_V`; Step 6d is `bound_III` with the four `JD` bounds; Step 8
 is `abstract_continuity_sharp` (eq:assembly, the sharp porosity-weighted
 form); and Step 9's absorption chain eq:absorb1–eq:normconv is
 `absorb_elem` + `step9`, yielding the final
-`abstract_continuity : B_S(U,V) ≤ C_tot (BrU + BrP) |||V|||` with a fully
+`abstract_continuity : |B_S(U,V)| ≤ C_tot (BrU + BrP) |||V|||` with a fully
 explicit constant. The trusted base is the named hypothesis list in the
 file header (integration-by-parts identities, facewise assembly, the two
 face-integral estimates, H:jump, bounded face multiplicity, the eight

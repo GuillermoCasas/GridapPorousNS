@@ -65,8 +65,10 @@ Qed.
 (*  Witnesses 2 and 3: abstract_osgs_continterp and abstract_osgs_consistency. *)
 (*                                                                           *)
 (*  A one-element mesh (K = unit, Th = [tt]) with nu = 1, sigma = 0, eps = 0, *)
-(*  c1 = c2 = 1, h = alpha = 1, |a| = 0, IU = IP = 1 makes tau1 = tau2 = 1,   *)
-(*  Da_{h,K} = 0, so the error function is E(h) = 2 (clean rational).         *)
+(*  c1 = c2 = 1, h = alpha = 1, |a| = 0 makes tau1 = tau2 = 1 and             *)
+(*  Da_{h,K} = 0, so the l2 error functional is                              *)
+(*  Psi_O(h) = (IU^2 + IP^2)^{1/2}; taking IU = 3, IP = 4 makes it the clean *)
+(*  rational 5.                                                              *)
 (*  The seven interpolation groups I1..I7 = 1 (BEV = 7) with unit constants,  *)
 (*  and the two consistency slots S1 = S2 = 1 (BcU = 2), are met with room.   *)
 (* ========================================================================= *)
@@ -75,28 +77,29 @@ Definition uTh  : list unit := [tt].
 Definition uhK  (_ : unit) : R := 1.
 Definition uaK  (_ : unit) : R := 1.
 Definition uam  (_ : unit) : R := 0.
-Definition uIU  (_ : unit) : R := 1.
-Definition uIP  (_ : unit) : R := 1.
+Definition uIU  (_ : unit) : R := 3.
+Definition uIP  (_ : unit) : R := 4.
 
-(*  E(h) = 2 on this instance (tau1 = tau2 = 1, Da_{h,K} = 0).  *)
-Lemma wEh_val :
-  OsgsInterpolation.Eh unit uTh 1 0 1 1 uhK uaK uam uIU uIP = 2.
+(*  Psi_O(h) = 5 on this instance (tau1 = tau2 = 1, Da_{h,K} = 0, 3-4-5).  *)
+Lemma wPsiO_val :
+  OsgsInterpolation.PsiO unit uTh 1 0 1 1 uhK uaK uam uIU uIP = 5.
 Proof.
-  unfold OsgsInterpolation.Eh, uTh. simpl Rsum.
-  unfold OsgsInterpolation.ErrTerm, OsgsInterpolation.t1, OsgsInterpolation.t2,
+  unfold OsgsInterpolation.PsiO, uTh. simpl Rsum.
+  unfold OsgsInterpolation.PsiTerm, OsgsInterpolation.t1, OsgsInterpolation.t2,
          OsgsInterpolation.Dah, uhK, uaK, uam, uIU, uIP.
   unfold ContinuityAlgebra.tau1, ContinuityAlgebra.tau2, ContinuityAlgebra.phi1,
          ContinuityAlgebra.tauNSinv.
-  replace (1 + 0 * 1^2 / (1 * 1)) with 1 by field.
   replace (1^2 * (1 * 1 / 1^2 + 1 * 0 / 1) / (1 * 1)) with 1 by field.
   replace (/ (1 * (1 * 1 / 1^2 + 1 * 0 / 1) + 0)) with 1 by field.
-  rewrite !sqrt_1.
-  field.
+  replace ((1 + 0 * 1^2 / (1 * 1)) * (1 / 1)^2 * (1 * 3^2 + 1 * 4^2) + 0)
+    with 25 by field.
+  replace (25) with (5 * 5) by ring.
+  rewrite sqrt_square; lra.
 Qed.
 
 Theorem witness_osgs_continterp :
   Rabs 7 <= OsgsInterpolation.CtotI 1 1 1 1 1 1 1
-            * (OsgsInterpolation.Eh unit uTh 1 0 1 1 uhK uaK uam uIU uIP * 1).
+            * (OsgsInterpolation.PsiO unit uTh 1 0 1 1 uhK uaK uam uIU uIP * 1).
 Proof.
   refine (OsgsInterpolation.abstract_osgs_continterp
            unit uTh 1 0 1 1 uhK uaK uam uIU uIP
@@ -105,12 +108,12 @@ Proof.
            1 1 1 1 1 1 1
            _ _ _ _ _ _ _ _);
     try lra;
-    rewrite Rabs_R1; rewrite wEh_val; lra.
+    rewrite Rabs_R1; rewrite wPsiO_val; lra.
 Qed.
 
 Theorem witness_osgs_consistency :
   Rabs 2 <= OsgsInterpolation.CconsI 1 1
-            * (OsgsInterpolation.Eh unit uTh 1 0 1 1 uhK uaK uam uIU uIP * 1).
+            * (OsgsInterpolation.PsiO unit uTh 1 0 1 1 uhK uaK uam uIU uIP * 1).
 Proof.
   refine (OsgsInterpolation.abstract_osgs_consistency
            unit uTh 1 0 1 1 uhK uaK uam uIU uIP
@@ -119,5 +122,5 @@ Proof.
            1 1
            _ _ _);
     try lra;
-    rewrite Rabs_R1; rewrite wEh_val; lra.
+    rewrite Rabs_R1; rewrite wPsiO_val; lra.
 Qed.

@@ -11,9 +11,13 @@ Layer 2, is unbuilt). The SymPy suite checks concrete *algebra* only.
 So one whole class of error is invisible to both machine layers **by construction**: a hypothesis fed
 into the trusted base whose *stated proof in the paper does not actually establish it*. The
 2026-07-23 external audit found exactly this class (`ω_χ→0`, patch equivalence, advection regularity).
-Coq even certified the *one-sided* `abstract_continuity` (`BS <= Ctot*(...)`, no `Rabs`,
-`AbstractContinuity.v:46`) — a true-but-weaker statement — which is why the missing-abs-values defect
-also slipped through.
+Coq even certified the *one-sided* `abstract_continuity` (`BS <= Ctot*(...)`, no `Rabs`) — a
+true-but-weaker statement — which is why the missing-abs-values defect also slipped through.
+**That Coq transcription was itself repaired on 2026-07-30**: `AbstractContinuity.v` now concludes
+`Rabs BS <= Ctot*(...)` (and `Rabs BS <= KUV·NU·NV + …` for the sharp form), matching the printed
+lemma; the signed bounds survive as `abstract_continuity[_sharp]_signed`. The repair needed no new
+mathematics — all eighteen group bounds in the file were already `Rabs` estimates, and the sibling
+`AbstractInterpolation.v` had stated the barred form all along.
 
 **This register is the defense.** It enumerates every trusted-base obligation whose justification is a
 *non-algebraic* lemma, ties each to (i) the paper locus that proves/assumes it and (ii) an explicit
@@ -40,7 +44,7 @@ gate). The *hypothesis-content* half below has no symbolic proxy and must be aud
 | 3 | Global regularity of `α a·∇u` on patches for the Scott–Zhang best approximation | `oa:lem:bestapprox` → `oa:lem:consistency`; `H:advectionsmooth` | `a ∈ W^{kᵤ,∞}(Ω)` **globally**. Elementwise-`W^{kᵤ,∞}` + global-`C⁰` is not in `H^{kᵤ}(S_K)` across faces for `kᵤ≥2`. | trusted | **repaired-2026-07-23**: `H:advectionsmooth` strengthened from elementwise `‖Dʲa‖_{L^∞(K)}` to global `a∈W^{kᵤ,∞}(Ω)`, symmetric to the already-global `α∈W^{m,∞}` of `H:porositysmooth`. |
 | 4 | Working norm is a **norm** (definiteness) | `H:projector`/`eq:PiKorn` (A3); `lem:projfamily` (§2.1 `sec:ViscousProjector`), `lem:definiteness` (App C), `oa:lem:definiteness` (App D) | Korn compatibility `‖∇v‖ ≤ C_K‖Π∇v‖` on `H¹₀`, now an explicit standing assumption. For the family it follows from the elementary identity `‖dev sym ∇v‖² = ½‖∇v‖² + (½−1/d)‖∇·v‖²` chained with the pointwise Pythagoras `eq:projmonotone`, with the uniform `C_K=√2`. No Korn/conformal-Killing machinery needed. | trusted → **algebraic** | **repaired-2026-07-23** (identity added, App D re-pointed); **generalized 2026-07-29**: promoted to the standing assumption (A3), so the obligation is now *printed* rather than implicit, and both halves are machine-covered — the chaining in `ViscousProjector.v` (`korn_sqrt2`, `nested_pythagoras`), the concrete identity and the sharp constants in `sympy/projector_algebra_verification.py`. |
 | 5 | Interpolant admissibility in the zero-mean pressure space (`ε=0`) | interpolant setup, App C; `oa:rem:meanshift`, App D | Mean-correct `p̂_h := I_h p − |Ω|⁻¹∫I_h p`; the shift is bounded by `‖p−I_h p‖` and invisible in gradient / zero-mean pairings. | trusted | **repaired-2026-07-23** (App C): mean-corrected interpolant now stated (App D already had it). |
-| 6 | Absolute-value bars on continuity-lemma LHS | `eq:continuity`, `eq:sharpcont` (App C); `oa:eq:ConsistencyBound` (App D) | A continuity estimate bounds `|B(·,·)|`, not the signed `B`. | **statement-lint** | **repaired-2026-07-23** (App C bars added); now guarded by `theorem_statement_verification.py`. |
+| 6 | Absolute-value bars on continuity-lemma LHS | `eq:continuity`, `eq:sharpcont` (App C); `oa:eq:ConsistencyBound` (App D) | A continuity estimate bounds `|B(·,·)|`, not the signed `B`. | **statement-lint** | **repaired-2026-07-23** (App C bars added), now guarded by `theorem_statement_verification.py`; the matching *Coq* statement repaired **2026-07-30** (`abstract_continuity` concludes on `Rabs BS`). |
 | 7 | inf–sup sup/inf domains exclude 0 | `oa:eq:InfSup` and its proof quotient | `\sup_{V_h∈Xhz\setminus\{0\}}` (Rayleigh quotient undefined at 0). | **statement-lint** | **repaired-2026-07-23** (proof-body quotient); guarded going forward. |
 | 8 | Projection stability (condition (35)) | `H:projection`; `codina2008analysis` | A Codina–Blasco property of the element **pair**, to be verified per family; not implied by the common mesh-and-data setting. Route-A sufficiency (`c₁,c₂` large, non-sharp) is stated as such. | trusted | **assumed** (correctly flagged non-automatic and non-sharp). A generalized-eigenvalue computation of `β₀` over representative regimes would upgrade this to `algebraic`. |
 | 9 | Coercivity threshold `c₁ > 2ξ C_inv²` | `lem:coercivity`, `H:coercivity` | `C_inv` is element-family dependent (`c1_dimension_note`, validated by `element_c1.jl`); `4k⁴` is under-margined for high-`C_inv` structured tets (documented). | algebraic (partly) | **assumed** with the element-dependence documented; `coverage_coercivity_numeric_verification.py` covers the algebra. |

@@ -106,7 +106,10 @@ and analytic \emph{claims} from the axioms of the real numbers and has them
 re-checked by Coq's trusted kernel. \textbf{The headline of the current
 revision: the paper's entire a priori chain --- \lbl{lemma:Stability},
 \lbl{lemma:Continuity}, \lbl{lem:continterp} and \lbl{thm:convergence} ---
-now consists of complete machine-checked theorems}
+now consists of complete machine-checked theorems \emph{over an explicit
+abstract interface}: kernel-proved assembly, conditional on a named analytic
+trusted base and on a concrete instantiation that is human-audited rather than
+formalised}
 (\coq{abstract_stability}, \coq{abstract_continuity},
 \coq{abstract_continterp}, \coq{abstract_convergence}), proved over an
 abstract inner-product / mesh interface from a short, \emph{named,
@@ -772,7 +775,7 @@ Section~\ref{sec:left}.
 \coq{face_CS_pair} & facewise Cauchy--Schwarz with the multiplicity hypotheses. \\
 \coq{abstract_continuity_sharp} & Step~8: the sharp porosity-weighted assembly (\lbl{eq:assembly}). \\
 \coq{absorb_elem}, \coq{step9} & Step~9: the \lbl{eq:absorb1}--normconv absorption chain. \\
-\coq{abstract_continuity} & \textbf{\lbl{lemma:Continuity}}: $B_S(U,V)\le C_{\mathrm{tot}}(\mathrm{Br}_U+\mathrm{Br}_P)\,|||V|||$, $C_{\mathrm{tot}}$ fully explicit. \\
+\coq{abstract_continuity} & \textbf{\lbl{lemma:Continuity}}: $\lvert B_S(U,V)\rvert\le C_{\mathrm{tot}}(\mathrm{Br}_U+\mathrm{Br}_P)\,|||V|||$, $C_{\mathrm{tot}}$ fully explicit. \\
 \bottomrule
 \end{longtable}
 
@@ -1068,37 +1071,46 @@ are proved in full.
 
 \subsection{\texttt{OsgsInterpolation.v} --- Lemmas D.11, D.13: consistency and interpolation continuity}\label{sec:crossOsgsInterp}
 
-The OSGS error function \lbl{oa:eq:ErrorFunction} $E(h)=\sum_K(\aK/h_K)(1+\Dah)^{1/2}
+Both OSGS error functionals of Appendix~D are \emph{defined} here concretely, and the two
+lemmas are stated in the sharp one: the porosity-weighted broken $\ell^2$ functional
+\lbl{oa:eq:ErrorFunctionL2} $\Psi_{\mathrm O}(h)$ is \coq{PsiO} (from \coq{PsiTerm}), and its
+coarser $\ell^1$ majorant \lbl{oa:eq:ErrorFunction}
+$\mathcal E(h)=\sum_K(\aK/h_K)(1+\Dah)^{1/2}
 (\tau_{2,K}^{1/2}E_{\mathrm{int},K}(\mathbf u)+\tau_{1,K}^{1/2}E_{\mathrm{int},K}(p))$
---- the ASGS error function times the elementwise $(1+\Dah)^{1/2}$ --- is
-\emph{defined} here as a concrete mesh sum (\coq{Eh}).
+--- the ASGS error function times the elementwise $(1+\Dah)^{1/2}$ --- is \coq{Eh} (from
+\coq{ErrTerm}).
 \footnote{Appendix~D (like the note) states \lbl{oa:th:convergence} in the sharper porosity-weighted broken
 $\ell^2$ functional $\Psi_{\mathrm O}(h)=\bigl(\sum_K(c_1+\Dah)(\aK^2/h_K^2)(\tau_{2,K}
 E_{\mathrm{int},K}(\mathbf u)^2+\tau_{1,K}E_{\mathrm{int},K}(p)^2)\bigr)^{1/2}$, of which
 $\mathcal E(h)$ is the $\ell^1$ majorant ($\Psi_{\mathrm O}\le c_1^{1/2}\mathcal E$). The
 machine-checked assembly here is agnostic to the choice of error functional---the per-term
 bounds \coq{HI1}--\coq{HS2} enter as abstract hypotheses, and \file{OsgsConvergence.v}
-composes them in broken $\ell^2$ norms (\coq{NE},\coq{Neta},\coq{NUU})---so it certifies the
-$\ell^1$ form directly; the sharper $\ell^2$ form follows from the \emph{same}
-functional-agnostic assembly (the mechanical mirror below), not as a logical consequence
-of the $\ell^1$ statement. Re-stating the
-Coq error functional as $\Psi_{\mathrm O}$ (redefining \coq{Eh} and the single concrete
-witness \coq{wEh\_val} of \file{NonVacuityOsgs.v}) is a purely mechanical mirror, left as a
-follow-up.} The seven per-term
+composes them in broken $\ell^2$ norms (\coq{NE},\coq{Neta},\coq{NUU})---so the choice of
+functional is a matter of which one the \emph{hypotheses} are stated against. Since
+2026-07-30 that choice is the sharp one: \coq{PsiO} $=\Psi_{\mathrm O}(h)$ (from
+\coq{PsiTerm}) is the functional the two theorems and every per-term hypothesis
+\coq{HI1}--\coq{HS2} are stated in, the $\ell^1$ majorant $\mathcal E(h)$ remains available
+as \coq{Eh} (from \coq{ErrTerm}), and the passage $\Psi_{\mathrm O}\le c_1^{1/2}\mathcal E$
+printed above is itself kernel-proved as \coq{PsiO\_le\_Eh} (under $c_1\ge1$, which
+\lbl{H:design} supplies). \file{OsgsConvergence.v} is unaffected: its error functional is an
+abstract nonnegative scalar, so \coq{abstract_osgs_convergence} and its two corollaries hold
+verbatim in either functional.} The seven per-term
 interpolation bounds (I1)--(I7) of \lbl{oa:lem:interpolation} and the two
 consistency-slot bounds (S1),(S2) of \lbl{oa:lem:consistency} --- each derived in
 Appendix~D from the interpolation estimates \lbl{oa:eq:NodalInterp}, the best-approximation
 lemma \lbl{oa:lem:bestapprox}, and the conversions (P3)--(P6) --- are the named
 analytic trusted base; the assembly (the triangle inequality over the terms,
-collecting them into $C\,E(h)\,|||V|||$) is proved in full.
+collecting them into $C\,\Psi_{\mathrm O}(h)\,|||V|||$) is proved in full.
 
 \begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
 \toprule
 \textbf{Coq statement} & \textbf{App~D content (all machine-checked)} \\
 \midrule \endhead
-\coq{Eh}, \coq{Eh_nonneg} & the concrete OSGS error function \lbl{oa:eq:ErrorFunction} and its nonnegativity. \\
-\coq{abstract_osgs_continterp} & \textbf{Lemma D.13}: $|B_{\mathrm{osgs}}(\widehat E,V_h)|\le C_{\mathrm{tot}}^{I}\,E(h)\,|||V_h|||$ from the decomposition into $I_1$--$I_7$ and the seven term bounds. \\
-\coq{abstract_osgs_consistency} & \textbf{Lemma D.11}: $|B_{\mathrm{osgs}}(U-U_h,V_h)|\le C_{\mathrm{cons}}^{I}\,E(h)\,|||V_h|||$ from the split into $S_1(U,V_h)+S_2(U,V_h)$. \\
+\coq{PsiTerm}, \coq{PsiO}, \coq{PsiO_nonneg} & the concrete sharp $\ell^2$ error functional $\Psi_{\mathrm O}(h)$ \lbl{oa:eq:ErrorFunctionL2} and its nonnegativity --- the functional the two lemmas below are stated in. \\
+\coq{ErrTerm}, \coq{Eh}, \coq{Eh_nonneg} & its coarser $\ell^1$ majorant $\mathcal E(h)$ \lbl{oa:eq:ErrorFunction} and its nonnegativity. \\
+\coq{PsiO_le_Eh} & the relation $\Psi_{\mathrm O}(h)\le c_1^{1/2}\mathcal E(h)$ printed below \lbl{oa:eq:ErrorFunction} (under $c_1\ge1$, from \lbl{H:design}): elementwise $c_1+\Dah\le c_1(1+\Dah)$ and $a^2+b^2\le(a+b)^2$, then the discrete $\ell^2\subset\ell^1$ inequality. \\
+\coq{abstract_osgs_continterp} & \textbf{Lemma D.13}: $|B_{\mathrm{osgs}}(\widehat E,V_h)|\le C_{\mathrm{tot}}^{I}\,\Psi_{\mathrm O}(h)\,|||V_h|||$ from the decomposition into $I_1$--$I_7$ and the seven term bounds. \\
+\coq{abstract_osgs_consistency} & \textbf{Lemma D.11}: $|B_{\mathrm{osgs}}(U-U_h,V_h)|\le C_{\mathrm{cons}}^{I}\,\Psi_{\mathrm O}(h)\,|||V_h|||$ from the split into $S_1(U,V_h)+S_2(U,V_h)$. \\
 \bottomrule
 \end{longtable}
 
@@ -1118,14 +1130,15 @@ $B_{\mathrm{osgs}}$ in its first argument (\coq{Hbilin}), the analogue of the AS
 \textbf{Coq statement} & \textbf{App~D content (all machine-checked)} \\
 \midrule \endhead
 \coq{Qk_CS}, \coq{sumQ_CS}, \coq{NUU_triangle} & the triangle inequality for the OSGS triple norm, \emph{proved} from the pre-Hilbert axioms: per-element five-fold Cauchy--Schwarz over the five weights $(2\nu,\sigma,\varepsilon,\tau_1,\tau_2)$, then the discrete C--S over the mesh. \\
-\coq{Neta_bound} & $|||\eta|||\le((C_{\mathrm{cons}}+C_{\mathrm{int}})C_W/\beta_{\mathrm{stab}})E(h)$: the appendix's chain $\beta_{\mathrm{stab}}|||\eta|||^2\le B_{\mathrm{osgs}}(\eta,W)=B_{\mathrm{osgs}}(U-U_h,W)-B_{\mathrm{osgs}}(\widehat E,W)\le\dots$ \\
-\coq{abstract_osgs_convergence} & \textbf{\lbl{oa:th:convergence}}: $|||U-U_h|||\le C_{\mathrm{conv}}\,E(h)$ (\lbl{oa:eq:MainResult}), triangle inequality $+$ \coq{Neta_bound} $+$ interp-size. \\
+\coq{Neta_bound} & $|||\eta|||\le((C_{\mathrm{cons}}+C_{\mathrm{int}})C_W/\beta_{\mathrm{stab}})\Psi_{\mathrm O}(h)$: the appendix's chain $\beta_{\mathrm{stab}}|||\eta|||^2\le B_{\mathrm{osgs}}(\eta,W)=B_{\mathrm{osgs}}(U-U_h,W)-B_{\mathrm{osgs}}(\widehat E,W)\le\dots$ \\
+\coq{abstract_osgs_convergence} & \textbf{\lbl{oa:th:convergence}}: $|||U-U_h|||\le C_{\mathrm{conv}}\,\Psi_{\mathrm O}(h)$ (\lbl{oa:eq:MainResult}), triangle inequality $+$ \coq{Neta_bound} $+$ interp-size. Stated for an abstract nonnegative error functional, so it holds in $\Psi_{\mathrm O}$ or in $\mathcal E$; \file{OsgsInterpolation.v} supplies the $\Psi_{\mathrm O}$ instance of its two inputs. \\
 \coq{perSU_le_perU}, \coq{abstract_osgs_convergence_asgsnorm} & \textbf{Corollary D.16} (\lbl{oa:cor:asgsnorm}): the estimate holds verbatim in the ASGS norm, via Lemma D.8. \\
-\coq{sig_vel_le_NUU}, \coq{abstract_osgs_convergence_Ltwo} & \textbf{Corollary D.17} (\lbl{oa:cor:Ltwo}): the $\sigma$-robust $L^2$ velocity estimate $\sqrt\sigma\,\lVert\mathbf u-\mathbf u_h\rVert\le C_{\mathrm{conv}}E(h)$, the reward for deleting the reactive subscale. \\
+\coq{sig_vel_le_NUU}, \coq{abstract_osgs_convergence_Ltwo} & \textbf{Corollary D.17} (\lbl{oa:cor:Ltwo}): the $\sigma$-robust $L^2$ velocity estimate $\sqrt\sigma\,\lVert\mathbf u-\mathbf u_h\rVert\le C_{\mathrm{conv}}\Psi_{\mathrm O}(h)$, the reward for deleting the reactive subscale. \\
 \bottomrule
 \end{longtable}
 
-\noindent Coq keeps the right-hand side as the abstract functional $E(h)=\Psi_{\mathrm O}(h)$; the
+\noindent Coq keeps the right-hand side as the error functional $\Psi_{\mathrm O}(h)$ (\coq{PsiO}) without
+unfolding it; the
 manuscript's \emph{closed-form} version of this corollary --- which unfolds $\sigma^{-1}\Psi_{\mathrm O}^2$
 into the elementwise $(1+c_1/\mathrm{Da}_h)\bigl[(1+\tfrac{c_2}{c_1}\mathrm{Re}_h)E_{u}^2+\tfrac{\alpha_K}{\sigma\nu}E_p^2\bigr]$ display --- is therefore not part of the Coq statement and is checked symbolically by
 \file{osgs_display_consistency_verification.py} (see \S\ref{sec:absexample} on the abstract/closed-form
@@ -1172,9 +1185,11 @@ energy $=1$ (so $|||U_h|||^2=6>0$) and the seven term estimates met with room,
 yielding $B_{\mathrm{osgs}}(U_h,W)=7\ge\beta_{\mathrm{stab}}|||U_h|||^2=\tfrac1{16}\cdot6=\tfrac38$,
 both sides strictly positive (\coq{osgs_stability_not_vacuous}).
 \item \coq{witness_osgs_continterp} and \coq{witness_osgs_consistency} --- a
-one-element mesh with $\tau_1=\tau_2=1$, $\Dah=0$, $E(h)=2$ (a clean rational,
-\coq{wEh_val}), giving $|B_{\mathrm{osgs}}(\widehat E,V_h)|=7\le C_{\mathrm{tot}}^{I}\cdot(E(h)\cdot|||V_h|||)=14$
-and $|B_{\mathrm{osgs}}(U-U_h,V_h)|=2\le4$, both non-degenerate.
+one-element mesh with $\tau_1=\tau_2=1$, $\Dah=0$ and interpolation data
+$(E_{\mathrm{int}}(\mathbf u),E_{\mathrm{int}}(p))=(3,4)$, so that
+$\Psi_{\mathrm O}(h)=5$ (a clean rational, \coq{wPsiO_val}), giving
+$|B_{\mathrm{osgs}}(\widehat E,V_h)|=7\le C_{\mathrm{tot}}^{I}\cdot(\Psi_{\mathrm O}(h)\cdot|||V_h|||)=35$
+and $|B_{\mathrm{osgs}}(U-U_h,V_h)|=2\le10$, both non-degenerate.
 \end{itemize}
 
 \noindent
@@ -2708,11 +2723,15 @@ to know exactly where.
 It proves, by explicit $\varepsilon$--$\delta$, that $\alpha_{\mathrm{mid}}$
 meets its neighbours continuously (\coq{am_limit_0}, \coq{am_limit_1}) and with
 vanishing first derivative (\coq{am'_limit_0}, \coq{am'_limit_1}). The
-manuscript asserts $C^\infty$, a claim that rests on \emph{every} derivative
-vanishing at the joins. Only the first-order case is inside the kernel --- and
-it is inside no other artefact either, the SymPy script stopping at the same
-order. The gap is real, and benign: $C^1$ is what finite element interpolation
-of the profile actually consumes.
+manuscript calls the profile \emph{smooth} (\lbl{eq:PlateauBumpFunction} and the
+text following \lbl{eq:Gamma}); read as $C^\infty$, that rests on \emph{every}
+derivative vanishing at the joins. Only the first-order case is inside the
+kernel; \file{sympy/manufactured_solution_verification.py} goes one order
+further, checking that both the first and the second derivative vanish at
+\emph{both} joins. Machine coverage is therefore $C^1$ (Coq) and $C^2$ (SymPy),
+and nothing certifies the flatness beyond second order. The gap is real, and
+benign: $C^1$ is what finite element interpolation of the profile actually
+consumes.
 
 \emph{(2) The asymptotic limits are partial, with the other number held fixed.}
 In \file{Asymptotics.v} the dominant-convection section declares
@@ -3588,7 +3607,7 @@ theorems in any formal system: they add \emph{no analytic trust}. \\
 \lbl{lemma:Stability}, \lbl{lemma:Continuity}, \lbl{lem:continterp} and
 \lbl{thm:convergence}: the coercivity bound
 $B_S\ge\Cstab\,|||U_h|||^2$, the continuity bound
-$B_S\le C_{\mathrm{tot}}(\mathrm{Br}_U+\mathrm{Br}_P)|||V|||$, the
+$|B_S|\le C_{\mathrm{tot}}(\mathrm{Br}_U+\mathrm{Br}_P)|||V|||$, the
 interpolation-error continuity
 $|B_S(E,V_h)|\le C_{\mathrm{tot}}^{I}(\Psi_U+\Psi_P)|||V_h|||$ and the
 convergence estimate

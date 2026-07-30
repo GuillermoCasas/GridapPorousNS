@@ -11,9 +11,13 @@
 #       lemma must state  |B(a;U,V)| <= (...) ,  not the one-sided  B(a;U,V) <= (...) .
 #       A one-sided bound is TRUE but strictly weaker than a continuity estimate,
 #       so neither SymPy (self-contained algebra) nor Coq flags it -- indeed Coq's
-#       own abstract_continuity was transcribed one-sided (BS <= Ctot*(...), no
-#       Rabs) and the kernel certified it happily (see AbstractContinuity.v:46).
-#       This is the 2026-07-23 audit's section 3.1 / M13 defect.
+#       own abstract_continuity WAS transcribed one-sided (BS <= Ctot*(...), no
+#       Rabs) and the kernel certified it happily. That Coq transcription was
+#       repaired on 2026-07-30 (AbstractContinuity.v now concludes
+#       Rabs BS <= Ctot*(...), with the signed form kept as a corollary), so the
+#       Coq and LaTeX statements now agree; this rule keeps guarding the LaTeX
+#       side, which no other gate reads. Origin: the 2026-07-23 audit's
+#       section 3.1 / M13 defect.
 #
 #   (2) An inf-sup sup/inf whose trial/test domain fails to exclude 0
 #       (\sup_{V_h \in Xhz}  must be  \sup_{V_h \in Xhz\setminus\{0\}}), else the

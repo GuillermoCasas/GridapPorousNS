@@ -40,11 +40,13 @@
 (*                                                                           *)
 (*  Conclusions (with fully explicit constants):                             *)
 (*    abstract_continuity_sharp :                                            *)
-(*      BS <= KUV (NU NV) + KPV (BrP NV) + sqrt c1 (BrU NV)                  *)
+(*      Rabs BS <= KUV (NU NV) + KPV (BrP NV) + sqrt c1 (BrU NV)             *)
 (*      -- eq:assembly / the sharp form eq:sharpcont;                        *)
 (*    abstract_continuity :                                                  *)
-(*      BS <= Ctot (BrU + BrP) NV                                            *)
+(*      Rabs BS <= Ctot (BrU + BrP) NV                                       *)
 (*      -- lemma:Continuity for discrete arguments, Step 9 included.         *)
+(*    (the signed companions abstract_continuity[_sharp]_signed drop the     *)
+(*     bars; the barred form is the one the paper prints.)                   *)
 (*                                                                           *)
 (*  Coq 8.18, stdlib only.                                                   *)
 (* ========================================================================= *)
@@ -54,6 +56,16 @@ Import ListNotations.
 From PNSFormal Require Import ContinuityAlgebra InnerSpace AbstractSums
                               InverseEstimates.
 Local Open Scope R_scope.
+
+(*  Two elementary Rabs bridges, used to state the continuity estimates on
+    |B_S|, as the paper prints them (eq:continuity, eq:sharpcont).  Both are
+    proved straight from the definition of Rabs, so they rest on no stdlib
+    lemma name.                                                              *)
+Lemma abs_two_sided : forall x y : R, Rabs x <= y -> x <= y /\ - x <= y.
+Proof. intros x y H. unfold Rabs in H. destruct (Rcase_abs x); lra. Qed.
+
+Lemma abs_le_of : forall x y : R, x <= y -> - x <= y -> Rabs x <= y.
+Proof. intros x y H1 H2. unfold Rabs. destruct (Rcase_abs x); lra. Qed.
 
 Section AbstractContinuity.
 
@@ -2161,8 +2173,16 @@ Definition KUV : R :=
   + sqrt C2 + sqrt C2 + K6d.
 Definition KPV : R := sqrt c1 + K6b.
 
+(*  The estimate is stated on Rabs BS, as the paper's continuity lemma prints it
+    (eq:continuity / eq:sharpcont) and as the sibling AbstractInterpolation.v
+    already did for abstract_continterp_sharp.  Nothing in the argument changes:
+    every one of the eighteen term bounds (bound_T1 ... bound_JmpP) is itself an
+    Rabs bound, so the regrouped sum is controlled in BOTH directions and the
+    triangle inequality closes the two-sided goal.  The previously stated
+    one-sided form (BS <= ...) is kept below as the corollary
+    abstract_continuity_sharp_signed.                                          *)
 Theorem abstract_continuity_sharp :
-  BS <= KUV * (NU * NV) + KPV * (BrP * NV) + sqrt c1 * (BrU * NV).
+  Rabs BS <= KUV * (NU * NV) + KPV * (BrP * NV) + sqrt c1 * (BrU * NV).
 Proof.
   pose proof T13_split as E13.
   pose proof step6a as E6a.
@@ -2172,35 +2192,34 @@ Proof.
                      + (IIterm + Vterm) + IIIterm + (- VolP) + (- JmpP)).
   { unfold BS. lra. }
   rewrite EBS.
-  pose proof bound_T1 as B1.
-  pose proof bound_T3_T14 as B3.
-  pose proof bound_T5 as B5.
-  pose proof bound_T15 as B15.
-  pose proof bound_T6 as B6.
-  pose proof bound_T7 as B7.
-  pose proof bound_T8 as B8.
-  pose proof bound_T9 as B9.
-  pose proof bound_T10 as B10.
-  pose proof bound_T12 as B12.
-  pose proof bound_T16 as B16.
-  pose proof bound_T17 as B17.
-  pose proof bound_T18 as B18.
-  pose proof bound_T13c as B13.
-  pose proof bound_II_V as B2V.
-  pose proof bound_III as B3d.
-  pose proof bound_VolP as BVp.
-  pose proof bound_JmpP as BJp.
-  pose proof (Rle_abs T1). pose proof (Rle_abs (T3 + T14)).
-  pose proof (Rle_abs T5). pose proof (Rle_abs T15).
-  pose proof (Rle_abs T6). pose proof (Rle_abs T7).
-  pose proof (Rle_abs T8). pose proof (Rle_abs T9).
-  pose proof (Rle_abs T10). pose proof (Rle_abs T12).
-  pose proof (Rle_abs T16). pose proof (Rle_abs T17).
-  pose proof (Rle_abs T18). pose proof (Rle_abs T13c).
-  pose proof (Rle_abs (IIterm + Vterm)). pose proof (Rle_abs IIIterm).
-  pose proof (Rle_abs (- VolP)) as HrV. rewrite Rabs_Ropp in HrV.
-  pose proof (Rle_abs (- JmpP)) as HrJ. rewrite Rabs_Ropp in HrJ.
-  unfold KUV, KPV. lra.
+  destruct (abs_two_sided _ _ bound_T1)            as [B1a B1b].
+  destruct (abs_two_sided _ _ bound_T3_T14)        as [B3a B3b].
+  destruct (abs_two_sided _ _ bound_T5)            as [B5a B5b].
+  destruct (abs_two_sided _ _ bound_T15)           as [B15a B15b].
+  destruct (abs_two_sided _ _ bound_T6)            as [B6a B6b].
+  destruct (abs_two_sided _ _ bound_T7)            as [B7a B7b].
+  destruct (abs_two_sided _ _ bound_T8)            as [B8a B8b].
+  destruct (abs_two_sided _ _ bound_T9)            as [B9a B9b].
+  destruct (abs_two_sided _ _ bound_T10)           as [B10a B10b].
+  destruct (abs_two_sided _ _ bound_T12)           as [B12a B12b].
+  destruct (abs_two_sided _ _ bound_T16)           as [B16a B16b].
+  destruct (abs_two_sided _ _ bound_T17)           as [B17a B17b].
+  destruct (abs_two_sided _ _ bound_T18)           as [B18a B18b].
+  destruct (abs_two_sided _ _ bound_T13c)          as [B13a B13b].
+  destruct (abs_two_sided _ _ bound_II_V)          as [B2Va B2Vb].
+  destruct (abs_two_sided _ _ bound_III)           as [B3da B3db].
+  destruct (abs_two_sided _ _ bound_VolP)          as [BVpa BVpb].
+  destruct (abs_two_sided _ _ bound_JmpP)          as [BJpa BJpb].
+  apply abs_le_of; unfold KUV, KPV; lra.
+Qed.
+
+(*  The one-sided form originally recorded here, kept so that a signed bound is
+    available without an Rabs elimination.                                     *)
+Corollary abstract_continuity_sharp_signed :
+  BS <= KUV * (NU * NV) + KPV * (BrP * NV) + sqrt c1 * (BrU * NV).
+Proof.
+  pose proof abstract_continuity_sharp as H.
+  pose proof (Rle_abs BS). lra.
 Qed.
 
 (* ========================================================================= *)
@@ -2490,7 +2509,7 @@ Qed.
 
 Definition Ctot : R := KUV * Kabs + KPV + sqrt c1.
 
-Theorem abstract_continuity : BS <= Ctot * ((BrU + BrP) * NV).
+Theorem abstract_continuity : Rabs BS <= Ctot * ((BrU + BrP) * NV).
 Proof.
   pose proof abstract_continuity_sharp as HS.
   pose proof step9 as H9.
@@ -2511,6 +2530,14 @@ Proof.
   assert (HSC : 0 <= sqrt c1 * NV) by nra.
   assert (S3 : sqrt c1 * (BrU * NV) <= sqrt c1 * ((BrU + BrP) * NV)) by nra.
   unfold Ctot. nra.
+Qed.
+
+(*  Signed companion of lemma:Continuity, for the same reason as
+    abstract_continuity_sharp_signed above.                                    *)
+Corollary abstract_continuity_signed : BS <= Ctot * ((BrU + BrP) * NV).
+Proof.
+  pose proof abstract_continuity as H.
+  pose proof (Rle_abs BS). lra.
 Qed.
 
 End AbstractContinuity.

@@ -175,7 +175,7 @@ _Generated 2026-07-21 from an automated coverage audit (15 region agents over al
 | eq:conditions_on_num_param | 927 | ESTIMATE | COQ | StabilityAlgebra.v:321 Theorem stability_constants_positive_sharp (proves C_visc>0 ∧ C_u>0 under the SHARP c1> |
 | lemma:Stability@940 | 940 | ESTIMATE | COQ | AbstractStability.v:577 Theorem abstract_stability : 0 < C_stab c1 Cb xi C2 /\ BS >= C_stab c1 Cb xi C2 * Norm |
 | unnumbered@945 | 945 | NOTATION | DEFINITIONAL |  |
-| lemma:Continuity@957 | 957 | ESTIMATE | COQ | AbstractContinuity.v:2493 Theorem abstract_continuity : BS <= Ctot * ((BrU + BrP) * NV); sharp variant abstrac |
+| lemma:Continuity@957 | 957 | ESTIMATE | COQ | AbstractContinuity.v:2512 Theorem abstract_continuity : Rabs BS <= Ctot * ((BrU + BrP) * NV); sharp variant abstrac |
 | eq:ConvergenceResult | 967 | ESTIMATE | COQ | AbstractConvergence.v:952 Theorem abstract_convergence : NErr <= Cconv * Psi, with Psi (AbstractConvergence.v: |
 | eq:InterpolationError | 972 | DEFINITION | DEFINITIONAL |  |
 
@@ -291,8 +291,8 @@ _Generated 2026-07-21 from an automated coverage audit (15 region agents over al
 | unnumbered@321 | 321 | ESTIMATE | PARTIAL | [NOT_AN_ERROR] Re-derived the second-contribution bound at continuity_appendix.tex line 321 fro |
 | eq:jumpest | 358 | ESTIMATE | COQ | ContinuityAlgebra.v jump_formula (L711), jump_bound_A (L791), sigt_id_tau (L158); coq_coverage.tex L623 maps l |
 | unnumbered@367 | 367 | IDENTITY | COQ | ContinuityAlgebra.v jump_formula (L711) proves exactly this closed form for the tau1 jump |
-| eq:continuity | 384 | ESTIMATE | COQ | AbstractContinuity.v abstract_continuity (L2493: BS <= Ctot*((BrU+BrP)*NV)); coq_coverage.tex L675 |
-| eq:sharpcont | 393 | ESTIMATE | COQ | AbstractContinuity.v abstract_continuity_sharp (L2164); coq_coverage.tex L673 (Step 8 sharp assembly) |
+| eq:continuity | 384 | ESTIMATE | COQ | AbstractContinuity.v abstract_continuity (L2512: Rabs BS <= Ctot*((BrU+BrP)*NV)); coq_coverage.tex L675 |
+| eq:sharpcont | 393 | ESTIMATE | COQ | AbstractContinuity.v abstract_continuity_sharp (L2184); coq_coverage.tex L673 (Step 8 sharp assembly) |
 | eq:T1 | 415 | DEFINITION | DEFINITIONAL |  |
 | eq:T2 | 416 | DEFINITION | DEFINITIONAL |  |
 | eq:T3 | 417 | DEFINITION | DEFINITIONAL |  |
@@ -351,7 +351,7 @@ _Generated 2026-07-21 from an automated coverage audit (15 region agents over al
 | eq:IIIbound | 737 | ESTIMATE | PARTIAL | [NOT_AN_ERROR] Re-derived from eq:IIIface. The facewise integrand bound C·Σ_{i,j∈{1,2}} (σ̃^{1/ |
 | eq:groupstep | 745 | ESTIMATE | PARTIAL | [ALREADY_COVERED] Independently re-derived eq:groupstep (continuity_appendix.tex:745) as a triangl |
 | eq:crosspenalty | 756 | ESTIMATE | COQ | Theorem step7_scalar (eps*sqrt tau2 <= sqrt C2 * sqrt eps) in ContinuityAlgebra.v Section EpsilonBound; uses P |
-| eq:assembly | 767 | ESTIMATE | COQ | Theorem abstract_continuity (BS <= Ctot*((BrU+BrP)*NV)) in proof_verification/coq-formal/AbstractContinuity.v  |
+| eq:assembly | 767 | ESTIMATE | COQ | Theorem abstract_continuity (Rabs BS <= Ctot*((BrU+BrP)*NV)) in proof_verification/coq-formal/AbstractContinuity.v  |
 | eq:absorb1 | 783 | ESTIMATE | COQ | Theorem absorb1_core (nu <= alphaK*tau2), absorb1_sqrt, and P3_sqrt in ContinuityAlgebra.v |
 | eq:absorb2 | 786 | ESTIMATE | COQ | Theorem absorb2_sqrt (sqrt sigt <= sqrt phi1) and Corollary absorb2_full (sqrt sigt * h <= sqrt c1 * alphaK *  |
 | eq:absorb3 | 789 | ESTIMATE | COQ | Theorem P5_sqrt (sqrt eps * h <= sqrt c1 * alphaK * sqrt tau1) in ContinuityAlgebra.v Section EpsilonBound |
