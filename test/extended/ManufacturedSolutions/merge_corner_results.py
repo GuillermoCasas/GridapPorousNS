@@ -101,8 +101,18 @@ def inject(h5_path, json_specs, kv, etype, idx_base=900):
             g.attrs["config_file"] = "corner_direct_solve"
             g.attrs["total_iters"] = int(sum(iters))
             g.attrs["total_time_s"] = 0.0
-            g.attrs["physical_epsilon"] = 0.0
-            g.attrs["numerical_epsilon_coeff"] = 0.0
+            # [provenance 2026-07-30] These were hardcoded 0.0, which is FALSE for these cells:
+            # the corner solves run through run_continuation.jl -> probe_stiff_diagnose.jl's
+            # build_cell, which sets "physical_epsilon" => 1e-8 (read as the DIMENSIONLESS penalty
+            # eps-hat; see the [covariance] note in run_test.jl's build_mms_formulation).  The
+            # sibling writer in run_test.jl was fixed the same day to read the assembled value;
+            # this one cannot -- it merges a JSON that does not carry it -- so record the value the
+            # corner driver actually hardcodes, and record the dimensionless one under its own name.
+            # If build_cell's literal ever changes, this must change with it (docs/pending-tasks.md
+            # 4g tracks removing both literals in favour of a config-threaded value).
+            g.attrs["physical_epsilon"] = float("nan")   # dimensional value not carried in the JSON
+            g.attrs["dimensionless_epsilon"] = 1e-8      # probe_stiff_diagnose.jl build_cell literal
+            g.attrs["numerical_epsilon_coeff"] = 0.0     # never passed to PaperGeneralFormulation
             g.attrs["target_ftol"] = 1e-8
             g.attrs["osgs_tolerance"] = 1e-8
             for rk, jk in _RATE.items():

@@ -873,8 +873,14 @@ function run_mms(config_file="test_config.json")
                                         attributes(g)["Re"] = Float64(Re)
                                         attributes(g)["Da"] = Float64(Da)
                                         attributes(g)["alpha_0"] = Float64(alpha_0)
-                                        attributes(g)["physical_epsilon"] = 0.0
-                                        attributes(g)["numerical_epsilon_coeff"] = 0.0
+                                        # [provenance 2026-07-30] Same fix as the sibling MMS harness: these were
+                                        # hardcoded 0.0 while the cell config at :513 sets physical_epsilon = 1e-8
+                                        # (the DIMENSIONLESS ε̂; see the [covariance] note at build_mms_formulation).
+                                        # A recorded 0.0 severs the parameters→results link, so read them back off
+                                        # the formulation actually assembled. See docs/findings.md §9.5.
+                                        attributes(g)["physical_epsilon"] = Float64(form.physical_epsilon)
+                                        attributes(g)["dimensionless_epsilon"] = Float64(config.physical_properties.physical_epsilon)
+                                        attributes(g)["numerical_epsilon_coeff"] = Float64(form.numerical_epsilon)
                                         attributes(g)["k_velocity"] = Int(kv)
                                         attributes(g)["k_pressure"] = Int(kp)
                                         attributes(g)["element_type"] = String(etype)

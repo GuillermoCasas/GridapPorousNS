@@ -1152,8 +1152,16 @@ function run_mms(config_file="test_config.json"; cli_filter=Dict{Symbol,Vector{S
                                         attributes(g)["Re"] = Float64(Re)
                                         attributes(g)["Da"] = Float64(Da)
                                         attributes(g)["alpha_0"] = Float64(alpha_0)
-                                        attributes(g)["physical_epsilon"] = 0.0
-                                        attributes(g)["numerical_epsilon_coeff"] = 0.0
+                                        # [provenance 2026-07-30] These were hardcoded to 0.0 while the cell config
+                                        # above sets physical_epsilon = 1e-8 (the DIMENSIONLESS penalty ε̂; see the
+                                        # [covariance 2026-06-02] note at `build_mms_formulation`). A recorded 0.0
+                                        # severs the parameters→results link the reproducible-results rule protects,
+                                        # so both are now read back off the formulation assembled for this cell:
+                                        # `physical_epsilon` is the DIMENSIONAL ε actually in the mass equation, and
+                                        # `dimensionless_epsilon` is the encoding-invariant ε̂ the config declares.
+                                        attributes(g)["physical_epsilon"] = Float64(form.physical_epsilon)
+                                        attributes(g)["dimensionless_epsilon"] = Float64(config.physical_properties.physical_epsilon)
+                                        attributes(g)["numerical_epsilon_coeff"] = Float64(form.numerical_epsilon)
                                         attributes(g)["k_velocity"] = Int(kv)
                                         attributes(g)["k_pressure"] = Int(kp)
                                         attributes(g)["element_type"] = String(etype)
