@@ -8,7 +8,7 @@ of work it touches, each pointing at the evidence/doc so it can be picked up col
 **Blocks**
 
 1. [Theory](#1-theory) — derivations, notes to write, paper-math questions.
-2. [Code–theory consistency](#2-codetheory-consistency) — where code and paper/algorithm must be kept aligned.
+2. [Code–theory consistency](#2-code-theory-consistency) — where code and paper/algorithm must be kept aligned.
 3. [Formulation](#3-formulation) — the weak form, τ, viscous/reaction operators, quadrature.
 4. [Solver / numerics](#4-solver--numerics) — Newton/Picard, gates, preconditioning, acceleration.
 5. [Post-processing](#5-post-processing) — plotting, rate computation, honest reporting of results.
@@ -56,7 +56,7 @@ Only the *textual* unwrap remains: **495** `\amend` + 8 `\Guillermo` + 3 `\Joaqu
 the v2 set; the v1 set is **502** (`article.tex` 460 + 8 + 3, same 31 in the appendices). Earlier
 registers recorded 435 and then 480; both were snapshots that the next prose pass invalidated, so
 **regenerate rather than quote**, counting only non-comment lines:
-```
+```bash
 python3 - <<'EOF'
 import re
 def n(f,m):
@@ -64,7 +64,9 @@ def n(f,m):
 for f in ('article_v2.tex','article.tex'):
     print(f, n(f,'amend'), n(f,'Guillermo'), n(f,'Joaquin'))
 EOF
-``` The "remove colour macros" half is **already done**:
+```
+
+The "remove colour macros" half is **already done**:
 `article_v2.tex:112-116` defines all three as identity (`\newcommand{\amend}[1]{#1}`), so the
 wrappers are typeset-neutral and the build is clean. Do the unwrap **once, after the prose freeze**,
 with a brace-balancing pass (not a regex — many bodies contain nested braces), then delete the three
@@ -196,7 +198,7 @@ Anderson is landed (`osgs_anderson_enabled`, default OFF, bit-identical), cuts s
 regimes where the linear rate is the bottleneck. Does **not** rescue P2-OSGS-3D (solved by the c₁-inflated
 preconditioner). See [`findings.md`](findings.md) §5 (Anderson).
 
-### 4g. 🟠 Both MMS harnesses hardcode `physical_epsilon = 1e-8` in the per-cell config (2026-07-30)
+### 4f. 🟠 Both MMS harnesses hardcode `physical_epsilon = 1e-8` in the per-cell config (2026-07-30)
 
 `ManufacturedSolutions/run_test.jl:780` and `CocquetFormMMS/run_test.jl:513` build each cell's config with
 a **literal** `"physical_epsilon" => 1e-8`; the swept factor `physical_properties.physical_epsilon = [0.0]`
@@ -234,16 +236,14 @@ production single-run path carries the same fixed `physical_epsilon`), and note 
 goes, `ε̂ = 1e-8` is *consistent* today — the MMS mass source carries the matching `ε·p_ex`
 (`mms_paper.jl:602`), so the current numbers are exact for the problem actually solved.
 
-### 4f. Encoding-invariance test — OSGS-covariance floor (threshold relaxed to 5e-8 — DECISION NEEDED)
+### 4g. Encoding-invariance test — OSGS-covariance floor (threshold relaxed to 5e-8 — DECISION NEEDED)
 `test/quick/encoding_invariance_quick_test.jl`: OSGS `err_u_l2` cross-encoding covariance sits at
 reldiff ≈ 1.378e-8 (the other 5 metrics pass ~1e-10). The gate `_INV_RTOL` was **relaxed 1e-8 → 5e-8**
 (commit `3e59810`, *"relax scale-covariance tolerance to 5e-8 for Philosophy-A mass envelope"*) so the test
 now passes. **Open decision:** is 5e-8 a legitimately re-derived roundoff floor for this cell, or does it mask
 a residual OSGS-covariance defect in the staggered map? The repo's no-relax-a-threshold-to-go-green rule
 (`.agents/rules/`) says this must be re-derived (or the covariance tightened), not left at a hand-tuned bound.
-*(Tension surfaced 2026-07-11 during the docs audit — resolve or ratify the 5e-8 floor.)*
-
-### 4g. Lower-priority solver audit findings (all LOW)
+### 4h. Lower-priority solver audit findings (all LOW)
 From the audit Appendix 2 (each verified by an independent code-grounding skeptic):
 - **NONL-04**: Anderson `update!` has no zero/near-zero residual guard before the least-squares solve (now
   reachable via `osgs_anderson_enabled`) — `src/solvers/accelerators.jl:53-127`.
@@ -266,6 +266,10 @@ and reports **ASGS's error under the OSGS label**. The `osgs_short_circuited_on_
 tuples, and surface per-level mesh quality (min dihedral / radius-ratio). (§5b — plotter now gates on
 `success` via `_level_success`, `7d670d6` — is DONE.)
 
+### 5b. CONV-04 (low) — sub-optimal-rate budget uses a bare power of `h`
+The sub-optimal-rate budget uses a bare power of h with no reference-error normalization (scale-dependent) —
+`src/solvers/mms_verification.jl:130-131`. (audit Appendix 2, CONV-04.)
+
 ### 5c. Per-attempt terminal-status supplement for the omitted cells (audit T6, 2026-07-30)
 
 §7 already discloses *which* cell is omitted (`(Re,α₀)=(10⁶,0.05)`), *which* meshes recover it
@@ -282,10 +286,6 @@ Cheap, no re-run: the data is on disk. Extend
 per `(Re, Da, α₀, element, method, N)`** with initialization, terminal residual and gate outcome.
 Ship it with the release bundle (§6g) rather than promising a supplement in the paper — the paper
 sentence goes in only once the artifact exists.
-
-### 5b. CONV-04 (low) — sub-optimal-rate budget uses a bare power of `h`
-The sub-optimal-rate budget uses a bare power of h with no reference-error normalization (scale-dependent) —
-`src/solvers/mms_verification.jl:130-131`. (audit Appendix 2, CONV-04.)
 
 ---
 
@@ -424,6 +424,23 @@ integration status:
   continuation — wording softened), **R3** (c₁-eigenvalue study — see `open-questions.md` §3), **R4** (pointwise
   vs elementwise τ — N09 text fallback stands; a moderate code change if ever pursued).
 
+### 7g. Constrained-projection OSGS — measure the P2 MMS rate (settles the L²/energy-norm split)
+The companion note [`theory/projection_space_note/`](../theory/projection_space_note/projection_space_note.pdf)
+proves the OSGS **constrained** residual projection (onto `X_{h0}` instead of the implemented unconstrained
+`V_free`/`Q_free`) is degree-dependent in the **energy** norm: optimal for k=1, but a boundary-strip
+consistency defect `η₀ = Θ(h^{3/2})` provably degrades the rate to 3/2 for k≥2 (two-sided; under `a=0` on
+`Γ_D` and the viscous regime `τ₂=Θ(1)`). The remaining open strand is the **plain-L²/MMS gate** (the norm the
+paper footnote's `O(h^{k+1})` and the ε_M/ε_C indicators measure), where an Aubin–Nitsche duality *may*
+recover part of the loss (the defect enters quadratically). **Decisive check:** flip the OSGS projection
+target from the unconstrained spaces to the Dirichlet-constrained `X_{h0}` and re-run the standard **P2** MMS
+sweep — a rate collapse to ≈3/2 confirms the theorem reaches the L² gate; an optimal `h³` (k=2, L²) would show
+the energy-norm defect stays out of the L² gate. Touch point: the `V_proj`/`Q_proj` selection in
+[`src/solvers/osgs_solver.jl`](../src/solvers/osgs_solver.jl) (currently `V_free`/`Q_free` — see
+[`theory-code-map.md`](theory-code-map.md) §2). This is a **debug/A-B** run — route output to
+`results/debug_results/`, do not disturb the official DBs. Derivation:
+`theory/projection_space_note/projection_space_note.pdf` §6 (the degree-dependent theorem); Codina (2008)
+Remark 1.
+
 ### 7h. 🔴 Re-run the stabilized-Taylor--Hood control to N=320 through the official path
 
 Found by the 2026-07-30 critical reread and **verified against the DBs**: the `P₂/P₁ ASGS` rows of
@@ -452,29 +469,21 @@ and 257 s for the other two — the first is dominated by one-time JIT (3 Newton
 a genuine 75-iteration coarse solve at `Re=10⁵`. That is still small against `N=160`/`N=320`, but it is
 **not** the ~30 s that an earlier version of this note quoted: that was one cell's `eval_times` read as
 if representative (the same read-one-cell-as-the-whole error class as
-`lessons_learned.md` 2026-07-30 (b)). On completion: requote the four `P₂/P₁ ASGS` rows in
+`lessons_learned.md` 2026-07-30 (b)). **Which number to requote — verified 2026-07-30, do not guess.** The printed slopes are the
+**two-finest-mesh** slopes `log2(e[-2]/e[-1])`, matching the caption ("computed from the two finest
+meshes"). They are **NOT** the HDF5 `rate_*` attributes, which are a whole-ladder fit and disagree by up
+to 0.16: at `(1,0.5)` the archive stores `rate_u_l2 = 2.9346` while the table prints `3.01`, the
+two-finest value `3.0134`; at `(10⁵,0.5)` stored `2.3405` vs printed `2.41` (two-finest `2.4077`); at
+`(1,0.1)` stored `2.9957` vs printed `2.84` (two-finest `2.8400`). Requoting from `rate_*` would change
+every slope in the table while looking like a faithful update. Compute the slope from the two finest
+**finite** entries of `err_*`, and take the FME from the last entry.
+
+On completion: requote the four `P₂/P₁ ASGS` rows in
 `tab:CocquetMMSL2/H1` from the official DB in **both** mains, drop the mesh caveat from the captions and
 the §7.3 preamble, re-check the two claims that depend on those rows (§7.3's "converges at optimal
 velocity and pressure rates at Re=10⁵" — the pre-run tables show the velocity sub-optimal, `2.4`/`1.3` at
 α₀=0.5 — and "all four discretizations behave alike" at Re=1), retire the corner side-config/DB, and
 close this item.
-
-### 7g. Constrained-projection OSGS — measure the P2 MMS rate (settles the L²/energy-norm split)
-The companion note [`theory/projection_space_note/`](../theory/projection_space_note/projection_space_note.pdf)
-proves the OSGS **constrained** residual projection (onto `X_{h0}` instead of the implemented unconstrained
-`V_free`/`Q_free`) is degree-dependent in the **energy** norm: optimal for k=1, but a boundary-strip
-consistency defect `η₀ = Θ(h^{3/2})` provably degrades the rate to 3/2 for k≥2 (two-sided; under `a=0` on
-`Γ_D` and the viscous regime `τ₂=Θ(1)`). The remaining open strand is the **plain-L²/MMS gate** (the norm the
-paper footnote's `O(h^{k+1})` and the ε_M/ε_C indicators measure), where an Aubin–Nitsche duality *may*
-recover part of the loss (the defect enters quadratically). **Decisive check:** flip the OSGS projection
-target from the unconstrained spaces to the Dirichlet-constrained `X_{h0}` and re-run the standard **P2** MMS
-sweep — a rate collapse to ≈3/2 confirms the theorem reaches the L² gate; an optimal `h³` (k=2, L²) would show
-the energy-norm defect stays out of the L² gate. Touch point: the `V_proj`/`Q_proj` selection in
-[`src/solvers/osgs_solver.jl`](../src/solvers/osgs_solver.jl) (currently `V_free`/`Q_free` — see
-[`theory-code-map.md`](theory-code-map.md) §2). This is a **debug/A-B** run — route output to
-`results/debug_results/`, do not disturb the official DBs. Derivation:
-`theory/projection_space_note/projection_space_note.pdf` §6 (the degree-dependent theorem); Codina (2008)
-Remark 1.
 
 ---
 
@@ -486,6 +495,16 @@ schema/`StabilizationConfig`/configs: `osgs_projection_coupling`, `osgs_freeze_a
 `osgs_state_drift_scale`, `osgs_projection_tolerance`, `osgs_warmup_*`, the ping-pong knobs, `ablation_mode`,
 and the inert off-switches. Retire them. See
 [`archive/coupled-only-leaning-and-jfnk-plan.md`](archive/coupled-only-leaning-and-jfnk-plan.md) §3.
+
+### 8b. `_inv_centered.json` latent fragility
+`test/quick/encoding_invariance_quick_test.jl` reads a config it must generate first — fine today, but a stale
+leftover can confuse a clean checkout.
+
+### 8c. Low-priority audit cleanups
+- **CONV-02** (low): inline `1e-2` √d self-check margin — `src/solvers/convergence_criterion.jl:267` (now on the
+  `eps_C_strong`/`div_ratio` diagnostic path, not the gate).
+- **PROJ-02** (low): `ProjectResidualWithoutPressurePenalty` is never instantiated in production — dead policy
+  reachable only from tests — `src/stabilization/projection.jl:34,121-143`.
 
 ### 8d. 🟡 Eight note `latexmkrc` files still use the broken literal-`%B` `$aux_dir`
 
@@ -506,16 +525,6 @@ Remaining (mechanical, ~5 min each — copy `theory/paper/latexmkrc`'s `@ARGV` b
 `projection_space_note/`, `scale_free_gate_note/`, `tau_saturation_note/`,
 `velocity_floor_regularization/`. Each should then be added to `DOCS` with its current overfull debt —
 none of them is gated today, so each may be carrying the same class of defect unseen.
-
-### 8b. `_inv_centered.json` latent fragility
-`test/quick/encoding_invariance_quick_test.jl` reads a config it must generate first — fine today, but a stale
-leftover can confuse a clean checkout.
-
-### 8c. Low-priority audit cleanups
-- **CONV-02** (low): inline `1e-2` √d self-check margin — `src/solvers/convergence_criterion.jl:267` (now on the
-  `eps_C_strong`/`div_ratio` diagnostic path, not the gate).
-- **PROJ-02** (low): `ProjectResidualWithoutPressurePenalty` is never instantiated in production — dead policy
-  reachable only from tests — `src/stabilization/projection.jl:34,121-143`.
 
 ---
 
