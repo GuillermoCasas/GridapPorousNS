@@ -268,3 +268,29 @@ logs, the SymPy suite re-derives mathematics, and neither runs a shell line out 
 (a filename), re-check the parts you did not intend to touch (the invocation) — a partially-corrected
 command reads as fully corrected. (iii) Both MMS harnesses take a BARE config filename and prepend
 `data/` themselves; grep `run_test.jl data/` before believing any recipe in this repo.
+
+### 2026-07-30 (f) — a "fix" that only round-trips the printed table can be less accurate than the text
+
+The 2026-07-30 revision report flagged §7.1's `9.6e-3` excess as non-reproducible, having recomputed it
+from the 3-significant-digit table entries and got `9.28e-3`. Both numbers are "right" for their input;
+the paper's is the correct one. The excess is `(e_OSGS² − e_ASGS²)^{1/2}` with the two errors differing
+by 3%, so a half-ULP of the printed entries (`±5e-5`) is ±4% on the result. Had the report been applied
+as written, a correct number would have been replaced by a worse one — in a paper whose whole numerics
+section is cross-checked against tables.
+
+The same intake produced four more patch-level defects that only an adversarial second pass caught: a
+`\cref` to the *lagged* projection equation in a sentence asserting the analysis takes it *converged*;
+an em-dash nest (`---A---B---`) that left an orphan closer; a claim that the FE error had *reached* the
+best `L²` approximation, which was never computed; and a parenthetical asserting the stabilized-TH FMEs
+are all at `N=160` when one cell's is at `N=320`. Separately, one DOI the report certified as verified
+(`10.1016/j.finel.2004.11.008`) returns HTTP 404 — the real one is `…2004.10.008`.
+
+**Guards.** (i) Before "correcting" a number, recompute it from the **raw data**, not from the paper's
+own rounded table — and ask whether the quantity is *rounding-amplifying* (differences of near-equal
+squares, ratios of near-equal errors, two-mesh slopes) before trusting either value. (ii) Resolve every
+DOI an audit hands you (`curl -LH 'Accept: application/vnd.citationstyles.csl+json' https://doi.org/…`)
+— "verified against publisher sources" in an audit is a claim, not a check. (iii) A proposed patch is
+not safe because its *diagnosis* is right: check the anchor's uniqueness, brace/dash balance, every
+`\cref` target's direction, and whether the replacement asserts anything not measured. (iv) A caption is
+part of the layout: lengthening four table captions for consistency pushed `tab:Linear2DH1` 4.27pt over
+the page and tripped hygiene rule H4 — always rebuild and re-run the gate after a caption edit.

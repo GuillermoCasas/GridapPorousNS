@@ -881,3 +881,129 @@ renders red/blue — handled by the §4 flatten (redefine to `{#1}`), not a sepa
    presentation fixes (F3 Da/σ, F10 pressure attribution, F13 function space), and the abstract/conclusions
    (IA-1/IA-2, C2/C3/C4) — before the final review-off build (§5); batch the 🟡 into the copy-edit + markup-flatten
    pass (§4). Note §10.A F2 is **display-only** (assembly/implementation verified correct).
+
+---
+
+## 11. Referee-style revision report on `article_v2` (intake 2026-07-30) — ✅ ALL 16 ADJUDICATED
+
+Source: `docs/article_v2_revision_report.md` (untracked dump, sha256 `48d70da4a2bb99149fe877e8d032a7e6f2191557e1b390baa4c6ab3b1e46c5ee`,
+committed verbatim then deleted per `.agents/skills/external-audit-intake`). Items **F1–F16**. Each was verified
+against primary sources (live `.tex`, the raw result HDF5s, CrossRef/DOI) by one agent and then adversarially
+re-checked by a second whose job was to refute the first — that second pass caught **five** defects in the
+proposed patches and is the reason the applied text differs from the report's suggestions in several places.
+
+### 11.A Applied — errors of statement (the report's P1 set)
+
+- **F1 ✅ (real, P1).** §7.1's corner paragraph said the OSGS L² velocity drops "to the reference itself—1.21e-5"
+  two clauses after quoting that reference as 2.85e-5. Raw data (`corner_tri_k1_a005.json`, N=768):
+  FME = 1.2056e-5 = **0.42×** the floor, i.e. 3.6% above the L²-best-approximation level 2.85e-5/√6 = 1.16e-5.
+  Rewritten to "dropping *below* it … a factor 0.42", tied to the √6 caveat the paragraph already carries.
+  **Two extras the report missed:** the trailing pressure clause ("about a factor 4 above it in L²") is likewise
+  true only at Da≤1 — at Da=1e6 the pressure is 9.10e-7 = 0.53× its 1.71e-6 floor — now stated; and
+  `docs/mms/convergence-2d.md`, the doc the paper's wording was transcribed from, carried the same slip (fixed).
+- **F2 ⚠️→✅ (report's quote was STALE; a different, real defect underneath).** The report quotes l.887 as citing
+  `sec:StabilityOSGS`; the live text says `sec:StabilityASGS` in **both** mains and always has (`git log --all -S`
+  is empty). But in **v2 only**, `sec:StabilityASGS` now labels the *umbrella* §5 "…the ASGS **and OSGS** methods",
+  so the `\cref` swept the OSGS analysis into a claim true only of ASGS. Retargeted to `sec:StabilityASGSvariant`
+  and followed by one sentence naming the three departures (converged not lagged projection, τ-weighted product,
+  first-order truncation) with a pointer to `oa:rem:analyzed`. **v1 deliberately unchanged** — there the label is
+  ASGS-only, so the plain sentence is correct and `oa:*` would be undefined.
+- **F3 ✅ (real, P1).** "[the stabilized P₂/P₁ control] converges at optimal velocity and pressure rates at
+  Re=10⁵" is false for velocity in **3 of 4** (norm, porosity) slots: 2.41 vs 3 (L²) and 1.26 vs 2 (H¹) at
+  α₀=0.5, 1.65 vs 2 (H¹) at α₀=0.1; only (10⁵,0.1) L² reaches 3.00. Pressure *is* optimal throughout. All slopes
+  re-derived from the HDF5. The existing two-mesh disclaimer does **not** cover it — it is scoped to the
+  (10⁵,0.1) corner, which is the one cell where L² velocity *is* optimal, while the worst shortfall sits at
+  (10⁵,0.5) on a full 6-rung ladder. Rewritten to state the observed rates against their references.
+- **F4 ✅ (clarity, not error).** The closing "This comparison does not isolate the effect of the element pair"
+  is *literally true* (its antecedent is the pairwise contrast in the sentence it closes — the adversarial pass
+  correctly downgraded the report's "flat contradiction"), but landing it two sentences after "the high-Reynolds
+  gain is therefore attributable to the convection stabilization itself" reads as self-denial. Rescoped to the
+  pairwise contrast and pointed forward to the control.
+- **F5 ✅ (real, P1).** γ meant three things: (A1) quasi-uniformity, (O1) OSGS design margin, and the bump
+  exponent γ(r). (A1) and (O1) sit in the same subsection. The (A1) γ is **write-only** — 2 tokens, one line,
+  never used again — so it was renamed to `C_qu` (1 line per main). The (O1) γ is entrenched across 82 appendix
+  lines + `coq_coverage.tex` + ~103 Coq identifiers and was left alone; γ(r) likewise (PlateauBump.v).
+
+### 11.B Applied — accuracy and hygiene
+
+- **F7 (PARTIAL — the report's own reasoning was wrong, the underlying ambiguity was real).** The report placed
+  this in the 3D section, about pressure ratios, and concluded "not bracketing". All three are wrong: it is the
+  2D section, about L² *velocity* growth, and the pair **does** bracket (ASGS 1.3–2.0 below, OSGS 3.5–4.1 above).
+  What is real is that the paper wrote the benchmark as a bare `α₀^{-1/2}`: for a *growth factor between two
+  porosities* the prediction is the **ratio** √(0.5/0.05)=√10≈3.2, but a reader substituting α₀=0.05 gets 4.47
+  and reaches the opposite conclusion. Benchmark now stated numerically in all **three** places carrying it —
+  including §7.3's `α₀^{-1/2}≈2.2`, which was **literally false** as printed (α₀^{-1/2} at 0.1 is 3.16; 2.2 is
+  the ratio √5) and which the report never patched.
+- **F11 ✅ partially applied.** (iv) "rates approach the interpolation-optimal exponents" → "approach **or
+  exceed**" (3D P2 gives 3.33/3.34 against an interpolant row of 3.20). (i) Q2 ASGS pressure "≈1.9 / ≈0.9" →
+  ranges "1.8–1.9 / 0.8–0.9" (actual 1.81–1.90 / 0.79–0.93). (iii) "about twenty times" → "some twenty to
+  twenty-five times": the sentence quotes **H¹ first**, where the ratio is 23.3–24.3, not the 19.7–20.5 of L².
+  (ii) "≈2" for P1 pressure left as is — a joint two-variant claim whose interpolant reference is exactly 2.00.
+- **F12 ✅ (real).** App. B l.146 hard-coded "the coefficient 4/3 of τ_{ν,1}^{-1}" while its own eq:ftTauNu gives
+  2−2/d and its l.76 says the factor is **1 in 2D** with "nothing to drop". Now states the general coefficient —
+  and, per the adversarial pass, keeps the **projector qualifier** both mains carry (2−2/d for `\DSPi`; 2 for
+  `I`, `\SPi`, `\DPi`, cf. `rem:ftGenericPi`), marked `\amend{}` like every other correction in that file.
+- **F13 ✅ (real).** App. D's "valid since c₁ ≥ 1 under (O1)" does not follow: (O1) gives c₁ ≥ γ²C_inv², so
+  c₁ ≥ 1 needs C_inv ≥ 1/γ. Replaced by the unconditional `max{c₁,1}` form, with the parenthetical recording
+  that the maximum is c₁ in practice. **Both App. D twins edited** (the SymPy twins gate compares them).
+- **F10 ✅ (9 sites, not the report's 5).** The report missed the App. D **clean twin** (`osgs_appendix.tex:408`),
+  **v1** (`article.tex:1069`), and three word families it did not scan (`manoeuvre`×2, `cancelling`, `labelled`×3).
+  An exhaustive 40-family sweep of all nine typeset files now returns zero British forms in typeset text.
+  Deliberately untouched: `nillama2022explicit`'s published title ("stabilised"), "CERCA programme", "Severo
+  Ochoa Centre" (proper names), and the `Behaviour` inside a label name (never typeset).
+- **F15 ✅ (a), (c), (e-verified); (d) DECLINED.** `\usepackage{lipsum}` removed (zero uses). All **six** table
+  captions unified to "worst-case bound rates in parentheses" — note the *first* unification attempt used a
+  longer phrase and pushed `tab:Linear2DH1` **4.27pt over the page**, tripping hygiene rule H4; the shorter
+  phrasing restores 0 oversized floats. `\headers` **enabled with a shortened running title**: the full title
+  overflows every odd page by 146.5pt (measured independently in a minimal document), against a gate budget of 0.
+- **F8 ✅ + F9 ✅ (bibliography, 20 entries).** All corrections re-verified against CrossRef/DOI, not taken on
+  trust — and every proposed DOI was resolved before use. Highlights: `CodinaBlasco1997` was in the `.bib` but
+  never cited (now cited at the first naming, with wording that claims only what is verifiable); the two Gridap
+  `doi` fields held **full URLs**, which `siamplain.bst` prepends `https://doi.org/` to — i.e. two **broken
+  links in the shipped PDF**, the only defect in the set that reached the reader; Brenner was missing Scott;
+  Quarteroni's *translator* was credited as co-author; "Carfagnay"/"Federicoz" were affiliation-marker scrape
+  artifacts (confirmed from the publisher PDF *and* independently from the authors' other joint papers — note
+  CrossRef itself propagates the error); Hornung is the volume's **editor**; Masud/Hughes, Feijóo (accent +
+  middle initial) and "Jean-Baptiste" (which changes the printed initials to J.-B.) all corrected; Bayona Roa's
+  compound surname was parsing as "Roa" and Balazi Atchy Nillama's as "Nillama". **All 9 Semantic Scholar
+  CorpusID stubs replaced by resolving DOIs** — including `Codina2008FiniteEA`, which the report did not list.
+  The 15 SIAM-template leftovers were deleted (verified uncited); genuine but uncited research entries were
+  **kept** (they never enter the `.bbl`, and `Codina2004ApproximationOT` is cited by `paper novelties/`).
+
+### 11.C Verified FALSE or declined — **do NOT re-fix**
+
+- **F6 — FALSE. The 9.6e-3 excess is correct.** The report recomputed it from the 3-digit table entries and got
+  9.28e-3. From the unrounded errors (`k1/TRI/results.h5`: ASGS 3.526348e-2, OSGS 3.654739e-2) it is
+  **9.6020e-3**, which is what the paper prints. The excess is a difference of nearly equal squares, so a
+  half-ULP in each table entry moves it ±4%; the other three excess figures (1.18e-1, 1.17e-1, 1.5e-2) *are*
+  reproducible from the rounded values, which is why only this one looked wrong. **Changing it to 9.28e-3 would
+  make the paper less accurate.** A clause noting the unrounded evaluation was added so the next reader does not
+  repeat the round trip.
+- **F9(13) — FALSE.** `Hamdan1994SinglephaseFT` does *not* need a colon: the publisher's registered title is
+  "…porous channels a review of flow models…", colonless. Adding one would diverge from the record.
+- **F9(19) purge — PARTIAL/declined in part.** Uncited entries never reach the `.bbl` (BibTeX emits only cited
+  keys), so this is cosmetic, as already ruled in §10.C. Template stubs deleted; research entries kept.
+- **F14 — declined (symbol reuse ψ, η).** All four objects are bound variables defined at their point of use and
+  no display mixes two meanings. A rename would desync the byte-identical interpolation-error paragraph across
+  the mains or touch ~105 lines across the two App. D twins plus `coq_coverage.tex`, for no gain.
+- **F15(d) — declined (the "large editorial comment blocks").** `article_v2.tex:317–334` and `848–862` are
+  **live in-source documentation**, not author notes: the first names its enforcing gate (rule D12 of
+  `projector_algebra_verification.py`) and the relocation to `theory/viscous_projector_note/`; the second is the
+  authoritative notation convention, duplicated verbatim in v1. Deleting them would be a regression. (LaTeX
+  comments are not typeset, so "SIAM production will query them" does not apply.)
+- **F16 — PARTIAL; the report's diagnosis was wrong.** The 1.2/1.5 accuracy factors are **measured**, not
+  back-extrapolated: TH at N=160 is 2.685e-6 / 1.437e-5 in the HDF5, giving 1.162 and 1.472. A footnote saying
+  "obtained by extrapolation" would have stated a falsehood. Instead the four errors are now quoted inline so a
+  reader can divide them. The report's proposed parenthetical was also **factually wrong** (it claimed the
+  control's FMEs are all at N=160; at (10⁵,0.1) it is N=320) and was not used.
+
+### 11.D Still open (unchanged by this intake)
+
+- 🔴 The stabilized-TH control's ladder is still **paused at 23/24 rungs** (§2 / `pending-tasks.md`), so the
+  printed `P₂/P₁ ASGS` block is transcribed from `previous_results/` + `debug_results/` rather than from the
+  official DB. **The F3 wording fix is correct either way** — completing the run moves (10⁵,0.5) to 2.36 (L²) /
+  1.32 (H¹), still sub-optimal.
+- 🟡 **One editorial call for the authors.** `Codina2015OnSM` (an unciteable `@misc`: no venue, Semantic Scholar
+  stub only) was **replaced** in the intro citation list by the archival `badia2010stabilized` (Badia & Codina,
+  CMAME 199, 2010), which supports the same claim and is by the same co-author. If R. Codina prefers to keep the
+  2015 document, revert that one `\cite` and supply its venue; the entry is still in the `.bib`.

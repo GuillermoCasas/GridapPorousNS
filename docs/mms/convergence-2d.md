@@ -50,8 +50,16 @@ exact-guess solve at `N≥512` once the fold clears; see the fold resolution bel
   directly, not extrapolated): velocity L²=2.85e-5, H¹=7.31e-2; pressure L²=1.71e-6, H¹=4.54e-3. Corner FME:
   velocity L²=7.94e-5 (Da≤1) / 1.21e-5 (Da=1e6), H¹=7.33e-2; pressure L²=7.38e-6 / 9.10e-7, H¹=4.55e-3. So the
   corner error **sits on the interpolation floor in H¹** (≤0.3% for all three Da) and is a pre-asymptotic ~2.8×
-  (velocity) / ~4× (pressure) above it in L², dropping to the floor for the reaction cell — i.e. once resolved,
-  the excluded corner is as accurate as the interpolant (resolution limit, not a formulation defect).
+  (velocity) / ~4× (pressure) above it in L², dropping **below** the floor for the reaction cell — i.e. once
+  resolved, the excluded corner is as accurate as the interpolant (resolution limit, not a formulation defect).
+  **Careful with "drops to the floor" (corrected 2026-07-30):** at Da=1e6 the L² velocity is 1.21e-5 = **0.42×**
+  the 2.85e-5 nodal floor and the L² pressure 9.10e-7 = 0.53× its 1.71e-6 floor — *below*, not *at*. That is
+  expected and unremarkable: for P1 the nodal interpolant exceeds the best L² approximation by √6≈2.45
+  asymptotically, so any FE error in [floor/√6, floor] is normal in that norm (0.42 ≈ 1/√6, i.e. essentially the
+  full gap). The earlier "dropping to the floor" phrasing here was transcribed verbatim into `article_v2.tex`
+  §7.1 and made that sentence self-contradictory (it quoted 2.85e-5 as the reference two clauses earlier); both
+  are now fixed. **H¹ is the norm where "sits on the floor" is meaningful** — there the nodal interpolant *is*
+  asymptotically optimal.
 - **Trouble axis is `Re×α₀`, not `Re×Da`** — constant `σ` is a benign, coercive knob (bit-identical roots at
   Da=1e6 vs 1e-6 for the same `(Re, α₀)`).
 - **α-continuation is the only viable continuation axis** (Da-/Re-continuation stall — they hold α=0.05 fixed, so

@@ -610,6 +610,76 @@ one: with a `0.3`-thick slab, `N/4` divisions give `dz/dx = (0.3/(N/4))/(1/N) = 
 element aspect ratio along the ladder, so the anisotropy is not a confounder for the observed rates.
 Corrected in both mains with that justification stated.
 
+
+## 10. Two reporting facts the 2026-07-30 revision report turned up (both re-derived from raw data)
+
+### 10.1 The ASGS/OSGS "excess indicator" is not reproducible from the printed tables — by construction
+
+The quadratic excess `(e_OSGS² − e_ASGS²)^{1/2}` reported in §7.1 is a difference of squares of two
+*nearly equal* numbers, so it amplifies the rounding of its inputs enormously. At `Re=1e6, Da≤1,
+α₀=0.5` the tables print `3.53e-2` / `3.65e-2`, from which a reader computes **9.28e-3**; the true
+value from the unrounded errors (`k1/TRI/results.h5`: `3.526348e-2` / `3.654739e-2`) is **9.6020e-3**,
+which is what the paper prints. The half-ULP of a 3-digit entry (`±5e-5`) is ±8% on the *squared*
+excess, i.e. ±4% on the excess itself — the whole discrepancy.
+
+**Why it matters:** an external reviewer flagged the paper's number as an error on exactly this round
+trip, and the number was right. The other three excess figures (`1.18e-1`, `1.17e-1`, `1.5e-2`) *are*
+reproducible from the rounded values — the two errors there differ by 20–250%, not 3% — which is why
+only this one looked wrong. The paper now says the indicator is evaluated on the unrounded errors.
+**Do not "correct" 9.6e-3 to 9.28e-3.**
+
+### 10.2 A porosity-weighted *growth factor* is a ratio of weights, not the weight
+
+Where §§6–7 compare an error growth between `α₀=0.5` and `α₀=0.05` (or `0.1`) against "the
+porosity-weighted prediction `α₀^{-1/2}`", the quantity actually predicted is the **ratio**
+`(0.05)^{-1/2}/(0.5)^{-1/2} = √10 ≈ 3.16` (resp. `√5 ≈ 2.24`), not `α₀^{-1/2}` evaluated at the low
+porosity (`4.47`, resp. `3.16`). Read the bare symbol literally and the observed OSGS factors 3.5–4.1
+sit *below* the benchmark instead of above it, reversing the paper's conclusion; §7.3 had even printed
+the identity "`α₀^{-1/2} ≈ 2.2`", which is false as an evaluation (it is the ratio `√5`). All three
+sites now state the benchmark numerically. The paper's own arithmetic was right throughout — only the
+symbol was ambiguous.
+
+
+
+### 10.3 Why the stabilized-Taylor–Hood control loses velocity rate at high Re — it is the `k_p < k_u` coupling
+
+The `P₂/P₁ ASGS` control converges sub-optimally in velocity **only** at `Re=10⁵` (H¹ 1.26 at
+α₀=0.5, 1.65 at 0.1; optimal 2), while being optimal at `Re=1` and while the equal-order `P₂/P₂`
+and `P₁/P₁` rows stay optimal at the *same* Reynolds number. §6 locates the mechanism. Writing the
+parent functional `E(h) = Σ (α_K/h_K)(τ₂^{1/2}E_int(u) + τ₁^{1/2}E_int(p))` in each regime gives a
+pressure/velocity term ratio of
+
+| regime | τ₁, τ₂ | ratio | Taylor–Hood (`k_p = k_u−1`) |
+|---|---|---|---|
+| viscous | `h²/αν`, `ν/α` | `h^{k_p−k_u+1}` | `1` — same order, no loss |
+| convective | `h/α‖a‖`, `h‖a‖/α` | `h^{k_p−k_u}` | `1/h` — pressure term dominates |
+
+which reproduces the printed `eq:ConvergenceResultDominantViscosity` (pressure enters at
+`E_int(p) = O(h^{k_p+1})`) and `eq:ConvergenceResultDominantConvection` (`E_int(p)/h = O(h^{k_p})`)
+exactly. `H:spaces` admits `k_p ≤ k_u+1`, so the analysis genuinely covers the control; and both §6
+subsections narrow to equal order *before* their "clearly optimal" specializations (l.1514, l.1536).
+
+**Three limits on the claim, all found by the adversarial pass and all reflected in the paper text:**
+
+1. **The bound permits, it does not predict.** A one-sided estimate that degrades does not forecast
+   degradation — the paper refuses that inference elsewhere ("as a one-sided estimate it is free to
+   be beaten"). What makes the mechanism *attributable* is the 2×2 pattern (shortfall only where
+   `k_p<k_u` **and** convection dominates) plus the magnitude fingerprint below.
+2. **H¹ only.** `eq:ConvergenceResultDominantConvection` has no L²-velocity term on its LHS, and the
+   two porosities disagree in L² (2.41 vs 3.00) while agreeing in H¹. The L² column is an
+   observation, not an attribution.
+3. **Not an indictment of stabilizing LBB-stable pairs.** The loss is tied to the τ *design* carried
+   over from the equal-order calibration, not to `k_p<k_u` per se — published work (Gelhard et al.,
+   JCAM 2005) obtains optimal rates for the same pair with a τ₁ ∼ h²/ν design. The paper is scoped
+   accordingly; **do not** write that residual stabilization is intrinsically lossy on Taylor–Hood.
+
+**Magnitude fingerprint (single mesh, N=160, α₀=0.5, Re=10⁵).** The control's velocity error is
+`3.68e-2` in H¹ against its own pressure error `2.18e-2` — i.e. it has *inherited* the pressure
+error — where the equal-order `P₂/P₂` pair reaches `4.28e-3` on the same mesh. The `P₂/P₁` pressure
+error is meanwhile identical to the unstabilized-TH and `P₁/P₁` values (`2.18e-2`), i.e. sitting on
+its own P₁ interpolation reference: the pressure converges at its optimal `k_p` and it is exactly
+that error which caps the velocity.
+
 ---
 
 ## Cross-references
