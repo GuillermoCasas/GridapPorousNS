@@ -459,7 +459,38 @@ four `P₂/P₁ ASGS` rows from the official DB and delete the caveat. Retire
 cell is covered officially. Note the earlier attempt "crashed (OOM, concurrent jobs) at N≥160" per the
 corner config's own comment, so run it alone, or sharded.
 
-**Status 2026-07-30, IN PROGRESS.** Launched alone through the official path (the DB was archived to
+**Status 2026-07-30, PAUSED AT 23/24 RUNGS — RESUME WITH ONE COMMAND.**
+Stopped cleanly (SIGTERM) after 7 h with **three of four cells complete** and the corner at `N=160`;
+only the `(10⁵,0.1)` `N=320` rung is missing. To finish:
+
+```
+cd test/extended/CocquetFormMMS
+julia --project=../../.. run_test.jl data/cocquet_form_mms_taylorhood_stabilized.json
+```
+
+`erase_past_results` has been flipped **`true` → `false`** in that config so the run **resumes**: the
+`[RESUME]` block (`run_test.jl:417`) reloads every per-`(cell, method, mesh)` result already on disk and
+solves only what is missing — its own comment states the final `.h5` is *identical to an uninterrupted
+run*. Verified before stopping: all four groups carry every attribute and dataset that block reads, and
+the DB reopens cleanly with all 23 rungs. Expect **~2 h** (the three completed `N=320` rungs took
+840–1163 s of solve each, and wall-clock runs ≈5× solve time because of the `max_n_pert=5` homotopy).
+**Flip `erase_past_results` back to `true` once it completes**, so the config's canonical state is a
+clean from-scratch run.
+
+Belt-and-braces: a snapshot of the 23-rung DB is at
+`results/cocquet_form_mms_taylorhood_stabilized.PARTIAL-21rungs-2026-07-30.h5` (gitignored). Note the
+`configs/` group is written only at the END of a run, so the paused DB is not yet self-describing — it
+will be after the resume.
+
+**Already settled by the three completed ladders** (see the slope table in `findings.md` §8 R5 once
+requoted): the viscous cells are optimal or better in every norm, while the convection-dominated
+`(10⁵,0.5)` cell holds `p_L²`/`p_H¹` at exactly 2.00/1.00 but loses the velocity — `u_L²` 2.36 and
+`u_H¹` 1.32 against optimal 3 and 2, and **stable under refinement** (2.41→2.36, 1.26→1.32), so it is a
+genuine property rather than a pre-asymptotic artifact. That already refutes §7.3's "optimal velocity
+and pressure rates at `Re=10⁵`" for `α₀=0.5`; the missing corner decides whether the corrected sentence
+is a flat retraction or porosity-dependent (the side-DB's `u_L²` slope there was 3.00).
+
+**Prior status (superseded).** Launched alone through the official path (the DB was archived to
 `previous_results/` first; the config already declared the full ladder `[10,20,40,80,160,320]`, so no
 config edit was needed). The full ladder is re-run, not just `N=320` — deliberately: the tabulated rates
 are two-mesh estimates so `N=160` is needed regardless, and trimming the declared ladder would change

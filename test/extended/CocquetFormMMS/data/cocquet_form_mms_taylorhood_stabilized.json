@@ -3,7 +3,7 @@
     "newton_re_iterations": 150
   },
   "_comment": "Convection-STABILIZED Taylor-Hood control: the same inf-sup-stable P2/P1 pair as the unstabilized-Galerkin baseline (cocquet_form_mms_taylorhood.json), but with the ASGS residual stabilization active. This isolates the two effects the DBF comparison otherwise conflates: (unstabilized-TH -> stabilized-TH) is the effect of residual convection/reaction stabilization on a FIXED space pair; (stabilized-TH -> stabilized equal-order, cocquet_form_mms_vms.json) is the effect of the velocity/pressure space pair under the SAME stabilization. Same Cocquet formulation (SymmetricGradient viscous + full Forchheimer-Ergun reaction, sigma_linear=0.3/sigma_nonlinear=1.75), same (Re,alpha) MMS grid (Re=[1,1e5], alpha_0=[0.5,0.1], Da held at 1.0 = no-op under fixed Forchheimer coefficients), same meshes N=10..320. Note the stabilization constants are the equal-order calibration c1=4*kv^4=64, c2=2*kv^2=8 at kv=2; for the LBB-stable pair the tau_2 pressure block is redundant-but-harmless and the tau_1 momentum block supplies the convection/reaction stabilization being isolated. Audit response R5/D05.",
-  "erase_past_results": true,
+  "erase_past_results": false,
   "epsilon_pert": [
     1.0
   ],
