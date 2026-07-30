@@ -465,8 +465,12 @@ only the `(10⁵,0.1)` `N=320` rung is missing. To finish:
 
 ```
 cd test/extended/CocquetFormMMS
-julia --project=../../.. run_test.jl data/cocquet_form_mms_taylorhood_stabilized.json
+julia --project=../../.. run_test.jl cocquet_form_mms_taylorhood_stabilized.json
 ```
+
+(Pass the **bare** filename: `run_mms` does `joinpath(@__DIR__, "data", config_file)`, so a `data/`
+prefix yields `data/data/…` and the run dies instantly. An earlier version of this note carried the
+`data/` form and would have failed on the first line.)
 
 `erase_past_results` has been flipped **`true` → `false`** in that config so the run **resumes**: the
 `[RESUME]` block (`run_test.jl:417`) reloads every per-`(cell, method, mesh)` result already on disk and

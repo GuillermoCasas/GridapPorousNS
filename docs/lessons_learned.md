@@ -248,3 +248,23 @@ reference audit must ask "did any *number* move?", not only "does the sentence s
 label-based `\cref` sites are safe by construction, hand-written numbers in sibling documents are not.
 (iii) Equation numbers move only if the inserted block carries a numbered display, and App-C
 statement numbers are hardcoded nowhere — knowing which counters are exposed is what bounds the sweep.
+
+### 2026-07-30 (e) — "fixing" a stale reproduce command regressed a working one
+
+The Cocquet note's Reproduce block named a config that no longer exists
+(`run_test.jl cocquet_form_mms.json`). The 2026-07-30 pass corrected the config names to the two that do
+exist — and, in doing so, wrote them as `run_test.jl data/<name>.json`, because that is where the files
+live on disk. But `run_mms` does `config_path = joinpath(@__DIR__, "data", config_file)`, in **both** MMS
+harnesses, so a `data/` prefix produces `data/data/<name>.json` and the run dies on the first line. The
+edit fixed one half of a broken command and broke the other half, and the same wrong form was then copied
+into the `pending-tasks.md` §7h resume recipe — where it would have cost an evening, since it was the
+single command a fresh session was told to run.
+
+Caught only because the command was actually executed. No gate covers it: `document_hygiene` reads build
+logs, the SymPy suite re-derives mathematics, and neither runs a shell line out of a `verbatim` block.
+
+**Guards.** (i) A reproduce/resume command written into a doc or a note is only "verified" if it was
+**run**. Run it, or mark it explicitly as untested. (ii) When correcting one part of a command
+(a filename), re-check the parts you did not intend to touch (the invocation) — a partially-corrected
+command reads as fully corrected. (iii) Both MMS harnesses take a BARE config filename and prepend
+`data/` themselves; grep `run_test.jl data/` before believing any recipe in this repo.

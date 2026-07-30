@@ -18,7 +18,7 @@ the dataset behind the 2026-06-10 success in [`../../../../docs/mms/convergence-
 Contents:
 
 - `phase1_quad_k1.h5` — the convergence database (per-mesh `err_{u,p}_{l2,h1}`, `eval_iters/times`,
-  `eval_eps`). Reproduce with `julia --project=../../.. run_test.jl data/phase1_quad_k1.json` (resumable).
+  `eval_eps`). Reproduce with `julia --project=../../.. run_test.jl phase1_quad_k1.json` (bare filename — the harness prepends `data/` itself) (resumable).
 - `summary_tables.txt`, `merged_convergence_report.md`, `convergence_report.md`, `flagged_cells.json`
   — the `analyze_results.py` outputs on this DB (the per-cell rates/FME).
 
