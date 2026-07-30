@@ -7,12 +7,16 @@ meta-documentation (observations, to-dos, process notes, and the paper↔code re
 ## `paper/` — the SIAM article
 
 Build from `theory/paper/` with its local `latexmkrc` (which adds `paper/siam/` to
-`TEXINPUTS`/`BSTINPUTS`). Verified clean 2026-07-29: `latexmk` exit 0, 0 undefined
-refs/citations, 0 multiply-defined labels — `article.tex` 76 pp / 768 labels,
-`article_v2.tex` 111 pp / 964 labels (v2 carries the commented OSGS appendix).
+`TEXINPUTS`/`BSTINPUTS`). Verified clean 2026-07-30: `latexmk` exit 0, 0 undefined refs/citations, 0
+multiply-defined labels, 0 overfull boxes > 1 pt — `article.tex` 80 pp / 776 labels,
+`article_v2.tex` 116 pp / 976 labels (v2 carries the commented OSGS appendix).
+**Regenerate these four numbers from the live build, never by hand:**
+`grep -a "Output written" "latex compilation/<base>/<base>.log"` and
+`grep -ac newlabel "latex compilation/<base>/<base>.aux"` — a stale count is what makes a
+"verified clean" claim unverifiable.
 
-- [`paper/article.tex`](paper/article.tex) — the paper; the authoritative theory anchor for the codebase.
-- [`paper/article_v2.tex`](paper/article_v2.tex) — the submission-track revision (adds the OSGS linear theory, Appendix D).
+- [`paper/article.tex`](paper/article.tex) — v1; the **code-transcription anchor** that `src/` and the `docs/` line references are written against. *Not* the submission source.
+- [`paper/article_v2.tex`](paper/article_v2.tex) — **the submission source of truth** (adds the OSGS linear theory, Appendix D). One file is authoritative for submission (v2), the other for the code map (v1); the source-coupled SymPy gates deliberately read **both**, because App. B and App. C are `\input` by both mains — do not narrow them to one file.
 - [`paper/asgs_convergence.tex`](paper/asgs_convergence.tex) (App. C), [`paper/fourier_appendix.tex`](paper/fourier_appendix.tex) (App. B) — **`\input` by BOTH articles**, so they may cite only labels defined in both; each carries a `[known-fragility]` header listing the guaranteed labels. Machine-guarded by `sympy/projector_algebra_verification.py` rule D3.
 - [`paper/osgs_appendix.tex`](paper/osgs_appendix.tex) / [`paper/osgs_appendix_commented.tex`](paper/osgs_appendix_commented.tex) (App. D, v2 only) — the clean and the pedagogy-annotated copies; edits go to **both**.
 - **The viscous projector is generic** (2026-07-29): the a priori theory is stated for any pointwise, constant-coefficient orthogonal projection of the velocity gradient that is Korn-compatible on `H¹₀` (standing assumption `H:projector`, display `eq:PiKorn`); the two required properties are numbered `(V1)` *Orthogonality* and `(V2)` *Korn compatibility*, and `{𝕀, sym, dev, dev∘sym}` are verified instances with the uniform constant `√2`, in **§2.1 `sec:ViscousProjector`** ("The viscous projector") — one main-text home for the definition, the assumed properties, the variants and the Korn proofs, duplicated verbatim in both mains because App. B and App. C cite its labels (relocated there from App. C on 2026-07-29). `\ViscProj` therefore denotes the *generic* operator; the deviatoric–symmetric default is `\DSPi`.
@@ -42,6 +46,7 @@ The `\Guillermo{}` / `\Joaquin{}` author-review macros are defined in `article.t
 - [`numerical_constants/`](numerical_constants/) — the `c1` dimension note (element-aware coercivity floor).
 - [`scale_free_gate_note/`](scale_free_gate_note/) — the scale-free convergence gate.
 - [`projection_space_note/`](projection_space_note/) — the OSGS projection-space note.
+- [`mesh_regularity_note/`](mesh_regularity_note/) — **which mesh-regularity hypothesis each step needs** (2026-07-30): global vs local vs patch quasi-uniformity vs smooth grading, the implications and the two counterexamples, and the proof that global quasi-uniformity is needed *only* for the single-`h` rate statements of §6 (because `h` appears on both sides there) and equally for both variants. It is the check behind simplifying (A1) to global quasi-uniformity, and it corrects the paper's former `ω_χ=O(h)` claim.
 - [`paper novelties/paper_novelties.tex`](paper%20novelties/paper_novelties.tex) — running record of what is new in the paper relative to the literature.
 - [`pressure_recentering_note/pressure_recentering_note.tex`](pressure_recentering_note/pressure_recentering_note.tex) — pressure-mean drift under the iterated (Codina) penalty in the all-Dirichlet setting, and a **re-centering** hardening. **Implemented** behind the default-off config flag `recenter_pressure_between_penalty_passes` (A/B-verified behavior-preserving); *adoption-by-default* still pending. Provenance: the iterated penalty is Codina's, the re-centering is *this note's* proposal (not attributed to Codina).
 

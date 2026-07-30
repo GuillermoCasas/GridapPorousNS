@@ -564,14 +564,16 @@ so legacy probes that pre-date the generalisation continue to compile.
 A new helper
 \code{compute\_L\_and\_U(strategy, Re, Da, alpha\_infty)}
 returns the pair $(L, U_{\mathrm{amp}})$ for the four named strategies
-\code{"centered"} (default — $L = 1$, $U = \mathrm{Re}/\sqrt{\alpha_\infty \mathrm{Da}}$),
+\code{"centered"} ($L = 1$, $U = \mathrm{Re}/\sqrt{\alpha_\infty \mathrm{Da}}$),
 \code{"balanced"} ($L = \sqrt{\alpha_\infty \mathrm{Da}}$,
 same $U$),
 \code{"minmax"} ($L = \sqrt{\alpha_\infty \mathrm{Da}}$,
 $U = (\mathrm{Re}^2 / (\alpha_\infty \mathrm{Da}))^{1/4}$), and
 \code{"unit"} ($L = U = 1$, kept for diagnostic probes). The strategy
-is read once at the top of \code{run\_mms} via
-\code{get(test\_dict, "encoding\_strategy", "centered")}.
+is read once at the top of \code{run\_mms} from the config key
+\code{encoding\_strategy}; for the fallback in force, and for the strategy
+each recorded sweep actually used, see the Provenance section at the end of
+this note.
 
 The harness builds the per-cell $L$ \emph{inside} the
 $(\mathrm{Re}, \mathrm{Da}, \alpha_0)$ triple loop because $L$ varies
@@ -867,19 +869,54 @@ confirms.
         first place to look.
 \end{itemize}
 
-\section*{Status (2026-06-01)}
+\section*{Provenance}
 
-Centered encoding (Section~2) is the harness default and the
-\code{phase1\_quad\_k1} master HDF5 was produced under it. Variable-$L$
-generalisation (Section~\ref{sec:varL}) is implemented in the harness
-with $L = 1$ centered preserved bit-identically; \code{"balanced"} and
-\code{"minmax"} are available as opt-in strategies. The corner case
-C7 (Re$=10^{-6}$, Da$=10^{6}$, $\alpha_0=1$) was the empirical
-diagnosis target: its Float64 noise-floor stall under centered at
-$N=320$ is recovered by minmax at the same $N$, confirming that the
-mechanism is solution-scale precision (not algorithm-side). The
-remainder of the (Re, Da, $\alpha$) sweep behaves equivalently across
-encodings for cells where neither floor is binding.
+The name of this note is historical: \code{"centered"} is the encoding it was
+written for, not the one in force. What each artefact was produced under:
+
+\begin{center}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}p{0.24\linewidth}p{0.13\linewidth}p{0.38\linewidth}p{0.15\linewidth}@{}}
+\toprule
+Artefact & Strategy & Where the strategy is recorded & Commit \\
+\midrule
+harness fallback (pre\-/generalisation) & \code{centered} ($L=1$) & superseded & --- \\
+harness fallback (current) & \code{minmax} & \code{run\_test.jl}, \code{get(test\_dict,} \code{"encoding\_strategy",} \code{"minmax")} & \code{6bbdef8} \\
+official 2D sweeps \code{phase1\_quad\_k1}, \code{phase1\_quad\_k2} & \code{minmax} & the config key, and \code{cell.encoding} in every \code{results/k*/*/} \code{traces/traj\_*.json} sidecar & \code{6bbdef8} \\
+official 2D sweeps \code{phase1\_tri\_k1}, \code{phase1\_tri\_k2} & \code{minmax} & as above & \code{efad5b5}, \code{ac594e4} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The results DB stores no encoding attribute of its own, so the
+strategy behind a recorded run is read from the trajectory sidecars'
+\code{cell.encoding} field and from the config embedded in the DB. Every
+official 2D sweep on disk --- and the archived
+\code{previous\_results/pre\_route\_b\_2026-07-01} leaves --- records
+\code{minmax}. The earlier Status note (2026-06-01) correctly recorded
+\code{centered} as the default of its day --- at \code{9742a77} the harness fell
+back to \code{"centered"} and the \code{phase1\_quad\_k1} config carried no
+\code{encoding\_strategy} key at all --- but it was superseded by the 2026-06-04
+switch (\code{6bbdef8}) and has been removed, since no \code{centered}-era DB
+survives on disk. The variable-$L$ generalisation
+(Section~\ref{sec:varL}) keeps \code{centered} available and
+bit-identical to the pre-generalisation behaviour.
+
+The corner case C7 (Re$=10^{-6}$, Da$=10^{6}$, $\alpha_0=1$) was the
+empirical diagnosis target: its stall under centered at $N=320$ is recovered
+by minmax at the same $N$. That is consistent with a solution-scale precision
+floor for this cell, but the mechanism must not be generalised: for the
+neighbouring high-Da OSGS cells the encoding dependence was later traced to
+scale-coupled solver gates rather than to roundoff (see
+\code{docs/lessons\_learned.md}, 2026-06-02, which lists the
+``FP noise-floor'' readings as wrong) and then removed by making those gates
+relative, and largely removed by renormalising them by the initial residual. What
+remains open is whether the relaxed cross-encoding tolerance ($5\times10^{-8}$,
+against a residual OSGS \code{err\_u\_l2} covariance of
+$\approx1.4\times10^{-8}$) is a re-derived roundoff floor or masks a residual
+covariance defect in the staggered map (\code{docs/pending-tasks.md} \S4f). The remainder of the (Re, Da, $\alpha$) sweep behaves
+equivalently across encodings for cells where neither floor is binding.
 
 This document is kept in \texttt{theory/} as a standalone working
 note. Once a final paper-grade $k=2$ sweep is performed (deciding

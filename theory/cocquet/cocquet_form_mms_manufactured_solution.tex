@@ -204,16 +204,23 @@ pressure is left free and pinned only through the penalty
 $\epsilon_{\mathrm p}p$ in \eqref{eq:mass}. This differs from the Cocquet
 benchmark, which prescribes a parabolic inlet, no-slip walls, and a
 traction-free Neumann outlet. The boundary \emph{data} therefore differ, but
-the differential operator, viscous form, reaction law and coefficients,
-stabilization (ASGS), and element pair are identical. Pure Navier--Stokes
+the differential operator, the viscous form, and the reaction law and its
+coefficients are identical to the reference. The \emph{discretization} is not:
+this is an \emph{operator-matched stabilized diagnostic}, in which the
+reference's element pair is combined with our ASGS residual stabilization,
+whereas the cited method is the pure Galerkin restriction on that pair (see
+\texttt{cocquet\_formulation.tex}, \S``Discretization''). The word
+``reproduction'' is reserved for the unstabilized Galerkin Taylor--Hood run of
+\texttt{CocquetTubeTest}. Pure Navier--Stokes
 runs (\S1, $\alpha_0=1$) already confirmed that the Cocquet boundary set does
 not, by itself, spoil convergence, so isolating the operator under clean
 Dirichlet data is the sharper diagnostic.
 
 \section{Discretization and expected rates}
 
-Taylor--Hood $\mathbb{P}_2/\mathbb{P}_1$ elements on simplicial (TRI) meshes,
-ASGS stabilization, matching Cocquet. The porosity is interpolated to the
+Taylor--Hood $\mathbb{P}_2/\mathbb{P}_1$ elements on simplicial (TRI)
+meshes---the reference's element pair---with our ASGS stabilization active,
+which the reference does not use. The porosity is interpolated to the
 velocity space order so it introduces no extra modeling error relative to the
 $\mathbb{P}_2$ velocity. The quadrature degree includes the Forchheimer bump
 $4k_v+\lfloor k_v/2\rfloor$ to integrate the non-polynomial
@@ -308,9 +315,14 @@ This isolates precisely what changes between the formulations.
 \section*{Reproduce}
 \begin{verbatim}
 cd test/extended/CocquetFormMMS
-julia --project=../../.. run_test.jl cocquet_form_mms.json
+# pure Galerkin (the reference method):
+julia --project=../../.. run_test.jl data/cocquet_form_mms_taylorhood.json
+# ASGS on the same pair (this diagnostic):
+julia --project=../../.. run_test.jl \
+      data/cocquet_form_mms_taylorhood_stabilized.json
 # rates stored as HDF5 attributes rate_u_l2, rate_p_l2, ... in
-# results/cocquet_form_mms.h5
+#   results/cocquet_form_mms_taylorhood.h5
+#   results/cocquet_form_mms_taylorhood_stabilized.h5
 \end{verbatim}
 
 \end{document}

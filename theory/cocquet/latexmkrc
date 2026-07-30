@@ -1,12 +1,33 @@
-# latexmk configuration file for porous_NS_with_Gridap
+# latexmk configuration file for porous_NS_with_Gridap — theory/cocquet
+#
+# Keep the build clean: route ALL auxiliary/intermediate files into a per-target
+# 'latex compilation/<basename>/' subfolder and leave ONLY the PDF beside the
+# source. See .agents/rules/clean-latex-compilation.md.
 
-# Route auxiliary files to a target-specific subdirectory
-$aux_dir = 'latex compilation/%B';
+# --- Per-target aux directory -------------------------------------------------
+# Compute the target basename from @ARGV rather than relying on %B: TeX Live
+# 2023's latexmk 4.79 leaves %B LITERAL inside $aux_dir, which routes every
+# intermediate into a directory actually named '%B' -- and then leaves a stale
+# log in the correctly-named sibling, so a freshness gate reads the wrong file.
+# (That is exactly what happened here before 2026-07-30; same approach as
+# theory/paper/latexmkrc and proof_verification/latexmkrc.)
+my $target = "";
+foreach my $arg (@ARGV) {
+    next if $arg =~ /^-/;
+    if ($arg =~ /^(.*)\.tex$/) { $target = $1; last; }
+    if (-e "$arg.tex")         { $target = $arg; last; }
+}
+$target =~ s/.*\///;
+$target = "default" if $target eq "";
 
-# Keep the output PDF in the source directory
-$out_dir = '.';
+$aux_dir = "latex compilation/$target";   # all intermediates go here
+$out_dir = '.';                            # the PDF stays next to the source
 
-# Clean up intermediate files that latexmk knows about
+# SyncTeX beside the PDF for editor forward/inverse search; enabled through the
+# engine because this latexmk does not honour the $synctex variable.
+$pdflatex = 'pdflatex -synctex=1 %O %S';
+
+# Extra extensions for `latexmk -c/-C` to remove.
 $clean_ext = 'synctex.gz synctex\(busy\) thm bbl blg';
 
-print "latexmk: Routing auxiliary files to 'latex compilation/%B/' and PDF to './'\n";
+print "latexmk: Routing auxiliary files to '$aux_dir/' and PDF to './'\n";

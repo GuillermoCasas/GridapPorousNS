@@ -54,6 +54,11 @@ Manifest.toml
 repomix-output.*
 *.repomix-output.*
 repomix/repomix-output-*
+# ...and named exports (repomix -o repomix-<name>.{md,xml}); these are large generated
+# packs of the tree, never sources.
+repomix-*.md
+repomix-*.xml
+repomix-*.txt
 
 # LaTeX compilation intermediates (independent of location)
 *.aux
@@ -98,6 +103,7 @@ latex\ compilation/
 /theory/viscous_projector_note/viscous_projector_note.pdf
 /theory/scale_free_gate_note/scale_free_gate_note.pdf
 /theory/velocity_floor_regularization/velocity_floor_regularization.pdf
+/theory/mesh_regularity_note/mesh_regularity_note.pdf
 
 # Python compilation files
 __pycache__/

@@ -1,0 +1,291 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.6cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,amsfonts}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\setlength{\emergencystretch}{3em}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!55!black,citecolor=blue!55!black}
+
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}[lemma]{Proposition}
+\newtheorem{remark}[lemma]{Remark}
+\newtheorem{example}[lemma]{Example}
+\theoremstyle{definition}
+\newtheorem{definition}[lemma]{Definition}
+
+\newcommand{\Th}{\mathcal{T}_h}
+\newcommand{\bu}{\boldsymbol{u}}
+\newcommand{\bv}{\boldsymbol{v}}
+\newcommand{\ba}{\boldsymbol{a}}
+\newcommand{\bx}{\boldsymbol{x}}
+\newcommand{\dd}{\,\mathrm{d}}
+\DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
+\newcommand{\Eint}[2]{\mathrm{E}_{\mathrm{int},#1}(#2)}
+\newcommand{\Reyn}{\operatorname{\mathit{Re}}}
+\newcommand{\Damk}{\operatorname{\mathit{Da}}}
+
+\title{Which mesh-regularity hypothesis does each step actually need?\\
+\large A check on simplifying the standing mesh assumption to global quasi-uniformity}
+\author{Companion note to \texttt{theory/paper/article\_v2.tex}}
+\date{2026-07-30}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The manuscript's standing mesh assumption (A1) asks for a conforming, shape-regular and
+\emph{locally} quasi-uniform family; the OSGS-specific (O3) adds \emph{patch} quasi-uniformity, a
+continuous element-size surrogate, and a \emph{smooth-grading} condition $\omega_\chi(h)\to0$; and
+Section~6 invokes \emph{global} quasi-uniformity, which (A1) does not supply. This note settles what
+each step needs, so that the standing assumption can be simplified without weakening or
+over-assuming. Four results: global quasi-uniformity implies both the local and the patch versions
+(Lemma~\ref{lem:implications}); it does \emph{not} imply smooth grading, but on a globally
+quasi-uniform family smooth grading is satisfiable by an admissible choice of surrogate
+(Lemma~\ref{lem:surrogate}); the manuscript's assertion that $\omega_\chi=O(h)$ ``when the family is
+quasi-uniform'' is \emph{false} as stated, and the correct sufficient condition is a Lipschitz size
+function (Lemma~\ref{lem:omegah}); and global quasi-uniformity is genuinely needed for the
+single-$h$ rate statements of Section~6, because the elementwise functional carries $h_K$ to
+\emph{different powers} on its two sides (Proposition~\ref{prop:rate}), the degradation without it
+being an explicit power of $h_{\max}/h_{\min}$. The recommendation, and the exact edits it licenses,
+are collected in Section~\ref{sec:recommendation}.
+\end{abstract}
+
+\section{Definitions}
+
+Let $\{\Th\}_{h>0}$ be a family of conforming simplicial or parallelotopal partitions of
+$\overline\Omega$, $h_K\coloneqq\operatorname{diam}K$, $\rho_K$ the radius of the largest inscribed
+ball, and $h\coloneqq\max_{K\in\Th}h_K$. Write $S_K$ for the patch of elements sharing at least a
+vertex with $K$, and $N_K$ for the vertices of $K$.
+
+\begin{definition}[the four conditions]\label{def:four}
+The family is
+\begin{enumerate}
+\item[(R)] \emph{shape-regular} if $h_K/\rho_K\le\gamma_0$ for all $K$ and all $h$;
+\item[(L)] \emph{locally quasi-uniform} if $h_K/h_{K'}\le\gamma_1$ whenever $K,K'$ share a face;
+\item[(P)] \emph{patch quasi-uniform} if $\underline C\,h_K\le h_{K'}\le\overline C\,h_K$ for all
+      $K'\subset S_K$, all $K$ and all $h$;
+\item[(G)] \emph{globally quasi-uniform} if $h\le\gamma_2\,h_K$ for all $K$ and all $h$,
+      equivalently $h_{\max}/h_{\min}\le\gamma_2$,
+\end{enumerate}
+with constants independent of $h$. Additionally, given continuous \emph{size surrogates}
+$\chi_1,\chi_2\in C^0(\overline\Omega)$ with
+\begin{equation}\label{eq:surrogate}
+  \chi_1(\bx_K,h)\le h_K\le\chi_2(\bx_K,h)\quad\text{at the barycentres }\bx_K,
+  \qquad \sup_h\sup_{\bx}\frac{\chi_2}{\chi_1}\le\chi_0<\infty,
+\end{equation}
+the family is \emph{smoothly graded} if
+\begin{equation}\label{eq:omega}
+  \omega_\chi(h)\coloneqq\sup_{K}\ \max_{\bx_a\in N_K}
+  \Bigl|\frac{\chi_1(\bx_a,h)}{\chi_1(\bx_K,h)}-1\Bigr|\ \xrightarrow[h\to0]{}\ 0 .
+\end{equation}
+\end{definition}
+
+These are exactly (A1) $=$ (R)$+$(L), (O3) $=$ (P)$+$\eqref{eq:surrogate}$+$\eqref{eq:omega}, and
+Section~6's ``global quasi-uniformity'' $=$ (G).
+
+\section{What implies what}
+
+\begin{lemma}[(G) subsumes (L) and (P)]\label{lem:implications}
+If the family satisfies (G) with constant $\gamma_2$, then it satisfies (L) with $\gamma_1=\gamma_2$
+and (P) with $\underline C=\gamma_2^{-1}$, $\overline C=\gamma_2$. The converse fails.
+\end{lemma}
+
+\begin{proof}
+Under (G), $h/\gamma_2\le h_K\le h$ for every $K$, so for any two elements $K,K'$ whatsoever
+(adjacent, in a common patch, or not) $h_{K'}/h_K\le h/(h/\gamma_2)=\gamma_2$ and
+$h_{K'}/h_K\ge\gamma_2^{-1}$. Both (L) and (P) are instances of this with the pair restricted.
+
+For the converse, take $\Omega=(0,1)$ and the graded family with nodes $x_j=(j/n)^2$,
+$j=0,\dots,n$, $h\sim 2/n$. Adjacent cells satisfy
+$h_{j+1}/h_j=(2j+1)/(2j-1)\le3$, so (L) and (P) hold uniformly, while
+$h_{\max}/h_{\min}=(2n-1)/1\to\infty$, so (G) fails.
+\end{proof}
+
+\begin{remark}
+Lemma~\ref{lem:implications} is what makes the proposed simplification a genuine
+\emph{simplification} rather than an added hypothesis: replacing (L) by (G) in the standing
+assumption does not sit \emph{on top of} the patch condition of (O3) --- it \emph{implies} it, so the
+patch clause becomes redundant wherever (G) is in force.
+\end{remark}
+
+\begin{lemma}[(G) does not imply smooth grading, but makes it available]\label{lem:surrogate}
+\phantom{x}
+\begin{enumerate}
+\item[(i)] (G) does not imply \eqref{eq:omega} for every admissible surrogate: there is a globally
+quasi-uniform family and an admissible $\chi_1$ tracking the local size, i.e.\
+$\chi_1(\bx_K)\eqsim h_K$, with $\omega_\chi(h)\ge\tfrac13$ for all $h$.
+\item[(ii)] On any globally quasi-uniform family the \emph{constant} choice
+$\chi_1\equiv h_{\min}$, $\chi_2\equiv h$ is admissible in the sense of \eqref{eq:surrogate}, with
+$\chi_0=\gamma_2$, and gives $\omega_\chi\equiv0$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(i) Take $\Omega=(0,1)$ and, for $n$ even, the partition whose cell widths alternate
+$\tfrac{2}{3n},\tfrac{4}{3n},\tfrac{2}{3n},\dots$; then $h_{\max}/h_{\min}=2$, so (G) holds with
+$\gamma_2=2$. Any continuous $\chi_1$ with $\chi_1(\bx_K)=h_K$ takes, at the vertex $\bx_a$ shared by
+a narrow and a wide cell, a value between the two barycentre values; whichever side of the midpoint
+it falls, one of the two ratios $\chi_1(\bx_a)/\chi_1(\bx_K)$ differs from $1$ by at least
+$\tfrac13$, because the two barycentre values differ by a factor $2$. Hence
+$\omega_\chi\ge\tfrac13$ uniformly in $h$.
+
+(ii) $\chi_1\equiv h_{\min}\le h_K$ and $h_K\le h\equiv\chi_2$ give \eqref{eq:surrogate}, with
+$\chi_2/\chi_1=h/h_{\min}\le\gamma_2$ by (G). A constant function has
+$\chi_1(\bx_a)/\chi_1(\bx_K)=1$ for every $K$ and every vertex, so $\omega_\chi\equiv0$.
+\end{proof}
+
+\begin{remark}[reading (ii)]
+Part (ii) is not a licence to use a single length everywhere in the \emph{method}: the element length
+that enters the stabilization parameters is whatever the implementation uses (in the manuscript's
+three-dimensional runs, $h_K=(6\sqrt2\,|K|)^{1/3}$). It says something narrower and sufficient: the
+\emph{surrogate} whose oscillation \eqref{eq:omega} controls the smoothing error of the OSGS analysis
+may be taken constant on a globally quasi-uniform family, so on such families the smooth-grading
+requirement costs nothing. Under (G) the two are comparable anyway, $h_K\eqsim\chi_1$, which is all
+the analysis uses them for.
+\end{remark}
+
+\begin{lemma}[the correct sufficient condition for $\omega_\chi=O(h)$]\label{lem:omegah}
+Quasi-uniformity --- local or global --- does not give $\omega_\chi(h)=O(h)$; Lemma~\ref{lem:surrogate}(i)
+is a counterexample with $\omega_\chi\ge\tfrac13$. If, however, the surrogate is the pointwise
+evaluation of a fixed $L$-Lipschitz size function $\sigma_{\!*}:\overline\Omega\to[\sigma_-,\sigma_+]$
+scaled by $h$, i.e.\ $\chi_1(\bx,h)=h\,\sigma_{\!*}(\bx)$ with $\sigma_-\!>0$, then
+\begin{equation}\label{eq:omegaLip}
+  \omega_\chi(h)\ \le\ \frac{L}{\sigma_-}\,h\ =\ O(h),
+\end{equation}
+uniformly in the family.
+\end{lemma}
+
+\begin{proof}
+For $\bx_a\in N_K$ one has $|\bx_a-\bx_K|\le h_K\le h$, so
+$|\chi_1(\bx_a)-\chi_1(\bx_K)|=h|\sigma_{\!*}(\bx_a)-\sigma_{\!*}(\bx_K)|\le hL|\bx_a-\bx_K|\le Lh^2$,
+while $\chi_1(\bx_K)=h\sigma_{\!*}(\bx_K)\ge h\sigma_-$. Dividing gives
+$|\chi_1(\bx_a)/\chi_1(\bx_K)-1|\le Lh/\sigma_-$.
+\end{proof}
+
+\begin{remark}
+So the manuscript's parenthetical ``$\omega_\chi(h)=O(h)$ when the family is quasi-uniform or a
+Lipschitz refinement of a fixed macro-mesh'' is right in its second alternative and wrong in its
+first. A Lipschitz refinement of a macro-mesh is exactly the situation of
+Lemma~\ref{lem:omegah} ($\sigma_{\!*}$ the macro-mesh size function). Quasi-uniformity should be
+dropped from that list, or replaced by the constant-surrogate statement of
+Lemma~\ref{lem:surrogate}(ii), which gives the stronger $\omega_\chi\equiv0$.
+\end{remark}
+
+\section{Where global quasi-uniformity is genuinely needed}
+
+The a priori estimates are stated in the porosity-weighted \emph{broken} $\ell^2$ functional
+\begin{equation}\label{eq:Psi}
+  \Psi(h)^2=\sum_{K}\frac{\alpha_K^2}{h_K^2}
+  \Bigl(\tau_{2,K}\,\Eint{K}{\bu}^2+\tau_{1,K}\,\Eint{K}{p}^2\Bigr),
+  \qquad \Eint{K}{\psi}=h_K^{k_\psi+1}\lvert\psi\rvert_{H^{k_\psi+1}(K)} ,
+\end{equation}
+(the OSGS version carries the extra elementwise factor $c_1+\Damk_{h,K}$, which changes nothing
+below). Nothing in \eqref{eq:Psi} needs (G): it is a sum of local quantities, and each appendix
+proves its bound elementwise.
+
+\begin{proposition}[the single-$h$ rate]\label{prop:rate}
+In the viscosity-dominated regime, $\tau_{1,K}\eqsim h_K^2/(\alpha_K\nu)$ and
+$\tau_{2,K}\eqsim\nu/\alpha_K$, so that
+\begin{equation}\label{eq:Psiexpanded}
+  \Psi(h)^2\eqsim
+  \nu\sum_K\alpha_K\,h_K^{2k_u}\lvert\bu\rvert^2_{H^{k_u+1}(K)}
+  +\frac1\nu\sum_K\alpha_K\,h_K^{2k_p+2}\lvert p\rvert^2_{H^{k_p+1}(K)} .
+\end{equation}
+Consequently:
+\begin{enumerate}
+\item[(i)] With no quasi-uniformity at all, using only $h_K\le h$ and $\alpha_K\le1$,
+\begin{equation}\label{eq:upper}
+  \Psi(h)\ \lesssim\ \sqrt\nu\,h^{k_u}\lvert\bu\rvert_{H^{k_u+1}(\Omega)}
+  +\nu^{-1/2}h^{k_p+1}\lvert p\rvert_{H^{k_p+1}(\Omega)} .
+\end{equation}
+\item[(ii)] The estimates of Section~6 are \emph{not} of the form \eqref{eq:upper}: they are
+normalized statements in which $h$ appears on \emph{both} sides, e.g.
+$\lVert\Pi^{\mathrm v}\nabla\boldsymbol{e}_u\rVert+\nu^{-1}h\lVert\nabla e_p\rVert_h
++\alpha_0^{-1/2}\lVert\nabla\!\cdot(\alpha\boldsymbol{e}_u)\rVert_h
+\lesssim\alpha_0^{-1/2}\bigl(\mathrm{E}_{\mathrm{int}}(\bu)/h+\nu^{-1}\mathrm{E}_{\mathrm{int}}(p)\bigr)$.
+Passing from \eqref{eq:Psi} to such a statement replaces $h_K$ by $h$ where it occurs with a
+\emph{negative} power as well as where it occurs with a positive one. Each such replacement costs a
+factor $h/h_K$, so the statement holds with the single $h$ if and only if $h/h_K$ is bounded ---
+that is, under (G) --- and in general degrades to
+\begin{equation}\label{eq:degrade}
+  \text{(single-}h\text{ form)}\ \lesssim\
+  \Bigl(\frac{h_{\max}}{h_{\min}}\Bigr)^{q}\times\text{(elementwise form)},
+\end{equation}
+with $q$ the largest total $h_K$-exponent swing among the terms retained ($q=1$ for the
+pressure-gradient normalization above, $q=k_u$ if the velocity term is also normalized by a single
+$h$).
+\item[(iii)] The $\ell^2\subset\ell^1$ passage $\Psi\le c_1^{1/2}\mathcal E$ loses at worst a factor
+$(\#\Th)^{1/2}\eqsim h^{-d/2}$, and that count is itself a (G) statement: on a globally
+quasi-uniform family $\#\Th\eqsim h^{-d}$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+\eqref{eq:Psiexpanded} is substitution into \eqref{eq:Psi}:
+$(\alpha_K^2/h_K^2)\tau_{2,K}h_K^{2k_u+2}=\alpha_K\nu h_K^{2k_u}$ and
+$(\alpha_K^2/h_K^2)\tau_{1,K}h_K^{2k_p+2}=\alpha_Kh_K^{2k_p+2}/\nu$. (i) follows from
+$h_K\le h$, $\alpha_K\le1$ and $\sum_K\lvert\psi\rvert^2_{H^{m}(K)}=\lvert\psi\rvert^2_{H^m(\Omega)}$
+for the broken seminorm. (ii) Each occurrence of $h_K^{-1}$ replaced by $h^{-1}$ is an inequality in
+the wrong direction unless $h^{-1}\le\gamma_2 h_K^{-1}$, i.e.\ unless (G) holds; tracking the
+exponents gives \eqref{eq:degrade}. (iii) Cauchy--Schwarz on the mesh index set gives the
+cardinality factor, and $\#\Th\eqsim h^{-d}$ requires two-sided control of $h_K$.
+\end{proof}
+
+\begin{remark}[the point of (ii)]
+It is tempting to think that an upper bound can always afford $h_K\le h$ and so never needs (G).
+That is true of \eqref{eq:upper}, and it is why the appendices can state their theorems without (G).
+It is false of the \emph{normalized}, single-$h$ statements that Section~6 compares against measured
+rates, because those carry $h$ in the denominator: there, replacing $h_K$ by $h$ is the
+\emph{unfavourable} direction and needs $h\lesssim h_K$.
+\end{remark}
+
+\section{Hypothesis-to-step map}
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.40\linewidth}p{0.24\linewidth}p{0.28\linewidth}@{}}
+\toprule
+Step & Needs & Does \emph{not} need \\
+\midrule
+Inverse estimates; facewise bookkeeping of the continuity proof (App.~C Steps 6b, 6d) & (R), (L) & (P), (G) \\
+\addlinespace
+Patch best approximation and the porosity/advection patch comparisons (App.~D) & (R), (P) & (G) \\
+\addlinespace
+Smoothing lemma of the OSGS inf--sup argument, through $\psi(h)\to0$ & \eqref{eq:surrogate} and $\omega_\chi\to0$ & (G), if the surrogate is Lipschitz-generated (Lemma~\ref{lem:omegah}) \\
+\addlinespace
+Elementwise $\ell^2$ convergence statements ($\Psi_{\mathrm A}$, $\Psi_{\mathrm O}$) & nothing beyond the above & (G) \\
+\addlinespace
+Normalized single-$h$ estimates of Section~6, and the measured-rate comparison of Section~7 & \textbf{(G)} & --- \\
+\addlinespace
+$\ell^1$ majorant $\mathcal E(h)$ read as an optimal-order statement & \textbf{(G)} (cardinality) & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Recommendation}\label{sec:recommendation}
+
+Both variants need (G) at exactly the same place and for exactly the same reason
+(Proposition~\ref{prop:rate}(ii)), and neither appendix needs it at all. Hence:
+
+\begin{enumerate}
+\item \textbf{State (G) in the standing assumption.} By Lemma~\ref{lem:implications} this
+\emph{replaces} (L) and makes the patch clause of (O3) redundant, so the assumption list gets
+shorter, not longer. It is also what the reported experiments use: uniform structured families in two
+dimensions, a uniform Kuhn family and a uniform (red) refinement of a fixed base mesh in three.
+\item \textbf{Say once that it can be weakened, and to what.} The appendices' estimates hold under
+(R)$+$(L) (ASGS) and (R)$+$(P)$+$smooth grading (OSGS); what (G) buys is the passage to the
+single-$h$ form. So the weakening is: drop (G), keep the results in the elementwise $\ell^2$
+functionals --- which is precisely the form in which the appendices state them.
+\item \textbf{Repair the $\omega_\chi$ parenthetical.} Drop ``quasi-uniform'' from the list of
+sufficient conditions (Lemma~\ref{lem:surrogate}(i)) and either keep only the Lipschitz-refinement
+alternative (Lemma~\ref{lem:omegah}) or note that under (G) the surrogate may be taken constant,
+whence $\omega_\chi\equiv0$ (Lemma~\ref{lem:surrogate}(ii)).
+\item \textbf{Do not delete the smooth-grading hypothesis.} It is independent of (G)
+(Lemma~\ref{lem:surrogate}(i)); it becomes free only for an admissible \emph{choice} of surrogate.
+\end{enumerate}
+
+\end{document}

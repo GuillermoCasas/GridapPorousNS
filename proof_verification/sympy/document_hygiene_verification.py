@@ -29,6 +29,9 @@
 #   H4  zero "Float too large for page"
 #   H5  zero "invalid in math mode" font warnings
 #   H6  no Overfull \hbox wider than OVERFULL_PT_LIMIT (these print a margin rule)
+#   H8  exactly ONE aux directory holds a <base>.log -- two means a misrouting
+#       latexmkrc is writing the live log somewhere other than the correctly-named
+#       sibling, leaving a stale log for this gate (or a reader) to trust.
 #   H7  the log is FRESH -- newer than every .tex it could have been built from.
 #       Without this the gate would happily certify a stale build, which is the
 #       failure mode already recorded for the Coq harness (lessons_learned,
@@ -40,7 +43,18 @@
 # a synthetic bad log and asserts it fires.
 #
 # Run:  python3 document_hygiene_verification.py
-#       (build first: cd theory/paper && latexmk -pdf article.tex article_v2.tex)
+#       Build FIRST, and build each document in its OWN latexmk invocation -- the
+#       latexmkrc computes $aux_dir from @ARGV's first .tex, so
+#       `latexmk -pdf article.tex article_v2.tex` routes article_v2's intermediates
+#       into 'latex compilation/article/' and H8 fails.  The documents this gate
+#       needs are the DOCS list below:
+#           cd theory/paper                    && latexmk -pdf article.tex
+#           cd theory/paper                    && latexmk -pdf article_v2.tex
+#           cd theory/viscous_projector_note   && latexmk -pdf viscous_projector_note.tex
+#           cd theory/mesh_regularity_note     && latexmk -pdf mesh_regularity_note.tex
+#           cd theory/centered_encoding        && latexmk -pdf centered_encoding.tex
+#           cd theory/cocquet                  && latexmk -pdf cocquet_form_mms_manufactured_solution.tex
+#           cd proof_verification              && latexmk -pdf coq_coverage.tex
 # =============================================================================
 import os
 import re
@@ -70,6 +84,20 @@ DOCS = [
     # specs tightened; worst box 133pt -> 56pt).  The residue needs per-cell content work
     # in an internal audit report -- low value.  This number may only ever go DOWN.
     ("proof_verification", "coq_coverage", 7),
+    # 2026-07-30: the standalone note that discharges the global-quasi-uniformity claim the two
+    # mains now assume in (A1) and its "more than the proofs need" footnote. The papers do not
+    # cite it (it is internal), which is exactly why it needs a build gate: nothing else would
+    # notice if its proofs stopped compiling while (A1) still leaned on them.
+    ("theory/mesh_regularity_note", "mesh_regularity_note", 0),
+    # 2026-07-30: the two notes this pass edited.  Both were UNGATED, and both silently acquired a
+    # catastrophic box from that edit -- a provenance table 344.92pt (~12cm) past the margin here,
+    # and two 124/127-character verbatim lines (243/260pt) in the Cocquet note.  Nothing would have
+    # caught either.  Both are fixed; the budgets below are the PRE-EXISTING debt of prose that was
+    # never gated, and may only ever go DOWN.  NB: neither directory's latexmkrc worked before this
+    # pass -- both used the literal-'%B' aux_dir, so the live log sat in 'latex compilation/%B/'
+    # while a months-old stale log sat in the correctly-named sibling that this gate reads.
+    ("theory/centered_encoding", "centered_encoding", 10),
+    ("theory/cocquet", "cocquet_form_mms_manufactured_solution", 2),
 ]
 
 results = []
@@ -85,13 +113,20 @@ def check(name, ok, detail=""):
     return ok
 
 
-def find_log(dirpath, base):
-    """The LIVE log lives under '<dir>/latex compilation/<something>/<base>.log'.
-    The aux subdirectory is '<base>' with theory/paper's latexmkrc but a literal
-    '%B' with the older note latexmkrc files, so glob rather than assume."""
+def find_logs(dirpath, base):
+    """Every candidate log under '<dir>/latex compilation/<something>/<base>.log'.
+
+    [known-fragility]  The aux subdirectory is '<base>' with the @ARGV latexmkrc
+    files, but a LITERAL '%B' with the older ones (TeX Live 2023's latexmk 4.79
+    does not expand %B inside $aux_dir).  A directory with BOTH therefore holds a
+    live log and a stale one -- and on 2026-07-30 this cost a real defect: the
+    previous version of this function returned sorted(...)[0], and '%B' sorts
+    BEFORE any letter, so for theory/centered_encoding it would have read a
+    months-old log while the build that actually shipped the PDF -- carrying a
+    344.92pt overfull table, ~12cm past the margin -- wrote to '%B/'.  So return
+    all candidates NEWEST FIRST, and let the caller fail on multiplicity."""
     pat = os.path.join(ROOT, dirpath, "latex compilation", "*", base + ".log")
-    hits = sorted(glob.glob(pat))
-    return hits[0] if hits else None
+    return sorted(glob.glob(pat), key=os.path.getmtime, reverse=True)
 
 
 def read_log(path):
@@ -162,11 +197,21 @@ print("=" * 72)
 
 n_docs = 0
 for dirpath, base, budget in DOCS:
-    log = find_log(dirpath, base)
-    if log is None:
+    logs = find_logs(dirpath, base)
+    if not logs:
         check(f"{base}: a live build log exists under '{dirpath}/latex compilation/'",
               False,
               f"no log found; build it first (cd '{dirpath}' && latexmk -pdf {base}.tex)")
+        continue
+    log = logs[0]  # newest
+    # H8: exactly ONE aux directory. More than one means a misrouting latexmkrc
+    # (the literal-'%B' form) is writing the live log somewhere other than the
+    # correctly-named sibling, leaving a stale log for a reader to trust.
+    if not check(f"H8 {base}: exactly one aux directory holds a {base}.log "
+                 f"({len(logs)} found)", len(logs) == 1,
+                 "candidates: " + ", ".join(os.path.relpath(p, ROOT) for p in logs)
+                 + f"  -- fix {dirpath}/latexmkrc to compute $aux_dir from @ARGV "
+                   "(see theory/paper/latexmkrc) and delete the stale directory"):
         continue
     txt = read_log(log)
     if not OUTPUT_OK.search(txt):
