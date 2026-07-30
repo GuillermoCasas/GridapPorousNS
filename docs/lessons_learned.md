@@ -175,6 +175,15 @@ against the table's other rows before quoting an FME — rates are mesh-ladder-r
 durable version of this lesson and would have caught it mechanically. (iii) A `debug_results/` path
 appearing anywhere in a provenance trace for a published number is a stop condition.
 
+**Outcome (2026-07-31).** The official config was re-run to its full declared ladder and the side-DB's
+`N=320` values were reproduced **exactly** — `0.00e+00` relative difference in all four norms. So the
+forked numbers were never *wrong*; what was wrong was that they could not be traced to the official path,
+and that they were printed beside `N=320` rows while sitting at `N=160`. Two things worth keeping from
+that: a provenance violation is not the same as a numerical error, and it is still a defect — the false
+"order of magnitude" headline came from the mesh mixing, not from the fork. The fork is retained (not
+deleted) as the record of a real run, per `.agents/rules/reproducible-results.md`, carrying a
+`_superseded` note.
+
 ### 2026-07-30 (c) — a hardcoded provenance attribute made a harness silently disagree with the paper
 
 `test/extended/ManufacturedSolutions/run_test.jl` wrote `attributes(g)["physical_epsilon"] = 0.0` and

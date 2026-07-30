@@ -2,6 +2,7 @@
   "mms_dynamic_budget": {
     "newton_re_iterations": 150
   },
+  "_superseded": "2026-07-31: SUPERSEDED, kept as the provenance record of a real run (see .agents/rules/reproducible-results.md -- do not delete). Its (Re,alpha_0)=(1e5,0.1) N=160,320 results were published in tab:CocquetMMSL2/H1 while the official sweep stopped at N=80 there, which .agents/rules/official-results-path.md forbids. The official config cocquet_form_mms_taylorhood_stabilized.json has since completed the full [10..320] ladder for all four cells and REPRODUCES this DB's N=320 values EXACTLY (0.00e+00 relative difference in all four norms), so the paper no longer sources any number from here. Do not re-run to publish.",
   "_comment": "Fold-corner completion for the R5 stabilized-TH table (Re=1e5,alpha0=0.1): the main sweep n.c. below the fold and crashed (OOM, concurrent jobs) at N>=160. This runs ONLY the two meshes above the fold (N=160,320) to supply the (1e5,0.1) stabilized-TH row. Matches the documented alpha=0.1 fold-recovery recipe (corner ladder above the fold). Not a pipeline DB fork: a targeted fold-corner completion, transcribed by hand into tab:CocquetMMS*.",
   "erase_past_results": true,
   "epsilon_pert": [

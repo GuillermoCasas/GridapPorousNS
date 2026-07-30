@@ -207,8 +207,9 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > one's remaining half. Do not let a later prose pass quietly remove them.
 >
 
-> **🔴 NEW BLOCKER found by the 2026-07-30 critical reread — the DBF table's stabilized-Taylor--Hood rows
-> mix meshes and databases.** Verified directly against the DBs: `cocquet_form_mms_taylorhood_stabilized.h5`
+> **✅ DISCHARGED 2026-07-31 — was: 🔴 NEW BLOCKER found by the 2026-07-30 critical reread, the DBF table's
+> stabilized-Taylor--Hood rows mix meshes and databases.** *Everything in this block describes the state
+> as found; the resolution is the last bullet.* Verified directly against the DBs at the time: `cocquet_form_mms_taylorhood_stabilized.h5`
 > stops at **N=160** (and at **N=80** for the `(10⁵,0.1)` cell, the rest NaN), while the equal-order and
 > unstabilized-TH rows are at **N=320**; and the `(10⁵,0.1)` `P₂/P₁ ASGS` row printed in the tables
 > (`2.18e-5` velocity, `4.81e-6` pressure) comes from **`results/debug_results/cocquet_stabth_corner.h5`**,
@@ -240,7 +241,11 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 >   The general lesson (now in `lessons_learned.md`): a claim that one main is exempt must be checked
 >   against that file, and a parity sweep must cover the passage the correction *implies*, not just the
 >   sentence that was quoted.
->   **Status: the re-run is in progress** — see `pending-tasks.md` §7h.
+>   **Status: ✅ DISCHARGED 2026-07-31.** The official config completed its full `[10..320]` ladder for all
+>   four cells; all eight `P₂/P₁ ASGS` rows are requoted in both mains, both caption caveats and the §7.3
+>   ladder caveat are deleted, and the corner row is now officially sourced — the re-run reproduces the
+>   side-DB's `N=320` values *exactly*, so those numbers were right and only their provenance was wrong.
+>   See `pending-tasks.md` §7h.
 >
 > **✅ Also corrected by the reread (3D subsection, both verified against the result records).** The
 > claim that both mesh families are "generated with `Gridap`" was wrong — the irregular base mesh is

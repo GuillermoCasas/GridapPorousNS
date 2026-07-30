@@ -434,9 +434,9 @@ integration status:
   v1 always carried the same four rows, so the earlier "not yet ported / v1 has no such rows" note was wrong
   (see the checklist correction and `lessons_learned.md` 2026-07-30 (d)). Verdict: it converges at Re=10⁵ where
   the unstabilized-TH velocity stagnates, isolating the high-Re gain to the **stabilization** rather than the
-  space pair. The viscous-regime penalty is **not** ~10×: that figure compared `N=160` against `N=320`; at the
-  common mesh it is **1.16×** (α₀=0.5) and **1.47×** (α₀=0.1). Both mains now print the common-mesh factor and
-  disclose the mesh caveat in the captions; the re-run that removes the caveat is §7h.
+  space pair. The viscous-regime penalty is **not** ~10×: that figure compared `N=160` against `N=320`. On the
+  completed ladder (§7h, ✅ done) the like-for-like factor at `N=320` is **1.2×** (α₀=0.5) and **1.4×**
+  (α₀=0.1); both mains print it and the mesh caveats are gone.
 - **R6 — genuinely-3D MMS** (audit N19): grid ran (`results/k*/TET/genuine3d/`), verdict optimal rates for both
   orders + OSGS pressure H¹ converges (slope 2.0, unlike the extruded field's 1.29 plateau).
   **✅ DONE + ported:** `theory/paper/genuine3d_table.tex` is `\input` after `tab:3DH1` in
@@ -468,86 +468,36 @@ the energy-norm defect stays out of the L² gate. Touch point: the `V_proj`/`Q_p
 `theory/projection_space_note/projection_space_note.pdf` §6 (the degree-dependent theorem); Codina (2008)
 Remark 1.
 
-### 7h. 🔴 Re-run the stabilized-Taylor--Hood control to N=320 through the official path
+### 7h. ✅ DONE (2026-07-31) — stabilized-Taylor--Hood control re-run to N=320 through the official path
 
-Found by the 2026-07-30 critical reread and **verified against the DBs**: the `P₂/P₁ ASGS` rows of
-`tab:CocquetMMSL2/H1` are not on the published ladder. `cocquet_form_mms_taylorhood_stabilized.h5` has
-`h = [1/10 … 1/160]` (the `(10⁵,0.1)` cell only `[1/10 … 1/80]`, the first three NaN), while every other
-row in those tables is at `N=320`; and the `(10⁵,0.1)` row actually printed (`2.18e-5` / `4.81e-6`) comes
-from **`results/debug_results/cocquet_stabth_corner.h5`**, a forked side-DB — forbidden for published
-numbers by `.agents/rules/official-results-path.md`.
+The `P₂/P₁ ASGS` rows of `tab:CocquetMMSL2/H1` were not on the published ladder: three cells stopped at
+`N=160` and the `(10⁵,0.1)` row came from the forked side-DB `results/debug_results/cocquet_stabth_corner.h5`,
+which `.agents/rules/official-results-path.md` forbids for published numbers. Mixing `N=160` against the other
+rows' `N=320` also manufactured a false headline ("about an order of magnitude less accurate").
 
-The paper now discloses this (captions + §7.3 preamble) and the false "order of magnitude less accurate"
-claim is corrected to the common-mesh ratio (1.16× at α₀=0.5, 1.47× at α₀=0.1). **The proper fix is a
-re-run:** extend the ladder in `data/cocquet_form_mms_taylorhood_stabilized.json` to `N=320` for all four
-cells, archive the current DB to `previous_results/` first, run through `run_test.jl`, then requote the
-four `P₂/P₁ ASGS` rows from the official DB and delete the caveat. Retire
-`cocquet_form_mms_taylorhood_stabilized_corner.json` / `debug_results/cocquet_stabth_corner.h5` once its
-cell is covered officially. Note the earlier attempt "crashed (OOM, concurrent jobs) at N≥160" per the
-corner config's own comment, so run it alone, or sharded.
+**Resolved by re-running the unmodified official config to its full declared ladder** — no fork, no filter, no
+merge. Two sessions (7 h, then a ~2.5 h resume through the harness's own `[RESUME]` path). All four cells now
+hold `[10,20,40,80,160,320]`.
 
-**Status 2026-07-30, PAUSED AT 23/24 RUNGS — RESUME WITH ONE COMMAND.**
-Stopped cleanly (SIGTERM) after 7 h with **three of four cells complete** and the corner at `N=160`;
-only the `(10⁵,0.1)` `N=320` rung is missing. To finish:
+Landed:
+- **All eight `P₂/P₁ ASGS` rows requoted** in *both* mains from the official DB, using the **two-finest-mesh**
+  slope `log2(e[-2]/e[-1])` — *not* the HDF5 `rate_*` attribute, which is a whole-ladder fit differing by up to
+  0.21 and would have silently changed every slope while looking faithful. Six of eight rows moved; the
+  corner's two were already correct.
+- **Both caption caveats and the §7.3 ladder caveat deleted** — the ladder is now common to all four methods.
+- **§7.3's convection claim requoted** at `N=320` (`2.36`/`1.32` replacing `2.41`/`1.26`), keeping the previous
+  doubling's values in text as evidence the shortfall is stable rather than pre-asymptotic.
+- **§7.3's viscous factor** is now like-for-like at `N=320`: `1.2×` (α₀=0.5) to `1.4×` (α₀=0.1), replacing the
+  `N=160` common-mesh workaround.
+- **Corner artefacts retired without deletion.** The official run reproduces the side-DB's `N=320` values
+  **exactly** (`0.00e+00` relative difference in all four norms) — the side-DB's numbers were correct; only
+  their provenance was wrong. Per `.agents/rules/reproducible-results.md` the forked config is kept as the
+  record of a real run and carries an additive `_superseded` note; no parameter was touched. Nothing in the
+  repo reads either artefact.
+- `erase_past_results` restored to `true` on the official config.
 
-```
-cd test/extended/CocquetFormMMS
-julia --project=../../.. run_test.jl cocquet_form_mms_taylorhood_stabilized.json
-```
-
-(Pass the **bare** filename: `run_mms` does `joinpath(@__DIR__, "data", config_file)`, so a `data/`
-prefix yields `data/data/…` and the run dies instantly. An earlier version of this note carried the
-`data/` form and would have failed on the first line.)
-
-`erase_past_results` has been flipped **`true` → `false`** in that config so the run **resumes**: the
-`[RESUME]` block (`run_test.jl:417`) reloads every per-`(cell, method, mesh)` result already on disk and
-solves only what is missing — its own comment states the final `.h5` is *identical to an uninterrupted
-run*. Verified before stopping: all four groups carry every attribute and dataset that block reads, and
-the DB reopens cleanly with all 23 rungs. Expect **~2 h** (the three completed `N=320` rungs took
-840–1163 s of solve each, and wall-clock runs ≈5× solve time because of the `max_n_pert=5` homotopy).
-**Flip `erase_past_results` back to `true` once it completes**, so the config's canonical state is a
-clean from-scratch run.
-
-Belt-and-braces: a snapshot of the 23-rung DB is at
-`results/cocquet_form_mms_taylorhood_stabilized.PARTIAL-21rungs-2026-07-30.h5` (gitignored). Note the
-`configs/` group is written only at the END of a run, so the paused DB is not yet self-describing — it
-will be after the resume.
-
-**Already settled by the three completed ladders** (see the slope table in `findings.md` §8 R5 once
-requoted): the viscous cells are optimal or better in every norm, while the convection-dominated
-`(10⁵,0.5)` cell holds `p_L²`/`p_H¹` at exactly 2.00/1.00 but loses the velocity — `u_L²` 2.36 and
-`u_H¹` 1.32 against optimal 3 and 2, and **stable under refinement** (2.41→2.36, 1.26→1.32), so it is a
-genuine property rather than a pre-asymptotic artifact. That already refutes §7.3's "optimal velocity
-and pressure rates at `Re=10⁵`" for `α₀=0.5`; the missing corner decides whether the corrected sentence
-is a flat retraction or porosity-dependent (the side-DB's `u_L²` slope there was 3.00).
-
-**Prior status (superseded).** Launched alone through the official path (the DB was archived to
-`previous_results/` first; the config already declared the full ladder `[10,20,40,80,160,320]`, so no
-config edit was needed). The full ladder is re-run, not just `N=320` — deliberately: the tabulated rates
-are two-mesh estimates so `N=160` is needed regardless, and trimming the declared ladder would change
-what the DB records about its own provenance. The measured cost of the sub-160 part is **~600 s across
-the four cells** (`312 + 257 + 31 + 0 s`), heavily skewed: 31 s for the cheap `(1, 0.1)` cell, but 312 s
-and 257 s for the other two — the first is dominated by one-time JIT (3 Newton iterations), the second is
-a genuine 75-iteration coarse solve at `Re=10⁵`. That is still small against `N=160`/`N=320`, but it is
-**not** the ~30 s that an earlier version of this note quoted: that was one cell's `eval_times` read as
-if representative (the same read-one-cell-as-the-whole error class as
-`lessons_learned.md` 2026-07-30 (b)). **Which number to requote — verified 2026-07-30, do not guess.** The printed slopes are the
-**two-finest-mesh** slopes `log2(e[-2]/e[-1])`, matching the caption ("computed from the two finest
-meshes"). They are **NOT** the HDF5 `rate_*` attributes, which are a whole-ladder fit and disagree by up
-to 0.16: at `(1,0.5)` the archive stores `rate_u_l2 = 2.9346` while the table prints `3.01`, the
-two-finest value `3.0134`; at `(10⁵,0.5)` stored `2.3405` vs printed `2.41` (two-finest `2.4077`); at
-`(1,0.1)` stored `2.9957` vs printed `2.84` (two-finest `2.8400`). Requoting from `rate_*` would change
-every slope in the table while looking like a faithful update. Compute the slope from the two finest
-**finite** entries of `err_*`, and take the FME from the last entry.
-
-On completion: requote the four `P₂/P₁ ASGS` rows in
-`tab:CocquetMMSL2/H1` from the official DB in **both** mains, drop the mesh caveat from the captions and
-the §7.3 preamble, re-check the two claims that depend on those rows (§7.3's "converges at optimal
-velocity and pressure rates at Re=10⁵" — the pre-run tables show the velocity sub-optimal, `2.4`/`1.3` at
-α₀=0.5 — and "all four discretizations behave alike" at Re=1), retire the corner side-config/DB, and
-close this item.
-
----
+Verified: both mains build clean (article 81 pp / 778 labels, article_v2 118 pp / 980 labels, 0 undefined,
+0 multiply-defined, 0 overfull > 1 pt); SymPy 636/636.
 
 ## 8. Cleanups
 
