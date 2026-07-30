@@ -72,8 +72,10 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > spelled out. **C9** Carathéodory-type conditions for the reaction pairing + the DBF drag's
 > velocity regularization (`(|u|²+u_ε²)^{1/2}`, mesh-independent, `u_ε/U ∈ [8·10⁻⁷, 1.2·10⁻⁴]`
 > across the four §7.3 cells — verified against the configs). **C10** the porosity-oscillation step
-> `α_{∞,K} ≤ δ_α α_{0,K}` now states that it uses element convexity and `h_K` = diameter (both App-D
-> twins too). **C11** abstract: "robust w.r.t. Re and Da" → "parameter-explicit"; conclusion: the
+> `α_{∞,K} ≤ δ_α α_{0,K}` is stated in (A4) and derived — with the element convexity and `h_K` =
+> diameter it needs, plus the non-convex `1+C_geo·C_∇α` and surrogate `1+χ₀·C_∇α` variants — in the
+> App-C remark `rem:porosityresolution`, which (A4) and both App-D twins cite instead of restating
+> it (relocated 2026-07-30). **C11** abstract: "robust w.r.t. Re and Da" → "parameter-explicit"; conclusion: the
 > `α₀^{-1/2}` claim is scoped to the *displayed* weights, naming `C_{∇α}`, `C_{α,m}`, `β₀`, `h₀`.
 > **T1** abstract states the experiments lie beyond the hypotheses. **T3** — the one *factual* find:
 > §7 printed the **`centered`** encoding (`L=1`, `ν=1/√(α_∞Da)`) while **every official 2D sweep ran
@@ -89,7 +91,8 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > both harnesses carry a literal `1e-8`; see `findings.md` §9.5 and `pending-tasks.md` §4g. The paper
 > now says so, and the recorded provenance attributes read the assembled value). **S1** the §5 opener
 > now states the scope before the first interpretation, and
-> (A4) records that α is used exactly. **T9** a *Code and data availability* section was added to
+> the exact-α statement (α is not interpolated onto a finite element space) is recorded — since
+> 2026-07-30 in the App-C remark `rem:porosityresolution` cited from (A4), not in (A4) itself. **T9** a *Code and data availability* section was added to
 > both mains.
 >
 > **✅ APPLIED — companion notes.** **T8** `cocquet_form_mms_manufactured_solution.tex` no longer

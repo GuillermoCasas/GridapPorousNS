@@ -124,8 +124,8 @@ subgrid-scale (OSGS) variant} of Appendix~D of \file{theory/paper/article_v2.tex
 (\file{osgs_appendix.tex}, mirroring the companion note
 \file{theory/osgs_a_priori/osgs_convergence.tex}): its parameter algebra
 (Lemma~D.3, including the Damk\"ohler inequality (P5)), norm comparison,
-inf--sup stability (Theorem~D.9), consistency and interpolation-continuity
-(Lemmas D.11 and D.13), and convergence (Theorem~D.15) with its two corollaries are
+inf--sup stability (Theorem~D.10), consistency and interpolation-continuity
+(Lemmas D.12 and D.14), and convergence (Theorem~D.16) with its two corollaries are
 machine-checked theorems over the same interface, with three of the OSGS
 hypothesis bundles machine-witnessed consistent. Section~\ref{sec:coq}
 is a primer on how Coq (now \emph{Rocq}) works and what ``machine-checked''
@@ -985,10 +985,10 @@ reconciled inside the kernel.
 Coq file & App~D location & Role \\
 \midrule
 \file{OsgsParameters.v}   & Lemma~D.3 (\lbl{oa:lem:parameters}) & parameter inequalities (P1)--(P6), (K1)--(K3) \\
-\file{OsgsNorm.v}         & Lemma~D.8 (\lbl{oa:lem:normcomparison}) & OSGS triple norm; ASGS-norm domination \\
-\file{OsgsStability.v}    & Theorem~D.9 (\lbl{oa:th:stability}) & inf--sup stability, complete theorem \\
-\file{OsgsInterpolation.v}& Lemmas D.11, D.13 & consistency error \& interpolation continuity \\
-\file{OsgsConvergence.v}  & Theorem~D.15 (\lbl{oa:th:convergence}) + Cor.\ D.16--D.17 & convergence, kernel-level composition \\
+\file{OsgsNorm.v}         & Lemma~D.9 (\lbl{oa:lem:normcomparison}) & OSGS triple norm; ASGS-norm domination \\
+\file{OsgsStability.v}    & Theorem~D.10 (\lbl{oa:th:stability}) & inf--sup stability, complete theorem \\
+\file{OsgsInterpolation.v}& Lemmas D.12, D.14 & consistency error \& interpolation continuity \\
+\file{OsgsConvergence.v}  & Theorem~D.16 (\lbl{oa:th:convergence}) + Cor.\ D.17--D.18 & convergence, kernel-level composition \\
 \file{NonVacuityOsgs.v}   & \S\ref{sec:osgsvac} & consistency witnesses (three bundles) \\
 \bottomrule
 \end{tabular}
@@ -1030,7 +1030,7 @@ no trusted base beyond the $\tau$ formulas.
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{OsgsNorm.v} --- Lemma D.8: the OSGS triple norm}\label{sec:crossOsgsNorm}
+\subsection{\texttt{OsgsNorm.v} --- Lemma D.9: the OSGS triple norm}\label{sec:crossOsgsNorm}
 
 \begin{longtable}{@{}L{0.36\textwidth}L{0.59\textwidth}@{}}
 \toprule
@@ -1038,11 +1038,11 @@ no trusted base beyond the $\tau$ formulas.
 \midrule \endhead
 \coq{perN} & the per-element OSGS energy $2\nu\lVert\mathbf g\rVert^2+\sigma\lVert\mathbf v\rVert^2+\varepsilon\lVert q\rVert^2+\tau_1\lVert\alpha X(V)\rVert^2+\tau_2\lVert\mathrm{div}(\alpha\mathbf v)\rVert^2$ (\lbl{oa:eq:TripleNorm}). \\
 \coq{perS} & the ASGS (``S'') per-element energy: viscous $\nu$ (not $2\nu$) and the damped $\sigt$. \\
-\coq{perS_le_perN}, \coq{NormS2_le_NN2} & \textbf{Lemma D.8}: the OSGS norm dominates the ASGS norm term by term, from $\nu\le2\nu$ and $\sigt\le\sigma$ (\coq{P4_le_sigma}). \\
+\coq{perS_le_perN}, \coq{NormS2_le_NN2} & \textbf{Lemma D.9}: the OSGS norm dominates the ASGS norm term by term, from $\nu\le2\nu$ and $\sigt\le\sigma$ (\coq{P4_le_sigma}). \\
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{OsgsStability.v} --- Theorem D.9: inf--sup stability}\label{sec:crossOsgsStab}
+\subsection{\texttt{OsgsStability.v} --- Theorem D.10: inf--sup stability}\label{sec:crossOsgsStab}
 
 Unlike the ASGS variant, which is \emph{coercive} (test $=$ trial), the OSGS
 variant is stable by an \emph{inf--sup} argument built on the special test
@@ -1069,7 +1069,7 @@ are proved in full.
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{OsgsInterpolation.v} --- Lemmas D.11, D.13: consistency and interpolation continuity}\label{sec:crossOsgsInterp}
+\subsection{\texttt{OsgsInterpolation.v} --- Lemmas D.12, D.14: consistency and interpolation continuity}\label{sec:crossOsgsInterp}
 
 Both OSGS error functionals of Appendix~D are \emph{defined} here concretely, and the two
 lemmas are stated in the sharp one: the porosity-weighted broken $\ell^2$ functional
@@ -1109,19 +1109,19 @@ collecting them into $C\,\Psi_{\mathrm O}(h)\,|||V|||$) is proved in full.
 \coq{PsiTerm}, \coq{PsiO}, \coq{PsiO_nonneg} & the concrete sharp $\ell^2$ error functional $\Psi_{\mathrm O}(h)$ \lbl{oa:eq:ErrorFunctionL2} and its nonnegativity --- the functional the two lemmas below are stated in. \\
 \coq{ErrTerm}, \coq{Eh}, \coq{Eh_nonneg} & its coarser $\ell^1$ majorant $\mathcal E(h)$ \lbl{oa:eq:ErrorFunction} and its nonnegativity. \\
 \coq{PsiO_le_Eh} & the relation $\Psi_{\mathrm O}(h)\le c_1^{1/2}\mathcal E(h)$ printed below \lbl{oa:eq:ErrorFunction} (under $c_1\ge1$, from \lbl{H:design}): elementwise $c_1+\Dah\le c_1(1+\Dah)$ and $a^2+b^2\le(a+b)^2$, then the discrete $\ell^2\subset\ell^1$ inequality. \\
-\coq{abstract_osgs_continterp} & \textbf{Lemma D.13}: $|B_{\mathrm{osgs}}(\widehat E,V_h)|\le C_{\mathrm{tot}}^{I}\,\Psi_{\mathrm O}(h)\,|||V_h|||$ from the decomposition into $I_1$--$I_7$ and the seven term bounds. \\
-\coq{abstract_osgs_consistency} & \textbf{Lemma D.11}: $|B_{\mathrm{osgs}}(U-U_h,V_h)|\le C_{\mathrm{cons}}^{I}\,\Psi_{\mathrm O}(h)\,|||V_h|||$ from the split into $S_1(U,V_h)+S_2(U,V_h)$. \\
+\coq{abstract_osgs_continterp} & \textbf{Lemma D.14}: $|B_{\mathrm{osgs}}(\widehat E,V_h)|\le C_{\mathrm{tot}}^{I}\,\Psi_{\mathrm O}(h)\,|||V_h|||$ from the decomposition into $I_1$--$I_7$ and the seven term bounds. \\
+\coq{abstract_osgs_consistency} & \textbf{Lemma D.12}: $|B_{\mathrm{osgs}}(U-U_h,V_h)|\le C_{\mathrm{cons}}^{I}\,\Psi_{\mathrm O}(h)\,|||V_h|||$ from the split into $S_1(U,V_h)+S_2(U,V_h)$. \\
 \bottomrule
 \end{longtable}
 
-\subsection{\texttt{OsgsConvergence.v} --- Theorem D.15: a kernel-level composition}\label{sec:crossOsgsConv}
+\subsection{\texttt{OsgsConvergence.v} --- Theorem D.16: a kernel-level composition}\label{sec:crossOsgsConv}
 
 Because the OSGS argument is inf--sup rather than coercive, its test function $W$
 is \emph{not} the trial function $\eta$, so the four inputs are carried as
 hypotheses about a common $W$ rather than re-derived internally (they are the
 conclusions of \coq{abstract_osgs_stability} applied to $\eta$,
 \coq{abstract_osgs_continterp} at $(\widehat E,W)$, \coq{abstract_osgs_consistency}
-at $W$, and Lemma D.14). The one genuinely new algebraic item is the bilinearity of
+at $W$, and Lemma D.15). The one genuinely new algebraic item is the bilinearity of
 $B_{\mathrm{osgs}}$ in its first argument (\coq{Hbilin}), the analogue of the ASGS
 \coq{Horth}. The triangle inequality and the whole gluing arithmetic are proved.
 
@@ -1132,8 +1132,8 @@ $B_{\mathrm{osgs}}$ in its first argument (\coq{Hbilin}), the analogue of the AS
 \coq{Qk_CS}, \coq{sumQ_CS}, \coq{NUU_triangle} & the triangle inequality for the OSGS triple norm, \emph{proved} from the pre-Hilbert axioms: per-element five-fold Cauchy--Schwarz over the five weights $(2\nu,\sigma,\varepsilon,\tau_1,\tau_2)$, then the discrete C--S over the mesh. \\
 \coq{Neta_bound} & $|||\eta|||\le((C_{\mathrm{cons}}+C_{\mathrm{int}})C_W/\beta_{\mathrm{stab}})\Psi_{\mathrm O}(h)$: the appendix's chain $\beta_{\mathrm{stab}}|||\eta|||^2\le B_{\mathrm{osgs}}(\eta,W)=B_{\mathrm{osgs}}(U-U_h,W)-B_{\mathrm{osgs}}(\widehat E,W)\le\dots$ \\
 \coq{abstract_osgs_convergence} & \textbf{\lbl{oa:th:convergence}}: $|||U-U_h|||\le C_{\mathrm{conv}}\,\Psi_{\mathrm O}(h)$ (\lbl{oa:eq:MainResult}), triangle inequality $+$ \coq{Neta_bound} $+$ interp-size. Stated for an abstract nonnegative error functional, so it holds in $\Psi_{\mathrm O}$ or in $\mathcal E$; \file{OsgsInterpolation.v} supplies the $\Psi_{\mathrm O}$ instance of its two inputs. \\
-\coq{perSU_le_perU}, \coq{abstract_osgs_convergence_asgsnorm} & \textbf{Corollary D.16} (\lbl{oa:cor:asgsnorm}): the estimate holds verbatim in the ASGS norm, via Lemma D.8. \\
-\coq{sig_vel_le_NUU}, \coq{abstract_osgs_convergence_Ltwo} & \textbf{Corollary D.17} (\lbl{oa:cor:Ltwo}): the $\sigma$-robust $L^2$ velocity estimate $\sqrt\sigma\,\lVert\mathbf u-\mathbf u_h\rVert\le C_{\mathrm{conv}}\Psi_{\mathrm O}(h)$, the reward for deleting the reactive subscale. \\
+\coq{perSU_le_perU}, \coq{abstract_osgs_convergence_asgsnorm} & \textbf{Corollary D.17} (\lbl{oa:cor:asgsnorm}): the estimate holds verbatim in the ASGS norm, via Lemma D.9. \\
+\coq{sig_vel_le_NUU}, \coq{abstract_osgs_convergence_Ltwo} & \textbf{Corollary D.18} (\lbl{oa:cor:Ltwo}): the $\sigma$-robust $L^2$ velocity estimate $\sqrt\sigma\,\lVert\mathbf u-\mathbf u_h\rVert\le C_{\mathrm{conv}}\Psi_{\mathrm O}(h)$, the reward for deleting the reactive subscale. \\
 \bottomrule
 \end{longtable}
 
@@ -1212,10 +1212,10 @@ contributions vanish identically under the projection, so the only neglected pie
 are the viscous ones and the force fluctuation --- exactly Method~I of
 \cite{codina2001stabilized}'s orthogonal-subscales program. Within that scope, the
 kernel-checked content is: the entire parameter algebra of Lemma D.3 (including the
-Damk\"ohler inequality (P5)), the norm comparison of Lemma D.8, the coefficient
-collection and triple-norm recovery of the inf--sup Theorem D.9, the assembly of
-the interpolation-continuity and consistency Lemmas D.11, D.13, and the composition
-of Theorem D.15 together with its two corollaries and the OSGS-norm triangle
+Damk\"ohler inequality (P5)), the norm comparison of Lemma D.9, the coefficient
+collection and triple-norm recovery of the inf--sup Theorem D.10, the assembly of
+the interpolation-continuity and consistency Lemmas D.12, D.14, and the composition
+of Theorem D.16 together with its two corollaries and the OSGS-norm triangle
 inequality. The named analytic trusted base of \S\ref{sec:osgsbase} --- the
 projection-stability condition (O2), the smoothing lemma, the seven test-function
 term estimates and the interpolation/consistency term bounds --- is the OSGS
@@ -1225,7 +1225,7 @@ each from textbook interpolation theory and the projection structure. As in
 \cite{codina2001stabilized}, (O2) is assumed rather than proved; Appendix~D indicates
 how the Codina--Blasco argument verifies its unweighted counterpart for simplicial
 elements. What the analysis does \emph{not} cover is stated in Appendix~D's
-\lbl{oa:rem:open} (Remark~D.23): the superior $L^2$ pressure convergence observed for $k\ge2$
+\lbl{oa:rem:open} (Remark~D.24): the superior $L^2$ pressure convergence observed for $k\ge2$
 (a duality argument), the lagged-projection staggered iteration, and the nonlinear
 problem.
 

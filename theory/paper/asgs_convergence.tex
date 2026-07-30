@@ -44,12 +44,19 @@
 %   eq:JumpCondition, eq:SigmaAlpha, eq:resolved, eq:conditions_on_num_param,
 %   eq:InterpolationError, eq:ConvergenceResult, sec:StabilityASGS,
 %   sec:TheContinuousProblem, sec:ViscousProjector, sec:NumericalExamplesStationaryCase3D,
+%   sec:Conclusions,
 %   lemma:Stability, lemma:Continuity, th:Convergence,
 %   lem:projfamily, lem:projinstances.
 %   (The rest of the relocated projector labels -- eq:PiOrthogonal, eq:projmonotone,
 %   eq:devsymidentity, eq:crossibp, eq:projconstants -- are
 %   NOT cited from here; they live in sec:ViscousProjector of both mains.  Add a name
 %   to the list above only when this file actually starts citing it.)
+%   Labels this file DEFINES that BOTH mains cite (keep them defined here, and keep the
+%   wording usable by both builds -- no v2-only notation):
+%     rem:porosityresolution -- cited from item H:porosity of each main's assumption list
+%       (2026-07-30: the extended discussion of (A4) was moved out of that list into this
+%       remark; it must therefore stay free of any reference to H:patch / chi_1, which is
+%       v2-only, and states the surrogate caveat with locally introduced symbols instead).
 %   (H:projector / eq:PiKorn were added to BOTH mains on 2026-07-29, immediately after
 %   the H:data item, so that every existing \crefrange / dash range over the standing
 %   assumptions keeps bracketing them without edits.)
@@ -215,6 +222,30 @@ gives $\nabla\cdot(\alpha\ba)=0$ in the weak sense, with $\alpha\ba$ continuous 
 faces, hence a.e.\ in each $K$ (the form used in \cref{eq:elemibp}); and \cref{H:spaces} makes
 $\tau_1,\tau_2$---and therefore $\sigmatilde$ through \cref{eq:sigmatilde}---constant on each
 element, which is what allows them to be moved in and out of elemental integrals.
+
+\begin{remark}[The porosity{\hyp}resolution condition and the constant $\delta_\alpha$]
+\label{rem:porosityresolution}
+\amend{Three readings of \cref{H:porosity} are used repeatedly below, and are worth separating
+once. (i)~The porosity entering the variational forms is the exact field $\alpha$; it is not
+interpolated onto a finite element space (that variant is left to future work, cf.\
+\cref{sec:Conclusions}), so \cref{eq:resolved} is a condition on $\alpha$ and on the mesh alone.
+Only the stabilization parameters replace $\alpha$ by the elementwise representative $\alpha_K$.
+(ii)~The comparability $\alpha_{\infty,K}\le\delta_\alpha\,\alpha_{0,K}$, with
+$\delta_\alpha=1+C_{\nabla\alpha}$, is a consequence of \cref{eq:resolved} and not a further
+hypothesis, provided the elements are \emph{convex} and the length $h_K$ in \cref{eq:resolved}
+is the diameter of $K$: any two points of $K$ are then joined by a segment lying in $K$, of
+length at most $h_K$, whence
+$\alpha_{\infty,K}-\alpha_{0,K}\le h_K\norm{\nabla\alpha}_{L^\infty(K)}\le
+C_{\nabla\alpha}\,\alpha_{0,K}$. Convexity holds for every element family used
+here---simplices and non{\hyp}degenerate parallelotopes---and is assumed throughout; on a
+non{\hyp}convex element the factor becomes $1+C_{\mathrm{geo}}C_{\nabla\alpha}$, with
+$C_{\mathrm{geo}}$ a uniform bound on the ratio of the interior path{\hyp}length metric of $K$
+to its diameter. (iii)~If the length in \cref{eq:resolved} is not the diameter but a smaller
+element{\hyp}size surrogate $\chi_1\le h_K$ with $h_K\le\chi_0\,\chi_1$ for a fixed
+$\chi_0$---the convention in force when the stabilization parameters are built from a continuous
+element{\hyp}size field rather than the raw diameter---the same argument yields the factor
+$1+\chi_0\,C_{\nabla\alpha}$ instead.}
+\end{remark}
 
 \subsection{Technical results}\label{sec:auxiliary}
 

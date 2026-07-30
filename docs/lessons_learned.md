@@ -221,3 +221,30 @@ caption asserts, the body text of BOTH mains that leans on that caption must be 
 prose drift silently because no gate couples them. (iii) A checklist line saying one main is exempt
 ("v1 has no such rows") is a claim about a file — verify it in the file. Here it was false, and it is what
 let v1 keep a refuted headline number.
+
+### 2026-07-30 (e) — a numbered environment is a cross-document edit: `coq_coverage.tex` hardcodes App-D numbers
+
+Shortening assumptions (A4) and (O3) by moving their extended discussion into two appendix remarks
+(`rem:porosityresolution` in App. C, `oa:rem:patchgrading` in App. D) was, on its face, a prose-only
+refactor of two list items. It silently invalidated 29 cross-references in a *different* document.
+
+Theorems, lemmas, corollaries and **remarks** share one counter per appendix, so the new App-D remark
+took `D.6` and pushed every later statement up by one. `proof_verification/coq_coverage.tex` writes
+those numbers **by hand** — "`Theorem~D.9 (\lbl{oa:th:stability})`" — because `\lbl{}` only typesets
+the label *name*; it resolves nothing. So the coverage report kept pointing at `D.9` while the
+inf--sup theorem had become `D.10`, and its Coq cross-walk tables named the wrong statements.
+
+Nothing caught it. `document_hygiene_verification.py` reads build logs (the numbers it would need are
+not warnings), the rest of the suite lints sources, and a five-dimension, 51-agent reference audit over every
+`\cref{H:porosity}` / `\cref{H:patch}` site missed it too: the audit looked for *broken prose*, and
+the prose was intact — only its numbers had moved. Fixed by re-deriving the label→number map from the
+live `latex compilation/article_v2/article_v2.aux` (`\newlabel{(oa:…)}{{(…)}`) and bumping D.8→D.9,
+D.9→D.10, D.11→D.12, D.13→D.14, D.14→D.15, D.15→D.16, D.16→D.17, D.17→D.18, D.23→D.24.
+
+**Guards.** (i) After inserting *any* numbered environment in App. C or App. D, re-derive the numbers
+from the live aux and check every `coq_coverage.tex` line that pairs a printed `D.n` with an
+`\lbl{oa:…}` — the pairing makes the check mechanical, so script it rather than reading. (ii) A
+reference audit must ask "did any *number* move?", not only "does the sentence still read correctly";
+label-based `\cref` sites are safe by construction, hand-written numbers in sibling documents are not.
+(iii) Equation numbers move only if the inserted block carries a numbered display, and App-C
+statement numbers are hardcoded nowhere — knowing which counters are exposed is what bounds the sweep.

@@ -541,7 +541,8 @@ builds clean), whose four results are:
    smooth-grading hypothesis must be **kept**, and is free for an admissible choice of surrogate.
 3. **The paper's former claim "`ω_χ(h)=O(h)` when the family is quasi-uniform" was false** (same
    counterexample). The correct sufficient condition is that the surrogate be the pointwise
-   evaluation of a fixed Lipschitz size function, whence `ω_χ ≤ (L/σ₋)h`. Corrected in (O3).
+   evaluation of a fixed Lipschitz size function, whence `ω_χ ≤ (L/σ₋)h`. Corrected in the paper;
+   since 2026-07-30 the statement lives in the App-D remark `oa:rem:patchgrading`, cited from (O3).
 4. **Where global QU is genuinely needed, and why the appendices escape it.** The elementwise ℓ²
    functionals only ever need `h_K ≤ h`, so App. C and App. D need nothing beyond local/patch
    regularity. §6's estimates are *normalized*: `h` appears on **both** sides (e.g.
@@ -552,8 +553,9 @@ builds clean), whose four results are:
 
 Applied to the paper: (A1) now states global quasi-uniformity, with a footnote recording that the
 appendices need only the weaker versions and that dropping it leaves every appendix result intact in
-its elementwise form; (O3) keeps the surrogates and smooth grading, notes that its patch clause is
-implied, and carries the corrected `ω_χ` statement; §6's invocation now points at (A1). Mirrored into
+its elementwise form; (O3) keeps `eq:PatchQuasiUniformity`, the surrogates and smooth grading, notes
+that its patch clause is implied, and points to a new App-D remark `oa:rem:patchgrading` (present in
+both twins), which now carries the corrected `ω_χ` statement; §6's invocation now points at (A1). Mirrored into
 `article.tex` with a label-safe footnote (v1 has no `app:osgs`, `H:patch` or `eq:ConvergenceOSGS`).
 
 ### 9.5 The 2D MMS sweep does **not** run at `ε = 0` — and the HDF5 attribute said it did

@@ -579,12 +579,11 @@ $0 < \underline{c} \le \overline{c}$, independent of $h$, such that for $i = 1,2
 \begin{proof}
 Patch quasi-uniformity gives $h_{K'} \eqsim h_K$. For the porosity, let $\boldsymbol{x}_a$ be a
 vertex shared by $K$ and $K' \subset S_K$. The resolved{\hyp}porosity condition of \cref{H:porosity}
-bounds the oscillation of $\alpha$ over each element by $\delta_\alpha \coloneqq 1 + C_{\nabla\alpha}$
-(from $h_K\norm{\nabla\alpha}_{L^\infty(K)} \le C_{\nabla\alpha}\,\alpha_{0,K}$, joining the
-extremal points of $\overline{K}$ by a segment inside the convex element $K$, of length at most the
-element diameter---the length entering the resolved{\hyp}porosity condition of \cref{H:porosity};
-under the surrogate convention of \cref{H:patch} the factor becomes $1+\chi_0 C_{\nabla\alpha}$---one gets
-$\max_{\overline{K}}\alpha \le \delta_\alpha\,\alpha_{0,K}$, with $\alpha_{0,K}=\min_{\overline{K}}\alpha$).
+bounds the oscillation of $\alpha$ over each element by $\delta_\alpha \coloneqq 1 + C_{\nabla\alpha}$,
+that is $\max_{\overline{K}}\alpha \le \delta_\alpha\,\alpha_{0,K}$ with
+$\alpha_{0,K}=\min_{\overline{K}}\alpha$ (see \cref{rem:porosityresolution} of
+\cref{app:Continuity}; under the surrogate convention of \cref{H:patch} the factor becomes
+$1+\chi_0 C_{\nabla\alpha}$).
 Since $\alpha_{0,K}\le\alpha(\boldsymbol{x}_a)$ and $\alpha(\boldsymbol{x}_a)\le\max_{\overline{K'}}\alpha\le\delta_\alpha\,\alpha_{0,K'}$,
 \begin{equation*}
   \alpha_K \le \delta_\alpha\,\alpha_{0,K} \le \delta_\alpha\,\alpha(\boldsymbol{x}_a)
@@ -727,6 +726,28 @@ here---large reaction does \emph{not} degrade $\psi$, because $\sigma$ enters
 $\tau_1^{-1}$ as a global constant and cancels from every nodal-versus-elemental
 difference.
 \end{pedagogy}
+
+\begin{remark}[Patch quasi{\hyp}uniformity and smooth grading: what each of them buys]
+\label{oa:rem:patchgrading}
+Of the three conditions gathered in \cref{H:patch}, the first two are not genuine
+strengthenings. Patch quasi{\hyp}uniformity \cref{eq:PatchQuasiUniformity} is implied by the
+global quasi{\hyp}uniformity of \cref{H:mesh}; it is recorded separately because it, and not
+global quasi{\hyp}uniformity, is what the proofs of this appendix use---through the parameter and
+porosity comparabilities of \cref{oa:lem:patch}. The element{\hyp}size surrogates are likewise
+available on any nondegenerate family, and adopting $\chi_1(\boldsymbol{x}_K,h)$ as $h_K$ alters
+each stabilization parameter by a bounded factor only. Smooth grading \cref{eq:SmoothGrading} is
+different: neither bounded patch equivalence \cref{eq:PatchQuasiUniformity} nor
+quasi{\hyp}uniformity forces it for an arbitrary admissible surrogate---a fixed
+neighbour{\hyp}size ratio bounded away from $1$ leaves $\omega_\chi = O(1)$ for a surrogate that
+tracks the local element size---so it has to be assumed. It holds with $\omega_\chi(h) = O(h)$
+whenever $\chi_1$ is the pointwise evaluation of a fixed Lipschitz size function, as for a
+Lipschitz refinement of a macro{\hyp}mesh, and with $\omega_\chi \equiv 0$ for the constant
+choice $\chi_1 \equiv \min_K h_K$, $\chi_2 \equiv h$, which \cref{H:mesh} makes admissible. What
+it buys is the vanishing of the smoothing discrepancy of \cref{oa:lem:smoothing}: it forces
+$\psi(h) \to 0$, which is what makes the mesh{\hyp}smallness threshold of
+\cref{oa:th:stability} attainable, since $\psi(h_0) \le \min\{1/8,\ \beta_0^2/16\}$ then holds
+once $h_0$ is small enough.
+\end{remark}
 
 \subsubsection{Best approximation by the weighted projections}
 
