@@ -223,12 +223,12 @@ meshes---the reference's element pair---with our ASGS stabilization active,
 which the reference does not use. The porosity is interpolated to the
 velocity space order so it introduces no extra modeling error relative to the
 $\mathbb{P}_2$ velocity. The quadrature degree includes the Forchheimer bump
-$4k_v+\lfloor k_v/2\rfloor$ to integrate the non-polynomial
+$4k_u+\lfloor k_u/2\rfloor$ to integrate the non-polynomial
 $\lvert\uu\rvert$ factor in \eqref{eq:sigma}.
 
 For a smooth solution the expected asymptotic $L^2$ rates are
 \begin{equation}
-\lVert\uu-\uu_h\rVert_{L^2}=O(h^{k_v+1})=O(h^3),
+\lVert\uu-\uu_h\rVert_{L^2}=O(h^{k_u+1})=O(h^3),
 \qquad
 \lVert p-p_h\rVert_{L^2}=O(h^{k_p+1})=O(h^2),
 \end{equation}

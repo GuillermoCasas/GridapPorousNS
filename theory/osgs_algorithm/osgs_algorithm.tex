@@ -120,7 +120,7 @@ porous Navier--Stokes system on a domain $\Omega \subset \mathbb{R}^d$,
     \end{aligned}
 \end{equation}
 discretised by an equal-order Lagrangian pair $(\boldsymbol{V}_h, Q_h)$
-of degree $(k_v, k_p) = (k, k)$ and stabilised by a Variational
+of degree $(k_u, k_p) = (k, k)$ and stabilised by a Variational
 Multiscale (VMS) formulation. The drag tensor
 $\sigma(\alpha, \boldsymbol{u}) = a(\alpha) + b(\alpha) |\boldsymbol{u}|$
 couples the Darcy--Forchheimer regime to the convective momentum
@@ -1370,7 +1370,7 @@ $\boldsymbol{\pi}_{h,u} \gets \Pi_{V_{\mathrm{free}}}(\mathcal{R}_u(U_h^\star))$
 $\pi_{h,p} \gets \Pi_{Q_{\mathrm{free}}}(\mathcal{R}_p(U_h^\star))$\;
 \extline{\If{$\code{mms\_cfg.enabled}$}{
     evaluate the MMS oracle at $U_h^\star$ once; record $\code{mms\_stop\_reason} = \code{coupled\_single\_solve}$\;
-    \If{$E_{u,2} > \kappa_{\mathrm{rate}}\, h^{\,k_v+1}$}{ record $\code{coupled\_at\_suboptimal\_rate}$ \tcp*{post-solve check only; no extra cycles} }
+    \If{$E_{u,2} > \kappa_{\mathrm{rate}}\, h^{\,k_u+1}$}{ record $\code{coupled\_at\_suboptimal\_rate}$ \tcp*{post-solve check only; no extra cycles} }
 }}
 \Return $(S, \boldsymbol{\pi}_{h,u}, \pi_{h,p})$\;
 \end{algorithm}
@@ -1799,9 +1799,9 @@ form with the same (Euclidean) vector norm. The viscous term is then the integra
 first-derivative quantity
 $\langle\boldsymbol{\varepsilon}^s(\boldsymbol{v}),\,2\alpha\nu\,\Pi^{\mathrm{ds}}\nabla\boldsymbol{u}^k\rangle$
 (\code{weak\_viscous\_operator}); no second derivative appears, so the construction needs no
-special-casing by polynomial order and is valid for the equal-order $P_{k_v}/P_{k_p}$ pair. Two
+special-casing by polynomial order and is valid for the equal-order $P_{k_u}/P_{k_p}$ pair. Two
 properties follow: (i) $\varepsilon_M\to0$ at the discrete solution---it reports genuine convergence
-rather than plateauing at the $O(h^{k_v})$ floor of the \emph{strong} residual; and (ii) the
+rather than plateauing at the $O(h^{k_u})$ floor of the \emph{strong} residual; and (ii) the
 sum-of-norms is a conservative envelope, $D_M^k \ge \|\sum_i \mathrm{term}_i\|$, so cancellation between
 co-dominant terms can never make $\varepsilon_M$ optimistically small. With consistent assembly
 $\varepsilon_M\in[0,1]$ up to the bounded stabilisation contribution; a \emph{persistent}
@@ -1884,7 +1884,7 @@ This criterion is the authoritative convergence verdict in both production and t
 harness: \code{solve\_system} injects it (as the \code{conv\_probe}) into every kernel instance
 (§\ref{sec:newton}). The harness additionally supplies the discretisation-coupled scalar
 tolerance~\eqref{eq:dynamic-ftol} as the \emph{fallback} floor $\textftol$, keyed to $h$ so the linear
-solve is not over-solved relative to the $O(h^{k_v+1})$ discretisation error; but the stopping decision
+solve is not over-solved relative to the $O(h^{k_u+1})$ discretisation error; but the stopping decision
 itself is this section's scale-free $\varepsilon_M/\varepsilon_C$ gate, not a residual target.
 The earlier per-field intrinsic-scale rule of Sec.~\ref{sec:harness-perfield}---which re-anchored the
 target to the per-segment initial residual---was removed in the 2026-06 cleanup (see the superseded
@@ -2216,7 +2216,7 @@ inflates the coupled-solve Newton budget
 ($N_{\mathrm{OSGS}}^{\mathrm{eff}} \gets N_{\mathrm{OSGS}} + K_{\mathrm{extra}}$),
 but only to give the single solve extra inner-Newton room; the post-solve
 hook records \code{mms\_stop\_reason} $=$ \code{coupled\_single\_solve} and,
-if the velocity $L^2$ error exceeds the expected $O(h^{k_v+1})$ rate,
+if the velocity $L^2$ error exceeds the expected $O(h^{k_u+1})$ rate,
 additionally records \code{coupled\_at\_suboptimal\_rate}. No extra
 cycles are run and Algorithm~\ref{alg:D}'s consecutive-pass machinery
 applies only to the ASGS extension path.}
@@ -2233,7 +2233,7 @@ and the consecutive-pass count $N_{\mathrm{plat}}$ play no role there.}
 
 \extline{\paragraph{The OSGS post-solve check is not a verification gate
 on the solver.} The single OSGS oracle evaluation classifies the
-converged FE error against the $O(h^{k_v+1})$ rate but does not gate
+converged FE error against the $O(h^{k_u+1})$ rate but does not gate
 success: the coupled solve reports its own algebraic convergence, and the
 \code{coupled\_at\_suboptimal\_rate} flag is a diagnostic recorded
 alongside \code{mms\_stop\_reason} $=$ \code{coupled\_single\_solve}, not
@@ -2284,13 +2284,13 @@ no $\mathrm{O}'$ or $\mathrm{B}'$ variants are needed.}
 \extline{Two error scales matter in an FE method. The \emph{algebraic
 error} is the distance between the iterate and the discrete root.
 The \emph{discretisation error} is the distance between the discrete
-root and the true PDE solution, which behaves as $O(h^{k_v+1})$.
+root and the true PDE solution, which behaves as $O(h^{k_u+1})$.
 The harness derives a discretisation-coupled scalar tolerance,}
 \begin{equation}
     \label{eq:dynamic-ftol}
     \textcolor{extcolor}{\textftol^{\,\mathrm{dyn}}
     = \max\!\Bigl(\textftol^{\,\mathrm{static}},\
-        \min(C_{\mathrm{ceil}},\ C_{\mathrm{sf}} \cdot h^{k_v+1}) \Bigr),}
+        \min(C_{\mathrm{ceil}},\ C_{\mathrm{sf}} \cdot h^{k_u+1}) \Bigr),}
 \end{equation}
 \extline{in which $C_{\mathrm{sf}}$ ties the algebraic target to the
 discretisation rate; the ceiling $C_{\mathrm{ceil}}$ guards against
@@ -2312,7 +2312,7 @@ the regime varies by many orders of magnitude.}
 \small
 \textbf{Superseded (2026-06).} The dimensionless-rate-per-field gate described in
 this subsection---the per-block scale proxy~\eqref{eq:per-field-scale-resolve}, the
-Bernoulli surrogate, the rate $\varepsilon_k=C_{\mathrm{sf}}h^{k_v+1}$
+Bernoulli surrogate, the rate $\varepsilon_k=C_{\mathrm{sf}}h^{k_u+1}$
 of~\eqref{eq:per-field-rate}, and the block-wise
 predicates~\eqref{eq:per-field-convergence}--\eqref{eq:per-field-honest}---was the
 \emph{re-anchored relative} convergence machinery (\code{relative\_ftol\_per\_field},
@@ -2414,11 +2414,11 @@ the FE discretisation rate,}
 \begin{equation}
     \label{eq:per-field-rate}
     \textcolor{extcolor}{
-    \varepsilon_{u} = \varepsilon_{p} = C_{\mathrm{sf}} \cdot h^{k_{v}+1},}
+    \varepsilon_{u} = \varepsilon_{p} = C_{\mathrm{sf}} \cdot h^{k_u+1},}
 \end{equation}
 \extline{so that the algebraic error tolerated at termination is, in
 \emph{dimensionless} units, a fixed fraction $C_{\mathrm{sf}}$ of the
-expected $O(h^{k_{v}+1})$ FE discretisation error---independently of
+expected $O(h^{k_u+1})$ FE discretisation error---independently of
 the regime. The dimensional tolerance recovered through
 \eqref{eq:per-field-effective-ftol} thereby scales linearly with the
 intrinsic magnitude of the field, while the convergence criterion
@@ -2536,7 +2536,7 @@ the Picard iteration budget when a stiffness threshold is exceeded:}
 \textbf{Symbol} & \textbf{Field in code} & \textbf{Role / effect} \\
 \midrule
 $C_{\mathrm{ceil}}$, $C_{\mathrm{sf}}$ & \code{dynamic\_ftol\_ceiling}, \code{dynamic\_ftol\_spatial\_safety\_factor} & Clamps for the discretisation-coupled residual tolerance \eqref{eq:dynamic-ftol}, \S\ref{sec:harness-ftol}; $C_{\mathrm{sf}}$ also sets the per-field dimensionless rate \eqref{eq:per-field-rate}. \\
-$\varepsilon_{k}$, $\varepsilon^{\mathrm{N}}_{k}$ & (built from $C_{\mathrm{sf}}$, $n^{\mathrm{sf}}$, $h$, $k_{v}$) & Dimensionless per-field convergence and noise-floor rates supplied to the inner Newton kernel as \code{relative\_ftol\_per\_field} and \code{relative\_stagnation\_noise\_floor\_per\_field}, \S\ref{sec:harness-perfield}. \\
+$\varepsilon_{k}$, $\varepsilon^{\mathrm{N}}_{k}$ & (built from $C_{\mathrm{sf}}$, $n^{\mathrm{sf}}$, $h$, $k_u$) & Dimensionless per-field convergence and noise-floor rates supplied to the inner Newton kernel as \code{relative\_ftol\_per\_field} and \code{relative\_stagnation\_noise\_floor\_per\_field}, \S\ref{sec:harness-perfield}. \\
 $\textftol^{\,\mathrm{static}}$ & (harness-set: $10\,\mathrm{eps}$) & Static machine-precision floor of~\eqref{eq:per-field-effective-ftol}; prevents per-field tolerances from descending below floating-point round-off. The corresponding noise-floor floor used in~\eqref{eq:per-field-noise} is $\textstag^{\,\mathrm{dyn}}$ from~\eqref{eq:dynamic-noise}. \\
 $n^{\mathrm{base}}, n^{\min}, n^{\mathrm{sf}}$ & \code{sol.condition\_noise\_floor\_*} & Adaptive noise-floor controls, \S\ref{sec:harness-noise}. \\
 $\mathrm{Re}^{\mathrm{th}}, N_{\mathrm{P}}^{\mathrm{Re}}$ & \code{dynamic\_picard\_re\_*} & Per-case Picard widening trigger and budget for high Reynolds. \\
