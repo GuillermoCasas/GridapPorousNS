@@ -48,7 +48,7 @@ where $\boldsymbol{e}_m$ is the $m$-th canonical vector of $\mathbb{R}^n$. Likew
   = \widehat{\mathcal{L}}_{\nu} + \widehat{\mathcal{L}}_{c} + \widehat{\mathcal{L}}_{b}
   + \widehat{\mathcal{L}}_{\sigma} + \widehat{\mathcal{L}}_{\nabla\alpha},
 \end{equation}
-analysed one by one below.
+analyzed one by one below.
 
 \subsection{Viscous term: the contraction \texorpdfstring{$k_{0,i}k_{0,j}\mathbf{K}_{ij}$}{k0i k0j Kij}}\label{sec:ftViscous}
 The viscous part is second order, so its symbol is the double contraction of the wavenumber with the diffusion matrix,
@@ -143,7 +143,7 @@ Summing the five contributions componentwise, $\boldsymbol{\tau}_K^{-1}=\sum_\bu
   \qquad\text{so that}\qquad
   \sqrt{\lambda} = \frac{h}{|\boldsymbol{k}_0|\,\tau_{1,\mathrm{NS}}},
 \end{equation}
-the coupling and porosity-gradient entries become $\tau_{b,1}^{-1}=\alpha/\tau_{1,\mathrm{NS}}$, $\tau_{b,2}^{-1}=c_1\,\alpha\,\tau_{1,\mathrm{NS}}/h^2$ and $\tau_{\nabla\alpha,1}^{-1}=(h/|\boldsymbol{k}_0|)\,|\nabla\alpha|\,\tau_{1,\mathrm{NS}}^{-1}$, with $c_1=|\boldsymbol{k}_0|^2$. For the \emph{momentum} eigenvalue, the viscous and convective entries collapse onto $\alpha\,\tau_{1,\mathrm{NS}}^{-1}$ (ignoring the coefficient $\tfrac43$ of $\tau_{\nu,1}^{-1}$, as is done below \cref{eq:StabilizationParameters}, and writing $c_2=|\boldsymbol{k}_0\cos\phi|$ so that $c_2|\boldsymbol{w}|=|\boldsymbol{w}\cdot\boldsymbol{k}_0|$, cf.\ \cref{eq:TauNavierStokes}); the $\tau_{b,1}^{-1}$ entry coincides with this same momentum scale and is therefore the self-referential contribution absorbed into the algorithmic constants (the cancellation noted after \cref{eq:StabilizationParameters}). Adding the porosity-gradient and reaction entries gives
+the coupling and porosity-gradient entries become $\tau_{b,1}^{-1}=\alpha/\tau_{1,\mathrm{NS}}$, $\tau_{b,2}^{-1}=c_1\,\alpha\,\tau_{1,\mathrm{NS}}/h^2$ and $\tau_{\nabla\alpha,1}^{-1}=(h/|\boldsymbol{k}_0|)\,|\nabla\alpha|\,\tau_{1,\mathrm{NS}}^{-1}$, with $c_1=|\boldsymbol{k}_0|^2$. For the \emph{momentum} eigenvalue, the viscous and convective entries collapse onto $\alpha\,\tau_{1,\mathrm{NS}}^{-1}$ (ignoring the coefficient of $\tau_{\nu,1}^{-1}$ displayed in \cref{eq:ftTauNu}\amend{---which for the default projector $\DSPi$ is $2-\tfrac2d$, equal to $\tfrac43$ for $d=3$ and to $1$ for $d=2$, and is $2$ for $\mathbb{I}$, $\SPi$ and $\DPi$ (\cref{rem:ftGenericPi})---}as is done below \cref{eq:StabilizationParameters}, and writing $c_2=|\boldsymbol{k}_0\cos\phi|$ so that $c_2|\boldsymbol{w}|=|\boldsymbol{w}\cdot\boldsymbol{k}_0|$, cf.\ \cref{eq:TauNavierStokes}); the $\tau_{b,1}^{-1}$ entry coincides with this same momentum scale and is therefore the self-referential contribution absorbed into the algorithmic constants (the cancellation noted after \cref{eq:StabilizationParameters}). Adding the porosity-gradient and reaction entries gives
 \begin{equation}\label{eq:ftTau1}
   \tau_1^{-1}
    = \Bigl(\alpha + \tfrac{h}{|\boldsymbol{k}_0|}|\nabla\alpha|\Bigr)\tau_{1,\mathrm{NS}}^{-1} + \rho_{\Lambda^{-1}}(\boldsymbol{\sigma})

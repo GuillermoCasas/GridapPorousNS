@@ -657,7 +657,7 @@ certify that the discrepancy is a uniform relative factor $\psi(h) \to 0$. The
 ASGS analysis has no counterpart to any of this---coercivity tests with $U_h$
 itself, and no $\tau$-weighted test function is ever built. The comparison
 worth internalizing: the discontinuity of the elementwise $\tau$ taxes
-\emph{both} analyses, each at the point where its own manoeuvre touches
+\emph{both} analyses, each at the point where its own maneuver touches
 faces---the ASGS proof pays through the $[\tau_1]$ face terms of its elementwise
 integrations by parts (\cref{eq:jumptotal}, \cref{eq:IIIface}), the OSGS proof
 pays through the smoothing discrepancy $\psi(h)$ here.
@@ -738,7 +738,7 @@ available on any nondegenerate family, and adopting $\chi_1(\boldsymbol{x}_K,h)$
 each stabilization parameter by a bounded factor only. Smooth grading \cref{eq:SmoothGrading} is
 different: neither bounded patch equivalence \cref{eq:PatchQuasiUniformity} nor
 quasi{\hyp}uniformity forces it for an arbitrary admissible surrogate---a fixed
-neighbour{\hyp}size ratio bounded away from $1$ leaves $\omega_\chi = O(1)$ for a surrogate that
+neighbor{\hyp}size ratio bounded away from $1$ leaves $\omega_\chi = O(1)$ for a surrogate that
 tracks the local element size---so it has to be assumed. It holds with $\omega_\chi(h) = O(h)$
 whenever $\chi_1$ is the pointwise evaluation of a fixed Lipschitz size function, as for a
 Lipschitz refinement of a macro{\hyp}mesh, and with $\omega_\chi \equiv 0$ for the constant
@@ -1444,8 +1444,8 @@ whose coarser $\ell^1$ majorant is the error function
 \end{equation}
 i.e., the error function of the ASGS convergence theorem of~the main text with the
 local factor $(1+\Dah)^{1/2}$ inserted. The two are related by
-$\Psi_{\mathrm O}(h) \le c_1^{1/2}\,\mathcal{E}(h)$ (the discrete $\ell^2\subset\ell^1$
-inequality together with $c_1+\Dah \le c_1(1+\Dah)$, valid since $c_1 \ge 1$ under \cref{H:design}). We state the theorem in
+$\Psi_{\mathrm O}(h) \le \max\{c_1,1\}^{1/2}\,\mathcal{E}(h)$ (the discrete $\ell^2\subset\ell^1$
+inequality together with $c_1+\Dah \le \max\{c_1,1\}\,(1+\Dah)$; under \cref{H:design}, which forces $c_1\ge\gamma_0^2C_{\mathrm{inv}}^2\ge400\,C_{\mathrm{inv}}^2$, the maximum is $c_1$ itself for any inverse constant $C_{\mathrm{inv}}\ge1/20$). We state the theorem in
 $\Psi_{\mathrm O}$: the $\ell^1$ passage to $\mathcal{E}$ can lose a mesh-cardinality
 factor $\sim h^{-d/2}$ on a quasi-uniform family, so the optimal-order corollaries
 must be read off the $\ell^2$ functional.
@@ -1720,7 +1720,7 @@ $-(\hat{\boldsymbol e}_u,\alpha X(V_h))$ against the composite first-order
 quantity $X(V_h)$---and that is the point, since $\alpha X(V_h)$ is exactly what the
 $\tau_1$-part of $\tnorm{V_h}_{\mathrm O}$ controls (\cref{oa:eq:TripleNorm}), leaving the whole
 convective-plus-mass block one weighted Cauchy--Schwarz from the test norm.
-(Term~(I5) repeats the manoeuvre for the pressure gradient, its boundary term
+(Term~(I5) repeats the maneuver for the pressure gradient, its boundary term
 vanishing instead because $\bv_h\in \mathcal{V}_{h0}$.)
 \end{pedagogy}
 
@@ -2119,7 +2119,7 @@ routes (coercivity for ASGS, inf--sup for OSGS).
 ``Dispensed'' is accurate about the \emph{proof} but is
 easily over-read about the \emph{hypotheses}, and the reader should hold both
 halves of the ledger. (a)~The jump condition's content---facewise comparability
-of $\varphi_1$, with $\sigma$ cancelling in the jump of $\tau_1^{-1}$---is
+of $\varphi_1$, with $\sigma$ canceling in the jump of $\tau_1^{-1}$---is
 implied by the standing hypotheses: it is \cref{oa:lem:patch} restricted to
 face-adjacent elements, derived there from porosity resolution, mesh
 nondegeneracy and continuity of $\ba$ over the viscous floor. So the ASGS

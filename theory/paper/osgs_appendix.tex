@@ -405,7 +405,7 @@ available on any nondegenerate family, and adopting $\chi_1(\boldsymbol{x}_K,h)$
 each stabilization parameter by a bounded factor only. Smooth grading \cref{eq:SmoothGrading} is
 different: neither bounded patch equivalence \cref{eq:PatchQuasiUniformity} nor
 quasi{\hyp}uniformity forces it for an arbitrary admissible surrogate---a fixed
-neighbour{\hyp}size ratio bounded away from $1$ leaves $\omega_\chi = O(1)$ for a surrogate that
+neighbor{\hyp}size ratio bounded away from $1$ leaves $\omega_\chi = O(1)$ for a surrogate that
 tracks the local element size---so it has to be assumed. It holds with $\omega_\chi(h) = O(h)$
 whenever $\chi_1$ is the pointwise evaluation of a fixed Lipschitz size function, as for a
 Lipschitz refinement of a macro{\hyp}mesh, and with $\omega_\chi \equiv 0$ for the constant
@@ -843,8 +843,8 @@ whose coarser $\ell^1$ majorant is the error function
 \end{equation}
 i.e., the error function of the ASGS convergence theorem of~the main text with the
 local factor $(1+\Dah)^{1/2}$ inserted. The two are related by
-$\Psi_{\mathrm O}(h) \le c_1^{1/2}\,\mathcal{E}(h)$ (the discrete $\ell^2\subset\ell^1$
-inequality together with $c_1+\Dah \le c_1(1+\Dah)$, valid since $c_1 \ge 1$ under \cref{H:design}). We state the theorem in
+$\Psi_{\mathrm O}(h) \le \max\{c_1,1\}^{1/2}\,\mathcal{E}(h)$ (the discrete $\ell^2\subset\ell^1$
+inequality together with $c_1+\Dah \le \max\{c_1,1\}\,(1+\Dah)$; under \cref{H:design}, which forces $c_1\ge\gamma_0^2C_{\mathrm{inv}}^2\ge400\,C_{\mathrm{inv}}^2$, the maximum is $c_1$ itself for any inverse constant $C_{\mathrm{inv}}\ge1/20$). We state the theorem in
 $\Psi_{\mathrm O}$: the $\ell^1$ passage to $\mathcal{E}$ can lose a mesh-cardinality
 factor $\sim h^{-d/2}$ on a quasi-uniform family, so the optimal-order corollaries
 must be read off the $\ell^2$ functional.
