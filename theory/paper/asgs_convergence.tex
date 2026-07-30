@@ -225,7 +225,7 @@ element, which is what allows them to be moved in and out of elemental integrals
 
 \begin{remark}[The porosity{\hyp}resolution condition and the constant $\delta_\alpha$]
 \label{rem:porosityresolution}
-\amend{Three readings of \cref{H:porosity} are used repeatedly below, and are worth separating
+Three readings of \cref{H:porosity} are used repeatedly below, and are worth separating
 once. (i)~The porosity entering the variational forms is the exact field $\alpha$; it is not
 interpolated onto a finite element space (that variant is left to future work, cf.\
 \cref{sec:Conclusions}), so \cref{eq:resolved} is a condition on $\alpha$ and on the mesh alone.
@@ -244,7 +244,7 @@ to its diameter. (iii)~If the length in \cref{eq:resolved} is not the diameter b
 element{\hyp}size surrogate $\chi_1\le h_K$ with $h_K\le\chi_0\,\chi_1$ for a fixed
 $\chi_0$---the convention in force when the stabilization parameters are built from a continuous
 element{\hyp}size field rather than the raw diameter---the same argument yields the factor
-$1+\chi_0\,C_{\nabla\alpha}$ instead.}
+$1+\chi_0\,C_{\nabla\alpha}$ instead.
 \end{remark}
 
 \subsection{Technical results}\label{sec:auxiliary}
@@ -406,12 +406,12 @@ $\alpha$-weighted second-order term $\nabla\cdot(\alpha\nu\ViscProj\nabla\buh)$:
 $\alpha$ is \emph{not} piecewise polynomial, \cref{eq:InverseEstimateFiniteOrderNorm} does not
 apply to it directly, and the relevant constant is not the bare $\Cinv$ but the slightly larger
 $\Cinva$, which incorporates the porosity-resolution constant $C_{\nabla\alpha}$ of
-\eqref{eq:resolved}. \amend{The main text writes $\Cinv$ for this enlarged constant, by an
+\eqref{eq:resolved}. The main text writes $\Cinv$ for this enlarged constant, by an
 explicit abuse of notation; its conditions on $c_1$---in particular
 \cref{eq:conditions_on_num_param} and the coercivity condition \cref{H:coercivity} of
 \cref{lemma:Stability}---are therefore to be read with the enlarged constant already in place,
 and require no further substitution. We write $\Cinva$ explicitly throughout this appendix
-only to keep the two constants distinguishable within the proofs.}
+only to keep the two constants distinguishable within the proofs.
 \end{remark}
 
 \subsubsection{The jump of $\tau_1$}
@@ -855,9 +855,9 @@ and $|T_{12}|\le C\triplenorm{U}\triplenorm{V}$ identically, applying
 \end{equation}
 
 \medskip\noindent\emph{Step 5: splitting of $T_{13}$.}
-\amend{Write $T_{13}=T_{13}^{\mathrm{c}}+R$, with the convective contribution
+Write $T_{13}=T_{13}^{\mathrm{c}}+R$, with the convective contribution
 $T_{13}^{\mathrm{c}}\coloneqq\sigma(\tau_1\bu,\alpha\,\ba\cdot\nabla\bv)_h$ and
-$R\coloneqq\sigma(\tau_1\bu,\alpha\nabla q)_h$.} For $T_{13}^{\mathrm{c}}$,
+$R\coloneqq\sigma(\tau_1\bu,\alpha\nabla q)_h$. For $T_{13}^{\mathrm{c}}$,
 \eqref{eq:winv-conv} and $c_2\alpha_K|\ba|_\infty/h\le\varphi_1$
 (\cref{lem:parameters}\ref{P:components}) give
 \begin{align}
@@ -871,8 +871,8 @@ $R\coloneqq\sigma(\tau_1\bu,\alpha\nabla q)_h$.} For $T_{13}^{\mathrm{c}}$,
   \bigl\lVert\sigmatilde^{1/2}\bv\bigr\rVert_h .
   \label{eq:T13conv}
 \end{align}
-The second contribution $R$ is kept and treated in the next step\amend{, where it is
-absorbed into the group $N$}.
+The second contribution $R$ is kept and treated in the next step, where it is
+absorbed into the group $N$.
 
 \medskip\noindent\emph{Step 6: the convective--pressure group
 $N\coloneqq R+T_2+T_4+T_{11}$.}
@@ -1045,10 +1045,10 @@ whence, summing over faces and applying the Cauchy--Schwarz inequality as before
   \le C\,\triplenorm{U}\,\triplenorm{V}.
 \end{equation}
 Collecting \eqref{eq:T13conv}, \eqref{eq:IIVbound}, \eqref{eq:IIVterm} and
-\eqref{eq:IIIbound} \amend{(and recalling that $R$ has been absorbed into $N$, so that
-$T_{13}+T_2+T_4+T_{11}=T_{13}^{\mathrm{c}}+N$)},
+\eqref{eq:IIIbound} (and recalling that $R$ has been absorbed into $N$, so that
+$T_{13}+T_2+T_4+T_{11}=T_{13}^{\mathrm{c}}+N$),
 \begin{equation}\label{eq:groupstep}
-  \amend{|T_{13}^{\mathrm{c}}| + |N|}
+  |T_{13}^{\mathrm{c}}| + |N|
   \le C\,\triplenorm{V}\Bigl(\triplenorm{U}
   + \bigl\lVert\alpha_K\tau_2^{1/2}h^{-1}\bu\bigr\rVert_h
   + \bigl\lVert\alpha_K\tau_1^{1/2}h^{-1}p\bigr\rVert_h\Bigr).

@@ -5,6 +5,11 @@
 > (A3) item, which now states the bare conditions only). Do not re-apply the Appendix C
 > placement described below; see `theory/README.md` and the header of
 > `theory/paper/asgs_convergence.tex`.
+>
+> **ALSO SUPERSEDED (2026-07-30): the `\amend{...}` wrapping.** Step 7 below and every verbatim
+> snippet wrap new prose in `\amend{...}`. That macro no longer exists — all 1011 wrappers were
+> unwrapped and the `\newcommand` deleted (`pending-tasks.md` §1c). Read those `\amend{…}` as plain
+> text; re-applying them would inject an undefined control sequence.
 
 # Implementation brief — generalize the viscous projector in the a priori theory of `article_v2.tex`
 

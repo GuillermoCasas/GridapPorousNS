@@ -19,8 +19,9 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > now states the `1/α₀` reaction-pressure exception → resolves F10); **D04** (Taylor–Hood match is velocity-only
 > → the §9 TH item); **I07** (α-interpolation claim → future work; the 9b MMS-α item; R2 ablation now runnable);
 > **C09/C10** (σ𝟏₃→σ𝕀; Damköhler≠Darcy → F3); **N02** (U=L=1 reconciled); **N10/N13/N15/N19/S03/S07** wording.
-> Still open: strip `\amend`/author-notes (final markup pass), raw-data + reproducibility supplement, bibliography
-> clean-up. The 3D-OSGS 1.29 (C7/E1) is confirmed a *genuine* under-stabilization (rerun R10), not stale data.
+> Still open: raw-data + reproducibility supplement, bibliography clean-up. (The `\amend`/author-note strip
+> was done 2026-07-30 — §4.) The 3D-OSGS 1.29 (C7/E1) is confirmed a *genuine* under-stabilization (rerun R10),
+> not stale data.
 
 > **2026-07-23 addendum (commented-appendix audit — applied).** A third external audit
 > (`ChatGPT audit/audit_commented_article.md`, verified disposition there) drove a batch of definite fixes,
@@ -32,8 +33,9 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > over-claim removal; the A17 inf–sup domain; and fold/`1/α` prose tempering. **Do NOT re-fix** the verified
 > false positives (§4.6 L² factor, §6.4 P₁ residual, §2.4 `m≥2`, §10 bib). Two new gates:
 > `proof_verification/sympy/theorem_statement_verification.py` (in `run_all.py`) and
-> `proof_verification/hypothesis_transcription_audit.md`. Still open: the `\amend`/author-note flatten, the
-> `:274` Fourier cite decision, and the broader β₀/h₀ and robustness wording (author judgment).
+> `proof_verification/hypothesis_transcription_audit.md`. Still open: the `:274` Fourier cite decision and the
+> broader β₀/h₀ and robustness wording (author judgment). (The `\amend`/author-note flatten was done
+> 2026-07-30 — §4.)
 
 > **2026-07-30 addendum (fourth external audit — verified, applied, and the dump deleted).** A
 > fourth external audit (produced from a Repomix export of `theory/` + `proof_verification/`, so it
@@ -127,11 +129,9 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > — the release bundle (pinned TeX/Coq/Python/Julia versions, one build command, one gate command,
 > archived logs with hashes, and the URL/DOI above): `pending-tasks.md` §6g. (iv) **T6** — a
 > per-attempt terminal-status supplement for the omitted cells: `pending-tasks.md` §5c. (v) **N7/P1**
-> — the `\amend`/author-macro flatten (**537** active wrappers in the v2
-> document set: `article_v2.tex` 495 `\amend` + 8 `\Guillermo` + 3 `\Joaquin`, plus 31 `\amend` across
-> App. A/B/C; the v1 set is **502**. The figures 435 and 480 were earlier snapshots that the next prose
-> pass invalidated — regenerate with the snippet in `pending-tasks.md` §1c, never carry the number by
-> hand): `pending-tasks.md` §1c.
+> — the `\amend`/author-macro flatten: **✅ DONE 2026-07-30**, 1011 wrappers unwrapped across both mains
+> and App. A/B/C and the three `\newcommand`s deleted, gated output-neutral (identical page/label counts,
+> zero-line PDF text diffs, SymPy 636/636). Detail: `pending-tasks.md` §1c.
 >
 > **✅ RESOLVED 2026-07-30 (was Tier-2, author-reserved twice) — the global-quasi-uniformity tension.**
 > (A1) asked for *local* quasi-uniformity, (O3) added *patch* quasi-uniformity, and §6 invoked *global*
@@ -494,14 +494,32 @@ predict ×10/×50/×116 — refuted as *sharp*.
 
 ## 4. Editorial / prose
 
-- 🔴 **open — finalize ALL review markup.** True counts (verified): `\Guillermo`=14, `\Joaquin`=4 (=**18**
-  spans), `\amend` used **328×** (recorded 279 — **stale by ~49**; per-file: article 156, elemental 15, continuity 7,
-  fourier 3; audit 2026-07-19). Two distinct tasks: (i) flatten the 328 `\amend` + 18 author spans (redefine
-  as `{#1}` for the final build); (ii) decolor the 18 author spans. **CORRECTION (audit 2026-07-19):** the
-  TODO-bearing macros (`REVIEW: CHECK` L398, `JUSTIFY` L402, `CITATIONS` L644, `CITATIONS FOR THIS STRATEGY` L655)
-  are **all on commented-out lines** and will not ship, and the `\Guillermo{Add figures}` note **no longer exists**
-  (already removed — see §3) — so flattening/decoloring is sufficient; no TODO-authoring or citation work is needed. Src: critique;
-  `article.tex:115–122`.
+- ✅ **DONE (2026-07-30) — ALL review markup finalized.** Both halves are now closed. Decoloring had
+  already been done (the three macros were identity `{#1}`); the remaining textual unwrap removed **1011**
+  wrappers — `article.tex` 461 `\amend` + 8 `\Guillermo` + 3 `\Joaquin`, `article_v2.tex` 495 + 8 + 3,
+  `asgs_convergence.tex` 6, `elemental_matrices_appendix.tex` 22, `fourier_appendix.tex` 5 — and deleted the
+  three `\newcommand`s. (Earlier counts here — 279, then 328 — were snapshots each later prose pass
+  invalidated; the file-set also grew by `article_v2.tex`.) The four TODO-bearing author notes
+  (`REVIEW: CHECK`, `JUSTIFY`, `CITATIONS`, `CITATIONS FOR THIS STRATEGY`) sat on commented-out draft
+  paragraphs, and those paragraphs were then deleted outright by the dead-comment sweep below — so the notes
+  no longer exist in the source at all. Gated output-neutral and it held: identical page counts (81/118), newlabel counts (778/980),
+  0 undefined/multiply-defined/overfull>1pt, and **zero-line** `pdftotext` diffs on both PDFs; SymPy 636/636.
+  Detail + the tooling change (`make_3d_tables.py` emitted *and* parsed `\amend`): `pending-tasks.md` §1c.
+- ✅ **DONE (2026-07-30) — commented-out draft fragments deleted from both mains.** Eight blocks, **116 lines
+  per file** (identical in v1 and v2), plus one dead trailing fragment: the abandoned Darcy-threshold
+  paraphrase (whose opening sentence was already broken) and its non-Darcy aside; the transient/initial-condition
+  aside; the alternative-`A_U`-definition remark; the entire dropped "Linearization of the differential operator"
+  subsection (generalized fixed point, contraction condition, Picard, Newton–Raphson — 75 lines); the
+  `eq:AdjointFlux_commented` equation (**this closes the "commented duplicate label" cosmetic residue** flagged
+  in `ChatGPT audit/latest_audit_response.md`); the superseded `eq:VMSWeakFormSystem_commented`; the dropped
+  Projection / SGS-linearization subsubsections; and the `%\input{variational_crimes}` placeholder for a section
+  never written (no such file exists). Verified first that **no live text references any label defined only
+  inside them** and that every removed line was a comment. Structural comments were deliberately kept: preamble
+  and macro notes, the SIAM `% REQUIRED` markers, the `v1/v2 DIVERGENCE` flags, the viscous-projector relocation
+  note, the authoritative notation convention, the appendix-ordering note, and the commented `\input` that
+  documents the App-D twin switch. Same output-neutral gate, same result: 81/118 pp, 778/980 newlabels, 0
+  undefined/multiply-defined/overfull>1pt, **zero-line** `pdftotext` diffs; SymPy 636/636; `make_3d_tables.py
+  --check` green.
 - ✅ **DONE (2026-07-19) — supplement.tex removed.** It was pure SIAM template boilerplate (`\lipsum`,
   "An Example Article", `thm:bigthm`, `tab:foo`) and `article.tex` made **no** `\cref` to any supplement label.
   Removed the `\externaldocument{supplement}` line + comment from `article.tex`, dropped `supplement.tex` from
@@ -584,7 +602,8 @@ predict ×10/×50/×116 — refuted as *sharp*.
   [1681](../theory/paper/article.tex#L1681)) are standard and cite only published works. Build green. Src: review D8.
 - ✅ **VERIFIED (2026-07-19) — 0 undefined citations.** The build reports 0 undefined citations, and a key-by-key
   reconciliation shows **34 cited keys ↔ 34 `\bibitem`s, exact match** — nothing cited-but-missing, nothing orphaned
-  (the 7 extra `\cite` matches were commented-out lines). All listed works resolve (codina 2001/2008/2018,
+  (the 7 extra `\cite` matches were commented-out lines — **as of 2026-07-30 those lines are gone**, so a bare
+  `\cite` grep now matches the real cites exactly). All listed works resolve (codina 2001/2008/2018,
   villota2019, cocquet2021, badia2020/verdugo2022 gridap, codina1993, nillama2022, hughes2007). Src: `theory/README.md`.
 
 ## 8. Formal proof (Coq)

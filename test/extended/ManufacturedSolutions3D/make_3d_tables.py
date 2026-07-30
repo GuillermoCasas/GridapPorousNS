@@ -125,15 +125,15 @@ def solver_row(data, kv, field, fam, opt):
 def interp_row(interp, kv, field, fam):
     fam_key = {"regular": "regular", "irregular": "irregular"}[fam]
     if interp is None:
-        return (f"    \\amend{{$\\mathbb{{P}}_{kv}$ interp.}} & \\multicolumn{{2}}{{c}}{{\\amend{{\\num{{--}}}}}} "
-                f"& \\multicolumn{{2}}{{c}}{{\\amend{{\\num{{--}}}}}} \\\\  "
+        return (f"    $\\mathbb{{P}}_{kv}$ interp. & \\multicolumn{{2}}{{c}}{{\\num{{--}}}} "
+                f"& \\multicolumn{{2}}{{c}}{{\\num{{--}}}} \\\\  "
                 f"% TODO run run_interpolation_reference3d.jl")
     s = interp[fam_key][str(kv)]
     slope_v = s["slope"][field]
     fme_v = s["fme"][field]
-    return (f"    \\amend{{$\\mathbb{{P}}_{kv}$ interp.}} "
-            f"& \\multicolumn{{2}}{{c}}{{\\amend{{\\num{{{num(slope_v,'slope')}}}}}}} "
-            f"& \\multicolumn{{2}}{{c}}{{\\amend{{\\num{{{num(fme_v,'fme4')}}}}}}} \\\\")
+    return (f"    $\\mathbb{{P}}_{kv}$ interp. "
+            f"& \\multicolumn{{2}}{{c}}{{\\num{{{num(slope_v,'slope')}}}}} "
+            f"& \\multicolumn{{2}}{{c}}{{\\num{{{num(fme_v,'fme4')}}}}} \\\\")
 
 
 def emit_table(which, data, interp):
@@ -203,7 +203,7 @@ def check(article_path, data, interp):
                 fm = re.search(r"\\textit\{" + fam + r" mesh\}", sub)
                 seg = sub[fm.end():] if fm else sub
                 for kv in (1, 2):
-                    # match the P_kv solver row (not the interp row, which has \amend + \multicolumn)
+                    # match the P_kv solver row (not the interp row, which has \multicolumn spans)
                     rx = (r"\$\\mathbb\{P\}_" + str(kv) + r"\$ \([^)]*\) & \\num\{([^}]*)\} & \\num\{([^}]*)\} "
                           r"& \\num\{([^}]*)\} & \\num\{([^}]*)\} \\\\")
                     rm = re.search(rx, seg)
@@ -221,10 +221,10 @@ def check(article_path, data, interp):
 
                     if interp is None:
                         continue
-                    # interp row: \amend{P_kv interp.} & \multicolumn{2}{c}{\amend{\num{slope}}} & ...{\num{fme}}
-                    irx = (r"\\amend\{\$\\mathbb\{P\}_" + str(kv) + r"\$ interp\.\} & "
-                           r"\\multicolumn\{2\}\{c\}\{\\amend\{\\num\{([^}]*)\}\}\} & "
-                           r"\\multicolumn\{2\}\{c\}\{\\amend\{\\num\{([^}]*)\}\}\}")
+                    # interp row: P_kv interp. & \multicolumn{2}{c}{\num{slope}} & ...{\num{fme}}
+                    irx = (r"\$\\mathbb\{P\}_" + str(kv) + r"\$ interp\. & "
+                           r"\\multicolumn\{2\}\{c\}\{\\num\{([^}]*)\}\} & "
+                           r"\\multicolumn\{2\}\{c\}\{\\num\{([^}]*)\}\}")
                     im = re.search(irx, seg)
                     if not im:
                         mismatches.append(f"[{label}/{word}/{fam}/P{kv}/interp] interp row not found")

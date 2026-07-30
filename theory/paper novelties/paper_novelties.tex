@@ -23,7 +23,7 @@
 \definecolor{newc}{rgb}{0.10,0.35,0.65}    % blue: "current / article.tex"
 \definecolor{locc}{rgb}{0.35,0.35,0.35}
 \definecolor{linkc}{rgb}{0.15,0.30,0.55}
-\definecolor{amend}{rgb}{0.58,0.0,0.83}    % same violet used by \amend in the paper
+\definecolor{amend}{rgb}{0.58,0.0,0.83}    % violet: the colour \amend used in the paper before it was flattened
 \definecolor{headc}{rgb}{0.12,0.22,0.40}
 
 \titleformat{\section}{\color{headc}\large\bfseries}{\thesection.}{0.6em}{}
@@ -88,11 +88,14 @@ trivial rows, so they are stated once here and not repeated):
 \begin{itemize}[itemsep=2pt,topsep=2pt]
   \item \emph{Notation.} Every bold symbol was re-typeset \verb|\pmb{...}| $\to$
         \verb|\boldsymbol{...}| throughout ($368$ occurrences). Purely cosmetic.
-  \item \emph{Review markup.} The current source introduces a violet \verb|\amend{...}| macro
-        flagging the deliberate 2026 correction pass; \textcolor{amend}{most substantive
-        changes below are wrapped in it}. It coexists with the pre-existing red
-        \verb|\Guillermo| / blue \verb|\Joaquin| author-annotation macros, which were
-        \emph{resolved} (accepted or deleted) in this revision.
+  \item \emph{Review markup.} A violet \verb|\amend{...}| macro flagged the deliberate 2026
+        correction pass, and \textcolor{amend}{most substantive changes below were wrapped in it};
+        it coexisted with the pre-existing red \verb|\Guillermo| / blue \verb|\Joaquin|
+        author-annotation macros. All three have since been \emph{accepted and flattened} ---
+        the $1011$ wrappers were unwrapped to their plain bodies and the three
+        \verb|\newcommand|s deleted, an edit verified output-neutral (identical page count,
+        label count, and PDF text layer). The corrections themselves are unaffected; this
+        document and the git history are their record.
 \end{itemize}
 
 \vspace{0.5em}
@@ -1232,10 +1235,11 @@ metadata, and infrastructure --- worth listing but not fitting the categories ab
    {To 76S05, 76M10, 65N30, 65N12, 65N15, 65Z05: added porous-media/FE-fluids/error-bound codes,
     dropped the time-dependent 65M60 --- reclassifying the paper as porous-media stationary FE with
     a~priori bounds.}
-\ch{New \texttt{\textbackslash amend} review-markup macro}
-   {n/a (new)}{Preamble, \artl{114}--118}
-   {Defines the violet \code{\textbackslash amend\{\}} flag for the 2026 correction pass (flatten to
-    accept all corrections). Markup infrastructure.}
+\ch{\texttt{\textbackslash amend} review-markup macro added, then flattened}
+   {n/a (new)}{Preamble, no longer present}
+   {The violet \code{\textbackslash amend\{\}} flag for the 2026 correction pass; since accepted
+    wholesale, so the wrappers and the \code{\textbackslash newcommand} are gone. Markup
+    infrastructure, no mathematical content.}
 \ch{New continuity-appendix macro block}
    {n/a (new)}{Preamble, \artl{168}--194}
    {A block of macros and an Assumption theorem environment supporting the inlined Appendix~C.}

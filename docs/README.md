@@ -94,7 +94,8 @@ coupled-only-leaning decision record.
 > (the original) and cite its line numbers. A harmonized [`../theory/paper/article_v2.tex`](../theory/paper/article_v2.tex)
 > now integrates the OSGS theory as Appendix D with symmetric ASGS/OSGS appendices; `coq_coverage.tex` already
 > targets it. Both compile and share `continuity_appendix.tex`. **Prefer citing labels/section names over raw
-> `article.tex` line numbers** — the numbers drift on every `\amend` pass and are ambiguous across the two files.
+> `article.tex` line numbers** — the numbers drift on every prose pass (the 2026-07-30 markup flatten shifted
+them again) and are ambiguous across the two files.
 
 ---
 

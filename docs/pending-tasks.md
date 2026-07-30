@@ -50,30 +50,57 @@ cross-reference; results-section figures — **tables-only settled**, the `\Guil
 porosity figure kept; the "Kratos Multiphysics" claim — the paper reads Gridap, 0 Kratos mentions). Full list:
 [`open-questions.md`](open-questions.md) §4.
 
-**Editorial-markup flatten (prior-audit B04; re-raised as N7/P1 by the 2026-07-30 audit), scoped.**
-Only the *textual* unwrap remains: **495** `\amend` + 8 `\Guillermo` + 3 `\Joaquin` in
-`article_v2.tex` and **31** `\amend` across App. A/B/C (App. D has none) — **537** active wrappers in
-the v2 set; the v1 set is **502** (`article.tex` 460 + 8 + 3, same 31 in the appendices). Earlier
-registers recorded 435 and then 480; both were snapshots that the next prose pass invalidated, so
-**regenerate rather than quote**, counting only non-comment lines:
-```bash
-python3 - <<'EOF'
-import re
-def n(f,m):
-    return sum(len(re.findall(re.escape('\\'+m+'{'), re.split(r'(?<!\\)%',l,1)[0])) for l in open(f))
-for f in ('article_v2.tex','article.tex'):
-    print(f, n(f,'amend'), n(f,'Guillermo'), n(f,'Joaquin'))
-EOF
-```
+**Editorial-markup flatten (prior-audit B04; re-raised as N7/P1 by the 2026-07-30 audit) — ✅ DONE
+2026-07-30.** All **1011** wrappers unwrapped to their plain bodies and the three `\newcommand`s
+deleted: `article.tex` 461 `\amend` + 8 `\Guillermo` + 3 `\Joaquin`, `article_v2.tex` 495 + 8 + 3,
+`asgs_convergence.tex` 6, `elemental_matrices_appendix.tex` 22, `fourier_appendix.tex` 5 (App. D had
+none). Done with a brace-balancing scan honouring escapes and comments, not a regex — 22 bodies span
+line breaks and many nest braces. Four commented-out draft paragraphs in each main carried
+`\Guillermo{REVIEW: CHECK}`-style author notes; those paragraphs were removed entirely by the
+dead-comment sweep below, so the notes are gone from the source.
 
-The "remove colour macros" half is **already done**:
-`article_v2.tex:112-116` defines all three as identity (`\newcommand{\amend}[1]{#1}`), so the
-wrappers are typeset-neutral and the build is clean. Do the unwrap **once, after the prose freeze**,
-with a brace-balancing pass (not a regex — many bodies contain nested braces), then delete the three
-`\newcommand`s, and gate it as *output-neutral*: same page count, same newlabel count, zero
-undefined refs, and a PDF text-layer diff of zero. Bundle P7 with it (12 relocation-provenance date
-stamps in `.tex` comments → neutral dependency statements; keep `shared.tex`'s `(verified <date>)`,
-which is the evidence a `[known-fragility]` workaround was reproduced rather than guessed).
+**Dead commented-out draft fragments deleted (same session).** Eight blocks, **116 lines per main**
+(byte-identical block set in v1 and v2), plus one dead trailing fragment on the `\ViscProj` paragraph:
+the abandoned Darcy-threshold paraphrase + non-Darcy aside; the transient/initial-condition aside; the
+alternative-`A_U` remark; the whole dropped *"Linearization of the differential operator"* subsection
+(generalized fixed point → contraction condition → Picard → Newton–Raphson, 75 lines); the
+`eq:AdjointFlux_commented` equation; the superseded `eq:VMSWeakFormSystem_commented`; the dropped
+Projection / SGS-linearization subsubsections; and `%\input{variational_crimes}`, a placeholder for a
+section never written (no such file exists). Located by first/last-line text rather than line number
+(the two mains are offset), with every intervening line asserted to be a comment and one adjacent
+blank absorbed so paragraph spacing is untouched. **Checked first that no live text `\cref`s any label
+defined only inside them** — `sec:LinearizationDifferentialOperator`, `eq:ContractingMapping`,
+`eq:TotalDerivativeOfResidual`, `eq:AdjointFlux_commented`, `eq:VMSWeakFormSystem_commented`,
+`eq:simplified_weak_form_subscales_OSGS{,_static_projection}` occur nowhere else in the repo. Removing
+`eq:AdjointFlux_commented` also closes the *"commented duplicate label"* cosmetic residue in
+`ChatGPT audit/latest_audit_response.md`, and the source now has **zero** commented-out `\cite` lines,
+so a bare `\cite` grep matches the real citation set exactly.
+
+**Kept deliberately** — these are load-bearing and must not be swept in a future pass: the preamble
+and macro notes, the SIAM template `% REQUIRED` markers, the `v1/v2 DIVERGENCE` flags, the
+viscous-projector relocation note (which names the guarding gate rule and says what not to
+reintroduce), the authoritative `%%` notation convention, `shared.tex`'s `[known-fragility]` nameref
+patch rationale, the appendix-header provenance blocks, the appendix-ordering note, and the commented
+`\input{osgs_appendix.tex}` that documents the App-D twin switch.
+
+**Gated output-neutral after each of the two edits, and it held exactly both times:** `article` 81 pp /
+778 newlabels, `article_v2` 118 pp / 980 newlabels, 0 undefined + 0 multiply-defined + 0 overfull >1pt
+in both — all identical to the pre-flatten build — and `pdftotext -layout` diffs of **zero lines** for
+both PDFs. SymPy suite 636/636 (incl. `document_hygiene` 63/63 off the fresh logs;
+`assembly_consistency` 4/4 with all 11 anchor definitions still detected, which is the check that the
+previously `\amend`-wrapped `G_αP`/`Q_φ` LHSs still parse); `make_3d_tables.py --check` green.
+
+One code dependency moved with it: `test/extended/ManufacturedSolutions3D/make_3d_tables.py` both
+*emitted* and *re-parsed* `\amend`-wrapped interp rows, so its `interp_row` writer and `irx` check
+regex were updated in the same change; `--check` re-passes against the flattened `article.tex`. The
+tolerant `\amend` unwraps in `sympy/assembly_consistency_verification.py:178` and
+`latex_index_notation.py:79` were left in place — harmless, and they keep the parsers robust if
+markup is ever reintroduced.
+
+*Still open:* **P7** (12 relocation-provenance date stamps in `.tex` comments → neutral dependency
+statements; keep `shared.tex`'s `(verified <date>)`, which is the evidence a `[known-fragility]`
+workaround was reproduced rather than guessed) — it was bundled with this task in the plan but is an
+independent edit and was not done here.
 *Declined:* keeping an annotated copy on a branch — git already holds it, and a second annotated
 appendix would recreate the un-gated-twin blind spot `sympy/appendix_twins_verification.py` exists to
 prevent.
