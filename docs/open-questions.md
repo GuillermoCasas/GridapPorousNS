@@ -64,13 +64,37 @@ independent of this removed question.
 
 ## 4. [OPEN] Paper editorial / theory items needing author judgment
 
-Items from the 2026-06-04 documentation audit that need an **author decision**, not a mechanical fix. Full list: this section (§4) — the former `docs/paper/errata.md` was folded here on 2026-07-10. (The paper compiles cleanly — `latexmk` exit 0, 0 undefined refs; the page count drifts with the `\amend` prose, so the build invariant is **722 newlabels / 0 unresolved**, not a fixed page number — `article.tex` ≈ 71 pp, the harmonized `article_v2.tex` ≈ 89 pp. The one unambiguous typo, the duplicate Fourier label `eq:728`, is already corrected. Many of the 2026-06-04 editorial items were addressed by that audit response — see the disposition in `docs/ChatGPT audit/validity_verdicts.csv`.)
+Items from the 2026-06-04 documentation audit that need an **author decision**, not a mechanical fix. Full list: this section (§4) — the former `docs/paper/errata.md` was folded here on 2026-07-10. (The paper compiles cleanly — `latexmk` exit 0, 0 undefined refs; the page count drifts with the `\amend` prose, so the invariant to watch is **0 unresolved refs and 0 overfull boxes > 1 pt**, with the label counts regenerated from the live build rather than quoted from memory — as of 2026-07-30, `article.tex` 80 pp / 776 newlabels and `article_v2.tex` 116 pp / 976 newlabels (v2 builds the *commented* App-D twin). The one unambiguous typo, the duplicate Fourier label `eq:728`, is already corrected. Many of the 2026-06-04 editorial items were addressed by that audit response — see the disposition in `docs/ChatGPT audit/validity_verdicts.csv`.)
 
 - **✅ RESOLVED (2026-07-19) — "Kratos Multiphysics" implementation claim.** The paper now states the experiments were run in Gridap ([`article.tex` line 1115](../theory/paper/article.tex#L1115)); "Kratos"/"Multiphysics" appear **0×** anywhere in `article.tex`. The flip has been made.
 - **✅ RESOLVED (2026-07-19) — results-section figures: tables-only.** The `\Guillermo{Add figures}` note is gone from `article.tex` and the staged convergence-plot PDFs were removed at the author's request as unreferenced, so the decision is **tables-only**. The paper keeps one figure — `bump_plateau.pdf` (the 1−α porosity field, [line 1142](../theory/paper/article.tex#L1142)) — which renders correctly (verified `pre-submission-checklist.md §3`). Nothing pending.
 - **✅ RESOLVED (2026-07-19) — `supplement.tex` removed.** It was SIAM template boilerplate (`\lipsum` / `thm:bigthm`) with no `\cref` from the article; the `\externaldocument{supplement}` line, the `latexmkrc`/README wiring, and the file itself were removed. Build green.
 - **✅ RESOLVED (2026-07-19) — `centered_encoding`: short section added.** A concise "Centered dimensional encoding" paragraph was added to §7 of `article.tex` (reproducibility level — the encoding keeps the dimensional coefficients near unity instead of ~`10^12`; a strict reparametrization that leaves the normalized errors unchanged). The full `centered_encoding.tex` is kept as a standalone companion note.
 - **Softer math to verify — ✅ VERIFIED 2026-07-08 (both consistent; no correction needed).** (1) The reaction matrix `S(w)` mass-equation row *is* consistent with `∇·(αu) = α∇·u + ∇α·u`: the 4th row of `𝓛_w U` reproduces `εp + ∇·(αu)` exactly, with `α∇·u` carried by the convection matrix `A_c,i` (row 4 `= α[δᵢ₁,δᵢ₂,δᵢ₃,0]`) and `∇α·u + εp` by `S(w)` (row 4 `= [∂₁α,∂₂α,∂₃α,ε]`). (2) The `CocquetTubeTest/data/structured` **and** `CocquetFormMMS` Galerkin runs *do* match the reference operator: both harnesses set `viscous_operator_type="SymmetricGradient"` (full `S(u)`, as `cocquet_formulation.tex` describes) on **both** the Galerkin and the VMS arms, so the comparison isolates stabilization rather than the operator (`article.tex`'s canonical operator is the deviatoric-symmetric one; the `CocquetTubeTest/data/deviatoric` sibling isolates the operator by re-running the VMS pairs with the deviatoric one). **Fully closed (author judgment 2026-07-08):** nothing further to reconcile — the paper is deliberately general in the viscous operator form (`article.tex` L243-251 defines it via the projection `ViscProj = DΠ·SΠ` and names the full-symmetric case as the Cocquet/DBF one), so it suffices that each experiment clearly defines the operator it solves with, which the configs do (`viscous_operator_type`). (Folded from the former `docs/paper/errata.md`.)
+
+- **✅ RESOLVED 2026-07-30 — Include the genuinely-3D manufactured test, or narrow the 3D claim?** (audit T7.)
+  **Decided: added alongside**, not replacing the extruded case. `\amend{\input{genuine3d_table.tex}}` sits after
+  `tab:3DH1` in `article_v2.tex` and `tab:Genuine3D` is cross-referenced from the body; v1 has no such rows, as
+  with the R5 control. The deciding argument is in `pre-submission-checklist.md` (the RESOLVED T7 block): the
+  genuine-3D data lifts the OSGS ℙ₂ pressure `H¹` *rate* to `2.00`, but its absolute `H¹` pressure errors stay
+  `O(1)` (1.22–2.97) exactly as on the extruded field — so the near-stagnant *magnitude* is **not** an artifact of
+  the extruded field's degeneracy, and including the table *sharpens* the adverse 3D finding instead of dissolving
+  it. The original statement of the question is kept below for the record.
+  <details><summary>as originally posed</summary>
+  `theory/paper/genuine3d_table.tex` exists, its data is certified (`results/k{1,2}/TET/genuine3d/`, every level
+  `success=true`, `c1_mult=4` ⇒ `c₁=16k⁴`, values re-derived from the JSON), and its manufactured field is guarded
+  by `sympy/genuine3d_mms_verification.py` (9 checks) plus a Blitz exactness test — but it is `\input` by neither
+  main. §7.2's 3D test is a 3D *discretization* of a `z`-invariant field, which the paper now says carefully; the
+  genuine-3D table would remove the obvious reviewer objection **and** show the OSGS pressure `H¹` converging
+  (ℙ₂ slope 2.00) instead of saturating at ≈1.29, i.e. it would attribute the plateau to the extruded field's
+  degeneracy. The decision is *add-alongside vs replace-extruded* (`pending-tasks.md` §7f); it is reserved to the
+  author because it changes what §7.2 claims. If added, its four-mesh ladder (two-finest ratios 4/3 and 6/5)
+  carries the same two-mesh-slope caveat as the rest of §7.2, and its `H¹` pressure errors are still `O(1)`.
+  </details>
+- **[OPEN — author decision] The regime-map table for §6** (audit S5, declined this pass with reasons in
+  `pre-submission-checklist.md`). Reopen only if a referee asks for it: the content is already carried by the
+  fixed-data-vs-pre-asymptotic paragraph, `tab:ASGSvsOSGS`'s reaction row and the caption convention, and a
+  six-column table is page budget plus overfull-box risk for no new information.
 
 ---
 

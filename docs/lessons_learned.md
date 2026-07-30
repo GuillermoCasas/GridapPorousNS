@@ -121,3 +121,103 @@ The Coq formalisation's build + kernel-check harness (`run_all.sh`, `Makefile`, 
 | 2026-07-29 | **A units slip survived three verification layers because every guard tested a SUBSTRING, not a quantity.** In `fourier_appendix.tex`'s `rem:ftGenericPi`, the general lower bound on the viscous symbol's spectral radius was written `2c_Π²|k₀|²` in a sentence whose two neighbouring bounds are `αν|k₀|²/h²` and `2αν|k₀|²/h²`. The tensor bound is `T_Π ≥ c_Π²|k₀|²I` and the symbol is `(2αν/h²)T_Π`, so the spectral radius is `2c_Π²·αν|k₀|²/h²`: the printed expression is a hybrid of the two conventions, off by `αν/h²`. It was found only by a whole-paper referee read, not by any gate. | Lint **D11** was written to stop the class from being re-broadened and tests `"2c_{\\ViscProj}^2" in APP_B` — a substring that the WRONG expression also contains. SymPy section C verifies the symbol algebra symbolically but never reads that sentence; Coq is one level of abstraction above it. So all three layers were green on a formula that is dimensionally inconsistent with the two bounds it is being compared to, in the same sentence. The general shape: a source lint that asserts a token is PRESENT cannot see that the surrounding quantity is wrong. | Fixed the expression; added **D11'**, which parses the actual expression after "the lower one becomes" and requires all three of `2c_{\\ViscProj}^2`, `\\alpha\\nu` and `h^2` — i.e. it checks the QUANTITY, not the presence of a name — and confirmed by negative control that it rejects the original text. **General rule: when a lint guards a formula, match the whole formula (or its units), never one token of it; a substring test passes on every wrong formula that happens to contain the token.** | `theory/paper/fourier_appendix.tex`, `proof_verification/sympy/projector_algebra_verification.py` | `paper`, `viscous-projector`, `verification`, `substring-vs-quantity`, `units`, `fix-applied` |
 | 2026-07-29 | **A green verification suite that could not, in principle, see three whole defect classes.** A whole-paper referee read found real defects in a much-reviewed paper while `sympy/run_all.py` reported 454/454 and Coq 25/25 + coqchk: nine index defects in App. A's pre-differentiation intermediates, a units slip in App. B, a 19.09 pt overfull box painting a visible black rule beside eq. (5.12) on p. 22, a float overflowing the page by 81.27 pt, four `\small invalid in math mode` warnings, and 18 lines of drift between App. D's two twins. | Three STRUCTURAL blind spots, none of which is the 'vacuous rule' failure mode already on this ledger. **BS-1 no gate read a LaTeX build log** — every script read either its own encoding or a `.tex` source, so the *rendered* document was unverified and no input to the suite carried the information. **BS-2 endpoint-only verification** — `elemental_matrices_verification.py` certifies App. A's printed *results* from its own sympy transcription and never opens the appendix, so a typo on the printed *path* is invisible while the destination is certified (all nine printed final results were correct). **BS-3 no file-pair consistency** — every gate reads one file at a time, so `osgs_appendix_commented.tex` (which article_v2 BUILDS) and `osgs_appendix.tex` (which the statement lint READS) drifted apart unseen; the rendered file was not the linted file. A fourth, distinct from all three: **token-presence lints** — D11 guarded a formula by testing for the substring `2c_{\ViscProj}^2`, which the WRONG formula also contains. | Added `sympy/document_hygiene_verification.py` (H1-H7, reads the LIVE logs; attributes each warning to the enclosing .tex because the log's 'at line N' is relative to the OPEN file — I mis-attributed two App-D boxes to result tables 100 pages away before adding that; freshness is dependency-aware via latexmk's .fls, so editing an appendix only one main inputs does not falsely mark the other stale) and `sympy/appendix_twins_verification.py` (T1-T4, diffs the twins modulo pedagogy boxes and re-reads the \input and the lint's FILES so renaming either file fails loudly). Added S1/S2 to `elemental_matrices_verification.py` for App. A's second-derivative convention, and D11' for the units. Suite: 454/454 -> 498/498 across 23 scripts. **Two cheap lints for the dummy-index class were prototyped and REJECTED: a per-row census flagged 52 of 68 rows and a per-summand census still cannot distribute over nested sums (22 false positives).** **CLOSED 2026-07-29 (same day, second pass):** the fix was NOT the transcribe-and-differentiate plan this row originally recorded — transcription would have certified the transcription, since the transcriber is the same reader who must notice the typo. `latex_index_notation.py` PARSES App. A instead, so both the intermediate and the printed result come from the `.tex`. Two arms: an index census on every monomial *after full distribution* (which is exactly what the two rejected lints could not do), and symbolic differentiation of the parsed intermediate against the parsed result. All 79 component displays pass as written; all NINE historical defects, re-injected verbatim from this commit's own pre-fix hunks, are rejected; five index-BALANCED mutations are rejected by the differentiation arm alone, proving the two arms are independent. `elemental_matrices_verification.py` 23 -> 118 checks. General rule: a suite's grand total certifies only the classes its inputs can carry — enumerate what each script READS, and the blind spots are the complement. | `proof_verification/sympy/{document_hygiene,appendix_twins,elemental_matrices,projector_algebra}_verification.py`, `theory/paper/{article,article_v2,elemental_matrices_appendix,fourier_appendix,osgs_appendix,osgs_appendix_commented}.tex` | `verification`, `blind-spot`, `build-log`, `endpoint-only`, `file-pair`, `paper`, `fix-applied`, `bs2-closed-2026-07-29` |
 | 2026-07-29 | **A check can stop covering anything without ever failing — twice over, in one script.** `stability_estimate_verification.py` presented itself as the gate on §5/App. C's coercivity coefficients. It had two independent ways of certifying nothing. (a) **Stale anchors.** Its sections [3]/[4] were written against `eq:StabilityEstimateFinal`, `eq:ViscousCoefficientBound`, `eq:VelocityCoefficientBound`; App. C was later rewritten from the `ξ` split to the `η` parameterisation (`eq:coerccollect` → `eq:coercoeff`) and **none of those three labels is defined in any `.tex` in the repository**. The encoded identities are still true, so nothing ever failed — but anyone asking "is the coercivity collection covered?" got a plausible hit on a script anchored to a display that no longer exists. (b) **A tautology.** Its check [5] asserted `sp.simplify((1 - C2) - (1 - C2)) == 0`, i.e. `0 == 0`, printing `[PASS]` forever; the comment beside it said "recorded for completeness". | This is the *coverage-illusion* sibling of the vacuous-rule class already on this ledger (2026-07-28 Rule 1, 2026-07-29 D3): there the rule inspected zero items, here the rule inspects real items but they are **not the ones printed in the paper**. Both are invisible to a grand total, and both are worse than an absent gate, because an absent gate is visible in a coverage audit while a stale one reads as done. A tautology is the degenerate case: it depends on nothing, so nothing can ever break it. Neither was found by any gate — both surfaced while inventorying which intermediates the suite actually reads (`docs/appendix-a-intermediate-coverage-spec.md` §6). | Kept [3]/[4] (the algebra is sound) but relabelled them as the **superseded ξ-form**, so they no longer claim to cover a printed display. Added section **[6]**, which reads the *current* η-optimisation out of `asgs_convergence.tex`: the printed coefficients of `eq:coerccollect`, the definitions of `c_v`/`c_r`, the printed quadratic `tη²+(1−4t)η−4`, its printed factorisation `(η−4)(tη+1)`, the unique positive root `η=4`, `eq:coercoeff`, and the `c₁ > 4C̄_inv,α²` threshold the 3D `c₁` work leans on — with **E0** asserting those labels resolve, so the next rename fails loudly. Replaced the tautology with the real slack identity `ε(1−ετ₂) − (1−C₂)ε = ε(C₂ − ετ₂)` plus a witness showing it goes **negative** when the hypothesis fails. 9 → 24 checks. A crude scan finds ~4 more real dangling anchors across the suite; a suite-wide resolvability lint (D3'' idiom) needs a convention for naming *unnumbered* displays first. **General rule: a check must name a live anchor and must fail if its hypothesis is removed. If deleting the hypothesis leaves the check passing, it is decoration.** | `proof_verification/sympy/stability_estimate_verification.py`, `theory/paper/asgs_convergence.tex` | `verification`, `coverage-illusion`, `stale-anchor`, `tautology`, `vacuous-rule`, `paper`, `fix-applied` |
+
+### 2026-07-30 — an external audit is input, not documentation; and a paper paragraph can outlive the default it describes
+
+**Two lessons from the fourth external-audit intake** (46 items, verified + adversarially re-checked;
+routed into the living docs and the dump deleted — see `.agents/skills/external-audit-intake/`).
+
+1. **Prose describing a harness default drifts silently when the default changes.** §7 of both mains
+   printed the `centered` dimensional encoding (`L=1`, `ν=1/√(α_∞Da)`, …) while every official 2D sweep
+   behind the four 2D tables had run `minmax` since the encoding generalisation (`6bbdef8`) — verified
+   three independent ways (the four `phase1_*.json` keys, the config *embedded in* the certified
+   `results.h5`, and `cell.encoding` in all 868 trajectory sidecars on disk, 868/868 `minmax`). Nothing caught it: no
+   SymPy gate reads that paragraph, the numbers in the tables are dimensionless and so were unaffected,
+   and the paragraph was added (2026-07-19) from the *note*, which was itself stale. **Guard:** when a
+   paper paragraph describes what a harness did, quote the value the **result artifact records**, not the
+   one a companion note describes — and prefer a provenance table (date, config, strategy, where it is
+   recorded) to a prose "the default is X", which is the form that rots. `centered_encoding.tex` carried
+   three mutually inconsistent status statements for the same reason; it now carries one table.
+2. **Verify the audit in both directions, and check what the auditor could see.** Of 46 items, 5 were
+   false or quoted paper text the repo had already softened, and 4 were artifacts of the Repomix export's
+   own exclusion rules (`article.tex`, the commented App-D twin, `figures/`, the `.vo` objects). Acting on
+   those would have *regressed* the paper: the audit's proposed footnote for the projection space is
+   weaker than what `projection_space_note` proves, and its "state the OSGS theorem in ℓ¹" remedy would
+   have reintroduced the global-quasi-uniformity requirement the ℓ² statement exists to avoid. Equally,
+   two items were real and worth the effort *because* the repo had already done the hard part: both Coq
+   statement repairs were mechanical mirrors of a sibling file. **The adversarial second pass earned its
+   keep** — it caught an arithmetic slip in an applied patch ("four orders" where the measured ratio was
+   `1.2×10⁻⁴`), a fourth occurrence of a defect the first pass called "exactly three sites", six missing
+   v1 mirrors, and two proposed note edits that would not have compiled (`\cref`/`{\hyp}` undefined in
+   standalone notes).
+
+### 2026-07-30 (b) — a published table row came from `debug_results/`, and a mesh mismatch manufactured a headline
+
+The `P₂/P₁ ASGS` control rows added to the DBF tables by the 2026-07-21 audit response (R5/D05) were
+assembled from **two databases at two resolutions**: three cells at `N=160` from the official
+`cocquet_form_mms_taylorhood_stabilized.h5`, and the `(10⁵,0.1)` cell at `N=320` from
+`results/debug_results/cocquet_stabth_corner.h5`. Everything else in those tables is at `N=320`.
+
+Two distinct failures, both invisible to every gate:
+
+1. **The rule was broken in the direction the rule anticipates.** `.agents/rules/official-results-path.md`
+   forbids exactly this (a forked `*_corner` side-config/DB whose numbers are merged into a report). The
+   fork was created for a legitimate reason — the main sweep OOM'd at `N≥160` under concurrent jobs — and
+   then its output was quoted as if official.
+2. **The mesh mismatch created a false headline.** "About an order of magnitude less accurate than the
+   unstabilized one" is `3.12e-6 / 2.85e-7 = 10.9` — i.e. the *whole* effect is one extra refinement of a
+   cubically-convergent method. At the common mesh the factor is `1.16`–`1.47`. A rate comparison would
+   have been safe; an FME comparison across meshes is not.
+
+**Guards.** (i) When a row is added to an existing results table, check the *finest mesh* of its source DB
+against the table's other rows before quoting an FME — rates are mesh-ladder-robust, magnitudes are not.
+(ii) `make_results_tables.py`-style generators should emit the per-row `N` (or refuse to mix), which is the
+durable version of this lesson and would have caught it mechanically. (iii) A `debug_results/` path
+appearing anywhere in a provenance trace for a published number is a stop condition.
+
+### 2026-07-30 (c) — a hardcoded provenance attribute made a harness silently disagree with the paper
+
+`test/extended/ManufacturedSolutions/run_test.jl` wrote `attributes(g)["physical_epsilon"] = 0.0` and
+`["numerical_epsilon_coeff"] = 0.0` as **literals**, while the per-cell config it assembles carries a
+literal `"physical_epsilon" => 1e-8` that the swept `[0.0]` factor never overrides. So the sweep ran at
+`ε̂ = 1e-8` and the database attested `0.0`. Both mains then stated "in all the examples we take `ε = 0`" —
+false for the 2D sweep and for the DBF comparison, which share the defect — while the 3D paragraph erred
+the other way, calling the lagged iterative penalty a physical compressibility (`ε > 0`) when `ε_phys`
+is exactly 0 there. Three descriptions of the same runs, all traceable to a recorded constant that was
+never a measurement. Full argument in [findings.md](findings.md) §9.5.
+
+The value is numerically inert (`1e-8`, far below `eq:UpperBoundOnEpsilon`, with the MMS oracle built from
+the same formulation), so nothing computed was wrong. What failed was the parameters→results link, which is
+what `.agents/rules/reproducible-results.md` exists to protect: an attribute that does not *read* the
+quantity it names is worse than an absent one, because it is quotable.
+
+**Guards.** (i) A provenance attribute must be read back off the object that was actually used
+(`form.physical_epsilon`), never restated as a literal — if the value is worth recording it is worth
+reading. (ii) Where a config value is *reinterpreted* (here the config's `physical_epsilon` is the
+dimensionless `ε̂`, converted per-cell), record **both** the declared and the assembled number under
+distinct names (`dimensionless_epsilon` and `physical_epsilon`); a single ambiguous name is how the paper
+came to describe the dimensionless value as if it were the dimensional one. (iii) When the paper states a
+parameter value "in all the examples", check each harness separately — 2D and 3D differed here.
+
+### 2026-07-30 (d) — a parity sweep must cover what the correction implies, not the sentence that was quoted
+
+Correcting one main and forgetting the other is the recurring miss in this repo, and this pass shows the
+subtler version of it: the mirror pass *ran*, and still left five factual drifts in `article.tex`.
+
+- It updated v1's "We compare **four** discretizations" preamble and left "the **three** discretizations
+  behave alike" standing three paragraphs later — the audit item quoted the first sentence, so only the
+  first sentence was searched.
+- Four more were drifts the audit never mentioned, exposed only because a v2 correction made v1 internally
+  inconsistent: v1's 3D penalty paragraph still called `ε = 10⁻⁴ε_ref` a *compressibility* while the same
+  subsection's newly amended text said `ε` is "kept at exactly 0"; v1 still claimed the 3D regular-mesh
+  "rates approach the theoretical optima" after its own captions stopped printing an optimum for the
+  pressure; v1's `c₁` remark still asserted an absolute margin below the Kuhn threshold without the
+  element-length convention that makes the ratio meaningful; and the `u_ε` drag-regularization disclosure
+  was absent, so v1 described a resistance law the harness does not solve.
+
+**Guards.** (i) After mirroring a correction, grep v1 for the *claim*, not the quoted string — every number,
+every count, every parameter name the correction touches. (ii) When a v2 edit changes what a shared table
+caption asserts, the body text of BOTH mains that leans on that caption must be re-read; a caption and its
+prose drift silently because no gate couples them. (iii) A checklist line saying one main is exempt
+("v1 has no such rows") is a claim about a file — verify it in the file. Here it was false, and it is what
+let v1 keep a refuted headline number.

@@ -5,6 +5,10 @@ glob: "**/*.{md,jl,json}"
 ---
 # Mindset: docs/ is a living ledger — reconcile it before every commit
 
+> **Audits are input, not documentation.** An external audit/review/critique is verified and then
+> *routed* into the docs below; the dump is deleted in the same pass. Procedure:
+> [`../skills/external-audit-intake/SKILL.md`](../skills/external-audit-intake/SKILL.md).
+
 `docs/` records the **process** of building this solver and its theory: what is known, what is open,
 what is next. That value decays the moment it drifts from reality — a closed question left flagged
 OPEN, a done task still in the backlog, a settled finding buried in a dossier. So `docs/` is not

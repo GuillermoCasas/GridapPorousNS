@@ -50,6 +50,32 @@ cross-reference; results-section figures — **tables-only settled**, the `\Guil
 porosity figure kept; the "Kratos Multiphysics" claim — the paper reads Gridap, 0 Kratos mentions). Full list:
 [`open-questions.md`](open-questions.md) §4.
 
+**Editorial-markup flatten (prior-audit B04; re-raised as N7/P1 by the 2026-07-30 audit), scoped.**
+Only the *textual* unwrap remains: **495** `\amend` + 8 `\Guillermo` + 3 `\Joaquin` in
+`article_v2.tex` and **31** `\amend` across App. A/B/C (App. D has none) — **537** active wrappers in
+the v2 set; the v1 set is **502** (`article.tex` 460 + 8 + 3, same 31 in the appendices). Earlier
+registers recorded 435 and then 480; both were snapshots that the next prose pass invalidated, so
+**regenerate rather than quote**, counting only non-comment lines:
+```
+python3 - <<'EOF'
+import re
+def n(f,m):
+    return sum(len(re.findall(re.escape('\\'+m+'{'), re.split(r'(?<!\\)%',l,1)[0])) for l in open(f))
+for f in ('article_v2.tex','article.tex'):
+    print(f, n(f,'amend'), n(f,'Guillermo'), n(f,'Joaquin'))
+EOF
+``` The "remove colour macros" half is **already done**:
+`article_v2.tex:112-116` defines all three as identity (`\newcommand{\amend}[1]{#1}`), so the
+wrappers are typeset-neutral and the build is clean. Do the unwrap **once, after the prose freeze**,
+with a brace-balancing pass (not a regex — many bodies contain nested braces), then delete the three
+`\newcommand`s, and gate it as *output-neutral*: same page count, same newlabel count, zero
+undefined refs, and a PDF text-layer diff of zero. Bundle P7 with it (12 relocation-provenance date
+stamps in `.tex` comments → neutral dependency statements; keep `shared.tex`'s `(verified <date>)`,
+which is the evidence a `[known-fragility]` workaround was reproduced rather than guessed).
+*Declined:* keeping an annotated copy on a branch — git already holds it, and a second annotated
+appendix would recreate the un-gated-twin blind spot `sympy/appendix_twins_verification.py` exists to
+prevent.
+
 ---
 
 ### 1d. Cover the paper's *intermediate* derivations in the verification suite — App. A **DONE**
@@ -170,6 +196,44 @@ Anderson is landed (`osgs_anderson_enabled`, default OFF, bit-identical), cuts s
 regimes where the linear rate is the bottleneck. Does **not** rescue P2-OSGS-3D (solved by the c₁-inflated
 preconditioner). See [`findings.md`](findings.md) §5 (Anderson).
 
+### 4g. 🟠 Both MMS harnesses hardcode `physical_epsilon = 1e-8` in the per-cell config (2026-07-30)
+
+`ManufacturedSolutions/run_test.jl:780` and `CocquetFormMMS/run_test.jl:513` build each cell's config with
+a **literal** `"physical_epsilon" => 1e-8`; the swept factor `physical_properties.physical_epsilon = [0.0]`
+that every config declares is never read into that dict, so it does not override the literal. So both 2D
+campaigns run at a dimensionless `ε̂ = 1e-8`, not `0` — see [`findings.md`](findings.md) §9.5 for the full
+argument and why nothing computed is affected (the MMS mass source carries the matching `ε·p_ex`).
+
+**Done:** the recorded provenance is fixed (both harnesses now read `physical_epsilon` and
+`numerical_epsilon_coeff` off the assembled formulation and add a `dimensionless_epsilon` attribute), and
+both mains now describe `ε` honestly in §7.1, §7.3 and the §3 trim paragraph.
+
+**The defect is broader than one literal — there are three unread swept factors and three writers:**
+
+| declared in the config | read by the harness? | what actually runs |
+|---|---|---|
+| `physical_properties.physical_epsilon = [0.0]` | **no** | `1e-8` (literal at `run_test.jl:780` / `:513`) |
+| `physical_properties.numerical_epsilon_coefficient = [0.0001]` | **no** | `0.0` (never passed to `PaperGeneralFormulation`, whose kwarg defaults to `0.0`) |
+| — | — | the `(10⁶,0.05)` corner runs via `probe_stiff_diagnose.jl` `build_cell`, a **fourth** literal `1e-8` |
+
+So the shipped configuration states the opposite of what runs, in both directions, and a re-run *driven
+from the config* would not reproduce the paper's `ε`. That is a direct tension with the
+no-implicit-defaults hard rule ("Fail loudly on missing input"), not merely untidy.
+
+**Done in this pass (provenance only, no numeric change):** all three writers now record what was
+assembled — `run_test.jl` in both harnesses reads `form.physical_epsilon` / `form.numerical_epsilon` and
+adds `dimensionless_epsilon`; `merge_corner_results.py` records the corner driver's literal instead of a
+false `0.0`.
+
+**Still open — a judgment call:** whether the literals become `0.0` (matching the configs, and restoring
+the simpler "`ε = 0`" statement in the paper) or the config factors get wired through (the right shape — a
+swept factor the harness ignores is a trap regardless of its value). Either changes every 2D cell's
+numbers at the `1e-8` level and so invalidates the committed DBs: it is a **re-run, not an edit**, and
+must wait until the submission ladder is frozen. Do not "fix" it silently. Settle together with `6f` (the
+production single-run path carries the same fixed `physical_epsilon`), and note that whichever way it
+goes, `ε̂ = 1e-8` is *consistent* today — the MMS mass source carries the matching `ε·p_ex`
+(`mms_paper.jl:602`), so the current numbers are exact for the problem actually solved.
+
 ### 4f. Encoding-invariance test — OSGS-covariance floor (threshold relaxed to 5e-8 — DECISION NEEDED)
 `test/quick/encoding_invariance_quick_test.jl`: OSGS `err_u_l2` cross-encoding covariance sits at
 reldiff ≈ 1.378e-8 (the other 5 metrics pass ~1e-10). The gate `_INV_RTOL` was **relaxed 1e-8 → 5e-8**
@@ -201,6 +265,23 @@ and reports **ASGS's error under the OSGS label**. The `osgs_short_circuited_on_
 *label* (e.g. `method="OSGS(degenerated→ASGS)"`), add a diagnostic that red-flags identical ASGS/OSGS error
 tuples, and surface per-level mesh quality (min dihedral / radius-ratio). (§5b — plotter now gates on
 `success` via `_level_success`, `7d670d6` — is DONE.)
+
+### 5c. Per-attempt terminal-status supplement for the omitted cells (audit T6, 2026-07-30)
+
+§7 already discloses *which* cell is omitted (`(Re,α₀)=(10⁶,0.05)`), *which* meshes recover it
+(ℙ₁ from N≈512, ℚ₂ from N=160), the *initialization* (exact solution), the *exit* (Newton and Picard
+both stall at a finite residual) and the non-claim (nonexistence is not established) — so the audit's
+"a reader cannot reconstruct" is mostly false of the manuscript. What is genuinely missing is a
+**per-attempt terminal-status record**: no residual values, no per-mesh pass/fail row, and the
+failing coarse-mesh corner attempts are in no official DB because the config skips them.
+
+Cheap, no re-run: the data is on disk. Extend
+`test/extended/ManufacturedSolutions/make_results_tables.py` (reuse `_mesh_success()`,
+`load_corner()`, `load_iters_traces()`, which already read `overall_verification_success`,
+`eval_residuals`, `eval_iters` and the sidecars' `final_residual`/`success`) to emit **one CSV row
+per `(Re, Da, α₀, element, method, N)`** with initialization, terminal residual and gate outcome.
+Ship it with the release bundle (§6g) rather than promising a supplement in the paper — the paper
+sentence goes in only once the artifact exists.
 
 ### 5b. CONV-04 (low) — sub-optimal-rate budget uses a bare power of `h`
 The sub-optimal-rate budget uses a bare power of h with no reference-error normalization (scale-dependent) —
@@ -247,6 +328,37 @@ named function + archive the config snapshot), and make `eps_val`/`eps_phys` agr
 the MMS harness derives. Harmless for a single run (no encoding sweep) but inconsistent with the harness
 ([`lessons_learned.md`](lessons_learned.md) §4, 2026-06-02).
 
+### 6g. Submission release bundle (audit C12/P2/S6/T9, 2026-07-30)
+
+The audit's C12 is **five-sixths a packing artifact** — `article.tex`,
+`osgs_appendix_commented.tex`, `figures/bump_plateau.pdf`, the 25 Coq `.vo` objects, `src/`, 39
+tracked configs and 12 tracked meshes all exist; they were absent from `repomix-theory-proofs-under-1m.md`
+only by its own exclusion rules. Its build-failure claim is **refuted** (both mains build clean here:
+v2 116 pp / 976 newlabels, v1 80 pp / 776; the auditor hit the known `ntheorem`×`cleveref≥0.21` clash
+inside the bundled 2019 `siamart190516.cls`, a TeX-distribution portability issue). What is real:
+
+1. **Pin the build environment.** The class/`cleveref` clash means "builds clean" is currently a
+   statement about *this* TeX Live. Record TeX Live year + `cleveref`/`ntheorem` versions (and
+   Coq/Rocq, Python+SymPy, Julia) in a lockfile or container.
+2. **One build command, one gate command**, with expected exit codes and expected summary counts —
+   this is what replaces the prose "verified clean". Keep the counts regenerated from the live build,
+   never hand-edited: `grep -a "Output written" "latex compilation/<base>/<base>.log"` and
+   `grep -ac newlabel "latex compilation/<base>/<base>.aux"`.
+3. **Archived logs with hashes**, and a source-coupled check that the file linted is the file built
+   (the App-D twin asymmetry is already gated by `sympy/appendix_twins_verification.py`; the same
+   idea should cover the rest).
+4. **The archival DOI** for the *Code and data availability* section now present in both mains. The
+   URL half is done — the section names `https://github.com/GuillermoCasas/GridapPorousNS`, verified
+   public 2026-07-30. Remaining: deposit the exact snapshot (Zenodo or equivalent), add its DOI and the
+   commit hash to the statement, and **push** the revision the paper describes (this pass is
+   uncommitted). Note the result DBs are gitignored by design, so the deposit should either include
+   them or rely on the regeneration recipe of items 2-3 above.
+5. Ship the per-attempt status CSV of §5c and the raw result DBs (or their regeneration recipe)
+   alongside.
+
+Do **not** describe a Repomix export with deliberate exclusions as self-contained — that framing is
+what produced four of this audit's items.
+
 ---
 
 ## 7. Tests & validation sweeps
@@ -291,20 +403,61 @@ optional provenance bookkeeping, not a blocker. Command if ever needed: `run_con
 Three audit-driven reruns were run and analyzed; verdicts recorded in [`findings.md`](findings.md) §8. Paper
 integration status:
 - **R5 — stabilized Taylor–Hood P2/P1 control** (audit D05): **✅ DONE + ported into `article_v2.tex`** as the
-  `P2/P1 ASGS` rows of `tab:CocquetMMSL2/H1` (commit `384362f`). Verdict: converges at optimal rates at Re=10⁵
-  where unstabilized-TH velocity stagnates, but ~10× less accurate in the viscous regime — isolates the high-Re
-  gain to the **stabilization**, not the space pair. (Not yet ported into `article.tex` v1 — only relevant if v1
-  is submitted.)
+  `P2/P1 ASGS` rows of `tab:CocquetMMSL2/H1` (commit `384362f`), **and into `article.tex` v1 on 2026-07-30** —
+  v1 always carried the same four rows, so the earlier "not yet ported / v1 has no such rows" note was wrong
+  (see the checklist correction and `lessons_learned.md` 2026-07-30 (d)). Verdict: it converges at Re=10⁵ where
+  the unstabilized-TH velocity stagnates, isolating the high-Re gain to the **stabilization** rather than the
+  space pair. The viscous-regime penalty is **not** ~10×: that figure compared `N=160` against `N=320`; at the
+  common mesh it is **1.16×** (α₀=0.5) and **1.47×** (α₀=0.1). Both mains now print the common-mesh factor and
+  disclose the mesh caveat in the captions; the re-run that removes the caveat is §7h.
 - **R6 — genuinely-3D MMS** (audit N19): grid ran (`results/k*/TET/genuine3d/`), verdict optimal rates for both
-  orders + OSGS pressure H¹ converges (slope 2.0, unlike the extruded field's 1.29 plateau). Drop-in table
-  `theory/paper/genuine3d_table.tex` **exists but is NOT yet `\input` into either article** — author decision
-  pending: add-alongside vs replace-extruded for §7.2.
+  orders + OSGS pressure H¹ converges (slope 2.0, unlike the extruded field's 1.29 plateau).
+  **✅ DONE + ported:** `theory/paper/genuine3d_table.tex` is `\input` after `tab:3DH1` in
+  `article_v2.tex` (v2 only, as with the R5 control), with a paragraph stating what the data shows.
+  The author decision came out *add-alongside*: the genuine-3D `H¹` pressure errors stay `O(1)`
+  (1.22–2.97) exactly as on the extruded field, so they **sharpen** the adverse 3D finding rather than
+  dissolving it (`open-questions.md` §4, `pre-submission-checklist.md` RESOLVED T7).
 - **R2 — α-interpolation ablation** (audit I07): **✅ analyzed.** P1-α is benign for P1 elements (~1.1×) but caps
   P2 convergence (48–73× worse) — FE interpolation of α preserves convergence only when interpolated at (≥) the
   velocity order. Refines the conclusion's I07 claim (currently softened to future work).
 - Dropped (analysis, no run): **R10** (3D-OSGS pressure = genuine under-stab, see 4d/7c), **R1** (fold
   continuation — wording softened), **R3** (c₁-eigenvalue study — see `open-questions.md` §3), **R4** (pointwise
   vs elementwise τ — N09 text fallback stands; a moderate code change if ever pursued).
+
+### 7h. 🔴 Re-run the stabilized-Taylor--Hood control to N=320 through the official path
+
+Found by the 2026-07-30 critical reread and **verified against the DBs**: the `P₂/P₁ ASGS` rows of
+`tab:CocquetMMSL2/H1` are not on the published ladder. `cocquet_form_mms_taylorhood_stabilized.h5` has
+`h = [1/10 … 1/160]` (the `(10⁵,0.1)` cell only `[1/10 … 1/80]`, the first three NaN), while every other
+row in those tables is at `N=320`; and the `(10⁵,0.1)` row actually printed (`2.18e-5` / `4.81e-6`) comes
+from **`results/debug_results/cocquet_stabth_corner.h5`**, a forked side-DB — forbidden for published
+numbers by `.agents/rules/official-results-path.md`.
+
+The paper now discloses this (captions + §7.3 preamble) and the false "order of magnitude less accurate"
+claim is corrected to the common-mesh ratio (1.16× at α₀=0.5, 1.47× at α₀=0.1). **The proper fix is a
+re-run:** extend the ladder in `data/cocquet_form_mms_taylorhood_stabilized.json` to `N=320` for all four
+cells, archive the current DB to `previous_results/` first, run through `run_test.jl`, then requote the
+four `P₂/P₁ ASGS` rows from the official DB and delete the caveat. Retire
+`cocquet_form_mms_taylorhood_stabilized_corner.json` / `debug_results/cocquet_stabth_corner.h5` once its
+cell is covered officially. Note the earlier attempt "crashed (OOM, concurrent jobs) at N≥160" per the
+corner config's own comment, so run it alone, or sharded.
+
+**Status 2026-07-30, IN PROGRESS.** Launched alone through the official path (the DB was archived to
+`previous_results/` first; the config already declared the full ladder `[10,20,40,80,160,320]`, so no
+config edit was needed). The full ladder is re-run, not just `N=320` — deliberately: the tabulated rates
+are two-mesh estimates so `N=160` is needed regardless, and trimming the declared ladder would change
+what the DB records about its own provenance. The measured cost of the sub-160 part is **~600 s across
+the four cells** (`312 + 257 + 31 + 0 s`), heavily skewed: 31 s for the cheap `(1, 0.1)` cell, but 312 s
+and 257 s for the other two — the first is dominated by one-time JIT (3 Newton iterations), the second is
+a genuine 75-iteration coarse solve at `Re=10⁵`. That is still small against `N=160`/`N=320`, but it is
+**not** the ~30 s that an earlier version of this note quoted: that was one cell's `eval_times` read as
+if representative (the same read-one-cell-as-the-whole error class as
+`lessons_learned.md` 2026-07-30 (b)). On completion: requote the four `P₂/P₁ ASGS` rows in
+`tab:CocquetMMSL2/H1` from the official DB in **both** mains, drop the mesh caveat from the captions and
+the §7.3 preamble, re-check the two claims that depend on those rows (§7.3's "converges at optimal
+velocity and pressure rates at Re=10⁵" — the pre-run tables show the velocity sub-optimal, `2.4`/`1.3` at
+α₀=0.5 — and "all four discretizations behave alike" at Re=1), retire the corner side-config/DB, and
+close this item.
 
 ### 7g. Constrained-projection OSGS — measure the P2 MMS rate (settles the L²/energy-norm split)
 The companion note [`theory/projection_space_note/`](../theory/projection_space_note/projection_space_note.pdf)
@@ -333,6 +486,26 @@ schema/`StabilizationConfig`/configs: `osgs_projection_coupling`, `osgs_freeze_a
 `osgs_state_drift_scale`, `osgs_projection_tolerance`, `osgs_warmup_*`, the ping-pong knobs, `ablation_mode`,
 and the inert off-switches. Retire them. See
 [`archive/coupled-only-leaning-and-jfnk-plan.md`](archive/coupled-only-leaning-and-jfnk-plan.md) §3.
+
+### 8d. 🟡 Eight note `latexmkrc` files still use the broken literal-`%B` `$aux_dir`
+
+`theory/<note>/latexmkrc` in **eight** directories still sets `$aux_dir = 'latex compilation/%B'`.
+TeX Live 2023's latexmk 4.79 does **not** expand `%B` there, so every build routes into a directory
+literally named `%B` while a months-old log sits in the correctly-named sibling. That is not cosmetic:
+`document_hygiene_verification.py` globs for `latex compilation/*/<base>.log`, and `%B` sorts *before*
+any letter, so the old `sorted(...)[0]` read the **stale** log. It hid a 344.92 pt overfull table
+(~12 cm past the margin) in `centered_encoding.tex` for the whole of 2026-07-30.
+
+Fixed in this pass: `centered_encoding/` and `cocquet/` (migrated to the `@ARGV` form, stale dirs
+deleted, both added to the gate's `DOCS`), and the gate now selects the **newest** log and fails a new
+rule `H8` when more than one aux directory holds a `<base>.log`.
+
+Remaining (mechanical, ~5 min each — copy `theory/paper/latexmkrc`'s `@ARGV` block, set
+`@default_files`, drop the `./siam//` paths, `rm -rf 'latex compilation/%B'`, rebuild):
+`continuity appendix/`, `osgs_algorithm/`, `osgs_reaction_note/`, `pressure_recentering_note/`,
+`projection_space_note/`, `scale_free_gate_note/`, `tau_saturation_note/`,
+`velocity_floor_regularization/`. Each should then be added to `DOCS` with its current overfull debt —
+none of them is gated today, so each may be carrying the same class of defect unseen.
 
 ### 8b. `_inv_centered.json` latent fragility
 `test/quick/encoding_invariance_quick_test.jl` reads a config it must generate first — fine today, but a stale

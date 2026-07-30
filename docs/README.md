@@ -81,6 +81,15 @@ coupled-only-leaning decision record.
 | Part-I erratum | [part_i_erratum.md](part_i_erratum.md) | The elemental-matrix assembly-display fix (RESOLVED 2026-07-12) + the durable `assembly_consistency_verification.py` guard. |
 | **External audit dossier** | [`ChatGPT audit/`](ChatGPT%20audit/) | Slimmed (2026-07-23): consumed audit dumps pruned; keeps the forward-looking records — `latest_audit_response.md` (live "what remains / do-not-re-fix" reference), `validity_verdicts.csv`, and the round-2 plans that produced `article_v2.tex`. The 2026-07-23 commented-appendix disposition is [`audit_commented_article.md`](audit_commented_article.md). |
 
+> **Audits do not get their own docs any more.** The fourth external audit (2026-07-30) was verified item
+> by item and **routed** into the docs above — applied/open/declined/false in
+> [`pre-submission-checklist.md`](pre-submission-checklist.md), settled results with their arguments in
+> [`findings.md`](findings.md) §9, work in [`pending-tasks.md`](pending-tasks.md) §1c/§5c/§6g, author
+> decisions in [`open-questions.md`](open-questions.md) §4, the process lesson in
+> [`lessons_learned.md`](lessons_learned.md) — and its dump was deleted. The procedure is
+> [`.agents/skills/external-audit-intake/SKILL.md`](../.agents/skills/external-audit-intake/SKILL.md);
+> follow it for the next one, and retire the dossiers above as their forward-looking content is absorbed.
+
 > **Paper version note.** The docs were written against [`../theory/paper/article.tex`](../theory/paper/article.tex)
 > (the original) and cite its line numbers. A harmonized [`../theory/paper/article_v2.tex`](../theory/paper/article_v2.tex)
 > now integrates the OSGS theory as Appendix D with symmetric ASGS/OSGS appendices; `coq_coverage.tex` already
@@ -130,7 +139,7 @@ move it to LaTeX — not something to grow here.
 The paper's a priori chain (stability, continuity, interpolation, convergence) is machine-checked in Coq
 under [`../proof_verification/`](../proof_verification/): the **ASGS** abstract theorems (four, proved from a
 ~50-hypothesis trusted base, plus non-vacuity witnesses) **and** the **OSGS** abstract theorems (inf–sup
-stability, interpolation, consistency, convergence — `abstract_osgs_*`). The tree is now **24 `.v` files**,
+stability, interpolation, consistency, convergence — `abstract_osgs_*`). The tree is now **25 `.v` files**,
 0 `Admitted` / 0 `Axiom`. The paper↔Coq map (ASGS = App. C, OSGS = App. D of `article_v2.tex`) and the
 trusted-base inventory are in
 [`../proof_verification/coq_coverage.tex`](../proof_verification/coq_coverage.tex); that tree is

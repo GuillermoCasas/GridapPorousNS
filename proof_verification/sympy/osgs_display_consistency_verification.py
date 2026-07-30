@@ -11,12 +11,14 @@
 # whole suite unflagged.
 #
 # The specific display at issue: the sigma-robust L^2 velocity corollary
-# oa:eq:LtwoVelocity (osgs_appendix.tex:1190) carries the elementwise factor
+# oa:eq:LtwoVelocity (osgs_appendix.tex:1157) carries the elementwise factor
 # (1 + c1/Da_h); the body text (article_v2.tex:1082-1092, 1226-1230) states the
 # Da_h >> c1 asymptotic form in which that factor -> 1. The Coq proves the
 # corollary only ABSTRACTLY (OsgsConvergence.abstract_osgs_convergence_Ltwo:
-# sqrt(sigma)*||e_u|| <= Cconv*Psi_O), keeping the RHS as the abstract functional
-# Eh and never unfolding this closed form -- so neither machine layer saw it.
+# sqrt(sigma)*||e_u|| <= Cconv*Psi_O), keeping the RHS as the error functional it
+# is handed (an abstract nonnegative scalar there; OsgsInterpolation instantiates
+# it as PsiO = Psi_O since 2026-07-30) and never unfolding this closed form --
+# so neither machine layer saw it.
 #
 # This script re-derives the corollary from the OSGS error functional Psi_O and
 # the elementwise parameter identities, verifying that the (1 + c1/Da_h) factor
@@ -28,13 +30,15 @@
 # spurious factor) would fail (C5b).
 #
 # Symbols/identities are transcribed from osgs_appendix.tex:
-#   Re_h  = |a|_inf,K h_K / nu                              (oa:eq:...,  l.107)
-#   Da_h  = sigma h_K^2 / (alpha_K nu)                      (              l.110)
-#   tau2  = (nu/alpha_K)(1 + (c2/c1) Re_h)                  (oa:eq:Tau2Expanded, l.102-105)
-#   tau1 <= 1/sigma                                          (oa:eq:P1,  l.287)
+# (Line numbers re-verified 2026-07-30; they drift on every appendix edit, so the
+#  LABEL is the authority and the number only a hint.)
+#   Re_h  = |a|_inf,K h_K / nu                              (osgs_appendix.tex l.67)
+#   Da_h  = sigma h_K^2 / (alpha_K nu)                      (                  l.70)
+#   tau2  = (nu/alpha_K)(1 + (c2/c1) Re_h)                  (oa:eq:Tau2Expanded, l.63)
+#   tau1 <= 1/sigma                                          (oa:eq:P1,  l.244)
 #   Psi_O^2 summand = (c1+Da_h)(alpha_K^2/h_K^2)(tau2 E_u^2 + tau1 E_p^2)
-#                                                            (oa:eq:ErrorFunctionL2, l.847)
-#   ||e_u|| <= sigma^{-1/2} Psi_O(h)                        (oa:cor:Ltwo proof, l.1209)
+#                                                            (oa:eq:ErrorFunctionL2, l.808)
+#   ||e_u|| <= sigma^{-1/2} Psi_O(h)                        (oa:cor:Ltwo, l.1154)
 #
 # Run:  python3 osgs_display_consistency_verification.py     (requires sympy)
 # =============================================================================

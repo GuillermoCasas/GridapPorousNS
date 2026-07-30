@@ -422,9 +422,191 @@ An external audit plus a full every-equation coverage sweep this session settled
 
 Three reruns were implemented and run for the external audit; all produced usable results (dropped after analysis — no run needed: **R10** 3D-OSGS 1.29 = genuine under-stabilization with a solution-preserving knob; **R1** fold continuation; **R3** c₁-eigenvalue study; **R4** pointwise-τ, N09 text fallback).
 
-- **R5 / D05 — stabilized Taylor–Hood control.** Applying the ASGS residual stabilization to the *same* inf-sup-stable P2/P1 pair as the unstabilized-Galerkin baseline: it **converges at optimal velocity and pressure rates at Re=10⁵** (L2u rate 2.41 at α₀=0.5) exactly where the unstabilized TH velocity stagnates (n.c.), but is ~10× *less* accurate than unstabilized TH in the viscous regime (the stabilization, calibrated for the equal-order LBB-unstable case, is a redundant perturbation on an already-stable pair). This **isolates the high-Re gain to the stabilization, not the space pair** — the decisive answer to D05. Added as the `$\mathbb{P}_2/\mathbb{P}_1$ ASGS` rows in `tab:CocquetMMSL2/H1`. Config `cocquet_form_mms_taylorhood_stabilized.json`.
-- **R6 / N19 — genuinely-3D field.** `u = U α₀·curl(A)/α` (all components x,y,z-dependent, u_z≠0, div(αu)=0 exactly). On the same regular Kuhn family at c₁=16k⁴, the method attains **optimal rates for both orders and both stabilizations** (P1: L2u≈1.9/H1u≈1.0; P2: L2u≈3.5/H1u≈2.3). Notably the **OSGS pressure converges in the H¹-seminorm** (P2 slope 2.0), *unlike* the extruded field's saturation (~1.29, slope≈0) — so the extruded pressure plateau was tied to the z-invariant degeneracy (consistent with the R10 reading, not contradicting it). Exact Newton reaches ‖R‖=3.5×10⁻¹⁶, confirming the hand-derived forcing is exact end-to-end. Drop-in table `theory/paper/genuine3d_table.tex`; harness `smoke3d.jl sweep_genuine3d` → `results/k*/TET/genuine3d/`. (Author to decide add-alongside vs. replace-extruded for §7.2.)
+- **R5 / D05 — stabilized Taylor–Hood control.** Applying the ASGS residual stabilization to the *same* inf-sup-stable P2/P1 pair as the unstabilized-Galerkin baseline: it **converges at Re=10⁵ exactly where the unstabilized TH velocity stagnates** (n.c.) — at the optimal *pressure* rate, and at a clearly positive but **sub-optimal velocity rate** (L2u 2.41 against the optimal 3 at α₀=0.5; the "optimal velocity rates" this bullet originally claimed contradicted its own quoted number). In the viscous regime the stabilization costs accuracy — a redundant perturbation on an already-stable pair — but by **1.16×** (α₀=0.5) to **1.47×** (α₀=0.1) at the common mesh, *not* the ~10× first recorded here: that figure compared the stabilized row's `N=160` FME against the unstabilized row's `N=320` (see [[lessons_learned]] 2026-07-30 (b)). Both figures are pending the §7h re-run to `N=320`. This **isolates the high-Re gain to the stabilization, not the space pair** — the decisive answer to D05. Added as the `$\mathbb{P}_2/\mathbb{P}_1$ ASGS` rows in `tab:CocquetMMSL2/H1`. Config `cocquet_form_mms_taylorhood_stabilized.json`.
+- **R6 / N19 — genuinely-3D field.** `u = U α₀·curl(A)/α` (all components x,y,z-dependent, u_z≠0, div(αu)=0 exactly). On the same regular Kuhn family at c₁=16k⁴, the method attains **optimal rates for both orders and both stabilizations** (P1: L2u≈1.9/H1u≈1.0; P2: L2u≈3.5/H1u≈2.3). Notably the **OSGS pressure converges in the H¹-seminorm** (P2 slope 2.0), *unlike* the extruded field's saturation (~1.29, slope≈0) — so the extruded pressure *rate* plateau was tied to the z-invariant degeneracy. Note the sharper reading the paper adopts: the absolute `H¹` pressure errors stay `O(1)` (1.22–2.97) on the genuine-3D field too, so the near-stagnant **magnitude** is **not** an artifact of the degeneracy — only the rate recovers. (Consistent with the R10 reading, not contradicting it.) Exact Newton reaches ‖R‖=3.5×10⁻¹⁶, confirming the hand-derived forcing is exact end-to-end. Table `theory/paper/genuine3d_table.tex`, now `\input` after `tab:3DH1` in `article_v2.tex` as `tab:Genuine3D` (decision: add-alongside); harness `smoke3d.jl sweep_genuine3d` → `results/k*/TET/genuine3d/`.
 - **R2 / I07 — α-interpolation.** Interpolating the porosity onto a degree-p FE space in the formulation while the oracle keeps analytic α (so the forcing stays exact, isolating the model error): **P1-α is benign for P1 elements** (~1.1× the analytic baseline) but **caps P2 convergence** (48–73× worse) — the O(h²) coefficient-interpolation error dominates the P2 method's O(h³). So FE interpolation of α preserves convergence when interpolated at (at least) the velocity order; under-resolving it caps the rate at the α-interpolation order. This refines the conclusion's I07 claim (currently softened to future work). Config `cocquet_form_mms_alpha_interp_p1.json`, knob `porosity_interpolation_order`.
+
+
+## 9. Statement-transcription repairs in the machine layer, and the encoding-provenance find — RESOLVED (2026-07-30)
+
+Three settled results from the fourth external audit's intake. Recorded with the argument, because
+in each case the *reason* is what makes the result reusable.
+
+### 9.1 The Coq continuity theorem now proves the printed statement (`Rabs BS`)
+
+**Verdict: the one-sidedness was a transcription gap, not a missing mathematical fact, and the
+repair was nearly free.** `AbstractContinuity.v` concluded `BS <= Ctot*((BrU+BrP)*NV)` on a signed
+`Definition BS` (the eighteen-term sum), while `lemma:Continuity` prints `|B_ASGS| ≤ …`. A one-sided
+bound on a signed quantity is strictly weaker, so the claim "the printed continuity lemma is
+kernel-certified" was false as stated — the repo's own `hypothesis_transcription_audit.md` (row 6)
+and `theorem_statement_verification.py` had both named it, paper-side only.
+
+The decisive observation: **every one of the eighteen group bounds in the file was already an `Rabs`
+estimate** (`bound_T1` … `bound_T13c`, `bound_VolP`, `bound_JmpP`, `bound_II_V`, `bound_III`), and
+the bars were discarded only in the last ten lines of the Step-8 assembly, via `Rle_abs`
+(`x <= Rabs x`). The sibling `AbstractInterpolation.v` — the same eighteen-term machinery re-run
+with the interpolation error in the first slot — had stated the **barred** form all along
+(`abstract_continterp_sharp : Rabs BS <= …`). So the file was the odd one out, and the fix is the
+triangle inequality it already had: two elementary `Rabs` bridges proved from the definition of
+`Rabs` (no stdlib lemma name to guess), then `apply abs_le_of` over the same regrouping. The signed
+bounds are kept as `abstract_continuity_signed` / `abstract_continuity_sharp_signed`, because
+`coq_coverage.tex`'s trust-stratum narrative reasons about them.
+
+*Why the negation shortcut was not used:* `BS` is bilinear and the right-hand side sign-invariant, so
+instantiating the section at negated `V`-data would also give the barred bound — but that step lives
+*outside* the kernel, which is exactly what "kernel-certified" is supposed to exclude.
+
+### 9.2 The OSGS Coq error functional is now the paper's sharp `Ψ_O` (broken ℓ²)
+
+`OsgsInterpolation.v` defined the error functional as the elementwise **sum**
+`E(h) = Σ_K (α_K/h_K)(1+Da_h)^{1/2}(τ₂^{1/2}E_u + τ₁^{1/2}E_p)` — the ℓ¹ majorant — while App. D
+states `oa:th:convergence` in `Ψ_O(h) = (Σ_K (c₁+Da_h)(α_K/h_K)²(τ₂E_u² + τ₁E_p²))^{1/2}` and says
+explicitly that the ℓ¹ passage *can lose a mesh-cardinality factor ~h^{-d/2}*, so the optimal-order
+corollaries must be read off ℓ². `coq_coverage.tex` called the mirror "purely mechanical, left as a
+follow-up" — and in one place wrongly wrote `E(h)=Ψ_O`.
+
+**Why the swap is legitimate rather than a strengthening of the trusted base:** App. D proves every
+per-group bound `(I1)–(I7)`, `(S1)`, `(S2)` *in `Ψ_O`* — cite by **label, not line** (this appendix
+shifts): `oa:eq:ConsistencyBound` and `oa:eq:InterpolationBound` are both stated in `Ψ_O`, and the
+collection step closing the latter says so in as many words ("Collecting (I1)--(I7), each
+square-summed right-hand side is dominated by `Ψ_O(h)` … we obtain `oa:eq:InterpolationBound`
+directly in the `ℓ²` functional"). The standalone note `osgs_a_priori/osgs_convergence.tex` is in
+`Ψ_O` too, so the Coq was off-source against *both* documents. The
+ℓ¹ hypotheses were therefore **weaker** than what the appendix establishes; stating them in `Ψ_O`
+moves the transcription *towards* the paper. And `OsgsConvergence.v` needed no change at all: its
+error functional is an abstract nonnegative scalar (`Variable Eh : R`), so
+`abstract_osgs_convergence` and its two corollaries hold in either functional — the composition is
+functional-agnostic, and only `OsgsInterpolation.v` commits.
+
+Landed: `PsiTerm`/`PsiO` (= `Ψ_O`) is what the two theorems and all nine per-term hypotheses are
+stated in; `ErrTerm`/`Eh` keep `E(h)`; **the printed relation `Ψ_O ≤ c₁^{1/2}E(h)` is now itself
+kernel-proved** (`PsiO_le_Eh`, under `c₁≥1` from `H:design`) — it had no gate before. The
+non-vacuity witness stays a clean rational by moving the interpolation data to `(3,4)`, giving
+`Ψ_O = 5`. 25/25 compile + `coqchk` + only the 3 stdlib axioms.
+
+*Scope, kept honest:* this is per-file. `OsgsConvergence.v`'s gluing hypotheses are still never
+discharged at a concrete instance (there is no OSGS analogue of `NonVacuityConv.v`), so the claim is
+"the assembly is checked in `Ψ_O`", never "`oa:th:convergence` is kernel-checked end-to-end".
+
+### 9.3 The paper printed the wrong dimensional encoding (`centered`, not `minmax`) — FIXED
+
+**The one factual defect the audit surfaced, and it is a provenance defect of exactly the kind
+`.agents/rules/reproducible-results.md` exists to prevent.** §7's reproducibility paragraph printed
+the **`centered`** encoding (`L=1`, `ν=1/√(α_∞Da)`, `σ=√(α_∞Da)`, `U=Re/√(α_∞Da)`, and the claim
+that the spread `σ/ν=α_∞Da` "cannot be removed"), while **every official 2D sweep behind the four
+2D tables ran `minmax`**:
+
+`L=√(α_∞Da)`, `U=(Re²/(α_∞Da))^{1/4}`, hence `ν=σ=(α_∞Da/Re²)^{1/4}`.
+
+Evidence, three independent ways: the `encoding_strategy` key of all four
+`data/phase1_{quad,tri}_k{1,2}.json`; the config **embedded inside** the certified
+`results/k1/QUAD/results.h5` (`config_file = phase1_quad_k1.json` → `minmax`); and `cell.encoding`
+in every one of the 868 trajectory sidecars on disk (verified: 868/868 `minmax`, 0 otherwise). The harness fallback is `minmax` too
+(`run_test.jl:471`). So the printed formulas described a *superseded default*.
+
+Two consequences worth keeping:
+
+- **The claim was self-inconsistent, not merely stale.** Under `L=1` the spread `σ/ν` is indeed
+  `α_∞Da`; with `L` free it is exactly 1 (`minmax` sets `ν=σ`). The "cannot be removed" sentence was
+  an artifact of fixing `L=1`.
+- **The dependent `Re_h` claim survives, and now says why.** `Re_h = Re·h/L` is *encoding-invariant*
+  because the harness scales the domain, the porosity radii and the manufactured amplitudes with `L`
+  together (`run_test.jl:45-50, 73`, comment at `:812`), so `h/L = 1/N` always. The 3D tests are
+  unaffected in any case: at `(Re,Da)=(1,1)` every encoding collapses to `L=U=ν=σ=1`. Note the
+  analogous `Da_h` relation is **not** `Da/N²` — it carries `α_∞/α_K` — which the paper states
+  correctly at `eq:GeneralAsymptoticBehaviourOfParameters` and which a careless rewrite would break.
+- **The invariance claim is analytic only.** `centered_encoding.tex` documents a two-mesh `L²u`
+  slope that stalls under one encoding and recovers under another; `lessons_learned.md` (2026-06-02)
+  further records that for the high-Da OSGS cells the mechanism is a *scale-coupled solver gate*,
+  not roundoff. The paper now says the continuous dimensionless problem is invariant while its
+  finite-precision realizations need not be.
+
+### 9.4 The mesh-regularity hypothesis: global quasi-uniformity adopted, and what it is needed for
+
+**Verdict (2026-07-30): global quasi-uniformity is needed by §6 alone, equally for both variants, and
+adopting it *shortens* the assumption list rather than lengthening it.** The tension had been flagged
+by two prior audits and twice reserved to the author: (A1) asked only for *local* quasi-uniformity,
+(O3) added *patch* quasi-uniformity, and §6 invoked *global* quasi-uniformity "assumed throughout" —
+which nothing supplied. Settled by developing the theory in
+[`theory/mesh_regularity_note/`](../theory/mesh_regularity_note/mesh_regularity_note.pdf) (4 pp,
+builds clean), whose four results are:
+
+1. **Global QU implies both the local and the patch versions** (with explicit constants), and the
+   converse fails (a graded family `x_j=(j/n)²` is locally and patchwise QU with
+   `h_max/h_min → ∞`). So replacing "locally" by "globally" in (A1) *subsumes* (O3)'s patch clause
+   instead of adding to it.
+2. **Global QU does not imply smooth grading** `ω_χ(h)→0` for an arbitrary admissible surrogate —
+   an alternating-width family is globally QU with `ω_χ ≥ 1/3` — but on a globally QU family the
+   *constant* surrogate `χ₁ ≡ min_K h_K`, `χ₂ ≡ h` is admissible and gives `ω_χ ≡ 0`. So the
+   smooth-grading hypothesis must be **kept**, and is free for an admissible choice of surrogate.
+3. **The paper's former claim "`ω_χ(h)=O(h)` when the family is quasi-uniform" was false** (same
+   counterexample). The correct sufficient condition is that the surrogate be the pointwise
+   evaluation of a fixed Lipschitz size function, whence `ω_χ ≤ (L/σ₋)h`. Corrected in (O3).
+4. **Where global QU is genuinely needed, and why the appendices escape it.** The elementwise ℓ²
+   functionals only ever need `h_K ≤ h`, so App. C and App. D need nothing beyond local/patch
+   regularity. §6's estimates are *normalized*: `h` appears on **both** sides (e.g.
+   `ν⁻¹h‖∇e_p‖` on the left against `E_int(u)/h` on the right), so replacing `h_K` by `h` is the
+   unfavourable direction and needs `h ≲ h_K`. Without it the single-`h` form degrades by
+   `(h_max/h_min)^q`. The same argument underlies the `#𝒯_h ≍ h^{-d}` cardinality count behind the
+   ℓ¹-vs-ℓ² caveat.
+
+Applied to the paper: (A1) now states global quasi-uniformity, with a footnote recording that the
+appendices need only the weaker versions and that dropping it leaves every appendix result intact in
+its elementwise form; (O3) keeps the surrogates and smooth grading, notes that its patch clause is
+implied, and carries the corrected `ω_χ` statement; §6's invocation now points at (A1). Mirrored into
+`article.tex` with a label-safe footnote (v1 has no `app:osgs`, `H:patch` or `eq:ConvergenceOSGS`).
+
+### 9.5 The 2D MMS sweep does **not** run at `ε = 0` — and the HDF5 attribute said it did
+
+**The 2D manufactured-solution campaign runs with a dimensionless compressibility `ε̂ = 1e-8`, not
+zero, and `results.h5` recorded `physical_epsilon = 0.0` regardless.** Both mains asserted "in all the examples we take `ε = 0`",
+which is false for 2D and for the DBF comparison. (The pre-existing 3D paragraph was wrong in the
+opposite direction — it said "we therefore take a small compressibility `ε > 0`", conflating the lagged
+iterative penalty with a physical compressibility; that is now split into `ε` and `ε_num`, with `ε_phys`
+stated as exactly 0 there. The "parity with 2D" claim was introduced by the *first* pass of this fix and
+removed by the second, so it never shipped.)
+
+The argument. `run_test.jl:780` builds each cell's config with a *literal*
+`"physical_epsilon" => 1e-8`; the swept factor `physical_properties.physical_epsilon = [0.0]` that
+every `phase1_*.json` declares is never read into that dict, so it does not override the literal.
+`build_mms_formulation` then converts it to the dimensional coefficient
+`ε = ε̂·(U/L)/P_c` with `P_c = (1+Re+Da)·U·ν/L`, i.e. the config value **is** the encoding-invariant
+`ε̂`, so `ε̂ = 1e-8` reaches the mass equation of every 2D cell. The 3D harness is genuinely zero:
+`smoke3d.jl:105` sets `physical_epsilon => (recenter ? 0.0 : 1e-8)` and every official 3D sweep runs
+`recenter=true`.
+
+`1e-8` is numerically inert, and — importantly — it introduces **no** inconsistency: the manufactured
+mass source carries the matching `ε·p_ex` term (`src/problems/mms_paper.jl:602` reads
+`formulation.physical_epsilon` for exactly this), so the manufactured field is an exact solution of
+the `ε̂ = 1e-8` problem and the reported errors are genuine discretization errors. The value is also
+far below `eq:UpperBoundOnEpsilon`. The pressure level is weakly anchored by the penalty rather than
+free, which is why the error is measured against the zero-mean representative. What was wrong was the *description*, in two places at once:
+
+- **The paper** now says `ε` is negligible rather than zero in 2D (retained only to keep each linear
+  solve nonsingular), states the pressure level is fixed only to within that penalty, and drops the
+  false 2D/3D parity claim from the 3D paragraph. `ε = 0` remains correct **only** for 3D:
+  `CocquetFormMMS/run_test.jl:513` carries the identical literal, so §7.3's comparison runs at
+  `ε̂ = 1e-8` too and now says so. The §3 trim paragraph, which had been given a parenthetical
+  asserting `ε = 0` in all the experiments, now says `ε` is either exactly zero or negligible.
+- **The provenance record.** `attributes(g)["physical_epsilon"] = 0.0` was *hardcoded* — a recorded
+  value contradicting the run. It now reads the assembled `form.physical_epsilon`, with a new
+  `dimensionless_epsilon` attribute carrying the `ε̂` the config declares. The sibling
+  `["numerical_epsilon_coeff"] = 0.0` was **faithful**, but only by accident: neither 2D harness ever
+  passes `numerical_epsilon` to `PaperGeneralFormulation`, whose kwarg defaults to `0.0`, so the
+  read-back is a no-op there. That exposes the *same trap a second time* — every `phase1_*.json`
+  declares `"numerical_epsilon_coefficient": [0.0001]`, and nothing reads it either. Both unread
+  factors are §4g. A third writer, `merge_corner_results.py`, hardcoded both `0.0` for the
+  `(10⁶, 0.05)` corner groups while `probe_stiff_diagnose.jl`'s `build_cell` runs them at `1e-8`;
+  it now records what that driver actually sets. See [[lessons_learned]] 2026-07-30 (c).
+
+### 9.6 The 3D regular mesh ladder is `N × N × N/4`, not `N × N × ⌈0.3N⌉`
+
+Long-standing text in both mains, wrong arithmetically: `⌈0.3N⌉` gives `3,5,8,10` for the `P₁`
+ladder and `4,5,6,8` for `P₂`, whereas `smoke3d.jl:485` uses `(8,8,2)→(16,16,4)→(24,24,6)→(32,32,8)`
+and `(12,12,3)→(16,16,4)→(20,20,5)→(24,24,6)`. The actual rule is better motivated than the printed
+one: with a `0.3`-thick slab, `N/4` divisions give `dz/dx = (0.3/(N/4))/(1/N) = 1.2` — a **constant**
+element aspect ratio along the ladder, so the anisotropy is not a confounder for the observed rates.
+Corrected in both mains with that justification stated.
 
 ---
 

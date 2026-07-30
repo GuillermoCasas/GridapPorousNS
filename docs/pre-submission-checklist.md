@@ -35,6 +35,225 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > `proof_verification/hypothesis_transcription_audit.md`. Still open: the `\amend`/author-note flatten, the
 > `:274` Fourier cite decision, and the broader β₀/h₀ and robustness wording (author judgment).
 
+> **2026-07-30 addendum (fourth external audit — verified, applied, and the dump deleted).** A
+> fourth external audit (produced from a Repomix export of `theory/` + `proof_verification/`, so it
+> saw neither `src/`, nor `article.tex`, nor the commented App-D twin) was verified item by item
+> against primary sources by a 10-cluster + adversarial-refutation workflow. **All 46 items adjudicated:
+> four verified FALSE (S4, S7, N4, P6), one stale quotation (C1's footnote half), one cluster that is an
+> artifact of the packed export rather than of the repo (C12/T9's "missing files" and the build failure),
+> a dozen already done, five declined with reasons, and the rest applied here.** Both papers rebuild clean
+> (**v2 116 pp / 976 newlabels, v1 80 pp / 776 newlabels, 0 undefined, 0 multiply-defined,
+> 0 overfull > 1 pt**), SymPy **615/615 across 23 scripts**, Coq **25/25 + coqchk + only the 3 stdlib
+> axioms**, Blitz **306/306**. (Counts regenerated from the live logs at the end of the pass — the
+> in-pass figures 114/974 and 608 were superseded by the later reread fixes.) The audit file
+> itself is gone (routed per `.agents/skills/external-audit-intake/`); its IDs are kept below so
+> nothing reads as missed.
+>
+> **✅ APPLIED — proof artefacts.** **C2:** `AbstractContinuity.v` now concludes on `Rabs BS`
+> (`abstract_continuity`, `abstract_continuity_sharp`), matching the printed `|B_ASGS| ≤ …`; the
+> signed bounds survive as `*_signed` corollaries. **C3:** the OSGS Coq error functional is now the
+> sharp broken-ℓ² `Ψ_O` (`PsiO`/`PsiTerm`), with the ℓ¹ majorant `E(h)` kept as `Eh` and the printed
+> relation `Ψ_O ≤ c₁^{1/2}E(h)` itself kernel-proved (`PsiO_le_Eh`). Both are transcription repairs,
+> not new mathematics — see `findings.md` §9 for why. Coverage wording synced in `coq_coverage.tex`
+> (4 loci incl. the trust-stratum table), `coq-formal/README.md`, `EQUATION_COVERAGE_LEDGER.md`,
+> `hypothesis_transcription_audit.md` (row 6 + the diagnosis paragraph), and
+> `theorem_statement_verification.py`'s header.
+>
+> **✅ APPLIED — paper (both mains unless noted).** **C1/N1/S2** the OSGS projection display: the
+> unconstrained target now has its own symbol `𝒳_h^proj := 𝒱_h × 𝒬_h`, defined once in
+> §`sec:ScaleSplitting` and used at all three projection sites (the OSGS bullet, `Π_{τh}`, and the
+> `W_h` quantifier of `eq:OSGSProblem`) — the display is no longer contradicted by its own footnote;
+> the formal scale-splitting `Π_h` is now explicitly distinguished from `Π_{τh}`, and a footnote
+> records that `𝒳_h^proj ⊄ 𝒳_0`, so the identification is at the level of the subscale *model*.
+> App-D item (iv) (both twins) no longer documents a mismatch that is gone. **C7** the advection is
+> "externally prescribed — modelled on, but not identified with, the frozen velocity", plus a §7
+> sentence that a `k_u≥2` Lagrange iterate satisfies neither `∇·(αu_h)=0` nor global `W^{k_u,∞}`.
+> **C8** the boundary operator's codomain is a generic trace space, with the classical/weak split
+> spelled out. **C9** Carathéodory-type conditions for the reaction pairing + the DBF drag's
+> velocity regularization (`(|u|²+u_ε²)^{1/2}`, mesh-independent, `u_ε/U ∈ [8·10⁻⁷, 1.2·10⁻⁴]`
+> across the four §7.3 cells — verified against the configs). **C10** the porosity-oscillation step
+> `α_{∞,K} ≤ δ_α α_{0,K}` now states that it uses element convexity and `h_K` = diameter (both App-D
+> twins too). **C11** abstract: "robust w.r.t. Re and Da" → "parameter-explicit"; conclusion: the
+> `α₀^{-1/2}` claim is scoped to the *displayed* weights, naming `C_{∇α}`, `C_{α,m}`, `β₀`, `h₀`.
+> **T1** abstract states the experiments lie beyond the hypotheses. **T3** — the one *factual* find:
+> §7 printed the **`centered`** encoding (`L=1`, `ν=1/√(α_∞Da)`) while **every official 2D sweep ran
+> `minmax`** (`L=√(α_∞Da)`, `U=(Re²/(α_∞Da))^{1/4}`, `ν=σ=(α_∞Da/Re²)^{1/4}`) — corrected, together
+> with the invariance claim (analytic, not finite-precision) and a new sentence justifying
+> `Re_h = Re h/L = Re/N`. **T4** the two 3D captions and both Cocquet captions now say *worst-case
+> bound rate* instead of "theoretical"/"optimal". **T5** the "finer meshes would only reconfirm
+> them" sentence is retracted (it contradicted the two-mesh-slope hedge four lines below). **N2**
+> the projector-independence claim now names the Korn constant `C_K` for the full-gradient
+> conversion. **N3** a σ-notation sentence in (A2). **P4** two over-strong verbs softened. **P5**
+> App-C definiteness made verbatim-parallel with App-D; the pressure gauge named at (A6) and at the
+> 2D `ε=0` statement (**superseded 2026-07-30**: the 2D and DBF campaigns do not run at `ε=0` at all —
+> both harnesses carry a literal `1e-8`; see `findings.md` §9.5 and `pending-tasks.md` §4g. The paper
+> now says so, and the recorded provenance attributes read the assembled value). **S1** the §5 opener
+> now states the scope before the first interpretation, and
+> (A4) records that α is used exactly. **T9** a *Code and data availability* section was added to
+> both mains.
+>
+> **✅ APPLIED — companion notes.** **T8** `cocquet_form_mms_manufactured_solution.tex` no longer
+> calls a P2/P1 **ASGS** test "matching Cocquet": it is an *operator-matched stabilized diagnostic*,
+> and "reproduction" is reserved for the pure-Galerkin TH run (its stale reproduce command fixed
+> too). **N10** `centered_encoding.tex`'s three mutually inconsistent status statements are replaced
+> by one provenance table (strategy per artefact, where it is recorded, commit), the false
+> "master HDF5 produced under centered" claim removed, and the roundoff attribution narrowed per
+> `lessons_learned.md`. **N5/N6** Coq module count 24→25 and the stale `theory/verification scripts/`
+> path fixed. **N9** the bump-smoothness coverage sentence corrected (Coq `C¹`, SymPy `C²`, nothing
+> beyond). **C4** the "entire chain machine-checked" headline is now qualified *in the bold*, in both
+> `coq_coverage.tex` and the Coq README. **N8** one submission source of truth named
+> (`article_v2.tex`; `article.tex` = the code-transcription anchor).
+>
+> **🔴 STILL OPEN from this audit.** (i) **T9** — the *Code and data availability* section now names
+> the repository, `\url{https://github.com/GuillermoCasas/GridapPorousNS}` (verified public on
+> 2026-07-30: the unauthenticated GitHub API returns `private: false`). What is **still missing and
+> cannot be produced from inside the repo** is the *archival* half: a Zenodo (or equivalent) deposit
+> of the exact snapshot, its DOI, and the commit hash of that snapshot. Two conditions to check before
+> submitting: the working tree of this pass is **not yet pushed**, so the revision the paper describes
+> is not on the remote until it is; and the statement's specific promises (a config file per reported
+> case, the mesh generators and committed base meshes, the table-regeneration scripts, the verification
+> suites) are true of the tracked tree — 39 tracked configs, 12 tracked meshes,
+> `make_results_tables.py`, `make_3d_tables.py`, `sympy/run_all.py`, `coq-formal/_CoqProject` all
+> git-tracked — but the *result databases* are gitignored by design, so either ship them with the
+> deposit or keep the statement's wording ("the scripts that regenerate the tables … from the raw
+> result databases") backed by §6g's regeneration recipe. (ii) **T7** — ✅ **resolved in this
+> same pass** (see the RESOLVED T7 block below): the author decision came out *add-alongside*, and
+> `genuine3d_table.tex` is now `\input` after `tab:3DH1` in `article_v2.tex`. This sentence recorded it
+> as open because it was written before the decision landed; `pending-tasks.md` §7f and
+> `open-questions.md` §4 are closed to match. (iii) **C12/P2/S6**
+> — the release bundle (pinned TeX/Coq/Python/Julia versions, one build command, one gate command,
+> archived logs with hashes, and the URL/DOI above): `pending-tasks.md` §6g. (iv) **T6** — a
+> per-attempt terminal-status supplement for the omitted cells: `pending-tasks.md` §5c. (v) **N7/P1**
+> — the `\amend`/author-macro flatten (**537** active wrappers in the v2
+> document set: `article_v2.tex` 495 `\amend` + 8 `\Guillermo` + 3 `\Joaquin`, plus 31 `\amend` across
+> App. A/B/C; the v1 set is **502**. The figures 435 and 480 were earlier snapshots that the next prose
+> pass invalidated — regenerate with the snippet in `pending-tasks.md` §1c, never carry the number by
+> hand): `pending-tasks.md` §1c.
+>
+> **✅ RESOLVED 2026-07-30 (was Tier-2, author-reserved twice) — the global-quasi-uniformity tension.**
+> (A1) asked for *local* quasi-uniformity, (O3) added *patch* quasi-uniformity, and §6 invoked *global*
+> quasi-uniformity "assumed throughout", which nothing supplied — flagged by two prior audits (A01) and
+> deferred both times. Settled by **developing the theory first** in
+> `theory/mesh_regularity_note/` (4 pp, builds clean): global QU **implies** the local and patch
+> versions (so adopting it shortens the hypothesis list), it does **not** imply smooth grading (kept,
+> and free for an admissible constant surrogate), the paper's former "`ω_χ=O(h)` when quasi-uniform"
+> claim was **false** (corrected to the Lipschitz-size-function condition), and global QU is needed
+> **only** for §6's single-`h` statements — because `h` appears on both sides of them — and equally for
+> both variants, the appendices needing nothing beyond the weaker versions. (A1) now states global
+> quasi-uniformity with a footnote recording exactly what it buys and how to weaken it; §6's invocation
+> now has a referent. Argument and counterexamples: `findings.md` §9.4.
+>
+> **✅ RESOLVED 2026-07-30 — T7, the genuinely-3D table is now in the paper.** `genuine3d_table.tex` is
+> `\input` after `tab:3DH1` (v2 only; v1 has no such rows, as with the R5 control), with a paragraph
+> that says what the data actually shows: the velocity rates approach or exceed the optimal exponents
+> for both orders and both variants, every pressure rate exceeds the worst-case bound rate, the OSGS ℙ₂
+> pressure reaches `2.00` in `H¹` (against `1.77` on the extruded field) — **but the absolute `H¹`
+> pressure errors remain `O(1)` (1.22–2.97), as on the extruded field**, so the near-stagnant
+> *magnitude* is *not* an artifact of the extruded field's degeneracy. That **sharpens** the adverse
+> 3D finding rather than dissolving it, which is why including the table is the more honest option:
+> the data exists, is certified (all 16 levels `success=true`, `c1_mult=4`), and every printed value
+> was re-derived from the record. The drop-in file's own suggested sentence was *not* used — it claimed
+> the OSGS pressure "converges rather than saturating", which the `O(1)` errors do not support.
+>
+> **✅ RESOLVED 2026-07-30 — the 3D `c₁` convention, and the ℙ₁ claim.** The runs' element length is now
+> stated: `h_K = (6√2|K|)^{1/3}`, the edge of the equal-volume regular tetrahedron
+> (`smoke3d.jl:176`, `h_conv="regular_tet"` — **not** the `shortest_edge` of `base_config.json`, which
+> the 3D harness never reads; a reread finding that assumed otherwise was a false positive). The
+> "sits just below the elementwise Kuhn threshold" sentence is now explicitly *relative* to the
+> two-dimensional value, with the absolute margin disclaimed as requiring both a fixed `ξ` and a common
+> length convention across element families — which is the standing ruling's own position. The
+> conclusions' ℙ₁ half no longer claims experimental support it does not have: the elementwise threshold
+> **vanishes identically** for ℙ₁, so no increase is required of it for coercivity, and that is now the
+> stated reason (all 3D runs used `16k⁴`; no ℙ₁ run at `4k⁴` is reported, and the repo's own control
+> found `4k⁴` *less* accurate for ℙ₁).
+>
+> **DECLINED, with reason (do not re-raise without new evidence).** **S3** per-theorem
+> "theorem / formal coverage / implemented" boxes in the article — the manuscript makes **zero**
+> formal-verification claims, so a coverage row would *add* a claim; rows 1 and 3 already exist
+> (per-result hypothesis labels + `tab:ASGSvsOSGS`; `:1456-1463`, §7 preamble, `oa:rem:analyzed`).
+> **S5** a six-column regime-map table — its content is already carried by the fixed-data-vs-
+> pre-asymptotic paragraph, `tab:ASGSvsOSGS`'s reaction row and the table-caption convention; a new
+> wide table is page budget and overfull-box risk for no new information. **C5** relocating the
+> theory/implementation distance list *before* the theorems — the paragraph exists after them and is
+> reinforced in §7; the honest register entry is "we decline the relocation", not "the auditor missed
+> it". **T2** the 3D `c₁` "admissible because global continuity weakens the elemental threshold"
+> clause — standing ruling, recorded twice (this file §1 and `open-questions.md` §3, R3 dropped
+> 2026-07-21); the ξ imprecision is already disclosed there. **P7** date stamps in `.tex` comments —
+> all 13 are on comment lines, invisible in the PDF; fold into the flatten pass if ever.
+>
+> **VERIFIED FALSE / ARTIFACT — do NOT "fix".** **N4** (Damköhler≠Darcy is already stated at the
+> definition of `Da`), **S7** (there is no verification-process history in the article body),
+> **P6** (no ε/machine-ε collision inside the paper; only in one standalone note),
+> **C1's footnote half** (the audit quoted the pre-2026-07-27 footnote; the live one already
+> concedes Codina's hedge, and the audit's replacement would be a *regression* — the repo's
+> `projection_space_note` proves a **degree-dependent** two-sided result, optimal for `k=1` and
+> `Θ(h^{3/2})` for `k≥2`, which is *stronger* than the audit's suggested wording), **C6/S4** (the
+> non-certification of `c₁=4k⁴/16k⁴`, `c₂=2k²` is already stated in the main text immediately after
+> `th:StabilityOSGS`), **C12's build-failure claim** (both mains build clean here; the auditor hit
+> the known `ntheorem`×`cleveref≥0.21` clash inside the bundled 2019 SIAM class — a TeX-distribution
+> portability issue, tracked as part of §6g), **C12/T9's "missing files"** (`article.tex`,
+> `osgs_appendix_commented.tex`, `figures/bump_plateau.pdf`, the 25 `.vo` objects, `src/`, the
+> configs and meshes all exist; they were absent from the *pack* by its own exclusion rules).
+>
+> **T10 (the audit's "positive alignment worth retaining")** needs no action and is not a compliment to
+> bank: it lists six caveats the numerical narrative already carries (fixed-data vs pre-asymptotic;
+> upper bounds permit but do not predict the OSGS reaction excess; pressure *rate* vs pressure *error*;
+> solver failure ≠ nonexistence; a 3D discretization test vs a genuinely 3D field; the stabilized-TH
+> comparison not isolating the element pair). Every one of them is still in the paper after this pass —
+> several were *strengthened* here (T4, T5, C11, P4) — and the T7 decision above is precisely the fifth
+> one's remaining half. Do not let a later prose pass quietly remove them.
+>
+
+> **🔴 NEW BLOCKER found by the 2026-07-30 critical reread — the DBF table's stabilized-Taylor--Hood rows
+> mix meshes and databases.** Verified directly against the DBs: `cocquet_form_mms_taylorhood_stabilized.h5`
+> stops at **N=160** (and at **N=80** for the `(10⁵,0.1)` cell, the rest NaN), while the equal-order and
+> unstabilized-TH rows are at **N=320**; and the `(10⁵,0.1)` `P₂/P₁ ASGS` row printed in the tables
+> (`2.18e-5` velocity, `4.81e-6` pressure) comes from **`results/debug_results/cocquet_stabth_corner.h5`**,
+> a forked side-DB — which `.agents/rules/official-results-path.md` forbids for published numbers.
+> Consequences, and what was done now:
+> - The claim that the stabilized control is "about an order of magnitude *less* accurate than the
+>   unstabilized one" in the viscous regime was an **artifact of comparing N=160 against N=320**:
+>   `3.12e-6 / 2.85e-7 = 10.9`, whereas at the common mesh N=160 the ratio is **1.16×** (α₀=0.5) and
+>   **1.47×** (α₀=0.1). ✅ **Corrected in the prose** to the like-for-like comparison.
+> - ✅ **Disclosed in both DBF captions** (which mesh each `P₂/P₁ ASGS` FME is on) and in the §7.3 preamble
+>   (four discretizations, not three; the ladder is not common to all of them).
+> - 🔴 **The proper fix is still open:** re-run the stabilized-TH control to N=320 at all four cells
+>   *through the official path* (`data/cocquet_form_mms_taylorhood_stabilized.json`, extend the ladder;
+>   archive the current DB to `previous_results/` first) so that every FME in the two tables is on one
+>   mesh and no row is sourced from `debug_results/`. Until then the tables carry the caveat above.
+>   **Correction (2026-07-30, later pass): the earlier claim here that "v1 is unaffected — it has no
+>   `P₂/P₁ ASGS` rows" was false.** `article.tex` carries the same four-method DBF tables
+>   (`article.tex:1793`, `:1802`, …), so every item in this block applies to it too. v1 had been left
+>   with the *uncorrected* prose — the refuted "order of magnitude less accurate", "three
+>   discretizations", the `Q_0` pressure-gauge clause — and with **no** mesh caveat in either caption.
+>   All now mirrored — but only after a second parity sweep, which found that the first pass had updated
+>   v1's "We compare **four** discretizations" preamble and left "the three discretizations behave alike"
+>   standing in the viscosity paragraph, plus four more v1-only drifts the audit batch had not touched:
+>   the 3D penalty paragraph still called `ε = 10⁻⁴ε_ref` a *compressibility* (contradicting the same
+>   subsection's new "kept at exactly `ε = 0`"), the 3D regular-mesh claim still said "the observed rates
+>   approach the theoretical optima" (true of the velocity only, and the captions no longer print an
+>   optimum there), the `c₁` remark still asserted an absolute margin below the Kuhn threshold without the
+>   element-length convention, and the `u_ε` drag-regularization disclosure was missing entirely.
+>   The general lesson (now in `lessons_learned.md`): a claim that one main is exempt must be checked
+>   against that file, and a parity sweep must cover the passage the correction *implies*, not just the
+>   sentence that was quoted.
+>   **Status: the re-run is in progress** — see `pending-tasks.md` §7h.
+>
+> **✅ Also corrected by the reread (3D subsection, both verified against the result records).** The
+> claim that both mesh families are "generated with `Gridap`" was wrong — the irregular base mesh is
+> generated by **gmsh** (`mesh3d.jl` drives `GridapGmsh.gmsh`, `Algorithm3D`), only the red refinement is
+> Gridap. And "the reported errors are computed with a direct (sparse LU) solver" was true of the **ASGS
+> rows only**: all four OSGS 3D records carry `jfnk: true` (`jfnk_restart` 30/80, and
+> `jfnk_precond_c1_mult: 4.0` for irregular ℙ₂), i.e. GMRES preconditioned by that LU factorization. Both
+> sentences now say what was actually done. *A gmsh citation should be added to `references.bib`* (the
+> canonical reference is Geuzaine & Remacle, IJNME 79(11), 2009) — the sentence names the tool but cites
+> nothing, since inventing bib fields is worse than leaving the citation to the author.
+
+> **One status correction to this file.** §10.A recorded the RW-3 batch as "ALL 15 APPLIED &
+> GREP-VERIFIED"; RW-3 was applied as an *added* clause (the two-mesh-slope hedge) without
+> retracting the sentence it contradicted. That sentence is now retracted (T5 above), so the status
+> line is finally accurate.
+
 ---
 
 ## 0. The α₀-exponent inconsistency in §6 — RE-DERIVED, ✅ APPLIED 2026-07-19

@@ -282,11 +282,22 @@ residual `R̃ = R − Π(R)`:
    the cheap Cholesky-cached mass solve (`discrete_l2_projection`). Converges to the same OSGS fixed point,
    targeting roughly ASGS iteration counts. (The per-eval projection cost motivates the JFNK
    linear-convergence fix — see the JFNK canonical doc + `theory/osgs_algorithm/osgs_algorithm.tex`.)
-2. **Topologically unconstrained orthogonal projection**: The projection is computed on the
-   **unconstrained** spaces `V_free` / `Q_free` (no Dirichlet). Projecting on the Dirichlet-constrained
-   space forces boundary nodes to mirror extreme Dirichlet velocities, annihilating the exact `L²`
-   projection and introducing an unphysical `O(1)` boundary residual that breaks the `O(h^{k+1})` MMS
-   convergence. The free-space projection protects optimal interpolation, mathematically and empirically.
+2. **Topologically unconstrained orthogonal projection** — `[paper-faithful]` since 2026-07-30 (was
+   `[code-actual]`): the projection is computed on the **unconstrained** spaces `V_free` / `Q_free` (no
+   Dirichlet), and **the paper now displays that** — `article_v2.tex`/`article.tex` define
+   `𝒳_h^proj := 𝒱_h × 𝒬_h` in §`sec:ScaleSplitting` and use it at all three projection sites (the OSGS
+   bullet, `Π_{τh}`, and the `W_h` quantifier of `eq:OSGSProblem`), so this row is no longer a divergence.
+   App. D's "analyzed versus implemented" item (iv) correspondingly no longer documents a mismatch.
+   *On the consequence of the constrained alternative, mind the strength of the claim.* The blunt reading
+   ("it breaks `O(h^{k+1})`") is **not** what is established. `theory/projection_space_note/` proves a
+   **degree-dependent, two-sided** result in the *energy* norm: constrained-projection OSGS is optimal for
+   `k=1` (the boundary defect `η₀=Θ(h^{3/2})=o(h)` hides under the interpolation floor) and genuinely
+   degrades to `Θ(h^{3/2})` for `k≥2` — consistent with Codina (2008) Remark 1, which asserts optimal
+   global convergence with spurious boundary layers, and which the note reads as *exactly right for `k=1`
+   and false for `k≥2`*. The plain-`L²`/MMS-gate verdict for `k≥2` is still **open** (the defect enters the
+   duality estimate quadratically); the decisive A/B — flip the projection target to `X_{h0}` and measure
+   the ℙ₂ MMS rate — is `pending-tasks.md` §7g. The paper's footnote is correspondingly hedged
+   ("even where it does not affect the global convergence order …"); do not restore a bare rate claim.
 
 ### 2.7 OSGS pressure projection — constant-mode treatment — `[deferred]` (OPEN QUESTION)
 
@@ -356,9 +367,13 @@ measurements in MMS sweeps at small `α₀`, where the constant-mode pollution s
    > **Clarification (2026-06-24 — `eps_phys` vs `eps_num`).** The gauge-fixing `ε` is the **numerical
    > iterative penalty** (`numerical_epsilon` / `eps_num`), implemented **Jacobian-only** (lagging
    > `ε p^{n−1}` to the RHS so it cancels at convergence) — *not* a physical compressibility. The physical
-   > `ε_phys` (`physical_epsilon`) is **0** for the incompressible problem
+   > `ε_phys` (`physical_epsilon`) is **0** in the *continuous* incompressible problem
    > ([`eq:StrongMassEquation`, article.tex L239](../theory/paper/article.tex#L239), "mainly for numerical
-   > reasons"; the 2D examples take `ε = 0`, L1098). A 2026-06-24 working-tree bug that set a non-zero
+   > reasons") and **exactly 0 in the 3D runs** (`smoke3d.jl`, `recenter=true`). It is **NOT** 0 in the two
+   > 2D harnesses: both hardcode a dimensionless `ε̂ = 1e-8` that the configs' declared `[0.0]` never
+   > overrides, so the 2D and DBF campaigns solve a slightly penalized mass equation — see
+   > [`findings.md`](findings.md) §9.5 and [`pending-tasks.md`](pending-tasks.md) §4g. Both mains were
+   > re-worded on 2026-07-30 accordingly; the former "the 2D examples take `ε = 0`" sentence is gone. A 2026-06-24 working-tree bug that set a non-zero
    > `eps_phys` default in the 3D MMS harness (silently solving a *compressible* problem, with `ε p_ex`
    > injected into the oracle source) was reverted — see `lessons_learned.md`. The canonical spec for the
    > gate's incompressible ε handling is §3 below (§4.1 of the criterion spec).

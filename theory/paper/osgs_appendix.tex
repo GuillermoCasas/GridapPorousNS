@@ -188,10 +188,9 @@ small under the resolution condition of \cref{H:porosity}. (iii)~\emph{Converged
 projection}: the analysis takes the projection equation solved exactly (the coupled
 system), whereas the implementation lags the projection along the nonlinear iteration.
 (iv)~\emph{Unconstrained projection space}: analyzed and implemented formulations
-agree (both project onto $\mathcal{V}_h\times\mathcal{Q}_h$ without Dirichlet constraints); note that the
-display defining the OSGS projection in~the main text shows the projection onto
-$\Xhz$, while the accompanying footnote states the implemented choice, which is the one
-analyzed here and the one recommended by~\cite[Remark~1]{codina2008analysis}.
+agree, both projecting onto $\mathcal{V}_h\times\mathcal{Q}_h$ without Dirichlet constraints
+--- the space written $\Xhproj$ in~the main text, where the displayed OSGS projection is posed
+on it as well --- which is also the choice recommended by~\cite[Remark~1]{codina2008analysis}.
 (v)~\emph{Elementwise-constant versus pointwise parameters}: as for the ASGS analysis
 of~the main text, $\tau_{i}$ is elementwise constant in the analysis and pointwise
 variable in the computations.
@@ -316,7 +315,10 @@ $0 < \underline{c} \le \overline{c}$, independent of $h$, such that for $i = 1,2
 Patch quasi-uniformity gives $h_{K'} \eqsim h_K$. For the porosity, let $\boldsymbol{x}_a$ be a
 vertex shared by $K$ and $K' \subset S_K$. The resolved{\hyp}porosity condition of \cref{H:porosity}
 bounds the oscillation of $\alpha$ over each element by $\delta_\alpha \coloneqq 1 + C_{\nabla\alpha}$
-(from $h_K\norm{\nabla\alpha}_{L^\infty(K)} \le C_{\nabla\alpha}\,\alpha_{0,K}$ one gets
+(from $h_K\norm{\nabla\alpha}_{L^\infty(K)} \le C_{\nabla\alpha}\,\alpha_{0,K}$, joining the
+extremal points of $\overline{K}$ by a segment inside the convex element $K$, of length at most the
+element diameter---the length entering the resolved{\hyp}porosity condition of \cref{H:porosity};
+under the surrogate convention of \cref{H:patch} the factor becomes $1+\chi_0 C_{\nabla\alpha}$---one gets
 $\max_{\overline{K}}\alpha \le \delta_\alpha\,\alpha_{0,K}$, with $\alpha_{0,K}=\min_{\overline{K}}\alpha$).
 Since $\alpha_{0,K}\le\alpha(\boldsymbol{x}_a)$ and $\alpha(\boldsymbol{x}_a)\le\max_{\overline{K'}}\alpha\le\delta_\alpha\,\alpha_{0,K'}$,
 \begin{equation*}
@@ -465,8 +467,7 @@ $\tnorm{\cdot}_{\mathrm A}$ of this appendix.
 
 \begin{lemma}[Definiteness]
 \label{oa:lem:definiteness}
-Under \cref{H:data,H:projector,H:porosity,H:advection,H:spaces}---the same hypotheses as \cref{lem:definiteness}---and
-with the pressure normalized to zero mean when $\varepsilon = 0$, \cref{oa:eq:TripleNorm} is a
+Under \cref{H:data,H:projector,H:porosity,H:advection,H:spaces}---the same hypotheses as \cref{lem:definiteness}---\cref{oa:eq:TripleNorm} is a
 norm on $\Xhz$; in particular $\tnorm{V}_{\mathrm{O}} = 0$ implies $V = 0$.
 \end{lemma}
 
@@ -1219,8 +1220,9 @@ estimate, not established as sharp or necessary.
 \label{oa:rem:numerics}
 The reaction-dominated experiments of~the main text (manufactured
 solutions, $\mathrm{Da} = 10^6$) report two facts about the OSGS variant relative to the ASGS
-one: (i)~the $L^2$ velocity errors of the two methods are indistinguishable at all
-resolutions, and (ii)~the $H^1$-type velocity error of the OSGS method exceeds the
+one: (i)~the $L^2$ velocity errors of the two methods stay within a factor of about two of
+each other on the finest $P_1$ meshes, in opposite directions at the two porosities and with no
+systematic ordering, and (ii)~the $H^1$-type velocity error of the OSGS method exceeds the
 ASGS one by a factor of about $3.5$ on the finest $P_1$ meshes---the largest velocity
 discrepancy of the whole campaign---with the gap closing under refinement at an
 accelerating relative rate. Both observations are compatible in order of magnitude with
