@@ -1384,9 +1384,7 @@ We consider two types of elements: linear triangles ($\mathbb{P}_1$ elements) an
 \setlength{\abovetopsep}{4pt}
 \begin{table}[!htbp]
 \centering
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{P}_1$ elements), calculated from the $L^2$-norm of the error obtained with the two finest meshes (theoretical convergence rates in parentheses). \amend{The parenthetical rate is $k_v+1$ for the velocity and $k_p$ for the pressure in the $L^2$-norm, and $k_v$ and $k_p-1$ respectively in the $H^1$-seminorm (a dash denoting that no positive rate is guaranteed); the same convention is used in \cref{tab:Linear2DH1,tab:Quadratic2DL2,tab:Quadratic2DH1}. These are the \emph{viscosity-dominated worst case}: in the reaction- and convection-dominated regimes the analysis of \cref{sec:Robustness} predicts one order more for the pressure, which the corresponding rows attain. The last entries of each block give the error of the nodal interpolant of the exact solution on the same mesh sequence, which is independent of $\Reyn$, $\Damk$ and of the stabilization variant (and, for the pressure, of $\alpha_0$); it is the nodal{\hyp}interpolation benchmark against which the FME should be read.}}
+\caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{P}_1$ elements), calculated from the $L^2$-norm of the error obtained with the two finest meshes \amend{(worst{\hyp}case rates of the analysis in parentheses)}}
 \begin{tabular}{>{\raggedleft\arraybackslash}p{7.5mm}
                 >{\raggedleft\arraybackslash}p{7.5mm}
                 >{\raggedleft\arraybackslash}p{7.5mm}
@@ -1452,7 +1450,7 @@ $10^{6}$  & $10^{6}$  & $0.5$  & \num{2.05} & \num{2.06} & \num{4.16e-6} & \num{
 
 \begin{table}[!htbp]
 \centering
-\caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{P}_1$ elements), calculated from the $H^1$-seminorm of the error obtained with the two finest meshes (theoretical convergence rates in parentheses)}
+\caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{P}_1$ elements), calculated from the $H^1$-seminorm of the error obtained with the two finest meshes (theoretical convergence rates in parentheses\amend{, a dash where none is positive})}
 \begin{tabular}{>{\raggedleft\arraybackslash}p{7.5mm}
                 >{\raggedleft\arraybackslash}p{7.5mm}
                 >{\raggedleft\arraybackslash}p{7.5mm}

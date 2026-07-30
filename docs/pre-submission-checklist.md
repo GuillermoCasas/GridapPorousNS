@@ -473,11 +473,16 @@ predict ×10/×50/×116 — refuted as *sharp*.
   reference matched to the digit). The two-finest-mesh slope rule (stated in the caption **and** used in the
   computation), the shared finest mesh (N=320 ladder), and the shared `calculate_normalized_errors` functional
   (`mms_error_norms.jl`, D5c) are all confirmed. Src: §5/§8/B1.
-- ✅ **VERIFIED (2026-07-19) — first table caption (`tab:Linear2DL2`, [1176](../theory/paper/article.tex#L1176)).**
-  Defines the parenthetical "(theoretical rate)" convention (`k_v+1`/`k_p` in L², `k_v`/`k_p−1` in H¹, dash = no
-  guaranteed rate; same convention in the other three 2D tables), the **regime-dependence caveat** ("these are the
-  *viscosity-dominated worst case*; the reaction/convection regimes attain one order more for the pressure"), the
-  two-finest-mesh slope rule, and the interpolation-reference-row convention. Src: review D4.
+- ✅ **VERIFIED (2026-07-19); caption re-scoped 2026-07-30 — first table caption (`tab:Linear2DL2`,
+  [1387](../theory/paper/article.tex#L1387) / [1675](../theory/paper/article_v2.tex#L1675)).** It now states only
+  what the table needs to be read unambiguously — element and norm, the two-finest-mesh slope rule, and that the
+  parenthetical is the **worst-case rate of the analysis** — so that the table could drop the `\footnotesize` +
+  `\tabcolsep` overrides that made it the one convergence table in a smaller font (at normalsize the five-line
+  caption ran the float 26.27pt past the page). Nothing was orphaned: the symbolic convention (`k_v+1`/`k_p` in L²,
+  `k_v`/`k_p−1` in H¹) is restated in place by every caption that defers to it (`tab:3DL2`, `tab:3DH1`, and
+  `tab:Genuine3D` in v2); the "dash = no positive rate" gloss moved into `tab:Linear2DH1`, the only 2D table that
+  prints one; the regime-dependence caveat (reaction/convection attain one order more for the pressure) is in the
+  results prose; and the interpolant rows are self-labelled in the table body. Src: review D4.
 - ✅ **VERIFIED / tables-only settled (2026-07-19) — results-section figures.** The paper has exactly one figure —
   `bump_plateau.pdf` (the 1−α porosity field), referenced at [1142](../theory/paper/article.tex#L1142) and present
   on disk; it **renders correctly** (a labeled 3D surface, z-axis 0 / 1−α₀ / 1, caption matches). No standing
