@@ -266,22 +266,41 @@ The rest of the paper is organized as follows. The continuous problem is introdu
 % the numerical experiments.  Every occurrence of \ViscProj in the analysis section and
 % appendices is to be read generically; the spots that specifically mean the default
 % instance write \DSPi.
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{v}}}{\Pi}}
-\newcommand{\DSPi}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
-\newcommand{\DPi}{\overset{\scriptscriptstyle{\mathrm{D}}}{\Pi}}
-\newcommand{\SPi}{\overset{\scriptscriptstyle{\mathrm{S}}}{\Pi}}
+%
+% NOTATION (2026-07-31).  The projector is a fourth-order tensor -- a pointwise linear map
+% on second-order tensors -- so it is set in sans-serif, a font this paper spends on no
+% other family, and each instance is named by the subspace it keeps: \IPi (all of Lin),
+% \SPi (Sym), \DPi (Dev), \DSPi (the deviatoric--symmetric one, the default).  This leaves
+% \Pi to mean only the L^2 projections onto FE spaces (\Pi_h, \Pi_1, \Pi_{1,0},
+% \Pi_{\boldsymbol{\tau}h}) -- a different species of projection -- and it matches the
+% component form P_{aibj} of \cref{app:FourierTau}.  \IPi also separates the FOURTH-order
+% identity (a member of the family) from the second-order \mathbb{I} of
+% $\boldsymbol{\sigma}=\sigma\mathbb{I}$ and of $\mathbb{I}_d$.  The previous notation set
+% the label above the symbol (\overset{v}{\Pi}): it collided with the line above whenever
+% it appeared inline -- hence the \scriptstyle hacks this change removed -- it shrank to
+% noise in subscripts such as \mathbf{T}_{\ViscProj} and c_{\ViscProj}, and its upright v
+% read as a stray \nu.
+\newcommand{\ViscProj}{\mathsf{P}}
+\newcommand{\IPi}{\mathsf{I}}
+% \AnyProj: a SECOND, hypothetical projector, needed only where one stands
+% beside \ViscProj (lem:projfamily quantifies over it).  Same species, same
+% font -- \Pi is no longer available for it, being now only the L^2 projections.
+\newcommand{\AnyProj}{\mathsf{Q}}
+\newcommand{\DSPi}{\mathsf{P}_{\mathrm{DS}}}
+\newcommand{\DPi}{\mathsf{P}_{\mathrm{Dev}}}
+\newcommand{\SPi}{\mathsf{P}_{\mathrm{Sym}}}
 Let our problem spatial domain be $\Omega\subset\mathbb{R}^d$, with $d\in\{2,3\}$ its dimension and let $\Gamma \coloneqq \partial \Omega$ be its boundary. For simplicity, we will consider $\Omega$ to be polyhedral. Let $\alpha : \Omega \rightarrow (0, 1]$ be a given spatially inhomogeneous scalar field over $\Omega$ representing the fluid volume fraction. We will assume this field to be differentiable, with a uniformly bounded gradient in $\Omega$. The continuous form of the problem consists in finding (fluid{\hyp}averaged) pressure and velocity fields, $p$ and $\boldsymbol{u}$, such that
 \begin{align}
   \alpha \boldsymbol{u} \cdot \nabla \boldsymbol{u} - 2\nabla \cdot ( \alpha \nu \ViscProj \nabla \boldsymbol{u}) + \alpha \nabla p + \boldsymbol{\sigma}(\alpha, \boldsymbol{u})\boldsymbol{u} = \boldsymbol{f} \quad \text{in } \Omega \label{eq:StrongMomentumEquation}, \\
   \varepsilon p + \nabla \cdot (\alpha \boldsymbol{u}) = 0 \quad \text{in } \Omega \label{eq:StrongMassEquation},
 \end{align}
-where $\boldsymbol{\sigma}$ represents a viscous resistance tensor (equal, in the linear Darcy limit, to the kinematic viscosity times the inverse of the permeability tensor), which we will assume to be symmetric and positive semidefinite, $\nu$ is the kinematic viscosity, and $\boldsymbol{f}$ is a forcing term representing external body forces, such as gravity, which for simplicity we will assume to be independent of the solution. Finally, $\varepsilon \geq 0$ represents a small compressibility, which we mainly include for numerical reasons (i.e., in order to implement the \emph{iterative penalty method}~\cite{codina1993iterative}), as in some cases it helps to ensure the well-posedness of the problem; see \cref{sec:NumericalExamplesStationaryCase3D}. The operator $\scriptstyle{\ViscProj}$ is a fixed linear map on second{\hyp}order tensors, acting pointwise with constant coefficients; \cref{sec:ViscousProjector} states the two properties the analysis requires of it, identifies the admissible choices found in the literature, and fixes our default, the deviatoric{\hyp}symmetric projection $\scriptstyle{\DSPi}$.
+where $\boldsymbol{\sigma}$ represents a viscous resistance tensor (equal, in the linear Darcy limit, to the kinematic viscosity times the inverse of the permeability tensor), which we will assume to be symmetric and positive semidefinite, $\nu$ is the kinematic viscosity, and $\boldsymbol{f}$ is a forcing term representing external body forces, such as gravity, which for simplicity we will assume to be independent of the solution. Finally, $\varepsilon \geq 0$ represents a small compressibility, which we mainly include for numerical reasons (i.e., in order to implement the \emph{iterative penalty method}~\cite{codina1993iterative}), as in some cases it helps to ensure the well-posedness of the problem; see \cref{sec:NumericalExamplesStationaryCase3D}. The operator $\ViscProj$ is a fixed linear map on second{\hyp}order tensors, acting pointwise with constant coefficients; \cref{sec:ViscousProjector} states the two properties the analysis requires of it, identifies the admissible choices found in the literature, and fixes our default, the deviatoric{\hyp}symmetric projection $\DSPi$.
 
-To complete the definition of the problem, it is necessary to supply the above equations with suitable boundary conditions, whose form will be specified in the following sections. We are not aware of any analysis addressing the well-posedness of the resulting problem in its full generality, although in~\cite{cocquet2021error} it is proven for the particular case $\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\SPi}$ (the symmetric{\hyp}gradient member of the family of \cref{sec:ViscousProjector}), a resistance term of the form $ \boldsymbol{\sigma} = \sigma(\alpha, \boldsymbol{u}) \mathbb{I}$, with $\sigma$ a scalar function defined in terms of additional scalar functions $a(\alpha), b(\alpha)$ as
+To complete the definition of the problem, it is necessary to supply the above equations with suitable boundary conditions, whose form will be specified in the following sections. We are not aware of any analysis addressing the well-posedness of the resulting problem in its full generality, although in~\cite{cocquet2021error} it is proven for the particular case $\ViscProj = \SPi$ (the symmetric{\hyp}gradient member of the family of \cref{sec:ViscousProjector}), a resistance term of the form $ \boldsymbol{\sigma} = \sigma(\alpha, \boldsymbol{u}) \mathbb{I}$, with $\sigma$ a scalar function defined in terms of additional scalar functions $a(\alpha), b(\alpha)$ as
 \begin{equation} \label{eq:DBFResistanceTerm}
     \sigma(\alpha, \boldsymbol{u}) = a(\alpha) + b(\alpha) |\boldsymbol{u}|,
 \end{equation}
-and a combination of Dirichlet (walls and inlet) and Neumann (outlet) boundary conditions. While we have not attempted a generalization of the results presented in~\cite{cocquet2021error}, we note that finding an alternative to the explicit use of Korn-type inequalities as done in that work may be nontrivial for $\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\DSPi}$, by which the spherical (trace) part of the symmetric velocity gradient is removed from the viscous term---equivalently, only its deviatoric symmetric part is retained, as the decomposition \cref{eq:DevSymDecomposition} below makes explicit---which is precisely what makes a deviatoric Korn{\hyp}type inequality necessary.\footnote{The difficulty is proper to the \emph{mixed Dirichlet--Neumann} setting of~\cite{cocquet2021error}: it is the Neumann portion of the boundary that leaves boundary terms in the integration by parts \cref{eq:crossibp} underlying \cref{eq:devsymidentity}. Where the velocity vanishes on the whole boundary, as in the a priori analysis of \cref{sec:StabilityASGS}, the corresponding inequality \cref{V:korn} is elementary and holds with the constant $\sqrt2$ for the whole family of \cref{sec:ViscousProjector}; see \cref{lem:projfamily}.}  We will nonetheless proceed by assuming that the solution always exists, and that uniqueness holds for sufficiently large values of $\nu$ and of $\inf_{\Omega}\{\alpha\}$.
+and a combination of Dirichlet (walls and inlet) and Neumann (outlet) boundary conditions. While we have not attempted a generalization of the results presented in~\cite{cocquet2021error}, we note that finding an alternative to the explicit use of Korn-type inequalities as done in that work may be nontrivial for $\ViscProj = \DSPi$, by which the spherical (trace) part of the symmetric velocity gradient is removed from the viscous term---equivalently, only its deviatoric symmetric part is retained, as the decomposition \cref{eq:DevSymDecomposition} below makes explicit---which is precisely what makes a deviatoric Korn{\hyp}type inequality necessary.\footnote{The difficulty is proper to the \emph{mixed Dirichlet--Neumann} setting of~\cite{cocquet2021error}: it is the Neumann portion of the boundary that leaves boundary terms in the integration by parts \cref{eq:crossibp} underlying \cref{eq:devsymidentity}. Where the velocity vanishes on the whole boundary, as in the a priori analysis of \cref{sec:StabilityASGS}, the corresponding inequality \cref{V:korn} is elementary and holds with the constant $\sqrt2$ for the whole family of \cref{sec:ViscousProjector}; see \cref{lem:projfamily}.}  We will nonetheless proceed by assuming that the solution always exists, and that uniqueness holds for sufficiently large values of $\nu$ and of $\inf_{\Omega}\{\alpha\}$.
 
 % ---------------------------------------------------------------------------
 % \cref{sec:ViscousProjector}: the single home of the viscous-projector
@@ -327,7 +346,7 @@ The operators in question are built from the two elementary extractors
 \end{equation}
 which return, respectively, the symmetric and the deviatoric part of the tensor upon which they act and which commute with one another. Taking for $\ViscProj$ the identity, either extractor, or their composition,
 \begin{equation}\label{eq:ProjFamily}
-  \ViscProj\in\Bigl\{\,\mathbb{I},\ \SPi,\ \DPi,\ \DSPi\coloneqq\DPi\SPi\,\Bigr\},
+  \ViscProj\in\Bigl\{\,\IPi,\ \SPi,\ \DPi,\ \DSPi\coloneqq\DPi\SPi\,\Bigr\},
 \end{equation}
 we obtain alternative formulations found in different contexts in the literature. Our default choice, denoted $\DSPi$ and used in all the numerical examples except where stated (cf.\ \cref{sec:NumericalExampleFromLiterature}), is the composition of both extractors. It yields
 \begin{equation}\label{eq:DevSymDecomposition}
@@ -337,17 +356,17 @@ we obtain alternative formulations found in different contexts in the literature
 
 % v1/v2 DIVERGENCE -- "the stabilized method" (v1, ASGS only) vs "the stabilized
 % methods" (v2, ASGS and OSGS) at the end of the next paragraph.
-  The remaining members of \cref{eq:ProjFamily} are met elsewhere in the literature. For instance, taking $\scriptstyle{\ViscProj} \displaystyle{=} \scriptstyle{\SPi}$, together with a particular expression for $\boldsymbol{\sigma}$, we recover the DBF equations~\cite{cocquet2021error}\footnote{In other works we find $\scriptstyle{\ViscProj} \displaystyle{\equiv} \mathbb{I}$~\cite{skrzypacz}, even though the name used for the equations is also DBF.}; this is also the choice with which the comparison of \cref{sec:NumericalExampleFromLiterature} runs the stabilized method.
+  The remaining members of \cref{eq:ProjFamily} are met elsewhere in the literature. For instance, taking $\ViscProj = \SPi$, together with a particular expression for $\boldsymbol{\sigma}$, we recover the DBF equations~\cite{cocquet2021error}\footnote{In other works we find $\ViscProj \equiv \IPi$~\cite{skrzypacz}, even though the name used for the equations is also DBF.}; this is also the choice with which the comparison of \cref{sec:NumericalExampleFromLiterature} runs the stabilized method.
 
 Of the two admissibility properties, \cref{V:orthogonality} is immediate to verify on any concrete candidate, whereas \cref{V:korn} is not. We therefore give a sufficient criterion for it, carrying a constant uniform over the whole family (\cref{lem:projfamily}), and check the criterion on the four operators of \cref{eq:ProjFamily} (\cref{lem:projinstances}). The criterion is sufficient but not necessary; since every operator of interest here meets it, we do not pursue the sharp characterization of \cref{V:korn}.
 
 \begin{lemma}[A sufficient criterion for Korn compatibility]\label{lem:projfamily}
-Let $\Pi$ be a constant{\hyp}coefficient orthogonal projection on second-order tensors whose
-range contains the deviatoric--symmetric tensors, i.e., $\Pi\mathbf{T}=\mathbf{T}$ whenever
+Let $\AnyProj$ be a constant{\hyp}coefficient orthogonal projection on second-order tensors whose
+range contains the deviatoric--symmetric tensors, i.e., $\AnyProj\mathbf{T}=\mathbf{T}$ whenever
 $\mathbf{T}=\mathbf{T}^{\mathsf T}$ and $\operatorname{tr}\mathbf{T}=0$. Then, pointwise,
 \begin{equation}\label{eq:projmonotone}
-  \bigl|\Pi\mathbf{T}\bigr|^2
-  = \bigl|\DSPi\,\mathbf{T}\bigr|^2 + \bigl|(\Pi-\DSPi)\mathbf{T}\bigr|^2
+  \bigl|\AnyProj\mathbf{T}\bigr|^2
+  = \bigl|\DSPi\,\mathbf{T}\bigr|^2 + \bigl|(\AnyProj-\DSPi)\mathbf{T}\bigr|^2
   \;\ge\; \bigl|\DSPi\,\mathbf{T}\bigr|^2
   \qquad\text{for every tensor }\mathbf{T},
 \end{equation}
@@ -358,17 +377,17 @@ and, for every $\bv\in H^1_0(\Omega)^d$,
   + \Bigl(\tfrac12-\tfrac1d\Bigr)\lVert\nabla\cdot\bv\rVert^2
   \ \ge\ \tfrac12\lVert\nabla\bv\rVert^2 .
 \end{equation}
-Consequently $\lVert\nabla\bv\rVert\le\sqrt2\,\lVert\Pi\nabla\bv\rVert$ for all
-$\bv\in H^1_0(\Omega)^d$: every such $\Pi$ satisfies \cref{V:korn} with
+Consequently $\lVert\nabla\bv\rVert\le\sqrt2\,\lVert\AnyProj\nabla\bv\rVert$ for all
+$\bv\in H^1_0(\Omega)^d$: every such $\AnyProj$ satisfies \cref{V:korn} with
 $C_{\mathrm{K}}=\sqrt2$, uniformly over the family and over the domain.
 \end{lemma}
 
 \begin{proof}
-Since the range of $\Pi$ contains that of $\DSPi$, $\Pi$ fixes it pointwise, so
-$\Pi\DSPi=\DSPi$; taking Frobenius adjoints and using that both operators are self-adjoint
-gives $\DSPi\Pi=\DSPi$ as well. Hence $\Pi-\DSPi$ is idempotent and self-adjoint---an
-orthogonal projection---and $(\Pi-\DSPi)\DSPi=0$, so its range is orthogonal to that of
-$\DSPi$. As $\Pi\mathbf{T}=\DSPi\mathbf{T}+(\Pi-\DSPi)\mathbf{T}$ splits $\Pi\mathbf{T}$ into
+Since the range of $\AnyProj$ contains that of $\DSPi$, $\AnyProj$ fixes it pointwise, so
+$\AnyProj\DSPi=\DSPi$; taking Frobenius adjoints and using that both operators are self-adjoint
+gives $\DSPi\AnyProj=\DSPi$ as well. Hence $\AnyProj-\DSPi$ is idempotent and self-adjoint---an
+orthogonal projection---and $(\AnyProj-\DSPi)\DSPi=0$, so its range is orthogonal to that of
+$\DSPi$. As $\AnyProj\mathbf{T}=\DSPi\mathbf{T}+(\AnyProj-\DSPi)\mathbf{T}$ splits $\AnyProj\mathbf{T}$ into
 two mutually orthogonal parts at every point, \cref{eq:projmonotone} is the resulting pointwise
 Pythagoras identity.
 
@@ -388,7 +407,7 @@ identities yields \cref{eq:devsymidentity}, the final inequality following from
 $\tfrac12-\tfrac1d\ge0$ for $d\ge2$. Integrating \cref{eq:projmonotone} with
 $\mathbf{T}=\nabla\bv$ and chaining with \cref{eq:devsymidentity} gives the Korn bound.
 
-The constant $\sqrt2$ is sharp already for $\Pi=\DSPi$: for $d=2$ the coefficient
+The constant $\sqrt2$ is sharp already for $\AnyProj=\DSPi$: for $d=2$ the coefficient
 $\tfrac12-\tfrac1d$ vanishes and \cref{eq:devsymidentity} is an equality for every field, while
 for $d=3$ any nonzero divergence{\hyp}free $\bv\in H^1_0(\Omega)^d$ makes it one.
 \end{proof}
@@ -398,7 +417,7 @@ The four operators of \cref{eq:ProjFamily} are constant{\hyp}coefficient orthogo
 projections whose ranges contain the deviatoric--symmetric tensors. They are therefore
 admissible, with $C_{\mathrm{K}}=\sqrt2$; their sharp Korn constants are, respectively,
 \begin{equation}\label{eq:projconstants}
-  C_{\mathrm{K}}(\mathbb{I})=1,\qquad
+  C_{\mathrm{K}}(\IPi)=1,\qquad
   C_{\mathrm{K}}(\SPi)=\sqrt2,\qquad
   C_{\mathrm{K}}(\DPi)=\sqrt{\tfrac{d}{d-1}},\qquad
   C_{\mathrm{K}}(\DSPi)=\sqrt2 .
@@ -406,7 +425,7 @@ admissible, with $C_{\mathrm{K}}=\sqrt2$; their sharp Korn constants are, respec
 \end{lemma}
 
 \begin{proof}
-\emph{The four operators are orthogonal projections.} For $\mathbb{I}$ there is nothing to
+\emph{The four operators are orthogonal projections.} For $\IPi$ there is nothing to
 prove. Idempotency of $\SPi$ and of $\DPi$ is immediate from \cref{eq:ProjExtractors}, and
 their Frobenius self{\hyp}adjointness follows from the two elementary identities
 \begin{equation*}
@@ -415,15 +434,15 @@ their Frobenius self{\hyp}adjointness follows from the two elementary identities
   &= \tfrac12\bigl(\mathbf{A}+\mathbf{A}^{\mathsf T}\bigr)\!:\!\mathbf{B}
   = \mathbf{A}\!:\!\tfrac12\bigl(\mathbf{B}+\mathbf{B}^{\mathsf T}\bigr)
   = \mathbf{A}\!:\!(\SPi\mathbf{B}), \\[2pt]
-  \bigl((\mathbb{I}-\DPi)\mathbf{A}\bigr)\!:\!\mathbf{B}
+  \bigl((\IPi-\DPi)\mathbf{A}\bigr)\!:\!\mathbf{B}
   &= \tfrac1d(\operatorname{tr}\mathbf{A})\,\mathbf{I}\!:\!\mathbf{B}
   = \tfrac1d(\operatorname{tr}\mathbf{A})(\operatorname{tr}\mathbf{B})
-  = \mathbf{A}\!:\!\bigl((\mathbb{I}-\DPi)\mathbf{B}\bigr),
+  = \mathbf{A}\!:\!\bigl((\IPi-\DPi)\mathbf{B}\bigr),
 \end{aligned}
 \end{equation*}
 the first using $\mathbf{A}^{\mathsf T}\!:\!\mathbf{B}=\mathbf{A}\!:\!\mathbf{B}^{\mathsf T}$
 and the second the definition of the trace; self{\hyp}adjointness of the spherical part
-$\mathbb{I}-\DPi$ is that of $\DPi$. The two extractors commute, since $\SPi$ preserves the
+$\IPi-\DPi$ is that of $\DPi$. The two extractors commute, since $\SPi$ preserves the
 trace and leaves spherical tensors unchanged:
 \begin{equation*}
   \DPi\SPi\mathbf{T}
@@ -434,7 +453,7 @@ so their composition $\DSPi$ is idempotent and self{\hyp}adjoint as well. Finall
 four leaves every symmetric traceless tensor unchanged, so \cref{lem:projfamily} applies and
 gives $C_{\mathrm{K}}=\sqrt2$ throughout.
 
-\emph{The sharp constants.} That $C_{\mathrm{K}}(\mathbb{I})=1$ is trivial. For $\SPi$, the
+\emph{The sharp constants.} That $C_{\mathrm{K}}(\IPi)=1$ is trivial. For $\SPi$, the
 identity \cref{eq:crossibp} gives, for every $\bv\in H^1_0(\Omega)^d$,
 \begin{equation*}
   \bigl\lVert\SPi\nabla\bv\bigr\rVert^2
@@ -923,7 +942,7 @@ Now, we must specify an expression for the scaling parameter $\lambda$ which, as
 \begin{equation}
   \lambda = \frac{h^2}{|\boldsymbol{k}_0|^2\tau_{1, \mathrm{NS}}^2},
 \end{equation}
-where $\tau_{1, \mathrm{NS}}$ corresponds to the usual expression for $\tau_1$ for the Navier{\hyp}Stokes equations~\cite{codina2001stabilized}, so as to recover the expected expression for $\tau_1$ at $\alpha \equiv 1$ (see \cref{eq:TauNavierStokes} below). Note that, in the latter case, the contribution $\tau_{b, 1}^{-1}$ becomes equal to the LHS of \cref{eq:DesignConditionOnTauWeak} which, if taken literally, leads to a nonsensical equation where $\tau_1$ cancels out. This should be interpreted as meaning that this contribution \emph{has the same asymptotic behavior} as the full $\tau_1$. Therefore, it is superfluous to include it as its effect will be absorbed in the algorithmic constants. In fact, neglecting the contribution to $\tau_1$ of the mass conservation equation is also done in~\cite{codina2002stabilized} using a different reasoning. For similar reasons, we will ignore the $O(1)$ factor $2-2/d$ in the expression of $\tau_{\nu, 1}^{-1}$, which for the default projector $\DSPi$ equals $4/3$ for $d=3$ and exactly $1$ for $d=2$, so that for $\DSPi$ in two dimensions there is nothing to drop, whereas for $\mathbb{I}$, $\SPi$ and $\DPi$ it equals $2$ in every dimension (\cref{rem:ftGenericPi} of \cref{app:FourierTau}); for every projector of the family of \cref{lem:projfamily} the discarded factor still lies in $[1,2]$, so the simplification---and with it the parameters \cref{eq:Tau1,eq:Tau2}---is uniform over that family, and remains an $O(1)$ factor for any admissible $\ViscProj$ (\cref{rem:ftGenericPi} of \cref{app:FourierTau}).
+where $\tau_{1, \mathrm{NS}}$ corresponds to the usual expression for $\tau_1$ for the Navier{\hyp}Stokes equations~\cite{codina2001stabilized}, so as to recover the expected expression for $\tau_1$ at $\alpha \equiv 1$ (see \cref{eq:TauNavierStokes} below). Note that, in the latter case, the contribution $\tau_{b, 1}^{-1}$ becomes equal to the LHS of \cref{eq:DesignConditionOnTauWeak} which, if taken literally, leads to a nonsensical equation where $\tau_1$ cancels out. This should be interpreted as meaning that this contribution \emph{has the same asymptotic behavior} as the full $\tau_1$. Therefore, it is superfluous to include it as its effect will be absorbed in the algorithmic constants. In fact, neglecting the contribution to $\tau_1$ of the mass conservation equation is also done in~\cite{codina2002stabilized} using a different reasoning. For similar reasons, we will ignore the $O(1)$ factor $2-2/d$ in the expression of $\tau_{\nu, 1}^{-1}$, which for the default projector $\DSPi$ equals $4/3$ for $d=3$ and exactly $1$ for $d=2$, so that for $\DSPi$ in two dimensions there is nothing to drop, whereas for $\IPi$, $\SPi$ and $\DPi$ it equals $2$ in every dimension (\cref{rem:ftGenericPi} of \cref{app:FourierTau}); for every projector of the family of \cref{lem:projfamily} the discarded factor still lies in $[1,2]$, so the simplification---and with it the parameters \cref{eq:Tau1,eq:Tau2}---is uniform over that family, and remains an $O(1)$ factor for any admissible $\ViscProj$ (\cref{rem:ftGenericPi} of \cref{app:FourierTau}).
 
 Furthermore, since $\alpha$ is assumed to be slowly varying over the element, it will be taken as a constant over each element and, in particular, we will take it to be equal to the maximum value it attains in it. Similarly, we will take the modulus of its gradient to be constant over the element and equal to its maximum value.
 
@@ -1078,7 +1097,7 @@ where $\psi$ is the field being interpolated and $k_\psi$ the corresponding poly
  follows at once by the discrete $\ell^2\subset\ell^1$ inequality and reduces, for $\alpha\equiv1$, to the form obtained in~\cite{codina2001stabilized}. A complete proof, following the process of~\cite{codina2001stabilized} adapted to the porosity field, is given in \cref{app:Continuity}.
 
 \begin{corollary}[The four viscous projectors]\label{cor:ProjectorASGS}
-Each of the four variants $\ViscProj\in\{\mathbb{I},\SPi,\DPi,\DSPi\}$ of \cref{sec:ViscousProjector} is admissible, with the uniform Korn constant $C_{\mathrm{K}}=\sqrt2$ (\cref{lem:projfamily,lem:projinstances}). \Cref{lemma:Stability,lemma:Continuity,th:Convergence} therefore hold for each of them, with the same constants. Indeed, the choice of $\ViscProj$ enters the three results only through \cref{H:projector}---no step uses the deviatoric{\hyp}symmetric form---and the constant $C_{\mathrm{K}}$ it supplies serves only to know that $\triplenorm{\cdot}_{\mathrm{A}}$ is a norm (\cref{lem:definiteness}): it fixes the norm in which the error is measured, and enters neither $C$ nor the error functional $\Psi_{\mathrm{A}}(h)$ of \cref{eq:ConvergenceResult}. The one place where the choice does tell quantitatively is the Fourier design of \cref{sec:StabilizationDesign}, and there the discarded $O(1)$ viscous factor stays, for all four, inside the uniform window $[1,2]$; for a general admissible projector its lower end is only $2c_{\ViscProj}^2$ (\cref{rem:ftGenericPi} of \cref{app:FourierTau}), which need not reach $1$.
+Each of the four variants $\ViscProj\in\{\IPi,\SPi,\DPi,\DSPi\}$ of \cref{sec:ViscousProjector} is admissible, with the uniform Korn constant $C_{\mathrm{K}}=\sqrt2$ (\cref{lem:projfamily,lem:projinstances}). \Cref{lemma:Stability,lemma:Continuity,th:Convergence} therefore hold for each of them, with the same constants. Indeed, the choice of $\ViscProj$ enters the three results only through \cref{H:projector}---no step uses the deviatoric{\hyp}symmetric form---and the constant $C_{\mathrm{K}}$ it supplies serves only to know that $\triplenorm{\cdot}_{\mathrm{A}}$ is a norm (\cref{lem:definiteness}): it fixes the norm in which the error is measured, and enters neither $C$ nor the error functional $\Psi_{\mathrm{A}}(h)$ of \cref{eq:ConvergenceResult}. The one place where the choice does tell quantitatively is the Fourier design of \cref{sec:StabilizationDesign}, and there the discarded $O(1)$ viscous factor stays, for all four, inside the uniform window $[1,2]$; for a general admissible projector its lower end is only $2c_{\ViscProj}^2$ (\cref{rem:ftGenericPi} of \cref{app:FourierTau}), which need not reach $1$.
 \end{corollary}
 
 \section{Robustness of the formulation with respect to changes in the physical parameters}\label{sec:Robustness}

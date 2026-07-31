@@ -52,10 +52,12 @@
 % ------------------------- notation -------------------------
 % Matches the article: \ViscProj is the GENERIC viscous projector, \DSPi its
 % deviatoric-symmetric instance, \SPi and \DPi the two elementary extractors.
-\newcommand{\ViscProj}{\overset{\scriptscriptstyle{\mathrm{v}}}{\Pi}}
-\newcommand{\DSPi}{\overset{\scriptscriptstyle{\mathrm{DS}}}{\Pi}}
-\newcommand{\DPi}{\overset{\scriptscriptstyle{\mathrm{D}}}{\Pi}}
-\newcommand{\SPi}{\overset{\scriptscriptstyle{\mathrm{S}}}{\Pi}}
+\newcommand{\ViscProj}{\mathsf{P}}
+\newcommand{\IPi}{\mathsf{I}}
+\newcommand{\AnyProj}{\mathsf{Q}}
+\newcommand{\DSPi}{\mathsf{P}_{\mathrm{DS}}}
+\newcommand{\DPi}{\mathsf{P}_{\mathrm{Dev}}}
+\newcommand{\SPi}{\mathsf{P}_{\mathrm{Sym}}}
 \newcommand{\bv}{\boldsymbol{v}}
 \newcommand{\bw}{\boldsymbol{w}}
 \newcommand{\bk}{\boldsymbol{k}}
@@ -63,7 +65,7 @@
 \newcommand{\be}{\boldsymbol{e}}
 \newcommand{\dd}{\,\mathrm{d}}
 \newcommand{\CK}{C_{\mathrm{K}}}
-\newcommand{\cP}{c_{\Pi}}
+\newcommand{\cP}{c_{\AnyProj}}
 \DeclarePairedDelimiter{\norm}{\lVert}{\rVert}
 
 \title{Korn{-}compatible viscous projectors:\\ a sharp characterization}
@@ -95,17 +97,17 @@ design of the stabilization parameters is no longer confined to the uniform wind
 Let $\Omega\subset\mathbb{R}^d$, $d\ge2$, be a bounded domain. Second{-}order tensors carry the
 Frobenius inner product $\mathbf{A}\!:\!\mathbf{B}=A_{ij}B_{ij}$ and the induced norm
 $|\mathbf{A}|$; $\norm{\cdot}$ denotes the $L^2(\Omega)$ norm of the corresponding field.
-Following~\cite{paper}, a linear map $\Pi$ on second{-}order tensors, acting pointwise and with
+Following~\cite{paper}, a linear map $\AnyProj$ on second{-}order tensors, acting pointwise and with
 constant coefficients, is called \emph{admissible} when it satisfies
 
 \begin{enumerate}[label=\textup{(V\arabic*)},ref=\textup{(V\arabic*)},leftmargin=3.4em]
-  \item\label{V:orth} \emph{Orthogonality.} $\Pi$ is an orthogonal projection for the Frobenius
-  inner product: $\Pi\Pi=\Pi$ and $(\Pi\mathbf{A})\!:\!\mathbf{B}=\mathbf{A}\!:\!(\Pi\mathbf{B})$
-  for all $\mathbf{A},\mathbf{B}$. In particular $|\Pi\mathbf{T}|\le|\mathbf{T}|$ pointwise.
+  \item\label{V:orth} \emph{Orthogonality.} $\AnyProj$ is an orthogonal projection for the Frobenius
+  inner product: $\AnyProj\AnyProj=\AnyProj$ and $(\AnyProj\mathbf{A})\!:\!\mathbf{B}=\mathbf{A}\!:\!(\AnyProj\mathbf{B})$
+  for all $\mathbf{A},\mathbf{B}$. In particular $|\AnyProj\mathbf{T}|\le|\mathbf{T}|$ pointwise.
   \item\label{V:korn} \emph{Korn compatibility.} There is $\CK\ge1$, independent of the mesh and
   of the physical parameters, with
   \begin{equation}\label{eq:PiKorn}
-    \norm{\nabla\bv}\ \le\ \CK\,\norm{\Pi\nabla\bv}
+    \norm{\nabla\bv}\ \le\ \CK\,\norm{\AnyProj\nabla\bv}
     \qquad\forall\,\bv\in H^1_0(\Omega)^d .
   \end{equation}
 \end{enumerate}
@@ -120,15 +122,15 @@ constant coefficients, is called \emph{admissible} when it satisfies
 which commute, so that $\DSPi\coloneqq\DPi\SPi=\SPi\DPi$ extracts the deviatoric{-}symmetric
 part. The article's family is
 \begin{equation}\label{eq:family}
-  \mathcal{F}\coloneqq\bigl\{\,\mathbb{I},\ \SPi,\ \DPi,\ \DSPi\,\bigr\},
+  \mathcal{F}\coloneqq\bigl\{\,\IPi,\ \SPi,\ \DPi,\ \DSPi\,\bigr\},
 \end{equation}
 and its sufficient criterion reads as follows.
 
 \begin{proposition}[Sufficient criterion; Lemma 2.1 of~\cite{paper}]\label{prop:criterion}
-Let $\Pi$ satisfy \cref{V:orth} and let its range contain every deviatoric{-}symmetric tensor.
-Then $\Pi$ satisfies \cref{V:korn} on every domain, with $\CK=\sqrt2$. Every member of
+Let $\AnyProj$ satisfy \cref{V:orth} and let its range contain every deviatoric{-}symmetric tensor.
+Then $\AnyProj$ satisfies \cref{V:korn} on every domain, with $\CK=\sqrt2$. Every member of
 $\mathcal{F}$ qualifies, with sharp constants
-$\CK(\mathbb{I})=1$, $\CK(\SPi)=\CK(\DSPi)=\sqrt2$ and $\CK(\DPi)=\sqrt{d/(d-1)}$.
+$\CK(\IPi)=1$, $\CK(\SPi)=\CK(\DSPi)=\sqrt2$ and $\CK(\DPi)=\sqrt{d/(d-1)}$.
 \end{proposition}
 
 \noindent The proof --- a pointwise Pythagoras identity chained with the $H^1_0$ identity
@@ -138,25 +140,25 @@ $\norm{\DSPi\nabla\bv}^2=\tfrac12\norm{\nabla\bv}^2+(\tfrac12-\tfrac1d)\norm{\na
 
 \section{The sharp characterization}\label{sec:sharp}
 
-The answer is that Korn compatibility is a purely algebraic property of $\Pi$, independent of
+The answer is that Korn compatibility is a purely algebraic property of $\AnyProj$, independent of
 $\Omega$, and detectable on rank{-}one tensors alone.
 
 \begin{definition}[Ellipticity constant]\label{def:cPi}
-For a constant{-}coefficient linear map $\Pi$ on second{-}order tensors set
+For a constant{-}coefficient linear map $\AnyProj$ on second{-}order tensors set
 \begin{equation}\label{eq:cPi}
-  \cP\ \coloneqq\ \min\bigl\{\,\bigl|\Pi(\bv\otimes\bk)\bigr|\ :\ |\bv|=|\bk|=1\,\bigr\},
+  \cP\ \coloneqq\ \min\bigl\{\,\bigl|\AnyProj(\bv\otimes\bk)\bigr|\ :\ |\bv|=|\bk|=1\,\bigr\},
 \end{equation}
 the minimum being attained, the set being compact and the map continuous.
 \end{definition}
 
 \begin{theorem}[Korn compatibility is equivalent to rank{-}one ellipticity]\label{thm:sharp}
-Let $\Pi$ satisfy \cref{V:orth}. The following are equivalent:
+Let $\AnyProj$ satisfy \cref{V:orth}. The following are equivalent:
 \begin{enumerate}[label=\textup{(\roman*)},leftmargin=2.6em]
-  \item\label{it:korn} $\Pi$ satisfies \cref{eq:PiKorn} on some bounded domain
+  \item\label{it:korn} $\AnyProj$ satisfies \cref{eq:PiKorn} on some bounded domain
   $\Omega\subset\mathbb{R}^d$;
-  \item\label{it:allomega} $\Pi$ satisfies \cref{eq:PiKorn} on \emph{every} domain
+  \item\label{it:allomega} $\AnyProj$ satisfies \cref{eq:PiKorn} on \emph{every} domain
   $\Omega\subset\mathbb{R}^d$;
-  \item\label{it:cpi} $\cP>0$, i.e.\ the kernel of $\Pi$ contains no nonzero rank{-}one tensor.
+  \item\label{it:cpi} $\cP>0$, i.e.\ the kernel of $\AnyProj$ contains no nonzero rank{-}one tensor.
 \end{enumerate}
 When they hold, the optimal constant is $\CK=\cP^{-1}$, and it is attained in the limit.
 \end{theorem}
@@ -168,28 +170,28 @@ because the trace vanishes. Its distributional gradient transforms as
 \begin{equation}\label{eq:fourier-grad}
   \widehat{\nabla\bv}(\bk)=\mathrm{i}\,\widehat{\bv}(\bk)\otimes\bk ,
 \end{equation}
-a rank{-}one tensor for each fixed $\bk$. Since $\Pi$ has real, constant coefficients it
+a rank{-}one tensor for each fixed $\bk$. Since $\AnyProj$ has real, constant coefficients it
 commutes with the Fourier transform, and $\bk$ is real, so Plancherel's theorem gives
 \begin{equation}\label{eq:plancherel}
 \begin{aligned}
-  \norm{\Pi\nabla\bv}^2
-  &= \int_{\mathbb{R}^d}\bigl|\Pi\bigl(\widehat{\bv}(\bk)\otimes\bk\bigr)\bigr|^2\dd\bk \\
+  \norm{\AnyProj\nabla\bv}^2
+  &= \int_{\mathbb{R}^d}\bigl|\AnyProj\bigl(\widehat{\bv}(\bk)\otimes\bk\bigr)\bigr|^2\dd\bk \\
   &\ \ge\ \cP^2\int_{\mathbb{R}^d}\bigl|\widehat{\bv}(\bk)\bigr|^2\,|\bk|^2\dd\bk
   \ =\ \cP^2\,\norm{\nabla\bv}^2 ,
 \end{aligned}
 \end{equation}
 the inequality being \cref{eq:cPi} applied to $\bk/|\bk|$ and to the real unit vectors
 obtained by splitting $\widehat{\bv}=\boldsymbol{a}+\mathrm{i}\boldsymbol{b}$ --- legitimate
-because $\Pi$ is real, so that
-$\bigl|\Pi(\widehat{\bv}\otimes\bk)\bigr|^2
-=\bigl|\Pi(\boldsymbol{a}\otimes\bk)\bigr|^2+\bigl|\Pi(\boldsymbol{b}\otimes\bk)\bigr|^2$
---- and then rescaled, the map $(\bv,\bk)\mapsto\Pi(\bv\otimes\bk)$ being bilinear. Hence \cref{eq:PiKorn} holds with
+because $\AnyProj$ is real, so that
+$\bigl|\AnyProj(\widehat{\bv}\otimes\bk)\bigr|^2
+=\bigl|\AnyProj(\boldsymbol{a}\otimes\bk)\bigr|^2+\bigl|\AnyProj(\boldsymbol{b}\otimes\bk)\bigr|^2$
+--- and then rescaled, the map $(\bv,\bk)\mapsto\AnyProj(\bv\otimes\bk)$ being bilinear. Hence \cref{eq:PiKorn} holds with
 $\CK=\cP^{-1}$, on every domain and with no reference to its geometry.
 
 \ref{it:allomega}$\Rightarrow$\ref{it:korn} is trivial.
 
 \ref{it:korn}$\Rightarrow$\ref{it:cpi}. Suppose $\cP=0$, so that
-$\Pi(\bv_0\otimes\bk_0)=0$ for some unit vectors $\bv_0,\bk_0$. Fix
+$\AnyProj(\bv_0\otimes\bk_0)=0$ for some unit vectors $\bv_0,\bk_0$. Fix
 $\varphi\in C_c^\infty(\Omega)$, $\varphi\not\equiv0$, and consider the oscillating profiles
 \begin{equation}\label{eq:oscillating}
   \bv_\lambda(\bx)\ \coloneqq\ \lambda^{-1}\,\bv_0\,\varphi(\bx)\,
@@ -203,17 +205,17 @@ Differentiating,
   \; + \; \underbrace{\lambda^{-1}\,\bv_0\otimes\nabla\varphi\,
     \sin(\lambda\,\bk_0\!\cdot\!\bx)}_{\text{order }\lambda^{-1}} .
 \end{equation}
-The first term is annihilated by $\Pi$ at every point, so
-$\norm{\Pi\nabla\bv_\lambda}\le\norm{\nabla\varphi}\,\lambda^{-1}\to0$, whereas
+The first term is annihilated by $\AnyProj$ at every point, so
+$\norm{\AnyProj\nabla\bv_\lambda}\le\norm{\nabla\varphi}\,\lambda^{-1}\to0$, whereas
 $\norm{\nabla\bv_\lambda}^2\to\tfrac12\norm{\varphi}^2>0$ by the Riemann--Lebesgue lemma
 applied to $\cos^2(\lambda\,\bk_0\!\cdot\!\bx)=\tfrac12(1+\cos(2\lambda\,\bk_0\!\cdot\!\bx))$.
-Therefore $\norm{\nabla\bv_\lambda}/\norm{\Pi\nabla\bv_\lambda}\to\infty$, and since every
+Therefore $\norm{\nabla\bv_\lambda}/\norm{\AnyProj\nabla\bv_\lambda}\to\infty$, and since every
 $\bv_\lambda$ already lies in $C_c^\infty(\Omega)^d\subset H^1_0(\Omega)^d$, no constant can
 make \cref{eq:PiKorn} hold on $\Omega$.
 
 Optimality of $\CK=\cP^{-1}$ follows by running \cref{eq:oscillating} at a minimizing pair
 $(\bv_0,\bk_0)$ of \cref{eq:cPi}: there the leading term of \cref{eq:oscillating-grad} has
-$|\Pi(\bv_0\otimes\bk_0)|=\cP$ exactly, so the quotient tends to $\cP^{-1}$.
+$|\AnyProj(\bv_0\otimes\bk_0)|=\cP$ exactly, so the quotient tends to $\cP^{-1}$.
 \end{proof}
 
 \begin{remark}[Why rank{-}one tensors are the whole story]\label{rem:whyrankone}
@@ -231,18 +233,18 @@ inequality, to which the Plancherel argument above does not apply.
 \section{The criterion is strictly weaker than the characterization}\label{sec:gap}
 
 \begin{example}[An admissible projector outside $\mathcal{F}$]\label{ex:complement}
-Let $\Pi=\mathbb{I}-\DSPi$, the projector onto the spherical{-}plus{-}skew part. Its range meets
+Let $\AnyProj=\IPi-\DSPi$, the projector onto the spherical{-}plus{-}skew part. Its range meets
 the deviatoric{-}symmetric tensors only at the origin, so \cref{prop:criterion} says nothing
 about it. Yet for unit $\bv,\bk$,
 \begin{equation}\label{eq:complement-c}
-  \bigl|(\mathbb{I}-\DSPi)(\bv\otimes\bk)\bigr|^2
+  \bigl|(\IPi-\DSPi)(\bv\otimes\bk)\bigr|^2
   = 1 - \bigl|\DSPi(\bv\otimes\bk)\bigr|^2
   = \tfrac12\Bigl(1-(\bv\!\cdot\!\bk)^2\Bigr) + \tfrac1d(\bv\!\cdot\!\bk)^2 ,
 \end{equation}
 whose coefficient in $(\bv\!\cdot\!\bk)^2$ is $\tfrac1d-\tfrac12\le0$, so the minimum
 sits at $(\bv\!\cdot\!\bk)^2=1$ and $\cP=d^{-1/2}>0$ (for $d=2$ the form is constant,
 equal to $\tfrac12$, and every pair attains the minimum). By
-\cref{thm:sharp}, $\mathbb{I}-\DSPi$ is admissible, with $\CK=\sqrt d$. Note that it is
+\cref{thm:sharp}, $\IPi-\DSPi$ is admissible, with $\CK=\sqrt d$. Note that it is
 admissible \emph{for the same reason} the criterion fails to see it: what matters is the
 kernel, not the range.
 \end{example}
@@ -280,33 +282,33 @@ independent of $\bv$, whence
   \cP^2(\Pi_\theta)=\tfrac12\bigl(1-|\sin 2\theta|\bigr) .
 \end{equation}
 So $\Pi_\theta$ is admissible for every $|\theta|<\pi/4$, with $\CK\to\infty$ as
-$|\theta|\to\pi/4$. At $\theta=0$ one recovers $\Pi_0=\mathbb{I}-\DSPi$ of
+$|\theta|\to\pi/4$. At $\theta=0$ one recovers $\Pi_0=\IPi-\DSPi$ of
 \cref{ex:complement}, consistently with $\cP^2=\tfrac12=d^{-1}$ at $d=2$.
 \end{example}
 
 \section{Consequence for the stabilization parameters}\label{sec:tau}
 
 The article designs its stabilization parameters from the Fourier symbol of the differential
-operator. The viscous block is $(2\alpha\nu/h^2)\,\mathbf{T}_{\Pi}(\bk_0)$ with
-$\mathbf{T}_{\Pi}(\bk)_{ab}\coloneqq P_{aibj}k_ik_j$, whose quadratic form is
+operator. The viscous block is $(2\alpha\nu/h^2)\,\mathbf{T}_{\AnyProj}(\bk_0)$ with
+$\mathbf{T}_{\AnyProj}(\bk)_{ab}\coloneqq P_{aibj}k_ik_j$, whose quadratic form is
 \begin{equation}\label{eq:symbol-quad}
-  \bv^{\mathsf T}\mathbf{T}_{\Pi}(\bk)\,\bv=\bigl|\Pi(\bv\otimes\bk)\bigr|^2 ,
+  \bv^{\mathsf T}\mathbf{T}_{\AnyProj}(\bk)\,\bv=\bigl|\AnyProj(\bv\otimes\bk)\bigr|^2 ,
 \end{equation}
 by idempotency and self{-}adjointness. Two bounds follow immediately, and they are of quite
 different quality:
 \begin{itemize}[leftmargin=1.6em]
   \item \emph{Upper bound, uniform.} Non{-}expansiveness \cref{V:orth} gives
-  $\mathbf{T}_{\Pi}(\bk_0)\le|\bk_0|^2\,\mathbb{I}_d$ for every admissible $\Pi$.
+  $\mathbf{T}_{\AnyProj}(\bk_0)\le|\bk_0|^2\,\mathbb{I}_d$ for every admissible $\AnyProj$.
   \item \emph{Lower bound, not uniform.} \Cref{eq:cPi} and \cref{eq:symbol-quad} give
-  $\mathbf{T}_{\Pi}(\bk_0)\ge\cP^2\,|\bk_0|^2\,\mathbb{I}_d$, and $\cP$ is positive but,
+  $\mathbf{T}_{\AnyProj}(\bk_0)\ge\cP^2\,|\bk_0|^2\,\mathbb{I}_d$, and $\cP$ is positive but,
   by \cref{ex:tilted}, not bounded below over the admissible class.
 \end{itemize}
-For $\Pi\in\mathcal{F}$ the optimality in \cref{thm:sharp} turns $\CK\le\sqrt2$ into
+For $\AnyProj\in\mathcal{F}$ the optimality in \cref{thm:sharp} turns $\CK\le\sqrt2$ into
 $\cP^2\ge\tfrac12$, upgrading the lower bound to
-$\mathbf{T}_{\Pi}(\bk_0)\ge\tfrac12|\bk_0|^2\mathbb{I}_d$, so the $O(1)$ factor the article
+$\mathbf{T}_{\AnyProj}(\bk_0)\ge\tfrac12|\bk_0|^2\mathbb{I}_d$, so the $O(1)$ factor the article
 discards when simplifying $\tau_{\nu,1}^{-1}$ lies in the uniform window $[1,2]$ --- it equals
-$2-2/d$ for $\DSPi$ and exactly $2$ for $\mathbb{I}$, $\SPi$ and $\DPi$. For a general
-admissible projector the window degrades to $[2\cP^2,2]$: still $O(1)$ for each fixed $\Pi$,
+$2-2/d$ for $\DSPi$ and exactly $2$ for $\IPi$, $\SPi$ and $\DPi$. For a general
+admissible projector the window degrades to $[2\cP^2,2]$: still $O(1)$ for each fixed $\AnyProj$,
 and still absorbed into the algorithmic constant $c_1$, but no longer uniform over the class.
 
 \begin{remark}[The practical reading]\label{rem:practical}
@@ -318,10 +320,10 @@ appropriate for a projector with small $\cP$, and the natural safeguard is to ke
 $\cP$ bounded away from zero when a new viscous operator is proposed. By
 \cref{eq:symbol-quad} that is a Legendre--Hadamard test,
 \begin{equation}\label{eq:cPi-recipe}
-  \cP^2=\min_{|\bk|=1}\ \lambda_{\min}\bigl(\mathbf{T}_{\Pi}(\bk)\bigr),
+  \cP^2=\min_{|\bk|=1}\ \lambda_{\min}\bigl(\mathbf{T}_{\AnyProj}(\bk)\bigr),
 \end{equation}
 a $d\times d$ eigenvalue problem minimized over the unit sphere --- \emph{not} a one-shot
-eigenvalue computation on the $d^2\times d^2$ matrix of $\Pi$, whose spectrum is contained
+eigenvalue computation on the $d^2\times d^2$ matrix of $\AnyProj$, whose spectrum is contained
 in $\{0,1\}$ for every orthogonal projection and so carries no information about $\cP$.
 \end{remark}
 
@@ -329,7 +331,7 @@ in $\{0,1\}$ for every orthogonal projection and so carries no information about
 All the algebra above is checked symbolically, for $d=2$ and $d=3$, by the script
 \texttt{projector\_\allowbreak algebra\_\allowbreak verification.py} under \texttt{proof\_\allowbreak verification/\allowbreak sympy/}:
 section~C computes
-$\cP$ for $\mathbb{I}$, $\SPi$, $\DPi$, $\DSPi$, $\mathbb{I}-\DSPi$, the skew and the spherical
+$\cP$ for $\IPi$, $\SPi$, $\DPi$, $\DSPi$, $\IPi-\DSPi$, the skew and the spherical
 parts and confirms \cref{eq:complement-c} and the two vanishing constants of
 \cref{ex:failures}; section~E reproduces \cref{eq:tilted-quad,eq:tilted-c} and exhibits
 $\theta=-0.3$ and $\theta=-0.75$ as witnesses that the window $[1,2]$ genuinely fails outside

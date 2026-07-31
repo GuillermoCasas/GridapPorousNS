@@ -6,6 +6,14 @@
 > placement described below; see `theory/README.md` and the header of
 > `theory/paper/asgs_convergence.tex`.
 >
+> **ALSO SUPERSEDED (2026-07-31): the macro BODIES quoted below.** The `\newcommand` snippets in
+> this brief still define `\ViscProj` and friends as `\overset{...}{\Pi}`. That notation was replaced
+> across `theory/` on 2026-07-31: the projector is now sans-serif with the instance named by the
+> subspace it keeps (`\ViscProj`=𝖯, `\SPi`=𝖯_Sym, `\DPi`=𝖯_Dev, `\DSPi`=𝖯_DS, plus `\IPi`=𝖨 and
+> `\AnyProj`=𝖰). The macro *names* and their semantics are unchanged, so every instruction below that
+> refers to a macro by name still applies verbatim — only the four bodies are stale. Rationale is in
+> the preamble comment of both mains; see also `theory/README.md`.
+>
 > **ALSO SUPERSEDED (2026-07-30): the `\amend{...}` wrapping.** Step 7 below and every verbatim
 > snippet wrap new prose in `\amend{...}`. That macro no longer exists — all 1011 wrappers were
 > unwrapped and the `\newcommand` deleted (`pending-tasks.md` §1c). Read those `\amend{…}` as plain

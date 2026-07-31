@@ -594,7 +594,11 @@ check(f"D3'' every cross-file label cited by a shared appendix is defined in BOT
 
 # D4  eq:projconstants states the four sharp constants -- in EACH main, since the
 # lemma now lives in the main text (duplicated verbatim in both articles).
-PATS_D4 = [r"C_\{\\mathrm\{K\}\}\(\\mathbb\{I\}\)\s*=\s*1",
+# 2026-07-31: the identity member is now \IPi (the sans-serif FOURTH-order identity),
+# not \mathbb{I}, which the mains keep for the second-order identity of
+# sigma = sigma I and I_d.  Same four constants, same strictness -- only the glyph
+# the source spells them with changed.
+PATS_D4 = [r"C_\{\\mathrm\{K\}\}\(\\IPi\)\s*=\s*1",
            r"C_\{\\mathrm\{K\}\}\(\\SPi\)\s*=\s*\\sqrt2",
            r"C_\{\\mathrm\{K\}\}\(\\DPi\)\s*=\s*\\sqrt\{\\tfrac\{d\}\{d-1\}\}",
            r"C_\{\\mathrm\{K\}\}\(\\DSPi\)\s*=\s*\\sqrt2"]
