@@ -56,8 +56,15 @@
 % Linux). So enable it only when lineno is NOT active, i.e. in non-review/final
 % builds -- exactly the builds where the vertical voids matter and where it is
 % safe. Review-mode drafts compile correctly without it.
+%
 \makeatletter
-\@ifpackageloaded{lineno}{}{\allowdisplaybreaks}
+\@ifundefined{ismacos}{%
+  % On Linux, allowdisplaybreaks is safe to use even with lineno (which avoids bad spacing)
+  \allowdisplaybreaks
+}{%
+  % On macOS, allowdisplaybreaks together with lineno collapses display math, so guard it
+  \@ifpackageloaded{lineno}{}{\allowdisplaybreaks}%
+}
 \makeatother
 
 \newlength\mytemplena

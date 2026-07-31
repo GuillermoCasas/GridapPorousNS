@@ -27,8 +27,12 @@ $out_dir = '.';                            # the PDF stays next to the source
 # (VS Code / LaTeX Workshop needs it). latexmk moves it next to the PDF (out_dir),
 # it is gitignored, and `latexmk -c` removes it. Enabled via the engine because this
 # latexmk does not honour the $synctex variable; %O still carries latexmk's own
-# -recorder / -output-directory. Drop -synctex=1 for a PDF-only source tree.
-$pdflatex = 'pdflatex -synctex=1 %O %S';
+if ($^O eq 'darwin') {
+    # On macOS, inject \def\ismacos{1} so LaTeX can guard incompatible packages
+    $pdflatex = 'pdflatex -synctex=1 %O "\\def\\ismacos{1}\\input{%S}"';
+} else {
+    $pdflatex = 'pdflatex -synctex=1 %O %S';
+}
 
 # --- Search paths -------------------------------------------------------------
 #  ./siam//            : the SIAM class/bst (siamart190516.cls, siamplain.bst)
