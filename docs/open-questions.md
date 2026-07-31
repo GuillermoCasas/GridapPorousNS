@@ -74,7 +74,7 @@ Items from the 2026-06-04 documentation audit that need an **author decision**, 
 
 - **✅ RESOLVED 2026-07-30 — Include the genuinely-3D manufactured test, or narrow the 3D claim?** (audit T7.)
   **Decided: added alongside**, not replacing the extruded case. `\input{genuine3d_table.tex}` sits after
-  `tab:3DH1` in `article_v2.tex` and `tab:Genuine3D` is cross-referenced from the body; v1 has no such rows, as
+  `tab:3D` in `article_v2.tex` and `tab:Genuine3D` is cross-referenced from the body; v1 has no such rows, as
   with the R5 control. The deciding argument is in `pre-submission-checklist.md` (the RESOLVED T7 block): the
   genuine-3D data lifts the OSGS ℙ₂ pressure `H¹` *rate* to `2.00`, but its absolute `H¹` pressure errors stay
   `O(1)` (1.22–2.97) exactly as on the extruded field — so the near-stagnant *magnitude* is **not** an artifact of

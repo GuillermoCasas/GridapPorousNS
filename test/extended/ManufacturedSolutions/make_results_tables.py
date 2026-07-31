@@ -3,13 +3,20 @@
 make_results_tables.py — generate the paper's 2D manufactured-solution convergence tables,
 filled with the LATEST Gridap simulation results, as a standalone compilable LaTeX file.
 
-Reproduces the four tables of article.tex in their exact format (booktabs, velocity+pressure
-sub-blocks, ASGS/OSGS columns, `\\num{}` values, "slope (N)" theoretical-rate annotations):
+Follows the article's format (booktabs, velocity+pressure sub-blocks, ASGS/OSGS columns,
+`\\num{}` values, "slope (N)" theoretical-rate annotations), one table PER NORM:
 
-    tab:Linear2DL2     P1 (TRI k=1)   L2-norm     slope (2 / 1)
-    tab:Linear2DH1     P1 (TRI k=1)   H1-seminorm slope (1 / -)
-    tab:Quadratic2DL2  Q2 (QUAD k=2)  L2-norm     slope (3 / 2)
-    tab:Quadratic2DH1  Q2 (QUAD k=2)  H1-seminorm slope (2 / 1)
+    tab:Linear2D-L2     P1 (TRI k=1)   L2-norm     slope (2 / 1)
+    tab:Linear2D-H1     P1 (TRI k=1)   H1-seminorm slope (1 / -)
+    tab:Quadratic2D-L2  Q2 (QUAD k=2)  L2-norm     slope (3 / 2)
+    tab:Quadratic2D-H1  Q2 (QUAD k=2)  H1-seminorm slope (2 / 1)
+
+Since 2026-07-31 the ARTICLE reports both norms side by side in one table per example
+(tab:Linear2D, tab:Quadratic2D, tab:3D). This diagnostic view deliberately keeps them apart:
+it carries two extra columns the article does not have (the eps_pert / N_NS+N_Pic solver-effort
+pair), which a merged two-norm table has no room for. It is a monitoring view of the same data,
+not a transcription of the article -- the paper-faithful 3D transcription/gate is
+ManufacturedSolutions3D/make_3d_tables.py.
 
 Data sources (per cell, in priority order):
   1. corner JSONs  — the rescued high-Re/low-alpha corner cells (Re=1e6, alpha_0=0.05),
@@ -50,7 +57,7 @@ ROW_KEYS = [(re, da, al) for da in DA_VALS for re in RE_VALS for al in ALPHA_VAL
 NORM_FIELDS = ["slope_uL2", "FME_uL2", "slope_uH1", "FME_uH1",
                "slope_pL2", "FME_pL2", "slope_pH1", "FME_pH1"]
 
-# 3D tables (article tab:3DL2 / tab:3DH1): theoretical convergence orders shown after the element
+# 3D tables (article tab:3D): theoretical convergence orders shown after the element
 # type, keyed by (norm, field, kv). "-" = no predicted rate (P1 pressure H1).
 RATES_3D = {
     ("L2", "u", 1): "2", ("L2", "u", 2): "3", ("L2", "p", 1): "1", ("L2", "p", 2): "2",
@@ -260,7 +267,8 @@ def _fmt_slope(x):
 
 
 def _fmt_fme(x):
-    return r"\num[scientific-notation=true]{%.2e}" % x
+    # 2 s.f.: the article dropped one significant figure from every FME on 2026-07-31
+    return r"\num[scientific-notation=true]{%.1e}" % x
 
 
 def _eps_tex(eps):
@@ -388,7 +396,7 @@ def emit_table(dataset, *, norm, label, caption, vel_rate, prs_rate, fme_col6_mm
     return "\n".join(L), n_ext, n_nc
 
 
-# ---- 3D tables (article tab:3DL2 / tab:3DH1) -----------------------------------------------
+# ---- 3D tables (per-norm view of article tab:3D) -----------------------------------------------
 def load_3d(path):
     """Read the 3D nested-family sweep JSON (smoke3d.jl `sweep`). Returns {(kv,method): metrics}
     with the two-finest-mesh slope + finest-mesh error (FME) for all four norms."""
@@ -429,7 +437,7 @@ def load_3d(path):
 
 
 def emit_3d_table(data, *, norm, label, caption, fme_col_mm="18", iter_compact=True):
-    """The 3D table — article.tex tab:3DL2/3DH1 structure (element type | slope ASGS/OSGS |
+    """The 3D table — article.tex tab:3D structure (element type | slope ASGS/OSGS |
     FME ASGS/OSGS), velocity+pressure blocks, P1/P2 rows — extended with the same
     eps_pert (N_NS+N_Pic) solver-effort columns as the 2D tables (the 3D solves are direct
     exact-guess, so eps_pert = 0)."""
@@ -549,19 +557,19 @@ def build():
     q2.update(corner_q2)  # Q2/QUAD-k2 corner: converges directly at the standard 160→320 (no fold)
 
     specs = [
-        dict(data=p1, norm="L2", label="tab:Linear2DL2", vel_rate="2", prs_rate="1", fme_col6_mm="18",
+        dict(data=p1, norm="L2", label="tab:Linear2D-L2", vel_rate="2", prs_rate="1", fme_col6_mm="18",
              caption=r"Observed convergence rates and normalized finest mesh error (FME) for the 2D "
                      r"problem ($\mathbb{P}_1$ elements), calculated from the $L^2$-norm of the error "
                      r"obtained with the two finest meshes (theoretical convergence rates in parentheses)"),
-        dict(data=p1, norm="H1", label="tab:Linear2DH1", vel_rate="1", prs_rate="-", fme_col6_mm="18",
+        dict(data=p1, norm="H1", label="tab:Linear2D-H1", vel_rate="1", prs_rate="-", fme_col6_mm="18",
              caption=r"Observed convergence rates and normalized finest mesh error (FME) for the 2D "
                      r"problem ($\mathbb{P}_1$ elements), calculated from the $H^1$-seminorm of the error "
                      r"obtained with the two finest meshes (theoretical convergence rates in parentheses)"),
-        dict(data=q2, norm="L2", label="tab:Quadratic2DL2", vel_rate="3", prs_rate="2", fme_col6_mm="20",
+        dict(data=q2, norm="L2", label="tab:Quadratic2D-L2", vel_rate="3", prs_rate="2", fme_col6_mm="20",
              caption=r"Observed convergence rates and normalized finest mesh error (FME) for the 2D "
                      r"problem ($\mathbb{Q}_2$ elements), calculated from the $L^2$-norm of the error "
                      r"obtained with the two finest meshes (theoretical convergence rates in parentheses)"),
-        dict(data=q2, norm="H1", label="tab:Quadratic2DH1", vel_rate="2", prs_rate="1", fme_col6_mm="18",
+        dict(data=q2, norm="H1", label="tab:Quadratic2D-H1", vel_rate="2", prs_rate="1", fme_col6_mm="18",
              caption=r"Observed convergence rates and normalized finest mesh error (FME) for the 2D "
                      r"problem ($\mathbb{Q}_2$ elements), calculated from the $H^1$-seminorm of the error "
                      r"obtained with the two finest meshes (theoretical convergence rates in parentheses)"),
@@ -576,14 +584,14 @@ def build():
         total_ext += n_ext
         total_nc += n_nc
 
-    # ---- 3D tables (tab:3DL2 / tab:3DH1): one case (α,Re,Da)=(0.5,1,1), P1/P2, nested-tet family ----
+    # ---- 3D tables (per-norm view of tab:3D): one case (α,Re,Da)=(0.5,1,1), P1/P2, nested-tet family ----
     d3 = load_3d(args.threed_json)
     _cap3d = lambda nm: (r"Observed convergence rates and normalized finest mesh error (FME) for the 3D "
                          r"problem ($\alpha_0=0.5$, $\Reyn=1$, $\Damk=1$), calculated from the %s of the error "
                          r"obtained with the two finest meshes of a nested red-refined tetrahedral family "
                          r"(one base mesh subdivided $1\!\to\!8$ per level; theoretical convergence rates "
                          r"in parentheses)" % nm)
-    for norm, label, nmkind in (("L2", "tab:3DL2", r"$L^2$-norm"), ("H1", "tab:3DH1", r"$H^1$-seminorm")):
+    for norm, label, nmkind in (("L2", "tab:3D-L2", r"$L^2$-norm"), ("H1", "tab:3D-H1", r"$H^1$-seminorm")):
         tex3d, n_nc3 = emit_3d_table(d3, norm=norm, label=label, caption=_cap3d(nmkind),
                                      iter_compact=not args.iter_inline)
         tables.append(tex3d)

@@ -222,7 +222,7 @@ load-bearing measurements.
   the full α×Re grid ran: it **converges at optimal velocity + pressure rates at Re=10⁵** (L²u rate 2.41 at
   α₀=0.5) exactly where unstabilized-TH velocity stagnates, but is ~10× *less* accurate than unstabilized TH in
   the viscous regime — isolating the high-Re gain to the **stabilization**, not the space pair. Ported into
-  `article_v2.tex` as the `P2/P1 ASGS` rows of `tab:CocquetMMSL2/H1`. (ii) **R2** α-interpolation ablation
+  `article_v2.tex` as the `P2/P1 ASGS` rows of `tab:CocquetMMS`. (ii) **R2** α-interpolation ablation
   (`cocquet_form_mms_alpha_interp_p1.json`, audit I07, `porosity_interpolation_order` knob) — **P1-α is benign
   for P1 elements** (~1.1× the analytic baseline) but **caps P2 convergence** (48–73× worse), i.e. FE
   interpolation of α preserves convergence only when interpolated at (≥) the velocity order. See

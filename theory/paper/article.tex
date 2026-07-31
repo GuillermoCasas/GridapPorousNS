@@ -1246,292 +1246,146 @@ with $\alpha_\infty$ the porosity supremum. No scale then departs from unity by 
 For both 2D and 3D tests, we have considered the problem defined by \cref{eq:ManufacturedProblem}. In the following subsections we present the particularities of the various simulations and the results obtained.
 
 \subsection{Manufactured solutions: 2D cases}\label{sec:NumericalExamplesStationaryCase2D} \hfill\\
-We consider two types of elements: linear triangles ($\mathbb{P}_1$ elements) and biquadratic quadrilaterals ($\mathbb{Q}_2$ elements). The sequence of structured meshes is in both cases obtained by successively dividing the nodal distance by two, the coarsest one being given by a $10 \times 10$ grid, and the finest being $320 \times 320$. The triangle elements are obtained by dividing every resulting square into two triangles. In all the examples we take $\varepsilon$ negligible---at $10^{-8}$ in the dimensionless scaling of \cref{eq:PressureScale}, retained only so that each linear solve is nonsingular, and far below the smallness bound \cref{eq:UpperBoundOnEpsilon}. The pressure level is therefore fixed only to within that penalty, and the pressure error is measured against the zero{\hyp}mean representative of the discrete solution, so that the gauge mode is not charged as error. Of the eighteen parameter combinations described above, the strongly convection-dominated, low-porosity corner $(\Reyn,\alpha_0)=(10^6,0.05)$ is excluded from the sweep, leaving the fifteen cases reported in each of \cref{tab:Linear2DL2,tab:Linear2DH1,tab:Quadratic2DL2,tab:Quadratic2DH1}. The reason is that at this combination the nonlinear solvers tested here do not converge on the coarser meshes of the sequence: Newton and Picard iterations started from the exact solution itself both stall at a finite residual. The present computations do not determine whether a discrete root is genuinely absent there or merely unreachable by these solvers because of ill{\hyp}conditioning or loss of the basin of attraction; establishing the former would require branch{\hyp}continuation and Jacobian diagnostics that we have not carried out. This difficulty recedes under refinement, and once the meshes are fine enough to resolve the solution the corner converges at or above the optimal rates and to the accuracy of the nodal interpolant, as detailed with the convection-dominated results below; we therefore exclude it as a resolution limitation of the declared mesh sequence rather than a deficiency of the formulation, and prefer to report a uniform sequence for all the remaining cases.
+We consider two types of elements: linear triangles ($\mathbb{P}_1$ elements) and biquadratic quadrilaterals ($\mathbb{Q}_2$ elements). The sequence of structured meshes is in both cases obtained by successively dividing the nodal distance by two, the coarsest one being given by a $10 \times 10$ grid, and the finest being $320 \times 320$. The triangle elements are obtained by dividing every resulting square into two triangles. In all the examples we take $\varepsilon$ negligible---at $10^{-8}$ in the dimensionless scaling of \cref{eq:PressureScale}, retained only so that each linear solve is nonsingular, and far below the smallness bound \cref{eq:UpperBoundOnEpsilon}. The pressure level is therefore fixed only to within that penalty, and the pressure error is measured against the zero{\hyp}mean representative of the discrete solution, so that the gauge mode is not charged as error. Of the eighteen parameter combinations described above, the strongly convection-dominated, low-porosity corner $(\Reyn,\alpha_0)=(10^6,0.05)$ is excluded from the sweep, leaving the fifteen cases reported in each of \cref{tab:Linear2D,tab:Quadratic2D}. The reason is that at this combination the nonlinear solvers tested here do not converge on the coarser meshes of the sequence: Newton and Picard iterations started from the exact solution itself both stall at a finite residual. The present computations do not determine whether a discrete root is genuinely absent there or merely unreachable by these solvers because of ill{\hyp}conditioning or loss of the basin of attraction; establishing the former would require branch{\hyp}continuation and Jacobian diagnostics that we have not carried out. This difficulty recedes under refinement, and once the meshes are fine enough to resolve the solution the corner converges at or above the optimal rates and to the accuracy of the nodal interpolant, as detailed with the convection-dominated results below; we therefore exclude it as a resolution limitation of the declared mesh sequence rather than a deficiency of the formulation, and prefer to report a uniform sequence for all the remaining cases.
 
-\Cref{tab:Linear2DL2,tab:Linear2DH1} contain the measured convergence rates for the $L^2$-norm and $H^1$-seminorm for the $\mathbb{P}_1$ elements, along with the absolute errors in these norms measured on the finest mesh, i.e., the finest mesh error (FME). \Cref{tab:Quadratic2DL2,tab:Quadratic2DH1} are the analogues for $\mathbb{Q}_2$ elements. Overall, the two methods attain their optimal velocity \emph{rates} throughout, the most appreciable shortfall being the convection-dominated biquadratic rows ($\Reyn=10^6$), whose rates sit slightly below the nominal values because the finest mesh is not yet within the asymptotic range at that elemental Reynolds number (see below). The velocity \emph{errors} of the two variants are close to each other throughout, the main exception being the strongly reaction-dominated corner, where the OSGS linear element carries a larger error at a preserved rate (discussed below). The two methods differ mainly in the pressure, for which the OSGS variant tends to deliver cleaner and higher convergence rates than the ASGS one (most visibly for the biquadratic element in the viscosity-dominated regime, see below). Furthermore, the results are compatible with the error estimates provided in \cref{sec:Robustness}.
+\Cref{tab:Linear2D} contains the measured convergence rates for the $L^2$-norm and $H^1$-seminorm for the $\mathbb{P}_1$ elements, along with the absolute errors in these norms measured on the finest mesh, i.e., the finest mesh error (FME). \Cref{tab:Quadratic2D} is the analogue for $\mathbb{Q}_2$ elements. Overall, the two methods attain their optimal velocity \emph{rates} throughout, the most appreciable shortfall being the convection-dominated biquadratic rows ($\Reyn=10^6$), whose rates sit slightly below the nominal values because the finest mesh is not yet within the asymptotic range at that elemental Reynolds number (see below). The velocity \emph{errors} of the two variants are close to each other throughout, the main exception being the strongly reaction-dominated corner, where the OSGS linear element carries a larger error at a preserved rate (discussed below). The two methods differ mainly in the pressure, for which the OSGS variant tends to deliver cleaner and higher convergence rates than the ASGS one (most visibly for the biquadratic element in the viscosity-dominated regime, see below). Furthermore, the results are compatible with the error estimates provided in \cref{sec:Robustness}.
 
-\paragraph{Comparison against the interpolation error} The comparison can be made sharper than a rate check. Since the exact solution is known, the error of its nodal interpolant on the same mesh sequence provides a nodal{\hyp}interpolation benchmark, reported in each table as an additional entry; it is independent of $\Reyn$, of $\Damk$ and of the stabilization variant, and---the exact pressure carrying no porosity---the pressure reference is independent of $\alpha_0$ as well. Measured against it, the velocity error of both variants sits on the interpolation error in the $H^1$-seminorm for both elements, at both porosities and for every combination with $\Reyn \leq 1$ and $\Damk \leq 1$---that is, wherever neither convection nor reaction is dominant: the two agree to three significant digits for the linear element at $\alpha_0 = 0.5$ ($3.50\times10^{-2}$ against an interpolation value of $3.499\times10^{-2}$, the latter quoted to one more digit than the tables carry) and to within about half a percent in the remaining cases (the biquadratic element, and $\alpha_0 = 0.05$). (The strongly reaction-dominated rows are the exception, and are discussed below.) The stabilization therefore introduces no measurable loss of accuracy there relative to interpolation---a stronger statement than optimality of the rate. We note that for the linear element the nodal interpolant is not the best approximation in the $L^2$-norm (it exceeds it by a factor $\sqrt{6}$ asymptotically), so that errors below the reference in that norm, by up to that factor, are expected and unremarkable; in the $H^1$-seminorm, by contrast, the nodal interpolant is asymptotically optimal, which is what makes the coincidence above meaningful.
+\paragraph{Comparison against the interpolation error} The comparison can be made sharper than a rate check. Since the exact solution is known, the error of its nodal interpolant on the same mesh sequence provides a nodal{\hyp}interpolation benchmark, reported in each table as an additional entry; it is independent of $\Reyn$, of $\Damk$ and of the stabilization variant, and---the exact pressure carrying no porosity---the pressure reference is independent of $\alpha_0$ as well. Measured against it, the velocity error of both variants sits on the interpolation error in the $H^1$-seminorm for both elements, at both porosities and for every combination with $\Reyn \leq 1$ and $\Damk \leq 1$---that is, wherever neither convection nor reaction is dominant: the two agree to three significant digits for the linear element at $\alpha_0 = 0.5$ ($3.50\times10^{-2}$ against an interpolation value of $3.499\times10^{-2}$, both quoted to more digits than the table carries) and to within about half a percent in the remaining cases (the biquadratic element, and $\alpha_0 = 0.05$). (The strongly reaction-dominated rows are the exception, and are discussed below.) The stabilization therefore introduces no measurable loss of accuracy there relative to interpolation---a stronger statement than optimality of the rate. We note that for the linear element the nodal interpolant is not the best approximation in the $L^2$-norm (it exceeds it by a factor $\sqrt{6}$ asymptotically), so that errors below the reference in that norm, by up to that factor, are expected and unremarkable; in the $H^1$-seminorm, by contrast, the nodal interpolant is asymptotically optimal, which is what makes the coincidence above meaningful.
 
 \paragraph{Dependence on the minimum porosity} The effect of variations in the minimum porosity must be read against a property of the manufactured solution rather than of the method: any velocity compatible with $\nabla\cdot(\alpha\boldsymbol{u})=0$ scales as $1/\alpha$, so its interpolation error \emph{itself} grows as $\alpha_0$ decreases---by factors of $5.0$ ($\mathbb{P}_1$) and $11.6$ ($\mathbb{Q}_2$) when passing from $\alpha_0=0.5$ to $\alpha_0=0.05$, as the reference entries show. In the norms and regimes just listed the observed velocity errors grow by precisely these factors, so that the degradation is entirely that of the best approximation and the stability constants contribute no additional loss. Among the velocity errors of those rows, the only one retaining a residual method effect is the $\mathbb{P}_1$ velocity in the $L^2$-norm, whose error relative to interpolation grows by a factor between $1.3$ and $2.0$ (ASGS) and between $3.5$ and $4.1$ (OSGS) across the viscosity-dominated rows. This residual growth brackets the porosity-weighted prediction of \cref{sec:Robustness} (for a passage between two porosities, the ratio of the weights $\alpha_0^{-1/2}$ at the two values, here $\sqrt{10}\approx3.2$)---the ASGS factor below it and the OSGS one some $10$ to $30\%$ above---and, this being a one-sided upper bound that the absolute errors satisfy throughout, the experiments are consistent with it without establishing it as sharp. The pressure, whose exact field and normalization do not depend on $\alpha_0$, is the cleaner probe of the constants: in the viscosity-dominated regime its error grows by factors of $8.3$--$12.4$ ($\mathbb{P}_1$) and $10.2$--$18.8$ ($\mathbb{Q}_2$), which the estimates attribute to the coupling term $\tau_2^{1/2}\mathrm{E}_{\mathrm{int}}(\boldsymbol{u})$, dominant in this regime and growing with the interpolation error of the velocity quoted above.
 
 \paragraph{Viscosity{\hyp}dominated flows} In this regime ($\Reyn_h,\Damk_h\to 0$), the results are consistent with the predicted asymptotic bounds given by \cref{eq:DominantViscosityVelocityGradientEstimate,eq:DominantViscosityPressureGradientEstimate}. The velocity error is optimal in all cases; the two methods are virtually identical in the $H^1$-seminorm for both elements and in both norms for the biquadratic element, while for the linear element in the $L^2$-norm they differ by up to a factor of about $1.9$ (discussed below). The pressure is where the analysis and the two stabilizations can be told apart. For the biquadratic element the ASGS pressure converges at the rate predicted by the working-norm analysis---one order below the interpolation-optimal one in both norms ($1.8$--$1.9$ in the $L^2$-norm, $0.8$--$0.9$ in the $H^1$-seminorm)---so that the loss of one pressure order in \cref{eq:DominantViscosityPressureGradientEstimate} is not an artifact of the proof: it is observed, and precisely for the variant the analysis covers. The OSGS pressure, by contrast, is interpolation-optimal, one order higher in both norms, and for the linear element both variants are interpolation-optimal ($\approx 2$ in the $L^2$-norm). We attribute this pattern to the orthogonal projection removing the finite-element-resolvable components of the residual that pollute the ASGS pressure at the working-norm order for $k \geq 2$, while for $k=1$ the corresponding second-derivative terms vanish elementwise~\cite{codina2008analysis}.
 
-\paragraph{Convection{\hyp}dominated flows} In this regime ($\Reyn_h\to\infty$; the $\Reyn=10^6$ rows), the picture is close to that of the viscosity-dominated regime, in agreement with the estimates \cref{eq:DominantConvectionXTermEstimate,eq:DominantPressureGradientXTermEstimate}: the pressure rate is recovered for both elements; for the linear element the error additionally reaches the approximation benchmark of the pressure space ($1.09\times10^{-2}$ in the $H^1$-seminorm, equal to the interpolation reference), whereas for the biquadratic element the rate is optimal ($\approx 2$ in the $H^1$-seminorm and $\approx 2.9$ in the $L^2$-norm) but the error remains some twenty to twenty{\hyp}five times its interpolation reference. The biquadratic velocity rate sits slightly below its nominal value ($\approx 2.8$ in the $L^2$-norm and $\approx 1.8$ in the $H^1$-seminorm), which we attribute to the finest mesh not yet being within the asymptotic range at this Reynolds number: the elemental Reynolds number is still $\Reyn_h = \Reyn\,h/L = 10^6/320 \approx 3.1\times10^3$ there, so the regime---and with it the size of the constants in every convective estimate---is preserved throughout the sequence.
+\paragraph{Convection{\hyp}dominated flows} In this regime ($\Reyn_h\to\infty$; the $\Reyn=10^6$ rows), the picture is close to that of the viscosity-dominated regime, in agreement with the estimates \cref{eq:DominantConvectionXTermEstimate,eq:DominantPressureGradientXTermEstimate}: the pressure rate is recovered for both elements; for the linear element the error additionally reaches the approximation benchmark of the pressure space ($1.1\times10^{-2}$ in the $H^1$-seminorm, equal to the interpolation reference), whereas for the biquadratic element the rate is optimal ($\approx 2$ in the $H^1$-seminorm and $\approx 2.9$ in the $L^2$-norm) but the error remains some twenty to twenty{\hyp}five times its interpolation reference. The biquadratic velocity rate sits slightly below its nominal value ($\approx 2.8$ in the $L^2$-norm and $\approx 1.8$ in the $H^1$-seminorm), which we attribute to the finest mesh not yet being within the asymptotic range at this Reynolds number: the elemental Reynolds number is still $\Reyn_h = \Reyn\,h/L = 10^6/320 \approx 3.1\times10^3$ there, so the regime---and with it the size of the constants in every convective estimate---is preserved throughout the sequence.
 
 The one $\Reyn=10^6$ combination absent from the tables, the low-porosity corner $\alpha_0=0.05$, belongs to this regime as well; as anticipated at the start of the section, its discrete branch folds on the coarse meshes. The fold recedes under refinement---for $\mathbb{P}_1$ triangles a root exists from about $N=512$ on, while the $\mathbb{Q}_2$ element, which resolves the porosity layer roughly twice as well, clears it already by $N=160$, within the reported sequence (so that the corner is in fact attainable there, and is omitted only to report the same set of parameter combinations for both elements). Beyond the fold it converges at or above the optimal rates: for $\mathbb{P}_1$ over $N=512$--$768$, a super{\hyp}optimal, pre-asymptotic $L^2$ velocity rate of $\approx 3.03$ for the two lower-Damk\"ohler cells and the optimal $\approx 2.1$ for the reaction-dominated $\Damk=10^6$ cell, with $H^1$-seminorm rates near the optimal $1.0$. Measured against the nodal interpolant of the exact solution on that finest mesh---whose velocity interpolation references there are $\num{2.85e-5}$ in the $L^2${\hyp}norm and $\num{7.31e-2}$ in the $H^1${\hyp}seminorm---the $\mathbb{P}_1$ finest{\hyp}mesh velocity error sits \emph{on} that reference in the $H^1${\hyp}seminorm ($\num{7.33e-2}$, agreeing to within $0.4\%$ for all three Damk\"ohler numbers) and lies a pre{\hyp}asymptotic factor of about $2.8$ above it in the $L^2${\hyp}norm ($\num{7.94e-5}$ for the two lower{\hyp}Damk\"ohler cells, dropping \emph{below} it, to $\num{1.21e-5}$ or a factor $0.42$ of it---a gap of the size that the $\sqrt{6}$ separation between the nodal interpolant and the best $L^2$ approximation noted above allows---for the reaction{\hyp}dominated $\Damk=10^6$ cell); the pressure behaves identically, lying on its $H^1$ reference and, in the $L^2${\hyp}norm, about a factor $4$ above its own reference for the two lower Damk\"ohler numbers and a factor $0.5$ of it for $\Damk=10^6$. This is the same pre-asymptotic reading as for the rest of the regime: the elemental Reynolds number is still $\Reyn_h \approx 10^6/768 \approx 1.3\times10^3$ at that mesh.
 
-\paragraph{Reaction{\hyp}dominated flows} In this regime ($\Damk_h\to\infty$), the analysis indicates a slightly more complex convergence profile. As a preamble, let us note the relation $\Damk \propto \Damk_h L^2/h^2$, which implies that $\Damk_h$ varies considerably across the mesh sequence, becoming about $32^2 \approx \num{1.0e3}$ times smaller when passing from the coarsest discretization to the finest one. In particular, $\Damk_h \approx 10^6/320^2 \approx 9.8$ on the finest mesh when $\alpha_\infty$ is taken over the whole domain, so even the most reaction-dominated case is only moderately so at that resolution; note, though, that the local estimates of \cref{sec:Robustness} read $\alpha_\infty$ over the element, and within the low-porosity plateau at $\alpha_0 = 0.05$ the elementwise value is about twenty times larger, so the plateau is considerably more reaction-dominated than the global figure suggests. Increasing $\Damk$ from $1$ to $10^6$ produces a clear improvement of the pressure error, in agreement with the $h$-independent mitigation factor of \cref{eq:DominantReactionPressureGradientEstimate}. In the $H^1$-seminorm the improvement is complete: the $\mathbb{P}_1$ error reaches $1.09\times10^{-2}$, its interpolation reference, at \emph{both} porosities, so the $\alpha_0$-dependence that the estimate retains---being an upper bound---disappears entirely, the reference being itself $\alpha_0$-independent. In the $L^2$-norm the improvement is large but not complete: the error falls to $8.8\times10^{-6}$ at $\alpha_0=0.5$, marginally below the nodal reference of $9.8\times10^{-6}$ (as noted above, the nodal interpolant is not the best $L^2$ approximation for $\mathbb{P}_1$), whereas at $\alpha_0=0.05$ it stalls at $1.6\times10^{-5}$, about $1.6$ times that reference; a residual porosity sensitivity of a factor $1.85$ therefore survives in this norm---well within the growth the porosity{\hyp}weighted estimates of \cref{sec:Robustness} permit, but not zero.
+\paragraph{Reaction{\hyp}dominated flows} In this regime ($\Damk_h\to\infty$), the analysis indicates a slightly more complex convergence profile. As a preamble, let us note the relation $\Damk \propto \Damk_h L^2/h^2$, which implies that $\Damk_h$ varies considerably across the mesh sequence, becoming about $32^2 \approx \num{1.0e3}$ times smaller when passing from the coarsest discretization to the finest one. In particular, $\Damk_h \approx 10^6/320^2 \approx 9.8$ on the finest mesh when $\alpha_\infty$ is taken over the whole domain, so even the most reaction-dominated case is only moderately so at that resolution; note, though, that the local estimates of \cref{sec:Robustness} read $\alpha_\infty$ over the element, and within the low-porosity plateau at $\alpha_0 = 0.05$ the elementwise value is about twenty times larger, so the plateau is considerably more reaction-dominated than the global figure suggests. Increasing $\Damk$ from $1$ to $10^6$ produces a clear improvement of the pressure error, in agreement with the $h$-independent mitigation factor of \cref{eq:DominantReactionPressureGradientEstimate}. In the $H^1$-seminorm the improvement is complete: the $\mathbb{P}_1$ error reaches $1.1\times10^{-2}$, its interpolation reference, at \emph{both} porosities, so the $\alpha_0$-dependence that the estimate retains---being an upper bound---disappears entirely, the reference being itself $\alpha_0$-independent. In the $L^2$-norm the improvement is large but not complete: the error falls to $8.8\times10^{-6}$ at $\alpha_0=0.5$, marginally below the nodal reference of $9.8\times10^{-6}$ (as noted above, the nodal interpolant is not the best $L^2$ approximation for $\mathbb{P}_1$), whereas at $\alpha_0=0.05$ it stalls at $1.6\times10^{-5}$, about $1.6$ times that reference; a residual porosity sensitivity of a factor $1.85$ therefore survives in this norm---well within the growth the porosity{\hyp}weighted estimates of \cref{sec:Robustness} permit, but not zero.
 
-Conversely, the potential $\Damk^{1/2}$ deterioration of the velocity gradient allowed by \cref{eq:DominantReactionVelocityGradientEstimate} does not materialize: that term bounds the contamination of the velocity by the worst-case pressure error, and since the computed pressure sits at its interpolation reference, the mechanism is never activated---at $\Damk=10^6$ the estimate would permit a growth of order $\Damk^{1/2}=10^3$, whereas the largest observed is a factor of about $3.5$. That factor is nevertheless not negligible, and it is worth being precise about where it falls. Raising $\Damk$ from $1$ to $10^6$ at $\alpha_0=0.5$ leaves the $\mathbb{P}_1$ ASGS velocity on its interpolation reference in the $H^1$-seminorm ($3.52\times10^{-2}$ against $3.499\times10^{-2}$, a ratio of $1.01$), but multiplies the other three by about $3.5$: $\mathbb{P}_1$ OSGS reaches $1.23\times10^{-1}$ (ratio $3.5$), and \emph{both} variants of $\mathbb{Q}_2$ reach $\approx 1.5\times10^{-3}$ against a reference of $4.28\times10^{-4}$ (ratios $3.5$). The two stabilizations therefore part company only for the linear element, where ASGS is unaffected and OSGS is not; for the biquadratic element they agree closely with each other while both departing from the interpolant. This $\mathbb{P}_1$ ASGS/OSGS gap in the $H^1$-seminorm is the largest velocity discrepancy between the two variants in the campaign; the only other appreciable one is the $L^2$-norm difference of the same linear element in the viscosity-dominated rows noted above (a factor of about $1.9$). We report both as observations. The linear-element gap is not a fixed penalty of the OSGS variant but a pre-asymptotic effect governed by the elemental Damk\"ohler number $\Damk_h$, as three features of the \emph{excess}---a quadratic excess indicator (not a vector error component, since the ASGS and OSGS error fields need not be orthogonal), defined where it is real as $\big(e_{\mathrm{OSGS}}^2 - e_{\mathrm{ASGS}}^2\big)^{1/2}$ and evaluated on the unrounded errors, being a difference of nearly equal squares---make clear. First, its absolute size is essentially \emph{independent of the porosity}: at the finest mesh it is $\num{1.18e-1}$ at $\alpha_0 = 0.5$ and $\num{1.17e-1}$ at $\alpha_0 = 0.05$, equal to within $1\%$; the ratio $e_{\mathrm{OSGS}}/e_{\mathrm{ASGS}}$ falls from $3.5$ to $1.2$ between the two porosities only because the ASGS baseline rises with the interpolation error while the excess itself does not. Second, it decays under refinement at an accelerating rate---its convergence slope rising from about $0.6$ to $1.0$ as the mesh is refined---in step with the reaction weight $\Damk_h \propto h^2$. Third, it is largely suppressed once convection dominates the element: at $\Reyn = 10^6$, where $(1+\Reyn_h)/\Damk_h \gg 1$, the excess is only $\num{1.5e-2}$ (a ratio of $1.08$), an order of magnitude below the $\num{1.2e-1}$ of the low-Reynolds reaction rows and comparable to the $\num{9.6e-3}$ excess present there already at $\Damk \le 1$, which is convective rather than reactive in origin. This pattern runs opposite to what a coercivity comparison would suggest. For constant $\boldsymbol{\sigma}$ the reaction term lies in the finite element space, so the orthogonal projection removes it from the OSGS subscale exactly; the same coercivity argument then leaves OSGS's reactive control at least as strong as the drained $\widetilde{\sigma}_\alpha < \sigma$ it grants ASGS, so that OSGS ought to be \emph{no worse} controlled in the reaction limit---yet it is the variant carrying the larger error. The two facts are not in contradiction, since coercivity bounds are one-sided stability estimates and do not rank error constants; but the gap is an accuracy effect that our analysis does not resolve.
+Conversely, the potential $\Damk^{1/2}$ deterioration of the velocity gradient allowed by \cref{eq:DominantReactionVelocityGradientEstimate} does not materialize: that term bounds the contamination of the velocity by the worst-case pressure error, and since the computed pressure sits at its interpolation reference, the mechanism is never activated---at $\Damk=10^6$ the estimate would permit a growth of order $\Damk^{1/2}=10^3$, whereas the largest observed is a factor of about $3.5$. That factor is nevertheless not negligible, and it is worth being precise about where it falls. Raising $\Damk$ from $1$ to $10^6$ at $\alpha_0=0.5$ leaves the $\mathbb{P}_1$ ASGS velocity on its interpolation reference in the $H^1$-seminorm ($3.52\times10^{-2}$ against $3.499\times10^{-2}$, a ratio of $1.01$; both quoted to more digits than the table carries), but multiplies the other three by about $3.5$: $\mathbb{P}_1$ OSGS reaches $1.2\times10^{-1}$ (ratio $3.5$), and \emph{both} variants of $\mathbb{Q}_2$ reach $\approx 1.5\times10^{-3}$ against a reference of $4.3\times10^{-4}$ (ratios $3.5$). The two stabilizations therefore part company only for the linear element, where ASGS is unaffected and OSGS is not; for the biquadratic element they agree closely with each other while both departing from the interpolant. This $\mathbb{P}_1$ ASGS/OSGS gap in the $H^1$-seminorm is the largest velocity discrepancy between the two variants in the campaign; the only other appreciable one is the $L^2$-norm difference of the same linear element in the viscosity-dominated rows noted above (a factor of about $1.9$). We report both as observations. The linear-element gap is not a fixed penalty of the OSGS variant but a pre-asymptotic effect governed by the elemental Damk\"ohler number $\Damk_h$, as three features of the \emph{excess}---a quadratic excess indicator (not a vector error component, since the ASGS and OSGS error fields need not be orthogonal), defined where it is real as $\big(e_{\mathrm{OSGS}}^2 - e_{\mathrm{ASGS}}^2\big)^{1/2}$ and evaluated on the unrounded errors, being a difference of nearly equal squares---make clear. First, its absolute size is essentially \emph{independent of the porosity}: at the finest mesh it is $\num{1.18e-1}$ at $\alpha_0 = 0.5$ and $\num{1.17e-1}$ at $\alpha_0 = 0.05$, equal to within $1\%$; the ratio $e_{\mathrm{OSGS}}/e_{\mathrm{ASGS}}$ falls from $3.5$ to $1.2$ between the two porosities only because the ASGS baseline rises with the interpolation error while the excess itself does not. Second, it decays under refinement at an accelerating rate---its convergence slope rising from about $0.6$ to $1.0$ as the mesh is refined---in step with the reaction weight $\Damk_h \propto h^2$. Third, it is largely suppressed once convection dominates the element: at $\Reyn = 10^6$, where $(1+\Reyn_h)/\Damk_h \gg 1$, the excess is only $\num{1.5e-2}$ (a ratio of $1.08$), an order of magnitude below the $\num{1.2e-1}$ of the low-Reynolds reaction rows and comparable to the $\num{9.6e-3}$ excess present there already at $\Damk \le 1$, which is convective rather than reactive in origin. This pattern runs opposite to what a coercivity comparison would suggest. For constant $\boldsymbol{\sigma}$ the reaction term lies in the finite element space, so the orthogonal projection removes it from the OSGS subscale exactly; the same coercivity argument then leaves OSGS's reactive control at least as strong as the drained $\widetilde{\sigma}_\alpha < \sigma$ it grants ASGS, so that OSGS ought to be \emph{no worse} controlled in the reaction limit---yet it is the variant carrying the larger error. The two facts are not in contradiction, since coercivity bounds are one-sided stability estimates and do not rank error constants; but the gap is an accuracy effect that our analysis does not resolve.
 
 \setlength{\heavyrulewidth}{1.5pt}
 \setlength{\abovetopsep}{4pt}
 \begin{table}[!htbp]
 \centering
-\caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{P}_1$ elements), calculated from the $L^2$-norm of the error obtained with the two finest meshes (worst{\hyp}case bound rates in parentheses)}
-\begin{tabular}{>{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{18mm}
-                >{\raggedleft\arraybackslash}p{18mm}}
+\caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{P}_1$ elements), calculated from the $L^2${\hyp}norm and the $H^1${\hyp}seminorm of the error obtained with the two finest meshes. The pair in parentheses after each block name gives the worst{\hyp}case bound rates for the two norms in that order, a dash where none is positive}
+\label{tab:Linear2D}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{*{11}{r}}
 \toprule
-\multicolumn{7}{c}{velocity} \\
+{} & {} & {} & \multicolumn{4}{c}{$L^2${\hyp}norm} & \multicolumn{4}{c}{$H^1${\hyp}seminorm} \\
+\cmidrule(lr){4-7}\cmidrule(lr){8-11}
+{} & {} & {} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}
+$\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
 \midrule
-{} & {} & {} & \multicolumn{2}{c}{slope (2)} & \multicolumn{2}{c}{FME}\\
-\cmidrule(lr){4-7}
-$\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
+\multicolumn{11}{c}{velocity (2, 1)} \\
 \midrule
-$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.01} & \num{2.12} & \num{6.95e-5} & \num{3.62e-5} \\
-$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.90} & \num{2.08} & \num{6.84e-4} & \num{6.33e-4} \\
-$1$       & $10^{-6}$ & $0.5$  & \num{1.98} & \num{2.00} & \num{7.36e-5} & \num{4.60e-5} \\
-$1$       & $10^{-6}$ & $0.05$ & \num{1.88} & \num{2.01} & \num{5.09e-4} & \num{9.53e-4} \\
-$10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.09} & \num{2.04} & \num{1.75e-5} & \num{2.60e-5} \\
-$10^{-6}$ & $1$       & $0.5$  & \num{1.98} & \num{2.00} & \num{7.37e-5} & \num{4.57e-5} \\
-$10^{-6}$ & $1$       & $0.05$ & \num{1.89} & \num{2.00} & \num{4.83e-4} & \num{8.74e-4} \\
-$1$       & $1$       & $0.5$  & \num{1.98} & \num{2.00} & \num{7.37e-5} & \num{4.57e-5} \\
-$1$       & $1$       & $0.05$ & \num{1.89} & \num{2.00} & \num{4.83e-4} & \num{8.75e-4} \\
-$10^{6}$  & $1$       & $0.5$  & \num{2.09} & \num{2.04} & \num{1.75e-5} & \num{2.60e-5} \\
-$10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.12} & \num{2.00} & \num{1.07e-4} & \num{1.77e-4} \\
-$10^{-6}$ & $10^{6}$  & $0.05$ & \num{1.95} & \num{2.03} & \num{4.37e-4} & \num{1.97e-4} \\
-$1$       & $10^{6}$  & $0.5$  & \num{2.12} & \num{2.00} & \num{1.07e-4} & \num{1.77e-4} \\
-$1$       & $10^{6}$  & $0.05$ & \num{1.95} & \num{2.03} & \num{4.37e-4} & \num{1.97e-4} \\
-$10^{6}$  & $10^{6}$  & $0.5$  & \num{2.10} & \num{2.10} & \num{1.85e-5} & \num{2.85e-5} \\
+$10^{-6}$ & $10^{-6}$ & $0.5$ & \num{2.01} & \num{2.12} & \num{7.0e-5} & \num{3.6e-5} & \num{1.00} & \num{1.00} & \num{3.5e-2} & \num{3.5e-2} \\
+$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.90} & \num{2.08} & \num{6.8e-4} & \num{6.3e-4} & \num{1.01} & \num{1.00} & \num{1.8e-1} & \num{1.8e-1} \\
+$1$ & $10^{-6}$ & $0.5$ & \num{1.98} & \num{2.00} & \num{7.4e-5} & \num{4.6e-5} & \num{1.00} & \num{1.00} & \num{3.5e-2} & \num{3.5e-2} \\
+$1$ & $10^{-6}$ & $0.05$ & \num{1.88} & \num{2.01} & \num{5.1e-4} & \num{9.5e-4} & \num{1.00} & \num{1.01} & \num{1.8e-1} & \num{1.8e-1} \\
+$10^{6}$ & $10^{-6}$ & $0.5$ & \num{2.09} & \num{2.04} & \num{1.8e-5} & \num{2.6e-5} & \num{1.01} & \num{1.02} & \num{3.5e-2} & \num{3.7e-2} \\
+$10^{-6}$ & $1$ & $0.5$ & \num{1.98} & \num{2.00} & \num{7.4e-5} & \num{4.6e-5} & \num{1.00} & \num{1.00} & \num{3.5e-2} & \num{3.5e-2} \\
+$10^{-6}$ & $1$ & $0.05$ & \num{1.89} & \num{2.00} & \num{4.8e-4} & \num{8.7e-4} & \num{1.00} & \num{1.00} & \num{1.8e-1} & \num{1.8e-1} \\
+$1$ & $1$ & $0.5$ & \num{1.98} & \num{2.00} & \num{7.4e-5} & \num{4.6e-5} & \num{1.00} & \num{1.00} & \num{3.5e-2} & \num{3.5e-2} \\
+$1$ & $1$ & $0.05$ & \num{1.89} & \num{2.00} & \num{4.8e-4} & \num{8.8e-4} & \num{1.00} & \num{1.00} & \num{1.8e-1} & \num{1.8e-1} \\
+$10^{6}$ & $1$ & $0.5$ & \num{2.09} & \num{2.04} & \num{1.8e-5} & \num{2.6e-5} & \num{1.01} & \num{1.02} & \num{3.5e-2} & \num{3.7e-2} \\
+$10^{-6}$ & $10^{6}$ & $0.5$ & \num{2.12} & \num{2.00} & \num{1.1e-4} & \num{1.8e-4} & \num{1.02} & \num{1.05} & \num{3.5e-2} & \num{1.2e-1} \\
+$10^{-6}$ & $10^{6}$ & $0.05$ & \num{1.95} & \num{2.03} & \num{4.4e-4} & \num{2.0e-4} & \num{1.02} & \num{1.03} & \num{1.8e-1} & \num{2.1e-1} \\
+$1$ & $10^{6}$ & $0.5$ & \num{2.12} & \num{2.00} & \num{1.1e-4} & \num{1.8e-4} & \num{1.02} & \num{1.05} & \num{3.5e-2} & \num{1.2e-1} \\
+$1$ & $10^{6}$ & $0.05$ & \num{1.95} & \num{2.03} & \num{4.4e-4} & \num{2.0e-4} & \num{1.02} & \num{1.03} & \num{1.8e-1} & \num{2.1e-1} \\
+$10^{6}$ & $10^{6}$ & $0.5$ & \num{2.10} & \num{2.10} & \num{1.9e-5} & \num{2.9e-5} & \num{1.01} & \num{1.03} & \num{3.5e-2} & \num{3.8e-2} \\
 \addlinespace
-\multicolumn{7}{l}{\textit{nodal interpolant $I_h\boldsymbol{u}$ (independent of $\Reyn$, $\Damk$ and of the method)}} \\
-{} & {} & $0.5$  & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{3.26e-5}} \\
-{} & {} & $0.05$ & \multicolumn{2}{c}{\num{1.99}} & \multicolumn{2}{c}{\num{1.64e-4}} \\
+\multicolumn{11}{l}{\textit{nodal interpolant $I_h\boldsymbol{u}$ (independent of $\Reyn$, $\Damk$ and of the method)}} \\
+{} & {} & $0.5$ & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{3.3e-5}} & \multicolumn{2}{c}{\num{1.00}} & \multicolumn{2}{c}{\num{3.5e-2}} \\
+{} & {} & $0.05$ & \multicolumn{2}{c}{\num{1.99}} & \multicolumn{2}{c}{\num{1.6e-4}} & \multicolumn{2}{c}{\num{0.99}} & \multicolumn{2}{c}{\num{1.8e-1}} \\
 \midrule
-\multicolumn{7}{c}{pressure} \\
+\multicolumn{11}{c}{pressure (1, $-$)} \\
 \midrule
-{} & {} & {} & \multicolumn{2}{c}{slope (1)} & \multicolumn{2}{c}{FME}\\
-\cmidrule(lr){4-7}
-$\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-\midrule
-$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.20} & \num{2.20} & \num{2.35e-3} & \num{1.86e-3} \\
-$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.97} & \num{2.04} & \num{2.08e-2} & \num{1.76e-2} \\
-$1$       & $10^{-6}$ & $0.5$  & \num{1.88} & \num{2.01} & \num{1.99e-3} & \num{1.33e-3} \\
-$1$       & $10^{-6}$ & $0.05$ & \num{1.79} & \num{2.01} & \num{2.04e-2} & \num{1.34e-2} \\
-$10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.12} & \num{2.05} & \num{4.87e-6} & \num{6.22e-6} \\
-$10^{-6}$ & $1$       & $0.5$  & \num{1.88} & \num{2.01} & \num{2.00e-3} & \num{1.33e-3} \\
-$10^{-6}$ & $1$       & $0.05$ & \num{1.76} & \num{2.00} & \num{2.10e-2} & \num{1.39e-2} \\
-$1$       & $1$       & $0.5$  & \num{1.88} & \num{2.01} & \num{1.33e-3} & \num{8.88e-4} \\
-$1$       & $1$       & $0.05$ & \num{1.76} & \num{2.00} & \num{1.40e-2} & \num{9.29e-3} \\
-$10^{6}$  & $1$       & $0.5$  & \num{2.12} & \num{2.05} & \num{4.87e-6} & \num{6.22e-6} \\
-$10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.27} & \num{2.27} & \num{8.76e-6} & \num{8.76e-6} \\
-$10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.17} & \num{2.17} & \num{1.62e-5} & \num{1.62e-5} \\
-$1$       & $10^{6}$  & $0.5$  & \num{2.27} & \num{2.27} & \num{8.76e-6} & \num{8.76e-6} \\
-$1$       & $10^{6}$  & $0.05$ & \num{2.17} & \num{2.17} & \num{1.62e-5} & \num{1.62e-5} \\
-$10^{6}$  & $10^{6}$  & $0.5$  & \num{2.05} & \num{2.06} & \num{4.16e-6} & \num{4.26e-6} \\
+$10^{-6}$ & $10^{-6}$ & $0.5$ & \num{2.20} & \num{2.20} & \num{2.4e-3} & \num{1.9e-3} & \num{1.56} & \num{1.60} & \num{3.2e-1} & \num{2.7e-1} \\
+$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.97} & \num{2.04} & \num{2.1e-2} & \num{1.8e-2} & \num{1.95} & \num{2.07} & \num{2.6} & \num{2.2} \\
+$1$ & $10^{-6}$ & $0.5$ & \num{1.88} & \num{2.01} & \num{2.0e-3} & \num{1.3e-3} & \num{1.47} & \num{1.46} & \num{2.2e-1} & \num{1.8e-1} \\
+$1$ & $10^{-6}$ & $0.05$ & \num{1.79} & \num{2.01} & \num{2.0e-2} & \num{1.3e-2} & \num{1.71} & \num{2.05} & \num{2.6} & \num{1.7} \\
+$10^{6}$ & $10^{-6}$ & $0.5$ & \num{2.12} & \num{2.05} & \num{4.9e-6} & \num{6.2e-6} & \num{1.00} & \num{1.00} & \num{1.1e-2} & \num{1.1e-2} \\
+$10^{-6}$ & $1$ & $0.5$ & \num{1.88} & \num{2.01} & \num{2.0e-3} & \num{1.3e-3} & \num{1.47} & \num{1.46} & \num{2.2e-1} & \num{1.8e-1} \\
+$10^{-6}$ & $1$ & $0.05$ & \num{1.76} & \num{2.00} & \num{2.1e-2} & \num{1.4e-2} & \num{1.68} & \num{2.02} & \num{2.7} & \num{1.8} \\
+$1$ & $1$ & $0.5$ & \num{1.88} & \num{2.01} & \num{1.3e-3} & \num{8.9e-4} & \num{1.47} & \num{1.46} & \num{1.5e-1} & \num{1.2e-1} \\
+$1$ & $1$ & $0.05$ & \num{1.76} & \num{2.00} & \num{1.4e-2} & \num{9.3e-3} & \num{1.68} & \num{2.02} & \num{1.8} & \num{1.2} \\
+$10^{6}$ & $1$ & $0.5$ & \num{2.12} & \num{2.05} & \num{4.9e-6} & \num{6.2e-6} & \num{1.00} & \num{1.00} & \num{1.1e-2} & \num{1.1e-2} \\
+$10^{-6}$ & $10^{6}$ & $0.5$ & \num{2.27} & \num{2.27} & \num{8.8e-6} & \num{8.8e-6} & \num{1.00} & \num{1.00} & \num{1.1e-2} & \num{1.1e-2} \\
+$10^{-6}$ & $10^{6}$ & $0.05$ & \num{2.17} & \num{2.17} & \num{1.6e-5} & \num{1.6e-5} & \num{1.00} & \num{1.00} & \num{1.1e-2} & \num{1.1e-2} \\
+$1$ & $10^{6}$ & $0.5$ & \num{2.27} & \num{2.27} & \num{8.8e-6} & \num{8.8e-6} & \num{1.00} & \num{1.00} & \num{1.1e-2} & \num{1.1e-2} \\
+$1$ & $10^{6}$ & $0.05$ & \num{2.17} & \num{2.17} & \num{1.6e-5} & \num{1.6e-5} & \num{1.00} & \num{1.00} & \num{1.1e-2} & \num{1.1e-2} \\
+$10^{6}$ & $10^{6}$ & $0.5$ & \num{2.05} & \num{2.06} & \num{4.2e-6} & \num{4.3e-6} & \num{1.00} & \num{1.00} & \num{1.1e-2} & \num{1.1e-2} \\
 \addlinespace
-\multicolumn{7}{l}{\textit{nodal interpolant $I_h p$ (independent of $\Reyn$, $\Damk$, $\alpha_0$ and of the method)}} \\
-{} & {} & {} & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{9.84e-6}} \\
+\multicolumn{11}{l}{\textit{nodal interpolant $I_h p$ (independent of $\Reyn$, $\Damk$, $\alpha_0$ and of the method)}} \\
+{} & {} & {} & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{9.8e-6}} & \multicolumn{2}{c}{\num{1.00}} & \multicolumn{2}{c}{\num{1.1e-2}} \\
 \bottomrule
 \end{tabular}
-\label{tab:Linear2DL2}
 \end{table}
-
 \begin{table}[!htbp]
 \centering
-\caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{P}_1$ elements), calculated from the $H^1$-seminorm of the error obtained with the two finest meshes (worst{\hyp}case bound rates in parentheses, a dash where none is positive)}
-\begin{tabular}{>{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{7.5mm}
-                >{\raggedleft\arraybackslash}p{18mm}
-                >{\raggedleft\arraybackslash}p{18mm}}
+\caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{Q}_2$ elements), calculated from the $L^2${\hyp}norm and the $H^1${\hyp}seminorm of the error obtained with the two finest meshes. The pair in parentheses after each block name gives the worst{\hyp}case bound rates for the two norms in that order}
+\label{tab:Quadratic2D}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{*{11}{r}}
 \toprule
-\multicolumn{7}{c}{velocity} \\
+{} & {} & {} & \multicolumn{4}{c}{$L^2${\hyp}norm} & \multicolumn{4}{c}{$H^1${\hyp}seminorm} \\
+\cmidrule(lr){4-7}\cmidrule(lr){8-11}
+{} & {} & {} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME} \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}
+$\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
 \midrule
-{} & {} & {} & \multicolumn{2}{c}{slope (1)} & \multicolumn{2}{c}{FME}\\
-\cmidrule(lr){4-7}
-$\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
+\multicolumn{11}{c}{velocity (3, 2)} \\
 \midrule
-$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{3.50e-2} & \num{3.50e-2} \\
-$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.01} & \num{1.00} & \num{1.76e-1} & \num{1.76e-1} \\
-$1$       & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{3.50e-2} & \num{3.50e-2} \\
-$1$       & $10^{-6}$ & $0.05$ & \num{1.00} & \num{1.01} & \num{1.76e-1} & \num{1.76e-1} \\
-$10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.01} & \num{1.02} & \num{3.53e-2} & \num{3.65e-2} \\
-$10^{-6}$ & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{3.50e-2} & \num{3.50e-2} \\
-$10^{-6}$ & $1$       & $0.05$ & \num{1.00} & \num{1.00} & \num{1.76e-1} & \num{1.76e-1} \\
-$1$       & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{3.50e-2} & \num{3.50e-2} \\
-$1$       & $1$       & $0.05$ & \num{1.00} & \num{1.00} & \num{1.76e-1} & \num{1.76e-1} \\
-$10^{6}$  & $1$       & $0.5$  & \num{1.01} & \num{1.02} & \num{3.53e-2} & \num{3.65e-2} \\
-$10^{-6}$ & $10^{6}$  & $0.5$  & \num{1.02} & \num{1.05} & \num{3.52e-2} & \num{1.23e-1} \\
-$10^{-6}$ & $10^{6}$  & $0.05$ & \num{1.02} & \num{1.03} & \num{1.77e-1} & \num{2.12e-1} \\
-$1$       & $10^{6}$  & $0.5$  & \num{1.02} & \num{1.05} & \num{3.52e-2} & \num{1.23e-1} \\
-$1$       & $10^{6}$  & $0.05$ & \num{1.02} & \num{1.03} & \num{1.77e-1} & \num{2.12e-1} \\
-$10^{6}$  & $10^{6}$  & $0.5$  & \num{1.01} & \num{1.03} & \num{3.54e-2} & \num{3.84e-2} \\
+$10^{-6}$ & $10^{-6}$ & $0.5$ & \num{3.00} & \num{3.00} & \num{2.1e-7} & \num{2.1e-7} & \num{2.00} & \num{2.00} & \num{4.3e-4} & \num{4.3e-4} \\
+$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{2.99} & \num{2.98} & \num{2.4e-6} & \num{2.4e-6} & \num{2.00} & \num{1.99} & \num{5.0e-3} & \num{5.0e-3} \\
+$1$ & $10^{-6}$ & $0.5$ & \num{3.00} & \num{3.01} & \num{2.1e-7} & \num{2.1e-7} & \num{2.00} & \num{2.00} & \num{4.3e-4} & \num{4.3e-4} \\
+$1$ & $10^{-6}$ & $0.05$ & \num{3.02} & \num{3.01} & \num{2.4e-6} & \num{2.4e-6} & \num{2.00} & \num{2.00} & \num{5.0e-3} & \num{5.0e-3} \\
+$10^{6}$ & $10^{-6}$ & $0.5$ & \num{2.82} & \num{2.83} & \num{4.6e-7} & \num{4.6e-7} & \num{1.81} & \num{1.81} & \num{1.1e-3} & \num{1.1e-3} \\
+$10^{-6}$ & $1$ & $0.5$ & \num{3.00} & \num{3.01} & \num{2.1e-7} & \num{2.1e-7} & \num{2.00} & \num{2.00} & \num{4.3e-4} & \num{4.3e-4} \\
+$10^{-6}$ & $1$ & $0.05$ & \num{3.02} & \num{3.01} & \num{2.4e-6} & \num{2.4e-6} & \num{2.00} & \num{2.00} & \num{5.0e-3} & \num{5.0e-3} \\
+$1$ & $1$ & $0.5$ & \num{3.00} & \num{3.01} & \num{2.1e-7} & \num{2.1e-7} & \num{2.00} & \num{2.00} & \num{4.3e-4} & \num{4.3e-4} \\
+$1$ & $1$ & $0.05$ & \num{3.02} & \num{3.01} & \num{2.4e-6} & \num{2.4e-6} & \num{2.00} & \num{2.00} & \num{5.0e-3} & \num{5.0e-3} \\
+$10^{6}$ & $1$ & $0.5$ & \num{2.82} & \num{2.83} & \num{4.6e-7} & \num{4.6e-7} & \num{1.81} & \num{1.81} & \num{1.1e-3} & \num{1.1e-3} \\
+$10^{-6}$ & $10^{6}$ & $0.5$ & \num{3.17} & \num{3.58} & \num{6.6e-7} & \num{6.2e-7} & \num{2.18} & \num{2.59} & \num{1.5e-3} & \num{1.5e-3} \\
+$10^{-6}$ & $10^{6}$ & $0.05$ & \num{3.00} & \num{2.95} & \num{2.4e-6} & \num{2.4e-6} & \num{2.01} & \num{2.10} & \num{5.1e-3} & \num{5.1e-3} \\
+$1$ & $10^{6}$ & $0.5$ & \num{3.17} & \num{3.58} & \num{6.6e-7} & \num{6.2e-7} & \num{2.18} & \num{2.59} & \num{1.5e-3} & \num{1.5e-3} \\
+$1$ & $10^{6}$ & $0.05$ & \num{3.00} & \num{2.95} & \num{2.4e-6} & \num{2.4e-6} & \num{2.01} & \num{2.10} & \num{5.1e-3} & \num{5.1e-3} \\
+$10^{6}$ & $10^{6}$ & $0.5$ & \num{2.79} & \num{2.80} & \num{4.4e-7} & \num{4.5e-7} & \num{1.79} & \num{1.80} & \num{1.1e-3} & \num{1.1e-3} \\
 \addlinespace
-\multicolumn{7}{l}{\textit{nodal interpolant $I_h\boldsymbol{u}$ (independent of $\Reyn$, $\Damk$ and of the method)}} \\
-{} & {} & $0.5$ & \multicolumn{2}{c}{\num{1.00}} & \multicolumn{2}{c}{\num{3.50e-2}} \\
-{} & {} & $0.05$ & \multicolumn{2}{c}{\num{0.99}} & \multicolumn{2}{c}{\num{1.75e-1}} \\
+\multicolumn{11}{l}{\textit{nodal interpolant $I_h\boldsymbol{u}$ (independent of $\Reyn$, $\Damk$ and of the method)}} \\
+{} & {} & $0.5$ & \multicolumn{2}{c}{\num{3.00}} & \multicolumn{2}{c}{\num{2.1e-7}} & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{4.3e-4}} \\
+{} & {} & $0.05$ & \multicolumn{2}{c}{\num{2.99}} & \multicolumn{2}{c}{\num{2.4e-6}} & \multicolumn{2}{c}{\num{1.99}} & \multicolumn{2}{c}{\num{5.0e-3}} \\
 \midrule
-\multicolumn{7}{c}{pressure} \\
+\multicolumn{11}{c}{pressure (2, 1)} \\
 \midrule
-{} & {} & {} & \multicolumn{2}{c}{slope (-)} & \multicolumn{2}{c}{FME}\\
-\cmidrule(lr){4-7}
-$\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-\midrule
-$10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.56} & \num{1.60} & \num{3.16e-1} & \num{2.70e-1} \\
-$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.95} & \num{2.07} & \num{2.61}   & \num{2.24}   \\
-$1$       & $10^{-6}$ & $0.5$  & \num{1.47} & \num{1.46} & \num{2.18e-1} & \num{1.81e-1} \\
-$1$       & $10^{-6}$ & $0.05$ & \num{1.71} & \num{2.05} & \num{2.64}   & \num{1.71}   \\
-$10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
-$10^{-6}$ & $1$       & $0.5$  & \num{1.47} & \num{1.46} & \num{2.19e-1} & \num{1.81e-1} \\
-$10^{-6}$ & $1$       & $0.05$ & \num{1.68} & \num{2.02} & \num{2.71}   & \num{1.76}   \\
-$1$       & $1$       & $0.5$  & \num{1.47} & \num{1.46} & \num{1.46e-1} & \num{1.21e-1} \\
-$1$       & $1$       & $0.05$ & \num{1.68} & \num{2.02} & \num{1.81}   & \num{1.17}   \\
-$10^{6}$  & $1$       & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
-$10^{-6}$ & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
-$10^{-6}$ & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
-$1$       & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
-$1$       & $10^{6}$  & $0.05$ & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
-$10^{6}$  & $10^{6}$  & $0.5$  & \num{1.00} & \num{1.00} & \num{1.09e-2} & \num{1.09e-2} \\
+$10^{-6}$ & $10^{-6}$ & $0.5$ & \num{1.88} & \num{3.08} & \num{1.9e-5} & \num{3.0e-5} & \num{0.87} & \num{1.97} & \num{4.7e-2} & \num{7.2e-2} \\
+$10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.81} & \num{3.16} & \num{2.0e-4} & \num{4.9e-4} & \num{0.93} & \num{2.01} & \num{4.8e-1} & \num{1.2} \\
+$1$ & $10^{-6}$ & $0.5$ & \num{1.90} & \num{3.13} & \num{9.8e-6} & \num{1.7e-5} & \num{0.88} & \num{2.02} & \num{2.4e-2} & \num{4.0e-2} \\
+$1$ & $10^{-6}$ & $0.05$ & \num{1.81} & \num{3.45} & \num{1.1e-4} & \num{3.1e-4} & \num{0.79} & \num{2.28} & \num{2.6e-1} & \num{7.4e-1} \\
+$10^{6}$ & $10^{-6}$ & $0.5$ & \num{2.90} & \num{3.04} & \num{7.6e-8} & \num{7.9e-8} & \num{1.87} & \num{2.00} & \num{1.9e-4} & \num{1.9e-4} \\
+$10^{-6}$ & $1$ & $0.5$ & \num{1.89} & \num{3.13} & \num{9.8e-6} & \num{1.7e-5} & \num{0.88} & \num{2.02} & \num{2.4e-2} & \num{4.0e-2} \\
+$10^{-6}$ & $1$ & $0.05$ & \num{1.81} & \num{3.44} & \num{1.1e-4} & \num{3.1e-4} & \num{0.79} & \num{2.28} & \num{2.6e-1} & \num{7.4e-1} \\
+$1$ & $1$ & $0.5$ & \num{1.90} & \num{3.13} & \num{6.5e-6} & \num{1.1e-5} & \num{0.88} & \num{2.02} & \num{1.6e-2} & \num{2.7e-2} \\
+$1$ & $1$ & $0.05$ & \num{1.81} & \num{3.44} & \num{7.1e-5} & \num{2.1e-4} & \num{0.79} & \num{2.28} & \num{1.7e-1} & \num{4.9e-1} \\
+$10^{6}$ & $1$ & $0.5$ & \num{2.90} & \num{3.04} & \num{7.6e-8} & \num{7.9e-8} & \num{1.87} & \num{2.00} & \num{1.9e-4} & \num{1.9e-4} \\
+$10^{-6}$ & $10^{6}$ & $0.5$ & \num{3.00} & \num{3.00} & \num{3.8e-9} & \num{3.8e-9} & \num{2.00} & \num{2.01} & \num{8.0e-6} & \num{8.0e-6} \\
+$10^{-6}$ & $10^{6}$ & $0.05$ & \num{3.00} & \num{3.02} & \num{3.9e-9} & \num{3.9e-9} & \num{2.00} & \num{2.01} & \num{8.0e-6} & \num{8.2e-6} \\
+$1$ & $10^{6}$ & $0.5$ & \num{3.00} & \num{3.00} & \num{3.8e-9} & \num{3.8e-9} & \num{2.00} & \num{2.01} & \num{8.0e-6} & \num{8.0e-6} \\
+$1$ & $10^{6}$ & $0.05$ & \num{3.00} & \num{3.02} & \num{3.9e-9} & \num{3.9e-9} & \num{2.00} & \num{2.01} & \num{8.0e-6} & \num{8.2e-6} \\
+$10^{6}$ & $10^{6}$ & $0.5$ & \num{2.91} & \num{3.04} & \num{3.8e-8} & \num{4.0e-8} & \num{1.88} & \num{2.00} & \num{9.4e-5} & \num{9.8e-5} \\
 \addlinespace
-\multicolumn{7}{l}{\textit{nodal interpolant $I_h p$ (independent of $\Reyn$, $\Damk$, $\alpha_0$ and of the method)}} \\
-{} & {} & {} & \multicolumn{2}{c}{\num{1.00}} & \multicolumn{2}{c}{\num{1.09e-2}} \\
+\multicolumn{11}{l}{\textit{nodal interpolant $I_h p$ (independent of $\Reyn$, $\Damk$, $\alpha_0$ and of the method)}} \\
+{} & {} & {} & \multicolumn{2}{c}{\num{3.00}} & \multicolumn{2}{c}{\num{3.9e-9}} & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{8.0e-6}} \\
 \bottomrule
 \end{tabular}
-\label{tab:Linear2DH1}
 \end{table}
-
-\begin{table}[!htbp]
-    \centering
-    \caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{Q}_2$ elements), calculated from the $L^2$-norm of the error obtained with the two finest meshes (worst{\hyp}case bound rates in parentheses)}
-    \begin{tabular}{>{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{20mm}
-                    >{\raggedleft\arraybackslash}p{18mm}}
-    \toprule
-    \multicolumn{7}{c}{velocity} \\
-    \midrule
-    {} & {} & {} & \multicolumn{2}{c}{slope (3)} & \multicolumn{2}{c}{FME}\\
-    \cmidrule(lr){4-7}
-    $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-    \midrule
-    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{3.00} & \num{3.00} & \num{2.06e-7} & \num{2.07e-7} \\
-    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{2.99} & \num{2.98} & \num{2.39e-6} & \num{2.39e-6} \\
-    $1$       & $10^{-6}$ & $0.5$  & \num{3.00} & \num{3.01} & \num{2.07e-7} & \num{2.08e-7} \\
-    $1$       & $10^{-6}$ & $0.05$ & \num{3.02} & \num{3.01} & \num{2.40e-6} & \num{2.42e-6} \\
-    $10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.82} & \num{2.83} & \num{4.56e-7} & \num{4.57e-7} \\
-    $10^{-6}$ & $1$       & $0.5$  & \num{3.00} & \num{3.01} & \num{2.07e-7} & \num{2.08e-7} \\
-    $10^{-6}$ & $1$       & $0.05$ & \num{3.02} & \num{3.01} & \num{2.40e-6} & \num{2.42e-6} \\
-    $1$       & $1$       & $0.5$  & \num{3.00} & \num{3.01} & \num{2.07e-7} & \num{2.08e-7} \\
-    $1$       & $1$       & $0.05$ & \num{3.02} & \num{3.01} & \num{2.40e-6} & \num{2.42e-6} \\
-    $10^{6}$  & $1$       & $0.5$  & \num{2.82} & \num{2.83} & \num{4.56e-7} & \num{4.57e-7} \\
-    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{3.17} & \num{3.58} & \num{6.63e-7} & \num{6.18e-7} \\
-    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{3.00} & \num{2.95} & \num{2.44e-6} & \num{2.39e-6} \\
-    $1$       & $10^{6}$  & $0.5$  & \num{3.17} & \num{3.58} & \num{6.63e-7} & \num{6.18e-7} \\
-    $1$       & $10^{6}$  & $0.05$ & \num{3.00} & \num{2.95} & \num{2.44e-6} & \num{2.39e-6} \\
-    $10^{6}$  & $10^{6}$  & $0.5$  & \num{2.79} & \num{2.80} & \num{4.43e-7} & \num{4.45e-7} \\
-\addlinespace
-\multicolumn{7}{l}{\textit{nodal interpolant $I_h\boldsymbol{u}$ (independent of $\Reyn$, $\Damk$ and of the method)}} \\
-{} & {} & $0.5$ & \multicolumn{2}{c}{\num{3.00}} & \multicolumn{2}{c}{\num{2.06e-7}} \\
-{} & {} & $0.05$ & \multicolumn{2}{c}{\num{2.99}} & \multicolumn{2}{c}{\num{2.39e-6}} \\
-    \midrule
-    \multicolumn{7}{c}{pressure} \\
-    \midrule
-    {} & {} & {} & \multicolumn{2}{c}{slope (2)} & \multicolumn{2}{c}{FME}\\
-    \cmidrule(lr){4-7}
-    $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-    \midrule
-    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{1.88} & \num{3.08} & \num{1.91e-5} & \num{2.97e-5} \\
-    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{1.81} & \num{3.16} & \num{1.95e-4} & \num{4.90e-4} \\
-    $1$       & $10^{-6}$ & $0.5$  & \num{1.90} & \num{3.13} & \num{9.78e-6} & \num{1.67e-5} \\
-    $1$       & $10^{-6}$ & $0.05$ & \num{1.81} & \num{3.45} & \num{1.06e-4} & \num{3.11e-4} \\
-    $10^{6}$  & $10^{-6}$ & $0.5$  & \num{2.90} & \num{3.04} & \num{7.58e-8} & \num{7.91e-8} \\
-    $10^{-6}$ & $1$       & $0.5$  & \num{1.89} & \num{3.13} & \num{9.75e-6} & \num{1.67e-5} \\
-    $10^{-6}$ & $1$       & $0.05$ & \num{1.81} & \num{3.44} & \num{1.05e-4} & \num{3.13e-4} \\
-    $1$       & $1$       & $0.5$  & \num{1.90} & \num{3.13} & \num{6.52e-6} & \num{1.11e-5} \\
-    $1$       & $1$       & $0.05$ & \num{1.81} & \num{3.44} & \num{7.06e-5} & \num{2.09e-4} \\
-    $10^{6}$  & $1$       & $0.5$  & \num{2.90} & \num{3.04} & \num{7.58e-8} & \num{7.91e-8} \\
-    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{3.00} & \num{3.00} & \num{3.84e-9} & \num{3.84e-9} \\
-    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{3.00} & \num{3.02} & \num{3.85e-9} & \num{3.94e-9} \\
-    $1$       & $10^{6}$  & $0.5$  & \num{3.00} & \num{3.00} & \num{3.84e-9} & \num{3.84e-9} \\
-    $1$       & $10^{6}$  & $0.05$ & \num{3.00} & \num{3.02} & \num{3.85e-9} & \num{3.94e-9} \\
-    $10^{6}$  & $10^{6}$  & $0.5$  & \num{2.91} & \num{3.04} & \num{3.82e-8} & \num{3.98e-8} \\
-\addlinespace
-\multicolumn{7}{l}{\textit{nodal interpolant $I_h p$ (independent of $\Reyn$, $\Damk$, $\alpha_0$ and of the method)}} \\
-{} & {} & {} & \multicolumn{2}{c}{\num{3.00}} & \multicolumn{2}{c}{\num{3.85e-9}} \\
-    \bottomrule
-    \end{tabular}
-    \label{tab:Quadratic2DL2}
-\end{table}
-
-\begin{table}[!htbp]
-    \centering
-    \caption{Observed convergence rates and normalized finest mesh error (FME) for the 2D problem ($\mathbb{Q}_2$ elements), calculated from the $H^1$-seminorm of the error obtained with the two finest meshes (worst{\hyp}case bound rates in parentheses)}
-    \begin{tabular}{>{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{18mm}
-                    >{\raggedleft\arraybackslash}p{18mm}}
-    \toprule
-    \multicolumn{7}{c}{velocity} \\
-    \midrule
-    {} & {} & {} & \multicolumn{2}{c}{slope (2)} & \multicolumn{2}{c}{FME}\\
-    \cmidrule(lr){4-7}
-    $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-    \midrule
-    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{2.00} & \num{2.00} & \num{4.29e-4} & \num{4.28e-4} \\
-    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{2.00} & \num{1.99} & \num{4.97e-3} & \num{4.95e-3} \\
-    $1$       & $10^{-6}$ & $0.5$  & \num{2.00} & \num{2.00} & \num{4.29e-4} & \num{4.29e-4} \\
-    $1$       & $10^{-6}$ & $0.05$ & \num{2.00} & \num{2.00} & \num{4.96e-3} & \num{4.97e-3} \\
-    $10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.81} & \num{1.81} & \num{1.10e-3} & \num{1.10e-3} \\
-    $10^{-6}$ & $1$       & $0.5$  & \num{2.00} & \num{2.00} & \num{4.29e-4} & \num{4.29e-4} \\
-    $10^{-6}$ & $1$       & $0.05$ & \num{2.00} & \num{2.00} & \num{4.96e-3} & \num{4.97e-3} \\
-    $1$       & $1$       & $0.5$  & \num{2.00} & \num{2.00} & \num{4.29e-4} & \num{4.29e-4} \\
-    $1$       & $1$       & $0.05$ & \num{2.00} & \num{2.00} & \num{4.96e-3} & \num{4.97e-3} \\
-    $10^{6}$  & $1$       & $0.5$  & \num{1.81} & \num{1.81} & \num{1.10e-3} & \num{1.10e-3} \\
-    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.18} & \num{2.59} & \num{1.52e-3} & \num{1.51e-3} \\
-    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.01} & \num{2.10} & \num{5.10e-3} & \num{5.14e-3} \\
-    $1$       & $10^{6}$  & $0.5$  & \num{2.18} & \num{2.59} & \num{1.52e-3} & \num{1.51e-3} \\
-    $1$       & $10^{6}$  & $0.05$ & \num{2.01} & \num{2.10} & \num{5.10e-3} & \num{5.14e-3} \\
-    $10^{6}$  & $10^{6}$  & $0.5$  & \num{1.79} & \num{1.80} & \num{1.07e-3} & \num{1.07e-3} \\
-\addlinespace
-\multicolumn{7}{l}{\textit{nodal interpolant $I_h\boldsymbol{u}$ (independent of $\Reyn$, $\Damk$ and of the method)}} \\
-{} & {} & $0.5$ & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{4.28e-4}} \\
-{} & {} & $0.05$ & \multicolumn{2}{c}{\num{1.99}} & \multicolumn{2}{c}{\num{4.95e-3}} \\
-    \midrule
-    \multicolumn{7}{c}{pressure} \\
-    \midrule
-    {} & {} & {} & \multicolumn{2}{c}{slope (1)} & \multicolumn{2}{c}{FME}\\
-    \cmidrule(lr){4-7}
-    $\Reyn$ & $\Damk$ & $\alpha_0$ & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-    \midrule
-    $10^{-6}$ & $10^{-6}$ & $0.5$  & \num{0.87} & \num{1.97} & \num{4.71e-2} & \num{7.18e-2} \\
-    $10^{-6}$ & $10^{-6}$ & $0.05$ & \num{0.93} & \num{2.01} & \num{4.80e-1} & \num{1.16}   \\
-    $1$       & $10^{-6}$ & $0.5$  & \num{0.88} & \num{2.02} & \num{2.41e-2} & \num{4.01e-2} \\
-    $1$       & $10^{-6}$ & $0.05$ & \num{0.79} & \num{2.28} & \num{2.56e-1} & \num{7.36e-1} \\
-    $10^{6}$  & $10^{-6}$ & $0.5$  & \num{1.87} & \num{2.00} & \num{1.86e-4} & \num{1.94e-4} \\
-    $10^{-6}$ & $1$       & $0.5$  & \num{0.88} & \num{2.02} & \num{2.40e-2} & \num{4.01e-2} \\
-    $10^{-6}$ & $1$       & $0.05$ & \num{0.79} & \num{2.28} & \num{2.56e-1} & \num{7.40e-1} \\
-    $1$       & $1$       & $0.5$  & \num{0.88} & \num{2.02} & \num{1.60e-2} & \num{2.68e-2} \\
-    $1$       & $1$       & $0.05$ & \num{0.79} & \num{2.28} & \num{1.71e-1} & \num{4.94e-1} \\
-    $10^{6}$  & $1$       & $0.5$  & \num{1.87} & \num{2.00} & \num{1.86e-4} & \num{1.94e-4} \\
-    $10^{-6}$ & $10^{6}$  & $0.5$  & \num{2.00} & \num{2.01} & \num{7.98e-6} & \num{8.01e-6} \\
-    $10^{-6}$ & $10^{6}$  & $0.05$ & \num{2.00} & \num{2.01} & \num{8.00e-6} & \num{8.24e-6} \\
-    $1$       & $10^{6}$  & $0.5$  & \num{2.00} & \num{2.01} & \num{7.98e-6} & \num{8.01e-6} \\
-    $1$       & $10^{6}$  & $0.05$ & \num{2.00} & \num{2.01} & \num{8.00e-6} & \num{8.24e-6} \\
-    $10^{6}$  & $10^{6}$  & $0.5$  & \num{1.88} & \num{2.00} & \num{9.36e-5} & \num{9.76e-5} \\
-\addlinespace
-\multicolumn{7}{l}{\textit{nodal interpolant $I_h p$ (independent of $\Reyn$, $\Damk$, $\alpha_0$ and of the method)}} \\
-{} & {} & {} & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{7.98e-6}} \\
-    \bottomrule
-    \end{tabular}
-    \label{tab:Quadratic2DH1}
-\end{table}
-
 \subsection{Manufactured solutions: 3D cases}\label{sec:NumericalExamplesStationaryCase3D} \hfill\\
-For the 3D examples, we use the $z$-wise extruded version of the same manufactured field on the parallelepiped $(0, 1) \times (0, 1) \times (0, 0.3)$. We report results on two families of tetrahedral meshes: a \emph{regular} family, obtained by splitting a structured Cartesian grid into Kuhn tetrahedra with \texttt{Gridap}, and an \emph{irregular} family, obtained by successive uniform (red) \texttt{Gridap} refinement of an unstructured base mesh generated with \texttt{gmsh}, each refinement halving the element size. The irregular family is included precisely because its lack of symmetry forces the velocity to acquire a nonzero $z${\hyp}component through the discretization error, providing a genuinely three-dimensional \emph{discretization} test (the exact field itself remaining $z${\hyp}invariant, with zero exact $z${\hyp}velocity); the regular family, in turn, isolates the behavior of the method on well-shaped elements. We consider linear ($\mathbb{P}_1$) and quadratic ($\mathbb{P}_2$) tetrahedra. For the $\mathbb{P}_1$ elements we use four meshes in both families; for the (more expensive) $\mathbb{P}_2$ elements, four on the regular family and three on the irregular one. The regular meshes split a uniform $N \times N \times N/4$ grid of the parallelepiped into Kuhn tetrahedra---so that the element aspect ratio is a constant $1.2$ on the $0.3${\hyp}thick slab---with $N \in \{8,16,24,32\}$ for $\mathbb{P}_1$ and $N \in \{12,16,20,24\}$ for $\mathbb{P}_2$; the irregular meshes are produced by an unstructured tetrahedralization of target size $h \approx 0.2$, successively refined by uniform red subdivision, each refinement halving $h$. The linear algebra rests on sparse direct factorizations throughout: the ASGS rows are solved with a sparse LU factorization of the monolithic system, and the OSGS rows with the Newton--Krylov variant described above, whose inner GMRES iteration is preconditioned by a sparse LU factorization of the frozen{\hyp}projection tangent---assembled, for the $\mathbb{P}_2$ OSGS rows, from stabilization constants inflated by a factor four \emph{in the preconditioner only}, the matrix{\hyp}free product still differencing the residual at the stated $c_1$, so that the solved system and hence the computed solution are unchanged. In both cases the \emph{nonlinear} residual is driven well below the discretization error, so that the tabulated values are the genuine discretization errors rather than an artifact of a stopping tolerance; the memory required to factorize the monolithic velocity{\hyp}pressure system grows steeply with the number of unknowns and, on the single machine (32~GB of memory) used for these runs, this---rather than any property of the formulation---sets the finest mesh reported here. The slopes quoted from these sequences are local, two{\hyp}mesh estimates, which we read as evidence for---not as a determination of---the asymptotic exponents; the discussion of \cref{tab:3DL2,tab:3DH1} below states how much weight each one can carry. The physical parameters are fixed to $(\alpha_0, \Reyn, \Damk) = (0.5, 1, 1)$ for all the cases run.
+For the 3D examples, we use the $z$-wise extruded version of the same manufactured field on the parallelepiped $(0, 1) \times (0, 1) \times (0, 0.3)$. We report results on two families of tetrahedral meshes: a \emph{regular} family, obtained by splitting a structured Cartesian grid into Kuhn tetrahedra with \texttt{Gridap}, and an \emph{irregular} family, obtained by successive uniform (red) \texttt{Gridap} refinement of an unstructured base mesh generated with \texttt{gmsh}, each refinement halving the element size. The irregular family is included precisely because its lack of symmetry forces the velocity to acquire a nonzero $z${\hyp}component through the discretization error, providing a genuinely three-dimensional \emph{discretization} test (the exact field itself remaining $z${\hyp}invariant, with zero exact $z${\hyp}velocity); the regular family, in turn, isolates the behavior of the method on well-shaped elements. We consider linear ($\mathbb{P}_1$) and quadratic ($\mathbb{P}_2$) tetrahedra. For the $\mathbb{P}_1$ elements we use four meshes in both families; for the (more expensive) $\mathbb{P}_2$ elements, four on the regular family and three on the irregular one. The regular meshes split a uniform $N \times N \times N/4$ grid of the parallelepiped into Kuhn tetrahedra---so that the element aspect ratio is a constant $1.2$ on the $0.3${\hyp}thick slab---with $N \in \{8,16,24,32\}$ for $\mathbb{P}_1$ and $N \in \{12,16,20,24\}$ for $\mathbb{P}_2$; the irregular meshes are produced by an unstructured tetrahedralization of target size $h \approx 0.2$, successively refined by uniform red subdivision, each refinement halving $h$. The linear algebra rests on sparse direct factorizations throughout: the ASGS rows are solved with a sparse LU factorization of the monolithic system, and the OSGS rows with the Newton--Krylov variant described above, whose inner GMRES iteration is preconditioned by a sparse LU factorization of the frozen{\hyp}projection tangent---assembled, for the $\mathbb{P}_2$ OSGS rows, from stabilization constants inflated by a factor four \emph{in the preconditioner only}, the matrix{\hyp}free product still differencing the residual at the stated $c_1$, so that the solved system and hence the computed solution are unchanged. In both cases the \emph{nonlinear} residual is driven well below the discretization error, so that the tabulated values are the genuine discretization errors rather than an artifact of a stopping tolerance; the memory required to factorize the monolithic velocity{\hyp}pressure system grows steeply with the number of unknowns and, on the single machine (32~GB of memory) used for these runs, this---rather than any property of the formulation---sets the finest mesh reported here. The slopes quoted from these sequences are local, two{\hyp}mesh estimates, which we read as evidence for---not as a determination of---the asymptotic exponents; the discussion of \cref{tab:3D} below states how much weight each one can carry. The physical parameters are fixed to $(\alpha_0, \Reyn, \Damk) = (0.5, 1, 1)$ for all the cases run.
 
 As anticipated in the remark following \cref{eq:conditions_on_num_param}, tetrahedral meshes call for a larger viscous stabilization constant than in two dimensions. For $\mathbb{P}_2$ elements the elementwise viscous energy loses coercivity unless $c_1 \ge 2\hat c^2(K)$, a purely geometric threshold that is about $(100+5\sqrt2)/24 \approx 4.5$ times larger on the Kuhn tetrahedron than on the right triangle when both are measured in the same element{\hyp}length convention, whereas for $\mathbb{P}_1$ elements it vanishes identically.\footnote{These thresholds are the largest eigenvalues of a local (reference{\hyp}element) generalized eigenvalue problem for the operator $\boldsymbol{u}\mapsto\nabla\cdot(\DSPi\nabla\boldsymbol{u})$, for the deviatoric{\hyp}symmetric projector employed in the experiments. That $\mathbb{P}_2$ tetrahedra genuinely require the larger constant was confirmed directly, without relying on this estimate alone: a numerical evaluation of the discrete coercivity constant on the Kuhn meshes returns a negative value for $c_1=4k^4$---deepening as the mesh is refined---and a positive one for $c_1=16k^4$; correspondingly, the convergence study stalls well above the interpolation benchmark at $c_1=4k^4$ but recovers the optimal rates at $c_1=16k^4$.} Accordingly, in all the 3D experiments we take $c_1 = 16 k^4$ and keep $c_2 = 2 k^2$, with the element length entering \cref{eq:Tau1Final,eq:Tau2Final} taken as $h_K = (6\sqrt2\,\lvert K\rvert)^{1/3}$, the edge of the regular tetrahedron of the same volume. This round value---four times the two{\hyp}dimensional one---is the scaling that the threshold ratio above suggests, and it sits just below it: the argument is relative to the two{\hyp}dimensional value and not an absolute margin, which would require fixing both the constant in \cref{eq:conditions_on_num_param} and a common element{\hyp}length convention across the two element families. Its adequacy here rests on the direct evidence of the footnote, and on the fact that the inter{\hyp}element continuity of the conforming spaces renders the effective (global) coercivity requirement milder than the elementwise one; it proved sufficient on all the meshes tested.
 
@@ -1545,107 +1399,52 @@ where the first inequality holds for the parameter ranges chosen for the numeric
 
 Additionally, we also add the previous-step value of the penalty term to the right-hand side (i.e., we add $\varepsilon_{\mathrm{num}} p^{m-1}$ to the mass source term, with $m$ the nonlinear iteration counter of \cref{eq:LinearizedOSGSProblem}) at every nonlinear iteration, so that the penalty enters as $\varepsilon_{\mathrm{num}}(p^m-p^{m-1})$ and vanishes as the iteration converges. This \emph{iterative penalty method}, analyzed in~\cite{codina1993iterative}, ensures that the manufactured solution is not altered.
 
-\Cref{tab:3DL2,tab:3DH1} list the results for the $L^2$-norm and $H^1$-seminorm on both mesh families. On the regular mesh the method converges monotonically; the observed \emph{velocity} rates approach or exceed the interpolation{\hyp}optimal exponents, while the pressure rows exceed the worst{\hyp}case bound rates of the caption without reaching the interpolation{\hyp}optimal ones. As every slope reported here is a two-mesh estimate and the two finest regular meshes differ in size by as little as a factor $6/5$ (for $\mathbb{P}_2$)---so that a small perturbation of the error is strongly amplified in the slope---we gauge the regular-mesh accuracy chiefly from the finest-mesh errors relative to the nodal interpolant rather than from the slopes alone: these \emph{velocity} errors are close to the interpolation reference reported in the tables---for the $\mathbb{P}_2$ velocity, on which the two-mesh slope is least reliable, to within roughly a few percent in both norms---indicating that, once the element-aware $c_1$ is used, the three-dimensional behavior of the tested cases is consistent with the two-dimensional one. On the irregular mesh the convergence is likewise monotone, but the rates are somewhat lower. This residual sub-optimality is shared by the nodal interpolant on the same meshes---its velocity slopes drop from the regular to the irregular family by a comparable amount to those of the computed solutions (compare the interpolation rows of the two tables)---so that, the interpolant depending on neither the formulation nor the stabilization variant, the depression is a property of the irregular mesh sequence rather than of the method, and it is present for both ASGS and OSGS. As in the 2D case, the two stabilizations yield very similar velocity errors (most clearly in the $H^1$-seminorm and for $\mathbb{P}_2$), the salient qualitative difference again appearing in the pressure; here, however, the two-dimensional ordering is partly reversed, in that the OSGS pressure attains comparable or slightly higher \emph{rates} than the ASGS one but with larger absolute \emph{errors} (for the regular $\mathbb{P}_1$ element, $L^2$ slope $1.85$ and error $4.55\times10^{-2}$ for OSGS against $1.37$ and $2.87\times10^{-2}$ for ASGS), its $H^1$ error barely converging.\footnote{The value $1.29$ recurs three times in the OSGS pressure column of \cref{tab:3DH1} (regular $\mathbb{P}_1$, and irregular $\mathbb{P}_1$ and $\mathbb{P}_2$). This is a genuine coincidence, not a typographical error: the underlying finest-mesh errors are $1.292$, $1.289$ and $1.290$, which round to the same two digits because the OSGS pressure barely converges in the $H^1$-seminorm, so that its finest-mesh error saturates at an $O(1)$ level nearly independent of the element order and mesh family.} We regard this near{\hyp}stagnation of the OSGS pressure gradient in three dimensions as an adverse result that the present, velocity{\hyp}oriented analysis does not explain: the linear theory controls the pressure only through the same error functional as the velocity, and a dedicated duality argument---which would also account for the \emph{superior} OSGS pressure convergence observed for $k\ge2$ in two dimensions---is left to future work.
+\Cref{tab:3D} lists the results for the $L^2$-norm and $H^1$-seminorm on both mesh families. On the regular mesh the method converges monotonically; the observed \emph{velocity} rates approach or exceed the interpolation{\hyp}optimal exponents, while the pressure rows exceed the worst{\hyp}case bound rates of the caption without reaching the interpolation{\hyp}optimal ones. As every slope reported here is a two-mesh estimate and the two finest regular meshes differ in size by as little as a factor $6/5$ (for $\mathbb{P}_2$)---so that a small perturbation of the error is strongly amplified in the slope---we gauge the regular-mesh accuracy chiefly from the finest-mesh errors relative to the nodal interpolant rather than from the slopes alone: these \emph{velocity} errors are close to the interpolation reference reported in the table---for the $\mathbb{P}_2$ velocity, on which the two-mesh slope is least reliable, to within roughly a few percent in both norms---indicating that, once the element-aware $c_1$ is used, the three-dimensional behavior of the tested cases is consistent with the two-dimensional one. On the irregular mesh the convergence is likewise monotone, but the rates are somewhat lower. This residual sub-optimality is shared by the nodal interpolant on the same meshes---its velocity slopes drop from the regular to the irregular family by a comparable amount to those of the computed solutions (compare the interpolation rows in the two mesh families)---so that, the interpolant depending on neither the formulation nor the stabilization variant, the depression is a property of the irregular mesh sequence rather than of the method, and it is present for both ASGS and OSGS. As in the 2D case, the two stabilizations yield very similar velocity errors (most clearly in the $H^1$-seminorm and for $\mathbb{P}_2$), the salient qualitative difference again appearing in the pressure; here, however, the two-dimensional ordering is partly reversed, in that the OSGS pressure attains comparable or slightly higher \emph{rates} than the ASGS one but with larger absolute \emph{errors} (for the regular $\mathbb{P}_1$ element, $L^2$ slope $1.85$ and error $4.6\times10^{-2}$ for OSGS against $1.37$ and $2.9\times10^{-2}$ for ASGS), its $H^1$ error barely converging.\footnote{The value $1.3$ recurs three times in the $H^1$ OSGS pressure columns of \cref{tab:3D} (regular $\mathbb{P}_1$, and irregular $\mathbb{P}_1$ and $\mathbb{P}_2$). This is a genuine coincidence, not a typographical error: the underlying finest-mesh errors are $1.292$, $1.289$ and $1.290$, which round to the same two significant figures because the OSGS pressure barely converges in the $H^1$-seminorm, so that its finest-mesh error saturates at an $O(1)$ level nearly independent of the element order and mesh family.} We regard this near{\hyp}stagnation of the OSGS pressure gradient in three dimensions as an adverse result that the present, velocity{\hyp}oriented analysis does not explain: the linear theory controls the pressure only through the same error functional as the velocity, and a dedicated duality argument---which would also account for the \emph{superior} OSGS pressure convergence observed for $k\ge2$ in two dimensions---is left to future work.
 
 \begin{table}[!htbp]
-    \centering
-    \caption{Observed convergence rates and normalized finest mesh error (FME) for the 3D problem, calculated from the $L^2$-norm of the error obtained with the two finest meshes (worst{\hyp}case bound rates in parentheses, in the convention of \cref{tab:Linear2DL2}: $k_u+1$ for the velocity and $k_p$ for the pressure; the nodal{\hyp}interpolant rows converge one order faster in the pressure, so the parenthetical bounds the analysis rather than the approximability of the space)}
-    \begin{tabular}{>{\raggedleft\arraybackslash}p{20mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{18mm}
-                    >{\raggedleft\arraybackslash}p{18mm}}
-    \toprule
-    \multicolumn{5}{c}{velocity} \\
-    \midrule
-    {} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME}\\
-    \cmidrule(lr){2-5}
-    element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-    \midrule
-    \multicolumn{5}{l}{\textit{regular mesh}} \\
-    $\mathbb{P}_1$ (2) & \num{1.75} & \num{1.91} & \num{1.90e-3} & \num{1.05e-3} \\
-    $\mathbb{P}_2$ (3) & \num{3.33} & \num{3.34} & \num{1.85e-4} & \num{1.79e-4} \\
-    $\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{1.90}} & \multicolumn{2}{c}{\num{1.291e-3}} \\
-    $\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{3.20}} & \multicolumn{2}{c}{\num{1.783e-4}} \\
-    \addlinespace
-    \multicolumn{5}{l}{\textit{irregular mesh}} \\
-    $\mathbb{P}_1$ (2) & \num{1.70} & \num{1.63} & \num{1.10e-3} & \num{8.98e-4} \\
-    $\mathbb{P}_2$ (3) & \num{2.55} & \num{2.56} & \num{2.07e-4} & \num{2.02e-4} \\
-    $\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{1.83}} & \multicolumn{2}{c}{\num{6.823e-4}} \\
-    $\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{2.67}} & \multicolumn{2}{c}{\num{2.012e-4}} \\
-    \midrule
-    \multicolumn{5}{c}{pressure} \\
-    \midrule
-    {} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME}\\
-    \cmidrule(lr){2-5}
-    element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-    \midrule
-    \multicolumn{5}{l}{\textit{regular mesh}} \\
-    $\mathbb{P}_1$ (1) & \num{1.37} & \num{1.85} & \num{2.87e-2} & \num{4.55e-2} \\
-    $\mathbb{P}_2$ (2) & \num{2.32} & \num{2.74} & \num{6.42e-3} & \num{1.57e-2} \\
-    $\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{9.830e-4}} \\
-    $\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{3.00}} & \multicolumn{2}{c}{\num{2.038e-5}} \\
-    \addlinespace
-    \multicolumn{5}{l}{\textit{irregular mesh}} \\
-    $\mathbb{P}_1$ (1) & \num{1.28} & \num{1.29} & \num{1.51e-2} & \num{2.98e-2} \\
-    $\mathbb{P}_2$ (2) & \num{1.73} & \num{1.66} & \num{7.86e-3} & \num{1.46e-2} \\
-    $\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{1.87}} & \multicolumn{2}{c}{\num{4.351e-4}} \\
-    $\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{2.72}} & \multicolumn{2}{c}{\num{2.034e-5}} \\
-    \bottomrule
-    \end{tabular}
-    \label{tab:3DL2}
+\centering
+\caption{Observed convergence rates and normalized finest mesh error (FME) for the 3D problem, calculated from the $L^2${\hyp}norm and the $H^1${\hyp}seminorm of the error obtained with the two finest meshes. The pair in parentheses after each element type gives the worst{\hyp}case bound rates for the two norms in that order, in the convention of \cref{tab:Linear2D}: $k_u+1$ and $k_u$ for the velocity, $k_p$ and $k_p-1$ for the pressure, a dash where the latter is not positive. The nodal{\hyp}interpolant rows converge one order faster in the pressure, so the parenthetical bounds the analysis rather than the approximability of the space}
+\label{tab:3D}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{l*{8}{r}}
+\toprule
+{} & \multicolumn{4}{c}{$L^2${\hyp}norm} & \multicolumn{4}{c}{$H^1${\hyp}seminorm} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+{} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
+\midrule
+\multicolumn{9}{c}{velocity} \\
+\midrule
+\multicolumn{9}{l}{\textit{regular mesh}} \\
+$\mathbb{P}_1$ (2, 1) & \num{1.75} & \num{1.91} & \num{1.9e-3} & \num{1.1e-3} & \num{0.95} & \num{0.97} & \num{8.2e-2} & \num{8.2e-2} \\
+$\mathbb{P}_2$ (3, 2) & \num{3.33} & \num{3.34} & \num{1.8e-4} & \num{1.8e-4} & \num{2.22} & \num{2.29} & \num{1.7e-2} & \num{1.8e-2} \\
+$\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{1.90}} & \multicolumn{2}{c}{\num{1.29e-3}} & \multicolumn{2}{c}{\num{0.94}} & \multicolumn{2}{c}{\num{8.02e-2}} \\
+$\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{3.20}} & \multicolumn{2}{c}{\num{1.78e-4}} & \multicolumn{2}{c}{\num{2.22}} & \multicolumn{2}{c}{\num{1.70e-2}} \\
+\addlinespace
+\multicolumn{9}{l}{\textit{irregular mesh}} \\
+$\mathbb{P}_1$ (2, 1) & \num{1.70} & \num{1.63} & \num{1.1e-3} & \num{9.0e-4} & \num{0.83} & \num{0.85} & \num{7.6e-2} & \num{7.8e-2} \\
+$\mathbb{P}_2$ (3, 2) & \num{2.55} & \num{2.56} & \num{2.1e-4} & \num{2.0e-4} & \num{1.57} & \num{1.62} & \num{2.2e-2} & \num{2.2e-2} \\
+$\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{1.83}} & \multicolumn{2}{c}{\num{6.82e-4}} & \multicolumn{2}{c}{\num{0.71}} & \multicolumn{2}{c}{\num{8.42e-2}} \\
+$\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{2.67}} & \multicolumn{2}{c}{\num{2.01e-4}} & \multicolumn{2}{c}{\num{1.52}} & \multicolumn{2}{c}{\num{2.41e-2}} \\
+\midrule
+\multicolumn{9}{c}{pressure} \\
+\midrule
+\multicolumn{9}{l}{\textit{regular mesh}} \\
+$\mathbb{P}_1$ (1, $-$) & \num{1.37} & \num{1.85} & \num{2.9e-2} & \num{4.6e-2} & \num{0.71} & \num{0.88} & \num{7.9e-1} & \num{1.3} \\
+$\mathbb{P}_2$ (2, 1) & \num{2.32} & \num{2.74} & \num{6.4e-3} & \num{1.6e-2} & \num{1.18} & \num{1.77} & \num{4.7e-1} & \num{1.2} \\
+$\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{9.83e-4}} & \multicolumn{2}{c}{\num{1.00}} & \multicolumn{2}{c}{\num{5.97e-2}} \\
+$\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{3.00}} & \multicolumn{2}{c}{\num{2.04e-5}} & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{2.05e-3}} \\
+\addlinespace
+\multicolumn{9}{l}{\textit{irregular mesh}} \\
+$\mathbb{P}_1$ (1, $-$) & \num{1.28} & \num{1.29} & \num{1.5e-2} & \num{3.0e-2} & \num{0.35} & \num{0.32} & \num{7.3e-1} & \num{1.3} \\
+$\mathbb{P}_2$ (2, 1) & \num{1.73} & \num{1.66} & \num{7.9e-3} & \num{1.5e-2} & \num{0.66} & \num{0.63} & \num{7.0e-1} & \num{1.3} \\
+$\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{1.87}} & \multicolumn{2}{c}{\num{4.35e-4}} & \multicolumn{2}{c}{\num{0.79}} & \multicolumn{2}{c}{\num{4.87e-2}} \\
+$\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{2.72}} & \multicolumn{2}{c}{\num{2.03e-5}} & \multicolumn{2}{c}{\num{1.61}} & \multicolumn{2}{c}{\num{2.25e-3}} \\
+\bottomrule
+\end{tabular}
 \end{table}
-
-
-\begin{table}[!htbp]
-    \centering
-    \caption{Observed convergence rates and normalized finest mesh error (FME) for the 3D problem, calculated from the $H^1$-seminorm of the error obtained with the two finest meshes (worst{\hyp}case bound rates in parentheses, in the convention of \cref{tab:Linear2DL2}: $k_u$ for the velocity and $k_p-1$ for the pressure, a dash where that is not positive)}
-    \begin{tabular}{>{\raggedleft\arraybackslash}p{20mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{7.5mm}
-                    >{\raggedleft\arraybackslash}p{18mm}
-                    >{\raggedleft\arraybackslash}p{18mm}}
-    \toprule
-    \multicolumn{5}{c}{velocity} \\
-    \midrule
-    {} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME}\\
-    \cmidrule(lr){2-5}
-    element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-    \midrule
-    \multicolumn{5}{l}{\textit{regular mesh}} \\
-    $\mathbb{P}_1$ (1) & \num{0.95} & \num{0.97} & \num{8.19e-2} & \num{8.22e-2} \\
-    $\mathbb{P}_2$ (2) & \num{2.22} & \num{2.29} & \num{1.74e-2} & \num{1.81e-2} \\
-    $\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{0.94}} & \multicolumn{2}{c}{\num{8.023e-2}} \\
-    $\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{2.22}} & \multicolumn{2}{c}{\num{1.699e-2}} \\
-    \addlinespace
-    \multicolumn{5}{l}{\textit{irregular mesh}} \\
-    $\mathbb{P}_1$ (1) & \num{0.83} & \num{0.85} & \num{7.63e-2} & \num{7.79e-2} \\
-    $\mathbb{P}_2$ (2) & \num{1.57} & \num{1.62} & \num{2.23e-2} & \num{2.20e-2} \\
-    $\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{0.71}} & \multicolumn{2}{c}{\num{8.415e-2}} \\
-    $\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{1.52}} & \multicolumn{2}{c}{\num{2.410e-2}} \\
-    \midrule
-    \multicolumn{5}{c}{pressure} \\
-    \midrule
-    {} & \multicolumn{2}{c}{slope} & \multicolumn{2}{c}{FME}\\
-    \cmidrule(lr){2-5}
-    element type & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} & \multicolumn{1}{c}{ASGS} & \multicolumn{1}{c}{OSGS} \\
-    \midrule
-    \multicolumn{5}{l}{\textit{regular mesh}} \\
-    $\mathbb{P}_1$ (-) & \num{0.71} & \num{0.88} & \num{7.92e-1} & \num{1.29} \\
-    $\mathbb{P}_2$ (1) & \num{1.18} & \num{1.77} & \num{4.73e-1} & \num{1.15} \\
-    $\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{1.00}} & \multicolumn{2}{c}{\num{5.970e-2}} \\
-    $\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{2.00}} & \multicolumn{2}{c}{\num{2.054e-3}} \\
-    \addlinespace
-    \multicolumn{5}{l}{\textit{irregular mesh}} \\
-    $\mathbb{P}_1$ (-) & \num{0.35} & \num{0.32} & \num{7.25e-1} & \num{1.29} \\
-    $\mathbb{P}_2$ (1) & \num{0.66} & \num{0.63} & \num{7.01e-1} & \num{1.29} \\
-    $\mathbb{P}_1$ interp. & \multicolumn{2}{c}{\num{0.79}} & \multicolumn{2}{c}{\num{4.866e-2}} \\
-    $\mathbb{P}_2$ interp. & \multicolumn{2}{c}{\num{1.61}} & \multicolumn{2}{c}{\num{2.253e-3}} \\
-    \bottomrule
-    \end{tabular}
-    \label{tab:3DH1}
-\end{table}
-
 \subsection{Comparison with an inf{\hyp}sup{\hyp}stable formulation from the literature}\label{sec:NumericalExampleFromLiterature} \hfill\\
 As a final example, we compare the equal{\hyp}order stabilized method developed in this paper against the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood approach employed by Cocquet et al.~\cite{cocquet2021error} for the Darcy{\hyp}Brinkman{\hyp}Forchheimer (DBF) equations. Our goal is the same as in that reference: to assess the convergence rates and accuracy of the two discretizations. Rather than reproducing the tube{\hyp}flow benchmark of~\cite{cocquet2021error}---whose reference solution is itself a fine{\hyp}mesh approximation---we resort once more to the method of manufactured solutions, so that both methods are held to the same standard, namely the exact error.
 
@@ -1656,111 +1455,69 @@ To this end we keep the manufactured fields \cref{eq:ManufacturedProblem} and th
 \end{equation}
 where $C_a = 0.30$ and $C_b = 1.75$ are dimensionless constants ($C_b$ being the standard Forchheimer value of the reference). The resistance coefficients $a(\alpha)$ and $b(\alpha)$ they define carry, like the viscous term, a factor $\nu$ that we keep implicit in \cref{eq:CocquetMMSReaction} (exactly as in the reference, where $a$ is written with an explicit $1/\Reyn$ factor)---and it is this shared $\nu$ scaling that makes the Damk\"ohler number \cref{eq:DimensionlessParameters}, $\Damk = \sigma L^2/(\alpha_\infty\nu)$, independent of $\Reyn$: evaluating $\sigma$ at the minimum porosity $\alpha_0$ and $|\boldsymbol{u}| = U$ gives $\Damk(\alpha_0) = C_a\big((1-\alpha_0)/\alpha_0\big)^2 + C_b\big((1-\alpha_0)/\alpha_0\big)$, set solely by $\alpha_0$. Unlike the reference, we fix the dimensionless linear coefficient $C_a$ to a convenient value rather than to its Ergun value, which lets the drag magnitude and $\Reyn$ be varied independently. Since $\sigma(\alpha,\cdot)$ is not differentiable at $\boldsymbol{u}=\boldsymbol{0}$, the drag modulus is evaluated in the computations as $(\lvert\boldsymbol{u}\rvert^2+u_\varepsilon^2)^{1/2}$ with a fixed, mesh{\hyp}independent $u_\varepsilon$ at least three orders of magnitude below the velocity scale $U$ of each case---a plain smoothing of $\lvert\boldsymbol{u}\rvert$, not a mesh{\hyp}dependent floor, so that every mesh solves the same drag law---which makes $\boldsymbol{u}\mapsto\sigma(\alpha,\boldsymbol{u})\boldsymbol{u}$ of class $C^1$ and the Newton linearization well defined. The two values $\alpha_0 \in \{0.5, 0.1\}$ then correspond to $\Damk \approx 2$ and $\Damk \approx 40$ (moderate and strong drag, respectively), which we combine with $\Reyn \in \{1, 10^5\}$ to span the viscosity{\hyp} and convection{\hyp}dominated regimes.
 
-We compare four discretizations on a sequence of structured triangular meshes, obtained by successively halving the nodal distance from a $10\times10$ grid up to $320 \times 320$: our equal{\hyp}order stabilized method with linear ($\mathbb{P}_1/\mathbb{P}_1$) and quadratic ($\mathbb{P}_2/\mathbb{P}_2$) elements, in both its ASGS and OSGS variants; and the unstabilized Galerkin Taylor{\hyp}Hood pair ($\mathbb{P}_2/\mathbb{P}_1$), which satisfies the inf{\hyp}sup condition and is the element used in~\cite{cocquet2021error}; and the same inf{\hyp}sup{\hyp}stable pair with our stabilization active, as a control. All four are carried through the full ladder to $320\times320$, so every slope and every finest{\hyp}mesh error below is measured on the same sequence. In every case the porosity is evaluated analytically at the quadrature points, as in the other experiments of this section. As in the other two{\hyp}dimensional experiments, the equal{\hyp}order runs use the stabilization constants $c_1 = 4k^4$ and $c_2 = 2k^2$ (the triangular value, since $C_\mathrm{inv}$ is that of the two{\hyp}dimensional simplex) and take the same negligible $\varepsilon = 10^{-8}$ as in \cref{sec:NumericalExamplesStationaryCase2D}, leaving the additive constant of the pressure fixed only to within that penalty and measuring the pressure error against the zero{\hyp}mean representative of the discrete solution. \Cref{tab:CocquetMMSL2,tab:CocquetMMSH1} collect the observed convergence rates (computed from the two finest meshes) and the finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm and the $H^1${\hyp}seminorm.
+We compare four discretizations on a sequence of structured triangular meshes, obtained by successively halving the nodal distance from a $10\times10$ grid up to $320 \times 320$: our equal{\hyp}order stabilized method with linear ($\mathbb{P}_1/\mathbb{P}_1$) and quadratic ($\mathbb{P}_2/\mathbb{P}_2$) elements, in both its ASGS and OSGS variants; and the unstabilized Galerkin Taylor{\hyp}Hood pair ($\mathbb{P}_2/\mathbb{P}_1$), which satisfies the inf{\hyp}sup condition and is the element used in~\cite{cocquet2021error}; and the same inf{\hyp}sup{\hyp}stable pair with our stabilization active, as a control. All four are carried through the full ladder to $320\times320$, so every slope and every finest{\hyp}mesh error below is measured on the same sequence. In every case the porosity is evaluated analytically at the quadrature points, as in the other experiments of this section. As in the other two{\hyp}dimensional experiments, the equal{\hyp}order runs use the stabilization constants $c_1 = 4k^4$ and $c_2 = 2k^2$ (the triangular value, since $C_\mathrm{inv}$ is that of the two{\hyp}dimensional simplex) and take the same negligible $\varepsilon = 10^{-8}$ as in \cref{sec:NumericalExamplesStationaryCase2D}, leaving the additive constant of the pressure fixed only to within that penalty and measuring the pressure error against the zero{\hyp}mean representative of the discrete solution. \Cref{tab:CocquetMMS} collects the observed convergence rates (computed from the two finest meshes) and the finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm and the $H^1${\hyp}seminorm.
 
 \begin{table}[!htbp]
-    \centering
-    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$~TH is the unstabilized Galerkin Taylor{\hyp}Hood element, and $\mathbb{P}_2/\mathbb{P}_1$~ASGS is the \emph{same} inf{\hyp}sup{\hyp}stable pair with the residual stabilization active (a convection{\hyp}stabilized Taylor{\hyp}Hood control, so that the effect of the stabilization can be separated from that of the velocity{\hyp}pressure pair). The reference slope in parentheses is $k_u+1$ for the velocity; for the pressure it is the worst{\hyp}case bound rate $k_p$ of the analysis for the equal{\hyp}order pairs---which the observed and interpolant rows may exceed by one order---and the interpolation{\hyp}optimal $k_p+1$ for the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair. \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text).}
-    \begin{tabular}{c c l r r r r}
-    \toprule
-    & & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
-    \cmidrule(lr){4-5}\cmidrule(lr){6-7}
-    $\Reyn$ & $\alpha_0$ & \multicolumn{1}{c}{method} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} \\
-    \midrule
-    $1$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.95}~(2) & \num{1.33e-4} & \num{1.85}~(1) & \num{7.48e-3} \\
-        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.99}~(2) & \num{5.63e-5} & \num{1.99}~(1) & \num{1.78e-3} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.18}~(3) & \num{3.42e-7} & \num{2.02}~(2) & \num{1.83e-4} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.02}~(3) & \num{2.88e-7} & \num{1.90}~(2) & \num{1.77e-4} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{3.24}~(3) & \num{2.85e-7} & \num{2.92}~(2) & \num{4.17e-6} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{3.18}~(3) & \num{3.45e-7} & \num{2.75}~(2) & \num{5.23e-6} \\
-        &       & $\mathbb{P}_1$ interp. & \num{2.00} & \num{3.26e-5} & \num{2.00} & \num{9.84e-6} \\
-        &       & $\mathbb{P}_2$ interp. & \num{2.99} & \num{2.86e-7} & \num{3.00} & \num{8.60e-9} \\
-    \midrule
-    $1$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.87}~(2) & \num{5.33e-4} & \num{1.76}~(1) & \num{4.68e-2} \\
-        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.98}~(2) & \num{2.04e-4} & \num{1.98}~(1) & \num{1.16e-2} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.10}~(3) & \num{2.44e-6} & \num{2.04}~(2) & \num{1.18e-3} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.03}~(3) & \num{1.85e-6} & \num{1.80}~(2) & \num{1.10e-3} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{2.97}~(3) & \num{1.83e-6} & \num{3.73}~(2) & \num{9.52e-6} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{3.09}~(3) & \num{2.48e-6} & \num{2.98}~(2) & \num{3.76e-5} \\
-        &       & $\mathbb{P}_1$ interp. & \num{1.99} & \num{1.13e-4} & \num{2.00} & \num{9.84e-6} \\
-        &       & $\mathbb{P}_2$ interp. & \num{2.99} & \num{1.82e-6} & \num{3.00} & \num{8.60e-9} \\
-    \midrule
-    $10^5$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{2.13}~(2) & \num{1.54e-5} & \num{2.14}~(1) & \num{4.76e-6} \\
-           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{2.21}~(2) & \num{1.94e-5} & \num{2.11}~(1) & \num{5.71e-6} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.02}~(3) & \num{4.20e-7} & \num{2.86}~(2) & \num{9.95e-8} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.04}~(3) & \num{4.23e-7} & \num{3.05}~(2) & \num{1.07e-7} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{5.14e-1} & \num{2.00}~(2) & \num{9.84e-6} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{2.36}~(3) & \num{5.59e-6} & \num{2.00}~(2) & \num{4.02e-6} \\
-        &       & $\mathbb{P}_1$ interp. & \num{2.00} & \num{3.26e-5} & \num{2.00} & \num{9.84e-6} \\
-        &       & $\mathbb{P}_2$ interp. & \num{2.99} & \num{2.86e-7} & \num{3.00} & \num{8.60e-9} \\
-    \midrule
-    $10^5$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{3.01}~(2) & \num{2.28e-4} & \num{3.03}~(1) & \num{3.58e-5} \\
-           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{3.10}~(2) & \num{2.44e-4} & \num{3.12}~(1) & \num{3.85e-5} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.98}~(3) & \num{2.70e-6} & \num{2.73}~(2) & \num{5.96e-7} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.00}~(3) & \num{2.72e-6} & \num{3.00}~(2) & \num{6.87e-7} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.02e-1} & \num{2.00}~(2) & \num{9.84e-6} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{3.00}~(3) & \num{2.18e-5} & \num{2.53}~(2) & \num{4.81e-6} \\
-        &       & $\mathbb{P}_1$ interp. & \num{1.99} & \num{1.13e-4} & \num{2.00} & \num{9.84e-6} \\
-        &       & $\mathbb{P}_2$ interp. & \num{2.99} & \num{1.82e-6} & \num{3.00} & \num{8.60e-9} \\
-    \bottomrule
-    \end{tabular}
-    \label{tab:CocquetMMSL2}
+\centering
+\caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $L^2${\hyp}norm and the $H^1${\hyp}seminorm, computed from the two finest meshes. The $\mathbb{P}_1/\mathbb{P}_1$ and $\mathbb{P}_2/\mathbb{P}_2$ rows are the equal{\hyp}order stabilized method (ASGS/OSGS); $\mathbb{P}_2/\mathbb{P}_1$~TH is the unstabilized Galerkin Taylor{\hyp}Hood element, and $\mathbb{P}_2/\mathbb{P}_1$~ASGS is the \emph{same} inf{\hyp}sup{\hyp}stable pair with the residual stabilization active (a convection{\hyp}stabilized Taylor{\hyp}Hood control, so that the effect of the stabilization can be separated from that of the velocity{\hyp}pressure pair). The reference slope in parentheses next to each observed value follows the convention of \cref{tab:Linear2D}---$k_u+1$ and $k_u$ for the velocity, and the worst{\hyp}case bound rates $k_p$ and $k_p-1$ for the pressure, in the two norms respectively, a dash where none is positive---which the observed and interpolant rows may exceed by one order, save for the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood pair, whose pressure references are the interpolation{\hyp}optimal $k_p+1$ and $k_p$. \emph{n.c.}: the Taylor{\hyp}Hood velocity does not converge under refinement (its error stagnates at the tabulated $O(1)$ FME). At $(\Reyn,\alpha_0)=(10^5,0.1)$ the stabilized iteration converges only on the finer meshes; the slopes there are two{\hyp}mesh estimates (see text)}
+\label{tab:CocquetMMS}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{l*{8}{r}}
+\toprule
+{} & \multicolumn{4}{c}{$L^2${\hyp}norm} & \multicolumn{4}{c}{$H^1${\hyp}seminorm} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+{} & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+\multicolumn{1}{c}{method} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} \\
+\midrule
+\multicolumn{9}{l}{\textit{$\Reyn = 1$, $\alpha_0 = 0.5$}} \\
+$\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.95}~(2) & \num{1.3e-4} & \num{1.85}~(1) & \num{7.5e-3} & \num{1.03}~(1) & \num{3.5e-2} & \num{1.66}~($-$) & \num{6.3e-1} \\
+$\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.99}~(2) & \num{5.6e-5} & \num{1.99}~(1) & \num{1.8e-3} & \num{1.00}~(1) & \num{3.5e-2} & \num{1.46}~($-$) & \num{2.3e-1} \\
+$\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.18}~(3) & \num{3.4e-7} & \num{2.02}~(2) & \num{1.8e-4} & \num{2.08}~(2) & \num{7.1e-4} & \num{0.98}~(1) & \num{5.1e-1} \\
+$\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.02}~(3) & \num{2.9e-7} & \num{1.90}~(2) & \num{1.8e-4} & \num{2.01}~(2) & \num{6.6e-4} & \num{0.91}~(1) & \num{5.0e-1} \\
+$\mathbb{P}_2/\mathbb{P}_1$ TH & \num{3.24}~(3) & \num{2.9e-7} & \num{2.92}~(2) & \num{4.2e-6} & \num{1.99}~(2) & \num{6.6e-4} & \num{1.05}~(1) & \num{1.1e-2} \\
+$\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{3.18}~(3) & \num{3.5e-7} & \num{2.75}~(2) & \num{5.2e-6} & \num{2.09}~(2) & \num{7.2e-4} & \num{1.05}~(1) & \num{1.1e-2} \\
+$\mathbb{P}_1$ interp. & \num{2.00} & \num{3.3e-5} & \num{2.00} & \num{9.8e-6} & \num{1.00} & \num{3.5e-2} & \num{1.00} & \num{1.1e-2} \\
+$\mathbb{P}_2$ interp. & \num{2.99} & \num{2.9e-7} & \num{3.00} & \num{8.6e-9} & \num{1.99} & \num{6.6e-4} & \num{2.00} & \num{2.1e-5} \\
+\midrule
+\multicolumn{9}{l}{\textit{$\Reyn = 1$, $\alpha_0 = 0.1$}} \\
+$\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.87}~(2) & \num{5.3e-4} & \num{1.76}~(1) & \num{4.7e-2} & \num{1.05}~(1) & \num{1.2e-1} & \num{1.64}~($-$) & \num{4.8} \\
+$\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.98}~(2) & \num{2.0e-4} & \num{1.98}~(1) & \num{1.2e-2} & \num{1.01}~(1) & \num{1.2e-1} & \num{1.98}~($-$) & \num{1.2} \\
+$\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.10}~(3) & \num{2.4e-6} & \num{2.04}~(2) & \num{1.2e-3} & \num{2.04}~(2) & \num{4.8e-3} & \num{0.97}~(1) & \num{3.2} \\
+$\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.03}~(3) & \num{1.9e-6} & \num{1.80}~(2) & \num{1.1e-3} & \num{2.01}~(2) & \num{4.2e-3} & \num{0.82}~(1) & \num{3.1} \\
+$\mathbb{P}_2/\mathbb{P}_1$ TH & \num{2.97}~(3) & \num{1.8e-6} & \num{3.73}~(2) & \num{9.5e-6} & \num{1.98}~(2) & \num{4.2e-3} & \num{1.48}~(1) & \num{1.1e-2} \\
+$\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{3.09}~(3) & \num{2.5e-6} & \num{2.98}~(2) & \num{3.8e-5} & \num{2.05}~(2) & \num{4.9e-3} & \num{1.92}~(1) & \num{1.2e-2} \\
+$\mathbb{P}_1$ interp. & \num{1.99} & \num{1.1e-4} & \num{2.00} & \num{9.8e-6} & \num{0.99} & \num{1.2e-1} & \num{1.00} & \num{1.1e-2} \\
+$\mathbb{P}_2$ interp. & \num{2.99} & \num{1.8e-6} & \num{3.00} & \num{8.6e-9} & \num{1.99} & \num{4.2e-3} & \num{2.00} & \num{2.1e-5} \\
+\midrule
+\multicolumn{9}{l}{\textit{$\Reyn = 10^5$, $\alpha_0 = 0.5$}} \\
+$\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{2.13}~(2) & \num{1.5e-5} & \num{2.14}~(1) & \num{4.8e-6} & \num{1.01}~(1) & \num{3.5e-2} & \num{1.00}~($-$) & \num{1.1e-2} \\
+$\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{2.21}~(2) & \num{1.9e-5} & \num{2.11}~(1) & \num{5.7e-6} & \num{1.03}~(1) & \num{3.5e-2} & \num{1.00}~($-$) & \num{1.1e-2} \\
+$\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{3.02}~(3) & \num{4.2e-7} & \num{2.86}~(2) & \num{1.0e-7} & \num{2.06}~(2) & \num{1.0e-3} & \num{1.84}~(1) & \num{2.5e-4} \\
+$\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.04}~(3) & \num{4.2e-7} & \num{3.05}~(2) & \num{1.1e-7} & \num{2.07}~(2) & \num{1.0e-3} & \num{2.01}~(1) & \num{2.6e-4} \\
+$\mathbb{P}_2/\mathbb{P}_1$ TH & n.c. & \num{5.1e-1} & \num{2.00}~(2) & \num{9.8e-6} & n.c. & \num{6.3} & \num{1.00}~(1) & \num{1.1e-2} \\
+$\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{2.36}~(3) & \num{5.6e-6} & \num{2.00}~(2) & \num{4.0e-6} & \num{1.32}~(2) & \num{1.5e-2} & \num{1.00}~(1) & \num{1.1e-2} \\
+$\mathbb{P}_1$ interp. & \num{2.00} & \num{3.3e-5} & \num{2.00} & \num{9.8e-6} & \num{1.00} & \num{3.5e-2} & \num{1.00} & \num{1.1e-2} \\
+$\mathbb{P}_2$ interp. & \num{2.99} & \num{2.9e-7} & \num{3.00} & \num{8.6e-9} & \num{1.99} & \num{6.6e-4} & \num{2.00} & \num{2.1e-5} \\
+\midrule
+\multicolumn{9}{l}{\textit{$\Reyn = 10^5$, $\alpha_0 = 0.1$}} \\
+$\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{3.01}~(2) & \num{2.3e-4} & \num{3.03}~(1) & \num{3.6e-5} & \num{1.06}~(1) & \num{1.2e-1} & \num{1.10}~($-$) & \num{1.1e-2} \\
+$\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{3.10}~(2) & \num{2.4e-4} & \num{3.12}~(1) & \num{3.9e-5} & \num{1.10}~(1) & \num{1.2e-1} & \num{1.15}~($-$) & \num{1.1e-2} \\
+$\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.98}~(3) & \num{2.7e-6} & \num{2.73}~(2) & \num{6.0e-7} & \num{2.01}~(2) & \num{6.6e-3} & \num{1.66}~(1) & \num{1.5e-3} \\
+$\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{3.00}~(3) & \num{2.7e-6} & \num{3.00}~(2) & \num{6.9e-7} & \num{2.04}~(2) & \num{6.6e-3} & \num{1.93}~(1) & \num{1.7e-3} \\
+$\mathbb{P}_2/\mathbb{P}_1$ TH & n.c. & \num{4.0e-1} & \num{2.00}~(2) & \num{9.8e-6} & n.c. & \num{5.0} & \num{1.00}~(1) & \num{1.1e-2} \\
+$\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{3.00}~(3) & \num{2.2e-5} & \num{2.53}~(2) & \num{4.8e-6} & \num{1.65}~(2) & \num{3.1e-2} & \num{1.00}~(1) & \num{1.1e-2} \\
+$\mathbb{P}_1$ interp. & \num{1.99} & \num{1.1e-4} & \num{2.00} & \num{9.8e-6} & \num{0.99} & \num{1.2e-1} & \num{1.00} & \num{1.1e-2} \\
+$\mathbb{P}_2$ interp. & \num{2.99} & \num{1.8e-6} & \num{3.00} & \num{8.6e-9} & \num{1.99} & \num{4.2e-3} & \num{2.00} & \num{2.1e-5} \\
+\bottomrule
+\end{tabular}
 \end{table}
-
-\begin{table}[!htbp]
-    \centering
-    \caption{Manufactured DBF comparison: observed convergence rates (slope) and normalized finest{\hyp}mesh error (FME) in the $H^1${\hyp}seminorm, computed from the two finest meshes. Rows and notation as in \cref{tab:CocquetMMSL2}, with the reference slope in parentheses next to each observed value: $k_u$ for the velocity, and for the pressure the worst{\hyp}case bound rate $k_p-1$ for the equal{\hyp}order pairs and $k_p$ for the Taylor{\hyp}Hood pair (a dash denotes that no positive rate is guaranteed).}
-    \begin{tabular}{c c l r r r r}
-    \toprule
-    & & & \multicolumn{2}{c}{velocity} & \multicolumn{2}{c}{pressure} \\
-    \cmidrule(lr){4-5}\cmidrule(lr){6-7}
-    $\Reyn$ & $\alpha_0$ & \multicolumn{1}{c}{method} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} & \multicolumn{1}{c}{slope} & \multicolumn{1}{c}{FME} \\
-    \midrule
-    $1$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.03}~(1) & \num{3.53e-2} & \num{1.66}~($-$) & \num{6.27e-1} \\
-        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.00}~(1) & \num{3.50e-2} & \num{1.46}~($-$) & \num{2.31e-1} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.08}~(2) & \num{7.12e-4} & \num{0.98}~(1) & \num{5.10e-1} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01}~(2) & \num{6.62e-4} & \num{0.91}~(1) & \num{4.98e-1} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.99}~(2) & \num{6.59e-4} & \num{1.05}~(1) & \num{1.09e-2} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{2.09}~(2) & \num{7.18e-4} & \num{1.05}~(1) & \num{1.09e-2} \\
-        &       & $\mathbb{P}_1$ interp. & \num{1.00} & \num{3.50e-2} & \num{1.00} & \num{1.09e-2} \\
-        &       & $\mathbb{P}_2$ interp. & \num{1.99} & \num{6.59e-4} & \num{2.00} & \num{2.11e-5} \\
-    \midrule
-    $1$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.05}~(1) & \num{1.24e-1} & \num{1.64}~($-$) & \num{4.75} \\
-        &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.01}~(1) & \num{1.21e-1} & \num{1.98}~($-$) & \num{1.15} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.04}~(2) & \num{4.78e-3} & \num{0.97}~(1) & \num{3.24} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.01}~(2) & \num{4.23e-3} & \num{0.82}~(1) & \num{3.08} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & \num{1.98}~(2) & \num{4.19e-3} & \num{1.48}~(1) & \num{1.10e-2} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{2.05}~(2) & \num{4.86e-3} & \num{1.92}~(1) & \num{1.24e-2} \\
-        &       & $\mathbb{P}_1$ interp. & \num{0.99} & \num{1.21e-1} & \num{1.00} & \num{1.09e-2} \\
-        &       & $\mathbb{P}_2$ interp. & \num{1.99} & \num{4.19e-3} & \num{2.00} & \num{2.11e-5} \\
-    \midrule
-    $10^5$ & $0.5$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.01}~(1) & \num{3.50e-2} & \num{1.00}~($-$) & \num{1.09e-2} \\
-           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.03}~(1) & \num{3.53e-2} & \num{1.00}~($-$) & \num{1.09e-2} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.06}~(2) & \num{1.02e-3} & \num{1.84}~(1) & \num{2.47e-4} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.07}~(2) & \num{1.02e-3} & \num{2.01}~(1) & \num{2.64e-4} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{6.34}    & \num{1.00}~(1) & \num{1.09e-2} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{1.32}~(2) & \num{1.47e-2} & \num{1.00}~(1) & \num{1.09e-2} \\
-        &       & $\mathbb{P}_1$ interp. & \num{1.00} & \num{3.50e-2} & \num{1.00} & \num{1.09e-2} \\
-        &       & $\mathbb{P}_2$ interp. & \num{1.99} & \num{6.59e-4} & \num{2.00} & \num{2.11e-5} \\
-    \midrule
-    $10^5$ & $0.1$ & $\mathbb{P}_1/\mathbb{P}_1$ ASGS & \num{1.06}~(1) & \num{1.21e-1} & \num{1.10}~($-$) & \num{1.10e-2} \\
-           &       & $\mathbb{P}_1/\mathbb{P}_1$ OSGS & \num{1.10}~(1) & \num{1.22e-1} & \num{1.15}~($-$) & \num{1.10e-2} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ ASGS & \num{2.01}~(2) & \num{6.59e-3} & \num{1.66}~(1) & \num{1.46e-3} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_2$ OSGS & \num{2.04}~(2) & \num{6.60e-3} & \num{1.93}~(1) & \num{1.68e-3} \\
-           &       & $\mathbb{P}_2/\mathbb{P}_1$ TH   & n.c.       & \num{4.96}    & \num{1.00}~(1) & \num{1.09e-2} \\
-        &       & $\mathbb{P}_2/\mathbb{P}_1$ ASGS & \num{1.65}~(2) & \num{3.14e-2} & \num{1.00}~(1) & \num{1.09e-2} \\
-        &       & $\mathbb{P}_1$ interp. & \num{0.99} & \num{1.21e-1} & \num{1.00} & \num{1.09e-2} \\
-        &       & $\mathbb{P}_2$ interp. & \num{1.99} & \num{4.19e-3} & \num{2.00} & \num{2.11e-5} \\
-    \bottomrule
-    \end{tabular}
-    \label{tab:CocquetMMSH1}
-\end{table}
-
 \paragraph{Viscosity{\hyp}dominated flows} In this regime ($\Reyn = 1$) all four discretizations behave alike: the velocity converges at the optimal rate for all of them and at both porosities, and the equal{\hyp}order stabilized method matches the accuracy of the more elaborate Taylor{\hyp}Hood pair in the velocity, with the inf{\hyp}sup{\hyp}stable pair being more accurate in the pressure, as befits a discretization with a dedicated pressure space. As in the previous examples, the ASGS and OSGS variants are practically indistinguishable. Lowering $\alpha_0$ from $0.5$ to $0.1$ degrades the accuracy: the velocity error grows in step with its interpolation reference, while the $L^2$ pressure error grows by about a factor of six---some $2.8$ times the factor $(0.5/0.1)^{1/2}\approx2.2$ by which the porosity weight $\alpha_0^{-1/2}$ of \cref{sec:Robustness} grows between the two porosities. The excess is carried by the velocity{\hyp}error coupling that the same estimate contains (the $\tau_2^{1/2}\mathrm{E}_{\mathrm{int}}(\boldsymbol{u})$ term, whose interpolation error grows at low porosity), just as in the two{\hyp}dimensional experiments of \cref{sec:NumericalExamplesStationaryCase2D}, where the same excess over $\alpha_0^{-1/2}$ appears at \emph{fixed} $\Damk$. The porosity is not cleanly isolated here---\cref{eq:CocquetMMSReaction} ties $\Damk$ to $\alpha_0$, raising it from $\approx2$ to $\approx40$ as $\alpha_0$ falls---but that stronger drag would, by the mitigation factor of \cref{eq:DominantReactionPressureGradientEstimate}, if anything \emph{reduce} the pressure error, so it does not account for the growth observed.
 
-\paragraph{Convection{\hyp}dominated flows} This regime ($\Reyn = 10^5$) is where the two approaches part ways. The unstabilized Taylor{\hyp}Hood velocity fails to converge: although the $\mathbb{P}_2/\mathbb{P}_1$ pair is inf{\hyp}sup stable, the Galerkin form provides no control over the dominant convective term, and the velocity error stagnates at an $O(1)$ value on every mesh (marked \emph{n.c.}\ in the tables); its pressure nonetheless remains on the interpolation benchmark at the optimal $L^2$ rate---notable, since the standard mixed a priori estimate would let a non-convergent velocity pollute it. The equal{\hyp}order stabilized method, in contrast, retains optimal velocity and pressure convergence at $\alpha_0 = 0.5$, which is precisely the robustness that the stabilization is designed to provide. To confirm that this gain comes from the residual stabilization rather than from the choice of velocity{\hyp}pressure pair, we also apply the ASGS stabilization to the \emph{same} inf{\hyp}sup{\hyp}stable $\mathbb{P}_2/\mathbb{P}_1$ pair ($\mathbb{P}_2/\mathbb{P}_1$~ASGS in the tables): it converges at $\Reyn=10^5$, exactly where the unstabilized Taylor{\hyp}Hood pair stagnates---at the optimal pressure rates in both norms and at both porosities, and at velocity rates that reach the optimum in $L^2$ at $\alpha_0=0.1$ but stay below it elsewhere ($2.36$ against $3$ in $L^2$ and $1.32$ against $2$ in $H^1$ at $\alpha_0=0.5$, and $1.65$ against $2$ in $H^1$ at $\alpha_0=0.1$). These shortfalls are stable under refinement---over the previous mesh doubling the same two read $2.41$ and $1.26$---so they are a property of the stabilized pair in this regime rather than a pre{\hyp}asymptotic transient. This is the one place in the campaign where the velocity rate falls short, and the estimates of \cref{sec:Robustness} locate the mechanism---for the velocity \emph{gradient}, which is the quantity they control. For a pair with $k_p=k_u-1$---which \cref{H:spaces} admits, so that the analysis does cover this control---the pressure interpolation error enters the velocity control of the convection{\hyp}dominated estimate \cref{eq:ConvergenceResultDominantConvection} as $\mathrm{E}_\mathrm{int}(p)/h=O(h^{k_p})$, one order below the velocity contribution $\mathrm{E}_\mathrm{int}(\boldsymbol{u})/h=O(h^{k_u})$, and therefore dominates it under refinement; in the viscosity{\hyp}dominated estimate \cref{eq:ConvergenceResultDominantViscosity} the same term appears at $\mathrm{E}_\mathrm{int}(p)=O(h^{k_p+1})$, one power of $h$ higher, so that it lands on the velocity order instead; and for equal order the two contributions coincide in either regime. Being one{\hyp}sided, these bounds permit the observed rates without predicting them, but two features of the experiment point to this mechanism. First, the $H^1$ shortfall appears only where $k_p<k_u$ \emph{and} convection dominates: the equal{\hyp}order rows keep their velocity rate at the same Reynolds number, and this same control converges at its optimal velocity rate at $\Reyn=1$ ($2.09$ and $2.05$ against $2$ in the $H^1${\hyp}seminorm). Second, the $\mathbb{P}_2/\mathbb{P}_1$ pressure converges at its own optimal rate and the velocity error is of the size of that pressure error rather than of the accuracy the mesh affords: at $\alpha_0=0.5$ and $N=320$, $\num{1.47e-2}$ in the $H^1${\hyp}seminorm against a pressure error of $\num{1.09e-2}$, where the equal{\hyp}order $\mathbb{P}_2/\mathbb{P}_2$ pair reaches $\num{1.02e-3}$ on the same mesh. The $L^2$ velocity norm is not among the quantities \cref{eq:ConvergenceResultDominantConvection} controls, and its behavior is correspondingly less uniform across the two porosities; we report it as an observation. None of this bears on residual stabilization of inf{\hyp}sup{\hyp}stable pairs in general: the parameters \cref{eq:Tau1,eq:Tau2} are used here in the equal{\hyp}order calibration, carried over unchanged. In the viscosity{\hyp}dominated regime, by contrast, the stabilization is a redundant perturbation on an already stable pair and costs accuracy: at the common finest mesh $N=320$, the stabilized control is a factor of about $1.2$ ($\alpha_0=0.5$: $\num{3.45e-7}$ against $\num{2.85e-7}$) to $1.4$ ($\alpha_0=0.1$: $\num{2.48e-6}$ against $\num{1.83e-6}$) less accurate than the unstabilized one in the $L^2$ velocity error---the residual stabilization being calibrated for the equal{\hyp}order (inf{\hyp}sup{\hyp}unstable) case. The high{\hyp}Reynolds gain is therefore attributable to the convection stabilization itself, not to the equal{\hyp}order spaces. At the most demanding corner, $(\Reyn,\alpha_0) = (10^5, 0.1)$, the combination of strong drag and high Reynolds number prevents the tested nonlinear solvers from converging on the coarser meshes: the stabilized nonlinear iteration does not converge there (whether a discrete root is absent or merely hard to reach is not determined here), but once these are refined enough to resolve the solution it recovers accurate solutions, whereas Taylor{\hyp}Hood does not converge at this corner either. The mesh at which convergence sets in differs from row to row---the linear equal{\hyp}order rows recover only on the two finest meshes, the quadratic ones and the $\mathbb{P}_2/\mathbb{P}_1$ control earlier---so the slopes at this corner are measured in a pre{\hyp}asymptotic range and should be read as such; the pertinent observation is that the stabilized method delivers an accurate solution there while the unstabilized one does not.
+\paragraph{Convection{\hyp}dominated flows} This regime ($\Reyn = 10^5$) is where the two approaches part ways. The unstabilized Taylor{\hyp}Hood velocity fails to converge: although the $\mathbb{P}_2/\mathbb{P}_1$ pair is inf{\hyp}sup stable, the Galerkin form provides no control over the dominant convective term, and the velocity error stagnates at an $O(1)$ value on every mesh (marked \emph{n.c.}\ in the table); its pressure nonetheless remains on the interpolation benchmark at the optimal $L^2$ rate---notable, since the standard mixed a priori estimate would let a non-convergent velocity pollute it. The equal{\hyp}order stabilized method, in contrast, retains optimal velocity and pressure convergence at $\alpha_0 = 0.5$, which is precisely the robustness that the stabilization is designed to provide. To confirm that this gain comes from the residual stabilization rather than from the choice of velocity{\hyp}pressure pair, we also apply the ASGS stabilization to the \emph{same} inf{\hyp}sup{\hyp}stable $\mathbb{P}_2/\mathbb{P}_1$ pair ($\mathbb{P}_2/\mathbb{P}_1$~ASGS in the table): it converges at $\Reyn=10^5$, exactly where the unstabilized Taylor{\hyp}Hood pair stagnates---at the optimal pressure rates in both norms and at both porosities, and at velocity rates that reach the optimum in $L^2$ at $\alpha_0=0.1$ but stay below it elsewhere ($2.36$ against $3$ in $L^2$ and $1.32$ against $2$ in $H^1$ at $\alpha_0=0.5$, and $1.65$ against $2$ in $H^1$ at $\alpha_0=0.1$). These shortfalls are stable under refinement---over the previous mesh doubling the same two read $2.41$ and $1.26$---so they are a property of the stabilized pair in this regime rather than a pre{\hyp}asymptotic transient. This is the one place in the campaign where the velocity rate falls short, and the estimates of \cref{sec:Robustness} locate the mechanism---for the velocity \emph{gradient}, which is the quantity they control. For a pair with $k_p=k_u-1$---which \cref{H:spaces} admits, so that the analysis does cover this control---the pressure interpolation error enters the velocity control of the convection{\hyp}dominated estimate \cref{eq:ConvergenceResultDominantConvection} as $\mathrm{E}_\mathrm{int}(p)/h=O(h^{k_p})$, one order below the velocity contribution $\mathrm{E}_\mathrm{int}(\boldsymbol{u})/h=O(h^{k_u})$, and therefore dominates it under refinement; in the viscosity{\hyp}dominated estimate \cref{eq:ConvergenceResultDominantViscosity} the same term appears at $\mathrm{E}_\mathrm{int}(p)=O(h^{k_p+1})$, one power of $h$ higher, so that it lands on the velocity order instead; and for equal order the two contributions coincide in either regime. Being one{\hyp}sided, these bounds permit the observed rates without predicting them, but two features of the experiment point to this mechanism. First, the $H^1$ shortfall appears only where $k_p<k_u$ \emph{and} convection dominates: the equal{\hyp}order rows keep their velocity rate at the same Reynolds number, and this same control converges at its optimal velocity rate at $\Reyn=1$ ($2.09$ and $2.05$ against $2$ in the $H^1${\hyp}seminorm). Second, the $\mathbb{P}_2/\mathbb{P}_1$ pressure converges at its own optimal rate and the velocity error is of the size of that pressure error rather than of the accuracy the mesh affords: at $\alpha_0=0.5$ and $N=320$, $\num{1.5e-2}$ in the $H^1${\hyp}seminorm against a pressure error of $\num{1.1e-2}$, where the equal{\hyp}order $\mathbb{P}_2/\mathbb{P}_2$ pair reaches $\num{1.0e-3}$ on the same mesh. The $L^2$ velocity norm is not among the quantities \cref{eq:ConvergenceResultDominantConvection} controls, and its behavior is correspondingly less uniform across the two porosities; we report it as an observation. None of this bears on residual stabilization of inf{\hyp}sup{\hyp}stable pairs in general: the parameters \cref{eq:Tau1,eq:Tau2} are used here in the equal{\hyp}order calibration, carried over unchanged. In the viscosity{\hyp}dominated regime, by contrast, the stabilization is a redundant perturbation on an already stable pair and costs accuracy: at the common finest mesh $N=320$, the stabilized control is a factor of about $1.2$ ($\alpha_0=0.5$: $\num{3.5e-7}$ against $\num{2.9e-7}$) to $1.4$ ($\alpha_0=0.1$: $\num{2.5e-6}$ against $\num{1.8e-6}$) less accurate than the unstabilized one in the $L^2$ velocity error---the residual stabilization being calibrated for the equal{\hyp}order (inf{\hyp}sup{\hyp}unstable) case. The high{\hyp}Reynolds gain is therefore attributable to the convection stabilization itself, not to the equal{\hyp}order spaces. At the most demanding corner, $(\Reyn,\alpha_0) = (10^5, 0.1)$, the combination of strong drag and high Reynolds number prevents the tested nonlinear solvers from converging on the coarser meshes: the stabilized nonlinear iteration does not converge there (whether a discrete root is absent or merely hard to reach is not determined here), but once these are refined enough to resolve the solution it recovers accurate solutions, whereas Taylor{\hyp}Hood does not converge at this corner either. The mesh at which convergence sets in differs from row to row---the linear equal{\hyp}order rows recover only on the two finest meshes, the quadratic ones and the $\mathbb{P}_2/\mathbb{P}_1$ control earlier---so the slopes at this corner are measured in a pre{\hyp}asymptotic range and should be read as such; the pertinent observation is that the stabilized method delivers an accurate solution there while the unstabilized one does not.
 
-Overall, the equal{\hyp}order stabilized method attains comparable velocity accuracy to the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood element in the reported DBF cases---Taylor{\hyp}Hood being more accurate in the pressure where it converges, i.e.\ in the viscosity{\hyp}dominated regime---without requiring a compatible velocity{\hyp}pressure pair, and it remains robust in the convection{\hyp}dominated regime in which the unstabilized Galerkin method loses stability. Taken on its own, this pairwise contrast does not separate the effect of the element pair from that of the stabilization, since the equal{\hyp}order method additionally carries residual convection stabilization that is absent from the Taylor{\hyp}Hood comparator; that is what the stabilized Taylor{\hyp}Hood control of \cref{tab:CocquetMMSL2,tab:CocquetMMSH1} was included to disentangle.
+Overall, the equal{\hyp}order stabilized method attains comparable velocity accuracy to the inf{\hyp}sup{\hyp}stable Taylor{\hyp}Hood element in the reported DBF cases---Taylor{\hyp}Hood being more accurate in the pressure where it converges, i.e.\ in the viscosity{\hyp}dominated regime---without requiring a compatible velocity{\hyp}pressure pair, and it remains robust in the convection{\hyp}dominated regime in which the unstabilized Galerkin method loses stability. Taken on its own, this pairwise contrast does not separate the effect of the element pair from that of the stabilization, since the equal{\hyp}order method additionally carries residual convection stabilization that is absent from the Taylor{\hyp}Hood comparator; that is what the stabilized Taylor{\hyp}Hood control of \cref{tab:CocquetMMS} was included to disentangle.
 
 \section{Conclusions}\label{sec:Conclusions}
 We have applied the VMS framework to generalize the formulation and analysis presented in~\cite{codina2001stabilized} to the porous Navier{\hyp}Stokes system, in such a way that the original method is recovered when $\alpha\equiv1$. By using the abstract notation introduced in later works on VMS~\cite{codina2018variational}, we have strived to make it clearer to the less versed reader how the whole process is largely systematic once the particular equations are fit to the general framework.

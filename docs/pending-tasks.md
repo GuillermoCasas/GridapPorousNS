@@ -430,7 +430,7 @@ optional provenance bookkeeping, not a blocker. Command if ever needed: `run_con
 Three audit-driven reruns were run and analyzed; verdicts recorded in [`findings.md`](findings.md) §8. Paper
 integration status:
 - **R5 — stabilized Taylor–Hood P2/P1 control** (audit D05): **✅ DONE + ported into `article_v2.tex`** as the
-  `P2/P1 ASGS` rows of `tab:CocquetMMSL2/H1` (commit `384362f`), **and into `article.tex` v1 on 2026-07-30** —
+  `P2/P1 ASGS` rows of `tab:CocquetMMS` (commit `384362f`), **and into `article.tex` v1 on 2026-07-30** —
   v1 always carried the same four rows, so the earlier "not yet ported / v1 has no such rows" note was wrong
   (see the checklist correction and `lessons_learned.md` 2026-07-30 (d)). Verdict: it converges at Re=10⁵ where
   the unstabilized-TH velocity stagnates, isolating the high-Re gain to the **stabilization** rather than the
@@ -439,7 +439,7 @@ integration status:
   (α₀=0.1); both mains print it and the mesh caveats are gone.
 - **R6 — genuinely-3D MMS** (audit N19): grid ran (`results/k*/TET/genuine3d/`), verdict optimal rates for both
   orders + OSGS pressure H¹ converges (slope 2.0, unlike the extruded field's 1.29 plateau).
-  **✅ DONE + ported:** `theory/paper/genuine3d_table.tex` is `\input` after `tab:3DH1` in
+  **✅ DONE + ported:** `theory/paper/genuine3d_table.tex` is `\input` after `tab:3D` in
   `article_v2.tex` (v2 only, as with the R5 control), with a paragraph stating what the data shows.
   The author decision came out *add-alongside*: the genuine-3D `H¹` pressure errors stay `O(1)`
   (1.22–2.97) exactly as on the extruded field, so they **sharpen** the adverse 3D finding rather than
@@ -470,7 +470,7 @@ Remark 1.
 
 ### 7h. ✅ DONE (2026-07-31) — stabilized-Taylor--Hood control re-run to N=320 through the official path
 
-The `P₂/P₁ ASGS` rows of `tab:CocquetMMSL2/H1` were not on the published ladder: three cells stopped at
+The `P₂/P₁ ASGS` rows of `tab:CocquetMMS` were not on the published ladder: three cells stopped at
 `N=160` and the `(10⁵,0.1)` row came from the forked side-DB `results/debug_results/cocquet_stabth_corner.h5`,
 which `.agents/rules/official-results-path.md` forbids for published numbers. Mixing `N=160` against the other
 rows' `N=320` also manufactured a false headline ("about an order of magnitude less accurate").
