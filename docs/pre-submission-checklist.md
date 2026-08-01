@@ -184,6 +184,21 @@ and the source. Work the 🔴 first. "verify" = believed done but must be eyebal
 > 2026-07-21); the ξ imprecision is already disclosed there. **P7** date stamps in `.tex` comments —
 > all 13 are on comment lines, invisible in the PDF; fold into the flatten pass if ever.
 >
+> **✅ APPLIED 2026-08-01 (both mains + both App-D twins).** Two follow-ups to **C1/N1/S2**.
+> (a) *Unconstrained projection space, said once.* The rationale (target is `𝒳_h^proj`, whose members
+> need not vanish on `Γ_D`, so `π_h` is not pinned to zero there; projecting onto `𝒳_{h0}` instead
+> would drop (O2) but generates spurious near-wall layers, as in `codina2008analysis` Remark 1) was
+> stated in three places; it now lives in one footnote after `eq:L2InnerProduct`, the OSGS-space
+> bullet defers to it, the footnote to `eq:OSGSProblem` is gone, and `oa:sec:method` + `oa:rem:analyzed`(iv)
+> cite it instead of restating it — (iv) now reads "no difference". (b) *(A7)/(A9) gets a referent.*
+> The regularity assumption said "*the* exact solution" with nothing establishing that one exists:
+> §2's existence hedge is about the **nonlinear, mixed-BC, general-σ** problem, which `sec:WeakForm`
+> then explicitly declines to assert well-posedness for. Well-posedness of the *linearized* problem
+> is not a hypothesis but a two-line theorem — coercivity (viscous by (A3)'s Korn condition,
+> convection skew since `∇·(αa)=0`, reaction `≥0`) plus the α-weighted inf-sup, inherited from `α≡1`
+> through the isomorphism `v ↦ v/α` of (A4) — so it is now *stated* in a footnote to the assumption,
+> which assumes only the extra smoothness, genuinely unavailable on a polyhedral `Ω`.
+>
 > **VERIFIED FALSE / ARTIFACT — do NOT "fix".** **N4** (Damköhler≠Darcy is already stated at the
 > definition of `Da`), **S7** (there is no verification-process history in the article body),
 > **P6** (no ε/machine-ε collision inside the paper; only in one standalone note),

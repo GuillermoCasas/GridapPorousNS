@@ -82,11 +82,12 @@ $\Poneo \coloneqq I - \Pone$, $\Ptwoo \coloneqq I - \Ptwo$ the complementary
 (fluctuation) operators. We will also need $\Ponez$, the $\tau_1$-weighted projection
 onto the \emph{constrained} space $\mathcal{V}_{h0}$, which enters only the stability proof
 through the special test function, exactly as in~\cite{codina2008analysis}. Projecting onto the
-unconstrained spaces in the method matches both the implementation described
-in~the main text (footnote to the OSGS system there) and the discussion
-in~\cite[Remark~1]{codina2008analysis}: projecting onto the constrained spaces would simplify
-the analysis (assumption \cref{H:projection} would not be needed) but produces spurious numerical
-boundary layers.
+unconstrained spaces in the method is the choice made, and motivated, in~the main text in
+the discussion following \cref{eq:L2InnerProduct}; their product is the space written
+$\Xhproj$ there, on which the displayed OSGS projection is posed as well, and it is likewise
+the choice recommended in~\cite[Remark~1]{codina2008analysis}. It carries an analytical
+price: projecting onto the constrained spaces would simplify the analysis, since
+\cref{H:projection} would not be needed.
 
 The \emph{analyzed} OSGS method reads: find $U_h \in \Xhz$ such that
 \begin{equation}
@@ -187,10 +188,9 @@ with variable $\alpha$ it contributes $2\nu(\ViscProj\nabla\bu_h)\nabla\alpha$, 
 small under the resolution condition of \cref{H:porosity}. (iii)~\emph{Converged versus lagged
 projection}: the analysis takes the projection equation solved exactly (the coupled
 system), whereas the implementation lags the projection along the nonlinear iteration.
-(iv)~\emph{Unconstrained projection space}: analyzed and implemented formulations
-agree, both projecting onto $\mathcal{V}_h\times\mathcal{Q}_h$ without Dirichlet constraints
---- the space written $\Xhproj$ in~the main text, where the displayed OSGS projection is posed
-on it as well --- which is also the choice recommended by~\cite[Remark~1]{codina2008analysis}.
+(iv)~\emph{Unconstrained projection space}: no difference---analyzed and implemented
+formulations both project onto $\mathcal{V}_h\times\mathcal{Q}_h$ without Dirichlet
+constraints, as discussed in \cref{oa:sec:method}.
 (v)~\emph{Elementwise-constant versus pointwise parameters}: as for the ASGS analysis
 of~the main text, $\tau_{i}$ is elementwise constant in the analysis and pointwise
 variable in the computations.
